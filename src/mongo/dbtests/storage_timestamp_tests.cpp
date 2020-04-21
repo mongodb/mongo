@@ -63,6 +63,7 @@
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
@@ -2847,21 +2848,20 @@ public:
 };
 
 /**
- * There are a few scenarios where a primary will be using the IndexBuilder thread to build
- * indexes. Specifically, when a primary builds an index from an oplog entry which can happen on
- * primary catch-up, drain, a secondary step-up or `applyOps`.
- *
- * This test will exercise IndexBuilder code on primaries by performing an index build via an
- * `applyOps` command.
+ * This test exercises the code path in which a primary performs an index build via oplog
+ * application of a createIndexes oplog entry. In this code path, a primary timestamps the
+ * index build through applying the oplog entry, rather than creating an oplog entry.
  */
-class TimestampIndexBuilderOnPrimary : public StorageTimestampTest {
+class TimestampIndexOplogApplicationOnPrimary : public StorageTimestampTest {
 public:
     void run() {
-        // In order for applyOps to assign timestamps, we must be in non-replicated mode.
+        // In order for oplog application to assign timestamps, we must be in non-replicated mode
+        // and disable document validation.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
+        DisableDocumentValidation validationDisabler(_opCtx);
 
         std::string dbName = "unittest";
-        NamespaceString nss(dbName, "indexBuilderOnPrimary");
+        NamespaceString nss(dbName, "oplogApplicationOnPrimary");
         BSONObj doc = BSON("_id" << 1 << "field" << 1);
 
         const LogicalTime setupStart = _clock->reserveTicks(1);
@@ -2889,9 +2889,11 @@ public:
             assertDocumentAtTimestamp(coll, presentTs, doc);
         }
 
+        // Simulate a scenario where the node is a primary, but does not accept writes. This is
+        // the only scenario in which a primary can do an index build via oplog application, since
+        // the applyOps command no longer allows createIndexes (see SERVER-41554).
+        _coordinatorMock->alwaysAllowWrites(false);
         {
-            // Create an index via `applyOps`. Because this is a primary, the index build is
-            // timestamped with `startBuildTs`.
             const auto beforeBuildTime = _clock->reserveTicks(2);
             const auto startBuildTs = beforeBuildTime.addTicks(1).asTimestamp();
 
@@ -2904,28 +2906,39 @@ public:
                 origIdents = durableCatalog->getAllIdents(_opCtx);
             }
 
-            auto indexSpec =
-                BSON("createIndexes" << nss.coll() << "v" << static_cast<int>(kIndexVersion)
-                                     << "key" << BSON("field" << 1) << "name"
-                                     << "field_1");
+            auto keyPattern = BSON("field" << 1);
+            auto startBuildOpTime = repl::OpTime(startBuildTs, presentTerm);
+            UUID indexBuildUUID = UUID::gen();
 
-            auto createIndexOp = BSON("ts" << startBuildTs << "t" << 1LL << "v" << 2 << "op"
-                                           << "c"
-                                           << "ns" << nss.getCommandNS().ns() << "ui" << collUUID
-                                           << "wall" << Date_t() << "o" << indexSpec);
+            auto start = repl::makeStartIndexBuildOplogEntry(
+                startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
+            ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
+                _opCtx, &start, repl::OplogApplication::Mode::kSecondary));
 
-            ASSERT_OK(doAtomicApplyOps(nss.db().toString(), {createIndexOp}));
+            {
+                AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+                const std::string indexIdent =
+                    getNewIndexIdentAtTime(durableCatalog, origIdents, Timestamp::min());
+                assertIdentsMissingAtTimestamp(
+                    durableCatalog, "", indexIdent, beforeBuildTime.asTimestamp());
+                assertIdentsExistAtTimestamp(durableCatalog, "", indexIdent, startBuildTs);
 
+                // The index has not committed yet, so it is not ready.
+                RecordId catalogId = autoColl.getCollection()->getCatalogId();
+                ASSERT_FALSE(
+                    getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, startBuildTs),
+                                     "field_1")
+                        .ready);
+            }  // release read lock so commit index build oplog entry can take its own locks.
+
+            auto commit = repl::makeCommitIndexBuildOplogEntry(
+                startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
+            ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
+                _opCtx, &commit, repl::OplogApplication::Mode::kSecondary));
+
+            // Reacquire read lock to check index metadata.
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
             RecordId catalogId = autoColl.getCollection()->getCatalogId();
-            const std::string indexIdent =
-                getNewIndexIdentAtTime(durableCatalog, origIdents, Timestamp::min());
-            assertIdentsMissingAtTimestamp(
-                durableCatalog, "", indexIdent, beforeBuildTime.asTimestamp());
-            assertIdentsExistAtTimestamp(durableCatalog, "", indexIdent, startBuildTs);
-
-            // On a primary, the index build should start and finish at `startBuildTs` because it is
-            // built in the foreground.
             ASSERT_TRUE(getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, startBuildTs),
                                          "field_1")
                             .ready);
@@ -3872,7 +3885,7 @@ public:
         addIf<TimestampMultiIndexBuildsDuringRename>();
         addIf<TimestampAbortIndexBuild>();
         addIf<TimestampIndexDrops>();
-        addIf<TimestampIndexBuilderOnPrimary>();
+        addIf<TimestampIndexOplogApplicationOnPrimary>();
         addIf<SecondaryReadsDuringBatchApplicationAreAllowed>();
         addIf<ViewCreationSeparateTransaction>();
         addIf<CreateCollectionWithSystemIndex>();

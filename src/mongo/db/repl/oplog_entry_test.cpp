@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/idempotency_test_fixture.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

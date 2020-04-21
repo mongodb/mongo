@@ -573,12 +573,28 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_entry_test_helpers',
+    source=[
+        'oplog_entry_test_helpers.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_entry',
+        'optime',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/namespace_string',
+    ]
+)
+
+env.Library(
     target='idempotency_test_fixture',
     source=[
         'idempotency_test_fixture.cpp',
     ],
     LIBDEPS=[
         'oplog_applier_impl_test_fixture',
+        'oplog_entry_test_helpers',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/catalog/collection_validation',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
@@ -1311,6 +1327,7 @@ env.CppUnitTest(
         'oplog_buffer_collection',
         'oplog_buffer_proxy',
         'oplog_entry',
+        'oplog_entry_test_helpers',
         'oplog_fetcher',
         'oplog_interface_local',
         'oplog_interface_mock',
