@@ -66,7 +66,10 @@ public:
     void checkShardVersionOrThrow_DEPRECATED(OperationContext*) override {}
 
     void appendShardVersion(BSONObjBuilder* builder) override {}
-    void appendInfoForServerStatus(BSONArrayBuilder* builder) override {}
+
+    size_t numberOfRangesScheduledForDeletion() const override {
+        return 0;
+    }
 };
 
 }  // namespace

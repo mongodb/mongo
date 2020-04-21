@@ -124,11 +124,6 @@ public:
     void append(BSONObjBuilder* builder) const;
 
     /**
-     * Appends summarized information for server status.
-     */
-    void appendForServerStatus(BSONArrayBuilder* builder) const;
-
-    /**
      * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
      * on them, and adds the range to the list of ranges currently being received.
      *
@@ -169,6 +164,12 @@ public:
      * useful for unit tests.
      */
     size_t numberOfRangesToCleanStillInUse() const;
+
+    /**
+     * Returns the number of ranges scheduled for deletion, regardless of whether they may still be
+     * in use by running queries.
+     */
+    size_t numberOfRangesScheduledForDeletion() const;
 
     /**
      * Reports whether any range still scheduled for deletion overlaps the argument range. If so,

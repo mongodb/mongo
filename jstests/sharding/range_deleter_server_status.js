@@ -46,11 +46,7 @@ assert.commandWorked(
 
 let shardDB = st.rs0.getPrimary().getDB('test');
 let serverStatusRes = shardDB.runCommand({serverStatus: 1});
-
-let expectedList = [{'test.foo': 2}, {'test.bar': 1}];
-let taskList = serverStatusRes.shardingStatistics.rangeDeleterTasks;
-assert.eq(2, taskList.length, tojson(taskList));
-assert.sameMembers(expectedList, taskList);
+assert.eq(3, serverStatusRes.shardingStatistics.rangeDeleterTasks);
 
 // Close the cursors so the range deleter tasks can proceed and so there won't be tasks that
 // can't make progress when the check orphan hooks runs.

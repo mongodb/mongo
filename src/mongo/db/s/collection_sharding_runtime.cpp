@@ -422,17 +422,18 @@ void CollectionShardingRuntime::appendPendingReceiveChunks(BSONArrayBuilder* bui
     _metadataManager->toBSONPending(*builder);
 }
 
-void CollectionShardingRuntime::appendInfoForServerStatus(BSONArrayBuilder* builder) {
-    stdx::lock_guard lk(_metadataManagerLock);
-    if (_metadataManager) {
-        _metadataManager->appendForServerStatus(builder);
-    }
-}
-
 void CollectionShardingRuntime::clearReceivingChunks() {
     stdx::lock_guard lk(_metadataManagerLock);
     invariant(_metadataType == MetadataType::kSharded);
     _metadataManager->clearReceivingChunks();
+}
+
+size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
+    stdx::lock_guard lk(_metadataManagerLock);
+    if (_metadataManager) {
+        return _metadataManager->numberOfRangesScheduledForDeletion();
+    }
+    return 0;
 }
 
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns)

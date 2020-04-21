@@ -95,7 +95,7 @@ public:
 
     void appendShardVersion(BSONObjBuilder* builder) override;
 
-    void appendInfoForServerStatus(BSONArrayBuilder* builder) override;
+    size_t numberOfRangesScheduledForDeletion() const override;
 
     /**
      * Returns boost::none if the description for the collection is not known yet. Otherwise

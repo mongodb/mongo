@@ -141,9 +141,9 @@ public:
     virtual void appendShardVersion(BSONObjBuilder* builder) = 0;
 
     /**
-     * Append information for the collection to be displayed in server status.
+     * Returns the number of ranges scheduled for deletion on the collection.
      */
-    virtual void appendInfoForServerStatus(BSONArrayBuilder* builder) = 0;
+    virtual size_t numberOfRangesScheduledForDeletion() const = 0;
 
 protected:
     /**
