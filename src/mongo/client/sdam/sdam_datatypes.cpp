@@ -113,6 +113,24 @@ std::string toString(const TopologyType topologyType) {
     }
 }
 
+StatusWith<TopologyType> parseTopologyType(StringData strTopologyType) {
+    if (strTopologyType == "ReplicaSetNoPrimary") {
+        return TopologyType::kReplicaSetNoPrimary;
+    } else if (strTopologyType == "ReplicaSetWithPrimary") {
+        return TopologyType::kReplicaSetWithPrimary;
+    } else if (strTopologyType == "Sharded") {
+        return TopologyType::kSharded;
+    } else if (strTopologyType == "Unknown") {
+        return TopologyType::kUnknown;
+    } else if (strTopologyType == "Single") {
+        return TopologyType::kSingle;
+    } else {
+        std::stringstream errorMessage;
+        errorMessage << strTopologyType << " is an invalid TopologyType.";
+        return StatusWith<TopologyType>(ErrorCodes::InvalidTopologyType, errorMessage.str());
+    }
+}
+
 std::ostream& operator<<(std::ostream& os, const TopologyType topologyType) {
     os << toString(topologyType);
     return os;

@@ -129,7 +129,6 @@ boost::optional<ServerDescriptionPtr> TopologyDescription::installServerDescript
             const auto& currentDescription = *it;
             if (currentDescription->getAddress() == newServerDescription->getAddress()) {
                 previousDescription = *it;
-
                 *it = std::shared_ptr<ServerDescription>(newServerDescription);
                 break;
             }
@@ -139,14 +138,11 @@ boost::optional<ServerDescriptionPtr> TopologyDescription::installServerDescript
             _servers.push_back(std::shared_ptr<ServerDescription>(newServerDescription));
         }
     }
-
     newServerDescription->_topologyDescription = shared_from_this();
-
     checkWireCompatibilityVersions();
     calculateLogicalSessionTimeout();
 
     topologyDescriptionInstallServerDescription.shouldFail();
-
     return previousDescription;
 }
 
