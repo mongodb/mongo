@@ -5964,7 +5964,7 @@ TEST_F(ReplCoordTest, NodeFailsVoteRequestIfItFailsToStoreLastVote) {
     ASSERT_EQUALS(lastVote.getCandidateIndex(), 0);
 }
 
-TEST_F(ReplCoordTest, NodeNodesNotGrantVoteIfInTerminalShutdown) {
+TEST_F(ReplCoordTest, NodeDoesNotGrantVoteIfInTerminalShutdown) {
     // Set up a 2-node replica set config.
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -6004,6 +6004,36 @@ TEST_F(ReplCoordTest, NodeNodesNotGrantVoteIfInTerminalShutdown) {
     ASSERT_NOT_OK(r);
     ASSERT_EQUALS("In the process of shutting down", r.reason());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, r.code());
+}
+
+TEST_F(ReplCoordTest, RemovedNodeDoesNotGrantVote) {
+    // A 1-node set. This node is not a member.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node2", 12345));
+
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_REMOVED));
+    ReplSetRequestVotesArgs args;
+    ASSERT_OK(args.initialize(BSON(
+        "replSetRequestVotes" << 1 << "setName"
+                              << "mySet"
+                              << "term" << 2 << "candidateIndex" << 0LL << "configVersion" << 1LL
+                              << "dryRun" << false << "lastCommittedOp" << OpTime().toBSON())));
+
+    ReplSetRequestVotesResponse response;
+    auto opCtx = makeOperationContext();
+    auto r = getReplCoord()->processReplSetRequestVotes(opCtx.get(), args, &response);
+    ASSERT_NOT_OK(r);
+    ASSERT_EQUALS("Invalid replica set config, or this node is not a member", r.reason());
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, r.code());
+
+    // Vote was not recorded.
+    ServiceContext* svcCtx = getServiceContext();
+    ASSERT(ReplicationMetrics::get(svcCtx).getElectionParticipantMetricsBSON().isEmpty());
 }
 
 // TODO(schwerin): Unit test election id updating
