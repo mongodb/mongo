@@ -567,8 +567,8 @@ session_ops_create(WT_SESSION *session)
 
     /*! [Create a table with columns] */
     /*
-     * Create a table with columns: keys are record numbers, values are
-     * (string, signed 32-bit integer, unsigned 16-bit integer).
+     * Create a table with columns: keys are record numbers, values are (string, signed 32-bit
+     * integer, unsigned 16-bit integer).
      */
     error_check(session->create(session, "table:mytable",
       "key_format=r,value_format=SiH,"

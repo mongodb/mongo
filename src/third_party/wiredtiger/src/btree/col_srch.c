@@ -156,9 +156,8 @@ descend:
         /*
          * Reference the slot used for next step down the tree.
          *
-         * Base is the smallest index greater than recno and may be the
-         * (last + 1) index.  The slot for descent is the one before
-         * base.
+         * Base is the smallest index greater than recno and may be the (last + 1) index. The slot
+         * for descent is the one before base.
          */
         if (recno != descent->ref_recno) {
             /*

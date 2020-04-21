@@ -118,10 +118,8 @@ format_process_env(void)
     (void)signal(SIGTERM, signal_handler);
 #endif
 
-    /* Initialize locks to single-thread backups, failures, and timestamp updates. */
-    testutil_check(pthread_rwlock_init(&g.backup_lock, NULL));
+    /* Initialize lock to ensure single threading during failure handling */
     testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
-    testutil_check(pthread_rwlock_init(&g.ts_lock, NULL));
 
 #if 0
     /* Configure the GNU malloc for debugging. */
@@ -327,10 +325,6 @@ main(int argc, char *argv[])
     }
 
     config_print(false);
-
-    testutil_check(pthread_rwlock_destroy(&g.backup_lock));
-    testutil_check(pthread_rwlock_destroy(&g.death_lock));
-    testutil_check(pthread_rwlock_destroy(&g.ts_lock));
 
     config_clear();
 

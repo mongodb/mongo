@@ -30,7 +30,7 @@
 #include "config.h"
 
 static void config(void);
-static void config_backup(void);
+static void config_backup_incr(void);
 static void config_backward_compatible(void);
 static void config_cache(void);
 static void config_checkpoint(void);
@@ -197,7 +197,7 @@ config(void)
     config_transaction();
 
     /* Simple selection. */
-    config_backup();
+    config_backup_incr();
     config_checkpoint();
     config_checksum();
     config_compression("btree.compression");
@@ -257,39 +257,55 @@ config(void)
 }
 
 /*
- * config_backup --
- *     Backup configuration.
+ * config_backup_incr --
+ *     Incremental backup configuration.
  */
 static void
-config_backup(void)
+config_backup_incr(void)
 {
-    const char *cstr;
+    /* Incremental backup requires backup. */
+    if (g.c_backups == 0)
+        return;
 
     /*
-     * Choose a type of incremental backup.
+     * Incremental backup using log files is incompatible with logging archival. Testing log file
+     * archival doesn't seem as useful as testing backup, let the backup configuration override.
      */
-    if (!config_is_perm("backup.incremental")) {
-        cstr = "backup.incremental=off";
-        switch (mmrand(NULL, 1, 10)) {
-        case 1: /* 30% full backup only */
-        case 2:
-        case 3:
-            break;
-        case 4: /* 40% block based incremental */
-        case 5:
-        case 6:
-        case 7:
-            cstr = "backup.incremental=block";
-            break;
-        case 8:
-        case 9:
-        case 10: /* 30% log based incremental */
-            if (!g.c_logging_archive)
-                cstr = "backup.incremental=log";
-            break;
+    if (config_is_perm("backup.incremental")) {
+        if (g.c_backup_incr_flag == INCREMENTAL_LOG) {
+            if (g.c_logging_archive && config_is_perm("logging.archive"))
+                testutil_die(EINVAL, "backup.incremental=log is incompatible with logging.archive");
+            if (g.c_logging_archive)
+                config_single("logging.archive=0", false);
         }
+        return;
+    }
 
-        config_single(cstr, false);
+    /*
+     * Choose a type of incremental backup, where the log archival setting can eliminate incremental
+     * backup based on log files.
+     */
+    switch (mmrand(NULL, 1, 10)) {
+    case 1: /* 30% full backup only */
+    case 2:
+    case 3:
+        config_single("backup.incremental=off", false);
+        break;
+    case 4: /* 30% log based incremental */
+    case 5:
+    case 6:
+        if (!g.c_logging_archive || !config_is_perm("logging.archive")) {
+            if (g.c_logging_archive)
+                config_single("logging.archive=0", false);
+            config_single("backup.incremental=log", false);
+        }
+    /* FALLTHROUGH */
+    case 7: /* 40% block based incremental */
+    case 8:
+    case 9:
+    case 10:
+        config_single("backup.incremental=block", false);
+        break;
     }
 }
 

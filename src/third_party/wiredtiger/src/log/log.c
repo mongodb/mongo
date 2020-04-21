@@ -1191,10 +1191,8 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
      */
     if (create_log) {
         /*
-         * Increment the missed pre-allocated file counter only
-         * if a hot backup is not in progress. We are deliberately
-         * not using pre-allocated log files during backup
-         * (see comment above).
+         * Increment the missed pre-allocated file counter only if a hot backup is not in progress.
+         * We are deliberately not using pre-allocated log files during backup (see comment above).
          */
         if (!conn->hot_backup)
             log->prep_missed++;
@@ -1430,10 +1428,9 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn, bool this_log, bool salvag
     /*
      * Truncate the log file to the given LSN.
      *
-     * It's possible the underlying file system doesn't support truncate
-     * (there are existing examples), which is fine, but we don't want to
-     * repeatedly do the setup work just to find that out every time. Check
-     * before doing work, and if there's a not-supported error, turn off
+     * It's possible the underlying file system doesn't support truncate (there are existing
+     * examples), which is fine, but we don't want to repeatedly do the setup work just to find that
+     * out every time. Check before doing work, and if there's a not-supported error, turn off
      * future truncates.
      */
     WT_ERR(__log_openfile(session, lsn->l.file, 0, &log_fh));

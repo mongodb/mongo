@@ -678,20 +678,15 @@ __backup_start(
     }
     if (!target_list) {
         /*
-         * It's important to first gather the log files to be copied
-         * (which internally starts a new log file), followed by
-         * choosing a checkpoint to reference in the WiredTiger.backup
-         * file.
+         * It's important to first gather the log files to be copied (which internally starts a new
+         * log file), followed by choosing a checkpoint to reference in the WiredTiger.backup file.
          *
-         * Applications may have logic that takes a checkpoint, followed
-         * by performing a write that should only appear in the new
-         * checkpoint. This ordering prevents choosing the prior
-         * checkpoint, but including the write in the log files
-         * returned.
+         * Applications may have logic that takes a checkpoint, followed by performing a write that
+         * should only appear in the new checkpoint. This ordering prevents choosing the prior
+         * checkpoint, but including the write in the log files returned.
          *
-         * It is also possible, and considered legal, to choose the new
-         * checkpoint, but not include the log file that contains the
-         * log entry for taking the new checkpoint.
+         * It is also possible, and considered legal, to choose the new checkpoint, but not include
+         * the log file that contains the log entry for taking the new checkpoint.
          */
         WT_ERR(__backup_log_append(session, cb, true));
         WT_ERR(__backup_all(session));

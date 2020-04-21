@@ -379,9 +379,9 @@ backup(void *arg)
          * with named checkpoints. Wait for the checkpoint to complete, otherwise backups might be
          * starved out.
          */
-        testutil_check(pthread_rwlock_wrlock(&g.backup_lock));
+        lock_writelock(session, &g.backup_lock);
         if (g.workers_finished) {
-            testutil_check(pthread_rwlock_unlock(&g.backup_lock));
+            lock_writeunlock(session, &g.backup_lock);
             break;
         }
 
@@ -471,7 +471,7 @@ backup(void *arg)
             testutil_check(session->truncate(session, "log:", backup_cursor, NULL, NULL));
 
         testutil_check(backup_cursor->close(backup_cursor));
-        testutil_check(pthread_rwlock_unlock(&g.backup_lock));
+        lock_writeunlock(session, &g.backup_lock);
         active_files_sort(active_now);
         active_files_remove_missing(active_prev, active_now);
         active_prev = active_now;

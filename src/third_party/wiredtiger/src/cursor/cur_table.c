@@ -128,8 +128,7 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx, WT_CURSOR *cur,
         WT_RET(__wt_schema_project_merge(
           session, ctable->cg_cursors, idx->key_plan, idx->key_format, &cur->key));
         /*
-         * The index key is now set and the value is empty
-         * (it starts clear and is never set).
+         * The index key is now set and the value is empty (it starts clear and is never set).
          */
         F_SET(cur, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
         WT_RET(f(cur));
@@ -704,12 +703,11 @@ err:
     CURSOR_UPDATE_API_END(session, ret);
 
     /*
-     * The application might do a WT_CURSOR.get_value call when we return,
-     * so we need a value and the underlying functions didn't set one up.
-     * For various reasons, those functions may not have done a search and
-     * any previous value in the cursor might race with WT_CURSOR.reserve
-     * (and in cases like LSM, the reserve never encountered the original
-     * key). For simplicity, repeat the search here.
+     * The application might do a WT_CURSOR.get_value call when we return, so we need a value and
+     * the underlying functions didn't set one up. For various reasons, those functions may not have
+     * done a search and any previous value in the cursor might race with WT_CURSOR.reserve (and in
+     * cases like LSM, the reserve never encountered the original key). For simplicity, repeat the
+     * search here.
      */
     return (ret == 0 ? cursor->search(cursor) : ret);
 }
@@ -1039,20 +1037,18 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
     WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
     /*
-     * We'll need to squirrel away a copy of the cursor configuration for
-     * if/when we open indices.
+     * We'll need to squirrel away a copy of the cursor configuration for if/when we open indices.
      *
-     * cfg[0] is the baseline configuration for the cursor open and we can
-     * acquire another copy from the configuration structures, so it would
-     * be reasonable not to copy it here: but I'd rather be safe than sorry.
+     * cfg[0] is the baseline configuration for the cursor open and we can acquire another copy from
+     * the configuration structures, so it would be reasonable not to copy it here: but I'd rather
+     * be safe than sorry.
      *
      * cfg[1] is the application configuration.
      *
-     * Underlying indices are always opened without dump or readonly; that
-     * information is appended to cfg[1] so later "fast" configuration calls
-     * (checking only cfg[0] and cfg[1]) work. I don't expect to see more
-     * than two configuration strings here, but it's written to compact into
-     * two configuration strings, a copy of cfg[0] and the rest in cfg[1].
+     * Underlying indices are always opened without dump or readonly; that information is appended
+     * to cfg[1] so later "fast" configuration calls (checking only cfg[0] and cfg[1]) work. I don't
+     * expect to see more than two configuration strings here, but it's written to compact into two
+     * configuration strings, a copy of cfg[0] and the rest in cfg[1].
      */
     WT_ERR(__wt_calloc_def(session, 3, &ctable->cfg));
     WT_ERR(__wt_strdup(session, cfg[0], &ctable->cfg[0]));

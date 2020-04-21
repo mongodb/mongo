@@ -928,14 +928,15 @@ extern int __wt_logop_row_truncate_unpack(WT_SESSION_IMPL *session, const uint8_
   const uint8_t *end, uint32_t *fileidp, WT_ITEM *startp, WT_ITEM *stopp, uint32_t *modep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logop_txn_timestamp_pack(WT_SESSION_IMPL *session, WT_ITEM *logrec,
-  uint64_t time_sec, uint64_t time_nsec, uint64_t commit_ts, uint64_t durable_ts, uint64_t first_ts,
-  uint64_t prepare_ts, uint64_t read_ts) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  uint64_t time_sec, uint64_t time_nsec, uint64_t commit_ts, uint64_t durable_ts,
+  uint64_t first_commit_ts, uint64_t prepare_ts, uint64_t read_ts, uint64_t pinned_read_ts)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logop_txn_timestamp_print(WT_SESSION_IMPL *session, const uint8_t **pp,
   const uint8_t *end, WT_TXN_PRINTLOG_ARGS *args) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logop_txn_timestamp_unpack(WT_SESSION_IMPL *session, const uint8_t **pp,
   const uint8_t *end, uint64_t *time_secp, uint64_t *time_nsecp, uint64_t *commit_tsp,
-  uint64_t *durable_tsp, uint64_t *first_tsp, uint64_t *prepare_tsp, uint64_t *read_tsp)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  uint64_t *durable_tsp, uint64_t *first_commit_tsp, uint64_t *prepare_tsp, uint64_t *read_tsp,
+  uint64_t *pinned_read_tsp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logrec_alloc(WT_SESSION_IMPL *session, size_t size, WT_ITEM **logrecp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_logrec_read(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
@@ -1126,8 +1127,8 @@ extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CEL
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack,
   WT_ITEM *store, bool *decoded) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack,
-  bool evicting) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page, const uint8_t *addr,
   size_t addr_size, const void *value, size_t value_size)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -1530,8 +1531,8 @@ extern int __wt_verbose_dump_sessions(WT_SESSION_IMPL *session, bool show_cursor
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn, int error_code,
-  const char *error_string) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_SESSION_IMPL *txn_session,
+  int error_code, const char *error_string) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_verbose_dump_update(WT_SESSION_IMPL *session, WT_UPDATE *upd)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
@@ -1701,7 +1702,6 @@ extern void __wt_optrack_record_funcid(
   WT_SESSION_IMPL *session, const char *func, uint16_t *func_idp);
 extern void __wt_os_stdio(WT_SESSION_IMPL *session);
 extern void __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern void __wt_ovfl_discard_remove(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_ovfl_reuse_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_print_huffman_code(void *huffman_arg, uint16_t symbol);
@@ -1759,8 +1759,8 @@ extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_global_destroy(WT_SESSION_IMPL *session);
 extern void __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op);
+extern void __wt_txn_publish_durable_timestamp(WT_SESSION_IMPL *session);
 extern void __wt_txn_publish_read_timestamp(WT_SESSION_IMPL *session);
-extern void __wt_txn_publish_timestamp(WT_SESSION_IMPL *session);
 extern void __wt_txn_release(WT_SESSION_IMPL *session);
 extern void __wt_txn_release_resources(WT_SESSION_IMPL *session);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);

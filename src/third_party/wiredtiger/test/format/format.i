@@ -162,3 +162,51 @@ key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 
     key_gen_common(key, keyno, suffix[mmrand(rnd, 0, 14)]);
 }
+
+/*
+ * lock_try_writelock
+ *     Try to get exclusive lock.  Fail immediately if not available.
+ */
+static inline int
+lock_try_writelock(WT_SESSION *session, RWLOCK *lock)
+{
+    testutil_assert(LOCK_INITIALIZED(lock));
+
+    if (lock->lock_type == LOCK_WT) {
+        return (__wt_try_writelock((WT_SESSION_IMPL *)session, &lock->l.wt));
+    } else {
+        return (pthread_rwlock_trywrlock(&lock->l.pthread));
+    }
+}
+
+/*
+ * lock_writelock --
+ *     Wait to get exclusive lock.
+ */
+static inline void
+lock_writelock(WT_SESSION *session, RWLOCK *lock)
+{
+    testutil_assert(LOCK_INITIALIZED(lock));
+
+    if (lock->lock_type == LOCK_WT) {
+        __wt_writelock((WT_SESSION_IMPL *)session, &lock->l.wt);
+    } else {
+        testutil_check(pthread_rwlock_wrlock(&lock->l.pthread));
+    }
+}
+
+/*
+ * lock_writeunlock --
+ *     Release an exclusive lock.
+ */
+static inline void
+lock_writeunlock(WT_SESSION *session, RWLOCK *lock)
+{
+    testutil_assert(LOCK_INITIALIZED(lock));
+
+    if (lock->lock_type == LOCK_WT) {
+        __wt_writeunlock((WT_SESSION_IMPL *)session, &lock->l.wt);
+    } else {
+        testutil_check(pthread_rwlock_unlock(&lock->l.pthread));
+    }
+}

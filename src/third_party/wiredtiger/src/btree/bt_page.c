@@ -336,9 +336,9 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno, size_t 
     repeat_off = 0;
 
     /*
-     * Walk the page, building references: the page contains unsorted value
-     * items.  The value items are on-page (WT_CELL_VALUE), overflow items
-     * (WT_CELL_VALUE_OVFL) or deleted items (WT_CELL_DEL).
+     * Walk the page, building references: the page contains unsorted value items. The value items
+     * are on-page (WT_CELL_VALUE), overflow items (WT_CELL_VALUE_OVFL) or deleted items
+     * (WT_CELL_DEL).
      */
     indx = 0;
     cip = page->pg_var;

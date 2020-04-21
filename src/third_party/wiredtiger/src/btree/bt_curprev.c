@@ -413,11 +413,9 @@ restart_read:
         }
 
         /*
-         * If we're at the same slot as the last reference and there's
-         * no matching insert list item, re-use the return information
-         * (so encoded items with large repeat counts aren't repeatedly
-         * decoded).  Otherwise, unpack the cell and build the return
-         * information.
+         * If we're at the same slot as the last reference and there's no matching insert list item,
+         * re-use the return information (so encoded items with large repeat counts aren't
+         * repeatedly decoded). Otherwise, unpack the cell and build the return information.
          */
         if (cbt->cip_saved != cip) {
             cell = WT_COL_PTR(page, cip);

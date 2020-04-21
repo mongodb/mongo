@@ -46,7 +46,7 @@ typedef enum {
 
 #define WT_TXNID_LT(t1, t2) ((t1) < (t2))
 
-#define WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
+#define WT_SESSION_TXN_SHARED(s) (&S2C(s)->txn_global.txn_shared_list[(s)->id])
 
 #define WT_SESSION_IS_CHECKPOINT(s) ((s)->id != 0 && (s)->id == S2C(s)->txn_global.checkpoint_id)
 
@@ -72,39 +72,59 @@ typedef enum {
 /*
  * Perform an operation at the specified isolation level.
  *
- * This is fiddly: we can't cope with operations that begin transactions
- * (leaving an ID allocated), and operations must not move our published
- * snap_min forwards (or updates we need could be freed while this operation is
- * in progress).  Check for those cases: the bugs they cause are hard to debug.
+ * This is fiddly: we can't cope with operations that begin transactions (leaving an ID allocated),
+ * and operations must not move our published snap_min forwards (or updates we need could be freed
+ * while this operation is in progress). Check for those cases: the bugs they cause are hard to
+ * debug.
  */
-#define WT_WITH_TXN_ISOLATION(s, iso, op)                                 \
-    do {                                                                  \
-        WT_TXN_ISOLATION saved_iso = (s)->isolation;                      \
-        WT_TXN_ISOLATION saved_txn_iso = (s)->txn.isolation;              \
-        WT_TXN_STATE *txn_state = WT_SESSION_TXN_STATE(s);                \
-        WT_TXN_STATE saved_state = *txn_state;                            \
-        (s)->txn.forced_iso++;                                            \
-        (s)->isolation = (s)->txn.isolation = (iso);                      \
-        op;                                                               \
-        (s)->isolation = saved_iso;                                       \
-        (s)->txn.isolation = saved_txn_iso;                               \
-        WT_ASSERT((s), (s)->txn.forced_iso > 0);                          \
-        (s)->txn.forced_iso--;                                            \
-        WT_ASSERT((s), txn_state->id == saved_state.id &&                 \
-            (txn_state->metadata_pinned == saved_state.metadata_pinned || \
-                         saved_state.metadata_pinned == WT_TXN_NONE) &&   \
-            (txn_state->pinned_id == saved_state.pinned_id ||             \
-                         saved_state.pinned_id == WT_TXN_NONE));          \
-        txn_state->metadata_pinned = saved_state.metadata_pinned;         \
-        txn_state->pinned_id = saved_state.pinned_id;                     \
+#define WT_WITH_TXN_ISOLATION(s, iso, op)                                       \
+    do {                                                                        \
+        WT_TXN_ISOLATION saved_iso = (s)->isolation;                            \
+        WT_TXN_ISOLATION saved_txn_iso = (s)->txn->isolation;                   \
+        WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(s);                   \
+        WT_TXN_SHARED saved_txn_shared = *txn_shared;                           \
+        (s)->txn->forced_iso++;                                                 \
+        (s)->isolation = (s)->txn->isolation = (iso);                           \
+        op;                                                                     \
+        (s)->isolation = saved_iso;                                             \
+        (s)->txn->isolation = saved_txn_iso;                                    \
+        WT_ASSERT((s), (s)->txn->forced_iso > 0);                               \
+        (s)->txn->forced_iso--;                                                 \
+        WT_ASSERT((s), txn_shared->id == saved_txn_shared.id &&                 \
+            (txn_shared->metadata_pinned == saved_txn_shared.metadata_pinned || \
+                         saved_txn_shared.metadata_pinned == WT_TXN_NONE) &&    \
+            (txn_shared->pinned_id == saved_txn_shared.pinned_id ||             \
+                         saved_txn_shared.pinned_id == WT_TXN_NONE));           \
+        txn_shared->metadata_pinned = saved_txn_shared.metadata_pinned;         \
+        txn_shared->pinned_id = saved_txn_shared.pinned_id;                     \
     } while (0)
 
-struct __wt_txn_state {
+struct __wt_txn_shared {
     WT_CACHE_LINE_PAD_BEGIN
     volatile uint64_t id;
     volatile uint64_t pinned_id;
     volatile uint64_t metadata_pinned;
-    volatile bool is_allocating;
+
+    /*
+     * The first commit or durable timestamp used for this transaction. Determines its position in
+     * the durable queue and prevents the all_durable timestamp moving past this point.
+     */
+    wt_timestamp_t pinned_durable_timestamp;
+
+    /*
+     * Set to the first read timestamp used in the transaction. As part of our history store
+     * mechanism, we can move the read timestamp forward so we need to keep track of the original
+     * read timestamp to know what history should be pinned in front of oldest.
+     */
+    wt_timestamp_t pinned_read_timestamp;
+
+    TAILQ_ENTRY(__wt_txn_shared) read_timestampq;
+    TAILQ_ENTRY(__wt_txn_shared) durable_timestampq;
+    /* Set if need to clear from the durable queue */
+
+    volatile uint8_t is_allocating;
+    uint8_t clear_durable_q;
+    uint8_t clear_read_q; /* Set if need to clear from the read queue */
 
     WT_CACHE_LINE_PAD_END
 };
@@ -144,12 +164,12 @@ struct __wt_txn_global {
 
     /* List of transactions sorted by durable timestamp. */
     WT_RWLOCK durable_timestamp_rwlock;
-    TAILQ_HEAD(__wt_txn_dts_qh, __wt_txn) durable_timestamph;
+    TAILQ_HEAD(__wt_txn_dts_qh, __wt_txn_shared) durable_timestamph;
     uint32_t durable_timestampq_len;
 
     /* List of transactions sorted by read timestamp. */
     WT_RWLOCK read_timestamp_rwlock;
-    TAILQ_HEAD(__wt_txn_rts_qh, __wt_txn) read_timestamph;
+    TAILQ_HEAD(__wt_txn_rts_qh, __wt_txn_shared) read_timestamph;
     uint32_t read_timestampq_len;
 
     /*
@@ -163,14 +183,14 @@ struct __wt_txn_global {
      */
     volatile bool checkpoint_running;    /* Checkpoint running */
     volatile uint32_t checkpoint_id;     /* Checkpoint's session ID */
-    WT_TXN_STATE checkpoint_state;       /* Checkpoint's txn state */
+    WT_TXN_SHARED checkpoint_txn_shared; /* Checkpoint's txn shared state */
     wt_timestamp_t checkpoint_timestamp; /* Checkpoint's timestamp */
 
     volatile uint64_t debug_ops;       /* Debug mode op counter */
     uint64_t debug_rollback;           /* Debug mode rollback */
     volatile uint64_t metadata_pinned; /* Oldest ID for metadata */
 
-    WT_TXN_STATE *states; /* Per-session transaction states */
+    WT_TXN_SHARED *txn_shared_list; /* Per-session shared transaction states */
 };
 
 typedef enum __wt_txn_isolation {
@@ -288,12 +308,6 @@ struct __wt_txn {
     /* Read updates committed as of this timestamp. */
     wt_timestamp_t read_timestamp;
 
-    TAILQ_ENTRY(__wt_txn) durable_timestampq;
-    TAILQ_ENTRY(__wt_txn) read_timestampq;
-    /* Set if need to clear from the durable queue */
-    bool clear_durable_q;
-    bool clear_read_q; /* Set if need to clear from the read queue */
-
     /* Array of modifications by this transaction. */
     WT_TXN_OP *mod;
     size_t mod_alloc;
@@ -322,7 +336,7 @@ struct __wt_txn {
  * WT_TXN_HAS_TS_DURABLE --
  *	The transaction has an explicitly set durable timestamp (that is, it
  *	hasn't been mirrored from its commit timestamp value).
- * WT_TXN_TS_PUBLISHED --
+ * WT_TXN_SHARED_TS_DURABLE --
  *	The transaction has been published to the durable queue. Setting this
  *	flag lets us know that, on release, we need to mark the transaction for
  *	clearing.
@@ -339,20 +353,26 @@ struct __wt_txn {
 #define WT_TXN_HAS_TS_READ 0x000080u
 #define WT_TXN_IGNORE_PREPARE 0x000100u
 #define WT_TXN_PREPARE 0x000200u
-#define WT_TXN_PUBLIC_TS_READ 0x000400u
-#define WT_TXN_READONLY 0x000800u
-#define WT_TXN_RUNNING 0x001000u
-#define WT_TXN_SYNC_SET 0x002000u
-#define WT_TXN_TS_COMMIT_ALWAYS 0x004000u
-#define WT_TXN_TS_COMMIT_KEYS 0x008000u
-#define WT_TXN_TS_COMMIT_NEVER 0x010000u
-#define WT_TXN_TS_DURABLE_ALWAYS 0x020000u
-#define WT_TXN_TS_DURABLE_KEYS 0x040000u
-#define WT_TXN_TS_DURABLE_NEVER 0x080000u
-#define WT_TXN_TS_PUBLISHED 0x100000u
+#define WT_TXN_READONLY 0x000400u
+#define WT_TXN_RUNNING 0x000800u
+#define WT_TXN_SHARED_TS_DURABLE 0x001000u
+#define WT_TXN_SHARED_TS_READ 0x002000u
+#define WT_TXN_SYNC_SET 0x004000u
+#define WT_TXN_TS_COMMIT_ALWAYS 0x008000u
+#define WT_TXN_TS_COMMIT_KEYS 0x010000u
+#define WT_TXN_TS_COMMIT_NEVER 0x020000u
+#define WT_TXN_TS_DURABLE_ALWAYS 0x040000u
+#define WT_TXN_TS_DURABLE_KEYS 0x080000u
+#define WT_TXN_TS_DURABLE_NEVER 0x100000u
 #define WT_TXN_TS_ROUND_PREPARED 0x200000u
 #define WT_TXN_TS_ROUND_READ 0x400000u
 #define WT_TXN_UPDATE 0x800000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
+
+    /*
+     * Zero or more bytes of value (the payload) immediately follows the WT_UPDATE structure. We use
+     * a C99 flexible array member which has the semantics we want.
+     */
+    uint64_t __snapshot[];
 };

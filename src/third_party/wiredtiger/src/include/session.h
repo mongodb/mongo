@@ -129,7 +129,7 @@ struct __wt_session_impl {
     WT_ITEM err; /* Error buffer */
 
     WT_TXN_ISOLATION isolation;
-    WT_TXN txn; /* Transaction state */
+    WT_TXN *txn; /* Transaction state */
 
 #define WT_SESSION_BG_SYNC_MSEC 1200000
     WT_LSN bg_sync_lsn; /* Background sync operation LSN. */
@@ -145,11 +145,10 @@ struct __wt_session_impl {
     /*
      * Operations acting on handles.
      *
-     * The preferred pattern is to gather all of the required handles at
-     * the beginning of an operation, then drop any other locks, perform
-     * the operation, then release the handles.  This cannot be easily
-     * merged with the list of checkpoint handles because some operations
-     * (such as compact) do checkpoints internally.
+     * The preferred pattern is to gather all of the required handles at the beginning of an
+     * operation, then drop any other locks, perform the operation, then release the handles. This
+     * cannot be easily merged with the list of checkpoint handles because some operations (such as
+     * compact) do checkpoints internally.
      */
     WT_DATA_HANDLE **op_handle; /* Handle list */
     u_int op_handle_next;       /* Next empty slot */
@@ -190,8 +189,9 @@ struct __wt_session_impl {
 #define WT_SESSION_QUIET_CORRUPT_FILE 0x02000000u
 #define WT_SESSION_READ_WONT_NEED 0x04000000u
 #define WT_SESSION_RESOLVING_TXN 0x08000000u
-#define WT_SESSION_SCHEMA_TXN 0x10000000u
-#define WT_SESSION_SERVER_ASYNC 0x20000000u
+#define WT_SESSION_ROLLBACK_TO_STABLE 0x10000000u
+#define WT_SESSION_SCHEMA_TXN 0x20000000u
+#define WT_SESSION_SERVER_ASYNC 0x40000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 
@@ -271,9 +271,3 @@ struct __wt_session_impl {
 
     WT_SESSION_STATS stats;
 };
-
-/*
- * Rollback to stable should ignore tombstones in the history store since it needs to scan the
- * entire table sequentially.
- */
-#define WT_SESSION_ROLLBACK_TO_STABLE_FLAGS (WT_SESSION_IGNORE_HS_TOMBSTONE)

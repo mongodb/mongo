@@ -79,23 +79,18 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     mod = page->modify;
 
     /*
-     * If modifying a record not previously modified, but which is in the
-     * same update slot as a previously modified record, cursor.ins will
-     * not be set because there's no list of update records for this recno,
-     * but cursor.ins_head will be set to point to the correct update slot.
-     * Acquire the necessary insert information, then create a new update
-     * entry and link it into the existing list. We get here if a page has
-     * a single cell representing multiple records (the records have the
-     * same value), and then a record in the cell is updated or removed,
-     * creating the update list for the cell, and then a cursor iterates
-     * into that same cell to update/remove a different record. We find the
-     * correct slot in the update array, but we don't find an update list
-     * (because it doesn't exist), and don't have the information we need
-     * to do the insert. Normally, we wouldn't care (we could fail and do
-     * a search for the record which would configure everything for the
-     * insert), but range truncation does this pattern for every record in
-     * the cell, and the performance is terrible. For that reason, catch it
-     * here.
+     * If modifying a record not previously modified, but which is in the same update slot as a
+     * previously modified record, cursor.ins will not be set because there's no list of update
+     * records for this recno, but cursor.ins_head will be set to point to the correct update slot.
+     * Acquire the necessary insert information, then create a new update entry and link it into the
+     * existing list. We get here if a page has a single cell representing multiple records (the
+     * records have the same value), and then a record in the cell is updated or removed, creating
+     * the update list for the cell, and then a cursor iterates into that same cell to update/remove
+     * a different record. We find the correct slot in the update array, but we don't find an update
+     * list (because it doesn't exist), and don't have the information we need to do the insert.
+     * Normally, we wouldn't care (we could fail and do a search for the record which would
+     * configure everything for the insert), but range truncation does this pattern for every record
+     * in the cell, and the performance is terrible. For that reason, catch it here.
      */
     if (cbt->ins == NULL && cbt->ins_head != NULL) {
         cbt->ins = __col_insert_search(cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno);

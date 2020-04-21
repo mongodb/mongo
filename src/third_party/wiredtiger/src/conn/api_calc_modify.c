@@ -146,12 +146,11 @@ __wt_calc_modify(WT_SESSION_IMPL *wt_session, const WT_ITEM *oldv, const WT_ITEM
         goto end;
 
     /*
-     * Walk through the post-image, maintaining start / end markers
-     * separated by a gap in the pre-image.  If the current point in the
-     * post-image matches either marker, try to extend the match to find a
-     * (large) range of matching bytes.  If the end of the range is reached
-     * in the post-image without finding a good match, double the size of
-     * the gap, update the markers and keep trying.
+     * Walk through the post-image, maintaining start / end markers separated by a gap in the
+     * pre-image. If the current point in the post-image matches either marker, try to extend the
+     * match to find a (large) range of matching bytes. If the end of the range is reached in the
+     * post-image without finding a good match, double the size of the gap, update the markers and
+     * keep trying.
      */
     hstart = hend = 0;
     i = gap = 0;

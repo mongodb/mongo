@@ -141,13 +141,13 @@ __wt_txn_parse_timestamp(
 /*
  * __txn_get_read_timestamp --
  *     Get the read timestamp from the transaction. Additionally return bool to specify whether the
- *     transaction has set clear read queue flag.
+ *     transaction has set the clear read queue flag.
  */
 static bool
-__txn_get_read_timestamp(WT_TXN *txn, wt_timestamp_t *read_timestampp)
+__txn_get_read_timestamp(WT_TXN_SHARED *txn_shared, wt_timestamp_t *read_timestampp)
 {
-    WT_ORDERED_READ(*read_timestampp, txn->read_timestamp);
-    return (!txn->clear_read_q);
+    WT_ORDERED_READ(*read_timestampp, txn_shared->pinned_read_timestamp);
+    return (!txn_shared->clear_read_q);
 }
 
 /*
@@ -158,8 +158,8 @@ int
 __wt_txn_get_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, uint32_t flags)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *txn_shared;
     wt_timestamp_t tmp_read_ts, tmp_ts;
     bool include_oldest, txn_has_write_lock;
 
@@ -185,13 +185,13 @@ __wt_txn_get_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, uin
 
     /* Look for the oldest ordinary reader. */
     __wt_readlock(session, &txn_global->read_timestamp_rwlock);
-    TAILQ_FOREACH (txn, &txn_global->read_timestamph, read_timestampq) {
+    TAILQ_FOREACH (txn_shared, &txn_global->read_timestamph, read_timestampq) {
         /*
          * Skip any transactions on the queue that are not active. Copy out value of read timestamp
          * to prevent possible race where a transaction resets its read timestamp while we traverse
          * the queue.
          */
-        if (!__txn_get_read_timestamp(txn, &tmp_read_ts))
+        if (!__txn_get_read_timestamp(txn_shared, &tmp_read_ts))
             continue;
         /*
          * A zero timestamp is possible here only when the oldest timestamp is not accounted for.
@@ -213,37 +213,15 @@ __wt_txn_get_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, uin
 }
 
 /*
- * __txn_get_published_timestamp --
- *     Get the current durable timestamp for a given transaction. If there is an explicit durable
- *     timestamp, this function will return the commit timestamp since this is implied. If there is
- *     neither a commit nor a durable timestamp, this function will return 0.
+ * __txn_get_durable_timestamp --
+ *     Get the durable timestamp from the transaction. Additionally return bool to specify whether
+ *     the transaction has set the clear durable queue flag.
  */
-static inline wt_timestamp_t
-__txn_get_published_timestamp(WT_SESSION_IMPL *session, WT_TXN *txn)
+static bool
+__txn_get_durable_timestamp(WT_TXN_SHARED *txn_shared, wt_timestamp_t *durable_timestampp)
 {
-    wt_timestamp_t ts;
-
-    /*
-     * Any checking of bit flags in this logic is invalid. __wt_txn_release may have already been
-     * called on this transaction which will set the flags member to 0. So we need to deduce which
-     * timestamp to use purely by inspecting the timestamp members which we deliberately preserve
-     * for reader threads such as ourselves.
-     *
-     * In the non-prepared case, the first commit will either be less than the commit (in the case
-     * of multiple commits) in which case we should return the first commit. Or it will be equal to
-     * the commit (in the case of a single commit) and we can return durable (which is mirrored from
-     * the commit timestamp).
-     *
-     * In the prepared case, the first commit will always be equal to the commit so we'll return
-     * durable.
-     */
-    if (txn->commit_timestamp != txn->first_commit_timestamp)
-        ts = txn->first_commit_timestamp;
-    else
-        ts = txn->durable_timestamp;
-
-    WT_ASSERT(session, ts != WT_TS_NONE);
-    return (ts);
+    WT_ORDERED_READ(*durable_timestampp, txn_shared->pinned_durable_timestamp);
+    return (!txn_shared->clear_durable_q);
 }
 
 /*
@@ -255,8 +233,8 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
-    WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *txn_shared;
     wt_timestamp_t ts, tmpts;
 
     conn = S2C(session);
@@ -280,14 +258,13 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
          * Compare with the least recently durable transaction.
          */
         __wt_readlock(session, &txn_global->durable_timestamp_rwlock);
-        TAILQ_FOREACH (txn, &txn_global->durable_timestamph, durable_timestampq) {
-            if (txn->clear_durable_q)
-                continue;
-
-            tmpts = __txn_get_published_timestamp(session, txn) - 1;
-            if (tmpts < ts)
-                ts = tmpts;
-            break;
+        TAILQ_FOREACH (txn_shared, &txn_global->durable_timestamph, durable_timestampq) {
+            if (__txn_get_durable_timestamp(txn_shared, &tmpts)) {
+                --tmpts;
+                if (tmpts < ts)
+                    ts = tmpts;
+                break;
+            }
         }
         __wt_readunlock(session, &txn_global->durable_timestamp_rwlock);
 
@@ -333,8 +310,10 @@ __txn_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, const char 
 {
     WT_CONFIG_ITEM cval;
     WT_TXN *txn;
+    WT_TXN_SHARED *txn_shared;
 
-    txn = &session->txn;
+    txn = session->txn;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
     WT_STAT_CONN_INCR(session, session_query_ts);
     if (!F_ISSET(txn, WT_TXN_RUNNING))
@@ -348,7 +327,7 @@ __txn_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, const char 
     else if (WT_STRING_MATCH("prepare", cval.str, cval.len))
         *tsp = txn->prepare_timestamp;
     else if (WT_STRING_MATCH("read", cval.str, cval.len))
-        *tsp = txn->read_timestamp;
+        *tsp = txn_shared->pinned_read_timestamp;
     else
         WT_RET_MSG(session, EINVAL, "unknown timestamp query %.*s", (int)cval.len, cval.str);
 
@@ -603,23 +582,26 @@ set:
  */
 static int
 __txn_assert_after_reads(
-  WT_SESSION_IMPL *session, const char *op, wt_timestamp_t ts, WT_TXN **prevp)
+  WT_SESSION_IMPL *session, const char *op, wt_timestamp_t ts, WT_TXN_SHARED **prev_sharedp)
 {
 #ifdef HAVE_DIAGNOSTIC
-    WT_TXN *prev, *txn = &session->txn;
-    WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+    WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *prev_shared, *txn_shared;
     wt_timestamp_t tmp_timestamp;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
+    txn_global = &S2C(session)->txn_global;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
+
     __wt_readlock(session, &txn_global->read_timestamp_rwlock);
-    prev = TAILQ_LAST(&txn_global->read_timestamph, __wt_txn_rts_qh);
-    while (prev != NULL) {
+    prev_shared = TAILQ_LAST(&txn_global->read_timestamph, __wt_txn_rts_qh);
+    while (prev_shared != NULL) {
         /*
          * Skip self and non-active transactions. Copy out value of read timestamp to prevent
          * possible race where a transaction resets its read timestamp while we traverse the queue.
          */
-        if (!__txn_get_read_timestamp(prev, &tmp_timestamp) || prev == txn) {
-            prev = TAILQ_PREV(prev, __wt_txn_rts_qh, read_timestampq);
+        if (!__txn_get_read_timestamp(prev_shared, &tmp_timestamp) || prev_shared == txn_shared) {
+            prev_shared = TAILQ_PREV(prev_shared, __wt_txn_rts_qh, read_timestampq);
             continue;
         }
 
@@ -636,13 +618,13 @@ __txn_assert_after_reads(
 
     __wt_readunlock(session, &txn_global->read_timestamp_rwlock);
 
-    if (prevp != NULL)
-        *prevp = prev;
+    if (prev_sharedp != NULL)
+        *prev_sharedp = prev_shared;
 #else
     WT_UNUSED(session);
     WT_UNUSED(op);
     WT_UNUSED(ts);
-    WT_UNUSED(prevp);
+    WT_UNUSED(prev_sharedp);
 #endif
 
     return (0);
@@ -658,11 +640,14 @@ __txn_assert_after_reads(
 int
 __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t commit_ts)
 {
-    WT_TXN *txn = &session->txn;
-    WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t oldest_ts, stable_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool has_oldest_ts, has_stable_ts;
+
+    txn = session->txn;
+    txn_global = &S2C(session)->txn_global;
 
     /* Added this redundant initialization to circumvent build failure. */
     oldest_ts = stable_ts = WT_TS_NONE;
@@ -764,11 +749,14 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t commit_ts
 int
 __wt_txn_set_durable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts)
 {
-    WT_TXN *txn = &session->txn;
-    WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t oldest_ts, stable_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool has_oldest_ts, has_stable_ts;
+
+    txn = session->txn;
+    txn_global = &S2C(session)->txn_global;
 
     /* Added this redundant initialization to circumvent build failure. */
     oldest_ts = stable_ts = 0;
@@ -827,10 +815,15 @@ __wt_txn_set_durable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t durable_
 int
 __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_ts)
 {
-    WT_TXN *prev, *txn = &session->txn;
-    WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *prev_shared, *txn_shared;
     wt_timestamp_t oldest_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
+
+    txn = session->txn;
+    txn_global = &S2C(session)->txn_global;
+    prev_shared = txn_shared = WT_SESSION_TXN_SHARED(session);
 
     WT_RET(__wt_txn_context_prepare_check(session));
 
@@ -842,7 +835,7 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
           "commit timestamp "
           "should not have been set before the prepare timestamp");
 
-    WT_RET(__txn_assert_after_reads(session, "prepare", prepare_ts, &prev));
+    WT_RET(__txn_assert_after_reads(session, "prepare", prepare_ts, &prev_shared));
 
     /*
      * Check whether the prepare timestamp is less than the oldest timestamp.
@@ -857,7 +850,7 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
              * Check that there are no active readers. That would be a violation of preconditions
              * for rounding timestamps of prepared transactions.
              */
-            WT_ASSERT(session, prev == NULL);
+            WT_ASSERT(session, prev_shared == NULL);
 
             __wt_verbose(session, WT_VERB_TIMESTAMP,
               "prepare timestamp %s rounded to oldest "
@@ -886,11 +879,16 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
 int
 __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
 {
-    WT_TXN *txn = &session->txn;
-    WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *txn_shared;
     wt_timestamp_t ts_oldest;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool did_roundup_to_oldest;
+
+    txn = session->txn;
+    txn_global = &S2C(session)->txn_global;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
     WT_RET(__wt_txn_context_prepare_check(session));
 
@@ -922,7 +920,7 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
          * oldest timestamp.
          */
         if (F_ISSET(txn, WT_TXN_TS_ROUND_READ)) {
-            txn->read_timestamp = ts_oldest;
+            txn->read_timestamp = txn_shared->pinned_read_timestamp = ts_oldest;
             did_roundup_to_oldest = true;
         } else {
             __wt_readunlock(session, &txn_global->rwlock);
@@ -942,7 +940,7 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
             return (EINVAL);
         }
     } else
-        txn->read_timestamp = read_ts;
+        txn->read_timestamp = txn_shared->pinned_read_timestamp = read_ts;
 
     __wt_txn_publish_read_timestamp(session);
     __wt_readunlock(session, &txn_global->rwlock);
@@ -1002,7 +1000,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
         WT_RET(__wt_txn_set_durable_timestamp(session, ts));
     }
 
-    __wt_txn_publish_timestamp(session);
+    __wt_txn_publish_durable_timestamp(session);
 
     /* Look for a read timestamp. */
     WT_RET(__wt_config_gets_def(session, cfg, "read_timestamp", 0, &cval));
@@ -1025,21 +1023,23 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_txn_publish_timestamp --
- *     Publish a transaction's timestamp to the durable queue.
+ * __wt_txn_publish_durable_timestamp --
+ *     Publish a transaction's durable timestamp.
  */
 void
-__wt_txn_publish_timestamp(WT_SESSION_IMPL *session)
+__wt_txn_publish_durable_timestamp(WT_SESSION_IMPL *session)
 {
-    WT_TXN *qtxn, *txn, *txn_tmp;
+    WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
-    wt_timestamp_t ts;
+    WT_TXN_SHARED *qtxn_shared, *txn_shared, *txn_shared_tmp;
+    wt_timestamp_t tmpts, ts;
     uint64_t walked;
 
-    txn = &session->txn;
+    txn = session->txn;
     txn_global = &S2C(session)->txn_global;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
-    if (F_ISSET(txn, WT_TXN_TS_PUBLISHED))
+    if (F_ISSET(txn, WT_TXN_SHARED_TS_DURABLE))
         return;
 
     if (F_ISSET(txn, WT_TXN_HAS_TS_DURABLE))
@@ -1053,7 +1053,7 @@ __wt_txn_publish_timestamp(WT_SESSION_IMPL *session)
          */
         if (F_ISSET(txn, WT_TXN_PREPARE))
             return;
-        ts = txn->commit_timestamp;
+        ts = txn->first_commit_timestamp;
     } else
         return;
 
@@ -1063,9 +1063,9 @@ __wt_txn_publish_timestamp(WT_SESSION_IMPL *session)
      * otherwise might not remove ourselves before finding where to insert ourselves (which would
      * result in a list loop) and we don't want to walk more of the list than needed.
      */
-    if (txn->clear_durable_q) {
-        TAILQ_REMOVE(&txn_global->durable_timestamph, txn, durable_timestampq);
-        WT_PUBLISH(txn->clear_durable_q, false);
+    if (txn_shared->clear_durable_q) {
+        TAILQ_REMOVE(&txn_global->durable_timestamph, txn_shared, durable_timestampq);
+        txn_shared->clear_durable_q = false;
         --txn_global->durable_timestampq_len;
     }
     /*
@@ -1073,45 +1073,49 @@ __wt_txn_publish_timestamp(WT_SESSION_IMPL *session)
      * that are not active. We stop when we get to the location where we want to insert.
      */
     if (TAILQ_EMPTY(&txn_global->durable_timestamph)) {
-        TAILQ_INSERT_HEAD(&txn_global->durable_timestamph, txn, durable_timestampq);
+        TAILQ_INSERT_HEAD(&txn_global->durable_timestamph, txn_shared, durable_timestampq);
         WT_STAT_CONN_INCR(session, txn_durable_queue_empty);
     } else {
         /* Walk from the start, removing cleared entries. */
         walked = 0;
-        TAILQ_FOREACH_SAFE(qtxn, &txn_global->durable_timestamph, durable_timestampq, txn_tmp)
+        TAILQ_FOREACH_SAFE(
+          qtxn_shared, &txn_global->durable_timestamph, durable_timestampq, txn_shared_tmp)
         {
             ++walked;
             /*
              * Stop on the first entry that we cannot clear.
              */
-            if (!qtxn->clear_durable_q)
+            if (!qtxn_shared->clear_durable_q)
                 break;
 
-            TAILQ_REMOVE(&txn_global->durable_timestamph, qtxn, durable_timestampq);
-            WT_PUBLISH(qtxn->clear_durable_q, false);
+            TAILQ_REMOVE(&txn_global->durable_timestamph, qtxn_shared, durable_timestampq);
+            qtxn_shared->clear_durable_q = false;
             --txn_global->durable_timestampq_len;
         }
 
         /*
          * Now walk backwards from the end to find the correct position for the insert.
          */
-        qtxn = TAILQ_LAST(&txn_global->durable_timestamph, __wt_txn_dts_qh);
-        while (qtxn != NULL && __txn_get_published_timestamp(session, qtxn) > ts) {
+        qtxn_shared = TAILQ_LAST(&txn_global->durable_timestamph, __wt_txn_dts_qh);
+        while (qtxn_shared != NULL &&
+          (!__txn_get_durable_timestamp(qtxn_shared, &tmpts) || tmpts > ts)) {
             ++walked;
-            qtxn = TAILQ_PREV(qtxn, __wt_txn_dts_qh, durable_timestampq);
+            qtxn_shared = TAILQ_PREV(qtxn_shared, __wt_txn_dts_qh, durable_timestampq);
         }
-        if (qtxn == NULL) {
-            TAILQ_INSERT_HEAD(&txn_global->durable_timestamph, txn, durable_timestampq);
+        if (qtxn_shared == NULL) {
+            TAILQ_INSERT_HEAD(&txn_global->durable_timestamph, txn_shared, durable_timestampq);
             WT_STAT_CONN_INCR(session, txn_durable_queue_head);
         } else
-            TAILQ_INSERT_AFTER(&txn_global->durable_timestamph, qtxn, txn, durable_timestampq);
+            TAILQ_INSERT_AFTER(
+              &txn_global->durable_timestamph, qtxn_shared, txn_shared, durable_timestampq);
         WT_STAT_CONN_INCRV(session, txn_durable_queue_walked, walked);
     }
     ++txn_global->durable_timestampq_len;
     WT_STAT_CONN_INCR(session, txn_durable_queue_inserts);
-    txn->clear_durable_q = false;
-    F_SET(txn, WT_TXN_TS_PUBLISHED);
+    txn_shared->pinned_durable_timestamp = ts;
+    txn_shared->clear_durable_q = false;
     __wt_writeunlock(session, &txn_global->durable_timestamp_rwlock);
+    F_SET(txn, WT_TXN_SHARED_TS_DURABLE);
 }
 
 /*
@@ -1122,11 +1126,12 @@ void
 __wt_txn_clear_durable_timestamp(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
-    uint32_t flags;
+    WT_TXN_SHARED *txn_shared;
 
-    txn = &session->txn;
+    txn = session->txn;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
-    if (!F_ISSET(txn, WT_TXN_TS_PUBLISHED))
+    if (!F_ISSET(txn, WT_TXN_SHARED_TS_DURABLE))
         return;
 
     /*
@@ -1134,15 +1139,9 @@ __wt_txn_clear_durable_timestamp(WT_SESSION_IMPL *session)
      * durable timestamp queue whenever the next thread walks the queue. We do not need to remove it
      * now.
      */
-    txn->clear_durable_q = true;
-
-    /*
-     * Serialize clearing the flag with setting the queue state. The serialization has been here for
-     * awhile, but nobody remembers if or why it's necessary.
-     */
-    flags = txn->flags;
-    LF_CLR(WT_TXN_TS_PUBLISHED);
-    WT_PUBLISH(txn->flags, flags);
+    txn_shared->clear_durable_q = true;
+    WT_WRITE_BARRIER();
+    F_CLR(txn, WT_TXN_SHARED_TS_DURABLE);
 }
 
 /*
@@ -1152,15 +1151,17 @@ __wt_txn_clear_durable_timestamp(WT_SESSION_IMPL *session)
 void
 __wt_txn_publish_read_timestamp(WT_SESSION_IMPL *session)
 {
-    WT_TXN *qtxn, *txn, *txn_tmp;
+    WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *qtxn_shared, *txn_shared, *txn_shared_tmp;
     wt_timestamp_t tmp_timestamp;
     uint64_t walked;
 
-    txn = &session->txn;
+    txn = session->txn;
     txn_global = &S2C(session)->txn_global;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
-    if (F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
+    if (F_ISSET(txn, WT_TXN_SHARED_TS_READ))
         return;
 
     __wt_writelock(session, &txn_global->read_timestamp_rwlock);
@@ -1169,9 +1170,9 @@ __wt_txn_publish_read_timestamp(WT_SESSION_IMPL *session)
      * otherwise might not remove ourselves before finding where to insert ourselves (which would
      * result in a list loop) and we don't want to walk more of the list than needed.
      */
-    if (txn->clear_read_q) {
-        TAILQ_REMOVE(&txn_global->read_timestamph, txn, read_timestampq);
-        WT_PUBLISH(txn->clear_read_q, false);
+    if (txn_shared->clear_read_q) {
+        TAILQ_REMOVE(&txn_global->read_timestamph, txn_shared, read_timestampq);
+        WT_PUBLISH(txn_shared->clear_read_q, false);
         --txn_global->read_timestampq_len;
     }
     /*
@@ -1179,39 +1180,41 @@ __wt_txn_publish_read_timestamp(WT_SESSION_IMPL *session)
      * that are not active. We stop when we get to the location where we want to insert.
      */
     if (TAILQ_EMPTY(&txn_global->read_timestamph)) {
-        TAILQ_INSERT_HEAD(&txn_global->read_timestamph, txn, read_timestampq);
+        TAILQ_INSERT_HEAD(&txn_global->read_timestamph, txn_shared, read_timestampq);
         WT_STAT_CONN_INCR(session, txn_read_queue_empty);
     } else {
         /* Walk from the start, removing cleared entries. */
         walked = 0;
-        TAILQ_FOREACH_SAFE(qtxn, &txn_global->read_timestamph, read_timestampq, txn_tmp)
+        TAILQ_FOREACH_SAFE(
+          qtxn_shared, &txn_global->read_timestamph, read_timestampq, txn_shared_tmp)
         {
             ++walked;
-            if (!qtxn->clear_read_q)
+            if (!qtxn_shared->clear_read_q)
                 break;
 
-            TAILQ_REMOVE(&txn_global->read_timestamph, qtxn, read_timestampq);
-            WT_PUBLISH(qtxn->clear_read_q, false);
+            TAILQ_REMOVE(&txn_global->read_timestamph, qtxn_shared, read_timestampq);
+            WT_PUBLISH(qtxn_shared->clear_read_q, false);
             --txn_global->read_timestampq_len;
         }
 
         /*
          * Now walk backwards from the end to find the correct position for the insert.
          */
-        qtxn = TAILQ_LAST(&txn_global->read_timestamph, __wt_txn_rts_qh);
-        while (qtxn != NULL) {
-            if (!__txn_get_read_timestamp(qtxn, &tmp_timestamp) ||
-              tmp_timestamp > txn->read_timestamp) {
+        qtxn_shared = TAILQ_LAST(&txn_global->read_timestamph, __wt_txn_rts_qh);
+        while (qtxn_shared != NULL) {
+            if (!__txn_get_read_timestamp(qtxn_shared, &tmp_timestamp) ||
+              tmp_timestamp > txn_shared->pinned_read_timestamp) {
                 ++walked;
-                qtxn = TAILQ_PREV(qtxn, __wt_txn_rts_qh, read_timestampq);
+                qtxn_shared = TAILQ_PREV(qtxn_shared, __wt_txn_rts_qh, read_timestampq);
             } else
                 break;
         }
-        if (qtxn == NULL) {
-            TAILQ_INSERT_HEAD(&txn_global->read_timestamph, txn, read_timestampq);
+        if (qtxn_shared == NULL) {
+            TAILQ_INSERT_HEAD(&txn_global->read_timestamph, txn_shared, read_timestampq);
             WT_STAT_CONN_INCR(session, txn_read_queue_head);
         } else
-            TAILQ_INSERT_AFTER(&txn_global->read_timestamph, qtxn, txn, read_timestampq);
+            TAILQ_INSERT_AFTER(
+              &txn_global->read_timestamph, qtxn_shared, txn_shared, read_timestampq);
         WT_STAT_CONN_INCRV(session, txn_read_queue_walked, walked);
     }
     /*
@@ -1220,8 +1223,8 @@ __wt_txn_publish_read_timestamp(WT_SESSION_IMPL *session)
      */
     ++txn_global->read_timestampq_len;
     WT_STAT_CONN_INCR(session, txn_read_queue_inserts);
-    txn->clear_read_q = false;
-    F_SET(txn, WT_TXN_HAS_TS_READ | WT_TXN_PUBLIC_TS_READ);
+    txn_shared->clear_read_q = false;
+    F_SET(txn, WT_TXN_HAS_TS_READ | WT_TXN_SHARED_TS_READ);
     __wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
 }
 
@@ -1233,34 +1236,27 @@ void
 __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
-    uint32_t flags;
+    WT_TXN_SHARED *txn_shared;
 
-    txn = &session->txn;
+    txn = session->txn;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
-    if (!F_ISSET(txn, WT_TXN_PUBLIC_TS_READ)) {
-        txn->read_timestamp = WT_TS_NONE;
-        return;
+    if (F_ISSET(txn, WT_TXN_SHARED_TS_READ)) {
+        /* Assert the read timestamp is greater than or equal to the pinned timestamp. */
+        WT_ASSERT(session, txn->read_timestamp == txn_shared->pinned_read_timestamp &&
+            txn->read_timestamp >= S2C(session)->txn_global.pinned_timestamp);
+
+        /*
+         * Notify other threads that our transaction is inactive and can be cleaned up safely from
+         * the read timestamp queue whenever the next thread walks the queue. We do not need to
+         * remove it now.
+         */
+        txn_shared->clear_read_q = true;
+        WT_WRITE_BARRIER();
+
+        F_CLR(txn, WT_TXN_SHARED_TS_READ);
     }
-
-    /* Assert the read timestamp is greater than or equal to the pinned timestamp. */
-    WT_ASSERT(session, txn->read_timestamp >= S2C(session)->txn_global.pinned_timestamp);
-
-    /*
-     * Notify other threads that our transaction is inactive and can be cleaned up safely from the
-     * read timestamp queue whenever the next thread walks the queue. We do not need to remove it
-     * now.
-     */
-    txn->clear_read_q = true;
-
-    /*
-     * Serialize clearing the flag with setting the queue state. The serialization has been here for
-     * awhile, but nobody remembers if or why it's necessary.
-     */
-    flags = txn->flags;
-    LF_CLR(WT_TXN_PUBLIC_TS_READ);
-    WT_PUBLISH(txn->flags, flags);
-
-    txn->read_timestamp = WT_TS_NONE;
+    txn->read_timestamp = txn_shared->pinned_read_timestamp = WT_TS_NONE;
 }
 
 /*
@@ -1271,36 +1267,40 @@ __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
 void
 __wt_txn_clear_timestamp_queues(WT_SESSION_IMPL *session)
 {
-    WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *txn_shared;
 
-    txn = &session->txn;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
     txn_global = &S2C(session)->txn_global;
 
-    if (!txn->clear_durable_q && !txn->clear_read_q)
+    /*
+     * If we've closed the connection, our transaction shared states may already have been freed. In
+     * that case, there's nothing more to do here.
+     */
+    if (txn_shared == NULL || (!txn_shared->clear_durable_q && !txn_shared->clear_read_q))
         return;
 
-    if (txn->clear_durable_q) {
+    if (txn_shared->clear_durable_q) {
         __wt_writelock(session, &txn_global->durable_timestamp_rwlock);
         /*
          * Recheck after acquiring the lock.
          */
-        if (txn->clear_durable_q) {
-            TAILQ_REMOVE(&txn_global->durable_timestamph, txn, durable_timestampq);
+        if (txn_shared->clear_durable_q) {
+            TAILQ_REMOVE(&txn_global->durable_timestamph, txn_shared, durable_timestampq);
             --txn_global->durable_timestampq_len;
-            txn->clear_durable_q = false;
+            txn_shared->clear_durable_q = false;
         }
         __wt_writeunlock(session, &txn_global->durable_timestamp_rwlock);
     }
-    if (txn->clear_read_q) {
+    if (txn_shared->clear_read_q) {
         __wt_writelock(session, &txn_global->read_timestamp_rwlock);
         /*
          * Recheck after acquiring the lock.
          */
-        if (txn->clear_read_q) {
-            TAILQ_REMOVE(&txn_global->read_timestamph, txn, read_timestampq);
+        if (txn_shared->clear_read_q) {
+            TAILQ_REMOVE(&txn_global->read_timestamph, txn_shared, read_timestampq);
             --txn_global->read_timestampq_len;
-            txn->clear_read_q = false;
+            txn_shared->clear_read_q = false;
         }
         __wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
     }

@@ -112,7 +112,7 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
     WT_DECL_RET;
     WT_ITEM key, start_key, stop_key, value;
     WT_SESSION_IMPL *session;
-    wt_timestamp_t commit, durable, first, prepare, read;
+    wt_timestamp_t commit, durable, first_commit, pinned_read, prepare, read;
     uint64_t recno, start_recno, stop_recno, t_nsec, t_sec;
     uint32_t fileid, mode, optype, opsize;
 
@@ -141,9 +141,8 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
             WT_ERR_NOTFOUND_OK(ret, false);
         else {
             /*
-             * Build/insert a complete value during recovery rather
-             * than using cursor modify to create a partial update
-             * (for no particular reason than simplicity).
+             * Build/insert a complete value during recovery rather than using cursor modify to
+             * create a partial update (for no particular reason than simplicity).
              */
             WT_ERR(__wt_modify_apply(cursor, value.data));
             WT_ERR(cursor->insert(cursor));
@@ -203,9 +202,8 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
             WT_ERR_NOTFOUND_OK(ret, false);
         else {
             /*
-             * Build/insert a complete value during recovery rather
-             * than using cursor modify to create a partial update
-             * (for no particular reason than simplicity).
+             * Build/insert a complete value during recovery rather than using cursor modify to
+             * create a partial update (for no particular reason than simplicity).
              */
             WT_ERR(__wt_modify_apply(cursor, value.data));
             WT_ERR(cursor->insert(cursor));
@@ -268,8 +266,8 @@ __txn_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *
          * Timestamp records are informational only. We have to unpack it to properly move forward
          * in the log record to the next operation, but otherwise ignore.
          */
-        WT_ERR(__wt_logop_txn_timestamp_unpack(
-          session, pp, end, &t_sec, &t_nsec, &commit, &durable, &first, &prepare, &read));
+        WT_ERR(__wt_logop_txn_timestamp_unpack(session, pp, end, &t_sec, &t_nsec, &commit, &durable,
+          &first_commit, &prepare, &read, &pinned_read));
         break;
     default:
         WT_ERR(__wt_illegal_value(session, optype));

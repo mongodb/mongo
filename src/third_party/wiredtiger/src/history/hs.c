@@ -846,23 +846,16 @@ err:
 }
 
 /*
- * __hs_save_read_timestamp --
- *     Save the currently running transaction's read timestamp into a variable.
- */
-static void
-__hs_save_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *saved_timestamp)
-{
-    *saved_timestamp = session->txn.read_timestamp;
-}
-
-/*
  * __hs_restore_read_timestamp --
- *     Reset the currently running transaction's read timestamp with a previously saved one.
+ *     Reset the currently running transaction's read timestamp with the original read timestamp.
  */
 static void
-__hs_restore_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t saved_timestamp)
+__hs_restore_read_timestamp(WT_SESSION_IMPL *session)
 {
-    session->txn.read_timestamp = saved_timestamp;
+    WT_TXN_SHARED *txn_shared;
+
+    txn_shared = WT_SESSION_TXN_SHARED(session);
+    session->txn->read_timestamp = txn_shared->pinned_read_timestamp;
 }
 
 /*
@@ -886,7 +879,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
     WT_TXN *txn;
     WT_UPDATE *mod_upd, *upd;
     wt_timestamp_t durable_timestamp, durable_timestamp_tmp, hs_start_ts, hs_start_ts_tmp;
-    wt_timestamp_t hs_stop_ts, hs_stop_ts_tmp, read_timestamp, saved_timestamp;
+    wt_timestamp_t hs_stop_ts, hs_stop_ts_tmp, read_timestamp;
     size_t notused, size;
     uint64_t hs_counter, hs_counter_tmp, upd_type_full;
     uint32_t hs_btree_id, session_flags;
@@ -900,13 +893,19 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
     mod_upd = upd = NULL;
     orig_hs_value_buf = NULL;
     __wt_modify_vector_init(session, &modifies);
-    txn = &session->txn;
-    __hs_save_read_timestamp(session, &saved_timestamp);
+    txn = session->txn;
     notused = size = 0;
     hs_btree_id = S2BT(session)->id;
     session_flags = 0; /* [-Werror=maybe-uninitialized] */
     WT_NOT_READ(modify, false);
     is_owner = false;
+
+    /*
+     * We temporarily move the read timestamp forwards to read modify records in the history store.
+     * Outside of that window, it should always be equal to the original read timestamp.
+     */
+    WT_ASSERT(
+      session, txn->read_timestamp == WT_SESSION_TXN_SHARED(session)->pinned_read_timestamp);
 
     /* Row-store key is as passed to us, create the column-store key as needed. */
     WT_ASSERT(
@@ -983,7 +982,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
              * timestamp should be equivalent to the stop timestamp of the record that we're
              * currently on.
              */
-            session->txn.read_timestamp = hs_stop_ts_tmp;
+            session->txn->read_timestamp = hs_stop_ts_tmp;
 
             /*
              * Find the base update to apply the reverse deltas. If our cursor next fails to find an
@@ -1031,7 +1030,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
             mod_upd = NULL;
         }
         /* After we're done looping over modifies, reset the read timestamp. */
-        __hs_restore_read_timestamp(session, saved_timestamp);
+        __hs_restore_read_timestamp(session);
         WT_STAT_CONN_INCR(session, cache_hs_read_squash);
     }
 
@@ -1061,7 +1060,7 @@ err:
      * Restore the read timestamp if we encountered an error while processing a modify. There's no
      * harm in doing this multiple times.
      */
-    __hs_restore_read_timestamp(session, saved_timestamp);
+    __hs_restore_read_timestamp(session);
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
 
     __wt_free_update_list(session, &mod_upd);

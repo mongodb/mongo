@@ -170,9 +170,9 @@ struct __wt_cache {
     uint32_t evict_aggressive_score;
 
     /*
-     * Score of how often LRU queues are empty on refill. This score varies
-     * between 0 (if the queue hasn't been empty for a long time) and 100
-     * (if the queue has been empty the last 10 times we filled up.
+     * Score of how often LRU queues are empty on refill. This score varies between 0 (if the queue
+     * hasn't been empty for a long time) and 100 (if the queue has been empty the last 10 times we
+     * filled up.
      */
     uint32_t evict_empty_score;
 

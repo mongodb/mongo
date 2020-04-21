@@ -132,8 +132,8 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
              * We have to do this with a transaction ID pinned unless the cursor is reading from a
              * checkpoint.
              */
-            WT_TXN_STATE *txn_state = WT_SESSION_TXN_STATE(session);
-            WT_ASSERT(session, txn_state->pinned_id != WT_TXN_NONE ||
+            WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
+            WT_ASSERT(session, txn_shared->pinned_id != WT_TXN_NONE ||
                 (WT_PREFIX_MATCH(cursor->uri, "file:") &&
                                  F_ISSET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN)));
 #endif
@@ -184,14 +184,12 @@ static void
 __session_clear(WT_SESSION_IMPL *session)
 {
     /*
-     * There's no serialization support around the review of the hazard
-     * array, which means threads checking for hazard pointers first check
-     * the active field (which may be 0) and then use the hazard pointer
-     * (which cannot be NULL).
+     * There's no serialization support around the review of the hazard array, which means threads
+     * checking for hazard pointers first check the active field (which may be 0) and then use the
+     * hazard pointer (which cannot be NULL).
      *
-     * Additionally, the session structure can include information that
-     * persists past the session's end-of-life, stored as part of page
-     * splits.
+     * Additionally, the session structure can include information that persists past the session's
+     * end-of-life, stored as part of page splits.
      *
      * For these reasons, be careful when clearing the session structure.
      */
@@ -274,13 +272,13 @@ __session_close(WT_SESSION *wt_session, const char *config)
     F_CLR(session, WT_SESSION_CACHE_CURSORS);
 
     /* Rollback any active transaction. */
-    if (F_ISSET(&session->txn, WT_TXN_RUNNING))
+    if (F_ISSET(session->txn, WT_TXN_RUNNING))
         WT_TRET(__session_rollback_transaction(wt_session, NULL));
 
     /*
      * Also release any pinned transaction ID from a non-transactional operation.
      */
-    if (conn->txn_global.states != NULL)
+    if (conn->txn_global.txn_shared_list != NULL)
         __wt_txn_release_snapshot(session);
 
     /* Close all open cursors. */
@@ -1644,7 +1642,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
     WT_TXN *txn;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    txn = &session->txn;
+    txn = session->txn;
     SESSION_API_CALL_PREPARE_ALLOWED(session, commit_transaction, config, cfg);
     WT_STAT_CONN_INCR(session, txn_commit);
 
@@ -1748,7 +1746,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
     SESSION_API_CALL_PREPARE_ALLOWED(session, rollback_transaction, config, cfg);
     WT_STAT_CONN_INCR(session, txn_rollback);
 
-    txn = &session->txn;
+    txn = session->txn;
     if (F_ISSET(txn, WT_TXN_PREPARE)) {
         WT_STAT_CONN_INCR(session, txn_prepare_rollback);
         WT_STAT_CONN_DECR(session, txn_prepare_active);
@@ -1816,19 +1814,19 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
 {
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    WT_TXN_STATE *txn_state;
+    WT_TXN_SHARED *txn_shared;
     uint64_t pinned;
 
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(session, transaction_pinned_range);
 
-    txn_state = WT_SESSION_TXN_STATE(session);
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
     /* Assign pinned to the lesser of id or snap_min */
-    if (txn_state->id != WT_TXN_NONE && WT_TXNID_LT(txn_state->id, txn_state->pinned_id))
-        pinned = txn_state->id;
+    if (txn_shared->id != WT_TXN_NONE && WT_TXNID_LT(txn_shared->id, txn_shared->pinned_id))
+        pinned = txn_shared->id;
     else
-        pinned = txn_state->pinned_id;
+        pinned = txn_shared->pinned_id;
 
     if (pinned == WT_TXN_NONE)
         *prange = 0;

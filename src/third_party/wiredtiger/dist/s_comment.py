@@ -103,12 +103,13 @@ for line in sys.stdin:
         if (len(sline) >= 3 and sline.startswith('*') and sline[1] == ' ' and
             (sline[2].islower() or sline[2] == '_') and sline.endswith('--')):
             function_desc = True
-        # We're only reformatting block comments where each line begins with a
-        # space and an alphabetic character after the asterisk. The only
-        # exceptions are function descriptions.
+        # We're only reformatting block comments where each line begins with a space and an
+        # alphabetic character after the asterisk, or a parenthetical. The only exceptions
+        # are function descriptions.
         block = block and \
-                (len(sline) >= 3 and sline.startswith('*') and
-                 sline[1] == ' ' and sline[2].isalpha()) or function_desc
+            len(sline) >= 3 and sline.startswith('*') and sline[1] == ' ' and \
+            (sline[2].isalpha() or (len(sline) >= 5 and \
+            (sline[2] == '(' and sline[3].isalpha() and sline[4] != ')'))) or function_desc
         # Trim asterisks at the beginning of each line in a multiline comment.
         if sline.startswith('*'):
             sline = sline[1:]

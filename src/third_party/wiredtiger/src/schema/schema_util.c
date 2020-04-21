@@ -84,7 +84,7 @@ __wt_schema_internal_session(WT_SESSION_IMPL *session, WT_SESSION_IMPL **int_ses
      * flags from the original.
      */
     *int_sessionp = session;
-    if (F_ISSET(&session->txn, WT_TXN_RUNNING)) {
+    if (F_ISSET(session->txn, WT_TXN_RUNNING)) {
         /* We should not have a schema txn running now. */
         WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_TXN));
         WT_RET(

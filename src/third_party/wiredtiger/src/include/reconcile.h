@@ -25,10 +25,7 @@ struct __wt_reconcile {
     uint64_t orig_btree_checkpoint_gen;
     uint64_t orig_txn_checkpoint_gen;
 
-    /*
-     * Track the oldest running transaction and whether to skew history store to the newest update.
-     */
-    bool hs_skew_newest;
+    /* Track the oldest running transaction. */
     uint64_t last_running;
 
     /* Track the page's min/maximum transactions. */

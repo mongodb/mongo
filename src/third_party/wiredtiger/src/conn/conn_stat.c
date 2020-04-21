@@ -135,15 +135,13 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
         FLD_SET(conn->stat_flags, WT_STAT_ON_CLOSE);
 
     /*
-     * We don't allow the log path to be reconfigured for security reasons.
-     * (Applications passing input strings directly to reconfigure would
-     * expose themselves to a potential security problem, the utility of
-     * reconfiguring a statistics log path isn't worth the security risk.)
+     * We don't allow the log path to be reconfigured for security reasons. (Applications passing
+     * input strings directly to reconfigure would expose themselves to a potential security
+     * problem, the utility of reconfiguring a statistics log path isn't worth the security risk.)
      *
-     * See above for the details, but during reconfiguration we're loading
-     * the path value from the saved configuration information, and it's
-     * required during reconfiguration because we potentially stopped and
-     * are restarting, the server.
+     * See above for the details, but during reconfiguration we're loading the path value from the
+     * saved configuration information, and it's required during reconfiguration because we
+     * potentially stopped and are restarting, the server.
      */
     WT_RET(__wt_config_gets(session, cfg, "statistics_log.path", &cval));
     WT_ERR(__wt_scr_alloc(session, 0, &tmp));

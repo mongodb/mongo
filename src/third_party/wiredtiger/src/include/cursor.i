@@ -219,9 +219,8 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
     cbt->page_deleted_count = 0;
 
     /*
-     * Release any page references we're holding. This can trigger eviction
-     * (e.g., forced eviction of big pages), so it's important to do after
-     * releasing our snapshot above.
+     * Release any page references we're holding. This can trigger eviction (e.g., forced eviction
+     * of big pages), so it's important to do after releasing our snapshot above.
      *
      * Clear the reference regardless, so we don't try the release twice.
      */
