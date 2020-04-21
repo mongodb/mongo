@@ -12,11 +12,6 @@
 load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
 load('jstests/libs/parallelTester.js');     // For Thread.
 
-if (typeof db === 'undefined') {
-    throw new Error(
-        "Expected mongo shell to be connected a mongod, but global 'db' object isn't defined");
-}
-
 /**
  * Returns true if the error code is transient.
  */
@@ -77,7 +72,7 @@ function reconfigBackground(primary, numNodes) {
     assert.neq(
         null, conn, "Failed to connect to primary '" + primary + "' for background reconfigs");
 
-    var config = conn.getDB("local").system.replset.findOne();
+    var config = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetConfig: 1})).config;
 
     // Find the correct host in the member config
     const primaryHostIndex = (cfg, pHost) => cfg.members.findIndex(m => m.host === pHost);
@@ -121,8 +116,8 @@ function reconfigBackground(primary, numNodes) {
 // command. If we fail with a network error, ignore it.
 let res;
 try {
-    const conn = db.getMongo();
-    const topology = DiscoverTopology.findConnectedNodes(conn);
+    const conn = connect(TestData.connectionString);
+    const topology = DiscoverTopology.findConnectedNodes(conn.getMongo());
 
     if (topology.type !== Topology.kReplicaSet) {
         throw new Error('Unsupported topology configuration: ' + tojson(topology));
@@ -131,12 +126,21 @@ try {
     const numNodes = topology.nodes.length;
     res = reconfigBackground(topology.primary, numNodes);
 } catch (e) {
+    // If the ReplicaSetMonitor cannot find a primary because it has stepped down or
+    // been killed, it may take longer than 15 seconds for a new primary to step up.
+    // Ignore this error until we find a new primary.
+    const kReplicaSetMonitorError =
+        /^Could not find host matching read preference.*mode: "primary"/;
+
     if (isNetworkError(e)) {
-        jsTestLog("Ignoring network error: " + tojson(e));
-        res = {ok: 1};
+        jsTestLog("Ignoring network error" + tojson(e));
+    } else if (e.message.match(kReplicaSetMonitorError)) {
+        jsTestLog("Ignoring read preference primary error" + tojson(e));
     } else {
         throw e;
     }
+
+    res = {ok: 1};
 }
 
 assert.commandWorked(res, "reconfig hook failed: " + tojson(res));

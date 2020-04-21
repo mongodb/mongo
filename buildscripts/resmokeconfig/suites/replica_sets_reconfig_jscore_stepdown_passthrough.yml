@@ -72,6 +72,8 @@ selector:
   # Unacknowledged writes prohibited in an explicit session.
   - jstests/core/batch_write_command_w0.js
 
+  - jstests/core/bench_test*.js # benchRun() used for writes
+  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
   - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
   - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
   - jstests/core/top.js # Tests read commands (including getMore) against the secondary
@@ -172,6 +174,8 @@ executor:
       readMode: commands
   hooks:
   - class: DoReconfigInBackground
+    shell_options:
+      nodb: ""
   - class: ContinuousStepdown
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

@@ -64,6 +64,8 @@ executor:
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
   - class: DoReconfigInBackground
+    shell_options:
+      nodb: ""
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections

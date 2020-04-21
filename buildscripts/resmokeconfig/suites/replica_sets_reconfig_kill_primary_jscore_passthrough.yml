@@ -188,6 +188,8 @@ executor:
       readMode: commands
   hooks:
   - class: DoReconfigInBackground
+    shell_options:
+      nodb: ""
   - class: ContinuousStepdown
     kill: true
     background_reconfig: true
