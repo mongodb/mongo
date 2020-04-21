@@ -3506,6 +3506,11 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
             return Status(ErrorCodes::ShutdownInProgress, "In the process of shutting down");
         }
 
+        if (_selfIndex == -1) {
+            return Status(ErrorCodes::InvalidReplicaSetConfig,
+                          "Invalid replica set config, or this node is not a member");
+        }
+
         _topCoord->processReplSetRequestVotes(args, response);
     }
 
