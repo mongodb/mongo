@@ -639,11 +639,19 @@ ExitCode _initAndListen(int listenPort) {
     // Only do this on storage engines supporting snapshot reads, which hold resources we wish to
     // release periodically in order to avoid storage cache pressure build up.
     if (storageEngine->supportsReadConcernSnapshot()) {
-        PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
-        // The inMemory engine is not yet used for replica or sharded transactions in production so
-        // it does not currently maintain snapshot history. It is live in testing, however.
-        if (!storageEngine->isEphemeral() || getTestCommandsEnabled()) {
-            PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::get(serviceContext)->start();
+        try {
+            PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
+            // The inMemory engine is not yet used for replica or sharded transactions in production
+            // so it does not currently maintain snapshot history. It is live in testing, however.
+            if (!storageEngine->isEphemeral() || getTestCommandsEnabled()) {
+                PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::get(serviceContext)->start();
+            }
+        } catch (ExceptionFor<ErrorCodes::PeriodicJobIsStopped>&) {
+            log() << "Not starting periodic jobs as shutdown is in progress";
+            // Shutdown has already started before initialization is complete. Wait for the
+            // shutdown task to complete and return.
+            MONGO_IDLE_THREAD_BLOCK;
+            return waitForShutdown();
         }
     }
 

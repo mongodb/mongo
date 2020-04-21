@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include <boost/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/unittest/unittest.h"
@@ -68,6 +71,14 @@ class PeriodicRunnerImplTest : public PeriodicRunnerImplTestNoSetup {
 public:
     void setUp() override {
         PeriodicRunnerImplTestNoSetup::setUp();
+    }
+
+    auto makeStoppedJob() {
+        PeriodicRunner::PeriodicJob job("job", [](Client* client) {}, Seconds{1});
+        auto jobAnchor = runner().makeJob(std::move(job));
+        jobAnchor.start();
+        jobAnchor.stop();
+        return jobAnchor;
     }
 };
 
@@ -435,6 +446,23 @@ TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
     }
 
     tearDown();
+}
+
+TEST_F(PeriodicRunnerImplTest, ThrowsErrorOnceStopped) {
+    auto jobAnchor = makeStoppedJob();
+    ASSERT_THROWS_CODE_AND_WHAT(jobAnchor.start(),
+                                AssertionException,
+                                ErrorCodes::PeriodicJobIsStopped,
+                                "Attempted to start an already stopped job");
+    ASSERT_THROWS_CODE_AND_WHAT(jobAnchor.pause(),
+                                AssertionException,
+                                ErrorCodes::PeriodicJobIsStopped,
+                                "Attempted to pause an already stopped job");
+    ASSERT_THROWS_CODE_AND_WHAT(jobAnchor.resume(),
+                                AssertionException,
+                                ErrorCodes::PeriodicJobIsStopped,
+                                "Attempted to resume an already stopped job");
+    jobAnchor.stop();
 }
 
 }  // namespace
