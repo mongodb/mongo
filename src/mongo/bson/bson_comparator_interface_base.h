@@ -226,39 +226,55 @@ public:
      * Returns a function object which computes whether one BSONObj is less than another under this
      * comparator. This comparator must outlive the returned function object.
      */
-    LessThan makeLessThan() const {
+    LessThan makeLessThan() const& {
         return LessThan(this);
     }
+
+    LessThan makeLessThan() const&& = delete;
 
     /**
      * Returns a function object which computes whether one BSONObj is equal to another under this
      * comparator. This comparator must outlive the returned function object.
      */
-    EqualTo makeEqualTo() const {
+    EqualTo makeEqualTo() const& {
         return EqualTo(this);
     }
+
+    EqualTo makeEqualTo() const&& = delete;
 
 protected:
     constexpr BSONComparatorInterfaceBase() = default;
 
-    Set makeSet(std::initializer_list<T> init = {}) const {
+    Set makeSet(std::initializer_list<T> init = {}) const& {
         return Set(init, LessThan(this));
     }
 
-    UnorderedSet makeUnorderedSet(std::initializer_list<T> init = {}) const {
+    Set makeSet(std::initializer_list<T> init = {}) const&& = delete;
+
+    UnorderedSet makeUnorderedSet(std::initializer_list<T> init = {}) const& {
         return UnorderedSet(init, 0, Hasher(this), EqualTo(this));
     }
 
+    UnorderedSet makeUnorderedSet(std::initializer_list<T> init = {}) const&& = delete;
+
     template <typename ValueType>
-    Map<ValueType> makeMap(std::initializer_list<std::pair<const T, ValueType>> init = {}) const {
+    Map<ValueType> makeMap(std::initializer_list<std::pair<const T, ValueType>> init = {}) const& {
         return Map<ValueType>(init, LessThan(this));
     }
 
     template <typename ValueType>
+    Map<ValueType> makeMap(std::initializer_list<std::pair<const T, ValueType>> init = {}) const&& =
+        delete;
+
+    template <typename ValueType>
     UnorderedMap<ValueType> makeUnorderedMap(
-        std::initializer_list<std::pair<const T, ValueType>> init = {}) const {
+        std::initializer_list<std::pair<const T, ValueType>> init = {}) const& {
         return UnorderedMap<ValueType>(init, 0, Hasher(this), EqualTo(this));
     }
+
+    template <typename ValueType>
+    UnorderedMap<ValueType> makeUnorderedMap(
+        std::initializer_list<std::pair<const T, ValueType>> init = {}) const&& = delete;
 
     /**
      * Hashes 'objToHash', respecting the equivalence classes given by 'stringComparator'.

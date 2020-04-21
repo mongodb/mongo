@@ -57,17 +57,21 @@ public:
      * Constructs a BSONObjSet whose equivalence classes are given by this comparator. This
      * comparator must outlive the returned set.
      */
-    Set makeBSONObjSet(std::initializer_list<BSONObj> init = {}) const {
+    Set makeBSONObjSet(std::initializer_list<BSONObj> init = {}) const& {
         return makeSet(init);
     }
+
+    Set makeBSONObjSet(std::initializer_list<BSONObj> init = {}) const&& = delete;
 
     /**
      * Constructs a BSONObjUnorderedSet whose equivalence classes are given by this
      * comparator. This comparator must outlive the returned set.
      */
-    UnorderedSet makeBSONObjUnorderedSet(std::initializer_list<BSONObj> init = {}) const {
+    UnorderedSet makeBSONObjUnorderedSet(std::initializer_list<BSONObj> init = {}) const& {
         return makeUnorderedSet(init);
     }
+
+    UnorderedSet makeBSONObjUnorderedSet(std::initializer_list<BSONObj> init = {}) const&& = delete;
 
     /**
      * Constructs an ordered map from BSONObj to type ValueType whose ordering is given by this
@@ -75,9 +79,13 @@ public:
      */
     template <typename ValueType>
     Map<ValueType> makeBSONObjIndexedMap(
-        std::initializer_list<std::pair<const BSONObj, ValueType>> init = {}) const {
+        std::initializer_list<std::pair<const BSONObj, ValueType>> init = {}) const& {
         return makeMap(init);
     }
+
+    template <typename ValueType>
+    Map<ValueType> makeBSONObjIndexedMap(
+        std::initializer_list<std::pair<const BSONObj, ValueType>> init = {}) const&& = delete;
 
     /**
      * Constructs an unordered map from BSONObj to type ValueType whose ordering is given by this
@@ -85,9 +93,13 @@ public:
      */
     template <typename ValueType>
     UnorderedMap<ValueType> makeBSONObjIndexedUnorderedMap(
-        std::initializer_list<std::pair<const BSONObj, ValueType>> init = {}) const {
+        std::initializer_list<std::pair<const BSONObj, ValueType>> init = {}) const& {
         return makeUnorderedMap(init);
     }
+
+    template <typename ValueType>
+    UnorderedMap<ValueType> makeBSONObjIndexedUnorderedMap(
+        std::initializer_list<std::pair<const BSONObj, ValueType>> init = {}) const&& = delete;
 };
 
 using BSONObjSet = BSONComparatorInterfaceBase<BSONObj>::Set;

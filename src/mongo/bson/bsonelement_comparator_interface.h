@@ -60,17 +60,22 @@ public:
      * Constructs a BSONEltSet whose equivalence classes are given by this comparator. This
      * comparator must outlive the returned set.
      */
-    Set makeBSONEltSet(std::initializer_list<BSONElement> init = {}) const {
+    Set makeBSONEltSet(std::initializer_list<BSONElement> init = {}) const& {
         return makeSet(init);
     }
+
+    Set makeBSONEltSet(std::initializer_list<BSONElement> init = {}) const&& = delete;
 
     /**
      * Constructs a BSONEltUnorderedSet whose equivalence classes are given by this
      * comparator. This comparator must outlive the returned set.
      */
-    UnorderedSet makeBSONEltUnorderedSet(std::initializer_list<BSONElement> init = {}) const {
+    UnorderedSet makeBSONEltUnorderedSet(std::initializer_list<BSONElement> init = {}) const& {
         return makeUnorderedSet(init);
     }
+
+    UnorderedSet makeBSONEltUnorderedSet(std::initializer_list<BSONElement> init = {}) const&& =
+        delete;
 
     /**
      * Constructs an ordered map from BSONElement to type ValueType whose ordering is given by this
@@ -78,9 +83,13 @@ public:
      */
     template <typename ValueType>
     Map<ValueType> makeBSONEltIndexedMap(
-        std::initializer_list<std::pair<const BSONElement, ValueType>> init = {}) const {
+        std::initializer_list<std::pair<const BSONElement, ValueType>> init = {}) const& {
         return makeMap(init);
     }
+
+    template <typename ValueType>
+    Map<ValueType> makeBSONEltIndexedMap(
+        std::initializer_list<std::pair<const BSONElement, ValueType>> init = {}) const&& = delete;
 
     /**
      * Constructs an unordered map from BSONElement to type ValueType whose ordering is given by
@@ -88,9 +97,13 @@ public:
      */
     template <typename ValueType>
     UnorderedMap<ValueType> makeBSONEltIndexedUnorderedMap(
-        std::initializer_list<std::pair<const BSONElement, ValueType>> init = {}) const {
+        std::initializer_list<std::pair<const BSONElement, ValueType>> init = {}) const& {
         return makeUnorderedMap(init);
     }
+
+    template <typename ValueType>
+    UnorderedMap<ValueType> makeBSONEltIndexedUnorderedMap(
+        std::initializer_list<std::pair<const BSONElement, ValueType>> init = {}) const&& = delete;
 };
 
 using BSONEltSet = BSONComparatorInterfaceBase<BSONElement>::Set;
