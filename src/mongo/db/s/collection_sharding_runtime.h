@@ -159,6 +159,11 @@ public:
         _metadataManager->toBSONPending(bb);
     }
 
+    /**
+     * Clears the list of chunks that are being received as a part of an incoming migration.
+     */
+    void clearReceivingChunks();
+
     std::uint64_t getNumMetadataManagerChanges_forTest() {
         return _numMetadataManagerChanges;
     }
