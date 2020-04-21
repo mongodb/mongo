@@ -185,6 +185,11 @@ public:
         return _buffer.get() + _offset;
     }
 
+    // Returns whether or not a memory fragment is currently being built.
+    bool building() const {
+        return _inUse;
+    }
+
 private:
     SharedBuffer _buffer;
     ptrdiff_t _offset;

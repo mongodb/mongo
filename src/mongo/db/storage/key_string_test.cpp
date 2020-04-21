@@ -768,6 +768,20 @@ TEST_F(KeyStringBuilderTest, ReasonableSize) {
     ASSERT_LTE(value5.memUsageForSorter(), 34);
 }
 
+TEST_F(KeyStringBuilderTest, DiscardIfNotReleased) {
+    SharedBufferFragmentBuilder fragmentBuilder(1024);
+    {
+        // Intentially not released, but the data should be discarded correctly.
+        KeyString::PooledBuilder pooledBuilder(
+            fragmentBuilder, KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
+    }
+    {
+        KeyString::PooledBuilder pooledBuilder(
+            fragmentBuilder, KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
+        pooledBuilder.release();
+    }
+}
+
 TEST_F(KeyStringBuilderTest, LotsOfNumbers1) {
     for (int i = 0; i < 64; i++) {
         int64_t x = 1LL << i;

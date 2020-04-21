@@ -130,6 +130,12 @@ class SharedBufferFragmentAllocator {
 public:
     SharedBufferFragmentAllocator(SharedBufferFragmentBuilder& fragmentBuilder)
         : _fragmentBuilder(fragmentBuilder) {}
+    ~SharedBufferFragmentAllocator() {
+        // Discard if the build was not finished at the time of destruction.
+        if (_fragmentBuilder.building()) {
+            free();
+        }
+    }
 
     // Allow moving but not copying. It would be an error for two SharedBufferFragmentAllocator to
     // use the same underlying builder at the same time.
