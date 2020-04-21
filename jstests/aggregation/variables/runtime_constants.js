@@ -16,11 +16,11 @@ assert.commandWorked(coll.insert({x: true}));
 assert.commandFailedWithCode(
     db.runCommand(
         {aggregate: coll.getName(), pipeline: [{$addFields: {testField: "$$IS_MR"}}], cursor: {}}),
-    17276);
+    4631101);
 
 // Runtime constant $$JS_SCOPE is unable to be retrieved by users.
 assert.commandFailedWithCode(
     db.runCommand(
         {aggregate: coll.getName(), pipeline: [{$addFields: {field: "$$JS_SCOPE"}}], cursor: {}}),
-    17276);
+    4631100);
 })();

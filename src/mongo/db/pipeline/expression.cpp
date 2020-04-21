@@ -2068,7 +2068,7 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(
         const StringData rawSD = raw;
         const StringData fieldPath = rawSD.substr(2);  // strip off $$
         const StringData varName = fieldPath.substr(0, fieldPath.find('.'));
-        Variables::uassertValidNameForUserRead(varName);
+        Variables::validateNameForUserRead(varName);
         auto varId = vps.getVariable(varName);
         return new ExpressionFieldPath(expCtx, fieldPath.toString(), varId);
     } else {
@@ -2252,7 +2252,7 @@ intrusive_ptr<Expression> ExpressionFilter::parse(
     // If "as" is not specified, then use "this" by default.
     auto varName = asElem.eoo() ? "this" : asElem.str();
 
-    Variables::uassertValidNameForUserWrite(varName);
+    Variables::validateNameForUserWrite(varName);
     Variables::Id varId = vpsSub.defineVariable(varName);
 
     // Parse "cond", has access to "as" variable.
@@ -2382,7 +2382,7 @@ intrusive_ptr<Expression> ExpressionLet::parse(
     std::vector<boost::intrusive_ptr<Expression>>::size_type index = 0;
     for (auto&& varElem : varsObj) {
         const string varName = varElem.fieldName();
-        Variables::uassertValidNameForUserWrite(varName);
+        Variables::validateNameForUserWrite(varName);
         Variables::Id id = vpsSub.defineVariable(varName);
 
         vars.emplace(id, NameAndExpression{varName, children[index]});  // only has outer vars
@@ -2490,7 +2490,7 @@ intrusive_ptr<Expression> ExpressionMap::parse(
     // If "as" is not specified, then use "this" by default.
     auto varName = asElem.eoo() ? "this" : asElem.str();
 
-    Variables::uassertValidNameForUserWrite(varName);
+    Variables::validateNameForUserWrite(varName);
     Variables::Id varId = vpsSub.defineVariable(varName);
 
     // parse "in"

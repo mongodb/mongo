@@ -59,7 +59,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     if (constants) {
         for (auto&& constElem : *constants) {
             const auto constName = constElem.fieldNameStringData();
-            Variables::uassertValidNameForUserRead(constName);
+            Variables::validateNameForUserRead(constName);
 
             auto varId = _expCtx->variablesParseState.defineVariable(constName);
             _expCtx->variables.setConstantValue(varId, Value(constElem));

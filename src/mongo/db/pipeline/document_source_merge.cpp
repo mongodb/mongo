@@ -370,7 +370,7 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
 
         for (auto&& varElem : *letVariables) {
             const auto varName = varElem.fieldNameStringData();
-            Variables::uassertValidNameForUserWrite(varName);
+            Variables::validateNameForUserWrite(varName);
 
             _letVariables->emplace(
                 varName.toString(),

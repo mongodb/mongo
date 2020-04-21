@@ -73,23 +73,24 @@ public:
 
     Variables() = default;
 
-    static void uassertValidNameForUserWrite(StringData varName);
-    static void uassertValidNameForUserRead(StringData varName);
-
+    static void validateNameForUserWrite(StringData varName);
+    static void validateNameForUserRead(StringData varName);
     static bool isUserDefinedVariable(Variables::Id id) {
         return id >= 0;
     }
 
     // Ids for builtin variables.
-    static constexpr Variables::Id kRootId = Id(-1);
-    static constexpr Variables::Id kRemoveId = Id(-2);
-    static constexpr Variables::Id kNowId = Id(-3);
-    static constexpr Variables::Id kClusterTimeId = Id(-4);
-    static constexpr Variables::Id kJsScopeId = Id(-5);
-    static constexpr Variables::Id kIsMapReduceId = Id(-6);
+    static constexpr auto kRootId = Id(-1);
+    static constexpr auto kRemoveId = Id(-2);
+    static constexpr auto kNowId = Id(-3);
+    static constexpr auto kClusterTimeId = Id(-4);
+    static constexpr auto kJsScopeId = Id(-5);
+    static constexpr auto kIsMapReduceId = Id(-6);
 
     // Map from builtin var name to reserved id number.
     static const StringMap<Id> kBuiltinVarNameToId;
+    static const std::map<StringData, std::function<void(const Value&)>> kSystemVarValidators;
+    static const std::map<Id, std::string> kIdToBuiltinVarName;
 
     /**
      * Sets the value of a user-defined variable. Illegal to use with the reserved builtin variables
@@ -108,6 +109,14 @@ public:
      * special ROOT variable, then we return 'root' in Value form.
      */
     Value getValue(Variables::Id id, const Document& root) const;
+
+    /**
+     * Gets the value of a user-defined or system variable. Skips user-facing checks and does not
+     * return the Document for ROOT.
+     */
+    auto getValue(Variables::Id id) const {
+        return getValue(id, Document{});
+    }
 
     /**
      * Gets the value of a user-defined variable. Should only be called when we know 'id' represents
@@ -153,6 +162,25 @@ public:
     void setDefaultRuntimeConstants(OperationContext* opCtx);
 
     /**
+     * Return an object which represents the variables which are considered let parameters.
+     */
+    BSONObj serializeLetParameters(const VariablesParseState& vps) const;
+
+    /**
+     * Seed let parameters with the given BSONObj.
+     */
+    void seedVariablesWithLetParameters(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                        const BSONObj letParameters);
+
+    bool hasValue(Variables::Id id) const {
+        if (id < 0)  // system variables.
+            return true;
+        if (auto it = _letParametersMap.find(id); it != _letParametersMap.end())
+            return true;
+        return false;
+    };
+
+    /**
      * Copies this Variables and 'vps' to the Variables and VariablesParseState objects in 'expCtx'.
      * The VariablesParseState's 'idGenerator' in 'expCtx' is replaced with the pointer to the
      * 'idGenerator' in the new copy of the Variables instance.
@@ -175,6 +203,11 @@ private:
 
     void setValue(Id id, const Value& value, bool isConstant);
 
+    static void validateName(StringData varName,
+                             std::function<bool(char)> prefixPred,
+                             std::function<bool(char)> suffixPred,
+                             int prefixLen);
+
     static auto getBuiltinVariableName(Variables::Id variable) {
         for (auto& [name, id] : kBuiltinVarNameToId) {
             if (variable == id) {
@@ -187,6 +220,7 @@ private:
     IdGenerator _idGenerator;
     stdx::unordered_map<Id, ValueAndState> _values;
     stdx::unordered_map<Id, Value> _runtimeConstantsMap;
+    stdx::unordered_map<Id, Value> _letParametersMap;
 
     // Populated after construction. Should not be set more than once.
     boost::optional<RuntimeConstants> _runtimeConstants;
@@ -232,6 +266,8 @@ public:
      * Returns the set of variable IDs defined at this scope.
      */
     std::set<Variables::Id> getDefinedVariableIDs() const;
+
+    BSONObj serialize(const Variables& vars) const;
 
     /**
      * Return a copy of this VariablesParseState. Will replace the copy's '_idGenerator' pointer

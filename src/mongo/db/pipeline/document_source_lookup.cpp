@@ -97,7 +97,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
 
     for (auto&& varElem : letVariables) {
         const auto varName = varElem.fieldNameStringData();
-        Variables::uassertValidNameForUserWrite(varName);
+        Variables::validateNameForUserWrite(varName);
 
         _letVariables.emplace_back(
             varName.toString(),

@@ -128,7 +128,9 @@ public:
                       const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
-                      bool mayDbProfile);
+                      bool mayDbProfile,
+                      const boost::optional<BSONObj>& letParameters = boost::none);
+
 
     /**
      * Constructs an ExpressionContext suitable for use outside of the aggregation system, including

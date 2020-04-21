@@ -28,9 +28,10 @@
  */
 
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/str.h"
@@ -38,65 +39,101 @@
 
 namespace mongo {
 
+using namespace std::string_literals;
+
 constexpr Variables::Id Variables::kRootId;
 constexpr Variables::Id Variables::kRemoveId;
 
-const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {
-    {"ROOT", kRootId}, {"REMOVE", kRemoveId}, {"NOW", kNowId}, {"CLUSTER_TIME", kClusterTimeId}};
+const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {{"ROOT", kRootId},
+                                                                 {"REMOVE", kRemoveId},
+                                                                 {"NOW", kNowId},
+                                                                 {"CLUSTER_TIME", kClusterTimeId},
+                                                                 {"JS_SCOPE", kJsScopeId},
+                                                                 {"IS_MR", kIsMapReduceId}};
 
-void Variables::uassertValidNameForUserWrite(StringData varName) {
+const std::map<Variables::Id, std::string> Variables::kIdToBuiltinVarName = {
+    {kRootId, "ROOT"},
+    {kRemoveId, "REMOVE"},
+    {kNowId, "NOW"},
+    {kClusterTimeId, "CLUSTER_TIME"},
+    {kJsScopeId, "JS_SCOPE"},
+    {kIsMapReduceId, "IS_MR"}};
+
+const std::map<StringData, std::function<void(const Value&)>> Variables::kSystemVarValidators = {
+    {"NOW"_sd,
+     [](const auto& value) {
+         uassert(ErrorCodes::TypeMismatch,
+                 str::stream() << "$$NOW must have a date value, found "
+                               << typeName(value.getType()),
+                 value.getType() == BSONType::Date);
+     }},
+    {"CLUSTER_TIME"_sd,
+     [](const auto& value) {
+         uassert(ErrorCodes::TypeMismatch,
+                 str::stream() << "$$CLUSTER_TIME must have a timestamp value, found "
+                               << typeName(value.getType()),
+                 value.getType() == BSONType::bsonTimestamp);
+     }},
+    {"JS_SCOPE"_sd,
+     [](const auto& value) {
+         uassert(ErrorCodes::TypeMismatch,
+                 str::stream() << "$$JS_SCOPE must have an object value, found "
+                               << typeName(value.getType()),
+                 value.getType() == BSONType::Object);
+     }},
+    {"IS_MR"_sd, [](const auto& value) {
+         uassert(ErrorCodes::TypeMismatch,
+                 str::stream() << "$$IS_MR must have a bool value, found "
+                               << typeName(value.getType()),
+                 value.getType() == BSONType::Bool);
+     }}};
+
+void Variables::validateName(StringData varName,
+                             std::function<bool(char)> prefixPred,
+                             std::function<bool(char)> suffixPred,
+                             int prefixLen) {
+    uassert(16866, "empty variable names are not allowed", !varName.empty());
+    for (int i = 0; i < prefixLen; ++i)
+        if (!prefixPred(varName[i]))
+            uasserted(16867,
+                      str::stream()
+                          << "'" << varName
+                          << "' starts with an invalid character for a user variable name");
+
+    for (size_t i = prefixLen; i < varName.size(); i++)
+        if (!suffixPred(varName[i]))
+            uasserted(16868,
+                      str::stream() << "'" << varName << "' contains an invalid character "
+                                    << "for a variable name: '" << varName[i] << "'");
+}
+
+void Variables::validateNameForUserWrite(StringData varName) {
     // System variables users allowed to write to (currently just one)
     if (varName == "CURRENT") {
         return;
     }
-
-    uassert(16866, "empty variable names are not allowed", !varName.empty());
-
-    const bool firstCharIsValid =
-        (varName[0] >= 'a' && varName[0] <= 'z') || (varName[0] & '\x80')  // non-ascii
-        ;
-
-    uassert(16867,
-            str::stream() << "'" << varName
-                          << "' starts with an invalid character for a user variable name",
-            firstCharIsValid);
-
-    for (size_t i = 1; i < varName.size(); i++) {
-        const bool charIsValid = (varName[i] >= 'a' && varName[i] <= 'z') ||
-            (varName[i] >= 'A' && varName[i] <= 'Z') || (varName[i] >= '0' && varName[i] <= '9') ||
-            (varName[i] == '_') || (varName[i] & '\x80')  // non-ascii
-            ;
-
-        uassert(16868,
-                str::stream() << "'" << varName << "' contains an invalid character "
-                              << "for a variable name: '" << varName[i] << "'",
-                charIsValid);
-    }
+    validateName(varName,
+                 [](char ch) -> bool {
+                     return (ch >= 'a' && ch <= 'z') || (ch & '\x80');  // non-ascii
+                 },
+                 [](char ch) -> bool {
+                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                         (ch >= '0' && ch <= '9') || (ch == '_') || (ch & '\x80');  // non-ascii
+                 },
+                 1);
 }
 
-void Variables::uassertValidNameForUserRead(StringData varName) {
-    uassert(16869, "empty variable names are not allowed", !varName.empty());
-
-    const bool firstCharIsValid = (varName[0] >= 'a' && varName[0] <= 'z') ||
-        (varName[0] >= 'A' && varName[0] <= 'Z') || (varName[0] & '\x80')  // non-ascii
-        ;
-
-    uassert(16870,
-            str::stream() << "'" << varName
-                          << "' starts with an invalid character for a variable name",
-            firstCharIsValid);
-
-    for (size_t i = 1; i < varName.size(); i++) {
-        const bool charIsValid = (varName[i] >= 'a' && varName[i] <= 'z') ||
-            (varName[i] >= 'A' && varName[i] <= 'Z') || (varName[i] >= '0' && varName[i] <= '9') ||
-            (varName[i] == '_') || (varName[i] & '\x80')  // non-ascii
-            ;
-
-        uassert(16871,
-                str::stream() << "'" << varName << "' contains an invalid character "
-                              << "for a variable name: '" << varName[i] << "'",
-                charIsValid);
-    }
+void Variables::validateNameForUserRead(StringData varName) {
+    validateName(varName,
+                 [](char ch) -> bool {
+                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                         (ch & '\x80');  // non-ascii
+                 },
+                 [](char ch) -> bool {
+                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                         (ch >= '0' && ch <= '9') || (ch == '_') || (ch & '\x80');  // non-ascii
+                 },
+                 1);
 }
 
 void Variables::setValue(Id id, const Value& value, bool isConstant) {
@@ -139,7 +176,6 @@ Value Variables::getValue(Id id, const Document& root) const {
                 if (auto it = _runtimeConstantsMap.find(id); it != _runtimeConstantsMap.end()) {
                     return it->second;
                 }
-
                 uasserted(51144,
                           str::stream() << "Builtin variable '$$" << getBuiltinVariableName(id)
                                         << "' is not available");
@@ -197,6 +233,43 @@ void Variables::setDefaultRuntimeConstants(OperationContext* opCtx) {
     setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
 }
 
+BSONObj Variables::serializeLetParameters(const VariablesParseState& vps) const {
+    auto bob = BSONObjBuilder{};
+    for (auto&& [id, value] : _letParametersMap)
+        bob << kIdToBuiltinVarName.at(id) << value;
+    return bob.appendElements(vps.serialize(*this)).obj();
+}
+void Variables::seedVariablesWithLetParameters(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                               const BSONObj letParams) {
+    for (auto&& elem : letParams) {
+        Variables::validateNameForUserWrite(elem.fieldName());
+        auto expr = Expression::parseOperand(expCtx, elem, expCtx->variablesParseState);
+        auto foldedExpr = expr->optimize();
+        uassert(31474,
+                "Command let Expression does not evaluate to constant "s + elem.toString(),
+                ExpressionConstant::isNullOrConstant(foldedExpr));
+        auto value = static_cast<ExpressionConstant&>(*foldedExpr).getValue();
+        const auto sysVarName = [&]() -> boost::optional<StringData> {
+            // ROOT and REMOVE are excluded since they're not constants.
+            auto name = elem.fieldNameStringData();
+            if (auto it = kSystemVarValidators.find(name); it != kSystemVarValidators.end()) {
+                auto&& [ignore, validator] = *it;
+                validator(value);
+                return name;
+            }
+            return boost::none;
+        }();
+        if (sysVarName) {
+            if (!(sysVarName == "CLUSTER_TIME"_sd && value.getTimestamp().isNull())) {
+                // Avoid populating a value for CLUSTER_TIME if the value is null.
+                _runtimeConstantsMap[kBuiltinVarNameToId.at(*sysVarName)] = value;
+            }
+        } else {
+            setConstantValue(expCtx->variablesParseState.defineVariable(elem.fieldName()), value);
+        }
+    }
+}
+
 RuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
     // On a standalone, the clock may not be running and $$CLUSTER_TIME is unavailable. If the
     // logical clock is available, set the clusterTime in the runtime constants. Otherwise, the
@@ -218,7 +291,7 @@ void Variables::copyToExpCtx(const VariablesParseState& vps, ExpressionContext* 
 }
 
 Variables::Id VariablesParseState::defineVariable(StringData name) {
-    // Caller should have validated before hand by using Variables::uassertValidNameForUserWrite.
+    // Caller should have validated before hand by using Variables::validateNameForUserWrite.
     massert(17275,
             "Can't redefine a non-user-writable variable",
             Variables::kBuiltinVarNameToId.find(name) == Variables::kBuiltinVarNameToId.end());
@@ -257,5 +330,13 @@ std::set<Variables::Id> VariablesParseState::getDefinedVariableIDs() const {
     }
 
     return ids;
+}
+
+BSONObj VariablesParseState::serialize(const Variables& vars) const {
+    auto bob = BSONObjBuilder{};
+    for (auto&& [var_name, id] : _variables)
+        if (vars.hasValue(id))
+            bob << var_name << vars.getValue(id);
+    return bob.obj();
 }
 }  // namespace mongo

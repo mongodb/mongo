@@ -36,6 +36,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -87,7 +88,8 @@ ExpressionContext::ExpressionContext(
     const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
     boost::optional<UUID> collUUID,
-    bool mayDbProfile)
+    bool mayDbProfile,
+    const boost::optional<BSONObj>& letParameters)
     : explain(explain),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
@@ -107,7 +109,13 @@ ExpressionContext::ExpressionContext(
       _valueComparator(_collator.get()),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
 
-    if (runtimeConstants) {
+    if (runtimeConstants && runtimeConstants->getClusterTime().isNull()) {
+        // Try to get a default value for clusterTime if a logical clock exists.
+        auto genConsts = variables.generateRuntimeConstants(opCtx);
+        genConsts.setJsScope(runtimeConstants->getJsScope());
+        genConsts.setIsMapReduce(runtimeConstants->getIsMapReduce());
+        variables.setRuntimeConstants(genConsts);
+    } else if (runtimeConstants) {
         variables.setRuntimeConstants(*runtimeConstants);
     } else {
         variables.setDefaultRuntimeConstants(opCtx);
@@ -115,6 +123,16 @@ ExpressionContext::ExpressionContext(
 
     if (!isMapReduce) {
         jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
+    }
+    if (letParameters) {
+        // TODO SERVER-47713: One possible fix is to change the interface of everything that needs
+        // an expression context intrusive_ptr to take a raw ptr.
+        auto intrusiveThis = boost::intrusive_ptr{this};
+        ON_BLOCK_EXIT([&] {
+            intrusiveThis.detach();
+            unsafeRefDecRefCountTo(0u);
+        });
+        variables.seedVariablesWithLetParameters(intrusiveThis, *letParameters);
     }
 }
 

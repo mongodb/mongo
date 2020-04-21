@@ -57,17 +57,30 @@ env.Library(
 env.Library(
     target='expression_context',
     source=[
+        'expression.cpp',
         'expression_context.cpp',
+        'expression_function.cpp',
+        'expression_js_emit.cpp',
+        'expression_trigonometric.cpp',
         'javascript_execution.cpp',
+        'make_js_function.cpp',
         'variables.cpp',
     ],
     LIBDEPS=[
-        'aggregation_request',
+        '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
-	    '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
+        '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/scripting/scripting',
+        '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/intrusive_counter',
+        '$BUILD_DIR/mongo/util/regex_util',
+        '$BUILD_DIR/mongo/util/summation',
+        'aggregation_request',
+        'dependencies',
     ]
 )
 
@@ -79,37 +92,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         'field_path',
-    ]
-)
-
-env.Library(
-    target='expression',
-    source=[
-        'expression.cpp',
-        'expression_trigonometric.cpp',
-        'make_js_function.cpp'
-        ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/util/regex_util',
-        '$BUILD_DIR/mongo/util/summation',
-        'dependencies',
-        'expression_context',
-    ]
-)
-
-env.Library(
-    target='expression_javascript',
-    source=[
-        'expression_function.cpp',
-        'expression_js_emit.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/scripting/scripting_common',
-        '$BUILD_DIR/mongo/db/query/query_knobs',
-        'expression',
     ]
 )
 
@@ -133,7 +115,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/summation',
-        'expression',
+        'expression_context',
         'field_path',
     ]
 )
@@ -147,7 +129,7 @@ env.Library(
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        'expression',
+        'expression_context',
         'field_path',
     ]
 )
@@ -289,9 +271,7 @@ pipelineEnv.Library(
         'dependencies',
         'document_path_support',
         'document_sources_idl',
-        'expression',
         'expression_context',
-        'expression_javascript',
         'granularity_rounder',
     ],
     LIBDEPS_PRIVATE=[
@@ -379,6 +359,7 @@ env.CppUnitTest(
         'document_source_unwind_test.cpp',
         'expression_and_test.cpp',
         'expression_compare_test.cpp',
+        'expression_context_test.cpp',
         'expression_convert_test.cpp',
         'expression_date_test.cpp',
         'expression_field_path_test.cpp',
@@ -428,7 +409,7 @@ env.CppUnitTest(
         'aggregation_request',
         'document_source_mock',
         'document_sources_idl',
-        'expression',
+        'expression_context',
         'field_path',
         'granularity_rounder',
         'pipeline',
