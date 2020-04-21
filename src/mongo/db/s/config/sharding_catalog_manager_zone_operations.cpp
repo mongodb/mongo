@@ -34,6 +34,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
@@ -58,7 +59,7 @@ const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::
  * Note: range should have the full shard key.
  * Returns ErrorCodes::RangeOverlapConflict is an overlap is detected.
  */
-Status checkForOveralappedZonedKeyRange(OperationContext* opCtx,
+Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
                                         Shard* configServer,
                                         const NamespaceString& nss,
                                         const ChunkRange& range,
@@ -164,6 +165,36 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
 
     return ChunkRange(shardKeyPattern.extendRangeBound(range.getMin(), false),
                       shardKeyPattern.extendRangeBound(range.getMax(), false));
+}
+
+/**
+ * Checks whether every hashed field in the given shard key pattern corresponds to a field of type
+ * NumberLong, MinKey, or MaxKey in the provided chunk range. Returns ErrorCodes::InvalidOptions if
+ * there exists a field violating this constraint.
+ */
+Status checkHashedShardKeyRange(const ChunkRange& range, const KeyPattern& shardKeyPattern) {
+    BSONObjIterator rangeMin(range.getMin());
+    BSONObjIterator rangeMax(range.getMax());
+    BSONObjIterator shardKey(shardKeyPattern.toBSON());
+
+    while (shardKey.more()) {
+        auto shardKeyField = shardKey.next();
+        auto rangeMinField = rangeMin.next();
+        auto rangeMaxField = rangeMax.next();
+
+        if (ShardKeyPattern::isHashedPatternEl(shardKeyField) &&
+            (!ShardKeyPattern::isValidHashedValue(rangeMinField) ||
+             !ShardKeyPattern::isValidHashedValue(rangeMaxField))) {
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "there exists a field in the range " << range.getMin()
+                                  << " -->> " << range.getMax()
+                                  << " not of type NumberLong, MinKey, or MaxKey which corresponds "
+                                     "to a hashed field in the shard key pattern "
+                                  << shardKeyPattern};
+        }
+    }
+
+    return Status::OK();
 }
 
 }  // namespace
@@ -322,7 +353,12 @@ Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
                 str::stream() << "zone " << zoneName << " does not exist"};
     }
 
-    auto overlapStatus = checkForOveralappedZonedKeyRange(
+    auto hashedShardKeyRangeStatus = checkHashedShardKeyRange(fullShardKeyRange, shardKeyPattern);
+    if (!hashedShardKeyRangeStatus.isOK()) {
+        return hashedShardKeyRangeStatus;
+    }
+
+    auto overlapStatus = checkForOverlappingZonedKeyRange(
         opCtx, configServer.get(), nss, fullShardKeyRange, zoneName, shardKeyPattern);
     if (!overlapStatus.isOK()) {
         return overlapStatus;

@@ -34,43 +34,80 @@ function fillMissingShardKeyFields(shardKey, doc, value) {
  * Test that 'updateZoneKeyRange' works correctly by verifying 'tags' collection, after sharding the
  * collection.
  */
-function testZoningAfterSharding(namespace, shardKey) {
+function testZoningAfterSharding(namespace, shardKey, NumberType) {
     assert.commandWorked(st.s.adminCommand({shardCollection: namespace, key: shardKey}));
 
+    if (shardKey.x === "hashed") {
+        // Cannot assign with a non-NumberLong range value on a hashed shard key field.
+        assert.commandFailedWithCode(
+            st.s.adminCommand(
+                {updateZoneKeyRange: namespace, min: {x: 0}, max: {x: 10}, zone: 'zoneName'}),
+            ErrorCodes.InvalidOptions);
+    }
+
     // Testing basic assign.
-    assert.commandWorked(st.s.adminCommand(
-        {updateZoneKeyRange: namespace, min: {x: 0}, max: {x: 10}, zone: 'zoneName'}));
+    assert.commandWorked(st.s.adminCommand({
+        updateZoneKeyRange: namespace,
+        min: {x: NumberType(0)},
+        max: {x: NumberType(10)},
+        zone: 'zoneName'
+    }));
 
     let tagDoc = configDB.tags.findOne();
 
     assert.eq(namespace, tagDoc.ns);
-    assert.eq(fillMissingShardKeyFields(shardKey, {x: 0}), tagDoc.min);
-    assert.eq(fillMissingShardKeyFields(shardKey, {x: 10}), tagDoc.max);
+    assert.eq(fillMissingShardKeyFields(shardKey, {x: NumberType(0)}), tagDoc.min);
+    assert.eq(fillMissingShardKeyFields(shardKey, {x: NumberType(10)}), tagDoc.max);
     assert.eq('zoneName', tagDoc.tag);
 
     // Cannot assign overlapping ranges
-    assert.commandFailedWithCode(
-        st.s.adminCommand(
-            {updateZoneKeyRange: namespace, min: {x: -10}, max: {x: 20}, zone: 'zoneName'}),
-        ErrorCodes.RangeOverlapConflict);
+    assert.commandFailedWithCode(st.s.adminCommand({
+        updateZoneKeyRange: namespace,
+        min: {x: NumberType(-10)},
+        max: {x: NumberType(20)},
+        zone: 'zoneName'
+    }),
+                                 ErrorCodes.RangeOverlapConflict);
 
     // Cannot have non-shard key fields in tag range.
     assert.commandFailedWithCode(st.s.adminCommand({
         updateZoneKeyRange: namespace,
-        min: {newField: -10},
-        max: {newField: 20},
+        min: {newField: NumberType(-10)},
+        max: {newField: NumberType(20)},
         zone: 'zoneName'
     }),
                                  ErrorCodes.ShardKeyNotFound);
 
     tagDoc = configDB.tags.findOne();
     assert.eq(namespace, tagDoc.ns);
-    assert.eq(fillMissingShardKeyFields(shardKey, {x: 0}), tagDoc.min);
-    assert.eq(fillMissingShardKeyFields(shardKey, {x: 10}), tagDoc.max);
+    assert.eq(fillMissingShardKeyFields(shardKey, {x: NumberType(0)}), tagDoc.min);
+    assert.eq(fillMissingShardKeyFields(shardKey, {x: NumberType(10)}), tagDoc.max);
     assert.eq('zoneName', tagDoc.tag);
 
     // Testing basic remove.
-    const res = assert.commandWorked(st.s.adminCommand({
+    assert.commandWorked(st.s.adminCommand({
+        updateZoneKeyRange: namespace,
+        min: fillMissingShardKeyFields(shardKey, {x: NumberType(0)}, MinKey),
+        max: fillMissingShardKeyFields(shardKey, {x: NumberType(10)}, MinKey),
+        zone: null
+    }));
+    assert.eq(null, configDB.tags.findOne());
+
+    // Insert directly into the tags collection.
+    const zone = {
+        _id: 0,
+        ns: namespace,
+        min: fillMissingShardKeyFields(shardKey, {x: 0}, MinKey),
+        max: fillMissingShardKeyFields(shardKey, {x: 10}, MinKey),
+        zone: "zoneName"
+    };
+    assert.commandWorked(configDB.tags.insert(zone));
+    assert.eq(zone, configDB.tags.findOne());
+
+    // Remove works on entries inserted directly into the tags collection, even when those entries
+    // do not adhere to the updateZoneKeyRange command requirement of having a NumberLong range
+    // value for a hashed shard key field.
+    assert.commandWorked(st.s.adminCommand({
         updateZoneKeyRange: namespace,
         min: fillMissingShardKeyFields(shardKey, {x: 0}, MinKey),
         max: fillMissingShardKeyFields(shardKey, {x: 10}, MinKey),
@@ -79,8 +116,9 @@ function testZoningAfterSharding(namespace, shardKey) {
     assert.eq(null, configDB.tags.findOne());
 }
 
-testZoningAfterSharding("test.compound_hashed", {x: 1, y: "hashed", z: 1});
-testZoningAfterSharding("test.compound_hashed_prefix", {x: "hashed", y: 1, z: 1});
+testZoningAfterSharding("test.compound_hashed", {x: 1, y: "hashed", z: 1}, Number);
+testZoningAfterSharding("test.compound_hashed", {x: 1, y: "hashed", z: 1}, NumberLong);
+testZoningAfterSharding("test.compound_hashed_prefix", {x: "hashed", y: 1, z: 1}, NumberLong);
 
 /**
  * Test that shardCollection correctly validates shard key against existing zones.
