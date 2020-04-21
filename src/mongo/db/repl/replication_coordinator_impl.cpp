@@ -4965,6 +4965,11 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
                                         << _rsConfig.getNumMembers() - 1 << " inclusive");
         }
 
+        if (_selfIndex == -1) {
+            return Status(ErrorCodes::InvalidReplicaSetConfig,
+                          "Invalid replica set config, or this node is not a member");
+        }
+
         _topCoord->processReplSetRequestVotes(args, response);
 
         if (!args.isADryRun()) {
