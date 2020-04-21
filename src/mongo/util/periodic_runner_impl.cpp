@@ -33,9 +33,11 @@
 
 #include "mongo/util/periodic_runner_impl.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/scopeguard.h"
 
@@ -57,13 +59,15 @@ PeriodicRunnerImpl::PeriodicJobImpl::PeriodicJobImpl(PeriodicJob job,
     : _job(std::move(job)), _clockSource(source), _serviceContext(svc), _client(nullptr) {}
 
 void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
-    auto [startPromise, startFuture] = makePromiseFuture<void>();
-
     {
         stdx::lock_guard lk(_mutex);
+        if (MONGO_unlikely(_execStatus == ExecutionStatus::CANCELED))
+            uasserted(ErrorCodes::PeriodicJobIsStopped,
+                      "Attempted to start an already stopped job");
         invariant(_execStatus == ExecutionStatus::NOT_SCHEDULED);
     }
 
+    auto [startPromise, startFuture] = makePromiseFuture<void>();
 
     _thread = stdx::thread([this, startPromise = std::move(startPromise)]() mutable {
         ON_BLOCK_EXIT([this] { _stopPromise.emplaceValue(); });
@@ -129,6 +133,8 @@ void PeriodicRunnerImpl::PeriodicJobImpl::start() {
 
 void PeriodicRunnerImpl::PeriodicJobImpl::pause() {
     stdx::lock_guard<Latch> lk(_mutex);
+    if (MONGO_unlikely(_execStatus == ExecutionStatus::CANCELED))
+        uasserted(ErrorCodes::PeriodicJobIsStopped, "Attempted to pause an already stopped job");
     invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING);
     _execStatus = PeriodicJobImpl::ExecutionStatus::PAUSED;
 }
@@ -136,6 +142,9 @@ void PeriodicRunnerImpl::PeriodicJobImpl::pause() {
 void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
     {
         stdx::lock_guard<Latch> lk(_mutex);
+        if (MONGO_unlikely(_execStatus == ExecutionStatus::CANCELED))
+            uasserted(ErrorCodes::PeriodicJobIsStopped,
+                      "Attempted to resume an already stopped job");
         invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::PAUSED);
         _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
     }
