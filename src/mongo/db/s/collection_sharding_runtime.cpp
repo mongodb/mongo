@@ -192,7 +192,8 @@ void CollectionShardingRuntime::exitCriticalSection(OperationContext* opCtx) {
 }
 
 std::shared_ptr<Notification<void>> CollectionShardingRuntime::getCriticalSectionSignal(
-    ShardingMigrationCriticalSection::Operation op) const {
+    OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op) {
+    auto csrLock = CSRLock::lockShared(opCtx, this);
     return _critSec.getSignal(op);
 }
 

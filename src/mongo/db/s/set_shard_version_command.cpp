@@ -299,8 +299,8 @@ public:
                 // TODO: Refactor all of this
                 if (requestedVersion < collectionShardVersion &&
                     requestedVersion.epoch() == collectionShardVersion.epoch()) {
-                    auto critSecSignal =
-                        csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                    auto critSecSignal = csr->getCriticalSectionSignal(
+                        opCtx, ShardingMigrationCriticalSection::kWrite);
                     if (critSecSignal) {
                         collLock.reset();
                         autoDb.reset();
@@ -320,8 +320,8 @@ public:
                 if (!collectionShardVersion.isSet() && !authoritative) {
                     // Needed b/c when the last chunk is moved off a shard, the version gets reset
                     // to zero, which should require a reload.
-                    auto critSecSignal =
-                        csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                    auto critSecSignal = csr->getCriticalSectionSignal(
+                        opCtx, ShardingMigrationCriticalSection::kWrite);
                     if (critSecSignal) {
                         collLock.reset();
                         autoDb.reset();
