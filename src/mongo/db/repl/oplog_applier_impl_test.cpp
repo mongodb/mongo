@@ -56,6 +56,8 @@
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
