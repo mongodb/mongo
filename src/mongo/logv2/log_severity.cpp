@@ -92,8 +92,4 @@ StringData LogSeverity::toStringDataCompact() const {
     return "U"_sd;
 }
 
-std::ostream& operator<<(std::ostream& os, LogSeverity severity) {
-    return os << severity.toStringData();
-}
-
 }  // namespace mongo::logv2
