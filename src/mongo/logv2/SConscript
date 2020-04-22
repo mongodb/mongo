@@ -7,6 +7,7 @@ env = env.Clone()
 env.CppUnitTest(
     target='logv2_test',
     source=[
+        'logv2_component_test.cpp',
         'logv2_test.cpp',
         'redaction_test.cpp',
     ],

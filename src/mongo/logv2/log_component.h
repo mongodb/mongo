@@ -34,8 +34,7 @@
 
 #include "mongo/base/string_data.h"
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 // clang-format off
 /**
@@ -144,5 +143,9 @@ private:
 
 std::ostream& operator<<(std::ostream& os, LogComponent component);
 
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2
+
+// Legacy alias
+namespace mongo::logger {
+using logv2::LogComponent;
+}  // namespace mongo::logger
