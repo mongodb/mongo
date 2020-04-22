@@ -47,6 +47,14 @@ waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 1);
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 2);
 waitForConfigReplication(primary, rst.nodes);
 
+// We did two automatic reconfigs to remove 'newlyAdded' fields (for members 1 and 2).
+const replMetricsAtStart = primaryDb.serverStatus().metrics.repl;
+assert(replMetricsAtStart.hasOwnProperty("reconfig"));
+const numAutoReconfigsAtStart =
+    replMetricsAtStart.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
+// We did two automatic reconfigs while setting up the original replset.
+assert.eq(2, numAutoReconfigsAtStart, replMetricsAtStart);
+
 assert.commandWorked(primaryColl.insert({"starting": "doc"}, {writeConcern: {w: 3}}));
 
 jsTestLog("Adding a new node to the replica set");
@@ -177,6 +185,14 @@ assert.commandFailedWithCode(rst.nodes[1].adminCommand({replSetStepUp: 1}),
 rst.nodes[0].reconnect(rst.nodes);
 rst.nodes[2].reconnect(rst.nodes);
 
+// Record metric for number of automatic reconfigs before we perform the next one.
+const replMetricsBefore = primaryDb.serverStatus().metrics.repl;
+assert(replMetricsBefore.hasOwnProperty("reconfig"));
+const numAutoReconfigsBefore =
+    replMetricsBefore.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
+// We did two automatic reconfigs while setting up the original replset.
+assert.eq(2, numAutoReconfigsBefore, replMetricsBefore);
+
 jsTestLog("Waiting for 'newlyAdded' field to be removed");
 doNotRemoveNewlyAddedFP.off();
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 3);
@@ -186,6 +202,13 @@ assertVoteCount(primary, {
     writableVotingMembersCount: 4,
     writeMajorityCount: 3
 });
+
+jsTestLog("Checking that the metric for removal of 'newlyAdded' fields was incremented");
+const replMetricsAfter = primaryDb.serverStatus().metrics.repl;
+assert(replMetricsAfter.hasOwnProperty("reconfig"), replMetricsAfter);
+const numAutoReconfigsAfter =
+    replMetricsAfter.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
+assert.eq(3, numAutoReconfigsAfter, replMetricsAfter);
 
 jsTestLog("Testing behavior during steady state");
 assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 4}}));

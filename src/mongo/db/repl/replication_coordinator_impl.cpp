@@ -147,6 +147,13 @@ Counter64 userOpsRunning;
 ServerStatusMetricField<Counter64> displayUserOpsRunning(
     "repl.stateTransition.userOperationsRunning", &userOpsRunning);
 
+// Tracks the number of times we have successfully performed automatic reconfigs to remove
+// 'newlyAdded' fields.
+Counter64 numAutoReconfigsForRemovalOfNewlyAddedFields;
+ServerStatusMetricField<Counter64> displayNumAutoReconfigs(
+    "repl.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields",
+    &numAutoReconfigsForRemovalOfNewlyAddedFields);
+
 using namespace fmt::literals;
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -3651,6 +3658,8 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
         // instead find out the reconfig already took place and is no longer necessary.
         return;
     }
+
+    numAutoReconfigsForRemovalOfNewlyAddedFields.increment(1);
 
     // We intentionally do not wait for config commitment. If the config does not get committed, we
     // will try again on the next heartbeat.
