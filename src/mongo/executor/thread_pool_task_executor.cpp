@@ -421,11 +421,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     const BatonHandle& baton) {
 
     RemoteCommandRequestOnAny scheduledRequest = request;
-    if (request.timeout == RemoteCommandRequest::kNoTimeout) {
-        scheduledRequest.expirationDate = RemoteCommandRequest::kNoExpirationDate;
-    } else {
-        scheduledRequest.expirationDate = _net->now() + scheduledRequest.timeout;
-    }
+    scheduledRequest.dateScheduled = _net->now();
 
     // In case the request fails to even get a connection from the pool,
     // we wrap the callback in a method that prepares its input parameters.
@@ -666,11 +662,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
     const RemoteCommandOnAnyCallbackFn& cb,
     const BatonHandle& baton) {
     RemoteCommandRequestOnAny scheduledRequest = request;
-    if (request.timeout == RemoteCommandRequest::kNoTimeout) {
-        scheduledRequest.expirationDate = RemoteCommandRequest::kNoExpirationDate;
-    } else {
-        scheduledRequest.expirationDate = _net->now() + scheduledRequest.timeout;
-    }
+    scheduledRequest.dateScheduled = _net->now();
 
     // In case the request fails to even get a connection from the pool,
     // we wrap the callback in a method that prepares its input parameters.

@@ -60,6 +60,9 @@ public:
         unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
     using RemoteCommandOnReplyFn = unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
 
+    // Indicates that there is no expiration time by when a request needs to complete
+    static constexpr Date_t kNoExpirationDate{Date_t::max()};
+
     virtual ~NetworkInterface();
 
     /**

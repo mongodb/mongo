@@ -51,8 +51,6 @@ AtomicWord<unsigned long long> requestIdCounter(0);
 
 constexpr Milliseconds RemoteCommandRequestBase::kNoTimeout;
 
-constexpr Date_t RemoteCommandRequestBase::kNoExpirationDate;
-
 RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
                                                    const std::string& theDbName,
                                                    const BSONObj& theCmdObj,
@@ -142,8 +140,8 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
     }
     out << " db:" << dbname;
 
-    if (expirationDate != kNoExpirationDate) {
-        out << " expDate:" << expirationDate.toString();
+    if (dateScheduled && timeout != kNoTimeout) {
+        out << " expDate:" << (*dateScheduled + timeout).toString();
     }
 
     if (hedgeOptions) {

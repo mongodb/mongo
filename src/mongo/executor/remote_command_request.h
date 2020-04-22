@@ -53,9 +53,6 @@ struct RemoteCommandRequestBase {
     // Indicates that there is no timeout for the request to complete
     static constexpr Milliseconds kNoTimeout{-1};
 
-    // Indicates that there is no expiration time by when the request needs to complete
-    static constexpr Date_t kNoExpirationDate{Date_t::max()};
-
     // Type to represent the internal id of this request
     typedef uint64_t RequestId;
 
@@ -93,8 +90,8 @@ struct RemoteCommandRequestBase {
 
     Milliseconds timeout = kNoTimeout;
 
-    // Deadline by when the request must be completed
-    Date_t expirationDate = kNoExpirationDate;
+    // Time when the request was scheduled.
+    boost::optional<Date_t> dateScheduled;
 
     transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode;
 
