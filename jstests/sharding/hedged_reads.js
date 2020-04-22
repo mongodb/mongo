@@ -146,6 +146,7 @@ try {
 } finally {
     clearCommandDelay(sortedNodes[0]);
     clearCommandDelay(sortedNodes[1]);
+    assert.commandWorked(st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: 100}));
 }
 
 // Need causally consistent reads to verify the document count
@@ -161,8 +162,6 @@ assert.commandWorked(bulk.execute());
 
 jsTest.log("Verify that the getMore on hedge request do not inherit maxTimeMS");
 try {
-    assert.commandWorked(st.s.adminCommand({setParameter: 1, maxTimeMSForHedgedReads: 1000}));
-
     // force to open hedge read cursor on sortedNodes[1]
     setCommandDelay(sortedNodes[0], "find", 500, ns);
 

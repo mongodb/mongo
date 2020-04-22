@@ -525,6 +525,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                     2,
                     "Request finished with response",
                     "requestId"_attr = cmdState->requestOnAny.id,
+                    "isOK"_attr = rs.isOK(),
                     "response"_attr =
                         redact(rs.isOK() ? rs.data.toString() : rs.status.toString()));
         onFinish(std::move(rs));
@@ -841,12 +842,8 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
         .getAsync([ this, anchor = shared_from_this() ](auto swr) noexcept {
             auto response = uassertStatusOK(std::move(swr));
             auto commandStatus = getStatusFromCommandResult(response.data);
-
-            if (!cmdState->finishLine.arriveStrongly()) {
-                return;
-            }
-
-            // Ignore maxTimeMS expiration errors for hedged reads
+            // Ignore maxTimeMS expiration errors for hedged reads without triggering the finish
+            // line.
             if (isHedge && commandStatus == ErrorCodes::MaxTimeMSExpired) {
                 LOGV2_DEBUG(4660701,
                             2,
@@ -854,15 +851,27 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
                             "requestId"_attr = request->id,
                             "target"_attr = request->target,
                             "status"_attr = commandStatus);
-            } else {
-                if (isHedge) {
-                    auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
-                    invariant(hm);
-                    hm->incrementNumAdvantageouslyHedgedOperations();
-                }
-                fulfilledPromise = true;
-                cmdState->fulfillFinalPromise(std::move(response));
+                return;
             }
+
+            if (!cmdState->finishLine.arriveStrongly()) {
+                LOGV2_DEBUG(4754301,
+                            2,
+                            "Skipping the response because it was already received from other node",
+                            "requestId"_attr = request->id,
+                            "target"_attr = request->target,
+                            "status"_attr = commandStatus);
+
+                return;
+            }
+
+            if (isHedge) {
+                auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
+                invariant(hm);
+                hm->incrementNumAdvantageouslyHedgedOperations();
+            }
+            fulfilledPromise = true;
+            cmdState->fulfillFinalPromise(std::move(response));
         });
 }
 
