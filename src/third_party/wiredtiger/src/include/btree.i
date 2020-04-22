@@ -555,8 +555,8 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     }
 
     /* Check if this is the largest transaction ID to update the page. */
-    if (WT_TXNID_LT(page->modify->update_txn, session->txn.id))
-        page->modify->update_txn = session->txn.id;
+    if (WT_TXNID_LT(page->modify->update_txn, session->txn->id))
+        page->modify->update_txn = session->txn->id;
 }
 
 /*

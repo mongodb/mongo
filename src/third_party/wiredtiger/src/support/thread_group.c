@@ -176,8 +176,7 @@ __thread_group_resize(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, uint32_t
     for (i = group->max; i < new_max; i++) {
         WT_ERR(__wt_calloc_one(session, &thread));
         /*
-         * Threads get their own session and hs table cursor
-         * (if the hs table is open).
+         * Threads get their own session and hs table cursor (if the hs table is open).
          */
         session_flags = LF_ISSET(WT_THREAD_CAN_WAIT) ? WT_SESSION_CAN_WAIT : 0;
         WT_ERR(

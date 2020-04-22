@@ -47,8 +47,6 @@ __wt_ovfl_read(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store, bool *decoded)
 {
     WT_DECL_RET;
-    WT_OVFL_TRACK *track;
-    size_t i;
 
     *decoded = false;
 
@@ -60,22 +58,15 @@ __wt_ovfl_read(
         return (__ovfl_read(session, unpack->data, unpack->size, store));
 
     /*
-     * WT_CELL_VALUE_OVFL_RM cells: If reconciliation deleted an overflow value, but there was still
-     * a reader in the system that might need it, the on-page cell type will have been reset to
-     * WT_CELL_VALUE_OVFL_RM and we will be passed a page so we can check the on-page cell.
-     *
-     * Acquire the overflow lock, and retest the on-page cell's value inside the lock.
+     * WT_CELL_VALUE_OVFL_RM cells: if reconciliation deletes an overflow value, the on-page cell
+     * type is reset to WT_CELL_VALUE_OVFL_RM. Any values required by an existing reader will be
+     * copied into the HS file, which means this value should never be read. It's possible to race
+     * with checkpoints doing that work, lock before testing the removed flag.
      */
     __wt_readlock(session, &S2BT(session)->ovfl_lock);
     if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM) {
-        track = page->modify->ovfl_track;
-        for (i = 0; i < track->remove_next; ++i)
-            if (track->remove[i].cell == unpack->cell) {
-                store->data = track->remove[i].data;
-                store->size = track->remove[i].size;
-                break;
-            }
-        WT_ASSERT(session, i < track->remove_next);
+        WT_ASSERT(session, __wt_txn_visible_all(session, unpack->stop_txn, unpack->stop_ts));
+        ret = __wt_buf_setstr(session, store, "WT_CELL_VALUE_OVFL_RM");
         *decoded = true;
     } else
         ret = __ovfl_read(session, unpack->data, unpack->size, store);
@@ -85,109 +76,35 @@ __wt_ovfl_read(
 }
 
 /*
- * __wt_ovfl_discard_remove --
- *     Free the on-page overflow value cache.
- */
-void
-__wt_ovfl_discard_remove(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-    WT_OVFL_TRACK *track;
-    uint32_t i;
-
-    if (page->modify != NULL && (track = page->modify->ovfl_track) != NULL) {
-        for (i = 0; i < track->remove_next; ++i)
-            __wt_free(session, track->remove[i].data);
-        __wt_free(session, page->modify->ovfl_track->remove);
-        track->remove_allocated = 0;
-        track->remove_next = 0;
-    }
-}
-
-/*
- * __ovfl_cache --
- *     Cache an overflow value.
- */
-static int
-__ovfl_cache(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
-{
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
-    WT_OVFL_TRACK *track;
-
-    /* Read the overflow value. */
-    WT_RET(__wt_scr_alloc(session, 1024, &tmp));
-    WT_ERR(__wt_dsk_cell_data_ref(session, page->type, unpack, tmp));
-
-    /* Allocating tracking structures as necessary. */
-    if (page->modify->ovfl_track == NULL)
-        WT_ERR(__wt_ovfl_track_init(session, page));
-    track = page->modify->ovfl_track;
-
-    /* Copy the overflow item into place. */
-    WT_ERR(
-      __wt_realloc_def(session, &track->remove_allocated, track->remove_next + 1, &track->remove));
-    track->remove[track->remove_next].cell = unpack->cell;
-    WT_ERR(__wt_memdup(session, tmp->data, tmp->size, &track->remove[track->remove_next].data));
-    track->remove[track->remove_next].size = tmp->size;
-    ++track->remove_next;
-
-err:
-    __wt_scr_free(session, &tmp);
-    return (ret);
-}
-
-/*
  * __wt_ovfl_remove --
  *     Remove an overflow value.
  */
 int
-__wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack, bool evicting)
+__wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
     /*
      * This function solves two problems in reconciliation.
      *
-     * The first problem is snapshot readers needing on-page overflow values
-     * that have been removed. The scenario is as follows:
-     *
-     *     - reconciling a leaf page that references an overflow item
-     *     - the item is updated and the update committed
-     *     - a checkpoint runs, freeing the backing overflow blocks
-     *     - a snapshot transaction wants the original version of the item
-     *
-     * In summary, we may need the original version of an overflow item for
-     * a snapshot transaction after the item was deleted from a page that's
-     * subsequently been checkpointed, where the checkpoint must know about
-     * the freed blocks.  We don't have any way to delay a free of the
-     * underlying blocks until a particular set of transactions exit (and
-     * this shouldn't be a common scenario), so cache the overflow value in
-     * memory.
-     *
-     * This gets hard because the snapshot transaction reader might:
-     *     - search the WT_UPDATE list and not find an useful entry
+     * The first problem is snapshot readers needing on-page overflow values that have been removed.
+     * If the overflow value is required by a reader, it will be copied into the HS file before the
+     * backing blocks are removed. However, this gets hard because the snapshot transaction reader
+     * might:
+     *     - search the update list and not find a useful entry
      *     - read the overflow value's address from the on-page cell
      *     - go to sleep
-     *     - checkpoint runs, caches the overflow value, frees the blocks
+     *     - checkpoint runs, frees the backing blocks
      *     - another thread allocates and overwrites the blocks
-     *     - the reader wakes up and reads the wrong value
+     *     - the reader wakes up and uses the on-page cell to read the blocks
      *
-     * Use a read/write lock and the on-page cell to fix the problem: hold
-     * a write lock when changing the cell type from WT_CELL_VALUE_OVFL to
-     * WT_CELL_VALUE_OVFL_RM and hold a read lock when reading an overflow
-     * item.
+     * Use a read/write lock and the on-page cell to fix the problem: get a write lock when changing
+     * the cell type from WT_CELL_VALUE_OVFL to WT_CELL_VALUE_OVFL_RM, get a read lock when reading
+     * an overflow item.
      *
-     * The read/write lock is per btree, but it could be per page or even
-     * per overflow item.  We don't do any of that because overflow values
-     * are supposed to be rare and we shouldn't see contention for the lock.
+     * The read/write lock is per btree (but could be per page or even per overflow item). We don't
+     * bother because overflow values are supposed to be rare and contention isn't expected.
      *
-     * We only have to do this for checkpoints: in any eviction mode, there
-     * can't be threads sitting in our update lists.
-     */
-    if (!evicting)
-        WT_RET(__ovfl_cache(session, page, unpack));
-
-    /*
-     * The second problem is to only remove the underlying blocks once, solved by the
-     * WT_CELL_VALUE_OVFL_RM flag.
+     * The second problem is to only remove the underlying blocks once, also solved by checking the
+     * flag before doing any work.
      *
      * Queue the on-page cell to be set to WT_CELL_VALUE_OVFL_RM and the underlying overflow value's
      * blocks to be freed when reconciliation completes.
@@ -213,11 +130,11 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
     __wt_cell_unpack(session, page, cell, unpack);
 
     /*
-     * Finally remove overflow key/value objects, called when reconciliation finishes after
-     * successfully writing a page.
+     * Remove overflow key/value objects, called when reconciliation finishes after successfully
+     * reconciling a page.
      *
-     * Keys must have already been instantiated and value objects must have already been cached (if
-     * they might potentially still be read by any running transaction).
+     * Keys must have already been instantiated and value objects must have already been written to
+     * the HS file (if they might potentially still be read by any running transaction).
      *
      * Acquire the overflow lock to avoid racing with a thread reading the backing overflow blocks.
      */

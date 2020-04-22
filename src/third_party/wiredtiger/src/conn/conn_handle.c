@@ -83,6 +83,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
         TAILQ_INIT(&conn->blockhash[i]); /* Block handle hash lists */
     TAILQ_INIT(&conn->blockqh);          /* Block manager list */
 
+    conn->ckpt_prep_min = UINT64_MAX;
+    conn->ckpt_time_min = UINT64_MAX;
+
     return (0);
 }
 

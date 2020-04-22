@@ -95,6 +95,6 @@ optypes = [
     LogOperationType('txn_timestamp', 'txn_timestamp',
         [('uint64', 'time_sec'), ('uint64', 'time_nsec'),
             ('uint64', 'commit_ts'), ('uint64', 'durable_ts'),
-            ('uint64', 'first_ts'), ('uint64', 'prepare_ts'),
-            ('uint64', 'read_ts')]),
+            ('uint64', 'first_commit_ts'), ('uint64', 'prepare_ts'),
+            ('uint64', 'read_ts'), ('uint64', 'pinned_read_ts')]),
 ]

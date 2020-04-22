@@ -403,10 +403,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
      * Set read-uncommitted: we have already checked that all of the updates in this chunk are
      * globally visible, use the cheapest possible check in reconciliation.
      */
-    saved_isolation = session->txn.isolation;
-    session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
+    saved_isolation = session->txn->isolation;
+    session->txn->isolation = WT_ISO_READ_UNCOMMITTED;
     ret = __wt_sync_file(session, WT_SYNC_WRITE_LEAVES);
-    session->txn.isolation = saved_isolation;
+    session->txn->isolation = saved_isolation;
     WT_ERR(ret);
 
     __wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointing %s", chunk->uri);

@@ -97,6 +97,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     /* The eviction server is shut down last. */
     WT_TRET(__wt_evict_destroy(session));
 
+    /* There should be no more file opens after this point. */
+    F_SET(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
+    WT_FULL_BARRIER();
+
     /* Close open data handles. */
     WT_TRET(__wt_conn_dhandle_discard(session));
 
@@ -202,11 +206,9 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_logmgr_create(session, cfg));
 
     /*
-     * Run recovery.
-     * NOTE: This call will start (and stop) eviction if recovery is
-     * required.  Recovery must run before the history store table is created
-     * (because recovery will update the metadata), and before eviction is
-     * started for real.
+     * Run recovery. NOTE: This call will start (and stop) eviction if recovery is required.
+     * Recovery must run before the history store table is created (because recovery will update the
+     * metadata), and before eviction is started for real.
      */
     WT_RET(__wt_txn_recover(session));
 

@@ -73,11 +73,9 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key, con
      */
     for (year = term_start; year <= term_end; ++year) {
         /*
-         * Note that the extract callback is called for all operations
-         * that update the table, not just inserts.  The user sets the
-         * key and uses the cursor->insert() method to return the index
-         * key(s).  WiredTiger will perform the required operation
-         * (such as a remove()).
+         * Note that the extract callback is called for all operations that update the table, not
+         * just inserts. The user sets the key and uses the cursor->insert() method to return the
+         * index key(s). WiredTiger will perform the required operation (such as a remove()).
          */
         fprintf(
           stderr, "EXTRACTOR: index op for year %" PRIu16 ": %s %s\n", year, first_name, last_name);

@@ -968,7 +968,7 @@ compare:
          * they're no longer useful.
          */
         if (ovfl_state == OVFL_UNUSED && vpack->raw != WT_CELL_VALUE_OVFL_RM)
-            WT_ERR(__wt_ovfl_remove(session, page, vpack, F_ISSET(r, WT_REC_EVICT)));
+            WT_ERR(__wt_ovfl_remove(session, page, vpack));
     }
 
     /* Walk any append list. */

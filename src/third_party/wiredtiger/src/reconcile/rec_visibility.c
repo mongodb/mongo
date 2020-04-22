@@ -63,67 +63,65 @@ __rec_append_orig_value(
 
     WT_ASSERT(session, upd != NULL && unpack != NULL && unpack->type != WT_CELL_DEL);
 
-    for (;; upd = upd->next) {
-        /* Done if at least one self-contained update is globally visible. */
-        if (WT_UPDATE_DATA_VALUE(upd) && __wt_txn_upd_visible_all(session, upd))
-            return (0);
+    append = tombstone = NULL;
+    total_size = 0;
 
+    /* Review the current update list, checking conditions that mean no work is needed. */
+    for (;; upd = upd->next) {
         /*
-         * If the update is restored from the history store for the rollback to stable operation we
-         * don't need the on-disk value anymore and we're done.
+         * Done if the update was restored from the history store for the rollback to stable
+         * operation.
          */
         if (F_ISSET(upd, WT_UPDATE_RESTORED_FOR_ROLLBACK))
             return (0);
 
-        /* On page value already on chain */
-        if (unpack != NULL && unpack->start_ts == upd->start_ts && unpack->start_txn == upd->txnid)
+        /* Done if the on page value already appears on the update list. */
+        if (unpack->start_ts == upd->start_ts && unpack->start_txn == upd->txnid)
             return (0);
 
-        /* Leave reference at the last item in the chain. */
+        /*
+         * Done if at least one self-contained update is globally visible. It's tempting to pull
+         * this test out of the loop and only test the oldest self-contained update for global
+         * visibility (as visibility tests are expensive). However, when running at lower isolation
+         * levels, or when an application intentionally commits in out of timestamp order, it's
+         * possible for an update on the chain to be globally visible and followed by an (earlier)
+         * update that is not yet globally visible.
+         */
+        if (WT_UPDATE_DATA_VALUE(upd) && __wt_txn_upd_visible_all(session, upd))
+            return (0);
+
+        /* Leave reference pointing to the last item in the update list. */
         if (upd->next == NULL)
             break;
     }
 
-    /*
-     * We need the original on-page value for some reader: get a copy and append it to the end of
-     * the update list with a transaction ID that guarantees its visibility.
-     *
-     * If we don't have a value cell, it's an insert/append list key/value pair which simply doesn't
-     * exist for some reader; place a deleted record at the end of the update list.
-     *
-     * If the an update is out of order so it masks the value in the cell, don't append.
-     */
-    append = tombstone = NULL; /* -Wconditional-uninitialized */
-    total_size = size = 0;     /* -Wconditional-uninitialized */
+    /* Done if the stop time pair of the onpage cell is globally visible. */
+    if ((unpack->stop_ts != WT_TS_MAX || unpack->stop_txn != WT_TXN_MAX) &&
+      __wt_txn_visible_all(session, unpack->stop_txn, unpack->stop_ts))
+        return (0);
 
-    /*
-     * We need to append a TOMBSTONE before the onpage value if the onpage value has a valid
-     * stop pair.
-     *
-     * Imagine a case we insert and delete a value respectively at timestamp 0 and 10, and later
-     * insert it again at 20. We need the TOMBSTONE to tell us there is no value between 10 and
-     * 20.
-     */
-    if (unpack->stop_ts != WT_TS_MAX || unpack->stop_txn != WT_TXN_MAX) {
-        /* No need to append anything if the stop time pair is globally visible. */
-        if (__wt_txn_visible_all(session, unpack->stop_txn, unpack->stop_ts))
-            return (0);
-        WT_ERR(__wt_update_alloc(session, NULL, &tombstone, &size, WT_UPDATE_TOMBSTONE));
-        tombstone->txnid = unpack->stop_txn;
-        tombstone->start_ts = unpack->stop_ts;
-        tombstone->durable_ts = unpack->durable_stop_ts;
-        total_size += size;
-    }
-
+    /* We need the original on-page value for some reader: get a copy. */
     WT_ERR(__wt_scr_alloc(session, 0, &tmp));
     WT_ERR(__wt_page_cell_data_ref(session, page, unpack, tmp));
     WT_ERR(__wt_update_alloc(session, tmp, &append, &size, WT_UPDATE_STANDARD));
+    total_size += size;
     append->txnid = unpack->start_txn;
     append->start_ts = unpack->start_ts;
     append->durable_ts = unpack->durable_start_ts;
-    total_size += size;
 
-    if (tombstone != NULL) {
+    /*
+     * Additionally, we need to append a tombstone before the onpage value we're about to append to
+     * the list, if the onpage value has a valid stop pair. Imagine a case where we insert and
+     * delete a value respectively at timestamp 0 and 10, and later insert it again at 20. We need
+     * the tombstone to tell us there is no value between 10 and 20.
+     */
+    if (unpack->stop_ts != WT_TS_MAX || unpack->stop_txn != WT_TXN_MAX) {
+        WT_ERR(__wt_update_alloc(session, NULL, &tombstone, &size, WT_UPDATE_TOMBSTONE));
+        total_size += size;
+        tombstone->txnid = unpack->stop_txn;
+        tombstone->start_ts = unpack->stop_ts;
+        tombstone->durable_ts = unpack->durable_stop_ts;
+
         tombstone->next = append;
         append = tombstone;
     }
@@ -133,13 +131,12 @@ __rec_append_orig_value(
 
     __wt_cache_page_inmem_incr(session, page, total_size);
 
+    if (0) {
 err:
-    __wt_scr_free(session, &tmp);
-    /* Free append when tombstone allocation fails */
-    if (ret != 0) {
         __wt_free(session, append);
         __wt_free(session, tombstone);
     }
+    __wt_scr_free(session, &tmp);
     return (ret);
 }
 
@@ -156,8 +153,8 @@ __rec_need_save_upd(
 
     /*
      * Save updates for any reconciliation that doesn't involve history store (in-memory database
-     * and fixed length column store), except when the maximum timestamp and txnid are globally
-     * visible.
+     * and fixed length column store), except when the selected stop time pair or the selected start
+     * time pair is globally visible.
      */
     if (!F_ISSET(r, WT_REC_HS) && !F_ISSET(r, WT_REC_IN_MEMORY) && r->page->type != WT_PAGE_COL_FIX)
         return (false);
@@ -296,7 +293,8 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
      * checkpoint in a concurrent session.
      */
     WT_ASSERT(session, !WT_IS_METADATA(session->dhandle) || upd == NULL ||
-        upd->txnid == WT_TXN_NONE || upd->txnid != S2C(session)->txn_global.checkpoint_state.id ||
+        upd->txnid == WT_TXN_NONE ||
+        upd->txnid != S2C(session)->txn_global.checkpoint_txn_shared.id ||
         WT_SESSION_IS_CHECKPOINT(session));
 
     /* If all of the updates were aborted, quit. */
@@ -464,11 +462,17 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
 
     /*
      * Returning an update means the original on-page value might be lost, and that's a problem if
-     * there's a reader that needs it. This call makes a copy of the on-page value. We do that any
-     * time there are saved updates and during reconciliation of a backing overflow record that will
-     * be physically removed once it's no longer needed.
+     * there's a reader that needs it, make a copy of the on-page value. We do that any time there
+     * are saved updates (we may need the original on-page value to terminate the update chain, for
+     * example, in the case of an update that modifies the original value). Additionally, make a
+     * copy of the on-page value if the value is an overflow item and anything other than the
+     * on-page cell is being written. This is because the value's backing overflow blocks aren't
+     * part of the page, and they are physically removed by checkpoint writing this page, that is,
+     * the checkpoint doesn't include the overflow blocks so they're removed and future readers of
+     * this page won't be able to find them.
      */
-    if (vpack != NULL && vpack->type != WT_CELL_DEL && upd_select->upd != NULL && upd_saved)
+    if (upd_select->upd != NULL && vpack != NULL && vpack->type != WT_CELL_DEL &&
+      (upd_saved || F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)))
         WT_ERR(__rec_append_orig_value(session, page, upd_select->upd, vpack));
 
 err:

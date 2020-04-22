@@ -89,7 +89,7 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
      * functions, but in the case of a search, we will see different results based on the cursor's
      * initial location. See WT-5134 for the details.
      */
-    if (search_operation && session->txn.isolation == WT_ISO_READ_COMMITTED)
+    if (search_operation && session->txn->isolation == WT_ISO_READ_COMMITTED)
         return (false);
 
     /*
@@ -1471,11 +1471,11 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
      * time and the failure is unlikely to be detected. Require explicit transactions for modify
      * operations.
      */
-    if (session->txn.isolation != WT_ISO_SNAPSHOT)
+    if (session->txn->isolation != WT_ISO_SNAPSHOT)
         WT_ERR_MSG(session, ENOTSUP,
           "not supported in read-committed or read-uncommitted "
           "transactions");
-    if (F_ISSET(&session->txn, WT_TXN_AUTOCOMMIT))
+    if (F_ISSET(session->txn, WT_TXN_AUTOCOMMIT))
         WT_ERR_MSG(session, ENOTSUP, "not supported in implicit transactions");
 
     if (!F_ISSET(cursor, WT_CURSTD_KEY_INT) || !F_ISSET(cursor, WT_CURSTD_VALUE_INT))

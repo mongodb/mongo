@@ -879,7 +879,7 @@ __wt_rec_row_leaf(
         } else {
             /* The first time we find an overflow record, discard the underlying blocks. */
             if (F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW) && vpack->raw != WT_CELL_VALUE_OVFL_RM)
-                WT_ERR(__wt_ovfl_remove(session, page, vpack, F_ISSET(r, WT_REC_EVICT)));
+                WT_ERR(__wt_ovfl_remove(session, page, vpack));
 
             switch (upd->type) {
             case WT_UPDATE_MODIFY:

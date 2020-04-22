@@ -328,11 +328,10 @@ __wt_meta_block_metadata(WT_SESSION_IMPL *session, const char *config, WT_CKPT *
     filecfg[1] = config;
 
     /*
-     * Find out if this file is encrypted. If encrypting, encrypt and encode.
-     * The metadata has to be encrypted because it contains private data
-     * (for example, column names). We pass the block manager text that
-     * describes the metadata (the encryption information), and the
-     * possibly encrypted metadata encoded as a hexadecimal string.
+     * Find out if this file is encrypted. If encrypting, encrypt and encode. The metadata has to be
+     * encrypted because it contains private data (for example, column names). We pass the block
+     * manager text that describes the metadata (the encryption information), and the possibly
+     * encrypted metadata encoded as a hexadecimal string.
      */
     WT_ERR(__wt_btree_config_encryptor(session, filecfg, &kencryptor));
     if (kencryptor == NULL) {

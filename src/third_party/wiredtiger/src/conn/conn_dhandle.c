@@ -367,13 +367,12 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
     }
 
     /*
-     * If marking the handle dead, do so after closing the underlying btree.
-     * (Don't do it before that, the block manager asserts there are never
-     * two references to a block manager object, and re-opening the handle
-     * can succeed once we mark this handle dead.)
+     * If marking the handle dead, do so after closing the underlying btree. (Don't do it before
+     * that, the block manager asserts there are never two references to a block manager object, and
+     * re-opening the handle can succeed once we mark this handle dead.)
      *
-     * Check discard too, code we call to clear the cache expects the data
-     * handle dead flag to be set when discarding modified pages.
+     * Check discard too, code we call to clear the cache expects the data handle dead flag to be
+     * set when discarding modified pages.
      */
     if (marked_dead || discard)
         F_SET(dhandle, WT_DHANDLE_DEAD);
@@ -426,8 +425,7 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
 
     WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) && !LF_ISSET(WT_DHANDLE_LOCK_ONLY));
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE_FLAGS) ||
-        !F_ISSET(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
+    WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
 
     /* Turn off eviction. */
     if (dhandle->type == WT_DHANDLE_TYPE_BTREE)
@@ -527,9 +525,8 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
         return (0);
 
     /*
-     * We need to pull the handle into the session handle cache and make
-     * sure it's referenced to stop other internal code dropping the handle
-     * (e.g in LSM when cleaning up obsolete chunks).
+     * We need to pull the handle into the session handle cache and make sure it's referenced to
+     * stop other internal code dropping the handle (e.g in LSM when cleaning up obsolete chunks).
      */
     if ((ret = __wt_session_get_dhandle(session, dhandle->name, dhandle->checkpoint, NULL, 0)) != 0)
         return (ret == EBUSY ? 0 : ret);

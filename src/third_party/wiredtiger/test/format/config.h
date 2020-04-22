@@ -336,6 +336,10 @@ static CONFIG c[] = {
   {"wiredtiger.config", "configuration string used to wiredtiger_open", C_IGNORE | C_STRING, 0, 0,
     0, NULL, &g.c_config_open},
 
+  /* 80% */
+  {"wiredtiger.rwlock", "if wiredtiger read/write mutexes should be used", C_BOOL, 80, 0, 0,
+    &g.c_wt_mutex, NULL},
+
   {"wiredtiger.leak_memory", "if memory should be leaked on close", C_BOOL, 0, 0, 0,
     &g.c_leak_memory, NULL},
 

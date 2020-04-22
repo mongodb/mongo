@@ -269,18 +269,16 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
         return (0);
 
     /*
-     * We may have raced between starting the checkpoint transaction and
-     * some operation completing on the handle that updated the metadata
-     * (e.g., closing a bulk load cursor).  All such operations either have
-     * exclusive access to the handle or hold the schema lock.  We are now
-     * holding the schema lock and have an open btree handle, so if we
-     * can't update the metadata, then there has been some state change
-     * invisible to the checkpoint transaction.
+     * We may have raced between starting the checkpoint transaction and some operation completing
+     * on the handle that updated the metadata (e.g., closing a bulk load cursor). All such
+     * operations either have exclusive access to the handle or hold the schema lock. We are now
+     * holding the schema lock and have an open btree handle, so if we can't update the metadata,
+     * then there has been some state change invisible to the checkpoint transaction.
      */
     if (!WT_IS_METADATA(session->dhandle)) {
         WT_CURSOR *meta_cursor;
 
-        WT_ASSERT(session, !F_ISSET(&session->txn, WT_TXN_ERROR));
+        WT_ASSERT(session, !F_ISSET(session->txn, WT_TXN_ERROR));
         WT_RET(__wt_metadata_cursor(session, &meta_cursor));
         meta_cursor->set_key(meta_cursor, session->dhandle->name);
         ret = __wt_curfile_insert_check(meta_cursor);
@@ -465,7 +463,7 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
 
     if (msec > conn->ckpt_time_max)
         conn->ckpt_time_max = msec;
-    if (conn->ckpt_time_min == 0 || msec < conn->ckpt_time_min)
+    if (msec < conn->ckpt_time_min)
         conn->ckpt_time_min = msec;
     conn->ckpt_time_recent = msec;
     conn->ckpt_time_total += msec;
@@ -475,7 +473,7 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
 
     if (msec > conn->ckpt_prep_max)
         conn->ckpt_prep_max = msec;
-    if (conn->ckpt_prep_min == 0 || msec < conn->ckpt_prep_min)
+    if (msec < conn->ckpt_prep_min)
         conn->ckpt_prep_min = msec;
     conn->ckpt_prep_recent = msec;
     conn->ckpt_prep_total += msec;
@@ -531,15 +529,15 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     WT_DECL_RET;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
-    WT_TXN_STATE *txn_state;
+    WT_TXN_SHARED *txn_shared;
     const char *txn_cfg[] = {
       WT_CONFIG_BASE(session, WT_SESSION_begin_transaction), "isolation=snapshot", NULL};
     bool use_timestamp;
 
     conn = S2C(session);
-    txn = &session->txn;
+    txn = session->txn;
     txn_global = &conn->txn_global;
-    txn_state = WT_SESSION_TXN_STATE(session);
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
     WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
     use_timestamp = (cval.val != 0);
@@ -585,21 +583,21 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      * time and only write to the metadata.
      */
     __wt_writelock(session, &txn_global->rwlock);
-    txn_global->checkpoint_state = *txn_state;
-    txn_global->checkpoint_state.pinned_id = txn->snap_min;
+    txn_global->checkpoint_txn_shared = *txn_shared;
+    txn_global->checkpoint_txn_shared.pinned_id = txn->snap_min;
 
     /*
      * Sanity check that the oldest ID hasn't moved on before we have cleared our entry.
      */
-    WT_ASSERT(session, WT_TXNID_LE(txn_global->oldest_id, txn_state->id) &&
-        WT_TXNID_LE(txn_global->oldest_id, txn_state->pinned_id));
+    WT_ASSERT(session, WT_TXNID_LE(txn_global->oldest_id, txn_shared->id) &&
+        WT_TXNID_LE(txn_global->oldest_id, txn_shared->pinned_id));
 
     /*
      * Clear our entry from the global transaction session table. Any operation that needs to know
      * about the ID for this checkpoint will consider the checkpoint ID in the global structure.
      * Most operations can safely ignore the checkpoint ID (see the visible all check for details).
      */
-    txn_state->id = txn_state->pinned_id = txn_state->metadata_pinned = WT_TXN_NONE;
+    txn_shared->id = txn_shared->pinned_id = txn_shared->metadata_pinned = WT_TXN_NONE;
 
     /*
      * Set the checkpoint transaction's timestamp, if requested.
@@ -608,7 +606,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      * the stable timestamp.
      */
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_READ |
-                           WT_TXN_TS_PUBLISHED | WT_TXN_PUBLIC_TS_READ));
+                           WT_TXN_SHARED_TS_DURABLE | WT_TXN_SHARED_TS_READ));
 
     if (use_timestamp) {
         /*
@@ -625,7 +623,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     } else {
         if (!F_ISSET(conn, WT_CONN_RECOVERING))
             txn_global->meta_ckpt_timestamp = WT_TS_NONE;
-        txn->read_timestamp = WT_TS_NONE;
+        txn->read_timestamp = txn_shared->pinned_read_timestamp = WT_TS_NONE;
     }
 
     __wt_writeunlock(session, &txn_global->rwlock);
@@ -756,7 +754,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     conn = S2C(session);
     cache = conn->cache;
     hs_dhandle = NULL;
-    txn = &session->txn;
+    txn = session->txn;
     txn_global = &conn->txn_global;
     saved_isolation = session->isolation;
     full = idle = logging = tracking = use_timestamp = false;
@@ -961,7 +959,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * Now that the metadata is stable, re-open the metadata file for regular eviction by clearing
      * the checkpoint_pinned flag.
      */
-    txn_global->checkpoint_state.pinned_id = WT_TXN_NONE;
+    txn_global->checkpoint_txn_shared.pinned_id = WT_TXN_NONE;
 
     if (full) {
         __checkpoint_stats(session);
@@ -1632,7 +1630,7 @@ fake:
      * that case, we need to sync the file here or we could roll forward the metadata in recovery
      * and open a checkpoint that isn't yet durable.
      */
-    if (WT_IS_METADATA(dhandle) || !F_ISSET(&session->txn, WT_TXN_RUNNING))
+    if (WT_IS_METADATA(dhandle) || !F_ISSET(session->txn, WT_TXN_RUNNING))
         WT_ERR(__wt_checkpoint_sync(session, NULL));
 
     WT_ERR(__wt_meta_ckptlist_set(session, dhandle->name, btree->ckpt, &ckptlsn));
@@ -1704,7 +1702,7 @@ __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
     bool with_timestamp;
 
     btree = S2BT(session);
-    txn = &session->txn;
+    txn = session->txn;
 
     /* Are we using a read timestamp for this checkpoint transaction? */
     with_timestamp = F_ISSET(txn, WT_TXN_HAS_TS_READ);

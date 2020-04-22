@@ -110,8 +110,8 @@ main(void)
     int64_t i;
 
     /*
-     * Test all values in a range, to ensure pack/unpack of small numbers
-     * (which most actively use different numbers of bits) works.
+     * Test all values in a range, to ensure pack/unpack of small numbers (which most actively use
+     * different numbers of bits) works.
      */
     test_spread(0, 100000, 100000);
     test_spread(INT16_MAX, 1025, 1025);

@@ -226,11 +226,9 @@ __curindex_search(WT_CURSOR *cursor)
     JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
 
     /*
-     * We are searching using the application-specified key, which
-     * (usually) doesn't contain the primary key, so it is just a prefix of
-     * any matching index key.  Do a search_near, step to the next entry if
-     * we land on one that is too small, then check that the prefix
-     * matches.
+     * We are searching using the application-specified key, which (usually) doesn't contain the
+     * primary key, so it is just a prefix of any matching index key. Do a search_near, step to the
+     * next entry if we land on one that is too small, then check that the prefix matches.
      */
     __wt_cursor_set_raw_key(child, &cursor->key);
     WT_ERR(child->search_near(child, &cmp));
@@ -297,15 +295,12 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
     JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
 
     /*
-     * We are searching using the application-specified key, which
-     * (usually) doesn't contain the primary key, so it is just a prefix of
-     * any matching index key.  That said, if there is an exact match, we
-     * want to find the first matching index entry and set exact equal to
-     * zero.
+     * We are searching using the application-specified key, which (usually) doesn't contain the
+     * primary key, so it is just a prefix of any matching index key. That said, if there is an
+     * exact match, we want to find the first matching index entry and set exact equal to zero.
      *
-     * Do a search_near, and if we find an entry that is too small, step to
-     * the next one.  In the unlikely event of a search past the end of the
-     * tree, go back to the last key.
+     * Do a search_near, and if we find an entry that is too small, step to the next one. In the
+     * unlikely event of a search past the end of the tree, go back to the last key.
      */
     __wt_cursor_set_raw_key(child, &cursor->key);
     WT_ERR(child->search_near(child, &cmp));

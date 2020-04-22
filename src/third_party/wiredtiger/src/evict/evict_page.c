@@ -608,8 +608,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      *
      * Don't set any other flags for internal pages: there are no update lists to be saved and
      * restored, changes can't be written into the history store table, nor can we re-create
-     * internal
-     * pages in memory.
+     * internal pages in memory.
      *
      * For leaf pages:
      *

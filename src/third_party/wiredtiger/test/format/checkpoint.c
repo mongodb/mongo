@@ -85,7 +85,7 @@ checkpoint(void *arg)
                  * few names to test multiple named snapshots in
                  * the system.
                  */
-                ret = pthread_rwlock_trywrlock(&g.backup_lock);
+                ret = lock_try_writelock(session, &g.backup_lock);
                 if (ret == 0) {
                     backup_locked = true;
                     testutil_check(__wt_snprintf(
@@ -98,7 +98,7 @@ checkpoint(void *arg)
                 /*
                  * 5% drop all named snapshots.
                  */
-                ret = pthread_rwlock_trywrlock(&g.backup_lock);
+                ret = lock_try_writelock(session, &g.backup_lock);
                 if (ret == 0) {
                     backup_locked = true;
                     ckpt_config = "drop=(all)";
@@ -110,7 +110,7 @@ checkpoint(void *arg)
         testutil_check(session->checkpoint(session, ckpt_config));
 
         if (backup_locked)
-            testutil_check(pthread_rwlock_unlock(&g.backup_lock));
+            lock_writeunlock(session, &g.backup_lock);
 
         secs = mmrand(NULL, 5, 40);
     }

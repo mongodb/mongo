@@ -374,7 +374,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
 {
     WT_BTREE *btree;
     WT_TXN_GLOBAL *txn_global;
-    WT_TXN_STATE *txn_state;
+    WT_TXN_SHARED *txn_shared;
     double pct_full;
 
     if (didworkp != NULL)
@@ -387,9 +387,9 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
      * sure there is free space in the cache.
      */
     txn_global = &S2C(session)->txn_global;
-    txn_state = WT_SESSION_TXN_STATE(session);
-    busy = busy || txn_state->id != WT_TXN_NONE || session->nhazard > 0 ||
-      (txn_state->pinned_id != WT_TXN_NONE && txn_global->current != txn_global->oldest_id);
+    txn_shared = WT_SESSION_TXN_SHARED(session);
+    busy = busy || txn_shared->id != WT_TXN_NONE || session->nhazard > 0 ||
+      (txn_shared->pinned_id != WT_TXN_NONE && txn_global->current != txn_global->oldest_id);
 
     /*
      * LSM sets the "ignore cache size" flag when holding the LSM tree lock, in that case, or when

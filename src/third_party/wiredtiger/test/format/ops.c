@@ -158,10 +158,12 @@ operations(u_int ops_seconds, bool lastrun)
     if (!SINGLETHREADED)
         g.rand_log_stop = true;
 
-    /* Logging requires a session. */
-    if (g.logging)
-        testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
     logop(session, "%s", "=============== thread ops start");
+
+    /* Initialize locks to single-thread backups, failures, and timestamp updates. */
+    lock_init(session, &g.backup_lock);
+    lock_init(session, &g.ts_lock);
 
     /*
      * Create the per-thread structures and start the worker threads. Allocate the thread structures
@@ -295,9 +297,11 @@ operations(u_int ops_seconds, bool lastrun)
         testutil_check(__wt_thread_join(NULL, &timestamp_tid));
     g.workers_finished = false;
 
+    lock_destroy(session, &g.backup_lock);
+    lock_destroy(session, &g.ts_lock);
+
     logop(session, "%s", "=============== thread ops stop");
-    if (g.logging)
-        testutil_check(session->close(session, NULL));
+    testutil_check(session->close(session, NULL));
 
     for (i = 0; i < g.c_threads; ++i) {
         tinfo = tinfo_list[i];
@@ -372,13 +376,13 @@ begin_transaction_ts(TINFO *tinfo, u_int *iso_configp)
      *
      * Lock out the oldest timestamp update.
      */
-    testutil_check(pthread_rwlock_wrlock(&g.ts_lock));
+    lock_writelock(session, &g.ts_lock);
 
     ts = __wt_atomic_addv64(&g.timestamp, 1);
     testutil_check(__wt_snprintf(buf, sizeof(buf), "read_timestamp=%" PRIx64, ts));
     testutil_check(session->timestamp_transaction(session, buf));
 
-    testutil_check(pthread_rwlock_unlock(&g.ts_lock));
+    lock_writeunlock(session, &g.ts_lock);
 
     snap_init(tinfo, ts, false);
     logop(session, "begin snapshot read-ts=%" PRIu64 " (not repeatable)", ts);
@@ -443,7 +447,7 @@ commit_transaction(TINFO *tinfo, bool prepared)
     ts = 0; /* -Wconditional-uninitialized */
     if (g.c_txn_timestamps) {
         /* Lock out the oldest timestamp update. */
-        testutil_check(pthread_rwlock_wrlock(&g.ts_lock));
+        lock_writelock(session, &g.ts_lock);
 
         ts = __wt_atomic_addv64(&g.timestamp, 1);
         testutil_check(__wt_snprintf(buf, sizeof(buf), "commit_timestamp=%" PRIx64, ts));
@@ -454,7 +458,7 @@ commit_transaction(TINFO *tinfo, bool prepared)
             testutil_check(session->timestamp_transaction(session, buf));
         }
 
-        testutil_check(pthread_rwlock_unlock(&g.ts_lock));
+        lock_writeunlock(session, &g.ts_lock);
     }
     testutil_check(session->commit_transaction(session, NULL));
 
@@ -509,7 +513,7 @@ prepare_transaction(TINFO *tinfo)
      *
      * Lock out the oldest timestamp update.
      */
-    testutil_check(pthread_rwlock_wrlock(&g.ts_lock));
+    lock_writelock(session, &g.ts_lock);
 
     ts = __wt_atomic_addv64(&g.timestamp, 1);
     testutil_check(__wt_snprintf(buf, sizeof(buf), "prepare_timestamp=%" PRIx64, ts));
@@ -517,7 +521,7 @@ prepare_transaction(TINFO *tinfo)
 
     logop(session, "prepare ts=%" PRIu64, ts);
 
-    testutil_check(pthread_rwlock_unlock(&g.ts_lock));
+    lock_writeunlock(session, &g.ts_lock);
 
     return (ret);
 }

@@ -257,7 +257,7 @@ read:
              */
             if (!LF_ISSET(WT_READ_IGNORE_CACHE_SIZE))
                 WT_RET(__wt_cache_eviction_check(
-                  session, true, !F_ISSET(&session->txn, WT_TXN_HAS_ID), NULL));
+                  session, true, !F_ISSET(session->txn, WT_TXN_HAS_ID), NULL));
             WT_RET(__page_read(session, ref, flags));
 
             /* We just read a page, don't evict it before we have a chance to use it. */

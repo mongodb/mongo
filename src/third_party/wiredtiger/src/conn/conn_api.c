@@ -1033,7 +1033,7 @@ err:
      * never referenced that file.
      */
     for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
-        if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL) && F_ISSET(&s->txn, WT_TXN_RUNNING)) {
+        if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL) && F_ISSET(s->txn, WT_TXN_RUNNING)) {
             wt_session = &s->iface;
             WT_TRET(wt_session->rollback_transaction(wt_session, NULL));
         }
@@ -1067,11 +1067,9 @@ err:
      * After the async and LSM threads have exited, we won't open more files for the application.
      * However, the sweep server is still running and it can close file handles at the same time the
      * final checkpoint is reviewing open data handles (forcing checkpoint to reopen handles). Shut
-     * down the sweep server and then flag the system should not open anything new.
+     * down the sweep server.
      */
     WT_TRET(__wt_sweep_destroy(session));
-    F_SET(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
-    WT_FULL_BARRIER();
 
     /*
      * Shut down the checkpoint and capacity server threads: we don't want to throttle writes and
@@ -1920,7 +1918,7 @@ __wt_verbose_dump_sessions(WT_SESSION_IMPL *session, bool show_cursors)
                   "read-committed" :
                   (s->isolation == WT_ISO_READ_UNCOMMITTED ? "read-uncommitted" : "snapshot")));
             WT_ERR(__wt_msg(session, "  Transaction:"));
-            WT_ERR(__wt_verbose_dump_txn_one(session, &s->txn, 0, NULL));
+            WT_ERR(__wt_verbose_dump_txn_one(session, s, 0, NULL));
         } else {
             WT_ERR(__wt_msg(session, "  Number of positioned cursors: %u", s->ncursors));
             TAILQ_FOREACH (cursor, &s->cursors, q) {
@@ -2645,13 +2643,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__conn_write_base_config(session, cfg));
 
     /*
-     * Check on the turtle and metadata files, creating them if necessary
-     * (which avoids application threads racing to create the metadata file
-     * later).  Once the metadata file exists, get a reference to it in
-     * the connection's session.
+     * Check on the turtle and metadata files, creating them if necessary (which avoids application
+     * threads racing to create the metadata file later). Once the metadata file exists, get a
+     * reference to it in the connection's session.
      *
-     * THE TURTLE FILE MUST BE THE LAST FILE CREATED WHEN INITIALIZING THE
-     * DATABASE HOME, IT'S WHAT WE USE TO DECIDE IF WE'RE CREATING OR NOT.
+     * THE TURTLE FILE MUST BE THE LAST FILE CREATED WHEN INITIALIZING THE DATABASE HOME, IT'S WHAT
+     * WE USE TO DECIDE IF WE'RE CREATING OR NOT.
      */
     WT_ERR(__wt_turtle_init(session));
 

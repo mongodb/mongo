@@ -315,14 +315,12 @@ restart:
         }
 
         /*
-         * Binary search of an internal page. There are three versions
-         * (keys with no application-specified collation order, in long
-         * and short versions, and keys with an application-specified
-         * collation order), because doing the tests and error handling
-         * inside the loop costs about 5%.
+         * Binary search of an internal page. There are three versions (keys with no
+         * application-specified collation order, in long and short versions, and keys with an
+         * application-specified collation order), because doing the tests and error handling inside
+         * the loop costs about 5%.
          *
-         * Reference the comment above about the 0th key: we continue to
-         * special-case it.
+         * Reference the comment above about the 0th key: we continue to special-case it.
          */
         base = 1;
         limit = pindex->entries - 1;
@@ -542,20 +540,17 @@ leaf_match:
     /*
      * We didn't find an exact match in the WT_ROW array.
      *
-     * Base is the smallest index greater than key and may be the 0th index
-     * or the (last + 1) index.  Set the slot to be the largest index less
-     * than the key if that's possible (if base is the 0th index it means
-     * the application is inserting a key before any key found on the page).
+     * Base is the smallest index greater than key and may be the 0th index or the (last + 1) index.
+     * Set the slot to be the largest index less than the key if that's possible (if base is the 0th
+     * index it means the application is inserting a key before any key found on the page).
      *
-     * It's still possible there is an exact match, but it's on an insert
-     * list.  Figure out which insert chain to search and then set up the
-     * return information assuming we'll find nothing in the insert list
-     * (we'll correct as needed inside the search routine, depending on
-     * what we find).
+     * It's still possible there is an exact match, but it's on an insert list. Figure out which
+     * insert chain to search and then set up the return information assuming we'll find nothing in
+     * the insert list (we'll correct as needed inside the search routine, depending on what we
+     * find).
      *
-     * If inserting a key smaller than any key found in the WT_ROW array,
-     * use the extra slot of the insert array, otherwise the insert array
-     * maps one-to-one to the WT_ROW array.
+     * If inserting a key smaller than any key found in the WT_ROW array, use the extra slot of the
+     * insert array, otherwise the insert array maps one-to-one to the WT_ROW array.
      */
     if (base == 0) {
         cbt->compare = 1;

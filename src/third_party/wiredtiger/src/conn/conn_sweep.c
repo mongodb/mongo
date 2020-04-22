@@ -66,17 +66,14 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
     /*
      * Acquire an exclusive lock on the handle and mark it dead.
      *
-     * The close would require I/O if an update cannot be written
-     * (updates in a no-longer-referenced file might not yet be
-     * globally visible if sessions have disjoint sets of files
-     * open).  In that case, skip it: we'll retry the close the
-     * next time, after the transaction state has progressed.
+     * The close would require I/O if an update cannot be written (updates in a no-longer-referenced
+     * file might not yet be globally visible if sessions have disjoint sets of files open). In that
+     * case, skip it: we'll retry the close the next time, after the transaction state has
+     * progressed.
      *
-     * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we want
-     * opens to block on us and then retry rather than returning an
-     * EBUSY error to the application.  This is done holding the
-     * handle list lock so that connection-level handle searches
-     * never need to retry.
+     * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we want opens to block on us and then retry
+     * rather than returning an EBUSY error to the application. This is done holding the handle list
+     * lock so that connection-level handle searches never need to retry.
      */
     WT_RET(__wt_try_writelock(session, &dhandle->rwlock));
 
