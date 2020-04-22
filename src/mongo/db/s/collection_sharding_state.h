@@ -182,9 +182,9 @@ public:
     virtual void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata) = 0;
 
     /**
-     * Append info to display in server status.
+     * Returns the number of ranges scheduled for deletion on the collection.
      */
-    virtual void appendInfoForServerStatus(BSONArrayBuilder* builder) = 0;
+    virtual size_t numberOfRangesScheduledForDeletion() const = 0;
 };
 
 /**

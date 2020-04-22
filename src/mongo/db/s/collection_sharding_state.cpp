@@ -92,16 +92,18 @@ public:
     }
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) {
-        BSONArrayBuilder rangeDeleterArrayBuilder(builder->subarrayStart("rangeDeleterTasks"));
-
-        {
+        auto totalNumberOfRangesScheduledForDeletion = ([this] {
             stdx::lock_guard lg(_mutex);
-            for (auto& coll : _collections) {
-                coll.second->appendInfoForServerStatus(&rangeDeleterArrayBuilder);
-            }
-        }
+            return std::accumulate(_collections.begin(),
+                                   _collections.end(),
+                                   0LL,
+                                   [](long long total, const auto& coll) {
+                                       return total +
+                                           coll.second->numberOfRangesScheduledForDeletion();
+                                   });
+        })();
 
-        rangeDeleterArrayBuilder.done();
+        builder->appendNumber("rangeDeleterTasks", totalNumberOfRangesScheduledForDeletion);
     }
 
 private:

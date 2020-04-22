@@ -105,7 +105,7 @@ public:
 
     void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata) override;
 
-    void appendInfoForServerStatus(BSONArrayBuilder* builder) override;
+    size_t numberOfRangesScheduledForDeletion() const override;
 
     /**
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
