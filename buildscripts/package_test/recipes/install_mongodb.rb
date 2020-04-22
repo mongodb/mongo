@@ -57,7 +57,7 @@ if platform_family? 'debian'
 
   # install the tools so we can test install_compass
   execute 'install mongo tools' do
-    command 'dpkg -i `find . -name "*tools*.deb"`'
+    command 'dpkg -i `find . -name "*tools-extra*.deb"`'
     cwd homedir
     returns [0, 1]
   end
@@ -89,7 +89,7 @@ if platform_family? 'rhel'
 
   # install the tools so we can test install_compass
   execute 'install mongo tools' do
-    command 'yum install -y `find . -name "*tools*.rpm"`'
+    command 'yum install -y `find . -name "*tools-extra*.rpm"`'
     cwd homedir
   end
 
