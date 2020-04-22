@@ -1677,9 +1677,13 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     // ensures the recency guarantee for the afterClusterTime read. At the end of the command, we
     // will wait for the lastApplied optime to become majority committed, which then satisfies the
     // durability guarantee.
-    const bool isMajorityCommittedRead =
-        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern &&
-        !readConcern.isSpeculativeMajority() && !opCtx->inMultiDocumentTransaction();
+    //
+    // Majority and snapshot reads outside of transactions should non-speculatively wait for the
+    // majority committed snapshot.
+    const bool isMajorityCommittedRead = !readConcern.isSpeculativeMajority() &&
+        !opCtx->inMultiDocumentTransaction() &&
+        (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
+         readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern);
 
     if (isMajorityCommittedRead) {
         return _waitUntilMajorityOpTime(opCtx, targetOpTime, deadline);
