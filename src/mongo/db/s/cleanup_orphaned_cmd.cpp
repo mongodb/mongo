@@ -39,7 +39,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -60,7 +59,7 @@ namespace {
 enum class CleanupResult { kDone, kContinue, kError };
 
 /**
- * In FCV 4.2 or if the resumable range deleter is disabled:
+ * If the resumable range deleter is disabled:
  * Cleans up one range of orphaned data starting from a range that overlaps or starts at
  * 'startingFromKey'.  If empty, startingFromKey is the minimum key of the sharded range.
  *
@@ -78,8 +77,6 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                                   const BSONObj& startingFromKeyConst,
                                   BSONObj* stoppedAtKey,
                                   std::string* errMsg) {
-    FixedFCVRegion fixedFCVRegion(opCtx);
-
     // Note that 'disableResumableRangeDeleter' is a startup-only parameter, so it cannot change
     // while this process is running.
     if (!disableResumableRangeDeleter.load()) {
@@ -239,13 +236,12 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 }
 
 /**
- * In FCV 4.2 or if 'disableResumableRangeDeleter=true':
+ * If 'disableResumableRangeDeleter=true':
  *
- * Cleanup orphaned data command.  Called on a particular namespace, and if the collection
- * is sharded will clean up a single orphaned data range which overlaps or starts after a
- * passed-in 'startingFromKey'.  Returns true and a 'stoppedAtKey' (which will start a
- * search for the next orphaned range if the command is called again) or no key if there
- * are no more orphaned ranges in the collection.
+ * Called on a particular namespace, and if the collection is sharded will clean up a single
+ * orphaned data range which overlaps or starts after a passed-in 'startingFromKey'.  Returns true
+ * and a 'stoppedAtKey' (which will start a search for the next orphaned range if the command is
+ * called again) or no key if there are no more orphaned ranges in the collection.
  *
  * If the collection is not sharded, returns true but no 'stoppedAtKey'.
  * On failure, returns false and an error message.
@@ -268,7 +264,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
  *      writeConcern: { <writeConcern options> }
  * }
  *
- * In FCV 4.4 if 'disableResumableRangeDeleter=false':
+ * If 'disableResumableRangeDeleter=false':
  *
  * Called on a particular namespace, and if the collection is sharded will wait for the number of
  * range deletion tasks on the collection on this shard to reach zero. Returns true on completion,
@@ -277,8 +273,8 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
  * If the collection is not sharded, returns true and no 'stoppedAtKey'.
  * On failure, returns false and an error message.
  *
- * As in FCV 4.2, since the sharding state may change after this call returns, there is no guarantee
- * that orphans won't re-appear as a result of migrations that commit after this call returns.
+ * Since the sharding state may change after this call returns, there is no guarantee that orphans
+ * won't re-appear as a result of migrations that commit after this call returns.
  *
  * Safe to call with the balancer on.
  */
