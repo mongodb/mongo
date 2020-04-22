@@ -129,8 +129,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
               "getOwnershipFilter called by operation that doesn't have a valid shard version");
 
     return _getMetadataWithVersionCheckAt(opCtx,
-                                          repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
-                                          TreatUnknownAsUnsharded::kNo);
+                                          repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
 }
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription() {
@@ -171,11 +170,7 @@ boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadat
 }
 
 void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx) {
-    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, TreatUnknownAsUnsharded::kNo);
-}
-
-void CollectionShardingRuntime::checkShardVersionOrThrow_DEPRECATED(OperationContext* opCtx) {
-    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, TreatUnknownAsUnsharded::kYes);
+    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
@@ -333,9 +328,7 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
 
 std::shared_ptr<ScopedCollectionDescription::Impl>
 CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
-    OperationContext* opCtx,
-    const boost::optional<mongo::LogicalTime>& atClusterTime,
-    TreatUnknownAsUnsharded treatUnknownAsUnsharded) {
+    OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
     if (!optReceivedShardVersion)
         return kUnshardedCollection;
@@ -349,15 +342,11 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
     auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime);
-    if (!optCurrentMetadata) {
-        uassert(StaleConfigInfo(
-                    _nss, receivedShardVersion, boost::none, ShardingState::get(opCtx)->shardId()),
-                str::stream() << "sharding status of collection " << _nss.ns()
-                              << " is not currently known and needs to be recovered",
-                !ChunkVersion::isIgnoredVersion(receivedShardVersion) &&
-                    treatUnknownAsUnsharded == TreatUnknownAsUnsharded::kYes);
-        optCurrentMetadata = kUnshardedCollection;
-    }
+    uassert(StaleConfigInfo(
+                _nss, receivedShardVersion, boost::none, ShardingState::get(opCtx)->shardId()),
+            str::stream() << "sharding status of collection " << _nss.ns()
+                          << " is not currently known and needs to be recovered",
+            optCurrentMetadata);
 
     const auto& currentMetadata = optCurrentMetadata->get();
     auto wantedShardVersion = currentMetadata.getShardVersion();

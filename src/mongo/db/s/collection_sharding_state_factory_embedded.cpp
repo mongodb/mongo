@@ -64,7 +64,6 @@ public:
         return {kUnshardedCollection};
     }
     void checkShardVersionOrThrow(OperationContext*) override {}
-    void checkShardVersionOrThrow_DEPRECATED(OperationContext*) override {}
 
     void appendShardVersion(BSONObjBuilder* builder) override {}
 

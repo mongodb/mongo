@@ -91,7 +91,6 @@ public:
     ScopedCollectionDescription getCollectionDescription_DEPRECATED() override;
 
     void checkShardVersionOrThrow(OperationContext* opCtx) override;
-    void checkShardVersionOrThrow_DEPRECATED(OperationContext* opCtx) override;
 
     void appendShardVersion(BSONObjBuilder* builder) override;
 
@@ -219,11 +218,8 @@ private:
      * atClusterTime if specified. Throws StaleConfigInfo if the shard version attached to the
      * operation context does not match the shard version on the active metadata object.
      */
-    enum class TreatUnknownAsUnsharded { kYes, kNo };
     std::shared_ptr<ScopedCollectionDescription::Impl> _getMetadataWithVersionCheckAt(
-        OperationContext* opCtx,
-        const boost::optional<mongo::LogicalTime>& atClusterTime,
-        TreatUnknownAsUnsharded treatUnknownAsUnsharded);
+        OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime);
 
     // Namespace this state belongs to.
     const NamespaceString _nss;
