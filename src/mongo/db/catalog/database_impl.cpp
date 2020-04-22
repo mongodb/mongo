@@ -547,11 +547,13 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
         Collection* toColl =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
-        invariant(
-            !toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
-            str::stream() << "cannot perform operation: an index build is currently running for "
+        if (toColl) {
+            invariant(!toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
+                      str::stream()
+                          << "cannot perform operation: an index build is currently running for "
                              "collection "
                           << toNss);
+        }
     }
 
     LOGV2(20319,
