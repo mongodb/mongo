@@ -998,12 +998,13 @@ void WiredTigerKVEngine::cleanShutdown() {
 
     const Timestamp stableTimestamp = getStableTimestamp();
     const Timestamp initialDataTimestamp = getInitialDataTimestamp();
-    if (stableTimestamp >= initialDataTimestamp) {
+    if (serverGlobalParams.enableMajorityReadConcern || stableTimestamp >= initialDataTimestamp) {
         invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
     } else {
+        // See SERVER-45010 for why this quickExit is necessary.
         LOGV2(22326,
-              "Skipping checkpoint during clean shutdown because stableTimestamp "
-              "({stableTimestamp}) is less than the initialDataTimestamp ({initialDataTimestamp})",
+              "Skipping checkpoint during clean shutdown because stableTimestamp is less than the "
+              "initialDataTimestamp and enableMajorityReadConcern is false",
               "stableTimestamp"_attr = stableTimestamp,
               "initialDataTimestamp"_attr = initialDataTimestamp);
         quickExit(EXIT_SUCCESS);

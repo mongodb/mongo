@@ -1820,6 +1820,9 @@ public:
         // dropDatabase must not timestamp the final write. The collection and index should seem
         // to have never existed.
         assertIdentsMissingAtTimestamp(durableCatalog, collIdent, indexIdent, syncTime);
+
+        // Reset initial data timestamp to avoid unintended storage engine timestamp side effects.
+        storageEngine->setInitialDataTimestamp(Timestamp(0, 0));
     }
 };
 
