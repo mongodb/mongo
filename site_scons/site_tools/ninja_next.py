@@ -1374,7 +1374,8 @@ def generate(env):
     # the DAG which is required so that we walk every target, and therefore add
     # it to the global NINJA_STATE, before we try to write the ninja file.
     def ninja_file_depends_on_all(target, source, env):
-        env.Depends(ninja_file, target)
+        if not any("conftest" in str(t) for t in target):
+            env.Depends(ninja_file, target)
         return target, source
 
     # The "Alias Builder" isn't in the BUILDERS map so we have to
