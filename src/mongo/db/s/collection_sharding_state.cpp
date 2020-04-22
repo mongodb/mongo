@@ -90,8 +90,8 @@ public:
             stdx::lock_guard lg(_mutex);
             return std::accumulate(_collections.begin(),
                                    _collections.end(),
-                                   uint64_t(0),
-                                   [](uint64_t total, const auto& coll) {
+                                   0LL,
+                                   [](long long total, const auto& coll) {
                                        return total +
                                            coll.second->numberOfRangesScheduledForDeletion();
                                    });
