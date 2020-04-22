@@ -51,6 +51,21 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+namespace {
+// std::is_copy_constructible incorrectly returns true for containers of move-only types, so we use
+// our own modified version instead. Note this version is brittle at the moment, since it determines
+// whether or not the type is a container by the presense of a value_type field. After we switch to
+// C++20 we can use the Container concept for this instread.
+template <typename T, typename = void>
+struct is_really_copy_constructible : std::is_copy_constructible<T> {};
+template <typename T>
+struct is_really_copy_constructible<T, std::void_t<typename T::value_type>>
+    : std::is_copy_constructible<typename T::value_type> {};
+template <typename T>
+constexpr bool is_really_copy_constructible_v = is_really_copy_constructible<T>::value;
+}  // namespace
+
 template <typename T>
 class Promise;
 
@@ -505,7 +520,7 @@ struct SharedStateImpl final : SharedStateBase {
     // Initial methods only called from future side.
 
     boost::intrusive_ptr<SharedState<T>> addChild() {
-        static_assert(std::is_copy_constructible_v<T>);  // T has been through VoidToFakeVoid.
+        static_assert(is_really_copy_constructible_v<T>);  // T has been through VoidToFakeVoid.
         invariant(!callback);
 
         auto out = make_intrusive<SharedState<T>>();
@@ -588,7 +603,7 @@ struct SharedStateImpl final : SharedStateBase {
     }
 
     void fillChildren(const Children& children) const override {
-        if constexpr (std::is_copy_constructible_v<T>) {  // T has been through VoidToFakeVoid.
+        if constexpr (is_really_copy_constructible_v<T>) {  // T has been through VoidToFakeVoid.
             for (auto&& child : children) {
                 checked_cast<SharedState<T>*>(child.get())->fillFromConst(*this);
             }

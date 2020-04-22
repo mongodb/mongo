@@ -737,5 +737,26 @@ TEST(Future_MoveOnly, Fail_onCompletionFutureReady) {
     });
 }
 
+// Tests for containers of move-only types.
+TEST(Future_MoveOnly, Success_vector) {
+    FUTURE_SUCCESS_TEST(
+        [] {
+            std::vector<Widget> vec;
+            vec.emplace_back(1);
+            return vec;
+        },
+        [](/*Future<vector<Widget>>*/ auto&& fut) { ASSERT_EQ(fut.get()[0], 1); });
+}
+
+TEST(Future_MoveOnly, Success_list) {
+    FUTURE_SUCCESS_TEST(
+        [] {
+            std::list<Widget> lst;
+            lst.emplace_back(1);
+            return lst;
+        },
+        [](/*Future<list<Widget>>*/ auto&& fut) { ASSERT_EQ(fut.get().front(), 1); });
+}
+
 }  // namespace
 }  // namespace mongo
