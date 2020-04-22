@@ -455,6 +455,74 @@ private:
     using NssToCursorContainerMap =
         stdx::unordered_map<NamespaceString, CursorEntryContainer, NamespaceString::Hasher>;
 
+    // Internal, fixed size log of events cursor manager. This has been added to help diagnose
+    // SERVER-27796.
+    struct LogEvent {
+        enum class Type {
+            kRegisterAttempt,   // Any attempt to create a cursor.
+            kRegisterComplete,  // A cursor actually being created.
+
+            // Checking out a cursor.
+            kCheckoutAttempt,
+            kCheckoutComplete,
+
+            // Caller attempts to check a cursor in. This event may be followed by a
+            // kCheckInCompleteCursorSaved, or by events which indicate the cursor is deleted.
+            kCheckInAttempt,
+
+            // Logged when the check-in is successful and the cursor is kept.
+            kCheckInCompleteCursorSaved,
+
+            // Detaching a cursor (and erasing associated namespace).
+            kDetachAttempt,
+            kDetachComplete,
+            kNamespaceEntryMapErased,
+
+            // These mark the beginning and end of the period where
+            // killCursorsSatisfyingPredicate() holds a lock.
+            kRemoveCursorsSatisfyingPredicateAttempt,
+            kRemoveCursorsSatisfyingPredicateComplete,
+
+            // Any call to killCursor().
+            kKillCursorAttempt,
+
+            // Represents each time killCursorsSatisfyingPredicate() detaches a cursor that it
+            // intends to destroy.
+            kCursorMarkedForDeletionBySatisfyingPredicate,
+
+            //
+            // NOTE: If you ever add to this enum be sure to update the typeToString() method
+            // below.
+            //
+        };
+
+        static std::string typeToString(Type);
+
+        Type type;
+
+        // boost::none for log entries that don't have an associated cursor ID.
+        boost::optional<CursorId> cursorId;
+
+        // Time is not always provided to avoid having to read the clock while the mutex is held.
+        boost::optional<Date_t> time;
+        boost::optional<NamespaceString> nss;
+    };
+
+    // Circular queue used to store the latest events that happened in the ClusterCursorManager.
+    struct CircularLogQueue {
+        std::vector<LogEvent> events{512};
+        size_t start = 0;
+        size_t end = 0;
+
+        void push(LogEvent&& e) {
+            events[end] = std::move(e);
+            end = (end + 1) % events.size();
+            if (end == start) {
+                start = (start + 1) % events.size();
+            }
+        }
+    };
+
     /**
      * Transfers ownership of the given pinned cursor back to the manager, and moves the cursor to
      * the 'idle' state.
@@ -506,13 +574,15 @@ private:
     void killOperationUsingCursor(WithLock, CursorEntry* entry);
 
     /**
-     * Kill the cursors satisfying the given predicate. Assumes that 'lk' is held upon entry.
+     * Kill the cursors satisfying the given predicate. Assumes that 'lk' is held upon entry. The
+     * 'now' parameter is only used for the internal logging mechansim.
      *
      * Returns the number of cursors killed.
      */
     std::size_t killCursorsSatisfying(stdx::unique_lock<stdx::mutex> lk,
                                       OperationContext* opCtx,
-                                      std::function<bool(CursorId, const CursorEntry&)> pred);
+                                      std::function<bool(CursorId, const CursorEntry&)> pred,
+                                      Date_t now);
 
     /**
      * CursorEntry is a moveable, non-copyable container for a single cursor.
@@ -646,6 +716,20 @@ private:
      */
     NssToCursorContainerMap::iterator eraseContainer(NssToCursorContainerMap::iterator it);
 
+    /**
+     * Functions which dump the state/history of the cursor manager into a BSONObj for debug
+     * purposes.
+     */
+    BSONObj dumpCursorIdToNssMap() const;
+    BSONObj dumpNssToContainerMap() const;
+    BSONObj dumpInternalLog() const;
+
+    /**
+     * Logs objects which summarize the current state of the cursor manager as well as its recent
+     * history.
+     */
+    void logCursorManagerInfo() const;
+
     // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.  May be
     // concurrently accessed by multiple threads.
     ClockSource* _clockSource;
@@ -656,6 +740,7 @@ private:
     bool _inShutdown{false};
 
     // Randomness source.  Used for cursor id generation.
+    const int64_t _randomSeed;
     PseudoRandom _pseudoRandom;
 
     // Map from cursor id prefix to associated namespace.  Exists only to provide namespace lookup
@@ -677,6 +762,8 @@ private:
     NssToCursorContainerMap _namespaceToContainerMap;
 
     size_t _cursorsTimedOut = 0;
+
+    CircularLogQueue _log;
 };
 
 }  // namespace
