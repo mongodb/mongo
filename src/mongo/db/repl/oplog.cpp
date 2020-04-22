@@ -791,15 +791,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'commitIndexBuild' oplog entry");
           }
-          try {
-              IndexBuildsCoordinator::get(opCtx)->applyCommitIndexBuild(opCtx,
-                                                                        swOplogEntry.getValue());
-          } catch (ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
-              // TODO(SERVER-46656): We sometimes do two-phase builds of empty collections on
-              // the primary, but treat them as one-phase on the secondary.  This will result
-              // in an IndexAlreadyExists when we commit.  When SERVER-46656 is fixed we should
-              // no longer catch and ignore this error.
-          }
+          auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
+          indexBuildsCoordinator->applyCommitIndexBuild(opCtx, swOplogEntry.getValue());
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists,
