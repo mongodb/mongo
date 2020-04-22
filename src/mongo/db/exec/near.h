@@ -108,6 +108,7 @@ protected:
               const char* typeName,
               StageType type,
               WorkingSet* workingSet,
+              const Collection* collection,
               const IndexDescriptor* indexDescriptor);
 
     //

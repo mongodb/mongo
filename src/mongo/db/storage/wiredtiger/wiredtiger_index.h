@@ -76,6 +76,7 @@ public:
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
                                                         const std::string& sysIndexConfig,
                                                         const std::string& collIndexConfig,
+                                                        const NamespaceString& collectionNamespace,
                                                         const IndexDescriptor& desc,
                                                         bool isPrefixed);
 
@@ -127,13 +128,11 @@ public:
         return _tableId;
     }
 
-    const NamespaceString& collectionNamespace() const {
-        return _collectionNamespace;
-    }
-
     std::string indexName() const {
         return _indexName;
     }
+
+    NamespaceString getCollectionNamespace(OperationContext* opCtx) const;
 
     const BSONObj& keyPattern() const {
         return _keyPattern;
@@ -180,7 +179,7 @@ protected:
     int _dataFormatVersion;
     std::string _uri;
     uint64_t _tableId;
-    const NamespaceString _collectionNamespace;
+    const IndexDescriptor* _desc;
     const std::string _indexName;
     const BSONObj _keyPattern;
     const BSONObj _collation;

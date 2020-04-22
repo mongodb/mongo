@@ -96,7 +96,7 @@ std::map<std::string, int64_t> _validateIndexesInternalStructure(
                       {LogComponent::kIndex},
                       "Validating internal structure",
                       "index"_attr = descriptor->indexName(),
-                      "namespace"_attr = descriptor->parentNS());
+                      "namespace"_attr = validateState->nss());
 
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
@@ -135,7 +135,7 @@ void _validateIndexes(OperationContext* opCtx,
                       {LogComponent::kIndex},
                       "Validating index consistency",
                       "index"_attr = descriptor->indexName(),
-                      "namespace"_attr = descriptor->parentNS());
+                      "namespace"_attr = validateState->nss());
 
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
         int64_t numTraversedKeys;
@@ -242,7 +242,7 @@ void _validateIndexKeyCount(OperationContext* opCtx,
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
         if (curIndexResults.valid) {
-            indexValidator->validateIndexKeyCount(descriptor, curIndexResults);
+            indexValidator->validateIndexKeyCount(index.get(), curIndexResults);
         }
     }
 }

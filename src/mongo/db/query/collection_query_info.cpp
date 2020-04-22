@@ -86,10 +86,9 @@ const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx
     return _indexedPaths;
 }
 
-void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx) {
+void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, Collection* coll) {
     _indexedPaths.clear();
 
-    const Collection* coll = get.owner(this);
     std::unique_ptr<IndexCatalog::IndexIterator> it =
         coll->getIndexCatalog()->getIndexIterator(opCtx, true);
     while (it->more()) {
@@ -160,12 +159,12 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx) {
 }
 
 void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
+                                        Collection* coll,
                                         const PlanSummaryStats& summaryStats) {
     _indexUsageTracker.recordCollectionScans(summaryStats.collectionScans);
     _indexUsageTracker.recordCollectionScansNonTailable(summaryStats.collectionScansNonTailable);
 
     const auto& indexesUsed = summaryStats.indexesUsed;
-    const Collection* coll = get.owner(this);
     // Record indexes used to fulfill query.
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
         // This index should still exist, since the PlanExecutor would have been killed if the
@@ -177,8 +176,7 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
     }
 }
 
-void CollectionQueryInfo::clearQueryCache() {
-    const Collection* coll = get.owner(this);
+void CollectionQueryInfo::clearQueryCache(const Collection* coll) {
     LOGV2_DEBUG(20907,
                 1,
                 "{namespace}: clearing plan cache - collection info cache reset",
@@ -197,13 +195,12 @@ QuerySettings* CollectionQueryInfo::getQuerySettings() const {
     return _querySettings.get();
 }
 
-void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx) {
+void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx, Collection* coll) {
     std::vector<CoreIndexInfo> indexCores;
 
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
     // catalog may be in an inconsistent state.  SERVER-18346.
     const bool includeUnfinishedIndexes = true;
-    const Collection* coll = get.owner(this);
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
         coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
@@ -214,8 +211,7 @@ void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx) {
     _planCache->notifyOfIndexUpdates(indexCores);
 }
 
-void CollectionQueryInfo::init(OperationContext* opCtx) {
-    const Collection* coll = get.owner(this);
+void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
 
     const bool includeUnfinishedIndexes = false;
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
@@ -225,27 +221,31 @@ void CollectionQueryInfo::init(OperationContext* opCtx) {
         _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
     }
 
-    rebuildIndexData(opCtx);
+    rebuildIndexData(opCtx, coll);
 }
 
-void CollectionQueryInfo::addedIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
+void CollectionQueryInfo::addedIndex(OperationContext* opCtx,
+                                     Collection* coll,
+                                     const IndexDescriptor* desc) {
     invariant(desc);
 
-    rebuildIndexData(opCtx);
+    rebuildIndexData(opCtx, coll);
     _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
 }
 
-void CollectionQueryInfo::droppedIndex(OperationContext* opCtx, StringData indexName) {
-    rebuildIndexData(opCtx);
+void CollectionQueryInfo::droppedIndex(OperationContext* opCtx,
+                                       Collection* coll,
+                                       StringData indexName) {
+    rebuildIndexData(opCtx, coll);
     _indexUsageTracker.unregisterIndex(indexName);
 }
 
-void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx) {
-    clearQueryCache();
+void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, Collection* coll) {
+    clearQueryCache(coll);
 
     _keysComputed = false;
-    computeIndexKeys(opCtx);
-    updatePlanCacheIndexEntries(opCtx);
+    computeIndexKeys(opCtx, coll);
+    updatePlanCacheIndexEntries(opCtx, coll);
 }
 
 CollectionIndexUsageMap CollectionQueryInfo::getIndexUsageStats() const {

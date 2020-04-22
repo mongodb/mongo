@@ -58,6 +58,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/locker.h"
@@ -1662,34 +1663,34 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
     _ensureIdentPath(ident);
 
     std::string collIndexOptions;
-    const Collection* collection = desc->getCollection();
 
-    // Treat 'collIndexOptions' as an empty string when the collection member of 'desc' is NULL in
-    // order to allow for unit testing WiredTigerKVEngine::createSortedDataInterface().
-    if (collection) {
-        if (!collOptions.indexOptionDefaults["storageEngine"].eoo()) {
-            BSONObj storageEngineOptions = collOptions.indexOptionDefaults["storageEngine"].Obj();
-            collIndexOptions =
-                dps::extractElementAtPath(storageEngineOptions, _canonicalName + ".configString")
-                    .valuestrsafe();
-        }
+    if (!collOptions.indexOptionDefaults["storageEngine"].eoo()) {
+        BSONObj storageEngineOptions = collOptions.indexOptionDefaults["storageEngine"].Obj();
+        collIndexOptions =
+            dps::extractElementAtPath(storageEngineOptions, _canonicalName + ".configString")
+                .valuestrsafe();
     }
+    // Some unittests use a OperationContextNoop that can't support such lookups.
+    auto ns = collOptions.uuid
+        ? *CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, *collOptions.uuid)
+        : NamespaceString();
 
     StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-        _canonicalName, _indexOptions, collIndexOptions, *desc, prefix.isPrefixed());
+        _canonicalName, _indexOptions, collIndexOptions, ns, *desc, prefix.isPrefixed());
     if (!result.isOK()) {
         return result.getStatus();
     }
 
     std::string config = result.getValue();
 
-    LOGV2_DEBUG(22336,
-                2,
-                "WiredTigerKVEngine::createSortedDataInterface ns: {collection_ns} ident: {ident} "
-                "config: {config}",
-                "collection_ns"_attr = collection->ns(),
-                "ident"_attr = ident,
-                "config"_attr = config);
+    LOGV2_DEBUG(
+        22336,
+        2,
+        "WiredTigerKVEngine::createSortedDataInterface uuid: {collection_uuid} ident: {ident} "
+        "config: {config}",
+        "collection_uuid"_attr = collOptions.uuid,
+        "ident"_attr = ident,
+        "config"_attr = config);
     return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), config));
 }
 

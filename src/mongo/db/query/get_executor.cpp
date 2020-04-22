@@ -177,7 +177,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     auto accessMethod = ice.accessMethod();
     invariant(accessMethod);
 
-    const bool isMultikey = desc->isMultikey();
+    const bool isMultikey = ice.isMultikey();
 
     const WildcardProjection* wildcardProjection = nullptr;
     std::set<FieldRef> multikeyPathSet;
@@ -412,7 +412,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
 
         root = std::make_unique<IDHackStage>(
-            canonicalQuery->getExpCtxRaw(), canonicalQuery.get(), ws, descriptor);
+            canonicalQuery->getExpCtxRaw(), canonicalQuery.get(), ws, collection, descriptor);
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
@@ -819,7 +819,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
                             "query"_attr = redact(unparsedQuery));
 
                 auto idHackStage = std::make_unique<IDHackStage>(
-                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), descriptor);
+                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), collection, descriptor);
                 unique_ptr<DeleteStage> root =
                     std::make_unique<DeleteStage>(expCtx.get(),
                                                   std::move(deleteStageParams),
@@ -1489,8 +1489,8 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
             if (!mayUnwindArrays &&
                 isAnyComponentOfPathMultikey(desc->keyPattern(),
-                                             desc->isMultikey(),
-                                             desc->getMultikeyPaths(opCtx),
+                                             ice->isMultikey(),
+                                             ice->getMultikeyPaths(opCtx),
                                              parsedDistinct.getKey())) {
                 // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
                 // then an index which is multikey on the distinct field may not be used. This is

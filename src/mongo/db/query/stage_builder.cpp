@@ -114,7 +114,8 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.direction = ixn->direction;
             params.addKeyMetadata = ixn->addKeyMetadata;
             params.shouldDedup = ixn->shouldDedup;
-            return std::make_unique<IndexScan>(expCtx, std::move(params), ws, ixn->filter.get());
+            return std::make_unique<IndexScan>(
+                expCtx, collection, std::move(params), ws, ixn->filter.get());
         }
         case STAGE_FETCH: {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
@@ -252,7 +253,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
                 opCtx, node->index.identifier.catalogName);
             invariant(twoDIndex);
 
-            return std::make_unique<GeoNear2DStage>(params, expCtx, ws, twoDIndex);
+            return std::make_unique<GeoNear2DStage>(params, expCtx, ws, collection, twoDIndex);
         }
         case STAGE_GEO_NEAR_2DSPHERE: {
             const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
@@ -269,7 +270,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
                 opCtx, node->index.identifier.catalogName);
             invariant(s2Index);
 
-            return std::make_unique<GeoNear2DSphereStage>(params, expCtx, ws, s2Index);
+            return std::make_unique<GeoNear2DSphereStage>(params, expCtx, ws, collection, s2Index);
         }
         case STAGE_TEXT: {
             const TextNode* node = static_cast<const TextNode*>(root);
@@ -289,7 +290,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             // created by planning a query that contains "no-op" expressions.
             params.query = static_cast<FTSQueryImpl&>(*node->ftsQuery);
             params.wantTextScore = cq.metadataDeps()[DocumentMetadataFields::kTextScore];
-            return std::make_unique<TextStage>(expCtx, params, ws, node->filter.get());
+            return std::make_unique<TextStage>(expCtx, collection, params, ws, node->filter.get());
         }
         case STAGE_SHARDING_FILTER: {
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
@@ -322,7 +323,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.scanDirection = dn->direction;
             params.bounds = dn->bounds;
             params.fieldNo = dn->fieldNo;
-            return std::make_unique<DistinctScan>(expCtx, std::move(params), ws);
+            return std::make_unique<DistinctScan>(expCtx, collection, std::move(params), ws);
         }
         case STAGE_COUNT_SCAN: {
             const CountScanNode* csn = static_cast<const CountScanNode*>(root);
@@ -344,7 +345,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.startKeyInclusive = csn->startKeyInclusive;
             params.endKey = csn->endKey;
             params.endKeyInclusive = csn->endKeyInclusive;
-            return std::make_unique<CountScan>(expCtx, std::move(params), ws);
+            return std::make_unique<CountScan>(expCtx, collection, std::move(params), ws);
         }
         case STAGE_ENSURE_SORTED: {
             const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(root);

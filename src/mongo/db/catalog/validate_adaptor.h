@@ -84,7 +84,7 @@ public:
      * Validates that the number of document keys matches the number of index keys previously
      * traversed in traverseIndex().
      */
-    void validateIndexKeyCount(const IndexDescriptor* idx, ValidateResults& results);
+    void validateIndexKeyCount(const IndexCatalogEntry* index, ValidateResults& results);
 
 private:
     IndexConsistency* _indexConsistency;

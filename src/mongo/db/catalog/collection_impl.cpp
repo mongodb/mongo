@@ -254,7 +254,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                       _ns.db() != "local"),
       _indexCatalog(std::make_unique<IndexCatalogImpl>(this)),
       _cappedNotifier(_recordStore && _recordStore->isCapped()
-                          ? std::make_unique<CappedInsertNotifier>()
+                          ? std::make_shared<CappedInsertNotifier>()
                           : nullptr) {
     if (isCapped())
         _recordStore->setCappedCallback(this);
@@ -654,7 +654,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     }
 
     int64_t keysInserted;
-    status = _indexCatalog->indexRecords(opCtx, bsonRecords, &keysInserted);
+    status = _indexCatalog->indexRecords(opCtx, this, bsonRecords, &keysInserted);
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
     }
@@ -806,7 +806,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
         int64_t keysInserted, keysDeleted;
 
         uassertStatusOK(_indexCatalog->updateRecord(
-            opCtx, *args->preImageDoc, newDoc, oldLocation, &keysInserted, &keysDeleted));
+            opCtx, this, *args->preImageDoc, newDoc, oldLocation, &keysInserted, &keysDeleted));
 
         if (opDebug) {
             opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
@@ -1204,7 +1204,7 @@ void CollectionImpl::setNs(NamespaceString nss) {
 void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
     DurableCatalog::get(opCtx)->indexBuildSuccess(
         opCtx, getCatalogId(), index->descriptor()->indexName());
-    _indexCatalog->indexBuildSuccess(opCtx, index);
+    _indexCatalog->indexBuildSuccess(opCtx, this, index);
 }
 
 void CollectionImpl::establishOplogCollectionForLogging(OperationContext* opCtx) {

@@ -903,7 +903,7 @@ public:
 
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
-            auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
+            auto insertStatus = iam->insert(&_opCtx, coll, badKey, id1, options, &insertResult);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_EQUALS(insertResult.numInserted, 1);
@@ -1710,6 +1710,7 @@ public:
 
                 InsertResult result;
                 auto insertStatus = iam->insertKeys(&_opCtx,
+                                                    coll,
                                                     {keys.begin(), keys.end()},
                                                     {},
                                                     MultikeyPaths{},
@@ -1741,6 +1742,7 @@ public:
                              IndexAccessMethod::kNoopOnSuppressedErrorFn);
                 ASSERT_EQ(1, keys.size());
                 auto insertStatus = iam->insertKeys(&_opCtx,
+                                                    coll,
                                                     {keys.begin(), keys.end()},
                                                     {},
                                                     MultikeyPaths{},

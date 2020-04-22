@@ -118,6 +118,7 @@ public:
      * following the last inserted record from a previous call to drainWritesIntoIndex.
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
+                                const Collection* coll,
                                 const InsertDeleteOptions& options,
                                 TrackDuplicates trackDups,
                                 DrainYieldPolicy drainYieldPolicy);
@@ -162,6 +163,7 @@ private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
     Status _applyWrite(OperationContext* opCtx,
+                       const Collection* coll,
                        const BSONObj& doc,
                        const InsertDeleteOptions& options,
                        TrackDuplicates trackDups,

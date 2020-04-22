@@ -64,8 +64,8 @@ namespace {
 class WiredTigerFactory : public StorageEngine::Factory {
 public:
     virtual ~WiredTigerFactory() {}
-    virtual StorageEngine* create(const StorageGlobalParams& params,
-                                  const StorageEngineLockFile* lockFile) const {
+    virtual std::unique_ptr<StorageEngine> create(const StorageGlobalParams& params,
+                                                  const StorageEngineLockFile* lockFile) const {
         if (lockFile && lockFile->createdByUncleanShutdown()) {
             LOGV2_WARNING(22302, "Recovering data from the last clean checkpoint.");
         }
@@ -100,17 +100,17 @@ public:
             }
         }
         const bool ephemeral = false;
-        WiredTigerKVEngine* kv =
-            new WiredTigerKVEngine(getCanonicalName().toString(),
-                                   params.dbpath,
-                                   getGlobalServiceContext()->getFastClockSource(),
-                                   wiredTigerGlobalOptions.engineConfig,
-                                   cacheMB,
-                                   wiredTigerGlobalOptions.getMaxHistoryFileSizeMB(),
-                                   params.dur,
-                                   ephemeral,
-                                   params.repair,
-                                   params.readOnly);
+        auto kv =
+            std::make_unique<WiredTigerKVEngine>(getCanonicalName().toString(),
+                                                 params.dbpath,
+                                                 getGlobalServiceContext()->getFastClockSource(),
+                                                 wiredTigerGlobalOptions.engineConfig,
+                                                 cacheMB,
+                                                 wiredTigerGlobalOptions.getMaxHistoryFileSizeMB(),
+                                                 params.dur,
+                                                 ephemeral,
+                                                 params.repair,
+                                                 params.readOnly);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
 
@@ -121,7 +121,7 @@ public:
 
             // Intentionally leaked.
             MONGO_COMPILER_VARIABLE_UNUSED auto leakedSection =
-                new WiredTigerServerStatusSection(kv);
+                new WiredTigerServerStatusSection(kv.get());
 
             // This allows unit tests to run this code without encountering memory leaks
 #if __has_feature(address_sanitizer)
@@ -133,7 +133,7 @@ public:
         options.directoryPerDB = params.directoryperdb;
         options.directoryForIndexes = wiredTigerGlobalOptions.directoryForIndexes;
         options.forRepair = params.repair;
-        return new StorageEngineImpl(kv, options);
+        return std::make_unique<StorageEngineImpl>(std::move(kv), options);
     }
 
     virtual StringData getCanonicalName() const {

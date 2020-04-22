@@ -60,8 +60,8 @@ struct DistinctParams {
         : DistinctParams(descriptor,
                          descriptor->indexName(),
                          descriptor->keyPattern(),
-                         descriptor->getMultikeyPaths(opCtx),
-                         descriptor->isMultikey()) {}
+                         descriptor->getEntry()->getMultikeyPaths(opCtx),
+                         descriptor->getEntry()->isMultikey()) {}
 
     const IndexDescriptor* indexDescriptor;
     std::string name;
@@ -95,7 +95,10 @@ struct DistinctParams {
  */
 class DistinctScan final : public RequiresIndexStage {
 public:
-    DistinctScan(ExpressionContext* expCtx, DistinctParams params, WorkingSet* workingSet);
+    DistinctScan(ExpressionContext* expCtx,
+                 const Collection* collection,
+                 DistinctParams params,
+                 WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;

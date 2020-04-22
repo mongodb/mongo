@@ -473,7 +473,7 @@ public:
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);
         if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
         opDebug->setPlanSummaryMetrics(summaryStats);
 
@@ -554,7 +554,7 @@ public:
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);
         if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
         UpdateStage::recordUpdateStatsInOpDebug(UpdateStage::getUpdateStats(exec.get()), opDebug);
         opDebug->setPlanSummaryMetrics(summaryStats);

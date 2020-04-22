@@ -42,12 +42,12 @@ namespace biggie {
 namespace {
 class BiggieStorageEngineFactory : public StorageEngine::Factory {
 public:
-    virtual StorageEngine* create(const StorageGlobalParams& params,
-                                  const StorageEngineLockFile* lockFile) const {
+    virtual std::unique_ptr<StorageEngine> create(const StorageGlobalParams& params,
+                                                  const StorageEngineLockFile* lockFile) const {
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
-        return new StorageEngineImpl(new KVEngine(), options);
+        return std::make_unique<StorageEngineImpl>(std::make_unique<KVEngine>(), options);
     }
 
     virtual StringData getCanonicalName() const {

@@ -102,8 +102,7 @@ constexpr StringData IndexDescriptor::kWeightsFieldName;
 IndexDescriptor::IndexDescriptor(Collection* collection,
                                  const std::string& accessMethodName,
                                  BSONObj infoObj)
-    : _collection(collection),
-      _accessMethodName(accessMethodName),
+    : _accessMethodName(accessMethodName),
       _indexType(IndexNames::nameToType(accessMethodName)),
       _infoObj(infoObj.getOwned()),
       _numFields(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).nFields()),
@@ -114,8 +113,7 @@ IndexDescriptor::IndexDescriptor(Collection* collection,
       _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
       _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
       _hidden(infoObj[kHiddenFieldName].trueValue()),
-      _partial(!infoObj[kPartialFilterExprFieldName].eoo()),
-      _cachedEntry(nullptr) {
+      _partial(!infoObj[kPartialFilterExprFieldName].eoo()) {
     BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
     fassert(50942, e.isNumber());
     _version = static_cast<IndexVersion>(e.numberInt());
@@ -162,24 +160,8 @@ IndexVersion IndexDescriptor::getDefaultIndexVersion() {
     return IndexVersion::kV2;
 }
 
-bool IndexDescriptor::isMultikey() const {
-    return _collection->getIndexCatalog()->isMultikey(this);
-}
-
-MultikeyPaths IndexDescriptor::getMultikeyPaths(OperationContext* opCtx) const {
-    return _collection->getIndexCatalog()->getMultikeyPaths(opCtx, this);
-}
-
-const IndexCatalog* IndexDescriptor::getIndexCatalog() const {
-    return _collection->getIndexCatalog();
-}
-
-const NamespaceString& IndexDescriptor::parentNS() const {
-    return _collection->ns();
-}
-
 IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
-    OperationContext* opCtx, const IndexCatalogEntry* other) const {
+    OperationContext* opCtx, const NamespaceString& ns, const IndexCatalogEntry* other) const {
     // We first check whether the key pattern is identical for both indexes.
     if (SimpleBSONObjComparator::kInstance.evaluate(keyPattern() !=
                                                     other->descriptor()->keyPattern())) {
@@ -212,8 +194,7 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     // would match the same set of documents, but these are not currently considered equivalent.
     // TODO SERVER-47664: take collation into account while comparing string predicates.
     if (isFCV46 && other->getFilterExpression()) {
-        auto expCtx =
-            make_intrusive<ExpressionContext>(opCtx, std::move(collator), _collection->ns());
+        auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), ns);
         auto filter = MatchExpressionParser::parseAndNormalize(partialFilterExpression(), expCtx);
         if (!filter->equivalent(other->getFilterExpression())) {
             return Comparison::kDifferent;

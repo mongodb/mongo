@@ -103,7 +103,7 @@ TEST_F(IndexSignatureTest, CanCreateMultipleIndexesOnSameKeyPatternWithDifferent
     // the parsed collator rather than the static collation object from the BSON index specs.
     auto collationDesc = makeIndexDescriptor(
         indexSpec.addFields(fromjson("{collation: {locale: 'en_US', strength: 3}}")));
-    ASSERT(collationDesc->compareIndexOptions(opCtx(), basicIndex) ==
+    ASSERT(collationDesc->compareIndexOptions(opCtx(), coll()->ns(), basicIndex) ==
            IndexDescriptor::Comparison::kIdentical);
 
     // Confirm that attempting to build this index will result in ErrorCodes::IndexAlreadyExists.
@@ -113,7 +113,7 @@ TEST_F(IndexSignatureTest, CanCreateMultipleIndexesOnSameKeyPatternWithDifferent
     // that all signature fields which uniquely identify the index match, but other fields differ.
     auto collationUniqueDesc =
         makeIndexDescriptor(collationDesc->infoObj().addFields(fromjson("{unique: true}")));
-    ASSERT(collationUniqueDesc->compareIndexOptions(opCtx(), basicIndex) ==
+    ASSERT(collationUniqueDesc->compareIndexOptions(opCtx(), coll()->ns(), basicIndex) ==
            IndexDescriptor::Comparison::kEquivalent);
 
     // Attempting to build the index, whether with the same name or a different name, now throws
@@ -128,7 +128,7 @@ TEST_F(IndexSignatureTest, CanCreateMultipleIndexesOnSameKeyPatternWithDifferent
     // being kDifferent; this means that both of these indexes can co-exist together.
     auto differentCollationDesc = makeIndexDescriptor(
         collationDesc->infoObj().addFields(fromjson("{collation: {locale: 'fr'}}")));
-    ASSERT(differentCollationDesc->compareIndexOptions(opCtx(), basicIndex) ==
+    ASSERT(differentCollationDesc->compareIndexOptions(opCtx(), coll()->ns(), basicIndex) ==
            IndexDescriptor::Comparison::kDifferent);
 
     // Verify that we can build this index alongside the existing indexes.
@@ -147,7 +147,7 @@ TEST_F(IndexSignatureTest,
     // the index's signature.
     auto partialFilterDesc = makeIndexDescriptor(indexSpec.addFields(
         fromjson("{partialFilterExpression: {a: {$gt: 5, $lt: 10}, b: 'blah'}}")));
-    ASSERT(partialFilterDesc->compareIndexOptions(opCtx(), basicIndex) ==
+    ASSERT(partialFilterDesc->compareIndexOptions(opCtx(), coll()->ns(), basicIndex) ==
            IndexDescriptor::Comparison::kDifferent);
 
     // Verify that we can build an index with this spec alongside the original index.
@@ -159,7 +159,7 @@ TEST_F(IndexSignatureTest,
     auto partialFilterDupeDesc = makeIndexDescriptor(indexSpec.addFields(
         fromjson("{name: 'partialFilter', partialFilterExpression: {$and: [{b: 'blah'}, "
                  "{a: {$lt: 10}}, {a: {$gt: 5}}]}}")));
-    ASSERT(partialFilterDupeDesc->compareIndexOptions(opCtx(), partialFilterIndex) ==
+    ASSERT(partialFilterDupeDesc->compareIndexOptions(opCtx(), coll()->ns(), partialFilterIndex) ==
            IndexDescriptor::Comparison::kIdentical);
 
     // Confirm that attempting to build this index will result in ErrorCodes::IndexAlreadyExists.
@@ -169,8 +169,9 @@ TEST_F(IndexSignatureTest,
     // that all signature fields which uniquely identify the index match, but other fields differ.
     auto partialFilterUniqueDesc =
         makeIndexDescriptor(partialFilterDesc->infoObj().addFields(fromjson("{unique: true}")));
-    ASSERT(partialFilterUniqueDesc->compareIndexOptions(opCtx(), partialFilterIndex) ==
-           IndexDescriptor::Comparison::kEquivalent);
+    ASSERT(
+        partialFilterUniqueDesc->compareIndexOptions(opCtx(), coll()->ns(), partialFilterIndex) ==
+        IndexDescriptor::Comparison::kEquivalent);
 
     // Attempting to build the index, whether with the same name or a different name, now throws
     // IndexOptionsConflict. The error message returned with the exception specifies whether the
@@ -186,7 +187,8 @@ TEST_F(IndexSignatureTest,
     // compare as kDifferent; this means that both of these indexes can co-exist together.
     auto differentPartialFilterDesc = makeIndexDescriptor(partialFilterDesc->infoObj().addFields(
         fromjson("{partialFilterExpression: {a: {$gt: 0, $lt: 10}, b: 'blah'}}")));
-    ASSERT(differentPartialFilterDesc->compareIndexOptions(opCtx(), partialFilterIndex) ==
+    ASSERT(differentPartialFilterDesc->compareIndexOptions(
+               opCtx(), coll()->ns(), partialFilterIndex) ==
            IndexDescriptor::Comparison::kDifferent);
 
     // Verify that we can build this index alongside the existing indexes.
@@ -209,7 +211,7 @@ TEST_F(IndexSignatureTest, CannotCreateMultipleIndexesOnSameKeyPatternIfNonSigna
     // the existing index. The two are considered equivalent, and we cannot build the new index.
     for (auto&& nonSigOpt : nonSigOptions) {
         auto nonSigDesc = makeIndexDescriptor(indexSpec.addFields(nonSigOpt));
-        ASSERT(nonSigDesc->compareIndexOptions(opCtx(), basicIndex) ==
+        ASSERT(nonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), basicIndex) ==
                IndexDescriptor::Comparison::kEquivalent);
         ASSERT_EQ(createIndex(nonSigDesc->infoObj()), ErrorCodes::IndexOptionsConflict);
     }
@@ -220,7 +222,7 @@ TEST_F(IndexSignatureTest, CannotCreateMultipleIndexesOnSameKeyPatternIfNonSigna
         unittest::assertGet(createIndex(fromjson("{v: 2, name: '$**_1', key: {'$**': 1}}")));
     auto nonSigWildcardDesc = makeIndexDescriptor(
         wildcardIndex->descriptor()->infoObj().addFields(fromjson("{wildcardProjection: {a: 1}}")));
-    ASSERT(nonSigWildcardDesc->compareIndexOptions(opCtx(), wildcardIndex) ==
+    ASSERT(nonSigWildcardDesc->compareIndexOptions(opCtx(), coll()->ns(), wildcardIndex) ==
            IndexDescriptor::Comparison::kEquivalent);
     ASSERT_EQ(
         createIndex(nonSigWildcardDesc->infoObj().addFields(fromjson("{name: 'nonSigWildcard'}"))),

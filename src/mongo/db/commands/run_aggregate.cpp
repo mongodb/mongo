@@ -780,7 +780,8 @@ Status runAggregate(OperationContext* opCtx,
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
         if (ctx && ctx->getCollection()) {
-            CollectionQueryInfo::get(ctx->getCollection()).notifyOfQuery(opCtx, stats);
+            Collection* coll = ctx->getCollection();
+            CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, stats);
         }
     }
 

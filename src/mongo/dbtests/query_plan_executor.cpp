@@ -153,7 +153,7 @@ public:
 
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
-        auto ixscan = std::make_unique<IndexScan>(_expCtx.get(), ixparams, ws.get(), nullptr);
+        auto ixscan = std::make_unique<IndexScan>(_expCtx.get(), coll, ixparams, ws.get(), nullptr);
         unique_ptr<PlanStage> root =
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ixscan), nullptr, coll);
 

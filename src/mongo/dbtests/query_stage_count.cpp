@@ -212,7 +212,7 @@ public:
         params.direction = 1;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new IndexScan(_expCtx.get(), params, ws, expr);
+        return new IndexScan(_expCtx.get(), _coll, params, ws, expr);
     }
 
     CollectionScan* createCollScan(MatchExpression* expr, WorkingSet* ws) {

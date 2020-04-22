@@ -306,7 +306,8 @@ DocumentSourceCursor::DocumentSourceCursor(
     }
 
     if (collection) {
-        CollectionQueryInfo::get(collection).notifyOfQuery(pExpCtx->opCtx, _planSummaryStats);
+        CollectionQueryInfo::get(collection)
+            .notifyOfQuery(pExpCtx->opCtx, collection, _planSummaryStats);
     }
 }
 

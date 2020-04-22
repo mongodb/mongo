@@ -38,6 +38,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog/multi_index_block_gen.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
@@ -262,7 +263,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
 
             collection->getIndexCatalog()->prepareInsertDeleteOptions(
-                opCtx, descriptor, &index.options);
+                opCtx, collection->ns(), descriptor, &index.options);
 
             // Index builds always relax constraints and check for violations at commit-time.
             index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
@@ -571,6 +572,8 @@ Status MultiIndexBlock::drainBackgroundWrites(
     IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy) {
     invariant(!_buildIsCleanedUp);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    const Collection* coll =
+        CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, _collectionUUID.get());
 
     // Drain side-writes table for each index. This only drains what is visible. Assuming intent
     // locks are held on the user collection, more writes can come in after this drain completes.
@@ -586,7 +589,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
         auto trackDups = !_ignoreUnique ? IndexBuildInterceptor::TrackDuplicates::kTrack
                                         : IndexBuildInterceptor::TrackDuplicates::kNoTrack;
         auto status = interceptor->drainWritesIntoIndex(
-            opCtx, _indexes[i].options, trackDups, drainYieldPolicy);
+            opCtx, coll, _indexes[i].options, trackDups, drainYieldPolicy);
         if (!status.isOK()) {
             return status;
         }
@@ -670,7 +673,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         if (interceptor) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
             if (multikeyPaths) {
-                _indexes[i].block->getEntry()->setMultikey(opCtx, multikeyPaths.get());
+                _indexes[i].block->getEntry()->setMultikey(opCtx, collection, multikeyPaths.get());
             }
         }
 
@@ -679,7 +682,8 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         // The bulk builder will track multikey information itself.
         const auto& bulkBuilder = _indexes[i].bulk;
         if (bulkBuilder->isMultikey()) {
-            _indexes[i].block->getEntry()->setMultikey(opCtx, bulkBuilder->getMultikeyPaths());
+            _indexes[i].block->getEntry()->setMultikey(
+                opCtx, collection, bulkBuilder->getMultikeyPaths());
         }
 
         // The commit() function can be called multiple times on write conflict errors. Dropping the
@@ -693,7 +697,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     onCommit();
 
     opCtx->recoveryUnit()->onCommit([collection, this](boost::optional<Timestamp> commitTime) {
-        CollectionQueryInfo::get(collection).clearQueryCache();
+        CollectionQueryInfo::get(collection).clearQueryCache(collection);
         _buildIsCleanedUp = true;
     });
 

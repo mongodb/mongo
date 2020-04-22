@@ -108,7 +108,7 @@ public:
 
         // This child stage gets owned and freed by the caller.
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), _coll, params, &_ws, filter);
     }
 
     IndexScan* createIndexScan(BSONObj startKey,
@@ -132,7 +132,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), _coll, params, &_ws, filter);
     }
 
     static const char* ns() {

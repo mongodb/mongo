@@ -67,10 +67,10 @@ const std::string catalogInfo = "_mdb_catalog";
 const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
 }  // namespace
 
-StorageEngineImpl::StorageEngineImpl(KVEngine* engine, StorageEngineOptions options)
-    : _engine(engine),
+StorageEngineImpl::StorageEngineImpl(std::unique_ptr<KVEngine> engine, StorageEngineOptions options)
+    : _engine(std::move(engine)),
       _options(std::move(options)),
-      _dropPendingIdentReaper(engine),
+      _dropPendingIdentReaper(_engine.get()),
       _minOfCheckpointAndOldestTimestampListener(
           TimestampMonitor::TimestampType::kMinOfCheckpointAndOldest,
           [this](Timestamp timestamp) { _onMinOfCheckpointAndOldestTimestampChanged(timestamp); }),
@@ -79,7 +79,7 @@ StorageEngineImpl::StorageEngineImpl(KVEngine* engine, StorageEngineOptions opti
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",
-            !(options.directoryPerDB && !engine->supportsDirectoryPerDB()));
+            !(options.directoryPerDB && !_engine->supportsDirectoryPerDB()));
 
     OperationContextNoop opCtx(_engine->newRecoveryUnit());
     loadCatalog(&opCtx);

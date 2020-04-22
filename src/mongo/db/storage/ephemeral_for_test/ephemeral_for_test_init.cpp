@@ -42,8 +42,8 @@ namespace {
 class EphemeralForTestFactory : public StorageEngine::Factory {
 public:
     virtual ~EphemeralForTestFactory() {}
-    virtual StorageEngine* create(const StorageGlobalParams& params,
-                                  const StorageEngineLockFile* lockFile) const {
+    virtual std::unique_ptr<StorageEngine> create(const StorageGlobalParams& params,
+                                                  const StorageEngineLockFile* lockFile) const {
         uassert(ErrorCodes::InvalidOptions,
                 "ephemeralForTest does not support --groupCollections",
                 !params.groupCollections);
@@ -51,7 +51,8 @@ public:
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
-        return new StorageEngineImpl(new EphemeralForTestEngine(), options);
+        return std::make_unique<StorageEngineImpl>(std::make_unique<EphemeralForTestEngine>(),
+                                                   options);
     }
 
     virtual StringData getCanonicalName() const {

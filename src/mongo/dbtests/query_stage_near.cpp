@@ -74,6 +74,10 @@ public:
         ASSERT(_mockGeoIndex);
     }
 
+    const Collection* getCollection() const {
+        return _autoColl->getCollection();
+    }
+
 protected:
     BSONObj _makeMinimalIndexSpec(BSONObj keyPattern) {
         return BSON(IndexDescriptor::kKeyPatternFieldName
@@ -108,11 +112,13 @@ public:
 
     MockNearStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   WorkingSet* workingSet,
+                  const Collection* coll,
                   const IndexDescriptor* indexDescriptor)
         : NearStage(expCtx.get(),
                     "MOCK_DISTANCE_SEARCH_STAGE",
                     STAGE_UNKNOWN,
                     workingSet,
+                    coll,
                     indexDescriptor),
           _pos(0) {}
 
@@ -192,7 +198,7 @@ TEST_F(QueryStageNearTest, Basic) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(_expCtx.get(), &workingSet, _mockGeoIndex);
+    MockNearStage nearStage(_expCtx.get(), &workingSet, getCollection(), _mockGeoIndex);
 
     // First set of results
     mockData.clear();
@@ -231,7 +237,7 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     auto* coll = autoColl.getCollection();
     ASSERT(coll);
 
-    MockNearStage nearStage(_expCtx.get(), &workingSet, _mockGeoIndex);
+    MockNearStage nearStage(_expCtx.get(), &workingSet, coll, _mockGeoIndex);
 
     // Empty set of results
     mockData.clear();

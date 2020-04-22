@@ -137,7 +137,7 @@ void endQueryOp(OperationContext* opCtx,
     curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (collection) {
-        CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
+        CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
     }
 
     if (curOp->shouldDBProfile()) {

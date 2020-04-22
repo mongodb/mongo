@@ -424,7 +424,7 @@ public:
 
 private:
     std::string _ns;
-    size_t _dotIndex;
+    size_t _dotIndex = 0;
 };
 
 /**

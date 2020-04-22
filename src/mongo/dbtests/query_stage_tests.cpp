@@ -89,8 +89,8 @@ public:
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-        unique_ptr<IndexScan> ix =
-            std::make_unique<IndexScan>(_expCtx.get(), params, ws.get(), filterExpr.get());
+        unique_ptr<IndexScan> ix = std::make_unique<IndexScan>(
+            _expCtx.get(), ctx.getCollection(), params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             _expCtx, std::move(ws), std::move(ix), ctx.getCollection(), PlanExecutor::NO_YIELD);

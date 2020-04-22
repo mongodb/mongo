@@ -287,9 +287,9 @@ public:
             params.bounds.boundInclusion = IndexBounds::makeBoundInclusionFromBoundBools(
                 nodeArgs["startKeyInclusive"].Bool(), nodeArgs["endKeyInclusive"].Bool());
             params.direction = nodeArgs["direction"].numberInt();
-            params.shouldDedup = desc->isMultikey();
+            params.shouldDedup = desc->getEntry()->isMultikey();
 
-            return new IndexScan(expCtx.get(), params, workingSet, matcher);
+            return new IndexScan(expCtx.get(), collection, params, workingSet, matcher);
         } else if ("andHash" == nodeName) {
             uassert(
                 16921, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());
@@ -466,7 +466,7 @@ public:
                 return nullptr;
             }
 
-            return new TextStage(expCtx.get(), params, workingSet, matcher);
+            return new TextStage(expCtx.get(), collection, params, workingSet, matcher);
         } else if ("delete" == nodeName) {
             uassert(18636,
                     "Delete stage doesn't have a filter (put it on the child)",

@@ -181,7 +181,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
 
-    auto idHackStage = std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), descriptor);
+    auto idHackStage =
+        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collection, descriptor);
 
     const bool isUpsert = params.request->isUpsert();
     auto root = (isUpsert ? std::make_unique<UpsertStage>(
@@ -234,10 +235,10 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     params.bounds.startKey = startKey;
     params.bounds.endKey = endKey;
     params.bounds.boundInclusion = boundInclusion;
-    params.shouldDedup = descriptor->isMultikey();
+    params.shouldDedup = descriptor->getEntry()->isMultikey();
 
     std::unique_ptr<PlanStage> root =
-        std::make_unique<IndexScan>(expCtx.get(), std::move(params), ws, nullptr);
+        std::make_unique<IndexScan>(expCtx.get(), collection, std::move(params), ws, nullptr);
 
     if (InternalPlanner::IXSCAN_FETCH & options) {
         root = std::make_unique<FetchStage>(expCtx.get(), ws, std::move(root), nullptr, collection);

@@ -381,11 +381,11 @@ private:
         try {
             exec->executePlan();
         } catch (const DBException& exception) {
-            LOGV2_ERROR(22543,
-                        "ttl query execution for index {index} failed with status: {error}",
-                        "TTL query execution failed",
-                        "index"_attr = idx,
-                        "error"_attr = redact(exception.toStatus()));
+            LOGV2_WARNING(22543,
+                          "ttl query execution for index {index} failed with status: {error}",
+                          "TTL query execution failed",
+                          "index"_attr = idx,
+                          "error"_attr = redact(exception.toStatus()));
             return;
         }
 

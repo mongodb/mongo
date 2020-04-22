@@ -72,8 +72,8 @@ void BtreeAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuild
                                   KeyStringSet* multikeyMetadataKeys,
                                   MultikeyPaths* multikeyPaths,
                                   boost::optional<RecordId> id) const {
-    const auto skipMultikey =
-        context == IndexAccessMethod::GetKeysContext::kValidatingKeys && !_descriptor->isMultikey();
+    const auto skipMultikey = context == IndexAccessMethod::GetKeysContext::kValidatingKeys &&
+        !_descriptor->getEntry()->isMultikey();
     _keyGenerator->getKeys(pooledBufferBuilder, obj, skipMultikey, keys, multikeyPaths, id);
 }
 

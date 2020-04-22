@@ -60,10 +60,11 @@ namespace mongo {
 const char* IndexScan::kStageType = "IXSCAN";
 
 IndexScan::IndexScan(ExpressionContext* expCtx,
+                     const Collection* collection,
                      IndexScanParams params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : RequiresIndexStage(kStageType, expCtx, params.indexDescriptor, workingSet),
+    : RequiresIndexStage(kStageType, expCtx, collection, params.indexDescriptor, workingSet),
       _workingSet(workingSet),
       _keyPattern(params.keyPattern.getOwned()),
       _bounds(std::move(params.bounds)),

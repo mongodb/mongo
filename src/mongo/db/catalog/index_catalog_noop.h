@@ -192,16 +192,19 @@ public:
     }
 
     void setMultikeyPaths(OperationContext* const opCtx,
+                          Collection* coll,
                           const IndexDescriptor* const desc,
                           const MultikeyPaths& multikeyPaths) override {}
 
     Status indexRecords(OperationContext* const opCtx,
+                        Collection* coll,
                         const std::vector<BsonRecord>& bsonRecords,
                         int64_t* const keysInsertedOut) override {
         return Status::OK();
     }
 
     Status updateRecord(OperationContext* const opCtx,
+                        Collection* coll,
                         const BSONObj& oldDoc,
                         const BSONObj& newDoc,
                         const RecordId& recordId,
@@ -233,10 +236,13 @@ public:
     }
 
     void prepareInsertDeleteOptions(OperationContext* opCtx,
+                                    const NamespaceString& ns,
                                     const IndexDescriptor* desc,
                                     InsertDeleteOptions* options) const override {}
 
-    void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) override {}
+    void indexBuildSuccess(OperationContext* opCtx,
+                           const Collection* coll,
+                           IndexCatalogEntry* index) override {}
 };
 
 }  // namespace mongo

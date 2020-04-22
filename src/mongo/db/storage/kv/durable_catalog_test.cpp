@@ -60,7 +60,7 @@ class DurableCatalogTest : public ServiceContextTest {
 public:
     DurableCatalogTest()
         : _nss("unittests.durable_catalog"),
-          _storageEngine(new DevNullKVEngine(), StorageEngineOptions()) {
+          _storageEngine(std::make_unique<DevNullKVEngine>(), StorageEngineOptions()) {
         _storageEngine.finishInit();
     }
 

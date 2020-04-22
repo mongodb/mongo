@@ -152,7 +152,7 @@ unique_ptr<PlanStage> getIxScanPlan(ExpressionContext* expCtx,
     ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
     ixparams.direction = 1;
 
-    auto ixscan = std::make_unique<IndexScan>(expCtx, ixparams, sharedWs, nullptr);
+    auto ixscan = std::make_unique<IndexScan>(expCtx, coll, ixparams, sharedWs, nullptr);
     return std::make_unique<FetchStage>(expCtx, sharedWs, std::move(ixscan), nullptr, coll);
 }
 

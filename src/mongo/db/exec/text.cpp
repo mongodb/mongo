@@ -57,11 +57,13 @@ using fts::MAX_WEIGHT;
 const char* TextStage::kStageType = "TEXT";
 
 TextStage::TextStage(ExpressionContext* expCtx,
+                     const Collection* collection,
                      const TextStageParams& params,
                      WorkingSet* ws,
                      const MatchExpression* filter)
     : PlanStage(kStageType, expCtx), _params(params) {
-    _children.emplace_back(buildTextTree(expCtx->opCtx, ws, filter, params.wantTextScore));
+    _children.emplace_back(
+        buildTextTree(expCtx->opCtx, collection, ws, filter, params.wantTextScore));
     _specificStats.indexPrefix = _params.indexPrefix;
     _specificStats.indexName = _params.index->indexName();
     _specificStats.parsedTextQuery = _params.query.toBSON();
@@ -94,11 +96,10 @@ const SpecificStats* TextStage::getSpecificStats() const {
 }
 
 unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
+                                               const Collection* collection,
                                                WorkingSet* ws,
                                                const MatchExpression* filter,
                                                bool wantTextScore) const {
-    const auto* collection = _params.index->getCollection();
-
     // Get all the index scans for each term in our query.
     std::vector<std::unique_ptr<PlanStage>> indexScanList;
     for (const auto& term : _params.query.getTermsForBounds()) {
@@ -110,9 +111,10 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         ixparams.bounds.isSimpleRange = true;
         ixparams.direction = -1;
-        ixparams.shouldDedup = _params.index->isMultikey();
+        ixparams.shouldDedup = _params.index->getEntry()->isMultikey();
 
-        indexScanList.push_back(std::make_unique<IndexScan>(expCtx(), ixparams, ws, nullptr));
+        indexScanList.push_back(
+            std::make_unique<IndexScan>(expCtx(), collection, ixparams, ws, nullptr));
     }
 
     // Build the union of the index scans as a TEXT_OR or an OR stage, depending on whether the

@@ -121,6 +121,7 @@ bool AbstractIndexAccessMethod::isFatalError(OperationContext* opCtx,
 
 // Find the keys for obj, put them in the tree pointing to loc.
 Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
+                                         const Collection* coll,
                                          const BSONObj& obj,
                                          const RecordId& loc,
                                          const InsertDeleteOptions& options,
@@ -143,10 +144,12 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
             loc,
             kNoopOnSuppressedErrorFn);
 
-    return insertKeys(opCtx, *keys, *multikeyMetadataKeys, *multikeyPaths, loc, options, result);
+    return insertKeys(
+        opCtx, coll, *keys, *multikeyMetadataKeys, *multikeyPaths, loc, options, result);
 }
 
 Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
+                                             const Collection* coll,
                                              const KeyStringSet& keys,
                                              const KeyStringSet& multikeyMetadataKeys,
                                              const MultikeyPaths& multikeyPaths,
@@ -184,7 +187,7 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
     }
 
     if (shouldMarkIndexAsMultikey(keys.size(), multikeyMetadataKeys, multikeyPaths)) {
-        _indexCatalogEntry->setMultikey(opCtx, multikeyPaths);
+        _indexCatalogEntry->setMultikey(opCtx, coll, multikeyPaths);
     }
     return Status::OK();
 }
@@ -197,15 +200,16 @@ void AbstractIndexAccessMethod::removeOneKey(OperationContext* opCtx,
     try {
         _newInterface->unindex(opCtx, keyString, dupsAllowed);
     } catch (AssertionException& e) {
+        NamespaceString ns = _indexCatalogEntry->getNSSFromCatalog(opCtx);
         LOGV2(20683,
-              "Assertion failure: _unindex failed on: {descriptorParentNamespace} for index: "
-              "{descriptorIndexName}. {error}  KeyString:{keyString}  dl:{recordId}",
+              "Assertion failure: _unindex failed on: {namespace} for index: {indexName}. "
+              "{error}  KeyString:{keyString}  dl:{recordId}",
               "Assertion failure: _unindex failed",
               "error"_attr = redact(e),
               "keyString"_attr = keyString,
               "recordId"_attr = loc,
-              "descriptorParentNamespace"_attr = _descriptor->parentNS(),
-              "descriptorIndexName"_attr = _descriptor->indexName());
+              "namespace"_attr = ns,
+              "indexName"_attr = _descriptor->indexName());
         printStackTrace();
     }
 }
@@ -396,6 +400,7 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
 }
 
 Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
+                                         Collection* coll,
                                          const UpdateTicket& ticket,
                                          int64_t* numInserted,
                                          int64_t* numDeleted) {
@@ -430,7 +435,7 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
 
     if (shouldMarkIndexAsMultikey(
             ticket.newKeys.size(), ticket.newMultikeyMetadataKeys, ticket.newMultikeyPaths)) {
-        _indexCatalogEntry->setMultikey(opCtx, ticket.newMultikeyPaths);
+        _indexCatalogEntry->setMultikey(opCtx, coll, ticket.newMultikeyPaths);
     }
 
     *numDeleted = ticket.removed.size();
@@ -650,7 +655,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                 auto dupKey =
                     KeyString::toBson(data.first, getSortedDataInterface()->getOrdering());
                 return buildDupKeyErrorStatus(dupKey.getOwned(),
-                                              _descriptor->parentNS(),
+                                              _indexCatalogEntry->getNSSFromCatalog(opCtx),
                                               _descriptor->indexName(),
                                               _descriptor->keyPattern(),
                                               _descriptor->collation());
@@ -683,7 +688,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
           "Index build: inserted {bulk_getKeysInserted} keys from external sorter into index in "
           "{timer_seconds} seconds",
           "Index build: inserted keys from external sorter into index",
-          "namespace"_attr = _descriptor->parentNS(),
+          "namespace"_attr = _indexCatalogEntry->getNSSFromCatalog(opCtx),
           "index"_attr = _descriptor->indexName(),
           "keysInserted"_attr = bulk->getKeysInserted(),
           "duration"_attr = Milliseconds(Seconds(timer.seconds())));
@@ -694,8 +699,10 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     return Status::OK();
 }
 
-void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx, MultikeyPaths paths) {
-    _indexCatalogEntry->setMultikey(opCtx, paths);
+void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx,
+                                                   Collection* collection,
+                                                   MultikeyPaths paths) {
+    _indexCatalogEntry->setMultikey(opCtx, collection, paths);
 }
 
 IndexAccessMethod::OnSuppressedErrorFn IndexAccessMethod::kNoopOnSuppressedErrorFn =

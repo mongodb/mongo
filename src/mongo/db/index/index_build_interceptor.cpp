@@ -111,6 +111,7 @@ Status IndexBuildInterceptor::checkDuplicateKeyConstraints(OperationContext* opC
 }
 
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
+                                                   const Collection* coll,
                                                    const InsertDeleteOptions& options,
                                                    TrackDuplicates trackDuplicates,
                                                    DrainYieldPolicy drainYieldPolicy) {
@@ -189,8 +190,13 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             batchSize += 1;
             batchSizeBytes += objSize;
 
-            if (auto status = _applyWrite(
-                    opCtx, unownedDoc, options, trackDuplicates, &totalInserted, &totalDeleted);
+            if (auto status = _applyWrite(opCtx,
+                                          coll,
+                                          unownedDoc,
+                                          options,
+                                          trackDuplicates,
+                                          &totalInserted,
+                                          &totalDeleted);
                 !status.isOK()) {
                 return status;
             }
@@ -234,8 +240,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 
     // Apply batches of side writes until the last record in the table is seen.
     while (!atEof) {
-        if (auto status = writeConflictRetry(
-                opCtx, "index build drain", _indexCatalogEntry->ns().ns(), applySingleBatch);
+        if (auto status =
+                writeConflictRetry(opCtx, "index build drain", coll->ns().ns(), applySingleBatch);
             !status.isOK()) {
             return status;
         }
@@ -257,6 +263,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 }
 
 Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
+                                          const Collection* coll,
                                           const BSONObj& operation,
                                           const InsertDeleteOptions& options,
                                           TrackDuplicates trackDups,
@@ -281,6 +288,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     if (opType == Op::kInsert) {
         InsertResult result;
         auto status = accessMethod->insertKeys(opCtx,
+                                               coll,
                                                {keySet.begin(), keySet.end()},
                                                {},
                                                MultikeyPaths{},
@@ -339,7 +347,8 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx) {
             hangDuringIndexBuildDrainYield.pauseWhileSet();
         },
         [&](auto&& config) {
-            return config.getStringField("namespace") == _indexCatalogEntry->ns().ns();
+            return config.getStringField("namespace") ==
+                _indexCatalogEntry->getNSSFromCatalog(opCtx).ns();
         });
 
     locker->restoreLockState(opCtx, snapshot);

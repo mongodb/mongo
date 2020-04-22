@@ -218,23 +218,8 @@ public:
 
     // ---- modify single index
 
-    /**
-     * Returns true if the index 'idx' is multikey, and returns false otherwise.
-     */
-    bool isMultikey(const IndexDescriptor* const idx) override;
-
-    /**
-     * Returns the path components that cause the index 'idx' to be multikey if the index supports
-     * path-level multikey tracking, and returns an empty vector if path-level multikey tracking
-     * isn't supported.
-     *
-     * If the index supports path-level multikey tracking but isn't multikey, then this function
-     * returns a vector with size equal to the number of elements in the index key pattern where
-     * each element in the vector is an empty set.
-     */
-    MultikeyPaths getMultikeyPaths(OperationContext* opCtx, const IndexDescriptor* idx) override;
-
     void setMultikeyPaths(OperationContext* const opCtx,
+                          Collection* coll,
                           const IndexDescriptor* desc,
                           const MultikeyPaths& multikeyPaths) override;
 
@@ -247,6 +232,7 @@ public:
      * This method may throw.
      */
     Status indexRecords(OperationContext* opCtx,
+                        Collection* coll,
                         const std::vector<BsonRecord>& bsonRecords,
                         int64_t* keysInsertedOut) override;
 
@@ -254,6 +240,7 @@ public:
      * See IndexCatalog::updateRecord
      */
     Status updateRecord(OperationContext* const opCtx,
+                        Collection* coll,
                         const BSONObj& oldDoc,
                         const BSONObj& newDoc,
                         const RecordId& recordId,
@@ -286,10 +273,13 @@ public:
      * index constraints, as needed by replication.
      */
     void prepareInsertDeleteOptions(OperationContext* opCtx,
+                                    const NamespaceString&,
                                     const IndexDescriptor* desc,
                                     InsertDeleteOptions* options) const override;
 
-    void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) override;
+    void indexBuildSuccess(OperationContext* opCtx,
+                           const Collection* collection,
+                           IndexCatalogEntry* index) override;
 
 private:
     static const BSONObj _idObj;  // { _id : 1 }
@@ -303,6 +293,7 @@ private:
     std::string _getAccessMethodName(const BSONObj& keyPattern) const;
 
     Status _indexKeys(OperationContext* opCtx,
+                      Collection* coll,
                       IndexCatalogEntry* index,
                       const KeyStringSet& keys,
                       const KeyStringSet& multikeyMetadataKeys,
@@ -313,16 +304,19 @@ private:
                       int64_t* keysInsertedOut);
 
     Status _indexFilteredRecords(OperationContext* opCtx,
+                                 Collection* coll,
                                  IndexCatalogEntry* index,
                                  const std::vector<BsonRecord>& bsonRecords,
                                  int64_t* keysInsertedOut);
 
     Status _indexRecords(OperationContext* opCtx,
+                         Collection* coll,
                          IndexCatalogEntry* index,
                          const std::vector<BsonRecord>& bsonRecords,
                          int64_t* keysInsertedOut);
 
     Status _updateRecord(OperationContext* const opCtx,
+                         Collection* coll,
                          IndexCatalogEntry* index,
                          const BSONObj& oldDoc,
                          const BSONObj& newDoc,

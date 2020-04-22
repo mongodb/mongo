@@ -429,7 +429,8 @@ public:
     TimestampKVEngineTest() {
         StorageEngineOptions options{
             /*directoryPerDB=*/false, /*directoryForIndexes=*/false, /*forRepair=*/false};
-        _storageEngine = std::make_unique<StorageEngineImpl>(new TimestampMockKVEngine, options);
+        _storageEngine =
+            std::make_unique<StorageEngineImpl>(std::make_unique<TimestampMockKVEngine>(), options);
         _storageEngine->finishInit();
     }
 

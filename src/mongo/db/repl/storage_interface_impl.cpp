@@ -590,7 +590,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
                           str::stream() << "Could not find index " << indexName << " in "
                                         << nss.ns() << " to set to multikey.");
         }
-        collection->getIndexCatalog()->setMultikeyPaths(opCtx, idx, paths);
+        collection->getIndexCatalog()->setMultikeyPaths(opCtx, collection, idx, paths);
         wunit.commit();
         return Status::OK();
     });

@@ -52,8 +52,9 @@ const char* IDHackStage::kStageType = "IDHACK";
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          CanonicalQuery* query,
                          WorkingSet* ws,
+                         const Collection* collection,
                          const IndexDescriptor* descriptor)
-    : RequiresIndexStage(kStageType, expCtx, descriptor, ws),
+    : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),
       _key(query->getQueryObj()["_id"].wrap()) {
     _specificStats.indexName = descriptor->indexName();
@@ -63,8 +64,11 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          const BSONObj& key,
                          WorkingSet* ws,
+                         const Collection* collection,
                          const IndexDescriptor* descriptor)
-    : RequiresIndexStage(kStageType, expCtx, descriptor, ws), _workingSet(ws), _key(key) {
+    : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
+      _workingSet(ws),
+      _key(key) {
     _specificStats.indexName = descriptor->indexName();
 }
 

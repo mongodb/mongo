@@ -97,12 +97,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         const IndexDescriptor* descriptor = index->descriptor();
         const IndexAccessMethod* iam = index->accessMethod();
 
-        if (descriptor->isPartial()) {
-            const IndexCatalogEntry* ice = indexCatalog->getEntry(descriptor);
-            if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
-                continue;
-            }
-        }
+        if (descriptor->isPartial() && !index->getFilterExpression()->matchesBSON(recordBson))
+            continue;
 
         auto documentKeySet = executionCtx.keys();
         auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
@@ -118,7 +114,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                      recordId,
                      IndexAccessMethod::kNoopOnSuppressedErrorFn);
 
-        if (!descriptor->isMultikey() &&
+        if (!index->isMultikey() &&
             iam->shouldMarkIndexAsMultikey(
                 documentKeySet->size(),
                 {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
@@ -134,8 +130,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             }
         }
 
-        if (descriptor->isMultikey()) {
-            const MultikeyPaths& indexPaths = descriptor->getMultikeyPaths(opCtx);
+        if (index->isMultikey()) {
+            const MultikeyPaths& indexPaths = index->getMultikeyPaths(opCtx);
             if (!MultikeyPathTracker::covers(indexPaths, *documentMultikeyPaths.get())) {
                 std::string msg = str::stream()
                     << "Index " << descriptor->indexName()
@@ -409,9 +405,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     output->appendNumber("nrecords", _numRecords);
 }
 
-void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx, ValidateResults& results) {
+void ValidateAdaptor::validateIndexKeyCount(const IndexCatalogEntry* index,
+                                            ValidateResults& results) {
     // Fetch the total number of index entries we previously found traversing the index.
-    const std::string indexName = idx->indexName();
+    const IndexDescriptor* desc = index->descriptor();
+    const std::string indexName = desc->indexName();
     IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
     auto numTotalKeys = indexInfo->numKeys;
 
@@ -419,7 +417,7 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx, Validate
     bool hasTooFewKeys = false;
     bool noErrorOnTooFewKeys = !_validateState->isFullIndexValidation();
 
-    if (idx->isIdIndex() && numTotalKeys != _numRecords) {
+    if (desc->isIdIndex() && numTotalKeys != _numRecords) {
         hasTooFewKeys = (numTotalKeys < _numRecords);
         std::string msg = str::stream()
             << "number of _id index entries (" << numTotalKeys
@@ -436,10 +434,10 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx, Validate
     // collection. This check is only valid for indexes that are not multikey (indexed arrays
     // produce an index key per array entry) and not $** indexes which can produce index keys for
     // multiple paths within a single document.
-    if (results.valid && !idx->isMultikey() && idx->getIndexType() != IndexType::INDEX_WILDCARD &&
-        numTotalKeys > _numRecords) {
+    if (results.valid && !index->isMultikey() &&
+        desc->getIndexType() != IndexType::INDEX_WILDCARD && numTotalKeys > _numRecords) {
         std::string err = str::stream()
-            << "index " << idx->indexName() << " is not multi-key, but has more entries ("
+            << "index " << desc->indexName() << " is not multi-key, but has more entries ("
             << numTotalKeys << ") than documents in the index (" << _numRecords << ")";
         results.errors.push_back(err);
         results.valid = false;
@@ -447,11 +445,11 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx, Validate
 
     // Ignore any indexes with a special access method. If an access method name is given, the
     // index may be a full text, geo or special index plugin with different semantics.
-    if (results.valid && !idx->isSparse() && !idx->isPartial() && !idx->isIdIndex() &&
-        idx->getAccessMethodName() == "" && numTotalKeys < _numRecords) {
+    if (results.valid && !desc->isSparse() && !desc->isPartial() && !desc->isIdIndex() &&
+        desc->getAccessMethodName() == "" && numTotalKeys < _numRecords) {
         hasTooFewKeys = true;
         std::string msg = str::stream()
-            << "index " << idx->indexName() << " is not sparse or partial, but has fewer entries ("
+            << "index " << desc->indexName() << " is not sparse or partial, but has fewer entries ("
             << numTotalKeys << ") than documents in the index (" << _numRecords << ")";
         if (noErrorOnTooFewKeys) {
             results.warnings.push_back(msg);
@@ -463,7 +461,7 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx, Validate
 
     if (!_validateState->isFullIndexValidation() && hasTooFewKeys) {
         std::string warning = str::stream()
-            << "index " << idx->indexName() << " has fewer keys than records."
+            << "index " << desc->indexName() << " has fewer keys than records."
             << " Please re-run the validate command with {full: true}";
         results.warnings.push_back(warning);
     }
