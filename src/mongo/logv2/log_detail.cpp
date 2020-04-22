@@ -40,6 +40,65 @@
 
 namespace mongo::logv2::detail {
 
+struct UnstructuredValueExtractor {
+    void operator()(StringData name, CustomAttributeValue const& val) {
+        // Prefer string serialization over BSON if available.
+        if (val.stringSerialize) {
+            fmt::memory_buffer buffer;
+            val.stringSerialize(buffer);
+            _storage.push_back(fmt::to_string(buffer));
+            operator()(name, _storage.back());
+        } else if (val.toString) {
+            _storage.push_back(val.toString());
+            operator()(name, _storage.back());
+        } else if (val.BSONAppend) {
+            BSONObjBuilder builder;
+            val.BSONAppend(builder, name);
+            BSONElement element = builder.done().getField(name);
+            _storage.push_back(element.toString(false));
+            operator()(name, _storage.back());
+        } else if (val.BSONSerialize) {
+            BSONObjBuilder builder;
+            val.BSONSerialize(builder);
+            operator()(name, builder.done());
+        } else if (val.toBSONArray) {
+            operator()(name, val.toBSONArray());
+        }
+    }
+
+    void operator()(StringData name, const BSONObj& val) {
+        StringBuilder ss;
+        val.toString(ss, false);
+        _storage.push_back(ss.str());
+        operator()(name, _storage.back());
+    }
+
+    void operator()(StringData name, const BSONArray& val) {
+        StringBuilder ss;
+        val.toString(ss, true);
+        _storage.push_back(ss.str());
+        operator()(name, _storage.back());
+    }
+
+    template <typename Period>
+    void operator()(StringData name, const Duration<Period>& val) {
+        _storage.push_back(val.toString());
+        operator()(name, _storage.back());
+    }
+
+    template <typename T>
+    void operator()(StringData name, const T& val) {
+        args.push_back(fmt::internal::make_arg<fmt::format_context>(val));
+    }
+
+    boost::container::small_vector<fmt::basic_format_arg<fmt::format_context>,
+                                   constants::kNumStaticAttrs>
+        args;
+
+private:
+    std::deque<std::string> _storage;
+};
+
 void doLogImpl(int32_t id,
                LogSeverity const& severity,
                LogOptions const& options,
@@ -67,6 +126,21 @@ void doLogImpl(int32_t id,
 
         source.push_record(std::move(record));
     }
+}
+
+void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
+                           LogOptions const& options,
+                           StringData message,
+                           TypeErasedAttributeStorage const& attrs) {
+
+    UnstructuredValueExtractor extractor;
+    extractor.args.reserve(attrs.size());
+    attrs.apply(extractor);
+    auto formatted = fmt::vformat(
+        to_string_view(message),
+        fmt::basic_format_args<fmt::format_context>(extractor.args.data(), extractor.args.size()));
+
+    doLogImpl(0, severity, options, formatted, TypeErasedAttributeStorage());
 }
 
 }  // namespace mongo::logv2::detail

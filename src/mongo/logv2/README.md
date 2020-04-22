@@ -419,6 +419,28 @@ Would emit a `uassert` after performing the log that is equivalent to:
 uasserted(ErrorCodes::DataCorruptionDetected, "Data corruption detected for RecordId(123456)");
 ```
 
+## Unstructured logging for local development
+
+To make it easier to use the log system for tracing in local development, there is a special API that does not use IDs or attribute names: 
+
+`logd(format-string, value0, ..., valueN);`
+
+It formats the string using libfmt similarly to what `fmt::format(format-string, value0, ..., valueN)` would produce but using the regular log system type support on how types are made loggable. The formatted string is logged as the `msg` field in the JSON output, with no `attr` subobject.
+
+When using `logd` the log will emitted with standard severity and the default component.
+
+A difference from regular logging, `logd` is allowed to be used in header files by including `logv2/log_debug.h`.
+
+Unstructured logging is not allowed to be used in code committed to master, there is a lint check to validate this. It is however allowed to be used in Evergreen patch builds.
+
+##### Examples
+
+```
+UserDefinedType t; // Defined in previous example
+logd("this is a debug log, value 1: {} and value 2: {}", 1, t);
+```
+
+
 # JSON output format
 
 Produces structured logs of the [Relaxed Extended JSON 2.0.0](https://github.com/mongodb/specifications/blob/master/source/extended-json.rst) format. Below is an example of a log statement in C++ and a pretty-printed JSON output:

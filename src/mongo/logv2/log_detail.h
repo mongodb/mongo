@@ -47,6 +47,11 @@ void doLogImpl(int32_t id,
                StringData message,
                TypeErasedAttributeStorage const& attrs);
 
+void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
+                           LogOptions const& options,
+                           StringData message,
+                           TypeErasedAttributeStorage const& attrs);
+
 
 template <typename S, typename... Args>
 void doLog(int32_t id,
