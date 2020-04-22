@@ -49,16 +49,27 @@ namespace {
 
 struct TextValueExtractor {
     void operator()(StringData name, CustomAttributeValue const& val) {
-        std::string unescapedStr;
         if (val.stringSerialize) {
             fmt::memory_buffer buffer;
             val.stringSerialize(buffer);
-            unescapedStr = fmt::to_string(buffer);
-        } else {
-            unescapedStr = val.toString();
+            _storage.push_back(fmt::to_string(buffer));
+            operator()(name, StringData(_storage.back()));
+        } else if (val.toString) {
+            _storage.push_back(val.toString());
+            operator()(name, StringData(_storage.back()));
+        } else if (val.BSONAppend) {
+            BSONObjBuilder builder;
+            val.BSONAppend(builder, name);
+            BSONElement element = builder.done().getField(name);
+            _storage.push_back(element.toString(false));
+            operator()(name, _storage.back());
+        } else if (val.BSONSerialize) {
+            BSONObjBuilder builder;
+            val.BSONSerialize(builder);
+            operator()(name, builder.done());
+        } else if (val.toBSONArray) {
+            operator()(name, val.toBSONArray());
         }
-        _storage.push_back(unescapedStr);
-        operator()(name, StringData(_storage.back()));
     }
 
     void operator()(StringData name, const BSONObj& val) {

@@ -49,6 +49,7 @@
 #include "mongo/logger/log_version_util.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_debug.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_options.h"
