@@ -49,7 +49,7 @@ public:
 
     void enterTerminalShutdown() override;
 
-    void enterQuiesceMode() override;
+    bool enterQuiesceModeIfSecondary() override;
 
     void shutdown(OperationContext* opCtx) override;
 

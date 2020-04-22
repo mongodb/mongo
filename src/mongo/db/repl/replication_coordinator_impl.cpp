@@ -915,12 +915,19 @@ void ReplicationCoordinatorImpl::enterTerminalShutdown() {
     _inTerminalShutdown = true;
 }
 
-void ReplicationCoordinatorImpl::enterQuiesceMode() {
+bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary() {
     stdx::lock_guard lk(_mutex);
+
+    if (!_memberState.secondary()) {
+        return false;
+    }
+
     _inQuiesceMode = true;
 
     // Increment the topology version and respond to all waiting isMaster requests with an error.
     _fulfillTopologyChangePromise(lk);
+
+    return true;
 }
 
 void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {

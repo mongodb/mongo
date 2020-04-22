@@ -214,6 +214,8 @@ using std::endl;
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceMode);
+
 const NamespaceString startupLogCollectionName("local.startup_log");
 
 #ifdef _WIN32
@@ -1072,6 +1074,24 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         const auto forceShutdown = true;
         // stepDown should never return an error during force shutdown.
         invariantStatusOK(stepDownForShutdown(opCtx, waitTime, forceShutdown));
+    }
+
+    if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
+        replCoord && replCoord->enterQuiesceModeIfSecondary()) {
+        ServiceContext::UniqueOperationContext uniqueOpCtx;
+        OperationContext* opCtx = client->getOperationContext();
+        if (!opCtx) {
+            uniqueOpCtx = client->makeOperationContext();
+            opCtx = uniqueOpCtx.get();
+        }
+        if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {
+            LOGV2(4695101, "hangDuringQuiesceMode failpoint enabled");
+            hangDuringQuiesceMode.pauseWhileSet(opCtx);
+        }
+
+        LOGV2(4695102, "Entering quiesce mode for shutdown");
+        opCtx->sleepFor(Milliseconds(100));
+        LOGV2(4695103, "Exiting quiesce mode for shutdown");
     }
 
     MirrorMaestro::shutdown(serviceContext);

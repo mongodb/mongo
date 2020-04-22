@@ -51,7 +51,7 @@ public:
 
     void enterTerminalShutdown() final;
 
-    void enterQuiesceMode() final;
+    bool enterQuiesceModeIfSecondary() final;
 
     void shutdown(OperationContext* opCtx) final;
 

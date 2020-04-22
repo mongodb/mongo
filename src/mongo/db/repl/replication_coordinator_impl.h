@@ -106,7 +106,7 @@ public:
 
     virtual void enterTerminalShutdown() override;
 
-    virtual void enterQuiesceMode() override;
+    virtual bool enterQuiesceModeIfSecondary() override;
 
     virtual void shutdown(OperationContext* opCtx) override;
 

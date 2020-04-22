@@ -70,7 +70,7 @@ public:
 
     virtual void enterTerminalShutdown();
 
-    virtual void enterQuiesceMode();
+    virtual bool enterQuiesceModeIfSecondary();
 
     virtual void shutdown(OperationContext* opCtx);
 

@@ -41,6 +41,10 @@
 
 namespace mongo {
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangInShutdownAfterStepdown);
+}  // namespace
+
 Status stepDownForShutdown(OperationContext* opCtx,
                            const Milliseconds& waitTime,
                            bool forceShutdown) noexcept {
@@ -50,6 +54,11 @@ Status stepDownForShutdown(OperationContext* opCtx,
     if (replCoord->getConfig().getNumMembers() != 1) {
         try {
             replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
+
+            if (MONGO_unlikely(hangInShutdownAfterStepdown.shouldFail())) {
+                LOGV2(4695100, "hangInShutdownAfterStepdown failpoint enabled");
+                hangInShutdownAfterStepdown.pauseWhileSet(opCtx);
+            }
         } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
             // Ignore not master errors.
         } catch (const DBException& e) {
