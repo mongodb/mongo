@@ -96,7 +96,8 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
             LOGV2(3871400,
                   "Dropping unfinished index '{name}' after collection was modified by "
                   "repair",
-                  "name"_attr = indexName);
+                  "Dropping unfinished index after collection was modified by repair",
+                  "index"_attr = indexName);
             WriteUnitOfWork wuow(opCtx);
             auto status = durableCatalog->removeIndex(opCtx, collection->getCatalogId(), indexName);
             if (!status.isOK()) {
@@ -120,7 +121,7 @@ Status repairCollections(OperationContext* opCtx,
     for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
 
-        LOGV2(21027, "Repairing collection {nss}", "nss"_attr = nss);
+        LOGV2(21027, "Repairing collection", "namespace"_attr = nss);
 
         auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
@@ -173,9 +174,7 @@ Status repairCollections(OperationContext* opCtx,
             return status;
         }
 
-        LOGV2(21028,
-              "Collection validation results: {output_done}",
-              "output_done"_attr = output.done());
+        LOGV2(21028, "Collection validation", "results"_attr = output.done());
 
         if (!validateResults.valid) {
             status = rebuildIndexesForNamespace(opCtx, nss, engine);
@@ -195,7 +194,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
     invariant(opCtx->lockState()->isW());
     invariant(dbName.find('.') == std::string::npos);
 
-    LOGV2(21029, "repairDatabase {dbName}", "dbName"_attr = dbName);
+    LOGV2(21029, "repairDatabase", "db"_attr = dbName);
 
     BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
@@ -212,8 +211,9 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
     if (!status.isOK()) {
         LOGV2_FATAL_CONTINUE(21030,
                              "Failed to repair database {dbName}: {status_reason}",
-                             "dbName"_attr = dbName,
-                             "status_reason"_attr = status.reason());
+                             "Failed to repair database",
+                             "db"_attr = dbName,
+                             "error"_attr = status);
     }
 
     try {
