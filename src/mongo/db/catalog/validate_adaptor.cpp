@@ -71,10 +71,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     }
 
     if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
-        LOGV2(46666001,
-              "[validate](record) {record_id}, Value: {record_data}",
-              "record_id"_attr = recordId,
-              "record_data"_attr = recordBson);
+        LOGV2(46666001, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
     }
 
     const Status status = validateBSON(
@@ -328,7 +325,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
             str::stream ss;
-            ss << "Document with RecordId " << record->id << " is corrupted. ";
             if (!status.isOK() && validatedSize != static_cast<size_t>(dataSize)) {
                 ss << "Reasons: (1) " << status << "; (2) Validated size of " << validatedSize
                    << " bytes does not equal the record size of " << dataSize << " bytes";
@@ -338,7 +334,10 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 ss << "Reason: Validated size of " << validatedSize
                    << " bytes does not equal the record size of " << dataSize << " bytes";
             }
-            LOGV2(20404, "{std_string_ss}", "std_string_ss"_attr = std::string(ss));
+            LOGV2(20404,
+                  "Document corruption details",
+                  "recordId"_attr = record->id,
+                  "reasons"_attr = std::string(ss));
 
             // Only log once
             if (results->valid) {

@@ -312,8 +312,9 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         for (const auto& indexName : entry.second.first) {
             LOGV2(21004,
                   "Rebuilding index. Collection: {collNss} Index: {indexName}",
-                  "collNss"_attr = collNss,
-                  "indexName"_attr = indexName);
+                  "Rebuilding index",
+                  "namespace"_attr = collNss,
+                  "index"_attr = indexName);
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
@@ -461,12 +462,10 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         auto repairObserver = StorageRepairObserver::get(opCtx->getServiceContext());
         repairObserver->onRepairDone(opCtx);
         if (repairObserver->getModifications().size() > 0) {
-            LOGV2_WARNING(21018, "Modifications made by repair:");
             const auto& mods = repairObserver->getModifications();
             for (const auto& mod : mods) {
-                LOGV2_WARNING(21019,
-                              "  {mod_getDescription}",
-                              "mod_getDescription"_attr = mod.getDescription());
+                LOGV2_WARNING(
+                    21019, "repairModification", "description"_attr = mod.getDescription());
             }
         }
         if (repairObserver->isDataInvalidated()) {

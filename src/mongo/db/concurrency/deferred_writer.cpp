@@ -49,8 +49,9 @@ void DeferredWriter::_logFailure(const Status& status) {
     if (TimePoint::clock::now() - _lastLogged > kLogInterval) {
         LOGV2(20516,
               "Unable to write to collection {nss}: {status}",
-              "nss"_attr = _nss.toString(),
-              "status"_attr = status.toString());
+              "Unable to write to collection",
+              "namespace"_attr = _nss.toString(),
+              "error"_attr = status);
         _lastLogged = stdx::chrono::system_clock::now();
     }
 }

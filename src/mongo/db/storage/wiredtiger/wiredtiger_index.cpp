@@ -291,8 +291,8 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
                    "in use by other operations.";
 
             LOGV2_WARNING(51781,
-                          "Could not complete validation of {uri}. This is a transient issue as "
-                          "the collection was actively in use by other operations.",
+                          "Could not complete validation. This is a transient issue as "
+                          "the collection was actively in use by other operations",
                           "uri"_attr = _uri);
             fullResults->warnings.push_back(msg);
         } else if (err) {
@@ -301,7 +301,7 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
                 << "This indicates structural damage. "
                 << "Not examining individual index entries.";
             LOGV2_ERROR(51782,
-                        "verify() returned {error}. This indicates structural damage. Not "
+                        "verify() returned an error. This indicates structural damage. Not "
                         "examining individual index entries.",
                         "error"_attr = wiredtiger_strerror(err));
             fullResults->errors.push_back(msg);

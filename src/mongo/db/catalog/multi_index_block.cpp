@@ -475,8 +475,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
     LOGV2(20391,
           "index build: collection scan done. scanned {n} total records in {t_seconds} seconds",
-          "n"_attr = n,
-          "t_seconds"_attr = t.seconds());
+          "Index build: collection scan done",
+          "totalRecords"_attr = n,
+          "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())));
 
     Status ret = dumpInsertsFromBulk(opCtx);
     if (!ret.isOK())

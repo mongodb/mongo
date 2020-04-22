@@ -173,12 +173,13 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
         LOGV2(20397,
               "Successfully renamed the target {targetNs} ({targetUUID}) to {tmpName} so that the "
               "source {sourceNs} ({sourceUUID}) could be renamed to {targetNs2}",
-              "targetNs"_attr = targetNs,
-              "targetUUID"_attr = targetUUID,
-              "tmpName"_attr = tmpName,
-              "sourceNs"_attr = sourceNs,
+              "Successfully renamed the target so that the source could be renamed",
+              "existingTargetNamespace"_attr = targetNs,
+              "existingTargetUUID"_attr = targetUUID,
+              "renamedExistingTarget"_attr = tmpName,
+              "sourceNamespace"_attr = sourceNs,
               "sourceUUID"_attr = sourceUUID,
-              "targetNs2"_attr = targetNs);
+              "newTargetNamespace"_attr = targetNs);
 
         return Status::OK();
     });
@@ -554,8 +555,9 @@ Status renameBetweenDBs(OperationContext* opCtx,
     LOGV2(20398,
           "Attempting to create temporary collection: {tmpName} with the contents of collection: "
           "{source}",
-          "tmpName"_attr = tmpName,
-          "source"_attr = source);
+          "Attempting to create temporary collection",
+          "temporaryCollection"_attr = tmpName,
+          "sourceCollection"_attr = source);
 
     Collection* tmpColl = nullptr;
     {
@@ -590,10 +592,11 @@ Status renameBetweenDBs(OperationContext* opCtx,
             LOGV2(20399,
                   "Unable to drop temporary collection {tmpName} while renaming from {source} to "
                   "{target}: {status}",
-                  "tmpName"_attr = tmpName,
+                  "Unable to drop temporary collection while renaming",
+                  "tempCollection"_attr = tmpName,
                   "source"_attr = source,
                   "target"_attr = target,
-                  "status"_attr = status);
+                  "reason"_attr = status);
         }
     });
 
@@ -822,13 +825,13 @@ Status renameCollection(OperationContext* opCtx,
             "renaming system.views collection or renaming to system.views is not allowed");
     }
 
-    const std::string dropTargetMsg =
-        options.dropTarget ? " and drop " + target.toString() + "." : ".";
+    StringData dropTargetMsg = options.dropTarget ? "yes"_sd : "no"_sd;
     LOGV2(20400,
           "renameCollectionForCommand: rename {source} to {target}{dropTargetMsg}",
-          "source"_attr = source,
-          "target"_attr = target,
-          "dropTargetMsg"_attr = dropTargetMsg);
+          "renameCollectionForCommand",
+          "sourceNamespace"_attr = source,
+          "targetNamespace"_attr = target,
+          "dropTarget"_attr = dropTargetMsg);
 
     if (source.db() == target.db())
         return renameCollectionWithinDB(opCtx, source, target, options);
@@ -920,16 +923,16 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                           << sourceNss.toString());
     }
 
-    const std::string dropTargetMsg =
-        uuidToDrop ? " and drop " + uuidToDrop->toString() + "." : ".";
+    const std::string uuidToDropString = uuidToDrop ? uuidToDrop->toString() : "<none>";
     const std::string uuidString = uuidToRename ? uuidToRename->toString() : "UUID unknown";
     LOGV2(20401,
           "renameCollectionForApplyOps: rename {sourceNss} ({uuidString}) to "
           "{targetNss}{dropTargetMsg}",
-          "sourceNss"_attr = sourceNss,
-          "uuidString"_attr = uuidString,
-          "targetNss"_attr = targetNss,
-          "dropTargetMsg"_attr = dropTargetMsg);
+          "renameCollectionForApplyOps",
+          "sourceNamespace"_attr = sourceNss,
+          "uuid"_attr = uuidString,
+          "targetNamespace"_attr = targetNss,
+          "uuidToDrop"_attr = uuidToDropString);
 
     if (sourceNss.db() == targetNss.db()) {
         return renameCollectionWithinDBForApplyOps(
@@ -952,6 +955,7 @@ Status renameCollectionForRollback(OperationContext* opCtx,
 
     LOGV2(20402,
           "renameCollectionForRollback: rename {source} ({uuid}) to {target}.",
+          "renameCollectionForRollback",
           "source"_attr = *source,
           "uuid"_attr = uuid,
           "target"_attr = target);
