@@ -35,6 +35,86 @@ on each of these collections for efficient querying
 
 ## The routing table cache
 
+The routing table cache is a read-only in-memory cache. This cache keeps track of the last-seen
+routing information for databases and sharded collections in a sharded cluster. An independent
+copy of the routing table cache exists on each router and shard.
+
+Operations consult the routing table cache in order to route requests to shards that hold data for
+a collection.
+
+### How the routing table cache refreshes
+
+The authoritative routing information exists persisted to disk on the config server. Certain node
+types load information (refresh) directly from the config server. Other node types refresh from an
+intermediary source. At any given time, the state of the in-memory cache is the result of the
+latest refresh from that node’s source. As a result, the cache may or may not be up-to-date with
+its corresponding source.
+
+We define the refresh behavior based on node type below:
+
+| Node Type                             | Information Source                                          | Additional Behavior  |
+| ---------                             | ------------------                                          | ------------------   |
+| Router                                | Config server                                               | N/A                  |
+| Shard server acting as replica set primary   | Config server                                               | Persists refreshed information to disk. This information should always be consistent with the in-memory cache. The persisted information is replicated to all replica set secondaries. |
+| Shard server acting as replica set secondary | On-disk information replicated from the replica set primary | N/A                  |
+
+When referring to a refresh in this section, we imply that the given node’s routing table cache
+will update its in-memory state with its corresponding source.
+
+### When the routing table cache will refresh
+
+The routing table cache is “lazy.” It does not refresh from its source unless necessary. The cache
+will refresh in two scenarios:
+
+1. A request sent to a shard returns an error indicating that the shard’s known routing information for that request doesn't match the sender's routing information.
+2. The cache attempts to access information for a collection that has been locally marked as having out-of-date routing information (stale).
+
+Operations that change a collection’s routing information (for example, a moveChunk command that
+updates a chunk’s location) will mark the local node’s routing table cache as “stale” for affected
+shards. Subsequent attempts to access routing information for affected shards will block on a
+routing table cache refresh. Some operations, such as dropCollection, will affect all shards. In
+this case, the entire collection will be marked as “stale.” Accordingly, subsequent attempts to
+access any routing information for the collection will block on a routing table cache refresh.
+
+### Types of refreshes
+
+The routing table cache performs two types of refreshes for a database or collection.
+
+1. A full refresh clears all cached information, and replaces the cache with the information that exists on the node’s source.
+2. An incremental refresh only replaces modified routing information from the node’s source.
+
+An incremental refresh occurs when the routing table cache already has a local notion of the
+collection or database. A full refresh occurs when:
+
+* The cache has no notion of a collection or database, or
+* A collection or database has been marked as dropped by a shard or the local node’s routing information, or
+* A collection has otherwise been marked as having a mismatched epoch.
+
+### Operational Caveats
+
+1. If the routing table cache receives an error in attempting to refresh, it will retry up to twice before giving up and returning stale information.
+2. If the gEnableFinerGrainedCatalogCacheRefresh startup parameter is disabled, then all attempts to access routing information for a stale namespace will block on a routing table cache refresh, regardless if a particular targeted shard is marked as stale.
+
+#### Code References
+
+* [The CatalogCache (routing table cache) class](https://github.com/mongodb/mongo/blob/master/src/mongo/s/catalog_cache.h)
+* [The CachedDatabaseInfo class](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L61-L81)
+* [The CachedCollectionRoutingInfo class](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L83-L119)
+
+Methods that will mark routing table cache information as stale (sharded collection).
+
+* [onStaleShardVersion](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L207-L213)
+* [invalidateShardOrEntireCollectionEntryForShardedCollection](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L226-L236)
+* [invalidateShardForShardedCollection](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L262-L268)
+* [invalidateEntriesThatReferenceShard](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L270-L274)
+* [purgeCollection](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L276-L280)
+
+Methods that will mark routing table cache information as stale (database).
+
+* [onStaleDatabaseVersion](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L197-L205)
+* [invalidateDatabaseEntry](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L256-L260)
+* [purgeDatabase](https://github.com/mongodb/mongo/blob/62d9485657717bf61fbb870cb3d09b52b1a614dd/src/mongo/s/catalog_cache.h#L282-L286)
+
 ## Shard versioning and database versioning
 
 In a sharded cluster, the placement of collections is determined by a versioning protocol. We use
