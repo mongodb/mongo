@@ -33,8 +33,7 @@
 
 #include <iostream>
 
-namespace mongo {
-namespace logv2 {
+namespace mongo::logv2 {
 
 namespace {
 
@@ -93,9 +92,4 @@ StringData LogSeverity::toStringDataCompact() const {
     return "U"_sd;
 }
 
-std::ostream& operator<<(std::ostream& os, LogSeverity severity) {
-    return os << severity.toStringData();
-}
-
-}  // namespace logv2
-}  // namespace mongo
+}  // namespace mongo::logv2
