@@ -97,7 +97,7 @@ public:
                                    });
         })();
 
-        builder->appendNumber("rangeDeleterTasks", totalNumberOfRangesScheduledForDeletion);
+        builder->appendIntOrLL("rangeDeleterTasks", totalNumberOfRangesScheduledForDeletion);
     }
 
 private:
