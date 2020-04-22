@@ -22,9 +22,6 @@ env.Program(
 env.CppUnitTest(
     target='logger_test',
     source=[
-        'log_component_settings_test.cpp',
-        'log_function_test.cpp',
-        'log_test.cpp',
         'rotatable_file_writer_test.cpp',
     ],
     LIBDEPS=[

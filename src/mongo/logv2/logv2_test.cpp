@@ -287,22 +287,6 @@ private:
     std::vector<boost::shared_ptr<boost::log::sinks::sink>> _attachedSinks;
 };
 
-TEST(LogV2Component, DottedName) {
-    struct {
-        LogComponent lc;
-        StringData expect;
-    } const kSpecs[] = {
-        {LogComponent::kDefault, "default"},
-        {LogComponent::kAccessControl, "accessControl"},
-        {LogComponent::kReplication, "replication"},
-        {LogComponent::kReplicationElection, "replication.election"},
-        {LogComponent::kNumLogComponents, "total"},
-    };
-    for (auto&& spec : kSpecs) {
-        ASSERT_EQ(spec.lc.getDottedName(), spec.expect) << spec.lc;
-    }
-}
-
 TEST_F(LogV2Test, Basic) {
     auto lines = makeLineCapture(PlainFormatter());
 

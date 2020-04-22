@@ -177,3 +177,8 @@ private:
 };
 
 }  // namespace mongo::logv2
+
+// Legacy alias
+namespace mongo::logger {
+using logv2::LogSeverity;
+}  // namespace mongo::logger

@@ -144,3 +144,8 @@ private:
 std::ostream& operator<<(std::ostream& os, LogComponent component);
 
 }  // namespace mongo::logv2
+
+// Legacy alias
+namespace mongo::logger {
+using logv2::LogComponent;
+}  // namespace mongo::logger
