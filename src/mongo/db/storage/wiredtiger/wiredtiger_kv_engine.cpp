@@ -1127,20 +1127,22 @@ void WiredTigerKVEngine::cleanShutdown() {
         closeConfig = "leak_memory=true,";
     }
 
-    std::uint64_t stableTimestamp = _stableTimestamp.load();
+    const Timestamp stableTimestamp = getStableTimestamp();
+    const Timestamp initialDataTimestamp = getInitialDataTimestamp();
     if (gTakeUnstableCheckpointOnShutdown) {
         closeConfig += "use_timestamp=false,";
-    } else if (stableTimestamp > 0 && stableTimestamp < _initialDataTimestamp.load()) {
+    } else if (!serverGlobalParams.enableMajorityReadConcern &&
+               stableTimestamp < initialDataTimestamp) {
         // After a rollback via refetch, WT update chains for _id index keys can be logically
         // corrupt for read timestamps earlier than the `_initialDataTimestamp`. Because the stable
         // timestamp is really a read timestamp, we must avoid taking a stable checkpoint.
         //
         // If a stable timestamp is not set, there's no risk of reading corrupt history.
         LOGV2(22326,
-              "Skipping checkpoint during clean shutdown because stableTimestamp < "
-              "initialDataTimestamp.",
+              "Skipping checkpoint during clean shutdown because stableTimestamp is less than the "
+              "initialDataTimestamp and enableMajorityReadConcern is false",
               "stableTimestamp"_attr = stableTimestamp,
-              "initialDataTimestamp"_attr = _initialDataTimestamp.load());
+              "initialDataTimestamp"_attr = initialDataTimestamp);
         quickExit(EXIT_SUCCESS);
     }
 
