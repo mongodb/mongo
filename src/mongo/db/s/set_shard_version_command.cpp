@@ -159,14 +159,6 @@ public:
 
         // Step 3
 
-        // Validate shardName parameter.
-        const auto shardName = cmdObj["shard"].str();
-        const auto storedShardName = shardingState->shardId().toString();
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "received shardName " << shardName
-                              << " which differs from stored shardName " << storedShardName,
-                storedShardName == shardName);
-
         // Validate namespace parameter.
         const NamespaceString nss(cmdObj["setShardVersion"].String());
         uassert(ErrorCodes::InvalidNamespace,
