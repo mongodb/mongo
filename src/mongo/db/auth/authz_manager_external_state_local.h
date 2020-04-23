@@ -79,7 +79,15 @@ public:
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result) override;
 
-    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final {
+        return _hasAnyPrivilegeDocuments.load();
+    }
+
+    void setHasAnyPrivilegeDocuments() {
+        // HAPD is deliberately only ever promoted to true, never reset to false.
+        // Regaining localhost auth bypass intentionally requires an empty privDB and restart.
+        _hasAnyPrivilegeDocuments.store(true);
+    }
 
     /**
      * Finds a document matching "query" in "collectionName", and store a shared-ownership
@@ -146,6 +154,12 @@ private:
                                       PrivilegeFormat showPrivileges,
                                       AuthenticationRestrictionsFormat showRestrictions,
                                       BSONObj* result);
+
+    /**
+     * Returns true if the auth DB contains any users or roles.
+     */
+    bool _checkHasAnyPrivilegeDocuments(OperationContext* opCtx);
+
     /**
      * Eventually consistent, in-memory representation of all roles in the system (both
      * user-defined and built-in).  Synchronized via _roleGraphMutex.
@@ -162,6 +176,14 @@ private:
      * Guards _roleGraphState and _roleGraph.
      */
     Mutex _roleGraphMutex = MONGO_MAKE_LATCH("AuthzManagerExternalStateLocal::_roleGraphMutex");
+
+    /**
+     * Once *any* privilege document is observed we cache the state forever,
+     * even if these collections are emptied/dropped.
+     * This ensures that the only way to recover localHostAuthBypass is to
+     * is to clear that in-memory cache by restarting the server.
+     */
+    AtomicWord<bool> _hasAnyPrivilegeDocuments{false};
 };
 
 }  // namespace mongo

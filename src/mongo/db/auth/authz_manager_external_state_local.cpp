@@ -67,6 +67,7 @@ Status AuthzManagerExternalStateLocal::initialize(OperationContext* opCtx) {
         }
     }
 
+    _hasAnyPrivilegeDocuments.store(_checkHasAnyPrivilegeDocuments(opCtx));
     return Status::OK();
 }
 
@@ -145,7 +146,7 @@ void addAuthenticationRestrictionObjectsToArrayElement(
 }
 }  // namespace
 
-bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
+bool AuthzManagerExternalStateLocal::_checkHasAnyPrivilegeDocuments(OperationContext* opCtx) {
     BSONObj userBSONObj;
     Status statusFindUsers =
         findOne(opCtx, AuthorizationManager::usersCollectionNamespace, BSONObj(), &userBSONObj);
@@ -541,9 +542,14 @@ public:
     }
 
     void commit(boost::optional<Timestamp> timestamp) final {
-        if (_nss == AuthorizationManager::rolesCollectionNamespace ||
-            _nss == AuthorizationManager::adminCommandNamespace) {
+        const bool isRolesColl = _nss == AuthorizationManager::rolesCollectionNamespace;
+        const bool isUsersColl = _nss == AuthorizationManager::usersCollectionNamespace;
+        const bool isAdminComm = _nss == AuthorizationManager::adminCommandNamespace;
+        if (isRolesColl || isAdminComm) {
             _refreshRoleGraph();
+        }
+        if ((isRolesColl || isUsersColl) && (_op == "i")) {
+            _externalState->setHasAnyPrivilegeDocuments();
         }
     }
 
