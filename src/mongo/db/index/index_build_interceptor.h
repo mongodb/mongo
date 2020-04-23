@@ -55,12 +55,6 @@ public:
     enum class Op { kInsert, kDelete };
 
     /**
-     * Indicates whether this interceptor will allow tracking of documents skipped due to key
-     * generation errors. When 'kTrack', a SkippedRecordTracker is created.
-     */
-    enum class TrackSkippedRecords { kNoTrack, kTrack };
-
-    /**
      * Indicates whether to record duplicate keys that have been inserted into the index. When set
      * to 'kNoTrack', inserted duplicate keys will be ignored. When set to 'kTrack', a subsequent
      * call to checkDuplicateKeyConstraints is required.
@@ -76,9 +70,7 @@ public:
      *
      * deleteTemporaryTable() must be called before destruction to delete the temporary tables.
      */
-    IndexBuildInterceptor(OperationContext* opCtx,
-                          IndexCatalogEntry* entry,
-                          TrackSkippedRecords trackSkippedRecords);
+    IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
 
     /**
      * Deletes the temporary side writes and duplicate key constraint violations tables. Must be
@@ -138,11 +130,11 @@ public:
                                 DrainYieldPolicy drainYieldPolicy);
 
     SkippedRecordTracker* getSkippedRecordTracker() {
-        return _skippedRecordTracker.get();
+        return &_skippedRecordTracker;
     }
 
     const SkippedRecordTracker* getSkippedRecordTracker() const {
-        return _skippedRecordTracker.get();
+        return &_skippedRecordTracker;
     }
 
     /**
@@ -187,7 +179,7 @@ private:
     std::unique_ptr<TemporaryRecordStore> _sideWritesTable;
 
     // Records RecordIds that have been skipped due to indexing errors.
-    std::unique_ptr<SkippedRecordTracker> _skippedRecordTracker;
+    SkippedRecordTracker _skippedRecordTracker;
 
     std::unique_ptr<DuplicateKeyTracker> _duplicateKeyTracker;
 

@@ -131,6 +131,10 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     if (!status.isOK()) {
         return status;
     }
+    status = indexer.retrySkippedRecords(opCtx, coll);
+    if (!status.isOK()) {
+        return status;
+    }
     status = indexer.checkConstraints(opCtx);
     if (!status.isOK()) {
         return status;

@@ -38,12 +38,6 @@ const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB[collName];
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    jsTestLog("Skipping test because two-phase index builds are not enabled");
-    rst.stopSet();
-    return;
-}
-
 // This will cause the index build to fail with a CannotIndexParallelArrays error.
 assert.commandWorked(
     primaryColl.insert({_id: 1, x: [1, 2], y: [1, 2]}, {"writeConcern": {"w": 1}}));
