@@ -1464,9 +1464,7 @@ following:
 
 As seen here, there can be operations on collections that have since been dropped or indexes could
 conflict with the data being added. As a result, many errors that occur here are ignored and assumed
-to resolve themselves, such as `DuplicateKey` errors (like in the example above). If known
-problematic operations such as `renameCollection` are received, where we cannot assume a drop will
-come and fix them, we abort and retry initial sync.
+to resolve themselves, such as `DuplicateKey` errors (like in the example above).
 
 ## Finishing initial sync
 
