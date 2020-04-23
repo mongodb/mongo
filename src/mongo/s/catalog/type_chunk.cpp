@@ -210,6 +210,19 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
     ChunkType chunk;
 
     {
+        std::string chunkID;
+        Status status = bsonExtractStringField(source, name.name(), &chunkID);
+        if (status.isOK()) {
+            chunk._id = chunkID;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Ignore NoSuchKey because when chunks are sent in commands they are not required to
+            // include the _id.
+        } else {
+            return status;
+        }
+    }
+
+    {
         std::string chunkNS;
         Status status = bsonExtractStringField(source, ns.name(), &chunkNS);
         if (!status.isOK())
@@ -372,9 +385,18 @@ BSONObj ChunkType::toShardBSON() const {
 }
 
 std::string ChunkType::getName() const {
+    if (_id) {
+        // This chunk already has an id so return it.
+        return *_id;
+    }
+
     invariant(_nss);
     invariant(_min);
     return genID(*_nss, *_min);
+}
+
+void ChunkType::setName(const std::string& id) {
+    _id = id;
 }
 
 void ChunkType::setNS(const NamespaceString& nss) {

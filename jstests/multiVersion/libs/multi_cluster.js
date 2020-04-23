@@ -2,6 +2,9 @@
 // MultiVersion utility functions for clusters
 //
 
+load('jstests/multiVersion/libs/multi_rs.js');  // For upgradeSet.
+load('jstests/replsets/rslib.js');              // For awaitRSClientHosts.
+
 /**
  * Restarts the specified binaries in options with the specified binVersion.
  * Note: this does not perform any upgrade operations.
@@ -23,6 +26,8 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
         options.upgradeConfigs = true;
     if (options.upgradeMongos == undefined)
         options.upgradeMongos = true;
+    if (options.waitUntilStable == undefined)
+        options.waitUntilStable = false;
 
     var upgradedSingleShards = [];
 
@@ -85,6 +90,22 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
 
         this.config = this.s.getDB("config");
         this.admin = this.s.getDB("admin");
+    }
+
+    if (options.waitUntilStable) {
+        // Wait for the config server and shards to become available.
+        this.configRS.awaitSecondaryNodes();
+        let shardPrimaries = [];
+        for (let rs of this._rs) {
+            rs.test.awaitSecondaryNodes();
+            shardPrimaries.push(rs.test.getPrimary());
+        }
+
+        // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of all
+        // shards.
+        for (let client of[...this._mongos, ...shardPrimaries]) {
+            awaitRSClientHosts(client, shardPrimaries, {ok: true, ismaster: true});
+        }
     }
 };
 

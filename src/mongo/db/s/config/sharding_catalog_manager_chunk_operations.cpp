@@ -196,7 +196,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         op.append("ns", ChunkType::ConfigNS.ns());
 
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), ChunkType::genID(nss, migratedChunk.getMin()));
+        n.append(ChunkType::name(), migratedChunk.getName());
         migratedChunk.getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), migratedChunk.getMin());
@@ -206,7 +206,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), ChunkType::genID(nss, migratedChunk.getMin()));
+        q.append(ChunkType::name(), migratedChunk.getName());
         q.done();
 
         updates.append(op.obj());
@@ -220,7 +220,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         op.append("ns", ChunkType::ConfigNS.ns());
 
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), ChunkType::genID(nss, controlChunk->getMin()));
+        n.append(ChunkType::name(), controlChunk->getName());
         controlChunk->getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), controlChunk->getMin());
@@ -231,7 +231,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), ChunkType::genID(nss, controlChunk->getMin()));
+        q.append(ChunkType::name(), controlChunk->getName());
         q.done();
 
         updates.append(op.obj());
@@ -376,6 +376,9 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     auto newChunkBounds(splitPoints);
     newChunkBounds.push_back(range.getMax());
 
+    auto shouldTakeOriginalChunkID = true;
+    std::string chunkID;
+
     BSONArrayBuilder updates;
 
     for (const auto& endKey : newChunkBounds) {
@@ -421,6 +424,13 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         // splits only update the 'minor' portion of version
         currentMaxVersion.incMinor();
 
+        // First chunk takes ID of the original chunk and all other chunks get new IDs. This occurs
+        // because we perform an update operation below (with upsert true). Keeping the original ID
+        // ensures we overwrite the old chunk (before the split) without having to perform a delete.
+        chunkID = shouldTakeOriginalChunkID ? origChunk.getValue().getName()
+                                            : ChunkType::genID(nss, startKey);
+        shouldTakeOriginalChunkID = false;
+
         // build an update operation against the chunks collection of the config database
         // with upsert true
         BSONObjBuilder op;
@@ -430,7 +440,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
 
         // add the modified (new) chunk information as the update object
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), ChunkType::genID(nss, startKey));
+        n.append(ChunkType::name(), chunkID);
         currentMaxVersion.appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), startKey);
@@ -447,7 +457,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
 
         // add the chunk's _id as the query part of the update statement
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), ChunkType::genID(nss, startKey));
+        q.append(ChunkType::name(), chunkID);
         q.done();
 
         updates.append(op.obj());
@@ -592,6 +602,17 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     // Do not use the first chunk boundary as a max bound while building chunks
     for (size_t i = 1; i < chunkBoundaries.size(); ++i) {
         itChunk.setMin(itChunk.getMax());
+
+        // Read the original chunk from disk to lookup that chunk's _id. Propagate the _id
+        // because in clusters where the shard key is a UUID and the chunk was last written
+        // in v3.4, the chunk entry's _id will be in the "BinData()" form, and calling
+        // ChunkType::genID would try to do the update with the _id in the "UUID()" form
+        // (because UUID::toString changed in v3.6), which wouldn't match any documents.
+        auto itOrigChunk = _findChunkOnConfig(opCtx, nss, itChunk.getMin());
+        if (!itOrigChunk.isOK()) {
+            return itOrigChunk.getStatus();
+        }
+        itChunk.setName(itOrigChunk.getValue().getName());
 
         // Ensure the chunk boundaries are strictly increasing
         if (chunkBoundaries[i].woCompare(itChunk.getMin()) <= 0) {
@@ -748,6 +769,13 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     newMigratedChunk.setVersion(ChunkVersion(
         currentCollectionVersion.majorVersion() + 1, 0, currentCollectionVersion.epoch()));
 
+    // Propagate the _id from the original chunk because in clusters where the
+    // shard key is a UUID and the chunk was last written in v3.4, the chunk entry's
+    // _id will be in the "BinData()" form, and calling ChunkType::genID would try to
+    // do the update with the _id in the "UUID()" form (because UUID::toString changed
+    // in v3.6), which wouldn't match any documents.
+    newMigratedChunk.setName(origChunk.getValue().getName());
+
     // Copy the complete history.
     auto newHistory = origChunk.getValue().getHistory();
     const int kHistorySecs = 10;
@@ -800,6 +828,13 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
             // FCV 3.6 does not have the history field in the persisted metadata
             newControlChunk->setHistory({});
         }
+
+        // Propagate the _id from the original chunk because in clusters where the
+        // shard key is a UUID and the chunk was last written in v3.4, the chunk entry's
+        // _id will be in the "BinData()" form, and calling ChunkType::genID would try to
+        // do the update with the _id in the "UUID()" form (because UUID::toString changed
+        // in v3.6), which wouldn't match any documents.
+        newControlChunk->setName(origControlChunk.getValue().getName());
     }
 
     auto command = makeCommitChunkTransactionCommand(
@@ -840,7 +875,7 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContex
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
                                             ChunkType::ConfigNS,
-                                            BSON(ChunkType::name << ChunkType::genID(nss, key)),
+                                            BSON(ChunkType::ns(nss.ns()) << ChunkType::min(key)),
                                             BSONObj(),
                                             1);
 
@@ -851,7 +886,9 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContex
     const auto origChunks = std::move(findResponse.getValue().docs);
     if (origChunks.size() != 1) {
         return {ErrorCodes::IncompatibleShardingMetadata,
-                str::stream() << "Tried to find the chunk for '" << ChunkType::genID(nss, key)
+                str::stream() << "Tried to find the chunk for namespace " << nss.ns()
+                              << " and min key "
+                              << key.toString()
                               << ", but found no chunks"};
     }
 
