@@ -3953,6 +3953,13 @@ if get_option('ninja') != 'disabled':
 if get_option('install-mode') == 'hygienic':
 
     if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
+
+        # The current ninja builder can't handle --separate-debug on non-Windows platforms
+        # like linux or macOS, because they depend on adding extra actions to the link step,
+        # which cannot be translated into the ninja bulider.
+        if not env.TargetOSIs("windows") and get_option('ninja') != 'disabled':
+            env.FatalError("Cannot use --separate-debug with Ninja on non-Windows platforms.")
+
         separate_debug = Tool('separate_debug')
         if not separate_debug.exists(env):
             env.FatalError('Cannot honor --separate-debug because the separate_debug.py Tool reported as nonexistent')
