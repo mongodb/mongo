@@ -66,7 +66,9 @@ ValidateState::ValidateState(OperationContext* opCtx,
     if (_background) {
         // We need to hold the global lock throughout the entire validation to avoid having to save
         // and restore our cursors used throughout. This is done in order to avoid abandoning the
-        // snapshot and invalidating our cursors.
+        // snapshot and invalidating our cursors. Avoid taking the PBWM lock, which will stall
+        // replication if this is a secondary node being validated.
+        ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
         _globalLock.emplace(opCtx, MODE_IS);
         _databaseLock.emplace(opCtx, _nss.db(), MODE_IS);
         _collectionLock.emplace(opCtx, _nss, MODE_IS);
@@ -147,18 +149,20 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&
               _indexes.size() == 0);
 
-    // Background validation will read from a snapshot opened on the all durable timestamp instead
-    // of the latest data. This allows concurrent writes to go ahead without interfering with
-    // validation's view of the data.
+    // Background validation will read from a snapshot opened on the kNoOverlap read source, which
+    // is the minimum of the last applied and all durable timestamps, instead of the latest data.
+    // Using the kNoOverlap read source prevents us from having to take the PBWM lock, which blocks
+    // replication. We cannot solely rely on the all durable timestamp as it can be set while we're
+    // in the middle of applying a batch on secondary nodes.
     if (_background) {
         invariant(!opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
         opCtx->recoveryUnit()->abandonSnapshot();
-        // Background validation is expecting to read from the all durable timestamp, but
+        // Background validation is expecting to read from the no overlap timestamp, but
         // standalones do not support timestamps. Therefore, if this process is currently running as
         // a standalone, don't use a timestamp.
         RecoveryUnit::ReadSource rs;
         if (repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
-            rs = RecoveryUnit::ReadSource::kAllDurableSnapshot;
+            rs = RecoveryUnit::ReadSource::kNoOverlap;
         } else {
             rs = RecoveryUnit::ReadSource::kNoTimestamp;
         }
