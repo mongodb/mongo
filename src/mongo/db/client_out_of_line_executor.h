@@ -33,7 +33,6 @@
 #include <memory>
 
 #include "mongo/db/client.h"
-#include "mongo/util/clock_source.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/producer_consumer_queue.h"
 
@@ -81,9 +80,10 @@ public:
     }
 
 private:
-    std::shared_ptr<QueueType> _taskQueue;
+    class Impl;
+    std::unique_ptr<Impl> _impl;
 
-    ClockSource::StopWatch _stopWatch;
+    std::shared_ptr<QueueType> _taskQueue;
 };
 
 }  // namespace mongo

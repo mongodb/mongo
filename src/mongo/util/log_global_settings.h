@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/logger/log_component.h"
-#include "mongo/logger/log_severity_limiter.h"
 #include "mongo/logger/log_version_util.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log_component.h"

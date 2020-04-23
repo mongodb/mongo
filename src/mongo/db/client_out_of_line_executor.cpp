@@ -33,15 +33,25 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/logger/log_severity_limiter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-ClientOutOfLineExecutor::ClientOutOfLineExecutor() noexcept {
-    _taskQueue = std::make_shared<QueueType>();
-}
+// Per-instance implementation details that need not appear in the header.
+class ClientOutOfLineExecutor::Impl {
+public:
+    /** Returns Info(), then suppresses to `Debug(2)` for a second. */
+    logv2::SeveritySuppressor bumpedSeverity{
+        Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
+    ClockSource::StopWatch stopWatch;
+};
+
+ClientOutOfLineExecutor::ClientOutOfLineExecutor() noexcept
+    : _impl{std::make_unique<Impl>()}, _taskQueue{std::make_shared<QueueType>()} {}
 
 ClientOutOfLineExecutor::~ClientOutOfLineExecutor() noexcept {
     // Force producers to consume their tasks beyond this point.
@@ -75,19 +85,18 @@ void ClientOutOfLineExecutor::consumeAllTasks() noexcept {
     // approximation of the acceptable overhead in the context of normal client operations.
     static constexpr auto kTimeLimit = Microseconds(30);
 
-    _stopWatch.restart();
+    _impl->stopWatch.restart();
 
     while (auto maybeTask = _taskQueue->tryPop()) {
         auto task = std::move(*maybeTask);
         task(Status::OK());
     }
 
-    auto elapsed = _stopWatch.elapsed();
+    auto elapsed = _impl->stopWatch.elapsed();
 
-    auto severity = MONGO_GET_LIMITED_SEVERITY(this, Seconds{1}, 0, 2);
     if (MONGO_unlikely(elapsed > kTimeLimit)) {
         LOGV2_DEBUG(4651401,
-                    logSeverityV1toV2(severity).toInt(),
+                    _impl->bumpedSeverity().toInt(),
                     "Client's executor exceeded time limit",
                     "elapsed"_attr = elapsed,
                     "limit"_attr = kTimeLimit);
