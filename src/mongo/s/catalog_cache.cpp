@@ -47,6 +47,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -582,7 +583,7 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
 
 void CatalogCache::checkAndRecordOperationBlockedByRefresh(OperationContext* opCtx,
                                                            mongo::LogicalOp opType) {
-    if (!operationBlockedBehindCatalogCacheRefresh(opCtx)) {
+    if (!isMongos() || !operationBlockedBehindCatalogCacheRefresh(opCtx)) {
         return;
     }
 
@@ -923,23 +924,25 @@ void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
 
     builder->append("countFailedRefreshes", countFailedRefreshes.load());
 
-    BSONObjBuilder operationsBlockedByRefreshBuilder(
-        builder->subobjStart("operationsBlockedByRefresh"));
+    if (isMongos()) {
+        BSONObjBuilder operationsBlockedByRefreshBuilder(
+            builder->subobjStart("operationsBlockedByRefresh"));
 
-    operationsBlockedByRefreshBuilder.append("countAllOperations",
-                                             operationsBlockedByRefresh.countAllOperations.load());
-    operationsBlockedByRefreshBuilder.append("countInserts",
-                                             operationsBlockedByRefresh.countInserts.load());
-    operationsBlockedByRefreshBuilder.append("countQueries",
-                                             operationsBlockedByRefresh.countQueries.load());
-    operationsBlockedByRefreshBuilder.append("countUpdates",
-                                             operationsBlockedByRefresh.countUpdates.load());
-    operationsBlockedByRefreshBuilder.append("countDeletes",
-                                             operationsBlockedByRefresh.countDeletes.load());
-    operationsBlockedByRefreshBuilder.append("countCommands",
-                                             operationsBlockedByRefresh.countCommands.load());
+        operationsBlockedByRefreshBuilder.append(
+            "countAllOperations", operationsBlockedByRefresh.countAllOperations.load());
+        operationsBlockedByRefreshBuilder.append("countInserts",
+                                                 operationsBlockedByRefresh.countInserts.load());
+        operationsBlockedByRefreshBuilder.append("countQueries",
+                                                 operationsBlockedByRefresh.countQueries.load());
+        operationsBlockedByRefreshBuilder.append("countUpdates",
+                                                 operationsBlockedByRefresh.countUpdates.load());
+        operationsBlockedByRefreshBuilder.append("countDeletes",
+                                                 operationsBlockedByRefresh.countDeletes.load());
+        operationsBlockedByRefreshBuilder.append("countCommands",
+                                                 operationsBlockedByRefresh.countCommands.load());
 
-    operationsBlockedByRefreshBuilder.done();
+        operationsBlockedByRefreshBuilder.done();
+    }
 }
 
 CachedDatabaseInfo::CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard)
