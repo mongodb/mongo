@@ -192,6 +192,8 @@ executor:
   config:
     shell_options:
       readMode: commands
+      eval: >-
+        load("jstests/libs/override_methods/mongos_manual_intervention_actions.js");
       global_vars:
         TestData:
           runningWithConfigStepdowns: true
