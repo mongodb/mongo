@@ -29,20 +29,18 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kConnectionPool
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/connection_pool.h"
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/logger/log_severity_limiter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/destructor_guard.h"
@@ -62,6 +60,11 @@ using namespace fmt::literals;
 namespace mongo {
 
 namespace {
+
+auto makeSeveritySuppressor() {
+    return std::make_unique<logv2::KeyedSeveritySuppressor<HostAndPort>>(
+        Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2));
+}
 
 template <typename Map, typename Key>
 auto& getOrInvariant(Map&& map, const Key& key) noexcept {
@@ -913,9 +916,9 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status) {
     _generation++;
 
     if (!_readyPool.empty() || !_processingPool.empty()) {
-        auto severity = MONGO_GET_LIMITED_SEVERITY(_hostAndPort, Seconds{1}, 0, 2);
+        static auto& bumpedSeverity = *makeSeveritySuppressor().release();
         LOGV2_DEBUG(22572,
-                    logSeverityV1toV2(severity).toInt(),
+                    bumpedSeverity(_hostAndPort).toInt(),
                     "Dropping all pooled connections to {hostAndPort} due to {error}",
                     "Dropping all pooled connections",
                     "hostAndPort"_attr = _hostAndPort,
@@ -1016,9 +1019,9 @@ void ConnectionPool::SpecificPool::spawnConnections() {
         return;
     }
 
-    auto severity = MONGO_GET_LIMITED_SEVERITY(_hostAndPort, Seconds{1}, 0, 2);
+    static auto& bumpedSeverity = *makeSeveritySuppressor().release();
     LOGV2_DEBUG(22576,
-                logSeverityV1toV2(severity).toInt(),
+                bumpedSeverity(_hostAndPort).toInt(),
                 "Connecting to {hostAndPort}",
                 "Connecting",
                 "hostAndPort"_attr = _hostAndPort);

@@ -38,8 +38,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/logger/log_severity_limiter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
@@ -386,10 +386,12 @@ Status LogicalSessionCacheImpl::_addToCacheIfNotFull(WithLock, LogicalSessionRec
                              << "Unable to add session ID " << record.getId()
                              << " into the cache because the number of active sessions is too "
                                 "high"};
-        auto severity =
-            MONGO_GET_LIMITED_SEVERITY(ErrorCodes::TooManyLogicalSessions, Seconds{1}, 0, 2);
+        // Returns Info() unless it was called in the past second.
+        // In that case it will return the quieter Debug(2) */
+        static auto& bumpedSeverity = *new logv2::SeveritySuppressor{
+            Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
         LOGV2_DEBUG(20715,
-                    logSeverityV1toV2(severity).toInt(),
+                    bumpedSeverity().toInt(),
                     "Unable to add session {sessionId} into the cache, too many active sessions: "
                     "{sessionCount}, maximum: {maxSessions}",
                     "Unable to add session into the cache, too many active sessions",
