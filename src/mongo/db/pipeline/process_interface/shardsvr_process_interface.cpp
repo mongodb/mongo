@@ -33,6 +33,8 @@
 
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
@@ -47,6 +49,8 @@
 #include "mongo/s/write_ops/cluster_write.h"
 
 namespace mongo {
+
+using namespace fmt::literals;
 
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
@@ -286,22 +290,32 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     newCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                          opCtx->getWriteConcern().toBSON());
     auto cmdObj = newCmdBuilder.done();
-    auto response =
-        executeCommandAgainstDatabasePrimary(opCtx,
-                                             ns.db(),
-                                             std::move(cachedDbInfo),
-                                             cmdObj,
-                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                             Shard::RetryPolicy::kIdempotent);
-    uassertStatusOKWithContext(response.swResponse,
-                               str::stream() << "failed while running command " << cmdObj);
-    auto result = response.swResponse.getValue().data;
-    uassertStatusOKWithContext(getStatusFromCommandResult(result),
-                               str::stream() << "failed while running command " << cmdObj);
-    uassertStatusOKWithContext(getWriteConcernStatusFromCommandResult(result),
-                               str::stream()
-                                   << "write concern failed while running command " << cmdObj);
+
+    sharded_agg_helpers::shardVersionRetry(
+        opCtx,
+        Grid::get(opCtx)->catalogCache(),
+        ns,
+        "copying index for empty collection {}"_format(ns.ns()),
+        [&] {
+            auto response = executeCommandAgainstDatabasePrimary(
+                opCtx,
+                ns.db(),
+                std::move(cachedDbInfo),
+                cmdObj,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kIdempotent);
+
+            uassertStatusOKWithContext(response.swResponse,
+                                       str::stream() << "failed to run command " << cmdObj);
+            auto result = response.swResponse.getValue().data;
+            uassertStatusOKWithContext(getStatusFromCommandResult(result),
+                                       str::stream() << "failed while running command " << cmdObj);
+            uassertStatusOKWithContext(
+                getWriteConcernStatusFromCommandResult(result),
+                str::stream() << "write concern failed while running command " << cmdObj);
+        });
 }
+
 void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
                                                  const NamespaceString& ns) {
     // Build and execute the dropCollection command against the primary shard of the given

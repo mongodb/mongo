@@ -136,60 +136,6 @@ void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss)
 }
 
 /**
- * Constructs the BSON specification document for the given namespace, index key and options.
- */
-BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
-                             const BSONObj& keys,
-                             const BSONObj& collation,
-                             bool unique) {
-    BSONObjBuilder index;
-
-    // Required fields for an index.
-
-    index.append("key", keys);
-
-    StringBuilder indexName;
-    bool isFirstKey = true;
-    for (BSONObjIterator keyIter(keys); keyIter.more();) {
-        BSONElement currentKey = keyIter.next();
-
-        if (isFirstKey) {
-            isFirstKey = false;
-        } else {
-            indexName << "_";
-        }
-
-        indexName << currentKey.fieldName() << "_";
-        if (currentKey.isNumber()) {
-            indexName << currentKey.numberInt();
-        } else {
-            indexName << currentKey.str();  // this should match up with shell command
-        }
-    }
-    index.append("name", indexName.str());
-
-    // Index options.
-
-    if (!collation.isEmpty()) {
-        // Creating an index with the "collation" option requires a v=2 index.
-        index.append("v", static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-        index.append("collation", collation);
-    }
-
-    if (unique && !IndexDescriptor::isIdIndexPattern(keys)) {
-        index.appendBool("unique", unique);
-    }
-
-    // The outer createIndexes command.
-
-    BSONObjBuilder createIndexes;
-    createIndexes.append("createIndexes", nss.coll());
-    createIndexes.append("indexes", BSON_ARRAY(index.obj()));
-    createIndexes.append("writeConcern", WriteConcernOptions::Majority);
-    return createIndexes.obj();
-}
-
-/**
  * Compares the proposed shard key with the shard key of the collection's existing zones
  * to ensure they are a legal combination.
  */
@@ -514,6 +460,10 @@ UUID shardCollection(OperationContext* opCtx,
                 collectionOptional->getUUID());
         return *collectionOptional->getUUID();
     }
+
+    // Make sure that this shard initializes the collection metadata so we can perform local
+    // operations without getting stale config exception.
+    forceShardFilteringMetadataRefresh(opCtx, nss, true);
 
     std::unique_ptr<InitialSplitPolicy> splitPolicy;
     InitialSplitPolicy::ShardCollectionConfig initialChunks;

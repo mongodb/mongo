@@ -12,7 +12,6 @@ var admin = mongos.getDB("admin");
 
 var collSh = mongos.getCollection(jsTestName() + ".collSharded");
 var collUn = mongos.getCollection(jsTestName() + ".collUnsharded");
-var collDi = st.shard0.getCollection(jsTestName() + ".collDirect");
 
 jsTest.log('Checking write to config collections...');
 assert.commandWorked(admin.TestColl.insert({SingleDoc: 1}));
@@ -26,7 +25,6 @@ assert.commandWorked(admin.runCommand({movePrimary: collUn.getDB() + "", to: st.
 
 printjson(collSh.ensureIndex({ukey: 1}, {unique: true}));
 printjson(collUn.ensureIndex({ukey: 1}, {unique: true}));
-printjson(collDi.ensureIndex({ukey: 1}, {unique: true}));
 
 assert.commandWorked(admin.runCommand({shardCollection: collSh + "", key: {ukey: 1}}));
 assert.commandWorked(admin.runCommand({split: collSh + "", middle: {ukey: 0}}));
@@ -36,7 +34,6 @@ assert.commandWorked(admin.runCommand(
 var resetColls = function() {
     assert.commandWorked(collSh.remove({}));
     assert.commandWorked(collUn.remove({}));
-    assert.commandWorked(collDi.remove({}));
 };
 
 var isDupKeyError = function(err) {
@@ -61,9 +58,6 @@ assert.eq(2, collSh.find().itcount());
 assert.commandWorked(collUn.insert(inserts));
 assert.eq(2, collUn.find().itcount());
 
-assert.commandWorked(collDi.insert(inserts));
-assert.eq(2, collDi.find().itcount());
-
 jsTest.log("Bulk insert (no COE) to single shard...");
 
 resetColls();
@@ -83,9 +77,6 @@ assert.eq(1, collSh.find().itcount());
 assert.writeError(collUn.insert(inserts));
 assert.eq(1, collUn.find().itcount());
 
-assert.writeError(collDi.insert(inserts));
-assert.eq(1, collDi.find().itcount());
-
 jsTest.log("Bulk insert (no COE) with mongod error...");
 
 resetColls();
@@ -99,10 +90,6 @@ res = assert.writeError(collUn.insert(inserts));
 assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
 assert.eq(1, collUn.find().itcount());
 
-res = assert.writeError(collDi.insert(inserts));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
-assert.eq(1, collDi.find().itcount());
-
 jsTest.log("Bulk insert (no COE) on second shard...");
 
 resetColls();
@@ -113,9 +100,6 @@ assert.eq(2, collSh.find().itcount());
 
 assert.commandWorked(collUn.insert(inserts));
 assert.eq(2, collUn.find().itcount());
-
-assert.commandWorked(collDi.insert(inserts));
-assert.eq(2, collDi.find().itcount());
 
 jsTest.log("Bulk insert to second shard (no COE) on second shard...");
 
@@ -141,9 +125,6 @@ assert.eq(4, collSh.find().itcount());
 assert.writeError(collUn.insert(inserts));
 assert.eq(4, collUn.find().itcount());
 
-assert.writeError(collDi.insert(inserts));
-assert.eq(4, collDi.find().itcount());
-
 jsTest.log("Bulk insert to third shard (no COE) with mongod error...");
 
 resetColls();
@@ -157,10 +138,6 @@ assert.eq(5, collSh.find().itcount());
 res = assert.writeError(collUn.insert(inserts));
 assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
 assert.eq(5, collUn.find().itcount());
-
-res = assert.writeError(collDi.insert(inserts));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
-assert.eq(5, collDi.find().itcount());
 
 //
 // CONTINUE-ON-ERROR
@@ -177,9 +154,6 @@ assert.eq(2, collSh.find().itcount());
 assert.writeError(collUn.insert(inserts, 1));
 assert.eq(2, collUn.find().itcount());
 
-assert.writeError(collDi.insert(inserts, 1));
-assert.eq(2, collDi.find().itcount());
-
 jsTest.log("Bulk insert to third shard (yes COE) with mongod error...");
 
 resetColls();
@@ -194,10 +168,6 @@ assert.eq(6, collSh.find().itcount());
 res = assert.writeError(collUn.insert(inserts, 1));
 assert.eq(6, res.nInserted, res.toString());
 assert.eq(6, collUn.find().itcount());
-
-res = assert.writeError(collDi.insert(inserts, 1));
-assert.eq(6, res.nInserted, res.toString());
-assert.eq(6, collDi.find().itcount());
 
 //
 // Test when WBL has to be invoked mid-insert

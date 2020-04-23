@@ -50,7 +50,7 @@ withTxnAndAutoRetryOnMongos(session, () => {
     // This should not block but return an error because the index exists with different options.
     res = testDB.runCommand({
         createIndexes: collName,
-        indexes: [{key: {a: 1}, name: "unique_a_1", unique: true}],
+        indexes: [{key: {a: 1}, name: "sparse_a_1", sparse: true}],
     });
     assert.commandFailedWithCode(res, ErrorCodes.IndexOptionsConflict);
 
