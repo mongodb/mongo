@@ -326,18 +326,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='set_index_commit_quorum_idl',
-    source=[
-        env.Idlc('set_index_commit_quorum.idl')[0],
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
-        '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
 # Commands that should only be present in mongod
 env.Library(
     target="mongod",
@@ -358,7 +346,6 @@ env.Library(
         "resize_oplog.cpp",
         "restart_catalog_command.cpp",
         "set_feature_compatibility_version_command.cpp",
-        "set_index_commit_quorum_command.cpp",
         "sharded_index_consistency_server_status.cpp",
         "shutdown_d.cpp",
         "snapshot_management.cpp",
@@ -407,7 +394,6 @@ env.Library(
         'profile_common',
         'server_status',
         'servers',
-        'set_index_commit_quorum_idl',
         'shell_protocol',
         'standalone',
         'test_commands_enabled',

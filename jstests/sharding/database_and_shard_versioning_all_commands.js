@@ -384,19 +384,6 @@ let testCases = {
     saslContinue: {skip: "not on a user database"},
     saslStart: {skip: "not on a user database"},
     serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
-    setIndexCommitQuorum: {
-        skipProfilerCheck: true,
-        sendsDbVersion: true,
-        sendsShardVersion: true,
-        setUp: function(mongosConn) {
-            // Expects the collection to exist, and doesn't implicitly create it.
-            assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-        },
-        command: {setIndexCommitQuorum: collName, indexNames: ["index"], commitQuorum: "majority"},
-        cleanUp: function(mongosConn) {
-            assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-        },
-    },
     setFeatureCompatibilityVersion: {skip: "not on a user database"},
     setFreeMonitoring:
         {skip: "explicitly fails for mongos, primary mongod only", conditional: true},

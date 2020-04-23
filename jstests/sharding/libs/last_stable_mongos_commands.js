@@ -20,7 +20,6 @@ const commandsAddedToMongosIn42 = [
     'clearJumboFlag',
     'commitTransaction',
     'dropConnections',
-    'setIndexCommitQuorum',
     'startRecordingTraffic',
     'stopRecordingTraffic',
     'waitForFailPoint',
