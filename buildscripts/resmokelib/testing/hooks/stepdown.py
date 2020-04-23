@@ -563,6 +563,10 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                 self.logger.info("Failed to step up the secondary on port %d of replica set '%s'.",
                                  chosen.port, rs_fixture.replset_name)
                 secondaries.remove(chosen)
+            except pymongo.errors.AutoReconnect:
+                # It is possible for a replSetStepUp to fail with AutoReconnect if that node goes
+                # into Rollback (which causes it to close any open connections).
+                pass
 
         if self._terminate:
             self.logger.info("Waiting for the old primary on port %d of replica set '%s' to exit.",
