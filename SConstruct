@@ -3930,7 +3930,7 @@ if get_option('ninja') != 'disabled':
         test_files = [test_file.path for test_file in env["MONGO_TEST_REGISTRY"][node.path]]
         files = "\\n".join(test_files)
         return {
-            "outputs": node.get_path(),
+            "outputs": [node.get_path()],
             "rule": "TEST_LIST",
             "implicit": test_files,
             "variables": {
