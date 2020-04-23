@@ -13,6 +13,9 @@
     load("jstests/replsets/rslib.js");
     load("jstests/libs/uuid_util.js");
 
+    // Skip checkOplogs since we seed the local oplog on a secondary.
+    TestData.skipCheckDBHashes = true;
+
     if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
         jsTestLog("Retryable writes are not supported, skipping test");
         return;
@@ -209,6 +212,10 @@
     assertCollSize(txnColl(primary), 2);
     assertCollSize(sessionsColl(seed), 2);
     assertCollSize(txnColl(seed), 2);
+
+    // We have set TestData.skipCheckDBHashes = true to skip checking oplog but we still want to
+    // check DBHashes for replicated data.
+    rst.checkReplicatedDataHashes();
 
     rst.stopSet();
 })();
