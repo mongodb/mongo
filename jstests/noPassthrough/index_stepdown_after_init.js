@@ -63,12 +63,9 @@ const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 
 if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    // Wait for the IndexBuildCoordinator thread, not the command thread, to report the index build
-    // as failed.
+    // Wait for the index build to be unregistred.
     if (isJsonLog(primary)) {
-        checkLog.containsJson(primary, 20649, {
-            nss: coll.getFullName(),
-        });
+        checkLog.containsJson(primary, 4656004);
     } else {
         checkLog.contains(primary, '[IndexBuildsCoordinatorMongod-0] Index build failed: ');
     }

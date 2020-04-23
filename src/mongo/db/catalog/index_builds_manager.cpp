@@ -98,7 +98,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     // secondaries. Secondaries can complete index builds in the middle of batches, which creates
     // the potential for finding duplicate key violations where there otherwise would be none at
     // consistent states.
-    // Two-phase builds will defer any unique key violations until commit-time.
+    // Index builds will otherwise defer any unique key constraint checks until commit-time.
     if (options.indexConstraints == IndexConstraints::kRelax &&
         options.protocol == IndexBuildProtocol::kSinglePhase) {
         builder->ignoreUniqueConstraint();

@@ -241,13 +241,12 @@ void unlockRSTL(OperationContext* opCtx) {
 void logFailure(Status status,
                 const NamespaceString& nss,
                 std::shared_ptr<ReplIndexBuildState> replState) {
-    LOGV2(
-        20649,
-        "Index build failed: {replState_buildUUID}: {nss} ( {replState_collectionUUID} ): {status}",
-        "replState_buildUUID"_attr = replState->buildUUID,
-        "nss"_attr = nss,
-        "replState_collectionUUID"_attr = replState->collectionUUID,
-        "status"_attr = status);
+    LOGV2(20649,
+          "Index build failed",
+          "buildUUID"_attr = replState->buildUUID,
+          "collection"_attr = nss,
+          "collectionUUID"_attr = replState->collectionUUID,
+          "status"_attr = status);
 }
 
 /**
@@ -1384,6 +1383,7 @@ void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
     });
     uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx, collection, buildUUID));
 
+    uassertStatusOK(_indexBuildsManager.retrySkippedRecords(opCtx, buildUUID, collection));
     uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(opCtx, buildUUID));
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
@@ -1522,7 +1522,7 @@ void IndexBuildsCoordinator::_unregisterIndexBuild(
 
     invariant(_allIndexBuilds.erase(replIndexBuildState->buildUUID));
 
-    LOGV2(4656004, "unregistering index build", "buildUUID"_attr = replIndexBuildState->buildUUID);
+    LOGV2(4656004, "Unregistering index build", "buildUUID"_attr = replIndexBuildState->buildUUID);
     _indexBuildsManager.unregisterIndexBuild(replIndexBuildState->buildUUID);
     _indexBuildsCondVar.notify_all();
 }
@@ -1967,6 +1967,16 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         return;
     }
 
+    {
+        // If the index build has already been cleaned-up because it encountered an error at
+        // commit-time, there is no work to do. This is the most routine case, since index
+        // constraint checking happens at commit-time for index builds.
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        if (replState->indexBuildState.isAborted()) {
+            uassertStatusOK(status);
+        }
+    }
+
     // We do not hold a collection lock here, but we are protected against the collection being
     // dropped while the index build is still registered for the collection -- until abortIndexBuild
     // is called. The collection can be renamed, but it is OK for the name to be stale just for
@@ -1980,31 +1990,20 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     NamespaceString nss = collection->ns();
     logFailure(status, nss, replState);
 
-    {
-        // If the index build has already been cleaned-up because it encountered an error at
-        // commit-time, there is no work to do. This is the most routine case, since index
-        // constraint checking happens at commit-time for two phase index builds.
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (replState->indexBuildState.isAborted()) {
-            uassertStatusOK(status);
-        }
-    }
-
     // If we received an external abort, the caller should have already set our state to kAborted.
     invariant(status.code() != ErrorCodes::IndexBuildAborted);
 
+    // Index builds only check index constraints when committing. If an error occurs at that point,
+    // then the build is cleaned up while still holding the appropriate locks. The only errors that
+    // we cannot anticipate are user interrupts and shutdown errors.
+    invariant(status.isA<ErrorCategory::Interruption>() ||
+                  status.isA<ErrorCategory::ShutdownError>(),
+              str::stream() << "Unnexpected error code during index build cleanup: " << status);
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         _cleanUpSinglePhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
     } else {
         invariant(IndexBuildProtocol::kTwoPhase == replState->protocol,
                   str::stream() << replState->buildUUID);
-        // Two-phase index builds only check index constraints when committing. If an error occurs
-        // at that point, then the build is cleaned up while still holding the appropriate locks.
-        // The only errors that we cannot anticipate are user interrupts and shutdown errors.
-        invariant(status.isA<ErrorCategory::Interruption>() ||
-                      status.isA<ErrorCategory::ShutdownError>(),
-                  str::stream() << "Unnexpected error code during two-phase index build cleanup: "
-                                << status);
         _cleanUpTwoPhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
     }
 
@@ -2152,7 +2151,9 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     }
 
     // If we are no longer primary after receiving a commit quorum, we must restart and wait for a
-    // new signal from a new primary because we cannot commit.
+    // new signal from a new primary because we cannot commit. Note that two-phase index builds can
+    // retry because a new signal should be received. Single-phase builds will be unable to commit
+    // and will self-abort.
     bool isMaster = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
     if (!isMaster && IndexBuildAction::kCommitQuorumSatisfied == action) {
         return CommitResult::kNoLongerPrimary;
@@ -2190,17 +2191,23 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     try {
-        if (MONGO_unlikely(failIndexBuildOnCommit.shouldFail())) {
-            uasserted(4698903, "index build aborted due to failpoint");
+        failIndexBuildOnCommit.execute(
+            [](const BSONObj&) { uasserted(4698903, "index build aborted due to failpoint"); });
+
+        // If we are no longer primary and a single phase index build started as primary attempts to
+        // commit, trigger a self-abort.
+        if (!isMaster && IndexBuildAction::kSinglePhaseCommit == action &&
+            !indexBuildOptions.replSetAndNotPrimaryAtStart) {
+            uassertStatusOK(
+                {ErrorCodes::NotMaster,
+                 str::stream() << "Unable to commit index build because we are no longer primary: "
+                               << replState->buildUUID});
         }
 
-        // Retry indexing records that failed key generation while relaxing constraints (i.e. while
-        // a secondary node), but only if we are primary and committing the index build and during
-        // two-phase builds. Single-phase index builds are not resilient to state transitions and do
-        // not track skipped records. Secondaries rely on the primary's decision to commit as
-        // assurance that it has checked all key generation errors on its behalf.
-        if (IndexBuildProtocol::kTwoPhase == replState->protocol &&
-            replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
+        // Retry indexing records that failed key generation, but only if we are primary.
+        // Secondaries rely on the primary's decision to commit as assurance that it has checked all
+        // key generation errors on its behalf.
+        if (isMaster) {
             uassertStatusOK(
                 _indexBuildsManager.retrySkippedRecords(opCtx, replState->buildUUID, collection));
         }
@@ -2217,19 +2224,30 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
             uassertStatusOK(
                 _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
         }
-    } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
+    } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+        logFailure(e.toStatus(), collection->ns(), replState);
         _completeAbortForShutdown(opCtx, replState, collection);
         throw;
     } catch (const DBException& e) {
+        auto status = e.toStatus();
+        logFailure(status, collection->ns(), replState);
+
         // It is illegal to abort the index build at this point. Note that Interruption exceptions
         // are allowed because we cannot control them as they bypass the routine abort machinery.
         invariant(e.code() != ErrorCodes::IndexBuildAborted);
 
-        // Index builds may not fail on secondaries at this point. If a primary replicated an
-        // abortIndexBuild oplog entry, then this index build would have been interrupted before
-        // committing with an IndexBuildAborted error code.
-        auto status = e.toStatus();
-        if (!isMaster) {
+        // Index build commit may not fail on secondaries because it implies diverenge with data on
+        // the primary. The only exception is single-phase builds started on primaries, which may
+        // fail after a state transition. In this case, we have not replicated anything to
+        // roll-back. With two-phase index builds, if a primary replicated an abortIndexBuild oplog
+        // entry, then this index build should have been interrupted before committing with an
+        // IndexBuildAborted error code.
+        const bool twoPhaseAndNotPrimary =
+            IndexBuildProtocol::kTwoPhase == replState->protocol && !isMaster;
+        const bool singlePhaseAndNotPrimaryAtStart =
+            IndexBuildProtocol::kSinglePhase == replState->protocol &&
+            indexBuildOptions.replSetAndNotPrimaryAtStart;
+        if (twoPhaseAndNotPrimary || singlePhaseAndNotPrimaryAtStart) {
             LOGV2_FATAL(4698902,
                         "Index build failed while not primary",
                         "buildUUID"_attr = replState->buildUUID,
