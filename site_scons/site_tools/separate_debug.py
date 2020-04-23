@@ -128,6 +128,14 @@ def _update_builder(env, builder):
             setattr(debug_file.attributes, "debug_file_for", target[0])
         setattr(target[0].attributes, "separate_debug_files", debug_files)
 
+        # On Windows, we don't want to emit the PDB. The mslink.py
+        # SCons tool is already doing so, so otherwise it would be
+        # emitted twice. This tool only needed to adorn the node with
+        # the various attributes as needed, so we just return the
+        # original target, source tuple.
+        if env.TargetOSIs("windows"):
+            return target, source
+
         return (target + debug_files, source)
 
     new_emitter = SCons.Builder.ListEmitter([base_emitter, new_emitter])
