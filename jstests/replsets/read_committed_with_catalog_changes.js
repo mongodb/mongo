@@ -20,8 +20,6 @@
  *  - repair database
  *  - reindex collection
  *  - compact collection
- *
- * @tags: [requires_fcv_44]
  */
 
 load("jstests/libs/parallelTester.js");  // For Thread.

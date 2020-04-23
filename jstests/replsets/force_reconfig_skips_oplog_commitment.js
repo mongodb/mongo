@@ -2,8 +2,6 @@
  * Verify that a force replica set reconfig skips the oplog commitment check. The force reconfig
  * should succeed even though oplog entries committed in the previous config are not committed in
  * the current config.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

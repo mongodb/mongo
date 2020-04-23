@@ -1,9 +1,8 @@
 // Tests that invalid options to the mapReduce command are rejected.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
-//   uses_map_reduce_with_temp_collections,
 //   does_not_support_stepdowns,
-//   requires_fcv_44
+//   uses_map_reduce_with_temp_collections,
 // ]
 (function() {
 "use strict";

@@ -4,7 +4,10 @@
  * The "requires_find_command" tag excludes this test from the op_query suites, which are
  * incompatible with implicit sessions.
  *
- * @tags: [uses_transactions, requires_fcv_44, requires_find_command]
+ * @tags: [
+ *   requires_find_command,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

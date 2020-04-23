@@ -1,7 +1,5 @@
 // Tests that an aggregate with an $out cannot output to a sharded collection, even if the
 // collection becomes sharded during the aggregation.
-// Requires fcv44 because the expected error codes for $out have changed in 4.4.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

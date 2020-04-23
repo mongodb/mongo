@@ -6,7 +6,6 @@
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
-//   requires_fcv_44,
 // ]
 (function() {
 "use strict";

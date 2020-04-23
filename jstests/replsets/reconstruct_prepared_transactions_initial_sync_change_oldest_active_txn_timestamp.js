@@ -10,7 +10,10 @@
  * the begin applying timestamp to after the prepare timestamp. We can then test that the node still
  * fetches all the oplog entries it needs to reconstruct the prepared transaction.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_44]
+ * @tags: [
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

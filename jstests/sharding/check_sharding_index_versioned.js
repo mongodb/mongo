@@ -1,6 +1,5 @@
-/*
+/**
  * Tests that the checkShardingIndex command checks shard version when run on a sharded collection.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

@@ -2,13 +2,10 @@
 // for each plan cache entry when appropriate.
 //
 // @tags: [
-//   assumes_read_preference_unchanged,
-//   assumes_read_concern_unchanged,
-//   does_not_support_stepdowns,
 //   assumes_balancer_off,
-//   # The "shard" and "host" fields were added in 4.4 as part of sharding support for
-//   # $planCacheStats.
-//   requires_fcv_44,
+//   assumes_read_concern_unchanged,
+//   assumes_read_preference_unchanged,
+//   does_not_support_stepdowns,
 // ]
 (function() {
 "use strict";

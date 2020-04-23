@@ -3,7 +3,6 @@
  * We should only report ops if they take longer than "slowMS" to apply on a secondary.
  * We intentionally target CRUD ops in this test, since we know we should be the only ones
  * issuing them. See below for details on how we simulate quickness and slowness.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

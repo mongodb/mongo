@@ -2,8 +2,9 @@
  * Tests that an updateLookup change stream doesn't throw ChangeStreamFatalError or
  * TooManyMatchingDocuments after fixing SERVER-44598.
  *
- * Remove requires_fcv_44 tag if SERVER-44598 is backported or 4.4 becomes last stable
- * @tags: [uses_change_streams, requires_fcv_44]
+ * @tags: [
+ *   uses_change_streams,
+ * ]
  */
 (function() {
 "use strict";

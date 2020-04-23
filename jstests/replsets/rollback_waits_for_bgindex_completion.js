@@ -3,11 +3,9 @@
  * starting the rollback process. Only applies to Recoverable Rollback via WiredTiger checkpoints.
  *
  * @tags: [
- *     requires_fcv_44,
  *     requires_wiredtiger,
  *     requires_journaling,
  *     requires_majority_read_concern,
-       requires_fcv_44,
  * ]
  */
 (function() {

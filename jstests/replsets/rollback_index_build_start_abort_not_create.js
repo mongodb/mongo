@@ -1,7 +1,6 @@
 /**
  * Test that rolling back an index build, but not collection creation, behaves correctly even when
  * the index build is aborted.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

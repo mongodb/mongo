@@ -3,7 +3,6 @@
  *
  * Always run on a fully upgraded cluster, so that {$meta: "sortKey"} projections use the newest
  * sort key format.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

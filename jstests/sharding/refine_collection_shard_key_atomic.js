@@ -1,7 +1,6 @@
 //
 // Tests that refineCollectionShardKey atomically updates metadata in config.collections,
 // config.chunks, and config.tags.
-// @tags: [requires_fcv_44]
 //
 
 (function() {

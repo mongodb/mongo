@@ -5,7 +5,7 @@ selector:
   - jstests/replsets/*.js
   exclude_with_any_tags:
   - multiversion_incompatible
-  - requires_fcv_44
+  - requires_fcv_46
   exclude_files:
   - jstests/replsets/*.js
   # Enable when 4.4 becomes last stable

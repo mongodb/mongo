@@ -1,6 +1,5 @@
 // Tests for the mongos explain command to ensure that the 'executionStats' section of the explain
 // output is populated correctly for each shard.
-// @tags: [requires_fcv_44]
 (function() {
 'use strict';
 

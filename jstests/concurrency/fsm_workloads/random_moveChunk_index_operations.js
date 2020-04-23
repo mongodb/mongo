@@ -6,7 +6,7 @@
  *
  * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
  *  requires_non_retryable_writes, requires_non_retryable_commands, # for moveChunk and collMod.
- *  requires_fcv_44];
+ * ];
  */
 
 load("jstests/concurrency/fsm_workload_helpers/chunks.js");  // for chunk helpers

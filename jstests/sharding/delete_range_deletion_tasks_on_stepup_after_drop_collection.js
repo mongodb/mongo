@@ -1,9 +1,6 @@
 /**
  * Tests that range deletion tasks are eventually deleted even if collection is dropped
  * before migration coordination is resumed.
- *
- * This test expects migrations to use the FCV 4.4 protocol.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

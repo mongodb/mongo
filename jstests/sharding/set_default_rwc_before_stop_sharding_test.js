@@ -1,8 +1,6 @@
 /**
  * Tests that none of the operations in the ShardingTest shutdown consistency checks are affected by
  * the cluster wide default read and write concern.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

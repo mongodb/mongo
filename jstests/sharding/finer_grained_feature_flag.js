@@ -1,7 +1,6 @@
 /**
  * Test that chunk operations cause the mongos to refresh if the finer grained catalog cache
  * refresh flag is set to false.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

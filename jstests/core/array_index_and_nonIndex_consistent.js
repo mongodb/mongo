@@ -1,7 +1,6 @@
-/*
+/**
  * Make sure that $gt and $lt queries return the same results regardless of whether there is a
  * multikey index.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

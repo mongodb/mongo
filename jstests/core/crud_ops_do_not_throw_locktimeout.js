@@ -5,8 +5,6 @@
  *   assumes_against_mongod_not_mongos,
  *   assumes_read_concern_unchanged,
  *   assumes_write_concern_unchanged,
- *   # This test requires failpoint behavior not available in v4.2.
- *   requires_fcv_44,
  *   uses_parallel_shell,
  * ]
  */

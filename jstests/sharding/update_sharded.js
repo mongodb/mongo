@@ -2,7 +2,10 @@
 // since shard key is immutable.
 //
 // Updating a shard key in a single statement may use a multi shard transaction.
-// @tags: [uses_transactions, uses_multi_shard_transaction, requires_fcv_44]
+// @tags: [
+//   uses_multi_shard_transaction,
+//   uses_transactions,
+// ]
 (function() {
 
 const s = new ShardingTest({name: "auto1", shards: 2, mongos: 1});

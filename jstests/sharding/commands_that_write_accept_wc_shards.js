@@ -7,7 +7,9 @@
  *
  * This test is labeled resource intensive because its total io_write is 58MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
- * @tags: [resource_intensive, requires_fcv_44]
+ * @tags: [
+ *   resource_intensive,
+ * ]
  */
 load('jstests/libs/write_concern_util.js');
 

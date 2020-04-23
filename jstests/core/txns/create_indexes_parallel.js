@@ -1,9 +1,9 @@
-/* Tests parallel transactions with createIndexes.
+/**
+ * Tests parallel transactions with createIndexes.
  *
- * @tags: [uses_transactions,
- *         # Creating collections inside multi-document transactions is supported only in v4.4
- *         # onwards.
- *         requires_fcv_44]
+ * @tags: [
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

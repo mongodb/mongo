@@ -5,9 +5,6 @@
 // Also tests the failure of a migration commit command on the source shard of a migration, due to
 // the balancer being interrupted, failing to recover the active migrations, and releasing the
 // distributed lock.
-//
-// Remove requires_fcv_44 tag if SERVER-42273 is backported or 4.4 becomes last-stable.
-// @tags: [requires_fcv_44]
 
 load('./jstests/libs/chunk_manipulation_util.js');
 

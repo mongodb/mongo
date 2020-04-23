@@ -1,6 +1,8 @@
 /**
  * Tests that initial sync survives a restart during the oplog fetching process.
- * @tags: [requires_persistence, requires_fcv_44]
+ * @tags: [
+ *   requires_persistence,
+ * ]
  */
 (function() {
 "use strict";

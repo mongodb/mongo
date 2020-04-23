@@ -3,9 +3,6 @@
 //   requires_fastcount,
 //   requires_getmore,
 //   requires_non_retryable_writes,
-//   # Map Reduce before 4.4. does not support outputting to a sharded collection whose shard key is
-//   # {_id: "hashed"}.
-//   requires_fcv_44,
 // ]
 
 load("jstests/aggregation/extras/utils.js");  // For resultsEq

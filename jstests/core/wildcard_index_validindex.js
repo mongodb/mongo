@@ -1,9 +1,8 @@
 /**
  * Tests parsing and validation of wildcard indexes.
  * @tags: [
- *  # Uses index building in background
- *  requires_background_index,
- *  requires_fcv_44
+ *   # Uses index building in background
+ *   requires_background_index,
  * ]
  */
 (function() {

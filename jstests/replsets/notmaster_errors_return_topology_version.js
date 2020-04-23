@@ -1,7 +1,5 @@
 /**
  * This tests that NotMaster errors include a TopologyVersion field.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

@@ -1,6 +1,5 @@
 // Performs an aggregation that will execute JavaScript on mongos. This is a sanity check to confirm
 // that JavaScript is available on mongos.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

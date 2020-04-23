@@ -1,8 +1,6 @@
-/*
+/**
  * Test that replSetReconfig waits for a majority of voting nodes to commit all oplog
  * entries from the previous config in the current config.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

@@ -4,9 +4,8 @@
  *
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
- *   uses_transactions,
  *   uses_snapshot_read_concern,
- *   requires_fcv_44
+ *   uses_transactions,
  * ]
  */
 (function() {

@@ -1,10 +1,9 @@
-/*
+/**
  * Test using the positional projection on documents which have multiple array fields.
  * See SERVER-6864 for details.
  *
  * Note that the user's query/filter document may only contain _ONE_ array field for positional
  * projection to work correctly.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

@@ -1,7 +1,7 @@
 // Tests that $unionWith can successfully read from a view that is backed by a sharded collection.
 // @tags: [
-//   requires_fcv_44,  # Uses $unionWith
-//   requires_find_command,  # Uses views, which do not support OP_QUERY.
+//   # Uses $unionWith
+//   requires_find_command,
 // ]
 (function() {
 "use strict";

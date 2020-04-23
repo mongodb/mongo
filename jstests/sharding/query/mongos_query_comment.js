@@ -3,7 +3,6 @@
  * into a find command for the shards. In addition, verify that the find command comment parameter
  * and query operator are passed to the shards correctly, and that an attempt to attach a non-string
  * comment to the find command fails.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

@@ -1,7 +1,5 @@
 /**
  * Test the autosplitter when a collection has very low cardinality
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

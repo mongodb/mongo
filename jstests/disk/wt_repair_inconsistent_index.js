@@ -1,7 +1,7 @@
 /**
  * Tests that --repair on WiredTiger correctly and gracefully handles inconsistent indexes.
  *
- * @tags: [requires_wiredtiger, requires_fcv_44]
+ * @tags: [requires_wiredtiger]
  */
 
 (function() {

@@ -1,7 +1,5 @@
-/*
+/**
  * Test that replSetReconfig ignores the term value provided by a user.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

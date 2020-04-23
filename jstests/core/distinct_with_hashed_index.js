@@ -3,8 +3,10 @@
  * of compound hashed indexes. In this test we also verify that the query planner uses
  * 'DISTINCT_SCAN' when it is appropriate.
  *
- * The compound hashed indexes and the optimization to use 'DISTINCT_SCAN' were added in 4.4.
- * @tags: [requires_fcv_44, assumes_unsharded_collection, does_not_support_stepdowns]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   does_not_support_stepdowns,
+ * ]
  */
 (function() {
 "use strict";

@@ -2,7 +2,6 @@
 // Upsert behavior tests for sharding
 // NOTE: Generic upsert behavior tests belong in the core suite
 //
-// @tags: [requires_fcv_44]
 (function() {
 'use strict';
 

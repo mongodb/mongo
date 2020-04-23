@@ -12,8 +12,6 @@
  *   does_not_support_stepdowns,
  *   # Checkpoint cursors cannot be open in lsm.
  *   does_not_support_wiredtiger_lsm,
- *   # Background validation will be first available in v4.4.
- *   requires_fcv_44,
  *   # inMemory does not have checkpoints; background validation only runs on a checkpoint.
  *   requires_persistence,
  *   # Background validation is only supported by WT.

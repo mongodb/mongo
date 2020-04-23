@@ -2,7 +2,9 @@
  * Test to verify that hashed indexes can cover projections when appropriate. The queries can be
  * covered when neither the query predicate nor projection uses a hashed field.
  *
- * @tags: [assumes_unsharded_collection, requires_fcv_44]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
  */
 (function() {
 "use strict";

@@ -12,8 +12,6 @@
  * metadata for the database from the server and appends the 'dropDatabase' operation to the oplog.
  * Unlike the 'Collections' phase, we do not wait for the 'dropDatabase' to propagate to a majority
  * unless explicitly requested by the user with a write concern.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

@@ -1,7 +1,9 @@
-/*
- * This test checks behavior that is new to mongos on v4.4.
- * @tags: [requires_fcv_44, multiversion_incompatible, uses_transactions,
- * uses_multi_shard_transaction]
+/**
+ * @tags: [
+ *   multiversion_incompatible,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

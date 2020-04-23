@@ -1,7 +1,6 @@
 /**
  * Test that chunk operations don't cause the mongos to refresh unless an affected chunk is
  * targeted.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

@@ -1,5 +1,9 @@
-/* Tests the "failCommand" failpoint.
- * @tags: [assumes_read_concern_unchanged, assumes_read_preference_unchanged, requires_fcv_44]
+/**
+ * Tests the "failCommand" failpoint.
+ * @tags: [
+ *   assumes_read_concern_unchanged,
+ *   assumes_read_preference_unchanged,
+ * ]
  */
 (function() {
 "use strict";

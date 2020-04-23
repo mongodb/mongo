@@ -1,9 +1,5 @@
 // Test that indexKey $meta projection works in find and aggregate commands and produces correct
 // result depending on whether index key metadata is available or not.
-//
-// Support of indexKey $meta is a new feature in 4.4 which is not planned for back port, hence we
-// need to blacklist it from multiversion testing.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

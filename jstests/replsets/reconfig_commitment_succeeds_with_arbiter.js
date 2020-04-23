@@ -1,8 +1,6 @@
 /**
  * Verify that a non force replica set reconfig can be committed by a primary and arbiter, with a
  * secondary down.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

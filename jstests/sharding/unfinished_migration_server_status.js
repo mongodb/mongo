@@ -1,8 +1,6 @@
 /**
  * Test that unfinishedMigrationFromPreviousPrimary field in shardingStatistics reports the
  * expected number.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

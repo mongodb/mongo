@@ -1,10 +1,10 @@
-/* Tests simple cases of creating a collection inside a multi-document transaction, both
+/**
+ * Tests simple cases of creating a collection inside a multi-document transaction, both
  * committing and aborting.
  *
- * @tags: [uses_transactions,
- *         # Creating collections inside multi-document transactions is supported only in v4.4
- *         # onwards.
- *         requires_fcv_44]
+ * @tags: [
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

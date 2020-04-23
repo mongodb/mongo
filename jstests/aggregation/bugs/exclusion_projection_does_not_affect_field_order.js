@@ -2,8 +2,6 @@
 // changes.
 //
 // This is designed as a regression test for SERVER-37791.
-//
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

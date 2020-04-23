@@ -2,7 +2,9 @@
  * Tests the pre-splitting behaviour of compound hashed shard key, for both the case where the
  * prefix field is hashed, and where the hashed field is not the prefix.
  *
- * @tags: [requires_fcv_44, multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ * ]
  */
 (function() {
 'use strict';

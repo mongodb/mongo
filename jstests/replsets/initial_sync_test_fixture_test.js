@@ -1,4 +1,4 @@
-/*
+/**
  * Test to check that the Initial Sync Test Fixture properly pauses initial sync.
  *
  * The test checks that both the collection cloning and oplog application stages of initial sync
@@ -9,7 +9,10 @@
  * the batches being applied are of the expected size and that only one batch was applied per step()
  * call.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_44]
+ * @tags: [
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

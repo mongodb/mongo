@@ -1,8 +1,6 @@
 /**
  * Tests to verify that the current op output shows all the sub-pipelines of a $unionWith. In this
  * test we also validate that current op shows the expected stages and comment.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

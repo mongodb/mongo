@@ -1,7 +1,5 @@
 // Tests the basic API of the getDefaultRWConcern and setDefaultRWConcern commands and their
 // associated persisted state against different topologies.
-//
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

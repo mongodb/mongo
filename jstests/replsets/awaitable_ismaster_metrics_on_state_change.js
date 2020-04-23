@@ -1,7 +1,6 @@
 /**
  * Tests that the server status metrics correctly reflect the number of waiting isMaster requests
  * before and after a state change.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

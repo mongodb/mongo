@@ -1,7 +1,10 @@
 /**
  * Ensure serverStatus reports the total time spent sampling the oplog for all storage engines that
  * support OplogStones.
- * @tags: [ requires_wiredtiger, requires_persistence, requires_fcv_44 ]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_wiredtiger,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,7 +1,5 @@
 /**
  * Tests that readPref applies on an explain for an aggregation command.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

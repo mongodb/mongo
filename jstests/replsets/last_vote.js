@@ -8,7 +8,9 @@
 // other node. It then restarts the first node as a replicaset and manually runs
 // replSetRequestVotes commands against it and checks that its response is correct.
 //
-// @tags: [requires_persistence, requires_fcv_44]
+// @tags: [
+//   requires_persistence,
+// ]
 
 (function() {
 "use strict";

@@ -1,6 +1,5 @@
 // Verifies refining a shard key checks for the presence of a compatible shard key index on a shard
 // with chunks, not the primary shard.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

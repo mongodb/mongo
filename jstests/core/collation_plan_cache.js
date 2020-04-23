@@ -1,15 +1,13 @@
 // Integration testing for the plan cache and index filter commands with collation.
 //
 // @tags: [
+//   assumes_read_concern_unchanged,
 //   # This test attempts to perform queries and introspect the server's plan cache entries. The
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
-//   assumes_read_concern_unchanged,
-//   does_not_support_stepdowns,
 //   assumes_unsharded_collection,
-//   # Sharding support for $planCacheStats requires all nodes to be binary version 4.4.
-//   requires_fcv_44,
+//   does_not_support_stepdowns,
 // ]
 (function() {
 'use strict';

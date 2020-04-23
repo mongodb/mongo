@@ -1,9 +1,9 @@
-/* Tests readConcern level snapshot outside of transactions.
+/**Tests readConcern level snapshot outside of transactions.
  *
- * TODO(SERVER-46592): This test is multiversion-incompatible in 4.6.  If we use 'requires_fcv_46'
- *                     as the tag for that, removing 'requires_fcv_44' is sufficient.  Otherwise,
- *                     please set the appropriate tag when removing 'requires_fcv_44'
- * @tags: [requires_majority_read_concern, requires_fcv_44, requires_fcv_46]
+ * @tags: [
+ *   requires_fcv_46,
+ *   requires_majority_read_concern,
+ * ]
  */
 (function() {
 "use strict";

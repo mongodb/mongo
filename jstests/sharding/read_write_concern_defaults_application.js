@@ -23,7 +23,6 @@
  *
  * @tags: [
  *   does_not_support_stepdowns,
- *   requires_fcv_44,
  *   requires_majority_read_concern,
  *   requires_profiling,
  *   uses_transactions,

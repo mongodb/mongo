@@ -16,7 +16,10 @@
  * makes sure the validate command does not accept a non local read concern or afterClusterTime and
  * that it is therefore safe to ignore prepare conflicts during its execution.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_44]
+ * @tags: [
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

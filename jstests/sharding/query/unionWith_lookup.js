@@ -1,8 +1,5 @@
 // Tests various combinations of $lookup and $unionWith to ensure that referencing a sharded
 // collection within $lookup is not allowed.
-// @tags: [
-//     requires_fcv_44
-// ]
 (function() {
 "use strict";
 

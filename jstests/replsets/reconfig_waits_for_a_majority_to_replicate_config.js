@@ -1,8 +1,6 @@
-/*
+/**
  * Test that replSetReconfig waits for a majority of nodes to replicate the config
  * before starting another reconfig.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

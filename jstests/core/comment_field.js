@@ -7,7 +7,6 @@
  *   assumes_unsharded_collection,
  *   assumes_write_concern_unchanged,
  *   does_not_support_stepdowns,
- *   requires_fcv_44,
  *   requires_profiling,
  *   uses_parallel_shell,
  * ]

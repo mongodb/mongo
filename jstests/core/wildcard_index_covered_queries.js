@@ -5,12 +5,10 @@
  * covered unless they include the shard key. Does not support stepdowns because the test issues
  * getMores, which the stepdown/kill_primary passthroughs will reject.
  *
- * @tags: [assumes_unsharded_collection,
- *         does_not_support_stepdowns,
- *         # This test attempts to project a $-prefixed field name ("$_path") which was allowed in
- *         # 4.2 but banned in 4.4. This test checks that the aforementioned case will throw an
- *         # error.
- *         requires_fcv_44]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   does_not_support_stepdowns,
+ * ]
  */
 (function() {
 "use strict";

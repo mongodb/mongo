@@ -1,6 +1,4 @@
 // Test creation of compound indexes with special index types.
-// FCV4.4 is required for compound hashed indexes.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 const coll = db.index_plugins;

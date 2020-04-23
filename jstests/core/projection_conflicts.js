@@ -1,6 +1,5 @@
 /**
  * Test projections which have conflicts in them.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

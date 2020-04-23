@@ -1,7 +1,5 @@
 /**
  * Test that step-up increments the config term via reconfig.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';

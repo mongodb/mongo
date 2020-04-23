@@ -1,9 +1,5 @@
 // Tests equality query on _id with a sort, intended to be tested on both mongos and mongod. For
 // SERVER-20641.
-//
-// Always run on a fully upgraded cluster, so that {$meta: "sortKey"} projections use the newest
-// sort key format.
-// @tags: [requires_fcv_44]
 
 (function() {
 'use strict';

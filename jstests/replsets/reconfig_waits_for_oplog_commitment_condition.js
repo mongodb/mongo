@@ -2,7 +2,6 @@
  * Verify that a non force replica set reconfig waits for all oplog entries committed in the
  * previous config to be committed in the current config.
  *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

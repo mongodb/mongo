@@ -3,7 +3,9 @@
 // The passthrough logic that bundles operations into transactions needs to be able identify change
 // stream aggregations so as to avoid running them in a transaction, but that code would fail to
 // recognize the intentionally malformed aggergations that we test here.
-// @tags: [change_stream_does_not_expect_txns, requires_fcv_44]
+// @tags: [
+//   change_stream_does_not_expect_txns,
+// ]
 (function() {
 "use strict";
 

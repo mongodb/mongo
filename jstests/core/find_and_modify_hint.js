@@ -3,8 +3,11 @@
  *   - A bad argument to the hint option should raise an error.
  *   - The hint option should support both the name of the index, and an index spec object.
  *
- * @tags: [assumes_unsharded_collection, requires_non_retryable_writes, requires_find_command,
- * requires_fcv_44]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   requires_find_command,
+ *   requires_non_retryable_writes,
+ * ]
  */
 
 (function() {

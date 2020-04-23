@@ -1,6 +1,5 @@
 /**
  * Test that CollectionCloner completes without error when a collection is renamed during cloning.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

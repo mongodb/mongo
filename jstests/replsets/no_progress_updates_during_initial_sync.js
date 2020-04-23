@@ -5,8 +5,6 @@
  *      initial-syncing nodes should send no replSetUpdatePosition commands upstream at all
  *  - via heartbeats:
  *      these nodes should include null lastApplied and lastDurable optimes in heartbeat responses
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

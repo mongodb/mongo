@@ -1,8 +1,7 @@
 // Tests that mapReduce commands fail if the result set does not fit into a single batch.
 // @tags: [
-//   requires_fcv_44,
-//   uses_map_reduce_with_temp_collections,
 //   does_not_support_stepdowns,
+//   uses_map_reduce_with_temp_collections,
 // ]
 (function() {
 

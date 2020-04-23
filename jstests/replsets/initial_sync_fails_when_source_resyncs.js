@@ -1,8 +1,6 @@
 /**
  * Tests that initial sync will abort an attempt if the sync source enters initial sync during
  * cloning. This test will timeout if the attempt is not aborted.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

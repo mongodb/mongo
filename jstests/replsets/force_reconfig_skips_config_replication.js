@@ -2,8 +2,6 @@
  * Verify that a force replica set reconfig skips the config replication check.
  * The force reconfig should succeed even though the previous config has not
  * committed across a majority of nodes.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

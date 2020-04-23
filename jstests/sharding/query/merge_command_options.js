@@ -1,6 +1,4 @@
 // Tests that aggregations with a $merge stage respect the options set on the command.
-// Requires fcv44 for when $out against a secondary creates a temp collection.
-// @tags: [requires_fcv_44]
 (function() {
 'use strict';
 

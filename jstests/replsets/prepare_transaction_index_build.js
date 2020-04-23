@@ -6,9 +6,8 @@
  * solution to this problem is to synchronize index build commits.
  *
  * @tags: [
- *     uses_transactions,
- *     uses_prepare_transaction,
- *     requires_fcv_44,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
  * ]
  */
 (function() {

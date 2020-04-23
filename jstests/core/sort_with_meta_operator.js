@@ -1,7 +1,4 @@
 // Tests to validate the input for sort on '$meta' operator.
-//
-// Require all nodes to be 4.4, since validation around $meta was relaxed in 4.4.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 const coll = db.sort_with_meta_operator;

@@ -1,4 +1,4 @@
-/*
+/**
  * Tests that nodes in initial sync update their commit point and gossip their commit point to
  * other nodes. This is done starting with a 3 node replica set with one non-voting secondary. We
  * disconnect the non-voting secondary from the other nodes and then add a new node to the replica
@@ -7,7 +7,6 @@
  * commit point, and verify that the commit point on the initial syncing node is updated. Finally,
  * we ensure that the disconnected secondary is able to update its commit point from the initial
  * syncing node via heartbeats.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

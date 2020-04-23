@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_writes, assumes_balancer_off, requires_fcv_44]
+// @tags: [
+//   assumes_balancer_off,
+//   requires_non_retryable_writes,
+// ]
 (function() {
 "use strict";
 

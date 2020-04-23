@@ -1,6 +1,4 @@
 // Tests propagation of RWC defaults across a sharded cluster.
-//
-// @tags: [requires_fcv_44]
 (function() {
 'use strict';
 

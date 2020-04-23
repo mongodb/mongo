@@ -1,7 +1,7 @@
 /**
  * Test TransientTransactionError error label for commands in transactions with write concern.
  * @tags: [
- *  uses_transactions, requires_fcv_44
+ *   uses_transactions,
  * ]
  */
 (function() {

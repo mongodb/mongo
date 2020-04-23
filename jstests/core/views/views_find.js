@@ -4,9 +4,6 @@
  * @tags: [
  *   requires_find_command,
  *   requires_getmore,
- *   # Includes tests for allowing $natural sort against a view, but support for this feature
- *   # requires all nodes to be binary version 4.4.
- *   requires_fcv_44,
  * ]
  */
 (function() {

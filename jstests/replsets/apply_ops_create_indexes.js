@@ -1,7 +1,6 @@
 /**
  * This test ensures that indexes created by running applyOps are both successful and replicated
  * correctly (see SERVER-31435).
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

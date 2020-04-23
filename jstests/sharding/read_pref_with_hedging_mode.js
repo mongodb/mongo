@@ -1,9 +1,6 @@
-/*
+/**
  * Intergration test for read preference with hedging mode. The more comprehensive
  * unit test can be found in dbtests/read_preference_test.cpp and s/hedge_options_util_test.cpp.
- *
- * TODO (SERVER-45432): test that hedging is performed as expected.
- * @tags: [requires_fcv_44]
  */
 (function() {
 

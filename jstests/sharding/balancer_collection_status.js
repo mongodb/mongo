@@ -1,8 +1,5 @@
 /**
  * Test the balancerCollectionStatus command and its possible outputs
- *
- * Remove requires_fcv_44 tag if SERVER-43990 is backported or 4.4 becomes last-stable.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

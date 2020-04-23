@@ -5,8 +5,6 @@
  *  - failure in first batch
  *  - failure in subsequent batches
  *  - multiple resumable failures during the same clone
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

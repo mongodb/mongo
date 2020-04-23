@@ -1,6 +1,5 @@
 /**
  * Tests that using the $_resumeAfter option in a query against the oplog does not invariant.
- * @@tags: [requires_fcv_44]
  */
 
 (function() {

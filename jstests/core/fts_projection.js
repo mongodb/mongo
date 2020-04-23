@@ -1,5 +1,4 @@
 // Test $text with $textScore projection.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

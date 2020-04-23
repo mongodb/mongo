@@ -7,7 +7,9 @@
  * the primary shard. It then runs a find().skip(n).limit(m) and ensures that the document count
  * meets expectation. It then runs the same test against a sharded collection with a single shard.
  */
-// @tags: [requires_fcv_44, requires_find_command]
+// @tags: [
+//   requires_find_command,
+// ]
 load("jstests/libs/profiler.js");      // For profilerHas*OrThrow helper functions.
 load("jstests/libs/analyze_plan.js");  // For getPlanStages helper function.
 

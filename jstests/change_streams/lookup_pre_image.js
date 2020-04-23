@@ -2,11 +2,10 @@
  * Tests the behaviour of the 'fullDocumentBeforeChange' argument to the $changeStream stage.
  *
  * @tags: [
+ *   assumes_against_mongod_not_mongos,
+ *   assumes_unsharded_collection,
  *   do_not_wrap_aggregations_in_facets,
  *   uses_multiple_connections,
- *   requires_fcv_44,
- *   assumes_against_mongod_not_mongos,
- *   assumes_unsharded_collection
  * ]
  */
 (function() {

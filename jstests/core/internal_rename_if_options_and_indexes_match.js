@@ -2,10 +2,9 @@
 //
 // This command cannot be run against mongos.
 // @tags: [
-//     assumes_against_mongod_not_mongos,
-//     incompatible_with_embedded,
-//     requires_capped,
-//     requires_fcv_44,
+//   assumes_against_mongod_not_mongos,
+//   incompatible_with_embedded,
+//   requires_capped,
 // ]
 
 (function() {

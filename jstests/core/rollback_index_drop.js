@@ -3,7 +3,10 @@
 //
 // This test was designed to reproduce SERVER-38372.
 //
-// @tags: [does_not_support_stepdowns, assumes_unsharded_collection, requires_fcv_44]
+// @tags: [
+//   assumes_unsharded_collection,
+//   does_not_support_stepdowns,
+// ]
 (function() {
 "use strict";
 

@@ -1,8 +1,6 @@
 /**
  * Tests that none of the operations in the ReplSetTest consistency checks are affected by
  * changing the default read or write concern during the test itself.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

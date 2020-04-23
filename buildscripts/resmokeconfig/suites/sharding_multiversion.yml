@@ -7,7 +7,7 @@ selector:
   - jstests/sharding/query/*.js
   exclude_with_any_tags:
   - multiversion_incompatible
-  - requires_fcv_44
+  - requires_fcv_46
   exclude_files:
   # Enable when 4.4 becomes last stable
   - jstests/sharding/killop.js

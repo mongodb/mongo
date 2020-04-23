@@ -2,7 +2,9 @@
  * Test to verify the behaviour of compound hashed indexes when 'sort' operation is used along with
  * the 'find' command. The test verifies compound hashed index with hashed prefix and non-hashed
  * prefix.
- * @tags: [assumes_unsharded_collection, requires_fcv_44]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
  */
 (function() {
 "use strict";

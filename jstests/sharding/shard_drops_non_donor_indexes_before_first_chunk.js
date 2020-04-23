@@ -1,8 +1,6 @@
 /**
  * Verify that a recipient shard drops indexes that do not exist on the donor shard before
  * receiving its first chunk.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

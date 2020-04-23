@@ -6,7 +6,6 @@
 // Part 3: Shard new collection on {skey : 1} but with a longer index.
 //         Insert docs with same val for 'skey' but different vals for 'extra'.
 //         Move chunks around and check that [min,max) chunk boundaries are properly obeyed.
-// @tags: [requires_fcv_44]
 (function() {
 'use strict';
 

@@ -6,7 +6,9 @@
  * until the secondary has installed the new config. Finally, we SIGKILL the secondary and restart
  * it to verify that its config after restart is the same one it previously installed.
  *
- * @tags: [requires_persistence, requires_fcv_44]
+ * @tags: [
+ *   requires_persistence,
+ * ]
  */
 (function() {
 "use strict";

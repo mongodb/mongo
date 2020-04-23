@@ -1,7 +1,4 @@
 // Tests for $natural sort and $natural hint.
-//
-// Includes tests for improved validation of $natural sort/hint added in 4.4.
-// @tags: [requires_fcv_44]
 (function() {
 'use strict';
 

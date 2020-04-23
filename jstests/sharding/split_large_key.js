@@ -1,5 +1,4 @@
 // Test for splitting a chunk with a very large shard key value.
-// @tags: [requires_fcv_44]
 (function() {
 'use strict';
 

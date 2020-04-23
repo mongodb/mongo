@@ -1,6 +1,5 @@
 // Test that mapReduce correctly fails if the target collection is not unsharded or sharded by just
 // _id.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

@@ -5,7 +5,9 @@
  *  - Creating zones before sharding the collection.
  *  - Creating zones in collection which has data and then sharding the collection.
  *
- * @tags: [requires_fcv_44, multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ * ]
  */
 (function() {
 'use strict';

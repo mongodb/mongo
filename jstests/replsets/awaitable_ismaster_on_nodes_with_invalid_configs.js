@@ -1,6 +1,5 @@
 /**
  * Tests the streamable isMaster protocol against nodes with invalid replica set configs.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

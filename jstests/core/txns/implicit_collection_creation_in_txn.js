@@ -1,6 +1,8 @@
 // Tests that it is allowed to implicitly create a collection using insert or upsert in a
 // multi-document transaction.
-// @tags: [uses_transactions, requires_fcv_44]
+// @tags: [
+//   uses_transactions,
+// ]
 (function() {
 "use strict";
 

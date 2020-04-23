@@ -2,8 +2,6 @@
  * Tests to verify that the queries return correct results in the presence of partial hashed
  * index and sparse index. The test verifies compound hashed index with hashed prefix and non-hashed
  * prefix.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

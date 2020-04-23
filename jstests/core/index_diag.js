@@ -1,4 +1,6 @@
-// @tags: [assumes_balancer_off, requires_fcv_44]
+// @tags: [
+//   assumes_balancer_off,
+// ]
 load("jstests/libs/fixture_helpers.js");
 
 t = db.index_diag;

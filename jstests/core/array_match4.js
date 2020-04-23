@@ -1,4 +1,3 @@
-// @tags: [requires_fcv_44]
 var t = db.array_match4;
 
 t.drop();

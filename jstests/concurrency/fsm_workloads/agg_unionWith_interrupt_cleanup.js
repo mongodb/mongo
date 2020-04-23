@@ -3,8 +3,7 @@
  * opened on behalf of the $unionWith are killed when interrupted.
  *
  * @tags: [
- *   uses_curop_agg_stage,
- *   requires_fcv_44,  # Uses $unionWith
+ *   uses_curop_agg_stage
  * ]
  */
 'use strict';

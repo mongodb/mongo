@@ -3,7 +3,6 @@
  * commands using UUIDs instead of namespaces. This verifies initial sync behavior in
  * cases where using UUIDs results in NamespaceNotFound while using namespace strings
  * results in an empty result or zero count.
- * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';

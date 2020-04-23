@@ -5,7 +5,9 @@
  * document-level locking because it uses the planExecutorHangBeforeShouldWaitForInserts failpoint
  * to block oplog fetching getMores while trying to do oplog writes. Thus we need a document-level
  * locking storage engine so that oplog writes would not conflict with oplog reads.
- * @tags: [requires_document_locking, requires_fcv_44]
+ * @tags: [
+ *   requires_document_locking,
+ * ]
  */
 
 (function() {

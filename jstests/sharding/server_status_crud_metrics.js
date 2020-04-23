@@ -1,10 +1,6 @@
 /**
  * Tests for the 'metrics.query' section of the mongoS serverStatus response dealing with CRUD
  * operations.
- *
- * TODO SERVER-47015: Remove this blacklist once the changes from SERVER-46505 are in the
- * last-stable binary used for multiversion testing.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

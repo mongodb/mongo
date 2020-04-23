@@ -3,7 +3,10 @@
  *
  * The tags below are necessary because collation requires that we use read/write commands rather
  * than legacy operations.
- * @tags: [requires_find_command, assumes_unsharded_collection, requires_fcv_44]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   requires_find_command,
+ * ]
  */
 (function() {
 "use strict";

@@ -15,8 +15,7 @@
  *  assumes_autosplit_off,
  *  requires_non_retryable_writes,
  *  # mapReduce does not support afterClusterTime.
- *  does_not_support_causal_consistency,
- *  requires_fcv_44
+ *  does_not_support_causal_consistency
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                     // for extendWorkload

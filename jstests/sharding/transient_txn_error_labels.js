@@ -1,8 +1,7 @@
 /**
  * Test TransientTransactionErrors error label in transactions.
  * @tags: [
- *  uses_transactions,
- *  requires_fcv_44,
+ *   uses_transactions,
  * ]
  */
 

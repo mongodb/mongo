@@ -1,8 +1,6 @@
-/*
+/**
  * Test that replSetReconfig does not consider non-voting nodes towards the config commitment
  * majority.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

@@ -1,6 +1,5 @@
 /**
  * Tests the fields returned by isMaster responses as a node goes through a step down and step up.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

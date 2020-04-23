@@ -1,4 +1,4 @@
-/*
+/**
  * Basic test of a succesful replica set rollback for DDL operations.
  *
  * This tests sets up a 3 node set, data-bearing nodes A and B and an arbiter.
@@ -10,8 +10,6 @@
  * 5. A receives many new operations, which B will replicate after rollback.
  * 6. B rejoins the set and goes through the rollback process.
  * 7. The contents of A and B are compare to ensure the rollback results in consistent nodes.
- *
- * @tags: [requires_fcv_44]
  */
 load("jstests/replsets/rslib.js");
 

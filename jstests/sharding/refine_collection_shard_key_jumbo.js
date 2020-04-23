@@ -1,6 +1,5 @@
 //
 // Jumbo tests for refineCollectionShardKey.
-// @tags: [requires_fcv_44]
 //
 
 (function() {

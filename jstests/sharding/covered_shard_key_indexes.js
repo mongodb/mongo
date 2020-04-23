@@ -1,7 +1,6 @@
 //
 // Tests that indexes containing the shard key can be used without fetching the document for
 // particular queries
-// @tags: [requires_fcv_44]
 //
 
 load("jstests/libs/analyze_plan.js");

@@ -2,7 +2,10 @@
  * Test to verify that all the CRUD operations get routed to the correct shard when the shard key is
  * compound hashed.
  *
- * @tags: [requires_fcv_44, multiversion_incompatible, requires_majority_read_concern]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   requires_majority_read_concern,
+ * ]
  */
 (function() {
 "use strict";

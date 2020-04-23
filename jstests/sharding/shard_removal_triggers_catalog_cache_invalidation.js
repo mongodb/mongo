@@ -1,7 +1,6 @@
 /**
  * Tests that shard removal triggers an update of the catalog cache so that routers don't continue
  * to target shards that have been removed.
- * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';

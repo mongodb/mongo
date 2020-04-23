@@ -4,10 +4,9 @@
  * initial sync (via heartbeats), it initiates a reconfig to remove the corresponding 'newlyAdded'
  * field.
  *
- * TODO(SERVER-46592): This test is multiversion-incompatible in 4.6.  If we use 'requires_fcv_46'
- *                     as the tag for that, removing 'requires_fcv_44' is sufficient.  Otherwise,
- *                     please set the appropriate tag when removing 'requires_fcv_44'
- * @tags: [requires_fcv_44, requires_fcv_46]
+ * @tags: [
+ *   requires_fcv_46,
+ * ]
  */
 
 (function() {

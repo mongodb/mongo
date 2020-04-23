@@ -3,7 +3,10 @@
 //
 // Tag this test as 'requires_find_command' to prevent it from running in the legacy passthroughs
 // and as 'requires_document_locking' because it uses retryable writes.
-// @tags: [requires_find_command, requires_document_locking, requires_fcv_44]
+// @tags: [
+//   requires_document_locking,
+//   requires_find_command,
+// ]
 //
 
 (function() {

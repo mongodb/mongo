@@ -1,9 +1,5 @@
 /**
  * Projection tests for FTS queries.
- *
- * Requires all nodes to be binary version 4.4, since this file includes test for additional
- * validation of the query added in 4.4.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

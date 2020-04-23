@@ -1,7 +1,6 @@
 /**
  * Test to demonstrate usage of $indexStats in an aggregation pipeline to detect inconsistent
  * indexes in a sharded cluster.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

@@ -3,14 +3,11 @@
  * "default".
  *
  * @tags: [
- *  # The distinction between the "simple" and "default" sort algorithms was introduced in version
- *  # should never run against a 4.2 node.
- *  requires_fcv_44,
- *  # Shard filtering may be required if the collection is sharded, which could affect the query
- *  # planner's selection of the "simple" versus "default" sort algorithm.
- *  assumes_unsharded_collection,
- *  # This test uses a non-retryable multi-update command.
- *  requires_non_retryable_writes,
+ *   # Shard filtering may be required if the collection is sharded, which could affect the query
+ *   # planner's selection of the "simple" versus "default" sort algorithm.
+ *   assumes_unsharded_collection,
+ *   # This test uses a non-retryable multi-update command.
+ *   requires_non_retryable_writes,
  * ]
  */
 (function() {

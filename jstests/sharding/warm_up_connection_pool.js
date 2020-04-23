@@ -1,5 +1,7 @@
-/*
- * @tags: [requires_fcv_44, multiversion_incompatible]
+/**
+ * @tags: [
+ *   multiversion_incompatible,
+ * ]
  */
 
 // Checking UUID and index consistency involves talking to a shard node, which in this

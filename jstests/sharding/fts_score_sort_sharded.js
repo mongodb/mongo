@@ -1,9 +1,5 @@
 // Test that queries with a sort on text metadata return results in the correct order in a sharded
 // collection.
-//
-// Require all nodes to be 4.4, since validation around $meta:"textScore" was relaxed in that
-// version, and the new behavior is tested here.
-// @tags: [requires_fcv_44]
 
 var st = new ShardingTest({shards: 2});
 st.stopBalancer();

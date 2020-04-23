@@ -1,6 +1,8 @@
 /**
  * Tests that initial sync survives a restart during each stage of the cloning process.
- * @tags: [requires_persistence, requires_fcv_44]
+ * @tags: [
+ *   requires_persistence,
+ * ]
  */
 (function() {
 "use strict";

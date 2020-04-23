@@ -30,8 +30,6 @@
  *   assumes_read_concern_unchanged,
  *   does_not_support_stepdowns,
  *   assumes_unsharded_collection,
- *   # Sharding support for $planCacheStats requires all nodes to be binary version 4.4.
- *   requires_fcv_44,
  * ]
  */
 

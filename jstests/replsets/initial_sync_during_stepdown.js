@@ -1,6 +1,5 @@
 /**
  * Test that stepdown during collection cloning and oplog fetching does not interrupt initial sync.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

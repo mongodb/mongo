@@ -1,12 +1,9 @@
 // Tests that mapReduce fails gracefully when given a map or reduce function which fails in some
 // way.
-// MapReduce uses $merge to merge in 4.4 which errors on missing fields, so this test cannot be run
-// in multiversion.
 // @tags: [
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
-//   requires_fcv_44,
 //   uses_map_reduce_with_temp_collections,
 // ]
 (function() {

@@ -4,7 +4,6 @@
  * - the node does not have a cached in-memory version
  * - the node's cached in-memory version is lower than the version sent by a client
  * - the movePrimary critical section is entered on the primary node
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

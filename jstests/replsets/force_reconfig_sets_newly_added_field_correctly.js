@@ -1,14 +1,13 @@
-/*
+/**
  * Verify that force reconfigs set the 'newlyAdded' field correctly in a replica set. We test this
  * by starting with a two node replica set. We first do a force reconfig that adds a node with
  * 'newlyAdded: true' and verify that it correctly sets the 'newlyAdded' field for that member. We
  * then do another force reconfig that adds a second node without the 'newlyAdded' field passed in
  * and verify that the node does not have 'newlyAdded' appended to it.
  *
- * TODO(SERVER-46592): This test is multiversion-incompatible in 4.6.  If we use 'requires_fcv_46'
- *                     as the tag for that, removing 'requires_fcv_44' is sufficient.  Otherwise,
- *                     please set the appropriate tag when removing 'requires_fcv_44'
- * @tags: [requires_fcv_44, requires_fcv_46]
+ * @tags: [
+ *   requires_fcv_46,
+ * ]
  *
  * TODO (SERVER-47331): Determine if this test needs to be altered, since this test will do a force
  *                      reconfig followed by a safe reconfig.

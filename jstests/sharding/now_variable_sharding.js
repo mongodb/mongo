@@ -3,7 +3,6 @@
  */
 // @tags: [
 //   requires_find_command,
-//   requires_fcv_44  # Uses $unionWith.
 // ]
 (function() {
 "use strict";

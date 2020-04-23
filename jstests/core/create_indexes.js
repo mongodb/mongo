@@ -1,5 +1,7 @@
 /**
- * @tags: [assumes_superuser_permissions, requires_fcv_44]
+ * @tags: [
+ *   assumes_superuser_permissions,
+ * ]
  */
 (function() {
 'use strict';

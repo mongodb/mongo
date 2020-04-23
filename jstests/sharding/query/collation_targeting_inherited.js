@@ -1,5 +1,4 @@
 // Test shard targeting for queries on a collection with a default collation.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

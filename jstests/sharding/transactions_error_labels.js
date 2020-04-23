@@ -1,7 +1,9 @@
 // Test TransientTransactionErrors error label in mongos write commands.
 //
-// Remove requires_fcv_44 tag if SERVER-43941 is backported or 4.4 becomes last-stable.
-// @tags: [uses_transactions, uses_multi_shard_transaction, requires_fcv_44]
+// @tags: [
+//   uses_multi_shard_transaction,
+//   uses_transactions,
+// ]
 (function() {
 "use strict";
 

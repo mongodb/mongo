@@ -1,7 +1,6 @@
 /**
  * Tests that doing a reconfig that changes the SplitHorizon will cause the server to disconnect
  * from clients with waiting isMaster requests.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

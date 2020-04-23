@@ -1,6 +1,5 @@
 // Confirms that JavaScript heap limits are respected in aggregation. Includes testing for mapReduce
 // and $where which use aggregation for execution.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

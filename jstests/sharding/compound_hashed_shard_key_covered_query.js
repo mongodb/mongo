@@ -1,8 +1,6 @@
 /**
  * Test to verify the covering behaviour of compound hashed index on a cluster sharded with compound
  * hashed shard key.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

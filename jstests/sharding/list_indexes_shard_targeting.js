@@ -1,8 +1,7 @@
-/*
+/**
  * Test that for an unsharded collection the listIndexes command targets the database's primary
  * shard, and for a sharded collection the command sends and checks shard versions and only
  * targets the shard that owns the MinKey chunk.
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

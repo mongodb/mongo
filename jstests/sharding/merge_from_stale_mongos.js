@@ -1,7 +1,5 @@
 // Tests for $merge against a stale mongos with combinations of sharded/unsharded source and target
 // collections.
-// Requires fcv44 because the expected error codes for $out have changed in 4.4.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

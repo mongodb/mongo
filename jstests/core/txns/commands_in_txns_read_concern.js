@@ -1,12 +1,12 @@
-/* Ensures createCollection and createIndexes are not permitted to run with a readConcern other than
+/**
+ * Ensures createCollection and createIndexes are not permitted to run with a readConcern other than
  * `local` inside transactions.
  *
- * @tags: [uses_transactions,
- *         # Creating collections inside multi-document transactions is supported only in v4.4
- *         # onwards.
- *         requires_fcv_44,
- *         assumes_no_implicit_collection_creation_after_drop,
- *         uses_snapshot_read_concern]
+ * @tags: [
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   uses_snapshot_read_concern,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

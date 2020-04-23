@@ -1,8 +1,6 @@
 /**
  * Tests that the index's full specification is included in the oplog entry corresponding to its
  * creation.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

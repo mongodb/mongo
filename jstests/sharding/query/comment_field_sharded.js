@@ -2,8 +2,6 @@
  * Test to verify that the 'comment' field set while running a command gets populated in $currentOp
  * and profiler. This test also verifies that for a sharded collection, the 'comment' fields gets
  * passed on from mongos to the respective shards.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

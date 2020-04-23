@@ -1,10 +1,11 @@
-/* Tests that attempts to create indexes that already exist as of the createIndexes call are
+/**
+ * Tests that attempts to create indexes that already exist as of the createIndexes call are
  * permitted inside multi-document transactions. Also test that attempts to create new
  * indexes on existing collections are not permitted inside multi-document transactions.
  *
- * @tags: [uses_transactions,
- *         # Creating indexes inside multi-document transactions is supported only in v4.4 onwards.
- *         requires_fcv_44]
+ * @tags: [
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

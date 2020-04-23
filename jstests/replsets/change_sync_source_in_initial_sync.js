@@ -1,8 +1,6 @@
 /**
  * Tests that calling 'replSetSyncFrom' on an initial syncing node will cancel the current syncing
  * attempt and cause it to retry against the newly designated sync source.
- *
- * @tags: [requires_fcv_44]
  */
 
 (function() {

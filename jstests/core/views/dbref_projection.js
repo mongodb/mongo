@@ -2,8 +2,9 @@
  * Test projecting DBRef fields ($ref, $id, $db) in views.
  *
  * Legacy find() queries do not support views, so must use the find() command.
- * DBRef fields are not supported in agg pre 4.4.
- * @tags: [requires_find_command, requires_fcv_44]
+ * @tags: [
+ *   requires_find_command,
+ * ]
  */
 (function() {
 "use strict";

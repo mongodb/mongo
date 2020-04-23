@@ -1,7 +1,5 @@
 // @tags: [
 //   requires_non_retryable_commands,
-//   # Uses $unionWith.
-//   requires_fcv_44,
 // ]
 
 (function() {

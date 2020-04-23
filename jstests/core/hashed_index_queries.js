@@ -1,8 +1,6 @@
 /**
  * Test to verify the behaviour of find, count, distinct operations in the presence of compound
  * hashed indexes.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 "use strict";

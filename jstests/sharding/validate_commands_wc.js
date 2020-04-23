@@ -1,7 +1,5 @@
 /**
  * Tests whether mongos correctly validates write concerns.
- *
- * @tags: [requires_fcv_44]
  */
 (function() {
 'use strict';

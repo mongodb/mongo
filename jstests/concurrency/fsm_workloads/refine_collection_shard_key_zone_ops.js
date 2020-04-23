@@ -15,7 +15,7 @@
  *  - refineCollectionShardKey - Refines the collection's shard key and decreases the latch count
  *    such that the next latch collection will be targeted by the test.
  *
- * @tags: [requires_persistence, requires_sharding, requires_fcv_44]
+ * @tags: [requires_persistence, requires_sharding]
  */
 
 load('jstests/libs/parallelTester.js');

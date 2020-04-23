@@ -5,7 +5,7 @@
  * includes multi=true updates and multi=false updates with exact _id queries.
  *
  * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
- * requires_non_retryable_writes, uses_transactions, requires_fcv_44];
+ * requires_non_retryable_writes, uses_transactions];
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');

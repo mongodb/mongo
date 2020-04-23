@@ -1,7 +1,6 @@
 //
 // Tests that refineCollectionShardKey deletes all existing chunks in the persisted routing table
 // cache.
-// @tags: [requires_fcv_44]
 //
 
 (function() {

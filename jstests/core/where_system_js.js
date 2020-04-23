@@ -1,12 +1,10 @@
 // Tests $where use of functions defined in the system.js collection.
 // @tags: [
-//     requires_non_retryable_writes,
-//     # This test expects a function stored in the system.js collection to be available to
-//     # $where, which may not be the case if it is implicitly sharded in a passthrough.
-//     assumes_unsharded_collection,
-//     requires_scripting,
-//     # $where in 4.2 accepts CodeWithScope whereas >= 4.4 does not.
-//     requires_fcv_44,
+//   # This test expects a function stored in the system.js collection to be available to $where,
+//   # which may not be the case if it is implicitly sharded in a passthrough.
+//   assumes_unsharded_collection,
+//   requires_non_retryable_writes,
+//   requires_scripting,
 // ]
 (function() {
 "use strict";

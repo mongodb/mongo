@@ -1,9 +1,6 @@
 /**
  * Test that a jumbo chunk can be moved using both manually and by the balancer when the
  * 'forceJumbo' option is set to true.
- *
- * Remove requires_fcv_44 tag if SERVER-42273 is backported or 4.4 becomes last-stable.
- * @tags: [requires_fcv_44]
  */
 
 (function() {

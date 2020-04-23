@@ -2,7 +2,6 @@
 // flag.
 // This test stresses behavior that is only true of the mapReduce implementation using aggregation,
 // so it cannot be run in mixed-version suites.
-// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 
