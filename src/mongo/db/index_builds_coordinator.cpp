@@ -1388,45 +1388,9 @@ void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto onCreateEachFn = [&](const BSONObj& spec) {
-        // If two phase index builds is enabled, index build will be coordinated using
-        // startIndexBuild and commitIndexBuild oplog entries.
-        if (supportsTwoPhaseIndexBuild()) {
-            return;
-        }
         opObserver->onCreateIndex(opCtx, collection->ns(), collectionUUID, spec, fromMigrate);
     };
-    auto onCommitFn = [&] {
-        // Index build completion will be timestamped using the createIndexes oplog entry.
-        if (!supportsTwoPhaseIndexBuild()) {
-            return;
-        }
-
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (!(replCoord->getSettings().usingReplSets() &&
-              replCoord->canAcceptWritesFor(opCtx, nss))) {
-            // Not primary.
-            return;
-        }
-
-        // TODO SERVER-47439: Should remove this onCommitFn lambda function as we no longer
-        // need to generate startIndexBuild and commitIndexBuild oplog entries.
-
-
-        // Currently, primary doesn't wait for any votes from secondaries to commit
-        // the index build. So, it's of no use to set the commit quorum option of any value
-        // greater than 0. Disabling commit quorum is just an optimization to avoid secondaries
-        // from trying to vote before committing index build.
-        //
-        // Persist the commit quorum value in the config.system.indexBuilds collection.
-        IndexBuildEntry indexbuildEntry(buildUUID,
-                                        collectionUUID,
-                                        CommitQuorumOptions(CommitQuorumOptions::kDisabled),
-                                        extractIndexNames(specs));
-        uassertStatusOK(addIndexBuildEntry(opCtx, indexbuildEntry));
-
-        opObserver->onStartIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
-        opObserver->onCommitIndexBuild(opCtx, nss, collectionUUID, buildUUID, specs, fromMigrate);
-    };
+    auto onCommitFn = MultiIndexBlock::kNoopOnCommitFn;
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
         opCtx, collection, nss, buildUUID, onCreateEachFn, onCommitFn));
     abortOnExit.dismiss();
