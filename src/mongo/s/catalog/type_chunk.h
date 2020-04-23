@@ -218,6 +218,8 @@ public:
 
     std::string getName() const;
 
+    void setName(const std::string& id);
+
     /**
      * Getters and setters.
      */
@@ -289,6 +291,13 @@ public:
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial; (C)onfig, (S)hard.
 
+    // (O)(C)     _id of the config.chunks doc for this chunk
+    // UUID::toString changed between v3.4 and v3.6, so for collections where the
+    // shard key contains a UUID, getName will produce a different _id string (via
+    // genID) in v3.6 than v3.4. Since _id is immutable, this was added to the
+    // ChunkType API to allow commitChunk{Merge,Migration,Split} to propagate the _id
+    // of a chunk written in v3.4 to the new chunk(s) they write.
+    boost::optional<std::string> _id;
     // (O)(C)     collection this chunk is in
     boost::optional<NamespaceString> _nss;
     // (M)(C)(S)  first key of the range, inclusive

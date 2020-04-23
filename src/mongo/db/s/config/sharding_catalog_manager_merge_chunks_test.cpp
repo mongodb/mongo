@@ -400,7 +400,7 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
     ASSERT_EQ(ErrorCodes::StaleEpoch, mergeStatus);
 }
 
-TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
+TEST_F(MergeChunkTest, MergeAlreadyHappenedFails) {
     ChunkType chunk;
     chunk.setNS(kNamespace);
 
@@ -433,7 +433,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
 
     Timestamp validAfter{1};
 
-    ASSERT_EQ(ErrorCodes::BadValue,
+    ASSERT_EQ(ErrorCodes::IncompatibleShardingMetadata,
               ShardingCatalogManager::get(operationContext())
                   ->commitChunkMerge(operationContext(),
                                      kNamespace,
