@@ -126,33 +126,6 @@ public:
 
         // Step 2
 
-        // Validate shardName parameter.
-        const auto shardName = cmdObj["shard"].str();
-        const auto storedShardName = shardingState->shardId().toString();
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "received shardName " << shardName
-                              << " which differs from stored shardName " << storedShardName,
-                storedShardName == shardName);
-
-        // Validate config connection string parameter.
-        const auto configdb = cmdObj["configdb"].String();
-        uassert(ErrorCodes::BadValue,
-                "Config server connection string cannot be empty",
-                !configdb.empty());
-
-        const auto givenConnStr = uassertStatusOK(ConnectionString::parse(configdb));
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Given config server string " << givenConnStr.toString()
-                              << " is not of type SET",
-                givenConnStr.type() == ConnectionString::SET);
-
-        const auto storedConnStr =
-            Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString();
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Given config server set name: " << givenConnStr.getSetName()
-                              << " differs from known set name: " << storedConnStr.getSetName(),
-                givenConnStr.getSetName() == storedConnStr.getSetName());
-
         // Validate namespace parameter.
         const NamespaceString nss(cmdObj["setShardVersion"].String());
         uassert(ErrorCodes::InvalidNamespace,

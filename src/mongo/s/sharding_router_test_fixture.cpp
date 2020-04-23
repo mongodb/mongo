@@ -460,7 +460,6 @@ void ShardingTestFixture::expectSetShardVersion(const HostAndPort& expectedHost,
             assertGet(SetShardVersionRequest::parseFromBSON(request.cmdObj));
 
         ASSERT(ssv.isAuthoritative());
-        ASSERT_EQ(expectedShard.getHost(), ssv.getShardConnectionString().toString());
         ASSERT_EQ(expectedNs, ssv.getNS());
         ASSERT_EQ(expectedChunkVersion.toString(), ssv.getNSVersion().toString());
 

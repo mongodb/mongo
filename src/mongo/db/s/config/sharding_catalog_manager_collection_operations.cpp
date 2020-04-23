@@ -374,13 +374,8 @@ void sendSSVToAllShards(OperationContext* opCtx, const NamespaceString& nss) {
     for (const auto& shardEntry : allShards) {
         const auto& shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardEntry.getName()));
 
-        SetShardVersionRequest ssv(shardRegistry->getConfigServerConnectionString(),
-                                   shardEntry.getName(),
-                                   fassert(28781, ConnectionString::parse(shardEntry.getHost())),
-                                   nss,
-                                   ChunkVersion::DROPPED(),
-                                   true /* isAuthoritative */,
-                                   true /* forceRefresh */);
+        SetShardVersionRequest ssv(
+            nss, ChunkVersion::DROPPED(), true /* isAuthoritative */, true /* forceRefresh */);
 
         auto ssvResult = shard->runCommandWithFixedRetryAttempts(
             opCtx,

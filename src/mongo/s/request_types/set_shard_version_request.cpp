@@ -43,29 +43,19 @@ namespace mongo {
 namespace {
 
 const char kCmdName[] = "setShardVersion";
-const char kConfigServer[] = "configdb";
-const char kShardName[] = "shard";
-const char kShardConnectionString[] = "shardHost";
 const char kForceRefresh[] = "forceRefresh";
 const char kAuthoritative[] = "authoritative";
-const char kNoConnectionVersioning[] = "noConnectionVersioning";
 
 }  // namespace
 
 constexpr StringData SetShardVersionRequest::kVersion;
 
-SetShardVersionRequest::SetShardVersionRequest(ConnectionString configServer,
-                                               ShardId shardName,
-                                               ConnectionString shardConnectionString,
-                                               NamespaceString nss,
+SetShardVersionRequest::SetShardVersionRequest(NamespaceString nss,
                                                ChunkVersion version,
                                                bool isAuthoritative,
                                                bool forceRefresh)
     : _isAuthoritative(isAuthoritative),
       _forceRefresh(forceRefresh),
-      _configServer(std::move(configServer)),
-      _shardName(std::move(shardName)),
-      _shardCS(std::move(shardConnectionString)),
       _nss(std::move(nss)),
       _version(std::move(version)) {}
 
@@ -73,28 +63,6 @@ SetShardVersionRequest::SetShardVersionRequest() = default;
 
 StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const BSONObj& cmdObj) {
     SetShardVersionRequest request;
-
-    {
-        std::string shardName;
-        Status status = bsonExtractStringField(cmdObj, kShardName, &shardName);
-        request._shardName = ShardId(shardName);
-
-        if (!status.isOK())
-            return status;
-    }
-
-    {
-        std::string shardCS;
-        Status status = bsonExtractStringField(cmdObj, kShardConnectionString, &shardCS);
-        if (!status.isOK())
-            return status;
-
-        auto shardCSStatus = ConnectionString::parse(shardCS);
-        if (!shardCSStatus.isOK())
-            return shardCSStatus.getStatus();
-
-        request._shardCS = std::move(shardCSStatus.getValue());
-    }
 
     {
         Status status = bsonExtractBooleanFieldWithDefault(
@@ -143,11 +111,6 @@ BSONObj SetShardVersionRequest::toBSON() const {
     cmdBuilder.append(kCmdName, _nss.get().ns());
     cmdBuilder.append(kForceRefresh, _forceRefresh);
     cmdBuilder.append(kAuthoritative, _isAuthoritative);
-    // TODO (SERVER-47440): Remove adding config server to BSON once v4.4 parsing is
-    // removed.
-    cmdBuilder.append(kConfigServer, _configServer.toString());
-    cmdBuilder.append(kShardName, _shardName.toString());
-    cmdBuilder.append(kShardConnectionString, _shardCS.toString());
 
     _version->appendLegacyWithField(&cmdBuilder, kVersion);
 

@@ -40,28 +40,17 @@ using unittest::assertGet;
 
 namespace {
 
-const ConnectionString configCS = ConnectionString::forReplicaSet(
-    "ConfigRS", {HostAndPort{"configHost1:27017"}, HostAndPort{"configHost2:27017"}});
-
-const ConnectionString shardCS = ConnectionString::forReplicaSet(
-    "ShardRS", {HostAndPort{"shardHost1:12345"}, HostAndPort{"shardHost2:12345"}});
-
 TEST(SetShardVersionRequest, ParseFull) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
-    SetShardVersionRequest request =
-        assertGet(SetShardVersionRequest::parseFromBSON(
-            BSON("setShardVersion"
-                 << "db.coll"
-                 << "shard"
-                 << "TestShard"
-                 << "shardHost" << shardCS.toString() << "version"
-                 << Timestamp(chunkVersion.toLong()) << "versionEpoch" << chunkVersion.epoch())));
+    SetShardVersionRequest request = assertGet(
+        SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
+                                                   << "db.coll"
+                                                   << "version" << Timestamp(chunkVersion.toLong())
+                                                   << "versionEpoch" << chunkVersion.epoch())));
 
     ASSERT(!request.shouldForceRefresh());
     ASSERT(!request.isAuthoritative());
-    ASSERT_EQ(request.getShardName(), "TestShard");
-    ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(request.getNS().toString(), "db.coll");
     ASSERT_EQ(request.getNSVersion().majorVersion(), chunkVersion.majorVersion());
     ASSERT_EQ(request.getNSVersion().minorVersion(), chunkVersion.minorVersion());
@@ -75,39 +64,11 @@ TEST(SetShardVersionRequest, ParseFullWithAuthoritative) {
         assertGet(SetShardVersionRequest::parseFromBSON(
             BSON("setShardVersion"
                  << "db.coll"
-                 << "shard"
-                 << "TestShard"
-                 << "shardHost" << shardCS.toString() << "version"
-                 << Timestamp(chunkVersion.toLong()) << "versionEpoch" << chunkVersion.epoch()
-                 << "authoritative" << true)));
+                 << "version" << Timestamp(chunkVersion.toLong()) << "versionEpoch"
+                 << chunkVersion.epoch() << "authoritative" << true)));
 
     ASSERT(!request.shouldForceRefresh());
     ASSERT(request.isAuthoritative());
-    ASSERT_EQ(request.getShardName(), "TestShard");
-    ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
-    ASSERT_EQ(request.getNS().toString(), "db.coll");
-    ASSERT_EQ(request.getNSVersion().majorVersion(), chunkVersion.majorVersion());
-    ASSERT_EQ(request.getNSVersion().minorVersion(), chunkVersion.minorVersion());
-    ASSERT_EQ(request.getNSVersion().epoch(), chunkVersion.epoch());
-}
-
-TEST(SetShardVersionRequest, ParseFullNoConnectionVersioning) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen());
-
-    SetShardVersionRequest request =
-        assertGet(SetShardVersionRequest::parseFromBSON(
-            BSON("setShardVersion"
-                 << "db.coll"
-                 << "shard"
-                 << "TestShard"
-                 << "shardHost" << shardCS.toString() << "version"
-                 << Timestamp(chunkVersion.toLong()) << "versionEpoch" << chunkVersion.epoch()
-                 << "noConnectionVersioning" << true)));
-
-    ASSERT(!request.shouldForceRefresh());
-    ASSERT(!request.isAuthoritative());
-    ASSERT_EQ(request.getShardName(), "TestShard");
-    ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(request.getNS().toString(), "db.coll");
     ASSERT_EQ(request.getNSVersion().majorVersion(), chunkVersion.majorVersion());
     ASSERT_EQ(request.getNSVersion().minorVersion(), chunkVersion.minorVersion());
@@ -120,10 +81,7 @@ TEST(SetShardVersionRequest, ParseFullNoNS) {
     auto ssvStatus =
         SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
                                                    << ""
-                                                   << "shard"
-                                                   << "TestShard"
-                                                   << "shardHost" << shardCS.toString() << "version"
-                                                   << Timestamp(chunkVersion.toLong())
+                                                   << "version" << Timestamp(chunkVersion.toLong())
                                                    << "versionEpoch" << chunkVersion.epoch()));
 
     ASSERT_EQ(ErrorCodes::InvalidNamespace, ssvStatus.getStatus().code());
@@ -135,10 +93,7 @@ TEST(SetShardVersionRequest, ParseFullNSContainsDBOnly) {
     auto ssvStatus =
         SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
                                                    << "dbOnly"
-                                                   << "shard"
-                                                   << "TestShard"
-                                                   << "shardHost" << shardCS.toString() << "version"
-                                                   << Timestamp(chunkVersion.toLong())
+                                                   << "version" << Timestamp(chunkVersion.toLong())
                                                    << "versionEpoch" << chunkVersion.epoch()));
 
     ASSERT_EQ(ErrorCodes::InvalidNamespace, ssvStatus.getStatus().code());
@@ -147,23 +102,17 @@ TEST(SetShardVersionRequest, ParseFullNSContainsDBOnly) {
 TEST(SetShardVersionRequest, ToSSVCommandFull) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
-    SetShardVersionRequest ssv(
-        configCS, ShardId("TestShard"), shardCS, NamespaceString("db.coll"), chunkVersion, false);
+    SetShardVersionRequest ssv(NamespaceString("db.coll"), chunkVersion, false);
 
     ASSERT(!ssv.shouldForceRefresh());
     ASSERT(!ssv.isAuthoritative());
-    ASSERT_EQ(ssv.getShardName(), "TestShard");
-    ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
     ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
                            << "db.coll"
-                           << "forceRefresh" << false << "authoritative" << false << "configdb"
-                           << configCS.toString() << "shard"
-                           << "TestShard"
-                           << "shardHost" << shardCS.toString() << "version"
+                           << "forceRefresh" << false << "authoritative" << false << "version"
                            << Timestamp(chunkVersion.toLong()) << "versionEpoch"
                            << chunkVersion.epoch()));
 }
@@ -171,23 +120,17 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
 TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
-    SetShardVersionRequest ssv(
-        configCS, ShardId("TestShard"), shardCS, NamespaceString("db.coll"), chunkVersion, true);
+    SetShardVersionRequest ssv(NamespaceString("db.coll"), chunkVersion, true);
 
     ASSERT(!ssv.shouldForceRefresh());
     ASSERT(ssv.isAuthoritative());
-    ASSERT_EQ(ssv.getShardName(), "TestShard");
-    ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
     ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
                            << "db.coll"
-                           << "forceRefresh" << false << "authoritative" << true << "configdb"
-                           << configCS.toString() << "shard"
-                           << "TestShard"
-                           << "shardHost" << shardCS.toString() << "version"
+                           << "forceRefresh" << false << "authoritative" << true << "version"
                            << Timestamp(chunkVersion.toLong()) << "versionEpoch"
                            << chunkVersion.epoch()));
 }
@@ -195,28 +138,17 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
 TEST(SetShardVersionRequest, ToSSVCommandFullForceRefresh) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
-    SetShardVersionRequest ssv(configCS,
-                               ShardId("TestShard"),
-                               shardCS,
-                               NamespaceString("db.coll"),
-                               chunkVersion,
-                               false,
-                               true);
+    SetShardVersionRequest ssv(NamespaceString("db.coll"), chunkVersion, false, true);
 
     ASSERT(ssv.shouldForceRefresh());
     ASSERT(!ssv.isAuthoritative());
-    ASSERT_EQ(ssv.getShardName(), "TestShard");
-    ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
     ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
                            << "db.coll"
-                           << "forceRefresh" << true << "authoritative" << false << "configdb"
-                           << configCS.toString() << "shard"
-                           << "TestShard"
-                           << "shardHost" << shardCS.toString() << "version"
+                           << "forceRefresh" << true << "authoritative" << false << "version"
                            << Timestamp(chunkVersion.toLong()) << "versionEpoch"
                            << chunkVersion.epoch()));
 }

@@ -94,15 +94,9 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
  */
 void refreshRecipientRoutingTable(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  ShardId toShard,
                                   const HostAndPort& toShardHost,
                                   const ChunkVersion& newCollVersion) {
-    SetShardVersionRequest ssv(Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString(),
-                               toShard,
-                               ConnectionString(toShardHost),
-                               nss,
-                               newCollVersion,
-                               false);
+    SetShardVersionRequest ssv(nss, newCollVersion, false);
 
     const executor::RemoteCommandRequest request(
         toShardHost,
@@ -519,11 +513,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     if (!MONGO_unlikely(doNotRefreshRecipientAfterCommit.shouldFail())) {
         // Best-effort make the recipient refresh its routing table to the new collection
         // version.
-        refreshRecipientRoutingTable(_opCtx,
-                                     getNss(),
-                                     _args.getToShardId(),
-                                     _recipientHost,
-                                     refreshedMetadata.getCollVersion());
+        refreshRecipientRoutingTable(
+            _opCtx, getNss(), _recipientHost, refreshedMetadata.getCollVersion());
     }
 
     std::string orphanedRangeCleanUpErrMsg = str::stream()

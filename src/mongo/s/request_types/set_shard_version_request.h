@@ -50,10 +50,7 @@ class SetShardVersionRequest {
 public:
     static constexpr StringData kVersion = "version"_sd;
 
-    SetShardVersionRequest(ConnectionString configServer,
-                           ShardId shardName,
-                           ConnectionString shardConnectionString,
-                           NamespaceString nss,
+    SetShardVersionRequest(NamespaceString nss,
                            ChunkVersion version,
                            bool isAuthoritative,
                            bool forceRefresh = false);
@@ -85,16 +82,6 @@ public:
     bool shouldForceRefresh() const {
         return _forceRefresh;
     }
-
-
-    const ShardId& getShardName() const {
-        return _shardName;
-    }
-
-    const ConnectionString& getShardConnectionString() const {
-        return _shardCS;
-    }
-
     /**
      * Returns the namespace associated with this set shard version request. It is illegal to access
      * this field if isInit() returns true.
@@ -112,13 +99,6 @@ private:
 
     bool _isAuthoritative{false};
     bool _forceRefresh{false};
-
-    // TODO (SERVER-47440): Remove this parameter once the v4.4 SetShardVersion command stops
-    // parsing it.
-    ConnectionString _configServer;
-
-    ShardId _shardName;
-    ConnectionString _shardCS;
 
     boost::optional<NamespaceString> _nss;
     boost::optional<ChunkVersion> _version;
