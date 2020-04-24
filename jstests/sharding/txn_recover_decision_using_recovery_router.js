@@ -2,10 +2,6 @@
  * Tests that the coordinateCommitTransaction command falls back to recovering the decision from
  * the local participant.
  *
- * TODO (SERVER-37364): Once coordinateCommit returns as soon as the decision is made durable, these
- * tests will pass but will be racy in terms of whether they're testing that coordinateCommit
- * returns the TransactionCoordinator's decision or local TransactionParticipant's decision.
- *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
@@ -179,8 +175,16 @@ const sendCommitViaRecoveryMongos = function(lsid, txnNumber, recoveryToken, wri
                                                         writeConcern));
 };
 
-let st =
-    new ShardingTest({shards: 2, rs: {nodes: 2}, mongos: 2, other: {mongosOptions: {verbose: 3}}});
+let st = new ShardingTest({
+    shards: 2,
+    rs: {nodes: 2},
+    mongos: 2,
+    other: {
+        mongosOptions: {verbose: 3},
+        shardOptions:
+            {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}}
+    }
+});
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
 st.ensurePrimaryShard('test', st.shard0.name);

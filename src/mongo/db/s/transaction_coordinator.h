@@ -95,8 +95,6 @@ public:
     /**
      * Gets a Future that will contain the decision that the coordinator reaches. Note that this
      * will never be signaled unless runCommit has been called.
-     *
-     * TODO (SERVER-37364): Remove this when it is no longer needed by the coordinator service.
      */
     SharedSemiFuture<txn::CommitDecision> getDecision() const;
 

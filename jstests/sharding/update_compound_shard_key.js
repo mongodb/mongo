@@ -1,6 +1,11 @@
 /**
  * Tests to validate the functionality of update command in the presence of a compound shard key.
+ *
+ * Use the 'requires_find_command' tag to skip this test in sharding_op_query suite. Otherwise,
+ * sessionDB.coll.find() will throw "Cannot run a legacy query on a session".
+ *
  * @tags: [
+ *   requires_find_command,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
  * ]
@@ -10,7 +15,11 @@
 
 load("jstests/sharding/libs/update_shard_key_helpers.js");
 
-const st = new ShardingTest({mongos: 1, shards: 3});
+const st = new ShardingTest({
+    mongos: 1,
+    shards: 3,
+    shardOptions: {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}}
+});
 const kDbName = 'update_compound_sk';
 const ns = kDbName + '.coll';
 const session = st.s.startSession({retryWrites: true});
@@ -164,7 +173,7 @@ assert.commandFailedWithCode(
 session.startTransaction();
 assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, updateDoc, true, true);
 assert.commandWorked(session.commitTransaction_forTesting());
-assert.eq(1, st.s.getDB(kDbName).coll.find(updateDoc).itcount());
+assert.eq(1, sessionDB.coll.find(updateDoc).itcount());
 
 // Full shard key not specified in query.
 
@@ -265,7 +274,7 @@ assert.commandFailedWithCode(
 session.startTransaction();
 assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, opStyle: true}, update, true, true);
 assert.commandWorked(session.commitTransaction_forTesting());
-assert.eq(1, st.s.getDB(kDbName).coll.find(update["$set"]).itcount());
+assert.eq(1, sessionDB.coll.find(update["$set"]).itcount());
 
 // Full shard key not specified in query.
 
@@ -395,7 +404,7 @@ assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, pipelineUpdate: true},
                                     }],
                                     true);
 assert.commandWorked(session.commitTransaction_forTesting());
-assert.eq(1, st.s.getDB(kDbName).coll.find({x: 2111, y: 55, z: 3, pipelineUpdate: true}).itcount());
+assert.eq(1, sessionDB.coll.find({x: 2111, y: 55, z: 3, pipelineUpdate: true}).itcount());
 
 // Full shard key not specified in query.
 assert.commandFailedWithCode(st.s.getDB(kDbName).coll.update(

@@ -356,9 +356,10 @@ executor:
           networkErrorAndTxnOverrideConfig:
             wrapCRUDinTransactions: true
           sessionOptions:
-            # Tests in this suite only read from primaries and only one node is electable, so causal
-            # consistency is not required to read your own writes.
-            causalConsistency: false
+            # Read your own writes is not guaranteed without causal consistency since the
+            # coordinateCommit commmand returns as soon as the decision is made durable, and
+            # prepare conflicts are explicity ignored for non-causal reads.
+            causalConsistency: true
       readMode: commands
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
@@ -390,5 +391,6 @@ executor:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
         writePeriodicNoops: true
+        coordinateCommitReturnImmediatelyAfterPersistingDecision: true
     num_rs_nodes_per_shard: 2
     num_shards: 2

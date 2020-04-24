@@ -147,6 +147,13 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     if "disableLogicalSessionCacheRefresh" not in suite_set_parameters:
         suite_set_parameters["disableLogicalSessionCacheRefresh"] = True
 
+    # Set coordinateCommitReturnImmediatelyAfterPersistingDecision to false so that tests do
+    # not need to rely on causal consistency or explicity wait for the transaction to finish
+    # committing.
+    if executable != LAST_STABLE_MONGOD_BINARY and \
+        "coordinateCommitReturnImmediatelyAfterPersistingDecision" not in suite_set_parameters:
+        suite_set_parameters["coordinateCommitReturnImmediatelyAfterPersistingDecision"] = False
+
     # There's a periodic background thread that checks for and aborts expired transactions.
     # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
     # and being aborted by the background thread. It defaults to 60 seconds, which is too short to

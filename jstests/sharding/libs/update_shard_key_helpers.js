@@ -63,8 +63,8 @@ function runUpdateCmdSuccess(st,
         let updatedVal = updates[i]["$set"] ? updates[i]["$set"] : updates[i];
         if (pipelineUpdateResult)
             updatedVal = pipelineUpdateResult[i];
-        assert.eq(0, st.s.getDB(kDbName).foo.find(queries[i]).itcount());
-        assert.eq(1, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
+        assert.eq(0, sessionDB.foo.find(queries[i]).itcount());
+        assert.eq(1, sessionDB.foo.find(updatedVal).itcount());
         if (bsonWoCompare(updatedVal, collectionSplitPoint) > 0) {
             assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
             assert.eq(1, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
@@ -90,7 +90,7 @@ function runFindAndModifyCmdSuccess(st,
     for (let i = 0; i < queries.length; i++) {
         let oldDoc;
         if (!returnNew && !upsert) {
-            oldDoc = st.s.getDB(kDbName).foo.find(queries[i]).toArray();
+            oldDoc = sessionDB.foo.find(queries[i]).toArray();
         }
 
         if (inTxn) {
@@ -107,8 +107,8 @@ function runFindAndModifyCmdSuccess(st,
         let updatedVal = updates[i]["$set"] ? updates[i]["$set"] : updates[i];
         if (pipelineUpdateResult)
             updatedVal = pipelineUpdateResult[i];
-        let newDoc = st.s.getDB(kDbName).foo.find(updatedVal).toArray();
-        assert.eq(0, st.s.getDB(kDbName).foo.find(queries[i]).itcount());
+        let newDoc = sessionDB.foo.find(updatedVal).toArray();
+        assert.eq(0, sessionDB.foo.find(queries[i]).itcount());
         assert.eq(1, newDoc.length);
         if (bsonWoCompare(updatedVal, collectionSplitPoint) > 0) {
             assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
@@ -162,9 +162,9 @@ function runUpdateCmdFail(st,
     let updatedVal = update["$set"] ? update["$set"] : update;
     if (pipelineUpdateResult)
         updatedVal = pipelineUpdateResult;
-    assert.eq(1, st.s.getDB(kDbName).foo.find(query).itcount());
+    assert.eq(1, sessionDB.foo.find(query).itcount());
     if (!update["$unset"] && Object.keys(update).length != 0 && !pipelineUpdateResult) {
-        assert.eq(0, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
+        assert.eq(0, sessionDB.foo.find(updatedVal).itcount());
     }
 }
 
@@ -185,9 +185,9 @@ function runFindAndModifyCmdFail(
     let updatedVal = update["$set"] ? update["$set"] : update;
     if (pipelineUpdateResult)
         updatedVal = pipelineUpdateResult;
-    assert.eq(1, st.s.getDB(kDbName).foo.find(query).itcount());
+    assert.eq(1, sessionDB.foo.find(query).itcount());
     if (!update["$unset"] && Object.keys(update).length != 0 && !pipelineUpdateResult) {
-        assert.eq(0, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
+        assert.eq(0, sessionDB.foo.find(updatedVal).itcount());
     }
 }
 
@@ -545,10 +545,10 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     if (inTxn) {
         assert.commandWorked(session.commitTransaction_forTesting());
     }
-    assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 300}).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 600}).itcount());
-    assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 4}).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 30}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": 300}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": 600}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": 4}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": 30}).itcount());
 
     assert.eq(0, bulkRes.nUpserted);
     assert.eq(2, bulkRes.nMatched);
@@ -575,9 +575,9 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     if (inTxn) {
         assert.commandWorked(session.commitTransaction_forTesting());
     }
-    assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 500}).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 400}).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 400, "a": 7}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": 400}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": 400, "a": 7}).itcount());
 
     assert.eq(0, bulkRes.nUpserted);
     assert.eq(2, bulkRes.nMatched);
@@ -607,11 +607,11 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     if (inTxn) {
         assert.commandWorked(session.commitTransaction_forTesting());
     }
-    assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 500}).itcount());
-    assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 400}).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 600}).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 600, "a": 6}).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 1}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": 400}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": 600}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": 600, "a": 6}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": 1}).itcount());
 
     assert.eq(0, bulkRes.nUpserted);
     assert.eq(2, bulkRes.nMatched);
@@ -799,10 +799,10 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
 }
 
 function assertHashedShardKeyUpdateCorrect(
-    st, kDbName, query, update, upsert, shouldExistOnShard0) {
+    st, sessionDB, kDbName, query, update, upsert, shouldExistOnShard0) {
     let updatedVal = update["$set"] ? update["$set"] : update;
-    assert.eq(0, st.s.getDB(kDbName).foo.find(query).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
+    assert.eq(0, sessionDB.foo.find(query).itcount());
+    assert.eq(1, sessionDB.foo.find(updatedVal).itcount());
     if (shouldExistOnShard0) {
         assert.eq(1, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
         assert.eq(0, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
@@ -844,11 +844,12 @@ function assertCanUpdatePrimitiveShardKeyHashedChangeShards(
 
     // Op-style modify
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
-    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, false);
+    assertHashedShardKeyUpdateCorrect(
+        st, sessionDB, kDbName, queries[0], updates[0], upsert, false);
 
     // Replacement style modify
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
-    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, true);
+    assertHashedShardKeyUpdateCorrect(st, sessionDB, kDbName, queries[1], updates[1], upsert, true);
 
     // Upsert case. The first update will initially target shard0, but insert on shard1. The second
     // will initially target shard1, but insert on shard0.
@@ -861,11 +862,12 @@ function assertCanUpdatePrimitiveShardKeyHashedChangeShards(
 
     // Op-style upsert
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
-    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, false);
+    assertHashedShardKeyUpdateCorrect(
+        st, sessionDB, kDbName, queries[0], updates[0], upsert, false);
 
     // Modify style upsert
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
-    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, true);
+    assertHashedShardKeyUpdateCorrect(st, sessionDB, kDbName, queries[1], updates[1], upsert, true);
 
     st.s.getDB(kDbName).foo.drop();
 }
@@ -897,11 +899,12 @@ function assertCanUpdatePrimitiveShardKeyHashedSameShards(
 
     // Op-style modify
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
-    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, true);
+    assertHashedShardKeyUpdateCorrect(st, sessionDB, kDbName, queries[0], updates[0], upsert, true);
 
     // Replacement style modify
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
-    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, false);
+    assertHashedShardKeyUpdateCorrect(
+        st, sessionDB, kDbName, queries[1], updates[1], upsert, false);
 
     // Upsert case
 
@@ -912,11 +915,12 @@ function assertCanUpdatePrimitiveShardKeyHashedSameShards(
 
     // Op-style upsert
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
-    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, true);
+    assertHashedShardKeyUpdateCorrect(st, sessionDB, kDbName, queries[0], updates[0], upsert, true);
 
     // Modify style upsert
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
-    assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, false);
+    assertHashedShardKeyUpdateCorrect(
+        st, sessionDB, kDbName, queries[1], updates[1], upsert, false);
 
     st.s.getDB(kDbName).foo.drop();
 }

@@ -350,11 +350,10 @@ executor:
           networkErrorAndTxnOverrideConfig:
             wrapCRUDinTransactions: true
           sessionOptions:
-            # Causal consistency is not required because tests in this suite only read from
-            # primaries, only one node is electable in each shard, all writes use majority write
-            # concern, and they use transactions with "snapshot" level read concern, which should
-            # see all majority committed writes.
-            causalConsistency: false
+            # Read your own writes is not guaranteed without causal consistency since the
+            # coordinateCommit commmand returns as soon as the decision is made durable, and
+            # prepare conflicts are explicity ignored for non-causal reads.
+            causalConsistency: true
       readMode: commands
   hooks:
   - class: CheckReplDBHashInBackground
@@ -385,5 +384,6 @@ executor:
           transaction: 4
         enableTestCommands: 1
         numInitialSyncAttempts: 1
+        coordinateCommitReturnImmediatelyAfterPersistingDecision: true
     num_rs_nodes_per_shard: 2
     num_shards: 2

@@ -1170,6 +1170,22 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
+            // New mongod-specific option in 4.5.x.
+            if (!programMajorMinorVersion || programMajorMinorVersion >= 450) {
+                // Allow the parameter to be overridden if set explicitly via TestData.
+                const parameters = jsTest.options().setParameters;
+
+                if ((parameters === undefined ||
+                     parameters['coordinateCommitReturnImmediatelyAfterPersistingDecision'] ===
+                         undefined) &&
+                    !argArrayContainsSetParameterValue(
+                        'coordinateCommitReturnImmediatelyAfterPersistingDecision=')) {
+                    argArray.push(
+                        ...['--setParameter',
+                            "coordinateCommitReturnImmediatelyAfterPersistingDecision=false"]);
+                }
+            }
+
             // New mongod-specific option in 4.3.x.
             if (!programMajorMinorVersion || programMajorMinorVersion >= 430) {
                 // Allow the parameter to be overridden if set explicitly via TestData.

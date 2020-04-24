@@ -167,6 +167,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/grid',
         'sharding_api_d',
+        'sharding_runtime_d_params',
     ]
 )
 

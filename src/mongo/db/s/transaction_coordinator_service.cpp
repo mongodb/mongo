@@ -34,6 +34,7 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/transaction_participant_gen.h"
@@ -138,12 +139,9 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
     coordinator->runCommit(opCtx,
                            std::vector<ShardId>{participantList.begin(), participantList.end()});
 
-    return coordinator->onCompletion();
-
-    // TODO (SERVER-37364): Re-enable the coordinator returning the decision as soon as the decision
-    // is made durable. Currently the coordinator waits to hear acks because participants in prepare
-    // reject requests with a higher transaction number, causing tests to fail.
-    // return coordinator->getDecision();
+    return coordinateCommitReturnImmediatelyAfterPersistingDecision.load()
+        ? coordinator->getDecision()
+        : coordinator->onCompletion();
 }
 
 boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorService::recoverCommit(
@@ -160,12 +158,9 @@ boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorSer
     // the coordinator.
     coordinator->cancelIfCommitNotYetStarted();
 
-    return coordinator->onCompletion();
-
-    // TODO (SERVER-37364): Re-enable the coordinator returning the decision as soon as the decision
-    // is made durable. Currently the coordinator waits to hear acks because participants in prepare
-    // reject requests with a higher transaction number, causing tests to fail.
-    // return coordinator->getDecision();
+    return coordinateCommitReturnImmediatelyAfterPersistingDecision.load()
+        ? coordinator->getDecision()
+        : coordinator->onCompletion();
 }
 
 void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,

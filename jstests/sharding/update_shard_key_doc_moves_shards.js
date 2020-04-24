@@ -9,7 +9,11 @@
 
 load("jstests/sharding/libs/update_shard_key_helpers.js");
 
-const st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
+const st = new ShardingTest({
+    mongos: 1,
+    shards: {rs0: {nodes: 3}, rs1: {nodes: 3}},
+    shardOptions: {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}}
+});
 const kDbName = 'db';
 const mongos = st.s0;
 const shard0 = st.shard0.shardName;
@@ -377,12 +381,12 @@ assert.commandWorked(sessionDB.foo.update({"x": 30}, {"$set": {"x": 600}}));
 assert.commandWorked(sessionDB.foo.update({"x": 4}, {"$set": {"x": 50}}));
 assert.commandWorked(session.commitTransaction_forTesting());
 
-assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).itcount());
-assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 30}).itcount());
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 600}).itcount());
-assert.eq(id, mongos.getDB(kDbName).foo.find({"x": 600}).toArray()[0]._id);
-assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 4}).itcount());
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 50}).itcount());
+assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
+assert.eq(0, sessionDB.foo.find({"x": 30}).itcount());
+assert.eq(1, sessionDB.foo.find({"x": 600}).itcount());
+assert.eq(id, sessionDB.foo.find({"x": 600}).toArray()[0]._id);
+assert.eq(0, sessionDB.foo.find({"x": 4}).itcount());
+assert.eq(1, sessionDB.foo.find({"x": 50}).itcount());
 
 mongos.getDB(kDbName).foo.drop();
 
@@ -396,10 +400,10 @@ assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 30}}));
 assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
 assert.commandWorked(session.commitTransaction_forTesting());
 
-assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).itcount());
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 30}).itcount());
-assert.eq(1, mongos.getDB(kDbName).foo.find({"a": 7}).itcount());
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 30, "a": 7}).itcount());
+assert.eq(0, sessionDB.foo.find({"x": 500}).itcount());
+assert.eq(1, sessionDB.foo.find({"x": 30}).itcount());
+assert.eq(1, sessionDB.foo.find({"a": 7}).itcount());
+assert.eq(1, sessionDB.foo.find({"x": 30, "a": 7}).itcount());
 
 mongos.getDB(kDbName).foo.drop();
 
@@ -413,12 +417,12 @@ assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
 sessionDB.foo.findAndModify({query: {"x": 500}, update: {$set: {"x": 20}}});
 assert.commandWorked(session.commitTransaction_forTesting());
 
-assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).toArray().length);
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 20}).toArray().length);
-assert.eq(20, mongos.getDB(kDbName).foo.find({"_id": id}).toArray()[0].x);
-assert.eq(1, mongos.getDB(kDbName).foo.find({"a": 7}).toArray().length);
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 20, "a": 7}).toArray().length);
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 1}).toArray().length);
+assert.eq(0, sessionDB.foo.find({"x": 500}).toArray().length);
+assert.eq(1, sessionDB.foo.find({"x": 20}).toArray().length);
+assert.eq(20, sessionDB.foo.find({"_id": id}).toArray()[0].x);
+assert.eq(1, sessionDB.foo.find({"a": 7}).toArray().length);
+assert.eq(1, sessionDB.foo.find({"x": 20, "a": 7}).toArray().length);
+assert.eq(1, sessionDB.foo.find({"x": 1}).toArray().length);
 
 mongos.getDB(kDbName).foo.drop();
 

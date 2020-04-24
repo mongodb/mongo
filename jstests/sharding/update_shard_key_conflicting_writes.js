@@ -2,7 +2,10 @@
  * Test the write conflict behavior between updates to a document's shard key and other
  * updates/deletes.
  *
- * @tags: [uses_transactions, uses_multi_shard_transaction]
+ * Use the 'requires_find_command' tag to skip this test in sharding_op_query suite. Otherwise,
+ * sessionDB.coll.find() will throw "Cannot run a legacy query on a session".
+ *
+ * @tags: [requires_find_command, uses_transactions, uses_multi_shard_transaction]
  */
 
 (function() {
@@ -12,7 +15,11 @@
 load('jstests/libs/parallelTester.js');  // for Thread.
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-let st = new ShardingTest({mongos: 1, shards: 2});
+let st = new ShardingTest({
+    mongos: 1,
+    shards: 2,
+    shardOptions: {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}}
+});
 let kDbName = 'db';
 let mongos = st.s0;
 let ns = kDbName + '.foo';
@@ -99,9 +106,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     assert.commandWorked(session.commitTransaction_forTesting());
     thread.join();
     assert.commandWorked(thread.returnData());
-    assert.eq(1, db.foo.find({"x": updatedShardKeyValue, "a": 6}).itcount());
-    assert.eq(0, db.foo.find({"x": originalShardKeyValue}).itcount());
-    assert.eq(0, db.foo.find({"a": 7}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": updatedShardKeyValue, "a": 6}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": originalShardKeyValue}).itcount());
+    assert.eq(0, sessionDB.foo.find({"a": 7}).itcount());
 })();
 
 /**
@@ -122,8 +129,8 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         ErrorCodes.WriteConflict);
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
-    assert.eq(1, db.foo.find({"x": originalShardKeyValue, "a": 7}).itcount());
-    assert.eq(0, db.foo.find({"x": updatedShardKeyValue}).itcount());
+    assert.eq(1, sessionDB.foo.find({"x": originalShardKeyValue, "a": 7}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": updatedShardKeyValue}).itcount());
 
     // Run a non-transactional delete before updating the shard key.
     updatedShardKeyValue = 20;
@@ -136,8 +143,8 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         ErrorCodes.WriteConflict);
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
-    assert.eq(0, db.foo.find({"x": originalShardKeyValue}).itcount());
-    assert.eq(0, db.foo.find({"x": updatedShardKeyValue}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": originalShardKeyValue}).itcount());
+    assert.eq(0, sessionDB.foo.find({"x": updatedShardKeyValue}).itcount());
 })();
 
 /**
@@ -169,9 +176,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         mode: "off",
     }));
     awaitShell();
-    assert.eq(1, db.foo.find({"x": -50, "a": 300}).itcount());
-    assert.eq(0, db.foo.find({"a": 10}).itcount());
-    assert.eq(0, db.foo.find({"x": 10}).itcount());
+    assert.eq(1, sessionDB2.foo.find({"x": -50, "a": 300}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"a": 10}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": 10}).itcount());
 })();
 
 // Assert that if a concurrent delete removes the same document that the original update
@@ -197,8 +204,8 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         mode: "off",
     }));
     awaitShell();
-    assert.eq(0, db.foo.find({"x": 100}).itcount());
-    assert.eq(0, db.foo.find({"x": -1}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": 100}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": -1}).itcount());
 })();
 
 // Assert that if the concurrent update also mutates the shard key (and remains on the same
@@ -225,9 +232,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         mode: "off",
     }));
     awaitShell();
-    assert.eq(0, db.foo.find({"x": -50}).itcount());
-    assert.eq(1, db.foo.find({"x": -500}).itcount());
-    assert.eq(0, db.foo.find({"x": 80}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": -50}).itcount());
+    assert.eq(1, sessionDB2.foo.find({"x": -500}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": 80}).itcount());
 })();
 
 /**
@@ -270,7 +277,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     }));
     awaitShell();
     awaitShell2();
-    assert.eq(1, db.foo.find({"x": 10}).itcount());
+    assert.soon(() => db.foo.find({"x": 10}).itcount() === 1);
     assert.eq(1, db.foo.find({"a": 4}).itcount());
     assert.eq(0, db.foo.find({"x": -100}).itcount());
     assert.eq(0, db.foo.find({"a": 5}).itcount());
@@ -309,7 +316,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     }));
     awaitShell();
     awaitShell2();
-    assert.eq(0, db.foo.find({"x": 10}).itcount());
+    assert.soon(() => db.foo.find({"x": 10}).itcount() === 0);
     assert.eq(1, db.foo.find({"x": -70}).itcount());
 })();
 
@@ -332,9 +339,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
     assert.commandWorked(session2.commitTransaction_forTesting());
-    assert.eq(1, db.foo.find({"x": 25}).itcount());
-    assert.eq(0, db.foo.find({"x": 250}).itcount());
-    assert.eq(0, db.foo.find({"x": -500}).itcount());
+    assert.eq(1, sessionDB2.foo.find({"x": 25}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": 250}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": -500}).itcount());
 })();
 
 /**
@@ -377,9 +384,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         mode: "off",
     }));
     awaitShell();
-    assert.eq(1, db.foo.find({"x": -150, "a": 3000}).itcount());
-    assert.eq(0, db.foo.find({"a": 15}).itcount());
-    assert.eq(0, db.foo.find({"x": 1000}).itcount());
+    assert.eq(1, sessionDB2.foo.find({"x": -150, "a": 3000}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"a": 15}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": 1000}).itcount());
 })();
 
 // Assert that if the concurrent update modifies the document and the update which changes the
@@ -407,9 +414,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         mode: "off",
     }));
     awaitShell();
-    assert.eq(1, db.foo.find({"x": -1000, "a": -200}).itcount());
-    assert.eq(0, db.foo.find({"a": 20}).itcount());
-    assert.eq(0, db.foo.find({"x": 150}).itcount());
+    assert.soon(() => sessionDB2.foo.find({"x": -1000, "a": -200}).itcount() === 1);
+    assert.eq(0, sessionDB2.foo.find({"a": 20}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": 150}).itcount());
 })();
 
 // Assert that if a concurrent delete removes the same document that the original update
@@ -437,9 +444,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         mode: "off",
     }));
     awaitShell();
-    assert.eq(0, db.foo.find({"x": -150}).itcount());
-    assert.eq(0, db.foo.find({"a": 3000}).itcount());
-    assert.eq(0, db.foo.find({"x": 1000}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": -150}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"a": 3000}).itcount());
+    assert.eq(0, sessionDB2.foo.find({"x": 1000}).itcount());
 })();
 
 st.stop();

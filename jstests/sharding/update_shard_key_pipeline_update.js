@@ -8,7 +8,11 @@
 
 load("jstests/sharding/libs/update_shard_key_helpers.js");
 
-const st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
+const st = new ShardingTest({
+    mongos: 1,
+    shards: {rs0: {nodes: 3}, rs1: {nodes: 3}},
+    shardOptions: {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}}
+});
 const kDbName = 'db';
 const mongos = st.s0;
 const shard0 = st.shard0.shardName;
