@@ -211,7 +211,9 @@ CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChun
     auto future = scheduleRoutingInfoForcedRefresh(nss);
 
     // Mock the expected config server queries.
-    expectGetDatabase(nss);
+    if (!nss.isAdminDB() && !nss.isConfigDB()) {
+        expectGetDatabase(nss);
+    }
     expectGetCollection(nss, epoch, shardKeyPattern);
     expectGetCollection(nss, epoch, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {

@@ -1333,22 +1333,6 @@ env.Library(
 )
 
 env.Library(
-    target='sessions_collection_sharded',
-    source=[
-        'sessions_collection_sharded.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'logical_session_id',
-        'sessions_collection',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/s/sharding_api',
-        'sessions_collection_rs',
-    ],
-)
-
-env.Library(
     target='sessions_collection_config_server',
     source=[
         'sessions_collection_config_server.cpp',
@@ -1356,9 +1340,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/sessions_collection_sharded',
         'dbdirectclient',
-        'sessions_collection',
-        'sessions_collection_sharded',
+        'sessions_collection'
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/s/sharding_router_api',
@@ -1431,12 +1415,12 @@ envWithAsio.Library(
         'logical_session_cache_factory_mongod.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/sessions_collection_sharded',
         'logical_session_cache',
         'logical_session_cache_impl',
         'service_liaison_mongod',
         'sessions_collection_config_server',
         'sessions_collection_rs',
-        'sessions_collection_sharded',
         'sessions_collection_standalone',
     ],
     LIBDEPS_PRIVATE=[

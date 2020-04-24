@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/sessions_collection_sharded.h"
+#include "mongo/s/sessions_collection_sharded.h"
 
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/operation_context.h"
@@ -143,7 +143,7 @@ void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         BatchWriteExecStats stats;
 
         ClusterWriter::write(opCtx, request, &stats, &response);
-        return response.toStatus();
+        uassertStatusOK(response.toStatus());
     };
 
     _doRefresh(NamespaceString::kLogicalSessionsNamespace,
@@ -162,7 +162,7 @@ void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         BatchWriteExecStats stats;
 
         ClusterWriter::write(opCtx, request, &stats, &response);
-        return response.toStatus();
+        uassertStatusOK(response.toStatus());
     };
 
     _doRemove(NamespaceString::kLogicalSessionsNamespace,
