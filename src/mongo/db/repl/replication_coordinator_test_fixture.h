@@ -76,6 +76,20 @@ public:
      */
     static BSONObj addProtocolVersion(const BSONObj& configDoc, int protocolVersion);
 
+    /**
+     * Helpers to construct a config.
+     */
+    static BSONObj member(int id, std::string host) {
+        return BSON("_id" << id << "host" << host);
+    }
+
+    static BSONObj configWithMembers(int version, long long term, BSONArray members) {
+        return BSON("_id"
+                    << "mySet"
+                    << "protocolVersion" << 1 << "version" << version << "term" << term << "members"
+                    << members);
+    }
+
 protected:
     ReplCoordTest();
     virtual ~ReplCoordTest();
