@@ -34,6 +34,8 @@
 namespace mongo {
 /**
  * An "OutOfLineExecutor" that actually runs on the same thread of execution
+ * This executor is not thread-safe, and accessing it by multiple threads is prohibited.
+ * Multi-threaded accesses to instances of "InlineCountingExecutor" result in undefined behavior.
  */
 class InlineCountingExecutor : public OutOfLineExecutor {
 public:

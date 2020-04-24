@@ -274,14 +274,14 @@ TEST(SharedFuture, ConcurrentTest_OneSharedFuture) {
     while (nTries--) {
         const auto nThreads = 16;
         auto threads = std::vector<stdx::thread>(nThreads);
-        const auto exec = InlineCountingExecutor::make();
 
         SharedPromise<void> promise;
 
         auto shared = promise.getFuture();
 
         for (int i = 0; i < nThreads; i++) {
-            threads[i] = stdx::thread([i, &shared, &exec] {
+            threads[i] = stdx::thread([i, &shared] {
+                auto exec = InlineCountingExecutor::make();
                 if (i % 5 == 0) {
                     // just wait directly on shared.
                     shared.get();
@@ -319,13 +319,13 @@ TEST(SharedFuture, ConcurrentTest_ManySharedFutures) {
     while (nTries--) {
         const auto nThreads = 16;
         auto threads = std::vector<stdx::thread>(nThreads);
-        const auto exec = InlineCountingExecutor::make();
 
         SharedPromise<void> promise;
 
         for (int i = 0; i < nThreads; i++) {
-            threads[i] = stdx::thread([i, &promise, &exec] {
+            threads[i] = stdx::thread([i, &promise] {
                 auto shared = promise.getFuture();
+                auto exec = InlineCountingExecutor::make();
 
                 if (i % 5 == 0) {
                     // just wait directly on shared.
