@@ -90,7 +90,9 @@ auto makeEgressHooksList(ServiceContext* service) {
  * Updates the config server field of the shardIdentity document with the given connection string if
  * setName is equal to the config server replica set name.
  */
-class ShardingReplicaSetChangeListener final : public ReplicaSetChangeNotifier::Listener {
+class ShardingReplicaSetChangeListener final
+    : public ReplicaSetChangeNotifier::Listener,
+      public std::enable_shared_from_this<ShardingReplicaSetChangeListener> {
 public:
     ShardingReplicaSetChangeListener(ServiceContext* serviceContext)
         : _serviceContext(serviceContext) {}
@@ -110,49 +112,24 @@ public:
             LOGV2(471692, "Unable to update the shard registry", "error"_attr = e);
         }
 
-        Grid::get(_serviceContext)
-            ->getExecutorPool()
-            ->getFixedExecutor()
-            ->schedule([serviceContext = _serviceContext, connStr](Status status) {
-                if (ErrorCodes::isCancelationError(status.code())) {
-                    LOGV2_DEBUG(22067,
-                                2,
-                                "Unable to schedule confirmed replica set update due to {error}",
-                                "Unable to schedule confirmed replica set update",
-                                "error"_attr = status);
-                    return;
-                }
-                invariant(status);
+        auto setName = connStr.getSetName();
+        bool updateInProgress = false;
+        {
+            stdx::lock_guard lock(_mutex);
+            if (!_hasUpdateState(lock, setName)) {
+                _updateStates.emplace(setName, std::make_shared<ReplSetConfigUpdateState>());
+            }
 
-                try {
-                    LOGV2(22068,
-                          "Updating config server with confirmed replica set {connectionString}",
-                          "Updating config server with confirmed replica set",
-                          "connectionString"_attr = connStr);
+            auto updateState = _updateStates.at(setName);
+            updateState->nextUpdateToSend = connStr;
+            updateInProgress = updateState->updateInProgress;
+        }
 
-                    if (MONGO_unlikely(failUpdateShardIdentityConfigString.shouldFail())) {
-                        return;
-                    }
-
-                    auto configsvrConnStr = Grid::get(serviceContext)
-                                                ->shardRegistry()
-                                                ->getConfigServerConnectionString();
-
-                    // Only proceed if the notification is for the configsvr
-                    if (configsvrConnStr.getSetName() != connStr.getSetName()) {
-                        return;
-                    }
-
-                    ThreadClient tc("updateShardIdentityConfigString", serviceContext);
-                    auto opCtx = tc->makeOperationContext();
-
-                    ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(),
-                                                                                  connStr);
-                } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-                    LOGV2(22069, "Unable to update config server", "error"_attr = e);
-                }
-            });
+        if (!updateInProgress) {
+            _scheduleUpdateShardIdentityConfigString(setName);
+        }
     }
+
     void onPossibleSet(const State& state) noexcept final {
         try {
             Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(state.connStr);
@@ -163,10 +140,116 @@ public:
                         "error"_attr = ex);
         }
     }
+
     void onDroppedSet(const Key&) noexcept final {}
 
 private:
+    // Schedules updates to the shard identity config string while preserving order.
+    void _scheduleUpdateShardIdentityConfigString(std::string setName) {
+        ConnectionString update;
+        {
+            stdx::lock_guard lock(_mutex);
+            if (!_hasUpdateState(lock, setName)) {
+                return;
+            }
+            auto updateState = _updateStates.at(setName);
+            if (updateState->updateInProgress) {
+                return;
+            }
+            updateState->updateInProgress = true;
+            update = updateState->nextUpdateToSend.get();
+            updateState->nextUpdateToSend = boost::none;
+        }
+
+        auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
+        executor->schedule([self = shared_from_this(), setName, update](Status status) {
+            self->_updateShardIdentityConfigString(status, setName, update);
+        });
+    }
+
+    void _updateShardIdentityConfigString(Status status,
+                                          std::string setName,
+                                          ConnectionString update) {
+        if (ErrorCodes::isCancelationError(status.code())) {
+            LOGV2_DEBUG(22067,
+                        2,
+                        "Unable to schedule confirmed replica set update due to {error}",
+                        "Unable to schedule confirmed replica set update",
+                        "error"_attr = status);
+            stdx::lock_guard lk(_mutex);
+            _updateStates.erase(setName);
+            return;
+        }
+        invariant(status);
+
+        if (MONGO_unlikely(failUpdateShardIdentityConfigString.shouldFail())) {
+            _endUpdateShardIdentityConfigString(setName, update);
+            return;
+        }
+
+        auto configsvrConnStr =
+            Grid::get(_serviceContext)->shardRegistry()->getConfigServerConnectionString();
+
+        // Only proceed if the notification is for the configsvr.
+        if (configsvrConnStr.getSetName() != update.getSetName()) {
+            _endUpdateShardIdentityConfigString(setName, update);
+            return;
+        }
+
+        try {
+            LOGV2(22068,
+                  "Updating shard identity config string with confirmed replica set "
+                  "{connectionString}",
+                  "Updating shard identity config string with confirmed replica set",
+                  "connectionString"_attr = update);
+
+
+            ThreadClient tc("updateShardIdentityConfigString", _serviceContext);
+            auto opCtx = tc->makeOperationContext();
+            ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), update);
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+            LOGV2(22069, "Unable to update shard identity config string", "error"_attr = e);
+        } catch (...) {
+            _endUpdateShardIdentityConfigString(setName, update);
+            throw;
+        }
+        _endUpdateShardIdentityConfigString(setName, update);
+    }
+
+    void _endUpdateShardIdentityConfigString(std::string setName, ConnectionString update) {
+        bool moreUpdates = false;
+        {
+            stdx::lock_guard lock(_mutex);
+            invariant(_hasUpdateState(lock, setName));
+            auto updateState = _updateStates.at(setName);
+            updateState->updateInProgress = false;
+            moreUpdates = (updateState->nextUpdateToSend != boost::none);
+            if (!moreUpdates) {
+                _updateStates.erase(setName);
+            }
+        }
+        if (moreUpdates) {
+            auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
+            executor->schedule([self = shared_from_this(), setName](auto args) {
+                self->_scheduleUpdateShardIdentityConfigString(setName);
+            });
+        }
+    }
+
+    // Returns true if a ReplSetConfigUpdateState exists for replica set setName.
+    bool _hasUpdateState(WithLock, std::string setName) {
+        return (_updateStates.find(setName) != _updateStates.end());
+    }
+
     ServiceContext* _serviceContext;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingReplicaSetChangeListenerMongod::mutex");
+
+    struct ReplSetConfigUpdateState {
+        bool updateInProgress = false;
+        boost::optional<ConnectionString> nextUpdateToSend;
+    };
+
+    stdx::unordered_map<std::string, std::shared_ptr<ReplSetConfigUpdateState>> _updateStates;
 };
 
 }  // namespace
