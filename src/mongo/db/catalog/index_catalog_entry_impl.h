@@ -240,9 +240,12 @@ private:
     // called.
     bool _indexTracksPathLevelMultikeyInfo = false;
 
-    // Set to true if this index is multikey. '_isMultikey' serves as a cache of the information
-    // stored in the NamespaceDetails or DurableCatalog.
-    AtomicWord<bool> _isMultikey;
+    // Set to true if this index may contain multikey data.
+    AtomicWord<bool> _isMultikeyForRead;
+
+    // Set to true after a transaction commit successfully updates multikey on the catalog data. At
+    // this point, future writers do not need to update the catalog.
+    AtomicWord<bool> _isMultikeyForWrite;
 
     // Controls concurrent access to '_indexMultikeyPaths'. We acquire this mutex rather than the
     // RESOURCE_METADATA lock as a performance optimization so that it is cheaper to detect whether
