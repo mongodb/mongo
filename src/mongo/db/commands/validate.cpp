@@ -122,16 +122,15 @@ public:
         }
 
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+        bool background = cmdObj["background"].trueValue();
 
-        const bool background = cmdObj["background"].trueValue();
-
-        // Background validation requires the storage engine to support checkpoints because it
-        // performs the validation on a checkpoint using checkpoint cursors.
-        if (background && !opCtx->getServiceContext()->getStorageEngine()->supportsCheckpoints()) {
-            uasserted(ErrorCodes::CommandNotSupported,
-                      str::stream() << "Running validate on collection " << nss
-                                    << " with { background: true } is not supported on the "
-                                    << storageGlobalParams.engine << " storage engine");
+        // Background validation is not supported on the ephemeralForTest storage engine due to its
+        // lack of support for timestamps. Switch the mode to foreground validation instead.
+        if (background && storageGlobalParams.engine == "ephemeralForTest") {
+            LOGV2(4775400,
+                  "ephemeralForTest does not support background validation, switching to "
+                  "foreground validation.");
+            background = false;
         }
 
         const bool fullValidate = cmdObj["full"].trueValue();
@@ -143,10 +142,10 @@ public:
 
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,
-                  "CMD: validate {nss_ns}{background_background_true}{fullValidate_full_true}",
-                  "nss_ns"_attr = nss.ns(),
-                  "background_background_true"_attr = (background ? ", background:true" : ""),
-                  "fullValidate_full_true"_attr = (fullValidate ? ", full:true" : ""));
+                  "CMD: validate",
+                  "namespace"_attr = nss,
+                  "background"_attr = background,
+                  "full"_attr = fullValidate);
         }
 
         // Only one validation per collection can be in progress, the rest wait.

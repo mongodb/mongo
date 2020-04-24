@@ -27,13 +27,6 @@ class ValidateCollectionsInBackground(jsfile.JSHook):
 
     def before_suite(self, test_report):
         """Start the background thread."""
-        server_status = self.fixture.mongo_client().admin.command("serverStatus")
-        if not server_status["storageEngine"].get("supportsCheckpointCursors", False):
-            self.logger.info(
-                "Not enabling the background collection validation thread because '%s' storage"
-                " engine does not support checkpoints.", server_status["storageEngine"]["name"])
-            return
-
         self._background_job = _BackgroundJob("ValidateCollectionsInBackground")
         self.logger.info("Starting the background collection validation thread.")
         self._background_job.start()
