@@ -184,6 +184,9 @@ public:
         }
 
         result.appendBool("valid", validateResults.valid);
+        if (validateResults.readTimestamp) {
+            result.append("readTimestamp", validateResults.readTimestamp.get());
+        }
         result.append("warnings", validateResults.warnings);
         result.append("errors", validateResults.errors);
         result.append("extraIndexEntries", validateResults.extraIndexEntries);

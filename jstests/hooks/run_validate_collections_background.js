@@ -96,6 +96,7 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
                 return z.name;
             });
 
+    conn.adminCommand({configureFailPoint: "crashOnMultikeyValidateFailure", mode: "alwaysOn"});
     for (let dbName of dbNames) {
         let db = conn.getDB(dbName);
 
@@ -121,6 +122,7 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
             }
         }
     }
+    conn.adminCommand({configureFailPoint: "crashOnMultikeyValidateFailure", mode: "off"});
 
     // If any commands failed, format and return an error.
     if (failedValidateResults.length) {

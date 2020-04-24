@@ -180,6 +180,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         opCtx, _collection->getRecordStore(), &_dataThrottle);
     _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
         opCtx, _collection->getRecordStore(), &_dataThrottle);
+    _validateTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
 
     const IndexCatalog* indexCatalog = _collection->getIndexCatalog();
     // The index iterator for ready indexes is timestamp-aware and will only return indexes that

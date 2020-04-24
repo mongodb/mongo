@@ -172,10 +172,9 @@ void _validateIndexes(OperationContext* opCtx,
             }
         }
 
-        if (curIndexResults.valid) {
-            keysPerIndex->appendNumber(descriptor->indexName(),
-                                       static_cast<long long>(numTraversedKeys));
-        } else {
+        keysPerIndex->appendNumber(descriptor->indexName(),
+                                   static_cast<long long>(numTraversedKeys));
+        if (!curIndexResults.valid) {
             results->valid = false;
         }
     }
@@ -261,6 +260,8 @@ void _reportValidationResults(OperationContext* opCtx,
                               ValidateResults* results,
                               BSONObjBuilder* output) {
     std::unique_ptr<BSONObjBuilder> indexDetails;
+
+    results->readTimestamp = validateState->getValidateTimestamp();
 
     if (validateState->isFullIndexValidation()) {
         invariant(opCtx->lockState()->isCollectionLockedForMode(validateState->nss(), MODE_X));

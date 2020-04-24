@@ -50,10 +50,13 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(crashOnMultikeyValidateFailure);
 
 const long long kInterruptIntervalNumRecords = 4096;
 const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
@@ -126,6 +129,9 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             ValidateResults& curRecordResults = (*_indexNsResultsMap)[descriptor->indexName()];
             curRecordResults.errors.push_back(msg);
             curRecordResults.valid = false;
+            if (crashOnMultikeyValidateFailure.shouldFail()) {
+                invariant(false, msg);
+            }
         }
 
         if (descriptor->isMultikey()) {
