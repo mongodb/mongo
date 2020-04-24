@@ -66,7 +66,9 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         std::move(processInterface),
                         std::move(resolvedNamespaces),
                         std::move(collUUID),
+                        request.letParameters,
                         mayDbProfile) {
+
     if (request.getIsMapReduceCommand()) {
         // mapReduce command JavaScript invocation is only subject to the server global
         // 'jsHeapLimitMB' limit.
@@ -88,8 +90,8 @@ ExpressionContext::ExpressionContext(
     const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
     boost::optional<UUID> collUUID,
-    bool mayDbProfile,
-    const boost::optional<BSONObj>& letParameters)
+    const boost::optional<BSONObj>& letParameters,
+    bool mayDbProfile)
     : explain(explain),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
@@ -217,8 +219,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     std::move(collator),
                                                     mongoProcessInterface,
                                                     _resolvedNamespaces,
-                                                    uuid,
-                                                    mayDbProfile);
+                                                    uuid);
 
     expCtx->inMongos = inMongos;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;

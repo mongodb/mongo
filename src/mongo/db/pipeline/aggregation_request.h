@@ -65,6 +65,7 @@ public:
     static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
     static constexpr StringData kUse44SortKeys = "use44SortKeys"_sd;
     static constexpr StringData kIsMapReduceCommand = "isMapReduceCommand"_sd;
+    static constexpr StringData kLet = "let"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -289,6 +290,10 @@ public:
     void setIsMapReduceCommand(bool isMapReduce) {
         _isMapReduceCommand = isMapReduce;
     }
+
+    // A document containing user-specified let parameter constants; i.e. values that do not change
+    // once computed.
+    BSONObj letParameters;
 
 private:
     // Required fields.

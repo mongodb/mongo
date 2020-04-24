@@ -77,6 +77,7 @@ public:
                             std::make_shared<StubMongoProcessInterface>(),
                             {},    // resolvedNamespaces
                             {},    // collUUID
+                            {},    // let
                             false  // mayDbProfile
           ) {
         // If there is an existing global ServiceContext, adopt it. Otherwise, create a new context.
@@ -127,6 +128,7 @@ public:
                             std::make_shared<StubMongoProcessInterface>(),
                             {},    // resolvedNamespaces
                             {},    // collUUID
+                            {},    // let
                             false  // mayDbProfile
                             ),
           _serviceContext(opCtx->getServiceContext()) {

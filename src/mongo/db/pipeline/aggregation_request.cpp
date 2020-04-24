@@ -36,6 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
@@ -189,19 +190,27 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             auto writeConcern = uassertStatusOK(WriteConcernOptions::parse(elem.embeddedObject()));
             request.setWriteConcern(writeConcern);
         } else if (kRuntimeConstants == fieldName) {
+            // TODO SERVER-46384: Remove 'runtimeConstants' in 4.5 since it is redundant with 'let'
             try {
                 IDLParserErrorContext ctx("internalRuntimeConstants");
                 request.setRuntimeConstants(RuntimeConstants::parse(ctx, elem.Obj()));
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
+        } else if (kLet == fieldName) {
+            if (elem.type() != BSONType::Object)
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << fieldName << " must be an object, not a " << typeName(elem.type())};
+            auto bob = BSONObjBuilder{request.letParameters};
+            bob.appendElementsUnique(elem.embeddedObject());
+            request.letParameters = bob.obj();
         } else if (fieldName == kUse44SortKeys) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << kUse44SortKeys << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
-
             // TODO SERVER-47065: A 4.6 node still has to accept the 'use44SortKeys' field, since it
             // could be included in a command sent from a 4.4 mongos or 4.4 mongod. In 4.7, this
             // code to tolerate the 'use44SortKeys' field can be deleted.
@@ -316,6 +325,7 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize runtime constants if any were specified.
         {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
         {kIsMapReduceCommand, _isMapReduceCommand ? Value(true) : Value()},
+        {kLet, !letParameters.isEmpty() ? Value(letParameters) : Value()},
     };
 }
 }  // namespace mongo

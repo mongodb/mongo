@@ -61,22 +61,21 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
     ASSERT_OK(logicalClock->advanceClusterTime(t1));
     LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
     {
-        const auto expCtx = ExpressionContext{
-            opCtx.get(),
-            {},     // explain
-            false,  // fromMongos
-            false,  // needsMerge
-            false,  // allowDiskUse
-            false,  // bypassDocumentValidation
-            false,  // isMapReduce
-            NamespaceString{"test"_sd, "namespace"_sd},
-            {},  // runtime constants
-            {},  // collator
-            std::make_shared<StubMongoProcessInterface>(),
-            {},  // resolvedNamespaces
-            {},  // collUUID
-            false,
-        };
+        const auto expCtx = ExpressionContext{opCtx.get(),
+                                              {},     // explain
+                                              false,  // fromMongos
+                                              false,  // needsMerge
+                                              false,  // allowDiskUse
+                                              false,  // bypassDocumentValidation
+                                              false,  // isMapReduce
+                                              NamespaceString{"test"_sd, "namespace"_sd},
+                                              {},  // runtime constants
+                                              {},  // collator
+                                              std::make_shared<StubMongoProcessInterface>(),
+                                              {},  // resolvedNamespaces
+                                              {},  // collUUID
+                                              {},  // let
+                                              false};
         ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
         ASSERT_DOES_NOT_THROW(
             static_cast<void>(expCtx.variables.getValue(Variables::kClusterTimeId)));
@@ -95,6 +94,7 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
                                               std::make_shared<StubMongoProcessInterface>(),
                                               {},  // resolvedNamespaces
                                               {},  // collUUID
+                                              {},  // let
                                               false};
         ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
         ASSERT_DOES_NOT_THROW(
@@ -114,6 +114,7 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
                                               std::make_shared<StubMongoProcessInterface>(),
                                               {},  // resolvedNamespaces
                                               {},  // collUUID
+                                              {},  // let
                                               false};
         ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
         ASSERT_DOES_NOT_THROW(
@@ -136,8 +137,8 @@ TEST_F(ExpressionContextTest, ParametersCanContainExpressionsWhichAreFolded) {
                                           std::make_shared<StubMongoProcessInterface>(),
                                           {},  // resolvedNamespaces
                                           {},  // collUUID
-                                          false,
-                                          BSON("atan2" << BSON("$atan2" << BSON_ARRAY(0 << 1)))};
+                                          BSON("atan2" << BSON("$atan2" << BSON_ARRAY(0 << 1))),
+                                          false};
     ASSERT_EQUALS(
         0.0,
         expCtx.variables.getValue(expCtx.variablesParseState.getVariable("atan2")).getDouble());
@@ -158,11 +159,11 @@ TEST_F(ExpressionContextTest, ParametersCanReferToAlreadyDefinedParameters) {
                                           std::make_shared<StubMongoProcessInterface>(),
                                           {},  // resolvedNamespaces
                                           {},  // collUUID
-                                          false,
                                           BSON("a" << 12 << "b"
                                                    << "$$a"
                                                    << "c"
-                                                   << "$$b")};
+                                                   << "$$b"),
+                                          false};
     ASSERT_EQUALS(
         12.0, expCtx.variables.getValue(expCtx.variablesParseState.getVariable("c")).getDouble());
 }
@@ -182,8 +183,8 @@ TEST_F(ExpressionContextTest, ParametersCanOverwriteInLeftToRightOrder) {
                                           std::make_shared<StubMongoProcessInterface>(),
                                           {},  // resolvedNamespaces
                                           {},  // collUUID
-                                          false,
-                                          BSON("x" << 12 << "b" << 10 << "x" << 20)};
+                                          BSON("x" << 12 << "b" << 10 << "x" << 20),
+                                          false};
     ASSERT_EQUALS(
         20, expCtx.variables.getValue(expCtx.variablesParseState.getVariable("x")).getDouble());
 }
@@ -204,9 +205,9 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfNonConstant) {
                                             std::make_shared<StubMongoProcessInterface>(),
                                             {},  // resolvedNamespaces
                                             {},  // collUUID
-                                            false,
                                             BSON("a"
-                                                 << "$b")}),
+                                                 << "$b"),
+                                            false}),
         DBException,
         31474);
 }
@@ -227,8 +228,8 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfUppercase) {
                                             std::make_shared<StubMongoProcessInterface>(),
                                             {},  // resolvedNamespaces
                                             {},  // collUUID
-                                            false,
-                                            BSON("A" << 12)}),
+                                            BSON("A" << 12),
+                                            false}),
         DBException,
         16867);
 }

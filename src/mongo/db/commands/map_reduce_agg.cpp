@@ -97,6 +97,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         MongoProcessInterface::create(opCtx),
         StringMap<ExpressionContext::ResolvedNamespace>{},  // resolvedNamespaces
         uuid,
+        boost::none,                             // let
         CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
     );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";

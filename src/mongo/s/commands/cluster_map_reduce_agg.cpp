@@ -102,7 +102,8 @@ auto makeExpressionContext(OperationContext* opCtx,
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
         std::move(resolvedNamespaces),
         boost::none,  // uuid
-        false         // mayDbProfile: false because mongos has no profile collection.
+        boost::none,
+        false  // mayDbProfile: false because mongos has no profile collection.
     );
     expCtx->inMongos = true;
     return expCtx;
