@@ -38,7 +38,7 @@ MongosIsMasterResponse::MongosIsMasterResponse(TopologyVersion topologyVersion) 
 }
 
 void MongosIsMasterResponse::appendToBuilder(BSONObjBuilder* builder) const {
-    builder->append(kIsMasterFieldName, "true");
+    builder->append(kIsMasterFieldName, true);
     builder->append(kMsgFieldName, "isdbgrid");
 
     BSONObjBuilder topologyVersionBuilder(builder->subobjStart(kTopologyVersionFieldName));
