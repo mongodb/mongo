@@ -49,13 +49,13 @@ jsTestLog("Wait for primary to reach collection scan phase.");
 IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, collName, 'i_1');
 
 rollbackTest.transitionToRollbackOperations();
-rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 
 jsTestLog("Resume index builds.");
-IndexBuildTest.resumeIndexBuilds(secondary);
 IndexBuildTest.resumeIndexBuilds(primary);
+IndexBuildTest.resumeIndexBuilds(secondary);
 
+rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
 
 let newPrimary = rollbackTest.getPrimary();
