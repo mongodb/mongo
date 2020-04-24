@@ -711,15 +711,14 @@ TEST(OpMsg, ServerRejectsExhaustIsMasterWithoutMaxAwaitTimeMS) {
 
 TEST(OpMsg, ServerStatusCorrectlyShowsExhaustIsMasterMetrics) {
     std::string errMsg;
-    auto fixtureConn = std::unique_ptr<DBClientBase>(
+    auto conn = std::unique_ptr<DBClientBase>(
         unittest::getFixtureConnectionString().connect("integration_test", errMsg));
-    uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
-    DBClientBase* conn = fixtureConn.get();
+    uassert(ErrorCodes::SocketException, errMsg, conn);
 
-    if (fixtureConn->isReplicaSetMember()) {
-        // Connect directly to the primary.
-        conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
-        ASSERT(conn);
+    if (conn->isReplicaSetMember()) {
+        // Don't run on replica sets as the RSM will use the streamable isMaster protocol by
+        // default. This can cause inconsistencies in our metrics tests.
+        return;
     }
 
     // Wait for stale exhuast streams to finish closing before testing the exhaust isMaster metrics.
@@ -771,15 +770,14 @@ TEST(OpMsg, ServerStatusCorrectlyShowsExhaustIsMasterMetrics) {
 TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream) {
     std::string errMsg;
     const auto conn1AppName = "integration_test";
-    auto fixtureConn = std::unique_ptr<DBClientBase>(
+    auto conn1 = std::unique_ptr<DBClientBase>(
         unittest::getFixtureConnectionString().connect(conn1AppName, errMsg));
-    uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
-    DBClientBase* conn1 = fixtureConn.get();
+    uassert(ErrorCodes::SocketException, errMsg, conn1);
 
-    if (fixtureConn->isReplicaSetMember()) {
-        // Connect directly to the primary.
-        conn1 = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
-        ASSERT(conn1);
+    if (conn1->isReplicaSetMember()) {
+        // Don't run on replica sets as the RSM will use the streamable isMaster protocol by
+        // default. This can cause inconsistencies in our metrics tests.
+        return;
     }
 
     // Wait for stale exhuast streams to finish closing before testing the exhaust isMaster metrics.
@@ -862,15 +860,14 @@ TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream)
 TEST(OpMsg, ExhaustIsMasterMetricOnNewExhaustIsMasterAfterTerminatingExhaustStream) {
     std::string errMsg;
     const auto conn1AppName = "integration_test";
-    auto fixtureConn = std::unique_ptr<DBClientBase>(
+    auto conn1 = std::unique_ptr<DBClientBase>(
         unittest::getFixtureConnectionString().connect(conn1AppName, errMsg));
-    uassert(ErrorCodes::SocketException, errMsg, fixtureConn);
-    DBClientBase* conn1 = fixtureConn.get();
+    uassert(ErrorCodes::SocketException, errMsg, conn1);
 
-    if (fixtureConn->isReplicaSetMember()) {
-        // Connect directly to the primary.
-        conn1 = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
-        ASSERT(conn1);
+    if (conn1->isReplicaSetMember()) {
+        // Don't run on replica sets as the RSM will use the streamable isMaster protocol by
+        // default. This can cause inconsistencies in our metrics tests.
+        return;
     }
 
     // Wait for stale exhuast streams to finish closing before testing the exhaust isMaster metrics.
