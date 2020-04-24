@@ -370,6 +370,7 @@ variables:
   - enterprise-ubuntu1804-arm64
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
+  - enterprise-ubuntu2004-64
   - enterprise-windows
   - enterprise-windows-compile-all
   - enterprise-windows-debug-unoptimized
@@ -436,10 +437,12 @@ variables:
   - ubuntu1804
   - ubuntu1804-arm64
   - ubuntu1804-s390x
+  - ubuntu2004
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu1804-arm64
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
+  - enterprise-ubuntu2004-64
   - enterprise-windows
   - windows
 
@@ -9267,6 +9270,108 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu1804-test
+
+- name: ubuntu2004
+  display_name: Ubuntu 20.04
+  run_on:
+  - ubuntu2004-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-ubuntu2004
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu2004
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu2004
+    repo_edition: org
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu2004-large
+  - name: .aggfuzzer .common !.multiversion
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency
+    distros:
+      - ubuntu2004-large
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  # - name: multiversion_gen
+  - name: replica_sets
+  - name: replica_sets_jscore_passthrough
+  - name: .sharding .txns
+  - name: sharding_gen
+  - name: sharding_jscore_passthrough
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+    distros:
+    - ubuntu2004-small
+
+- name: enterprise-ubuntu2004-64
+  display_name: Enterprise Ubuntu 20.04
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu2004-small
+  stepback: false
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-ubuntu2004
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu2004
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: ubuntu2004
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu2004-large
+  - name: compile_ninja_TG
+  - name: .aggfuzzer .common !.multiversion
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: jsCore_auth
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: .ocsp
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: test_packages
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+    distros:
+    - ubuntu2004-small
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
