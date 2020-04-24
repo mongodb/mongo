@@ -56,8 +56,9 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     if (!atClusterTime)
         return;
 
-    // TODO (SERVER-47472): The execution leading to here will guarantee that the metadata is always
-    // known, so the !metadata check can be removed
+    // TODO (SERVER-47701): As part of enabling transition from a replica-set to sharded cluster,
+    // without requiring application downtime, these checks need to be revisited. Ideally this code
+    // should not be reached upon direct writes to a shard.
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded())
         return;
