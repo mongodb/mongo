@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/sessions_collection_sharded.h"
 
 namespace mongo {
 
