@@ -10,7 +10,11 @@
  * needs to pick a read timestamp that is not derived from the commit point, but rather from the
  * 'lastApplied' optime on the primary.
  *
- * @tags: [uses_transactions, requires_find_command]
+ * @tags: [
+ *   uses_transactions,
+ *   requires_find_command,
+ *   need_fixing_for_46
+ * ]
  */
 
 (function() {

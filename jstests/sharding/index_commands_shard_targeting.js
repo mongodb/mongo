@@ -2,6 +2,7 @@
  * Test that the index commands send and check shard versions, and only target the shards
  * that have chunks for the collection. Also test that the commands fail if they are run
  * when the critical section is in progress, and block until the critical section is over.
+ * @tags: [need_fixing_for_46]
  */
 (function() {
 "use strict";

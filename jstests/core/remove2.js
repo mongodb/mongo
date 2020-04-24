@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [requires_non_retryable_writes, need_fixing_for_46]
 
 // remove2.js
 // a unit test for db remove

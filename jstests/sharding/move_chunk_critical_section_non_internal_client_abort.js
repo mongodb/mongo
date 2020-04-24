@@ -1,6 +1,8 @@
 /**
  * Tests that a moveChunk operation is properly aborted when an index command is received from a
  * non-internal client while in the critical section.
+ *
+ * @tags: [need_fixing_for_46]
  */
 (function() {
 "use strict";

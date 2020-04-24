@@ -2,6 +2,7 @@
  * Test TransientTransactionError error label for commands in transactions with write concern.
  * @tags: [
  *   uses_transactions,
+ *   need_fixing_for_46
  * ]
  */
 (function() {

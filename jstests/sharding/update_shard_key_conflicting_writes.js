@@ -5,7 +5,12 @@
  * Use the 'requires_find_command' tag to skip this test in sharding_op_query suite. Otherwise,
  * sessionDB.coll.find() will throw "Cannot run a legacy query on a session".
  *
- * @tags: [requires_find_command, uses_transactions, uses_multi_shard_transaction]
+ * @tags: [
+ *   requires_find_command,
+ *   uses_transactions,
+ *   uses_multi_shard_transaction,
+ *   need_fixing_for_46
+ * ]
  */
 
 (function() {

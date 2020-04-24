@@ -5,7 +5,10 @@
 
 // This test triggers a compiler bug that causes a crash when compiling with optimizations on, see
 // SERVER-36321.
-// @tags: [blacklist_from_rhel_67_s390x]
+// @tags: [
+//   blacklist_from_rhel_67_s390x,
+//   need_fixing_for_46
+// ]
 (function() {
 'use strict';
 

@@ -5,7 +5,10 @@
  * This test requrires persistence because it asumes the shard will still have it's data after
  * restarting
  *
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   need_fixing_for_46
+ * ]
  */
 (function() {
 'use strict';

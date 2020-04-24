@@ -4,7 +4,10 @@
 //
 // We restart a mongod to cause it to forget that a collection was sharded. When restarted, we
 // expect it to still have all the previous data.
-// @tags: [requires_persistence]
+// @tags: [
+//   requires_persistence,
+//   need_fixing_for_46
+// ]
 (function() {
 "use strict";
 

@@ -1,6 +1,5 @@
 /**
  * tests sharding with replica sets
- * @tags: [need_fixing_for_46]
  */
 (function() {
 'use strict';

@@ -26,6 +26,7 @@
  *   requires_majority_read_concern,
  *   requires_profiling,
  *   uses_transactions,
+ *   need_fixing_for_46
  * ]
  */
 (function() {
