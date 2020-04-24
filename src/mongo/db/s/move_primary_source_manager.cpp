@@ -82,12 +82,16 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
           "toShard"_attr = _toShard);
 
     // Record start in changelog
-    uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
+    auto logChangeCheckedStatus = ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "movePrimary.start",
         _dbname.toString(),
         _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
-        ShardingCatalogClient::kMajorityWriteConcern));
+        ShardingCatalogClient::kMajorityWriteConcern);
+
+    if (!logChangeCheckedStatus.isOK()) {
+        return logChangeCheckedStatus;
+    }
 
     {
         // We use AutoGetOrCreateDb the first time just in case movePrimary was called before any
@@ -119,7 +123,9 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         Shard::RetryPolicy::kNotIdempotent);
 
     auto cloneCommandStatus = Shard::CommandResponse::getEffectiveStatus(cloneCommandResponse);
-    uassertStatusOK(cloneCommandStatus);
+    if (!cloneCommandStatus.isOK()) {
+        return cloneCommandStatus;
+    }
 
     auto clonedCollsArray = cloneCommandResponse.getValue().response["clonedColls"];
     for (const auto& elem : clonedCollsArray.Obj()) {
@@ -139,7 +145,10 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
     auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
 
     // Mark the shard as running a critical operation that requires recovery on crash.
-    uassertStatusOK(ShardingStateRecovery::startMetadataOp(opCtx));
+    auto startMetadataOpStatus = ShardingStateRecovery::startMetadataOp(opCtx);
+    if (!startMetadataOpStatus.isOK()) {
+        return startMetadataOpStatus;
+    }
 
     {
         // The critical section must be entered with the database X lock in order to ensure there
