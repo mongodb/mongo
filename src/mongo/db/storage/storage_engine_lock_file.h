@@ -92,6 +92,8 @@ public:
     void clearPidAndUnlock();
 
 private:
+    std::string _getNonExistentPathMessage() const;
+
     std::string _dbpath;
     std::string _filespec;
     bool _uncleanShutdown;
