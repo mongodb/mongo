@@ -360,7 +360,10 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
 
     installed_files = []
     for s in source:
-        if not target:
+
+        target_for_source = target
+
+        if not target_for_source:
 
             # AIB currently uses file suffixes to do mapping. However, sometimes we need
             # to do the mapping based on a different suffix. This is used for things like
@@ -377,6 +380,8 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
                     "No target provided and no auto install mapping found for:", str(s)
                 )
 
+            target_for_source = auto_install_mapping.directory
+
         # We've already auto installed this file and it may have belonged to a
         # different role since it wouldn't get retagged above. So we just skip
         # this files since SCons will already wire the dependency since s is a
@@ -389,12 +394,13 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
 
         # We must do an early subst here so that the _aib_debugdir
         # generator has a chance to run while seeing 'source'.
-        target = env.Dir(env.subst(target, source=s))
+        target_for_source = env.Dir(env.subst('$DESTDIR/$TARGET', target=target_for_source, source=s))
+
         aib_additional_directory = getattr(s.attributes, "aib_additional_directory", None)
         if aib_additional_directory is not None:
-            target = env.Dir(aib_additional_directory, directory=target)
+            target_for_source = env.Dir(aib_additional_directory, directory=target_for_source)
 
-        new_installed_files = env.Install(target=target, source=s)
+        new_installed_files = env.Install(target=target_for_source, source=s)
         setattr(s.attributes, INSTALLED_FILES, new_installed_files)
 
         installed_files.extend(new_installed_files)
@@ -499,42 +505,9 @@ def add_suffix_mapping(env, suffix, role=None):
     env[SUFFIX_MAP].update({env.subst(key): value for key, value in suffix.items()})
 
 
-def suffix_mapping(env, directory=False, default_role=False):
+def suffix_mapping(env, directory="", default_role=False):
     """Generate a SuffixMap object from source and target."""
     return SuffixMap(directory=directory, default_role=default_role)
-
-
-def dest_dir_generator(initial_value=None):
-    """Memoized dest_dir_generator"""
-    dd = (None, None)
-
-    def generator(source, target, env, for_signature):
-        nonlocal dd
-
-        # SCons does not perform substitution for "sub" Dir calls on a
-        # Dir Node. Additionally we need to determine if it's an
-        # absolute path here because if it is the sub Dir call will
-        # not expand correctly.
-        prefix = env.subst("$PREFIX")
-        if prefix and prefix[0] == "/":
-            prefix = prefix[1:]
-
-        if dd[1] is not None and dd[0] == prefix:
-            return dd[1]
-
-        if initial_value is None:
-            dest_dir = env.Dir("#install")
-        elif isinstance(initial_value, str):
-            dest_dir = env.Dir(initial_value)
-        elif isinstance(initial_value, SCons.Node.FS.Dir):
-            dest_dir = initial_value
-        else:
-            raise Exception("initial DESTDIR value must be string or Dir")
-
-        dd = (prefix, dest_dir.Dir(prefix))
-        return dd[1]
-
-    return generator
 
 
 def get_auto_installed_files(env, node):
@@ -585,12 +558,13 @@ def generate(env):  # pylint: disable=too-many-statements
 
     # Matches the autoconf documentation:
     # https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
-    env["DESTDIR"] = dest_dir_generator(env.get("DESTDIR", None))
-    env["PREFIX_BINDIR"] = env.get("PREFIX_BINDIR", "$DESTDIR/bin")
-    env["PREFIX_LIBDIR"] = env.get("PREFIX_LIBDIR", "$DESTDIR/lib")
-    env["PREFIX_SHAREDIR"] = env.get("PREFIX_SHAREDIR", "$DESTDIR/share")
+    env["DESTDIR"] = env.Dir(env.get("DESTDIR", "#install"))
+    env["PREFIX"] = env.get("PREFIX", ".")
+    env["PREFIX_BINDIR"] = env.get("PREFIX_BINDIR", "$PREFIX/bin")
+    env["PREFIX_LIBDIR"] = env.get("PREFIX_LIBDIR", "$PREFIX/lib")
+    env["PREFIX_SHAREDIR"] = env.get("PREFIX_SHAREDIR", "$PREFIX/share")
     env["PREFIX_DOCDIR"] = env.get("PREFIX_DOCDIR", "$PREFIX_SHAREDIR/doc")
-    env["PREFIX_INCLUDEDIR"] = env.get("PREFIX_INCLUDEDIR", "$DESTDIR/include")
+    env["PREFIX_INCLUDEDIR"] = env.get("PREFIX_INCLUDEDIR", "$PREFIX/include")
     env[SUFFIX_MAP] = {}
     env[ALIAS_MAP] = defaultdict(dict)
 

@@ -3879,7 +3879,6 @@ if get_option('ninja') != 'disabled':
     else:
         ninja_builder = Tool("ninja_next")
         ninja_builder.generate(env)
-        env.Default(env.Alias("install-all-meta"))
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
@@ -4156,6 +4155,9 @@ if get_option('install-mode') == 'hygienic':
                 "-Wl,-install_name,@rpath/${TARGET.file}",
             ],
         )
+
+        env.Default(env.Alias("install-default"))
+
 elif get_option('separate-debug') == "on":
     env.FatalError('Cannot use --separate-debug without --install-mode=hygienic')
 
@@ -4499,7 +4501,10 @@ if has_option("cache"):
         addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
 
 
-resmoke_install_dir = env.subst("$PREFIX_BINDIR") if get_option("install-mode") == "hygienic" else env.Dir("#").abspath
+# We need to be explicit about including $DESTDIR here, unlike most
+# other places. Normally, auto_install_binaries will take care of
+# injecting DESTDIR for us, but we aren't using that now.
+resmoke_install_dir = env.subst("$DESTDIR/$PREFIX_BINDIR") if get_option("install-mode") == "hygienic" else env.Dir("#").abspath
 resmoke_install_dir = os.path.normpath(resmoke_install_dir).replace("\\", r"\\")
 
 # Much blood sweat and tears were shed getting to this point. Any version of

@@ -166,25 +166,17 @@ def archive_builder(source, target, env, for_signature):
     #
     # We pass the common_ancestor to tar via -C so that $PREFIX is
     # preserved in the tarball.
-    dest_dir_elems = env.Dir("$DESTDIR").get_abspath()
-    prefix_elems = env.subst("$PREFIX")
-
-    # In python slicing a string with [:-0] gives an empty string. So
-    # make sure we have a prefix to slice off before trying it.
-    if prefix_elems:
-        common_ancestor = dest_dir_elems[: -len(prefix_elems)]
-    else:
-        common_ancestor = dest_dir_elems
+    common_ancestor = env.Dir("$DESTDIR")
 
     archive_type = env["__AUTO_ARCHIVE_TYPE"]
-    make_archive_script = source[0].get_abspath()
+    make_archive_script = source[0]
     tar_cmd = env.WhereIs("tar")
     if archive_type == "tar" and tar_cmd:
         command_prefix = "{tar} -C {common_ancestor} -czf {archive_name}"
     else:
         command_prefix = "{python} {make_archive_script} {archive_type} {archive_name} {common_ancestor}"
 
-    archive_name = env.File(target[0]).get_abspath()
+    archive_name = env.File(target[0])
     command_prefix = command_prefix.format(
         tar=tar_cmd,
         python=sys.executable,
@@ -231,7 +223,7 @@ def archive_builder(source, target, env, for_signature):
     # We should find a way to avoid the repeated relpath invocation, probably by
     # bucketing by directory.
     relative_files = [
-        escape_func(os.path.relpath(file.get_abspath(), common_ancestor))
+        escape_func(os.path.relpath(file.get_abspath(), common_ancestor.get_abspath()))
         for file in transitive_files
     ]
 
