@@ -89,13 +89,15 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
         return Status::OK();
     }
 
-    // This check performs some validation but it is not exhaustive and may allow for an invalid
-    // pipeline specification. In this case the authorization check will succeed but the pipeline
-    // will fail to parse later in Command::run().
-    auto statusWithPrivs = authzSession->getPrivilegesForAggregate(
-        viewOnNs,
-        BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()),
-        isMongos);
+    auto status = AggregationRequest::parseFromBSON(viewNs,
+                                                    BSON("aggregate" << viewOnNs.coll()
+                                                                     << "pipeline" << viewPipeline
+                                                                     << "cursor" << BSONObj()));
+    if (!status.isOK())
+        return status.getStatus();
+
+    auto statusWithPrivs =
+        authzSession->getPrivilegesForAggregate(viewOnNs, status.getValue(), isMongos);
     PrivilegeVector privileges = uassertStatusOK(statusWithPrivs);
     if (!authzSession->isAuthorizedForPrivileges(privileges)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
@@ -250,7 +252,7 @@ PrivilegeVector AuthorizationSessionImpl::getDefaultPrivileges() {
 }
 
 StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
-    const NamespaceString& nss, const BSONObj& cmdObj, bool isMongos) {
+    const NamespaceString& nss, const AggregationRequest& request, bool isMongos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "Invalid input namespace, " << nss.ns());
@@ -264,13 +266,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
         return privileges;
     }
 
-    auto statusWithAggRequest = AggregationRequest::parseFromBSON(nss, cmdObj);
-    if (!statusWithAggRequest.isOK()) {
-        return statusWithAggRequest.getStatus();
-    }
-    AggregationRequest aggRequest = std::move(statusWithAggRequest.getValue());
-
-    const auto& pipeline = aggRequest.getPipeline();
+    const auto& pipeline = request.getPipeline();
 
     // If the aggregation pipeline is empty, confirm the user is authorized for find on 'nss'.
     if (pipeline.empty()) {
@@ -293,7 +289,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
     for (auto&& pipelineStage : pipeline) {
         liteParsedDocSource = LiteParsedDocumentSource::parse(nss, pipelineStage);
         PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(
-            isMongos, aggRequest.shouldBypassDocumentValidation());
+            isMongos, request.shouldBypassDocumentValidation());
         Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);
     }
     return privileges;

@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 
 namespace mongo {
 
@@ -218,10 +219,9 @@ public:
                                            UserNameIterator cursorOwner) = 0;
 
     // Attempts to get the privileges necessary to run the aggregation pipeline specified in
-    // 'cmdObj' on the namespace 'ns' either directly on mongoD or via mongoS. Returns a non-ok
-    // status if it is unable to parse the pipeline.
+    // 'request' on the namespace 'ns' either directly on mongoD or via mongoS.
     virtual StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString& ns,
-                                                                  const BSONObj& cmdObj,
+                                                                  const AggregationRequest& request,
                                                                   bool isMongos) = 0;
 
     // Checks if this connection has the privileges necessary to create 'ns' with the options

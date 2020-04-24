@@ -74,7 +74,7 @@ public:
         auto privileges = uassertStatusOK(
             AuthorizationSession::get(opCtx->getClient())
                 ->getPrivilegesForAggregate(
-                    aggregationRequest.getNamespaceString(), opMsgRequest.body, true));
+                    aggregationRequest.getNamespaceString(), aggregationRequest, true));
 
         return std::make_unique<Invocation>(
             this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));

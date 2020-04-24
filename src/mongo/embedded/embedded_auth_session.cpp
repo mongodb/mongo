@@ -139,7 +139,7 @@ public:
     }
 
     StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString&,
-                                                          const BSONObj&,
+                                                          const AggregationRequest&,
                                                           bool) override {
         return PrivilegeVector();
     }

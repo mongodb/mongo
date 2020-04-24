@@ -42,6 +42,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_set.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 
 namespace mongo {
 
@@ -121,7 +122,7 @@ public:
                                    UserNameIterator cursorOwner) override;
 
     StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString& ns,
-                                                          const BSONObj& cmdObj,
+                                                          const AggregationRequest& request,
                                                           bool isMongos) override;
 
     Status checkAuthForCreate(const NamespaceString& ns,
