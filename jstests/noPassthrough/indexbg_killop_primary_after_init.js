@@ -48,8 +48,9 @@ try {
     const filter = {"desc": {$regex: /conn.*/}};
     const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_1', filter);
 
-    // Kill the index build.
+    // Kill the index build and wait for it to abort.
     assert.commandWorked(testDB.killOp(opId));
+    checkLog.containsJson(primary, 4656003);
 } finally {
     assert.commandWorked(
         primary.adminCommand({configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
