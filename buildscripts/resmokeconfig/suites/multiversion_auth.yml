@@ -41,8 +41,6 @@ executor:
           authMechanism: SCRAM-SHA-1
           keyFile: *keyFile
           keyFileData: *keyFileData
-          # TODO: SERVER-45959 remove after v4.4
-          skipCheckOrphans: true
 
       authenticationDatabase: local
       authenticationMechanism: SCRAM-SHA-1

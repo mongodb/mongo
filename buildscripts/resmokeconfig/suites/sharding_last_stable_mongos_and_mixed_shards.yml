@@ -50,6 +50,4 @@ executor:
           mongosBinVersion: 'last-stable'
           shardMixedBinVersions: true
           skipCheckingUUIDsConsistentAcrossCluster: true
-          # TODO: SERVER-45959 remove after v4.4
-          skipCheckOrphans: true
       nodb: ''
