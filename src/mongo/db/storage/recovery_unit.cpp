@@ -33,7 +33,9 @@
 
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -41,6 +43,7 @@ namespace {
 // determine if documents changed, but a different recovery unit may be used across a getMore,
 // so there is a chance the snapshot ID will be reused.
 AtomicWord<unsigned long long> nextSnapshotId{1};
+MONGO_FAIL_POINT_DEFINE(widenWUOWChangesWindow);
 }  // namespace
 
 RecoveryUnit::RecoveryUnit() {
@@ -71,6 +74,9 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
     // Getting to this method implies `runPreCommitHooks` completed successfully, resulting in
     // having its contents cleared.
     invariant(_preCommitHooks.empty());
+    if (MONGO_unlikely(widenWUOWChangesWindow.shouldFail())) {
+        sleepmillis(1000);
+    }
     for (auto& change : _changes) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
@@ -88,6 +94,9 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
 
 void RecoveryUnit::abortRegisteredChanges() {
     _preCommitHooks.clear();
+    if (MONGO_unlikely(widenWUOWChangesWindow.shouldFail())) {
+        sleepmillis(1000);
+    }
     try {
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;

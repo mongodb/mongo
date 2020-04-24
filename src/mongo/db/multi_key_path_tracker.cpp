@@ -77,6 +77,19 @@ bool MultikeyPathTracker::isMultikeyPathsTrivial(const MultikeyPaths& paths) {
     return true;
 }
 
+bool MultikeyPathTracker::covers(const MultikeyPaths& parent, const MultikeyPaths& child) {
+    for (size_t idx = 0; idx < parent.size(); ++idx) {
+        auto& parentPath = parent[idx];
+        auto& childPath = child[idx];
+        for (auto&& item : childPath) {
+            if (parentPath.find(item) == parentPath.end()) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
     invariant(_trackMultikeyPathInfo);
     // Merge the `MultikeyPathInfo` input into the accumulated value being tracked for the

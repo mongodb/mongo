@@ -43,6 +43,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/key_string.h"
@@ -102,7 +103,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
         auto documentKeySet = executionCtx.keys();
         auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
-        auto multikeyPaths = executionCtx.multikeyPaths();
+        auto documentMultikeyPaths = executionCtx.multikeyPaths();
 
         iam->getKeys(executionCtx.pooledBufferBuilder(),
                      recordBson,
@@ -110,7 +111,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                      IndexAccessMethod::GetKeysContext::kAddingKeys,
                      documentKeySet.get(),
                      multikeyMetadataKeys.get(),
-                     multikeyPaths.get(),
+                     documentMultikeyPaths.get(),
                      recordId,
                      IndexAccessMethod::kNoopOnSuppressedErrorFn);
 
@@ -118,13 +119,25 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             iam->shouldMarkIndexAsMultikey(
                 documentKeySet->size(),
                 {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
-                *multikeyPaths)) {
+                *documentMultikeyPaths)) {
             std::string msg = str::stream()
                 << "Index " << descriptor->indexName() << " is not multi-key but has more than one"
                 << " key in document " << recordId;
             ValidateResults& curRecordResults = (*_indexNsResultsMap)[descriptor->indexName()];
             curRecordResults.errors.push_back(msg);
             curRecordResults.valid = false;
+        }
+
+        if (descriptor->isMultikey()) {
+            const MultikeyPaths& indexPaths = descriptor->getMultikeyPaths(opCtx);
+            if (!MultikeyPathTracker::covers(indexPaths, *documentMultikeyPaths.get())) {
+                std::string msg = str::stream()
+                    << "Index " << descriptor->indexName()
+                    << " multi-key paths do not cover a document. RecordId: " << recordId;
+                ValidateResults& curRecordResults = (*_indexNsResultsMap)[descriptor->indexName()];
+                curRecordResults.errors.push_back(msg);
+                curRecordResults.valid = false;
+            }
         }
 
         IndexInfo& indexInfo = _indexConsistency->getIndexInfo(descriptor->indexName());

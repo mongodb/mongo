@@ -389,6 +389,7 @@ env.Library(
         'catalog_impl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/multi_key_path_tracker',
         'throttle_cursor',
         'validate_state',
     ]
