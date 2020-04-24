@@ -5404,6 +5404,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_read_concern_majority_passthrough --storageEngine=wiredTiger
+      resmoke_jobs_factor: 0.5
 
 - <<: *task_template
   name: aggregation_secondary_reads
