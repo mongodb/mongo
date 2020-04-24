@@ -779,7 +779,7 @@ if not hygienic:
 distsrc = env.Dir('#distsrc')
 if hygienic:
     env.AutoInstall(
-        target='$DESTDIR',
+        target='$PREFIX',
         source=[
             distsrc.File('README'),
             # TODO: we need figure out what to do when we use a different
@@ -811,7 +811,7 @@ if not len(module_banner_filenames) == len(env['MODULE_BANNERS']):
 
 if hygienic:
     env.AutoInstall(
-        target='$DESTDIR',
+        target='$PREFIX',
         source=env.get('MODULE_BANNERS', []),
         AIB_COMPONENT='common',
         AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
