@@ -91,11 +91,6 @@ public:
     }
 };
 
-void ReplicationCoordinatorImpl::_startElectSelfV1(StartElectionReasonEnum reason) {
-    stdx::lock_guard<Latch> lk(_mutex);
-    _startElectSelfV1_inlock(reason);
-}
-
 void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(StartElectionReasonEnum reason) {
     invariant(!_voteRequester);
 

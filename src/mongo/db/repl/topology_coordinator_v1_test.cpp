@@ -2506,24 +2506,6 @@ TEST_F(TopoCoordTest, RespondToHeartbeatsWithNullLastAppliedAndLastDurableWhileI
     ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
 }
 
-TEST_F(TopoCoordTest, BecomeCandidateWhenBecomingSecondaryInSingleNodeSet) {
-    ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "hself"))),
-                 0);
-    ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
-
-    // if we are the only node, we should become a candidate when we transition to SECONDARY
-    ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
-    getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
-    ASSERT_TRUE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
-    ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
-}
-
 TEST_F(TopoCoordTest, DoNotBecomeCandidateWhenBecomingSecondaryInSingleNodeSetIfInMaintenanceMode) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
@@ -2549,36 +2531,6 @@ TEST_F(TopoCoordTest, DoNotBecomeCandidateWhenBecomingSecondaryInSingleNodeSetIf
     // Once we are no longer in maintenance mode, getMemberState() should return RS_SECONDARY.
     getTopoCoord().adjustMaintenanceCountBy(-1);
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
-}
-
-TEST_F(TopoCoordTest, BecomeCandidateWhenReconfigToBeElectableInSingleNodeSet) {
-    ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    ReplSetConfig cfg;
-    cfg.initialize(BSON("_id"
-                        << "rs0"
-                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                 << "hself"
-                                                 << "priority" << 0))))
-        .transitional_ignore();
-    getTopoCoord().updateConfig(cfg, 0, now()++);
-    ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
-
-    ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
-    getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
-    ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
-    ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
-
-    // we should become a candidate when we reconfig to become electable
-
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                               << "hself"))),
-                 0);
-    ASSERT_TRUE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 }
 
 TEST_F(TopoCoordTest,
@@ -2708,7 +2660,9 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedWhenRemovedFromConfigEvenWhenPrima
     ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
     getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
-    ASSERT_TRUE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
+    setMyOpTime({Timestamp(1, 1), 0});
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(Date_t(),
+                                                        StartElectionReasonEnum::kElectionTimeout));
 
     // win election and primary
     getTopoCoord().processWinElection(OID::gen(), Timestamp());
@@ -2741,7 +2695,9 @@ TEST_F(TopoCoordTest, NodeTransitionsToSecondaryWhenReconfiggingToBeUnelectable)
     ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
     getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
-    ASSERT_TRUE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
+    setMyOpTime({Timestamp(1, 1), 0});
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(Date_t(),
+                                                        StartElectionReasonEnum::kElectionTimeout));
 
     // win election and primary
     getTopoCoord().processWinElection(OID::gen(), Timestamp());
@@ -2777,7 +2733,9 @@ TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigIfNodeRemainsElecta
     ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
     getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
-    ASSERT_TRUE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
+    setMyOpTime({Timestamp(1, 1), 0});
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(Date_t(),
+                                                        StartElectionReasonEnum::kElectionTimeout));
 
     // win election and primary
     getTopoCoord().processWinElection(OID::gen(), Timestamp());

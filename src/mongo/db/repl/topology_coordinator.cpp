@@ -2196,13 +2196,6 @@ void TopologyCoordinator::updateConfig(const ReplSetConfig& newConfig, int selfI
 
     // By this point we know we are in Role::kFollower
     _currentPrimaryIndex = -1;  // force secondaries to re-detect who the primary is
-
-    if (_isElectableNodeInSingleNodeReplicaSet()) {
-        // If the new config describes a one-node replica set, we're the one member,
-        // we're electable, we're not in maintenance mode and we are currently in followerMode
-        // SECONDARY, we must transition to candidate, in leiu of heartbeats.
-        _role = Role::kCandidate;
-    }
 }
 std::string TopologyCoordinator::_getHbmsg(Date_t now) const {
     // ignore messages over 2 minutes old
@@ -2640,24 +2633,13 @@ void TopologyCoordinator::setFollowerMode(MemberState::MS newMode) {
         default:
             MONGO_UNREACHABLE;
     }
-
-    if (_followerMode != MemberState::RS_SECONDARY) {
-        return;
-    }
-
-    // When a single node replica set transitions to SECONDARY, we must check if we should
-    // be a candidate here.  This is necessary because a single node replica set has no
-    // heartbeats that would normally change the role to candidate.
-
-    if (_isElectableNodeInSingleNodeReplicaSet()) {
-        _role = Role::kCandidate;
-    }
 }
 
-bool TopologyCoordinator::_isElectableNodeInSingleNodeReplicaSet() const {
-    return _followerMode == MemberState::RS_SECONDARY && _rsConfig.getNumMembers() == 1 &&
-        _selfIndex == 0 && _rsConfig.getMemberAt(_selfIndex).isElectable() &&
-        _maintenanceModeCalls == 0;
+bool TopologyCoordinator::isElectableNodeInSingleNodeReplicaSet() const {
+    auto isSingleNode = _rsConfig.getNumMembers() == 1 && _selfIndex == 0;
+    // Single node replset must be electable.
+    invariant(!isSingleNode || _rsConfig.getMemberAt(_selfIndex).isElectable());
+    return (getMemberState() == MemberState::RS_SECONDARY) && isSingleNode;
 }
 
 void TopologyCoordinator::finishUnconditionalStepDown() {

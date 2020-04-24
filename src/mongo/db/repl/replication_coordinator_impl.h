@@ -458,13 +458,13 @@ public:
         long long term, TopologyCoordinator::UpdateTermResult* updateResult);
 
     /**
-     * If called after _startElectSelfV1(), blocks until all asynchronous
+     * If called after _startElectSelfV1_inlock(), blocks until all asynchronous
      * activities associated with election complete.
      */
     void waitForElectionFinish_forTest();
 
     /**
-     * If called after _startElectSelfV1(), blocks until all asynchronous
+     * If called after _startElectSelfV1_inlock(), blocks until all asynchronous
      * activities associated with election dry run complete, including writing
      * last vote and scheduling the real election.
      */
@@ -1077,7 +1077,7 @@ private:
      * For proper concurrency, start methods must be called while holding _mutex.
      *
      * For V1 (raft) style elections the election path is:
-     *      _startElectSelfV1() or _startElectSelfV1_inlock()
+     *      _startElectSelfIfEligibleV1()
      *      _processDryRunResult() (may skip)
      *      _startRealElection_inlock()
      *      _writeLastVoteForMyElection()
@@ -1085,7 +1085,6 @@ private:
      *      _onVoteRequestComplete()
      */
     void _startElectSelfV1_inlock(StartElectionReasonEnum reason);
-    void _startElectSelfV1(StartElectionReasonEnum reason);
 
     /**
      * Callback called when the dryRun VoteRequester has completed; checks the results and

@@ -171,6 +171,16 @@ public:
 
     enum class UpdateTermResult { kAlreadyUpToDate, kTriggerStepDown, kUpdatedTerm };
 
+    /**
+     * Returns true if we are a one-node replica set, we're the one member,
+     * we're electable, we're not in maintenance mode, and we are currently in followerMode
+     * SECONDARY.
+     *
+     * This is used to decide if we should start an election in a one-node replica set.
+     */
+    bool isElectableNodeInSingleNodeReplicaSet() const;
+
+
     ////////////////////////////////////////////////////////////
     //
     // Basic state manipulation methods.
@@ -962,15 +972,6 @@ private:
      * returns false.
      **/
     bool _memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now) const;
-
-    /**
-     * Returns true if we are a one-node replica set, we're the one member,
-     * we're electable, we're not in maintenance mode, and we are currently in followerMode
-     * SECONDARY.
-     *
-     * This is used to decide if we should transition to Role::candidate in a one-node replica set.
-     */
-    bool _isElectableNodeInSingleNodeReplicaSet() const;
 
     // Returns a string representation of the current replica set status for logging purposes.
     std::string _getReplSetStatusString();

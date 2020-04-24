@@ -780,17 +780,6 @@ public:
     unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
                                                        logv2::LogSeverity::Debug(3)};
 
-    BSONObj member(int id, std::string host) {
-        return BSON("_id" << id << "host" << host);
-    }
-
-    BSONObj configWithMembers(int version, long long term, BSONArray members) {
-        return BSON("_id"
-                    << "mySet"
-                    << "protocolVersion" << 1 << "version" << version << "term" << term << "members"
-                    << members);
-    }
-
     void respondToHeartbeat() {
         counter++;
         LOGV2(24245, "Going to respond to heartbeat", "counter"_attr = counter);
@@ -1436,6 +1425,34 @@ TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
     reconfigThread.join();
     ASSERT_EQ(status.code(), ErrorCodes::NotMaster);
     ASSERT_EQ(status.reason(), "Stepped down when persisting new config");
+}
+
+TEST_F(ReplCoordReconfigTest, StartElectionOnReconfigToSingleNode) {
+    // Start up as a secondary.
+    init();
+    assertStartSuccess(
+        configWithMembers(
+            1, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"))),
+        HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Simulate application of one oplog entry.
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+
+    // Construct the new config of single node replset.
+    auto configVersion = 2;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    args.newConfigObj = configWithMembers(configVersion, 1, BSON_ARRAY(member(1, "n1:1")));
+
+    BSONObjBuilder result;
+    const auto opCtx = makeOperationContext();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+    getNet()->enterNetwork();
+    getNet()->runReadyNetworkOperations();
+    getNet()->exitNetwork();
+
+    ASSERT_EQUALS(MemberState::RS_PRIMARY, getReplCoord()->getMemberState().s);
 }
 
 TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {

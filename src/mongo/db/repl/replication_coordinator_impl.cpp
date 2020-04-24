@@ -3965,12 +3965,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     const MemberState newState = _topCoord->getMemberState();
 
     if (newState == _memberState) {
-        if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
-            invariant(_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
-                      _rsConfig.getMemberAt(0).isElectable());
-            // Start election in protocol version 1
-            return kActionStartSingleNodeElection;
-        }
         return kActionNone;
     }
 
@@ -4020,13 +4014,10 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _readWriteAbility->setCanServeNonLocalReads_UNSAFE(1U);
     }
 
-    if (newState.secondary() && _topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
-        // When transitioning to SECONDARY, the only way for _topCoord to report the candidate
-        // role is if the configuration represents a single-node replica set.  In that case, the
-        // overriding requirement is to elect this singleton node primary.
-        invariant(_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
-                  _rsConfig.getMemberAt(0).isElectable());
-        // Start election in protocol version 1
+    if (newState.secondary() && result != kActionSteppedDown &&
+        _topCoord->isElectableNodeInSingleNodeReplicaSet()) {
+        // When transitioning from other follower states to SECONDARY, run for election on a
+        // single-node replica set.
         result = kActionStartSingleNodeElection;
     }
 
@@ -4102,9 +4093,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             _externalState->onStepDownHook();
             break;
         case kActionStartSingleNodeElection:
-            // In protocol version 1, single node replset will run an election instead of
-            // kActionWinElection as in protocol version 0.
-            _startElectSelfV1(StartElectionReasonEnum::kElectionTimeout);
+            _startElectSelfIfEligibleV1(StartElectionReasonEnum::kElectionTimeout);
             break;
         default:
             LOGV2_FATAL(26010,
@@ -4458,7 +4447,13 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     _cancelPriorityTakeover_inlock();
     _cancelAndRescheduleElectionTimeout_inlock();
 
-    const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk);
+    PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk);
+    if (_topCoord->isElectableNodeInSingleNodeReplicaSet()) {
+        // If the new config describes an electable one-node replica set, we need to start an
+        // election.
+        action = PostMemberStateUpdateAction::kActionStartSingleNodeElection;
+    }
+
     if (_selfIndex >= 0) {
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.

@@ -1065,7 +1065,9 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock,
                                                              StartElectionReasonEnum reason) {
     // If it is not a single node replica set, no need to start an election after stepdown timeout.
     if (reason == StartElectionReasonEnum::kSingleNodePromptElection &&
-        _rsConfig.getNumMembers() != 1) {
+        !_topCoord->isElectableNodeInSingleNodeReplicaSet()) {
+        LOGV2_FOR_ELECTION(
+            4764800, 0, "Not starting an election, since we are not an electable single node");
         return;
     }
 
