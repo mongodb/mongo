@@ -592,9 +592,8 @@ class NinjaState:
                 template_builders.append(build)
                 continue
 
-            implicit = build.get("implicit", [])
-            implicit.append(ninja_file)
-            build["implicit"] = sorted(implicit)
+            if "implicit" in build:
+                build["implicit"].sort()
 
             # Don't make generated sources depend on each other. We
             # have to check that none of the outputs are generated
@@ -605,7 +604,7 @@ class NinjaState:
                 generated_source_files
                 and not build["rule"] == "INSTALL"
                 and set(build["outputs"]).isdisjoint(generated_source_files)
-                and set(implicit).isdisjoint(generated_source_files)
+                and set(build.get("implicit", [])).isdisjoint(generated_source_files)
             ):
 
                 # Make all non-generated source targets depend on
@@ -696,13 +695,13 @@ class NinjaState:
         # jstests/SConscript and being specific to the MongoDB
         # repository layout.
         ninja.build(
-            ninja_file,
+            self.env.File(ninja_file).path,
             rule="REGENERATE",
             implicit=[
-                self.env.File("#SConstruct").get_abspath(),
-                os.path.abspath(__file__),
+                self.env.File("#SConstruct").path,
+                __file__,
             ]
-            + glob("src/**/SConscript", recursive=True),
+            + sorted(glob("src/**/SConscript", recursive=True)),
         )
 
         # If we ever change the name/s of the rules that include
@@ -712,6 +711,7 @@ class NinjaState:
             "compile_commands.json",
             rule="CMD",
             pool="console",
+            implicit=[ninja_file],
             variables={
                 "cmd": "ninja -f {} -t compdb CC CXX > compile_commands.json".format(
                     ninja_file
