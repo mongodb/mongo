@@ -49,9 +49,6 @@ struct QuerySolutionNode;
 class OperationContext;
 class ChunkManager;
 
-// Ordered map from the max for each chunk to an entry describing the chunk
-using ChunkInfoMap = std::map<std::string, std::shared_ptr<ChunkInfo>>;
-
 struct ShardVersionTargetingInfo {
     // Indicates whether the shard is stale and thus needs a catalog cache refresh. Is false by
     // default.
@@ -66,6 +63,56 @@ struct ShardVersionTargetingInfo {
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
 // shard is currently marked as needing a catalog cache refresh (stale).
 using ShardVersionMap = std::map<ShardId, ShardVersionTargetingInfo>;
+
+// This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
+// provides a simpler, high-level interface for domain specific operations without exposing the
+// underlying implementation.
+class ChunkMap {
+    // Ordered map from the max for each chunk to an entry describing the chunk
+    using ChunkInfoMap = std::map<std::string, std::shared_ptr<ChunkInfo>>;
+
+public:
+    ChunkMap(Ordering ordering) : _shardKeyOrdering(std::move(ordering)) {}
+
+    size_t size() const {
+        return _chunkMap.size();
+    }
+
+    template <typename Callable>
+    void forEach(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
+        auto it = shardKey.isEmpty() ? _chunkMap.begin() : _findIntersectingChunk(shardKey);
+
+        for (; it != _chunkMap.end(); ++it) {
+            if (!handler(it->second))
+                break;
+        }
+    }
+
+    template <typename Callable>
+    void forEachOverlappingChunk(const BSONObj& min,
+                                 const BSONObj& max,
+                                 bool isMaxInclusive,
+                                 Callable&& handler) const {
+        const auto bounds = _overlappingBounds(min, max, isMaxInclusive);
+
+        for (auto it = bounds.first; it != bounds.second; ++it) {
+            if (!handler(it->second))
+                break;
+        }
+    }
+
+    ShardVersionMap constructShardVersionMap(const OID& epoch) const;
+    void addChunk(const ChunkType& chunk);
+    std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const;
+
+private:
+    ChunkInfoMap::const_iterator _findIntersectingChunk(const BSONObj& shardKey) const;
+    std::pair<ChunkInfoMap::const_iterator, ChunkInfoMap::const_iterator> _overlappingBounds(
+        const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
+
+    ChunkInfoMap _chunkMap;
+    const Ordering _shardKeyOrdering;
+};
 
 /**
  * In-memory representation of the routing table for a single sharded collection at various points
@@ -157,8 +204,26 @@ public:
      */
     ChunkVersion getVersionForLogging(const ShardId& shardId) const;
 
-    const ChunkInfoMap& getChunkMap() const {
-        return _chunkMap;
+    size_t numChunks() const {
+        return _chunkMap.size();
+    }
+
+    template <typename Callable>
+    void forEachChunk(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
+        _chunkMap.forEach(std::forward<Callable>(handler), shardKey);
+    }
+
+    template <typename Callable>
+    void forEachOverlappingChunk(const BSONObj& min,
+                                 const BSONObj& max,
+                                 bool isMaxInclusive,
+                                 Callable&& handler) const {
+        _chunkMap.forEachOverlappingChunk(
+            min, max, isMaxInclusive, std::forward<Callable>(handler));
+    }
+
+    std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const {
+        return _chunkMap.findIntersectingChunk(shardKey);
     }
 
     /**
@@ -186,17 +251,13 @@ public:
         return _uuid;
     }
 
-    std::pair<ChunkInfoMap::const_iterator, ChunkInfoMap::const_iterator> overlappingRanges(
-        const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
-
-
 private:
     RoutingTableHistory(NamespaceString nss,
                         boost::optional<UUID> uuid,
                         KeyPattern shardKeyPattern,
                         std::unique_ptr<CollatorInterface> defaultCollator,
                         bool unique,
-                        ChunkInfoMap chunkMap,
+                        ChunkMap chunkMap,
                         ChunkVersion collectionVersion);
 
     /**
@@ -205,8 +266,6 @@ private:
     ShardVersionMap _constructShardVersionMap() const;
 
     ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
-
-    std::string _extractKeyString(const BSONObj& shardKeyValue) const;
 
     // The shard versioning mechanism hinges on keeping track of the number of times we reload
     // ChunkManagers.
@@ -221,8 +280,6 @@ private:
     // The key pattern used to shard the collection
     const ShardKeyPattern _shardKeyPattern;
 
-    const Ordering _shardKeyOrdering;
-
     // Default collation to use for routing data queries for this collection
     const std::unique_ptr<CollatorInterface> _defaultCollator;
 
@@ -231,13 +288,15 @@ private:
 
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).
-    const ChunkInfoMap _chunkMap;
+    ChunkMap _chunkMap;
 
     // Max version across all chunks
     const ChunkVersion _collectionVersion;
 
     // The representation of shard versions and staleness indicators for this namespace. If a
     // shard does not exist, it will not have an entry in the map.
+    // Note: this declaration must not be moved before _chunkMap since it is initialized by using
+    // the _chunkMap instance.
     ShardVersionMap _shardVersions;
 
     friend class ChunkManager;
@@ -250,52 +309,6 @@ class ChunkManager : public std::enable_shared_from_this<ChunkManager> {
     ChunkManager& operator=(const ChunkManager&) = delete;
 
 public:
-    class ConstChunkIterator {
-    public:
-        ConstChunkIterator() = default;
-        explicit ConstChunkIterator(ChunkInfoMap::const_iterator iter,
-                                    boost::optional<Timestamp> clusterTime)
-            : _iter{std::move(iter)}, _clusterTime{std::move(clusterTime)} {}
-
-        ConstChunkIterator& operator++() {
-            ++_iter;
-            return *this;
-        }
-        ConstChunkIterator operator++(int) {
-            return ConstChunkIterator{_iter++, _clusterTime};
-        }
-        bool operator==(const ConstChunkIterator& other) const {
-            return _iter == other._iter;
-        }
-        bool operator!=(const ConstChunkIterator& other) const {
-            return !(*this == other);
-        }
-        const Chunk operator*() const {
-            return Chunk{*_iter->second, _clusterTime};
-        }
-
-    private:
-        ChunkInfoMap::const_iterator _iter;
-        boost::optional<Timestamp> _clusterTime;
-    };
-
-    class ConstRangeOfChunks {
-    public:
-        ConstRangeOfChunks(ConstChunkIterator begin, ConstChunkIterator end)
-            : _begin{std::move(begin)}, _end{std::move(end)} {}
-
-        ConstChunkIterator begin() const {
-            return _begin;
-        }
-        ConstChunkIterator end() const {
-            return _end;
-        }
-
-    private:
-        ConstChunkIterator _begin;
-        ConstChunkIterator _end;
-    };
-
     ChunkManager(std::shared_ptr<RoutingTableHistory> rt, boost::optional<Timestamp> clusterTime)
         : _rt(std::move(rt)), _clusterTime(std::move(clusterTime)) {}
 
@@ -334,13 +347,19 @@ public:
         return _rt->getVersionForLogging(shardId);
     }
 
-    ConstRangeOfChunks chunks() const {
-        return {ConstChunkIterator{_rt->getChunkMap().cbegin(), _clusterTime},
-                ConstChunkIterator{_rt->getChunkMap().cend(), _clusterTime}};
+    template <typename Callable>
+    void forEachChunk(Callable&& handler) const {
+        _rt->forEachChunk(
+            [this, handler = std::forward<Callable>(handler)](const auto& chunkInfo) mutable {
+                if (!handler(Chunk{*chunkInfo, _clusterTime}))
+                    return false;
+
+                return true;
+            });
     }
 
     int numChunks() const {
-        return _rt->getChunkMap().size();
+        return _rt->numChunks();
     }
 
     /**
@@ -357,10 +376,10 @@ public:
 
     /**
      * Given a shardKey, returns the first chunk which is owned by shardId and overlaps or sorts
-     * after that shardKey. The returned iterator range always contains one or zero entries. If zero
-     * entries are returned, this means no such chunk exists.
+     * after that shardKey. If the return value is empty, this means no such chunk exists.
      */
-    ConstRangeOfChunks getNextChunkOnShard(const BSONObj& shardKey, const ShardId& shardId) const;
+    boost::optional<Chunk> getNextChunkOnShard(const BSONObj& shardKey,
+                                               const ShardId& shardId) const;
 
     /**
      * Given a shard key (or a prefix) that has been extracted from a document, returns the chunk

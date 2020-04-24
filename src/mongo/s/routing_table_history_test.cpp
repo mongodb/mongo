@@ -87,15 +87,13 @@ std::shared_ptr<RoutingTableHistory> splitChunk(
 std::set<ChunkInfo*> getChunksInRange(std::shared_ptr<RoutingTableHistory> rt,
                                       const BSONObj& min,
                                       const BSONObj& max) {
-    auto chunksFromSplitIter = rt->overlappingRanges(min, max, false);
-
     std::set<ChunkInfo*> chunksFromSplit;
-    std::transform(chunksFromSplitIter.first,
-                   chunksFromSplitIter.second,
-                   std::inserter(chunksFromSplit, chunksFromSplit.begin()),
-                   [](const std::pair<std::string, std::shared_ptr<ChunkInfo>>& pair) {
-                       return pair.second.get();
-                   });
+
+    rt->forEachOverlappingChunk(min, max, false, [&](auto& chunk) {
+        chunksFromSplit.insert(chunk.get());
+        return true;
+    });
+
     return chunksFromSplit;
 }
 
@@ -104,11 +102,16 @@ std::set<ChunkInfo*> getChunksInRange(std::shared_ptr<RoutingTableHistory> rt,
 std::shared_ptr<ChunkInfo> getChunkToSplit(std::shared_ptr<RoutingTableHistory> rt,
                                            const BSONObj& min,
                                            const BSONObj& max) {
-    auto chunkToSplitIter = rt->overlappingRanges(min, max, false);
-    invariant(std::distance(chunkToSplitIter.first, chunkToSplitIter.second) <= 1);
-    invariant(chunkToSplitIter.first != rt->getChunkMap().end());
+    std::shared_ptr<ChunkInfo> firstOverlappingChunk;
 
-    return (*chunkToSplitIter.first).second;
+    rt->forEachOverlappingChunk(min, max, false, [&](auto& chunkInfo) {
+        firstOverlappingChunk = chunkInfo;
+        return false;  // only need first chunk
+    });
+
+    invariant(firstOverlappingChunk);
+
+    return firstOverlappingChunk;
 }
 
 /**
@@ -136,8 +139,7 @@ void assertCorrectBytesWritten(std::shared_ptr<RoutingTableHistory> rt,
     auto chunksFromSplit = getChunksInRange(rt, minSplitBoundary, maxSplitBoundary);
     ASSERT_EQ(chunksFromSplit.size(), expectedNumChunksFromSplit);
 
-    for (auto kv : rt->getChunkMap()) {
-        auto chunkInfo = kv.second;
+    rt->forEachChunk([&](const auto& chunkInfo) {
         auto writesTracker = chunkInfo->getWritesTracker();
         auto bytesWritten = writesTracker->getBytesWritten();
         if (chunksFromSplit.count(chunkInfo.get()) > 0) {
@@ -145,7 +147,9 @@ void assertCorrectBytesWritten(std::shared_ptr<RoutingTableHistory> rt,
         } else {
             ASSERT_EQ(bytesWritten, expectedBytesInChunksNotSplit);
         }
-    }
+
+        return true;
+    });
 }
 
 /**
@@ -168,13 +172,13 @@ public:
         _rt = RoutingTableHistory::makeNew(
             kNss, UUID::gen(), _shardKeyPattern, nullptr, false, epoch, {initChunk});
 
-        ASSERT_EQ(_rt->getChunkMap().size(), 1ull);
+        ASSERT_EQ(_rt->numChunks(), 1ull);
         // Should only be one
-        for (auto kv : _rt->getChunkMap()) {
-            auto chunkInfo = kv.second;
+        _rt->forEachChunk([&](const auto& chunkInfo) {
             auto writesTracker = chunkInfo->getWritesTracker();
             writesTracker->addBytesWritten(_bytesInOriginalChunk);
-        }
+            return true;
+        });
     }
 
     virtual const KeyPattern& getShardKeyPattern() const {
@@ -209,7 +213,7 @@ public:
                                        getShardKeyPattern().globalMax()};
         _rt = splitChunk(RoutingTableHistoryTest::getInitialRoutingTable(),
                          _initialChunkBoundaryPoints);
-        ASSERT_EQ(_rt->getChunkMap().size(), 3ull);
+        ASSERT_EQ(_rt->numChunks(), 3ull);
     }
 
     const std::shared_ptr<RoutingTableHistory>& getInitialRoutingTable() const {
@@ -233,13 +237,14 @@ TEST_F(RoutingTableHistoryTest, SplittingOnlyChunkCopiesBytesWrittenToAllSubchun
 
     auto rt = splitChunk(getInitialRoutingTable(), newChunkBoundaryPoints);
 
-    ASSERT_EQ(rt->getChunkMap().size(), 3ull);
-    for (auto kv : rt->getChunkMap()) {
-        auto chunkInfo = kv.second;
+    ASSERT_EQ(rt->numChunks(), 3ull);
+
+    rt->forEachChunk([&](const auto& chunkInfo) {
         auto writesTracker = chunkInfo->getWritesTracker();
         auto bytesWritten = writesTracker->getBytesWritten();
         ASSERT_EQ(bytesWritten, getBytesInOriginalChunk());
-    }
+        return true;
+    });
 }
 
 TEST_F(RoutingTableHistoryTestThreeInitialChunks,
@@ -258,7 +263,7 @@ TEST_F(RoutingTableHistoryTestThreeInitialChunks,
     auto expectedNumChunksFromSplit = 2;
     auto expectedBytesInChunksFromSplit = getBytesInOriginalChunk() + bytesToWrite;
     auto expectedBytesInChunksNotSplit = getBytesInOriginalChunk();
-    ASSERT_EQ(rt->getChunkMap().size(), 4ull);
+    ASSERT_EQ(rt->numChunks(), 4ull);
     assertCorrectBytesWritten(rt,
                               minKey,
                               maxKey,
@@ -284,7 +289,7 @@ TEST_F(RoutingTableHistoryTestThreeInitialChunks,
     auto expectedNumChunksFromSplit = 3;
     auto expectedBytesInChunksFromSplit = getBytesInOriginalChunk() + bytesToWrite;
     auto expectedBytesInChunksNotSplit = getBytesInOriginalChunk();
-    ASSERT_EQ(rt->getChunkMap().size(), 5ull);
+    ASSERT_EQ(rt->numChunks(), 5ull);
     assertCorrectBytesWritten(rt,
                               minKey,
                               maxKey,
@@ -309,7 +314,7 @@ TEST_F(RoutingTableHistoryTestThreeInitialChunks,
     auto expectedNumChunksFromSplit = 2;
     auto expectedBytesInChunksFromSplit = getBytesInOriginalChunk() + bytesToWrite;
     auto expectedBytesInChunksNotSplit = getBytesInOriginalChunk();
-    ASSERT_EQ(rt->getChunkMap().size(), 4ull);
+    ASSERT_EQ(rt->numChunks(), 4ull);
     assertCorrectBytesWritten(rt,
                               minKey,
                               maxKey,

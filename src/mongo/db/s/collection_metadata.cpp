@@ -91,12 +91,12 @@ RangeMap CollectionMetadata::getChunks() const {
 
     RangeMap chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>());
 
-    for (const auto& chunk : _cm->chunks()) {
-        if (chunk.getShardId() != _thisShardId)
-            continue;
+    _cm->forEachChunk([this, &chunksMap](const auto& chunk) {
+        if (chunk.getShardId() == _thisShardId)
+            chunksMap.emplace_hint(chunksMap.end(), chunk.getMin(), chunk.getMax());
 
-        chunksMap.emplace_hint(chunksMap.end(), chunk.getMin(), chunk.getMax());
-    }
+        return true;
+    });
 
     return chunksMap;
 }
@@ -104,13 +104,13 @@ RangeMap CollectionMetadata::getChunks() const {
 bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk) const {
     invariant(isSharded());
 
-    auto foundIt = _cm->getNextChunkOnShard(lookupKey, _thisShardId);
-    if (foundIt.begin() == foundIt.end())
+    auto nextChunk = _cm->getNextChunkOnShard(lookupKey, _thisShardId);
+    if (!nextChunk)
         return false;
 
-    const auto& nextChunk = *foundIt.begin();
-    chunk->setMin(nextChunk.getMin());
-    chunk->setMax(nextChunk.getMax());
+    chunk->setMin(nextChunk->getMin());
+    chunk->setMax(nextChunk->getMax());
+
     return true;
 }
 
@@ -210,14 +210,16 @@ void CollectionMetadata::toBSONChunks(BSONArrayBuilder* builder) const {
     if (!isSharded())
         return;
 
-    for (const auto& chunk : _cm->chunks()) {
+    _cm->forEachChunk([this, &builder](const auto& chunk) {
         if (chunk.getShardId() == _thisShardId) {
             BSONArrayBuilder chunkBB(builder->subarrayStart());
             chunkBB.append(chunk.getMin());
             chunkBB.append(chunk.getMax());
             chunkBB.done();
         }
-    }
+
+        return true;
+    });
 }
 
 }  // namespace mongo
