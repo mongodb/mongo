@@ -104,8 +104,12 @@ bool StorageEngineLockFile::createdByUncleanShutdown() const {
 Status StorageEngineLockFile::open() {
     try {
         if (!boost::filesystem::exists(_dbpath)) {
-            return Status(ErrorCodes::NonExistentPath,
-                          str::stream() << "Data directory " << _dbpath << " not found.");
+            return Status(
+                ErrorCodes::NonExistentPath,
+                str::stream() << "Data directory " << _dbpath
+                              << " not found. Create the missing directory or specify another path "
+                                 "using (1) the --dbpath command line option, or (2) by adding the "
+                                 "'storage.dbPath' option in the configuration file.");
         }
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::UnknownError,
