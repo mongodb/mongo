@@ -105,6 +105,11 @@ platforms:
       image_id: ami-7ad76705
     transport:
       username: ubuntu
+  - name: ubuntu2004
+    driver:
+      image_id: ami-068663a3c619dd892
+    transport:
+      username: ubuntu
 
 transport:
   ssh_key: ~/.ssh/kitchen.pem

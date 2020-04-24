@@ -238,6 +238,19 @@ repos:
     repos:
       - apt/ubuntu/dists/bionic/mongodb-org
 
+  - name: ubuntu2004
+    type: deb
+    code_name: "focal"
+    edition: org
+    bucket: repo.mongodb.org
+    component: multiverse
+    architectures:
+      - amd64
+      - s390x
+      - arm64
+    repos:
+      - apt/ubuntu/dists/bionic/mongodb-org
+
 ####################
 #
 # Enterprise Repos:
@@ -430,6 +443,20 @@ repos:
       - amd64
       - ppc64el
       - i386
+      - s390x
+      - arm64
+    repos:
+      - apt/ubuntu/dists/bionic/mongodb-enterprise
+
+  - name: ubuntu2004
+    type: deb
+    code_name: "focal"
+    edition: enterprise
+    bucket: repo.mongodb.com
+    component: multiverse
+    architectures:
+      - amd64
+      - ppc64el
       - s390x
       - arm64
     repos:
