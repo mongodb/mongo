@@ -1,7 +1,7 @@
 // Test that non-transaction snapshot reads with atClusterTime (or afterClusterTime) will wait for
 // the majority commit point to move past the atClusterTime (or afterClusterTime) before they can
 // read.
-// @tags: [requires_majority_read_concern]
+// @tags: [requires_replication, requires_majority_read_concern]
 (function() {
 "use strict";
 
