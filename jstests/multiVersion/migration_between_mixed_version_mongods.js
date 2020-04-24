@@ -3,7 +3,6 @@
 // donor is the latest version and the recipient the last-stable, and vice versa.
 // Migrations should be successful.
 //
-// @tags: [fix_for_fcv_46]
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

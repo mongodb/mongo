@@ -1,6 +1,5 @@
 //
 // Tests pending chunk metadata.
-// @tags: [fix_for_fcv_46]
 //
 
 (function() {

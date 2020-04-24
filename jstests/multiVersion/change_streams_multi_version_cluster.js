@@ -1,7 +1,7 @@
 // Verify that we can successfully resume a change stream during several different stages of a
 // cluster upgrade.
 //
-// @tags: [uses_change_streams, requires_replication, fix_for_fcv_46]
+// @tags: [uses_change_streams, requires_replication]
 
 // Checking UUID consistency uses cached connections, which are not valid across restarts or
 // stepdowns.

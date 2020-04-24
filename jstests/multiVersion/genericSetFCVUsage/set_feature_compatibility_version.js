@@ -1,7 +1,5 @@
 /**
  * Tests setFeatureCompatibilityVersion.
- *
- * @tags: [fix_for_fcv_46]
  */
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown

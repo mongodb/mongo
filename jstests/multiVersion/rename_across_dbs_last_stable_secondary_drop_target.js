@@ -1,4 +1,3 @@
-// @tags: [fix_for_fcv_46]
 (function() {
 'use strict';
 

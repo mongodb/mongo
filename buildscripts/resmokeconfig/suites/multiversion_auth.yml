@@ -9,8 +9,6 @@ selector:
   roots:
   - jstests/multiVersion/*.js
   - jstests/multiVersion/genericSetFCVUsage/*.js
-  exclude_with_any_tags:
-  - fix_for_fcv_46
   exclude_files:
   # TODO: SERVER-21578
   - jstests/multiVersion/balancer_multiVersion_detect.js
@@ -24,6 +22,12 @@ selector:
   # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
   # it attempts to connect to an upgraded mongoD. Un-blacklist when SERVER-42919 fixes this issue.
   - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+
+    # TODO: SERVER-47822
+  - jstests/multiVersion/pending_chunk.js
+
+  # TODO: SERVER-47822
+  - jstests/multiVersion/migrations_with_mixed_fcv.js
 
 # Multiversion tests start their own mongod's.
 executor:
