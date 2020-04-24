@@ -1048,11 +1048,19 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     invariant(oplog);
     invariant(opCtx->lockState()->isLocked());
 
+    // Using a YieldPolicy WRITE_CONFLICT_RETRY_ONLY that will allow query to retry on
+    // WriteConflictExceptions without releasing locks that are important to callers.
+    //
+    // This read can run concurrently with the validate cmd's WT verify operation due to the special
+    // locking rules for internal operations accessing the oplog collection. Validate holds a MODE_X
+    // collection lock for WT verify, but an internal read only needs a MODE_IS global lock. Trying
+    // to open a cursor on a collection that has a verify operation running produces an EBUSY error
+    // that we then convert to a WCE.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
         InternalPlanner::collectionScan(opCtx,
                                         NamespaceString::kRsOplogNamespace.ns(),
                                         oplog,
-                                        PlanExecutor::NO_YIELD,
+                                        PlanExecutor::WRITE_CONFLICT_RETRY_ONLY,
                                         InternalPlanner::BACKWARD);
 
     // A record id in the oplog collection is equivalent to the document's timestamp field.
