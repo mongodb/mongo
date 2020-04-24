@@ -569,10 +569,8 @@ protected:
 };
 
 struct ValidateResults {
-    ValidateResults() {
-        valid = true;
-    }
-    bool valid;
+    bool valid = true;
+    boost::optional<Timestamp> readTimestamp = boost::none;
     std::vector<std::string> errors;
     std::vector<std::string> warnings;
     std::vector<BSONObj> extraIndexEntries;

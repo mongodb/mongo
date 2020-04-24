@@ -146,6 +146,10 @@ public:
         return _extraLoggingForTest;
     }
 
+    boost::optional<Timestamp> getValidateTimestamp() {
+        return _validateTs;
+    }
+
 private:
     ValidateState() = delete;
 
@@ -213,6 +217,8 @@ private:
 
     // Can be set by unit tests to obtain better insight into what validate sees/does.
     bool _extraLoggingForTest;
+
+    boost::optional<Timestamp> _validateTs = boost::none;
 };
 
 }  // namespace CollectionValidation
