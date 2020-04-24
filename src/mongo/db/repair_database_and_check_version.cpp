@@ -199,11 +199,17 @@ Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
  * This validates that all collections have UUIDs and an _id index. If a collection is missing an
  * _id index, this function will build it.
  *
+ * On return, if any collections have the "recordPreImages" option set, hasRecordPreImage will be
+ * true. Since the FCV will not be initialized when calling ensureCollectionProperties, this lets
+ * us check whether any collections have an invalid recordPreImages option set without re-iterating
+ * all databases and collections later when we have loaded the FCV.
+ *
  * Returns a MustDowngrade error if any collections are missing UUIDs.
  * Returns a MustDowngrade error if any index builds on the required _id field fail.
  */
 Status ensureCollectionProperties(OperationContext* opCtx,
-                                  const std::vector<std::string>& dbNames) {
+                                  const std::vector<std::string>& dbNames,
+                                  bool* hasRecordPreImage) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto downgradeError = Status{ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
     invariant(opCtx->lockState()->isW());
@@ -223,6 +229,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
             auto collOptions =
                 DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->getCatalogId());
             auto hasAutoIndexIdField = collOptions.autoIndexId == CollectionOptions::YES;
+            *hasRecordPreImage = *hasRecordPreImage || collOptions.recordPreImages;
 
             // Even if the autoIndexId field is not YES, the collection may still have an _id index
             // that was created manually by the user. Check the list of indexes to confirm index
@@ -385,6 +392,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     }
 
     bool ensuredCollectionProperties = false;
+    bool hasRecordPreImage = false;
 
     // Repair all databases first, so that we do not try to open them if they are in bad shape
     auto databaseHolder = DatabaseHolder::get(opCtx);
@@ -416,7 +424,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
 
         // All collections must have UUIDs before restoring the FCV document to a version that
         // requires UUIDs.
-        uassertStatusOK(ensureCollectionProperties(opCtx, dbNames));
+        uassertStatusOK(ensureCollectionProperties(opCtx, dbNames, &hasRecordPreImage));
         ensuredCollectionProperties = true;
 
         // Attempt to restore the featureCompatibilityVersion document if it is missing.
@@ -437,7 +445,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     }
 
     if (!ensuredCollectionProperties) {
-        uassertStatusOK(ensureCollectionProperties(opCtx, dbNames));
+        uassertStatusOK(ensureCollectionProperties(opCtx, dbNames, &hasRecordPreImage));
     }
 
     if (!storageGlobalParams.readOnly) {
@@ -503,12 +511,6 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // Refresh list of database names to include newly-created admin, if it exists.
     dbNames = storageEngine->listDatabases();
 
-    // We want to recover the admin database first so we can load the FCV early since
-    // some collection validation may depend on the FCV being set.
-    if (auto it = std::find(dbNames.begin(), dbNames.end(), "admin"); it != dbNames.end()) {
-        std::swap(*it, dbNames.front());
-    }
-
     for (const auto& dbName : dbNames) {
         if (dbName != "local") {
             nonLocalDatabases = true;
@@ -539,7 +541,6 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             quickExit(EXIT_NEED_UPGRADE);
             MONGO_UNREACHABLE;
         }
-
 
         // If the server configuration collection already contains a valid
         // featureCompatibilityVersion document, cache it in-memory as a server parameter.
@@ -643,6 +644,16 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         LOGV2_FATAL_NOTRACE(40652,
                             "Unable to start up mongod due to missing featureCompatibilityVersion "
                             "document. Please run with --repair to restore the document.");
+    }
+
+    // If any collection has the recordPreImages feature enabled and we loaded a FCV document that
+    // does not set the FCV to being fully upgraded to 4.4, then the server should fail to start.
+    if (hasRecordPreImage && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
+        LOGV2_FATAL_NOTRACE(4747201,
+                            "recordPreImages collection option is only supported when the feature "
+                            "compatibility version is set to 4.4 or above");
     }
 
     LOGV2_DEBUG(21017, 1, "done repairDatabases");

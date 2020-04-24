@@ -77,3 +77,19 @@ assert.throws(() => {
 
 rsTest.stopSet();
 }());
+(function() {
+rsTest = new ReplSetTest({nodes: 1});
+rsTest.startSet();
+rsTest.initiate();
+adminDB = rsTest.getPrimary().getDB("admin");
+testDB = rsTest.getPrimary().getDB("test");
+
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+assert.commandWorked(testDB.runCommand({create: "test", recordPreImages: true}));
+
+assert.doesNotThrow(() => {
+    rsTest.restart(rsTest.getPrimary());
+});
+
+rsTest.stopSet();
+}());

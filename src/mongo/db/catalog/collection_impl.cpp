@@ -221,7 +221,7 @@ Status validatePreImageRecording(OperationContext* opCtx, const NamespaceString&
                               << ns.db() << " database"};
     }
 
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.getVersion() !=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
         return {ErrorCodes::InvalidOptions,
