@@ -1,5 +1,6 @@
 /**
  * Tests that findAndModify with upsert=true does not conflict with a collection MODE_IX lock.
+ * @tags: [requires_document_locking]
  */
 (function() {
 "use strict";
@@ -34,8 +35,14 @@ const sleepID =
 const updateDoc = {
     a: 2
 };
-assert.commandWorked(
-    testDB.runCommand({findAndModify: collName, query: {a: 1}, update: updateDoc, upsert: true}));
+assert.commandWorked(testDB.runCommand({
+    findAndModify: collName,
+    query: {a: 1},
+    update: updateDoc,
+    upsert: true,
+    // Set expiration on lock acquisition to avoid waiting indefinitely.
+    maxTimeMS: 60 * 1000,
+}));
 assert.eq(testDB[collName].find(updateDoc).toArray().length, 1);
 
 // Interrupt the sleep command.
