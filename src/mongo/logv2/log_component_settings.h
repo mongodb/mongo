@@ -102,8 +102,3 @@ private:
 };
 
 }  // namespace mongo::logv2
-
-// Legacy alias
-namespace mongo::logger {
-using logv2::LogComponentSettings;
-}  // namespace mongo::logger

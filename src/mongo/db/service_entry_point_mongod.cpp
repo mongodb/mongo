@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -82,7 +82,7 @@ public:
                 const int debugLevel =
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
                 LOGV2_DEBUG(21975,
-                            logSeverityV1toV2(debugLevel).toInt(),
+                            debugLevel,
                             "Command on database {db} timed out waiting for read concern to be "
                             "satisfied. Command: {command}. Info: {error}",
                             "Command timed out waiting for read concern to be satisfied",

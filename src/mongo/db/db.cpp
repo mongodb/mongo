@@ -209,7 +209,7 @@
 
 namespace mongo {
 
-using logger::LogComponent;
+using logv2::LogComponent;
 using std::endl;
 
 namespace {
@@ -322,8 +322,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     if (kDebugBuild)
-        LOGV2_OPTIONS(
-            20533, {logComponentV1toV2(LogComponent::kControl)}, "DEBUG build (which is slower)");
+        LOGV2_OPTIONS(20533, {LogComponent::kControl}, "DEBUG build (which is slower)");
 
 #if defined(_WIN32)
     VersionInfoInterface::instance().logTargetMinOS();
@@ -1091,9 +1090,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     // Shutdown the TransportLayer so that new connections aren't accepted
     if (auto tl = serviceContext->getTransportLayer()) {
-        LOGV2_OPTIONS(20562,
-                      {logComponentV1toV2(LogComponent::kNetwork)},
-                      "Shutdown: going to close listening sockets");
+        LOGV2_OPTIONS(
+            20562, {LogComponent::kNetwork}, "Shutdown: going to close listening sockets");
         tl->shutdown();
     }
 
@@ -1200,7 +1198,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (auto sep = serviceContext->getServiceEntryPoint()) {
         if (!sep->shutdown(Seconds(10))) {
             LOGV2_OPTIONS(20563,
-                          {logComponentV1toV2(LogComponent::kNetwork)},
+                          {LogComponent::kNetwork},
                           "Service entry point did not shutdown within the time limit");
         }
     }
@@ -1210,7 +1208,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         Status status = svcExec->shutdown(Seconds(10));
         if (!status.isOK()) {
             LOGV2_OPTIONS(20564,
-                          {logComponentV1toV2(LogComponent::kNetwork)},
+                          {LogComponent::kNetwork},
                           "Service executor did not shutdown within the time limit",
                           "error"_attr = status);
         }
@@ -1241,7 +1239,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // the memory and makes leak sanitizer happy.
     ScriptEngine::dropScopeCache();
 
-    LOGV2_OPTIONS(20565, {logComponentV1toV2(LogComponent::kControl)}, "Now exiting");
+    LOGV2_OPTIONS(20565, {LogComponent::kControl}, "Now exiting");
 
     audit::logShutdown(client);
 

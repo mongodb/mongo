@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
@@ -127,7 +126,6 @@ ServerStatusMetricField<Counter64> displayNotMasterUnackWrites(
     "repl.network.notMasterUnacknowledgedWrites", &notMasterUnackWrites);
 
 namespace {
-using logger::LogComponent;
 
 void generateLegacyQueryErrorResponse(const AssertionException& exception,
                                       const QueryMessage& queryMessage,
@@ -153,7 +151,7 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
 
     if (queryMessage.ntoskip || queryMessage.ntoreturn) {
         LOGV2_OPTIONS(21952,
-                      {logComponentV1toV2(LogComponent::kQuery)},
+                      {logv2::LogComponent::kQuery},
                       "Query's nToSkip = {nToSkip} and nToReturn = {nToReturn}",
                       "Assertion for query with nToSkip and/or nToReturn",
                       "nToSkip"_attr = queryMessage.ntoskip,
@@ -173,7 +171,7 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
     const bool isStaleConfig = exception.code() == ErrorCodes::StaleConfig;
     if (isStaleConfig) {
         LOGV2_OPTIONS(21953,
-                      {logComponentV1toV2(LogComponent::kQuery)},
+                      {logv2::LogComponent::kQuery},
                       "Stale version detected during query over {namespace}: {error}",
                       "Detected stale version while querying namespace",
                       "namespace"_attr = queryMessage.ns,
@@ -1499,7 +1497,7 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
 
     if (shouldLog(logv2::LogSeverity::Debug(1)) || found != n) {
         LOGV2_DEBUG(21967,
-                    logSeverityV1toV2(found == n ? 1 : 0).toInt(),
+                    found == n ? 1 : 0,
                     "killCursors: found {found} of {numCursors}",
                     "killCursors found fewer cursors to kill than requested",
                     "found"_attr = found,

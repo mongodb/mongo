@@ -194,7 +194,7 @@ public:
     void stopCapturingLogMessages();
     void stopCapturingLogMessagesIfNeeded();
     const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
-    const std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
+    std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
     int64_t countTextFormatLogLinesContaining(const std::string& needle);
     int64_t countBSONFormatLogLinesIsSubset(const BSONObj needle);
     void printCapturedTextFormatLogLines() const;
@@ -245,40 +245,6 @@ void Test::run() {
 }
 
 namespace {
-class StringVectorAppender : public logger::MessageLogDomain::EventAppender {
-public:
-    explicit StringVectorAppender(std::vector<std::string>* lines) : _lines(lines) {}
-    virtual ~StringVectorAppender() {}
-    virtual Status append(const logger::MessageLogDomain::Event& event) {
-        std::ostringstream _os;
-        if (!_encoder.encode(event, _os)) {
-            return Status(ErrorCodes::LogWriteFailed, "Failed to append to LogTestAppender.");
-        }
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (_enabled) {
-            _lines->push_back(_os.str());
-        }
-        return Status::OK();
-    }
-
-    void enable() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        invariant(!_enabled);
-        _enabled = true;
-    }
-
-    void disable() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        invariant(_enabled);
-        _enabled = false;
-    }
-
-private:
-    stdx::mutex _mutex;  // NOLINT
-    bool _enabled = false;
-    logger::MessageEventDetailsEncoder _encoder;
-    std::vector<std::string>* _lines;
-};
 
 void CaptureLogs::startCapturingLogMessages() {
     invariant(!_isCapturingLogMessages);
@@ -321,7 +287,7 @@ const std::vector<std::string>& CaptureLogs::getCapturedTextFormatLogMessages() 
     return _capturedLogMessages;
 }
 
-const std::vector<BSONObj> CaptureLogs::getCapturedBSONFormatLogMessages() const {
+std::vector<BSONObj> CaptureLogs::getCapturedBSONFormatLogMessages() const {
     std::vector<BSONObj> objs;
     std::transform(_capturedBSONLogMessages.cbegin(),
                    _capturedBSONLogMessages.cend(),
@@ -397,7 +363,7 @@ void Test::stopCapturingLogMessages() {
 const std::vector<std::string>& Test::getCapturedTextFormatLogMessages() const {
     return getCaptureLogs()->getCapturedTextFormatLogMessages();
 }
-const std::vector<BSONObj> Test::getCapturedBSONFormatLogMessages() const {
+std::vector<BSONObj> Test::getCapturedBSONFormatLogMessages() const {
     return getCaptureLogs()->getCapturedBSONFormatLogMessages();
 }
 int64_t Test::countTextFormatLogLinesContaining(const std::string& needle) {

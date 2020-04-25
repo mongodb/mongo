@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include <fstream>
 #include <iostream>
@@ -673,7 +673,7 @@ int main(int argc, char* argv[]) {
     ArgParser args(argc, argv);
 
     ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logger::LogSeverity::Debug(args.Verbose()));
+        ::mongo::logv2::LogSeverity::Debug(args.Verbose()));
     args.LogParams();
 
     SdamJsonTestRunner testRunner(args.SourceDirectory(), args.TestFilters());

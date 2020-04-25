@@ -43,7 +43,6 @@
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/log_test.h"
-#include "mongo/util/log_global_settings.h"
 
 namespace mongo {
 namespace repl {

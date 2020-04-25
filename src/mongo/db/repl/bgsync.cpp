@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -533,7 +533,7 @@ void BackgroundSync::_produce() {
 
     const auto logLevel = getTestCommandsEnabled() ? 0 : 1;
     LOGV2_DEBUG(21092,
-                logSeverityV1toV2(logLevel).toInt(),
+                logLevel,
                 "scheduling fetcher to read remote oplog on {syncSource} starting at "
                 "{lastOpTimeFetched}",
                 "Scheduling fetcher to read remote oplog",

@@ -34,7 +34,7 @@
  * The primary entry point at runtime is saslClientAuthenticateImpl().
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
 
@@ -181,10 +181,7 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
     if (!status.isOK())
         return status;
 
-    LOGV2_DEBUG(20197,
-                logSeverityV1toV2(saslLogLevel).toInt(),
-                "sasl client input",
-                "payload"_attr = base64::encode(payload));
+    LOGV2_DEBUG(20197, saslLogLevel, "sasl client input", "payload"_attr = base64::encode(payload));
 
     // Create new payload for our response
     std::string responsePayload;
@@ -193,7 +190,7 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
         return status;
 
     LOGV2_DEBUG(20198,
-                logSeverityV1toV2(saslLogLevel).toInt(),
+                saslLogLevel,
                 "sasl client output",
                 "payload"_attr = base64::encode(responsePayload));
 

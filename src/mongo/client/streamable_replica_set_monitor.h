@@ -44,7 +44,7 @@
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/logger/log_component.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"

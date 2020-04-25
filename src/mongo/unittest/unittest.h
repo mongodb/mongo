@@ -49,7 +49,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -575,7 +574,7 @@ protected:
      * the last call to startCapturingLogMessages() in this test.
      */
     const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
-    const std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
+    std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
 
     /**
      * Returns the number of collected log lines containing "needle".

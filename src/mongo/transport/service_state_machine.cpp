@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
 
@@ -648,7 +648,7 @@ ServiceStateMachine::State ServiceStateMachine::state() {
 void ServiceStateMachine::_terminateAndLogIfError(Status status) {
     if (!status.isOK()) {
         LOGV2_WARNING_OPTIONS(22993,
-                              {logComponentV1toV2(logger::LogComponent::kExecutor)},
+                              {logv2::LogComponent::kExecutor},
                               "Terminating session due to error: {status}",
                               "status"_attr = status);
         terminate();

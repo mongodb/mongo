@@ -52,7 +52,6 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/log_global_settings.h"
 
 namespace mongo {
 namespace {

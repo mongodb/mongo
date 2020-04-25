@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 #include "mongo/db/catalog/collection_compact.h"
 
@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-using logger::LogComponent;
+using logv2::LogComponent;
 
 namespace {
 
@@ -104,7 +104,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
     }
 
     LOGV2_OPTIONS(20284,
-                  {logComponentV1toV2(LogComponent::kCommand)},
+                  {LogComponent::kCommand},
                   "compact {collectionNss} begin",
                   "collectionNss"_attr = collectionNss);
 

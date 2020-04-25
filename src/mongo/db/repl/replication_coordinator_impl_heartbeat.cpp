@@ -1013,7 +1013,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     }
     if (wasActive) {
         LOGV2_FOR_ELECTION(4615649,
-                           logSeverityV1toV2(cancelAndRescheduleLogLevel).toInt(),
+                           cancelAndRescheduleLogLevel,
                            "Canceling election timeout callback at {when}",
                            "Canceling election timeout callback",
                            "when"_attr = _handleElectionTimeoutWhen);
@@ -1031,7 +1031,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     if (wasActive) {
         // The log level here is 4 once per second, otherwise 5.
         LOGV2_FOR_ELECTION(4615650,
-                           logSeverityV1toV2(cancelAndRescheduleLogLevel).toInt(),
+                           cancelAndRescheduleLogLevel,
                            "Rescheduling election timeout callback at {when}",
                            "Rescheduling election timeout callback",
                            "when"_attr = when);

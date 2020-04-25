@@ -65,14 +65,14 @@ public:
     }
 
 private:
-    int getSyslogPriority(LogSeverity severity) {
-        if (severity <= LogSeverity::Debug(1))
+    int getSyslogPriority(logv2::LogSeverity severity) {
+        if (severity <= logv2::LogSeverity::Debug(1))
             return LOG_DEBUG;
-        if (severity == LogSeverity::Warning())
+        if (severity == logv2::LogSeverity::Warning())
             return LOG_WARNING;
-        if (severity == LogSeverity::Error())
+        if (severity == logv2::LogSeverity::Error())
             return LOG_ERR;
-        if (severity >= LogSeverity::Severe())
+        if (severity >= logv2::LogSeverity::Severe())
             return LOG_CRIT;
         // Info() and Log().
         return LOG_INFO;

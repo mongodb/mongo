@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
 
@@ -125,7 +125,7 @@
 
 namespace mongo {
 
-using logger::LogComponent;
+using logv2::LogComponent;
 
 #if !defined(__has_feature)
 #define __has_feature(x) 0
@@ -270,9 +270,8 @@ void cleanupTask(ServiceContext* serviceContext) {
 
         // Shutdown the TransportLayer so that new connections aren't accepted
         if (auto tl = serviceContext->getTransportLayer()) {
-            LOGV2_OPTIONS(22843,
-                          {logComponentV1toV2(LogComponent::kNetwork)},
-                          "shutdown: going to close all sockets...");
+            LOGV2_OPTIONS(
+                22843, {LogComponent::kNetwork}, "shutdown: going to close all sockets...");
 
             tl->shutdown();
         }
@@ -335,7 +334,7 @@ void cleanupTask(ServiceContext* serviceContext) {
         if (auto sep = serviceContext->getServiceEntryPoint()) {
             if (!sep->shutdown(Seconds(10))) {
                 LOGV2_OPTIONS(22844,
-                              {logComponentV1toV2(LogComponent::kNetwork)},
+                              {LogComponent::kNetwork},
                               "Service entry point did not shutdown within the time limit");
             }
         }
@@ -345,7 +344,7 @@ void cleanupTask(ServiceContext* serviceContext) {
             Status status = svcExec->shutdown(Seconds(5));
             if (!status.isOK()) {
                 LOGV2_OPTIONS(22845,
-                              {logComponentV1toV2(LogComponent::kNetwork)},
+                              {LogComponent::kNetwork},
                               "Service executor did not shutdown within the time limit",
                               "error"_attr = status);
             }
@@ -758,7 +757,7 @@ ExitCode main(ServiceContext* serviceContext) {
 
         if (configAddr.isLocalHost() != shardingContext->allowLocalHost()) {
             LOGV2_OPTIONS(22852,
-                          {logComponentV1toV2(LogComponent::kDefault)},
+                          {LogComponent::kDefault},
                           "cannot mix localhost and ip addresses in configdbs");
             return EXIT_BADOPTIONS;
         }

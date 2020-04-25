@@ -96,7 +96,7 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
     os << severity.toStringDataCompact();
     os << ' ';
 
-    LogComponent component = event.getComponent();
+    logv2::LogComponent component = event.getComponent();
     os << component;
     os << ' ';
 
@@ -145,7 +145,7 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
 MessageEventWithContextEncoder::~MessageEventWithContextEncoder() {}
 std::ostream& MessageEventWithContextEncoder::encode(const MessageEventEphemeral& event,
                                                      std::ostream& os) {
-    LogComponent component = event.getComponent();
+    logv2::LogComponent component = event.getComponent();
     os << component;
     os << ' ';
 

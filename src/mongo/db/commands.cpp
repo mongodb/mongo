@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -67,7 +67,7 @@
 
 namespace mongo {
 
-using logger::LogComponent;
+using logv2::LogComponent;
 
 namespace {
 
@@ -735,7 +735,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
         }
     } catch (const DBException& e) {
         LOGV2_OPTIONS(20436,
-                      {logComponentV1toV2(LogComponent::kAccessControl)},
+                      {LogComponent::kAccessControl},
                       "Checking authorization failed: {error}",
                       "Checking authorization failed",
                       "error"_attr = e.toStatus());

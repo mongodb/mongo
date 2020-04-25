@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -176,7 +176,7 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
         if (writePeriodicNoops.load()) {
             const auto logLevel = getTestCommandsEnabled() ? 0 : 1;
             LOGV2_DEBUG(21222,
-                        logSeverityV1toV2(logLevel).toInt(),
+                        logLevel,
                         "Writing noop to oplog as there has been no writes to this replica set in "
                         "over {writeInterval}",
                         "Writing noop to oplog as there has been no writes to this replica set "
