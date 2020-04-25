@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
 
@@ -216,7 +216,7 @@ void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
 }
 
 bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
-    using logger::LogComponent;
+    using logv2::LogComponent;
 
     stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
 
@@ -236,24 +236,20 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
     while (timeSpent < timeout &&
            !_shutdownCondition.wait_for(lk, checkInterval.toSystemDuration(), noWorkersLeft)) {
-        LOGV2_OPTIONS(22945,
-                      {logComponentV1toV2(LogComponent::kNetwork)},
-                      "shutdown: still waiting on {numOpenSessions} active workers to drain... ",
-                      "numOpenSessions"_attr = numOpenSessions());
+        LOGV2(22945,
+              "shutdown: still waiting on {numOpenSessions} active workers to drain... ",
+              "numOpenSessions"_attr = numOpenSessions());
         timeSpent += checkInterval;
     }
 
     bool result = noWorkersLeft();
     if (result) {
-        LOGV2_OPTIONS(22946,
-                      {logComponentV1toV2(LogComponent::kNetwork)},
-                      "shutdown: no running workers found...");
+        LOGV2(22946, "shutdown: no running workers found...");
     } else {
-        LOGV2_OPTIONS(22947,
-                      {logComponentV1toV2(LogComponent::kNetwork)},
-                      "shutdown: exhausted grace period for{numOpenSessions} active workers to "
-                      "drain; continuing with shutdown... ",
-                      "numOpenSessions"_attr = numOpenSessions());
+        LOGV2(22947,
+              "shutdown: exhausted grace period for{numOpenSessions} active workers to "
+              "drain; continuing with shutdown... ",
+              "numOpenSessions"_attr = numOpenSessions());
     }
     return result;
 }

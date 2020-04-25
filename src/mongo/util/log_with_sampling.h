@@ -33,7 +33,6 @@
 
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/util/log_global_settings.h"
 
 namespace mongo {
 

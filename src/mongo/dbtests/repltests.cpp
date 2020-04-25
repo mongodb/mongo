@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -56,8 +56,8 @@ using namespace mongo::repl;
 namespace ReplTests {
 
 using mongo::logger::globalLogDomain;
-using mongo::logger::LogComponent;
-using mongo::logger::LogSeverity;
+using mongo::logv2::LogComponent;
+using mongo::logv2::LogSeverity;
 using std::endl;
 using std::string;
 using std::stringstream;

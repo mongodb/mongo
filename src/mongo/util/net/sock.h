@@ -51,7 +51,7 @@
 #include <vector>
 
 #include "mongo/config.h"
-#include "mongo/logger/log_severity.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -97,7 +97,7 @@ public:
 
         Generally you don't want a timeout, you should be very prepared for errors if you set one.
     */
-    Socket(double so_timeout = 0, logger::LogSeverity logLevel = logger::LogSeverity::Log());
+    Socket(double so_timeout = 0, logv2::LogSeverity logLevel = logv2::LogSeverity::Log());
 
     ~Socket();
 
@@ -124,10 +124,10 @@ public:
     void recv(char* data, int len);
     int unsafe_recv(char* buf, int max);
 
-    logger::LogSeverity getLogLevel() const {
+    logv2::LogSeverity getLogLevel() const {
         return _logLevel;
     }
-    void setLogLevel(logger::LogSeverity ll) {
+    void setLogLevel(logv2::LogSeverity ll) {
         _logLevel = ll;
     }
 
@@ -240,7 +240,7 @@ private:
     std::unique_ptr<SSLConnectionInterface> _sslConnection;
     SSLManagerInterface* _sslManager;
 #endif
-    logger::LogSeverity _logLevel;  // passed to log() when logging errors
+    logv2::LogSeverity _logLevel;  // passed to log() when logging errors
 
     /** true until the first packet has been received or an outgoing connect has been made */
     bool _awaitingHandshake;

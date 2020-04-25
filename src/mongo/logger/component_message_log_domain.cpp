@@ -38,46 +38,48 @@ ComponentMessageLogDomain::ComponentMessageLogDomain() {}
 
 ComponentMessageLogDomain::~ComponentMessageLogDomain() {}
 
-bool ComponentMessageLogDomain::hasMinimumLogSeverity(LogComponent component) const {
+bool ComponentMessageLogDomain::hasMinimumLogSeverity(logv2::LogComponent component) const {
     return _settings.hasMinimumLogSeverity(component);
 }
 
-bool ComponentMessageLogDomain::shouldLog(LogComponent component, LogSeverity severity) const {
+bool ComponentMessageLogDomain::shouldLog(logv2::LogComponent component,
+                                          logv2::LogSeverity severity) const {
     return _settings.shouldLog(component, severity);
 }
 
-bool ComponentMessageLogDomain::shouldLog(LogComponent component1,
-                                          LogComponent component2,
-                                          LogSeverity severity) const {
+bool ComponentMessageLogDomain::shouldLog(logv2::LogComponent component1,
+                                          logv2::LogComponent component2,
+                                          logv2::LogSeverity severity) const {
     return _settings.shouldLog(component1, severity) || _settings.shouldLog(component2, severity);
 }
 
-bool ComponentMessageLogDomain::shouldLog(LogComponent component1,
-                                          LogComponent component2,
-                                          LogComponent component3,
-                                          LogSeverity severity) const {
+bool ComponentMessageLogDomain::shouldLog(logv2::LogComponent component1,
+                                          logv2::LogComponent component2,
+                                          logv2::LogComponent component3,
+                                          logv2::LogSeverity severity) const {
     return _settings.shouldLog(component1, severity) || _settings.shouldLog(component2, severity) ||
         _settings.shouldLog(component3, severity);
 }
 
-LogSeverity ComponentMessageLogDomain::getMinimumLogSeverity() const {
-    return _settings.getMinimumLogSeverity(LogComponent::kDefault);
+logv2::LogSeverity ComponentMessageLogDomain::getMinimumLogSeverity() const {
+    return _settings.getMinimumLogSeverity(logv2::LogComponent::kDefault);
 }
 
-LogSeverity ComponentMessageLogDomain::getMinimumLogSeverity(LogComponent component) const {
+logv2::LogSeverity ComponentMessageLogDomain::getMinimumLogSeverity(
+    logv2::LogComponent component) const {
     return _settings.getMinimumLogSeverity(component);
 }
 
-void ComponentMessageLogDomain::setMinimumLoggedSeverity(LogSeverity severity) {
-    _settings.setMinimumLoggedSeverity(LogComponent::kDefault, severity);
+void ComponentMessageLogDomain::setMinimumLoggedSeverity(logv2::LogSeverity severity) {
+    _settings.setMinimumLoggedSeverity(logv2::LogComponent::kDefault, severity);
 }
 
-void ComponentMessageLogDomain::setMinimumLoggedSeverity(LogComponent component,
-                                                         LogSeverity severity) {
+void ComponentMessageLogDomain::setMinimumLoggedSeverity(logv2::LogComponent component,
+                                                         logv2::LogSeverity severity) {
     _settings.setMinimumLoggedSeverity(component, severity);
 }
 
-void ComponentMessageLogDomain::clearMinimumLoggedSeverity(LogComponent component) {
+void ComponentMessageLogDomain::clearMinimumLoggedSeverity(logv2::LogComponent component) {
     _settings.clearMinimumLoggedSeverity(component);
 }
 

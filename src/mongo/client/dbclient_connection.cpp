@@ -31,7 +31,7 @@
  * Connect to a Mongo database as a database, from C++.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
 
@@ -554,18 +554,20 @@ void DBClientConnection::_checkConnection() {
     sleepFor(_autoReconnectBackoff.nextSleep());
 
     LOGV2_DEBUG(20120,
-                logSeverityV1toV2(_logLevel).toInt(),
-                "trying reconnect to {}",
-                ""_attr = toString());
+                _logLevel.toInt(),
+                "Trying to reconnect to {connString}",
+                "Trying to reconnnect",
+                "connString"_attr = toString());
     string errmsg;
     auto connectStatus = connect(_serverAddress, _applicationName);
     if (!connectStatus.isOK()) {
         _markFailed(kSetFlag);
         LOGV2_DEBUG(20121,
-                    logSeverityV1toV2(_logLevel).toInt(),
-                    "reconnect {} failed {errmsg}",
-                    ""_attr = toString(),
-                    "errmsg"_attr = errmsg);
+                    _logLevel.toInt(),
+                    "Reconnect attempt to {connString} failed: {reason}",
+                    "Reconnect attempt failed",
+                    "connString"_attr = toString(),
+                    "reason"_attr = errmsg);
         if (connectStatus == ErrorCodes::IncompatibleCatalogManager) {
             uassertStatusOK(connectStatus);  // Will always throw
         } else {
@@ -573,8 +575,11 @@ void DBClientConnection::_checkConnection() {
         }
     }
 
-    LOGV2_DEBUG(
-        20122, logSeverityV1toV2(_logLevel).toInt(), "reconnect {} ok", ""_attr = toString());
+    LOGV2_DEBUG(20122,
+                _logLevel.toInt(),
+                "Reconnected to {connString}",
+                "Reconnected",
+                "connString"_attr = toString());
     if (_internalAuthOnReconnect) {
         uassertStatusOK(authenticateInternalUser());
     } else {
@@ -583,15 +588,12 @@ void DBClientConnection::_checkConnection() {
                 DBClientConnection::_auth(kv.second);
             } catch (ExceptionFor<ErrorCodes::AuthenticationFailed>& ex) {
                 LOGV2_DEBUG(20123,
-                            logSeverityV1toV2(_logLevel).toInt(),
-                            "reconnect: auth failed "
-                            "{kv_second_auth_getSaslCommandUserDBFieldName}{kv_second_auth_"
-                            "getSaslCommandUserFieldName} {ex_what}",
-                            "kv_second_auth_getSaslCommandUserDBFieldName"_attr =
-                                kv.second[auth::getSaslCommandUserDBFieldName()],
-                            "kv_second_auth_getSaslCommandUserFieldName"_attr =
-                                kv.second[auth::getSaslCommandUserFieldName()],
-                            "ex_what"_attr = ex.what());
+                            _logLevel.toInt(),
+                            "Reconnect: auth failed for on {db} using {user}: {reason}",
+                            "Reconnect: auth failed",
+                            "db"_attr = kv.second[auth::getSaslCommandUserDBFieldName()],
+                            "user"_attr = kv.second[auth::getSaslCommandUserFieldName()],
+                            "reason"_attr = ex.what());
             }
         }
     }

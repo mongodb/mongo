@@ -38,7 +38,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/logger/logstream_builder.h"
 #include "mongo/util/bufreader.h"
 
 namespace mongo {

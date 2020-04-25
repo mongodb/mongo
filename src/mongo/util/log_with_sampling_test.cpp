@@ -34,7 +34,6 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
-#include "mongo/util/log_global_settings.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/scopeguard.h"
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -61,15 +61,15 @@ MessageLogDomain* LogManager::getNamedDomain(const std::string& name) {
 
 void LogManager::detachDefaultConsoleAppender() {
     invariant(_defaultAppender);
-    _globalDomain.detachAppender(_defaultAppender);
-    _defaultAppender.reset();
+    _globalDomain.detachAppender(*_defaultAppender);
+    _defaultAppender = {};
 }
 
 void LogManager::reattachDefaultConsoleAppender() {
     invariant(!_defaultAppender);
-    _defaultAppender =
-        _globalDomain.attachAppender(std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
-            &logv2::LogManager::global().getGlobalDomain(), false));
+    auto appender = std::make_unique<logger::LogV2Appender<MessageEventEphemeral>>(
+        &logv2::LogManager::global().getGlobalDomain(), false);
+    _defaultAppender = _globalDomain.attachAppender(std::move(appender));
 }
 
 bool LogManager::isDefaultConsoleAppenderAttached() const {

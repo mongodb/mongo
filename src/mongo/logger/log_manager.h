@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
 #include "mongo/logger/component_message_log_domain.h"
@@ -88,7 +89,7 @@ private:
 
     DomainsByNameMap _domains;
     ComponentMessageLogDomain _globalDomain;
-    ComponentMessageLogDomain::AppenderHandle _defaultAppender;
+    boost::optional<ComponentMessageLogDomain::AppenderHandle> _defaultAppender;
 };
 
 }  // namespace logger

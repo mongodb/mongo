@@ -34,10 +34,8 @@
 #include <boost/optional.hpp>
 #include <utility>
 
-#include "mongo/logger/logger.h"
-#include "mongo/logger/log_severity.h"
-#include "mongo/logger/logstream_builder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 
@@ -50,9 +48,9 @@ public:
   explicit VLogSink(int verbosity)
     : _v(verbosity) {}
     ~VLogSink() {
-      using namespace mongo;
+      using namespace mongo::literals;
       LOGV2_DEBUG_OPTIONS(
-        25000, 5, {logv2::LogComponent::kGeo}, "{message}", "message"_attr = _os.str());
+        25000, 5, {mongo::logv2::LogComponent::kGeo}, "{message}", "message"_attr = _os.str());
   }
 
   std::ostream& stream() override { return _os; }
@@ -73,21 +71,21 @@ public:
     _os << file << ":" << line << ": ";
   }
   ~SeverityLogSink() {
-    using namespace mongo;
-    auto severity = logv2::LogSeverity::Log();
+    auto severity = mongo::logv2::LogSeverity::Log();
     switch (_severity) {
       case s2_env::LogMessage::Severity::kInfo:
         break;
       case s2_env::LogMessage::Severity::kWarning:
-        severity = logv2::LogSeverity::Warning();
+        severity = mongo::logv2::LogSeverity::Warning();
         break;
       case s2_env::LogMessage::Severity::kFatal:
       default:
-        severity = logv2::LogSeverity::Severe();
+        severity = mongo::logv2::LogSeverity::Severe();
         break;
     };
+    using namespace mongo::literals;
     LOGV2_IMPL(
-      25001, severity, {logv2::LogComponent::kGeo}, "{message}", "message"_attr = _os.str());
+      25001, severity, {mongo::logv2::LogComponent::kGeo}, "{message}", "message"_attr = _os.str());
     if (_severity == s2_env::LogMessage::Severity::kFatal) {
       fassertFailed(40048);
     }

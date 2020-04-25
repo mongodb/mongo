@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kASIO
 
 #include "mongo/platform/basic.h"
 
@@ -437,10 +437,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         return kNetworkInterfaceShutdownInProgress;
     }
 
-    LOGV2_DEBUG(22596,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
-                "startCommand",
-                "request"_attr = redact(request.toString()));
+    LOGV2_DEBUG(
+        22596, kDiagnosticLogLevel, "startCommand", "request"_attr = redact(request.toString()));
 
     if (_metadataHook) {
         BSONObjBuilder newMetadata(std::move(request.metadata));
@@ -983,10 +981,8 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
 
-    LOGV2_DEBUG(23909,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
-                "startCommand",
-                "request"_attr = redact(request.toString()));
+    LOGV2_DEBUG(
+        23909, kDiagnosticLogLevel, "startCommand", "request"_attr = redact(request.toString()));
 
     if (_metadataHook) {
         BSONObjBuilder newMetadata(std::move(request.metadata));

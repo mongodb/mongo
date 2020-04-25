@@ -34,7 +34,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/logger/logstream_builder.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {

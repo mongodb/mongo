@@ -28,7 +28,7 @@
  */
 #include "mongo/client/server_is_master_monitor.h"
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/sdam/sdam.h"

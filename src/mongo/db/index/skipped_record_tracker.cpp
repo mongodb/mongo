@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 #include "mongo/db/index/skipped_record_tracker.h"
 
@@ -154,7 +154,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
 
     int logLevel = (resolved > 0) ? 0 : 1;
     LOGV2_DEBUG(23883,
-                logSeverityV1toV2(logLevel).toInt(),
+                logLevel,
                 "index build: reapplied {resolved} skipped records for index: "
                 "{indexCatalogEntry_descriptor_indexName}",
                 "resolved"_attr = resolved,

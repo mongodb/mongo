@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -48,7 +48,6 @@
 #include "mongo/util/debugger.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/log_global_settings.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"

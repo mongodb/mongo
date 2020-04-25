@@ -46,7 +46,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/logger/log_version_util.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_debug.h"
@@ -57,20 +56,12 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/errno_util.h"
 
-#if defined(MONGO_LOG_DEFAULT_COMPONENT)
-#include "mongo/logger/log_version_util.h"
-#endif
-
 namespace {
 #if defined(MONGO_LOGV2_DEFAULT_COMPONENT)
-const ::mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
-    MONGO_LOGV2_DEFAULT_COMPONENT;
-
 // Provide log component in global scope so that MONGO_LOG will always have a valid component.
 // Global log component will be kDefault unless overridden by MONGO_LOGV2_DEFAULT_COMPONENT.
-#elif defined(MONGO_LOG_DEFAULT_COMPONENT)
-const ::mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
-    ::mongo::logComponentV1toV2(MONGO_LOG_DEFAULT_COMPONENT);
+const mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
+    MONGO_LOGV2_DEFAULT_COMPONENT;
 #else
 #error \
     "mongo/logv2/log.h requires MONGO_LOGV2_DEFAULT_COMPONENT to be defined. " \

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kConnectionPool
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kConnectionPool
 
 #include "mongo/platform/basic.h"
 
@@ -648,7 +648,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
         if (conn) {
             LOGV2_DEBUG(
                 22559,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                kDiagnosticLogLevel,
                 "Requesting new connection to {hostAndPort}--using existing idle connection",
                 "hostAndPort"_attr = _hostAndPort);
             return Future<ConnectionPool::ConnectionHandle>::makeReady(std::move(conn));
@@ -660,7 +660,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
         timeout = pendingTimeout;
     }
     LOGV2_DEBUG(22560,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                kDiagnosticLogLevel,
                 "Requesting new connection to {hostAndPort} with timeout {timeout}",
                 "hostAndPort"_attr = _hostAndPort,
                 "timeout"_attr = timeout);
@@ -731,7 +731,7 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
     // to our internal one.
     if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
         LOGV2_DEBUG(22562,
-                    logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                    kDiagnosticLogLevel,
                     "Pending connection to host {hostAndPort} did not complete within the "
                     "connection timeout, retrying with a new connection;{openConnections} "
                     "connections to that host remain open",
@@ -743,7 +743,7 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
     // Pass a failure on through
     if (!status.isOK()) {
         LOGV2_DEBUG(22563,
-                    logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                    kDiagnosticLogLevel,
                     "Connection failed to {hostAndPort} due to {status}",
                     "hostAndPort"_attr = _hostAndPort,
                     "status"_attr = redact(status));
@@ -754,14 +754,14 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
     // If the host and port were dropped, let this lapse and spawn new connections
     if (!conn || conn->getGeneration() != _generation) {
         LOGV2_DEBUG(22564,
-                    logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                    kDiagnosticLogLevel,
                     "Dropping late refreshed connection to {hostAndPort}",
                     "hostAndPort"_attr = _hostAndPort);
         return;
     }
 
     LOGV2_DEBUG(22565,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                kDiagnosticLogLevel,
                 "Finishing connection refresh for {hostAndPort}",
                 "hostAndPort"_attr = _hostAndPort);
 
@@ -817,7 +817,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
         _processingPool[connPtr] = std::move(conn);
 
         LOGV2_DEBUG(22568,
-                    logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                    kDiagnosticLogLevel,
                     "Refreshing connection to {hostAndPort}",
                     "hostAndPort"_attr = _hostAndPort);
         connPtr->refresh(_parent->_controller->pendingTimeout(),
@@ -830,7 +830,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
 
     // If it's fine as it is, just put it in the ready queue
     LOGV2_DEBUG(22569,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                kDiagnosticLogLevel,
                 "Returning ready connection to {hostAndPort}",
                 "hostAndPort"_attr = _hostAndPort);
     addToReady(std::move(conn));
@@ -850,7 +850,7 @@ void ConnectionPool::SpecificPool::addToReady(OwnedConnection conn) {
     // returnConnection
     auto returnConnectionFunc = guardCallback([this, connPtr]() {
         LOGV2_DEBUG(22570,
-                    logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                    kDiagnosticLogLevel,
                     "Triggered refresh timeout for {hostAndPort}",
                     "hostAndPort"_attr = _hostAndPort);
         auto conn = takeFromPool(_readyPool, connPtr);
@@ -935,7 +935,7 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status) {
     }
 
     LOGV2_DEBUG(22573,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                kDiagnosticLogLevel,
                 "Failing requests to {hostAndPort}",
                 "hostAndPort"_attr = _hostAndPort);
     _requests.clear();
@@ -976,7 +976,7 @@ void ConnectionPool::SpecificPool::spawnConnections() {
 
     if (_health.isFailed) {
         LOGV2_DEBUG(22574,
-                    logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                    kDiagnosticLogLevel,
                     "Pool for {hostAndPort} has failed recently. Postponing any attempts to spawn "
                     "connections",
                     "hostAndPort"_attr = _hostAndPort);
@@ -985,7 +985,7 @@ void ConnectionPool::SpecificPool::spawnConnections() {
 
     auto controls = _parent->_controller->getControls(_id);
     LOGV2_DEBUG(22575,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                kDiagnosticLogLevel,
                 "Comparing connection state for {hostAndPort} to Controls: {controls}",
                 "hostAndPort"_attr = _hostAndPort,
                 "controls"_attr = controls);
@@ -1009,7 +1009,7 @@ void ConnectionPool::SpecificPool::spawnConnections() {
     auto allowance = std::min(controls.targetConnections - totalConnections,
                               controls.maxPendingConnections - pendingConnections);
     LOGV2_DEBUG(22577,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                kDiagnosticLogLevel,
                 "Spawning {allowance} connections to {hostAndPort}",
                 "allowance"_attr = allowance,
                 "hostAndPort"_attr = _hostAndPort);
@@ -1140,7 +1140,7 @@ void ConnectionPool::SpecificPool::updateController() {
         inUseConnections(),
     };
     LOGV2_DEBUG(22578,
-                logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
+                kDiagnosticLogLevel,
                 "Updating controller for {hostAndPort} with State: {state}",
                 "hostAndPort"_attr = _hostAndPort,
                 "state"_attr = state);
@@ -1198,10 +1198,8 @@ void ConnectionPool::SpecificPool::updateController() {
 void ConnectionPool::SpecificPool::updateState() {
     if (_health.isShutdown) {
         // If we're in shutdown, there is nothing to update. Our clients are all gone.
-        LOGV2_DEBUG(22579,
-                    logSeverityV1toV2(kDiagnosticLogLevel).toInt(),
-                    "{hostAndPort} is dead",
-                    "hostAndPort"_attr = _hostAndPort);
+        LOGV2_DEBUG(
+            22579, kDiagnosticLogLevel, "{hostAndPort} is dead", "hostAndPort"_attr = _hostAndPort);
         return;
     }
 

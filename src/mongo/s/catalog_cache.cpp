@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #define LOGV2_FOR_CATALOG_REFRESH(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(                                    \
@@ -639,7 +639,7 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
             : 1;
         LOGV2_FOR_CATALOG_REFRESH(
             24101,
-            logSeverityV1toV2(logLevel).toInt(),
+            logLevel,
             "Refreshed cached database entry for {db} to version {newDbVersion} from version "
             "{oldDbVersion}. Took {duration}",
             "Refreshed cached database entry",
@@ -750,7 +750,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
                 : 1;
             LOGV2_FOR_CATALOG_REFRESH(
                 24104,
-                logSeverityV1toV2(logLevel).toInt(),
+                logLevel,
                 "Refreshed cached collection {namespace} to version {newVersion} from version "
                 "{oldVersion}. Took {duration}",
                 "Refreshed cached collection",

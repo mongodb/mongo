@@ -42,7 +42,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/logger/log_severity.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"

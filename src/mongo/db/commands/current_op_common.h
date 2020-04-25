@@ -29,7 +29,7 @@
 
 #pragma once
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"

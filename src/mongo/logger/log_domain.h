@@ -29,15 +29,14 @@
 
 #pragma once
 
+#include <list>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "mongo/logger/appender.h"
-#include "mongo/logger/log_severity.h"
+#include "mongo/logv2/log_severity.h"
 
-namespace mongo {
-namespace logger {
+namespace mongo::logger {
 
 /**
  * Logging domain for events of type E.
@@ -60,42 +59,27 @@ namespace logger {
  */
 template <typename E>
 class LogDomain {
-    LogDomain(const LogDomain&) = delete;
-    LogDomain& operator=(const LogDomain&) = delete;
+    using Event = E;
+    using AppenderList = std::list<std::unique_ptr<Appender<Event>>>;
+    using AppendersIter = typename AppenderList::iterator;
 
 public:
-    typedef E Event;
-    typedef Appender<Event> EventAppender;
-    typedef std::unique_ptr<EventAppender> AppenderAutoPtr;
-
     /**
      * Opaque handle returned by attachAppender(), which can be subsequently passed to
      * detachAppender() to detach an appender from an instance of LogDomain.
      */
     class AppenderHandle {
-        friend class LogDomain;
-
-        static const size_t invalid_handle = (size_t)-1;
-
-    public:
-        AppenderHandle() : _index(invalid_handle) {}
-
-        explicit operator bool() const noexcept {
-            return _index != invalid_handle;
-        }
-
-        void reset() {
-            _index = invalid_handle;
-        }
-
     private:
-        explicit AppenderHandle(size_t index) : _index(index) {}
-
-        size_t _index;
+        friend class LogDomain;
+        explicit AppenderHandle(AppendersIter iter) : _iter{iter} {}
+        AppendersIter _iter;
     };
 
-    LogDomain();
-    ~LogDomain();
+    LogDomain() = default;
+    ~LogDomain() = default;
+
+    LogDomain(const LogDomain&) = delete;
+    LogDomain& operator=(const LogDomain&) = delete;
 
     /**
      * Receives an event for logging, calling append(event) on all attached appenders.
@@ -104,7 +88,17 @@ public:
      * *If abortOnFailure is set, ::abort() is immediately called.
      * *If abortOnFailure is not set, the error is returned and no further appenders are called.
      */
-    Status append(const Event& event);
+    Status append(const Event& event) {
+        for (auto& appender : _appenders) {
+            if (Status status = appender->append(event); !status.isOK()) {
+                if (_abortOnFailure) {
+                    ::abort();
+                }
+                return status;
+            }
+        }
+        return Status::OK();
+    }
 
     /**
      * Gets the state of the abortOnFailure flag.
@@ -120,38 +114,32 @@ public:
         _abortOnFailure = abortOnFailure;
     }
 
-    //
-    // Configuration methods.  Must be synchronized with each other and calls to "append" by the
-    // caller.
-    //
-
     /**
-     * Attaches "appender" to this domain, taking ownership of it.  Returns a handle that may be
-     * used later to detach this appender.
+     * Attaches `appender`. Returns a handle for use with `detachAppender`.
      */
-    AppenderHandle attachAppender(std::unique_ptr<EventAppender> appender);
-
-    template <typename Ptr>
-    AppenderHandle attachAppender(Ptr appender) {
-        return attachAppender(std::unique_ptr<EventAppender>(std::move(appender)));
+    AppenderHandle attachAppender(std::unique_ptr<Appender<Event>> appender) {
+        return AppenderHandle(_appenders.insert(_appenders.end(), std::move(appender)));
     }
 
     /**
-     * Detaches the appender referenced by "handle" from this domain, releasing ownership of it.
-     * Returns an unique_ptr to the handler to the caller, who is now responsible for its
-     * deletion. Caller should consider "handle" is invalid after this call.
+     * Detaches the appender referenced by `handle`, returning it.
      */
-    std::unique_ptr<EventAppender> detachAppender(AppenderHandle handle);
+    std::unique_ptr<Appender<Event>> detachAppender(AppenderHandle handle) {
+        auto result = std::move(*handle._iter);
+        _appenders.erase(handle._iter);
+        return result;
+    }
 
     /**
      * Destroy all attached appenders, invalidating all handles.
      */
-    void clearAppenders();
+    void clearAppenders() {
+        _appenders.clear();
+    }
 
 private:
-    std::vector<std::unique_ptr<EventAppender>> _appenders;
-    bool _abortOnFailure;
+    AppenderList _appenders;
+    bool _abortOnFailure = false;
 };
 
-}  // namespace logger
-}  // namespace mongo
+}  // namespace mongo::logger

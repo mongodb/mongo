@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -168,9 +168,7 @@ public:
 class LogRecordingScope {
 public:
     LogRecordingScope()
-        : _logged(false),
-          _threadName(mongo::getThreadName().toString()),
-          _handle(mongo::logger::globalLogDomain()->attachAppender(std::make_unique<Tee>(this))) {}
+        : _handle(mongo::logger::globalLogDomain()->attachAppender(std::make_unique<Tee>(this))) {}
     ~LogRecordingScope() {
         mongo::logger::globalLogDomain()->detachAppender(_handle);
     }
@@ -180,11 +178,10 @@ public:
     }
 
 private:
-    class Tee : public mongo::logger::MessageLogDomain::EventAppender {
+    class Tee : public mongo::logger::Appender<mongo::logger::MessageEventEphemeral> {
     public:
         Tee(LogRecordingScope* scope) : _scope(scope) {}
-        virtual ~Tee() {}
-        virtual Status append(const logger::MessageEventEphemeral& event) {
+        Status append(const logger::MessageEventEphemeral& event) override {
             // Don't want to consider logging by background threads.
             if (mongo::getThreadName() == _scope->_threadName) {
                 _scope->_logged = true;
@@ -195,8 +192,9 @@ private:
     private:
         LogRecordingScope* _scope;
     };
-    bool _logged;
-    const string _threadName;
+
+    bool _logged = false;
+    const string _threadName = mongo::getThreadName().toString();
     mongo::logger::MessageLogDomain::AppenderHandle _handle;
 };
 
