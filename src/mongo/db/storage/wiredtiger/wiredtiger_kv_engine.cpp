@@ -500,95 +500,6 @@ Status OpenReadTransactionParam::setFromString(const std::string& str) {
     return _data->resize(num);
 }
 
-namespace {
-
-StatusWith<StorageEngine::BackupInformation> getBackupInformationFromBackupCursor(
-    WT_SESSION* session,
-    WT_CURSOR* cursor,
-    bool incrementalBackup,
-    bool fullBackup,
-    std::string dbPath,
-    const char* statusPrefix) {
-    int wtRet;
-    StorageEngine::BackupInformation backupInformation;
-    const char* filename;
-    const auto directoryPath = boost::filesystem::path(dbPath);
-    const auto wiredTigerLogFilePrefix = "WiredTigerLog";
-    while ((wtRet = cursor->next(cursor)) == 0) {
-        invariantWTOK(cursor->get_key(cursor, &filename));
-
-        std::string name(filename);
-
-        boost::filesystem::path filePath = directoryPath;
-        if (name.find(wiredTigerLogFilePrefix) == 0) {
-            // TODO SERVER-13455:replace `journal/` with the configurable journal path.
-            filePath /= boost::filesystem::path("journal");
-        }
-        filePath /= name;
-
-        boost::system::error_code errorCode;
-        const std::uint64_t fileSize = boost::filesystem::file_size(filePath, errorCode);
-        uassert(31403,
-                "Failed to get a file's size. Filename: {} Error: {}"_format(filePath.string(),
-                                                                             errorCode.message()),
-                !errorCode);
-
-        StorageEngine::BackupFile backupFile(fileSize);
-        backupInformation.insert({filePath.string(), backupFile});
-
-        // For the first full incremental backup, include the offset and length.
-        if (incrementalBackup && fullBackup) {
-            backupInformation.at(filePath.string()).blocksToCopy.push_back({0, fileSize});
-        }
-
-        // Full backups cannot open an incremental cursor, even if they are the first full backup
-        // for incremental.
-        if (!incrementalBackup || fullBackup) {
-            continue;
-        }
-
-        // For each file listed, open a duplicate backup cursor and get the blocks to copy.
-        std::stringstream ss;
-        ss << "incremental=(file=" << filename << ")";
-        const std::string config = ss.str();
-        WT_CURSOR* dupCursor;
-        wtRet = session->open_cursor(session, nullptr, cursor, config.c_str(), &dupCursor);
-        if (wtRet != 0) {
-            return wtRCToStatus(wtRet);
-        }
-
-        while ((wtRet = dupCursor->next(dupCursor)) == 0) {
-            uint64_t offset, size, type;
-            invariantWTOK(dupCursor->get_key(dupCursor, &offset, &size, &type));
-            LOGV2_DEBUG(22311,
-                        2,
-                        "Block to copy for incremental backup: filename: {filePath_string}, "
-                        "offset: {offset}, size: {size}, type: {type}",
-                        "filePath_string"_attr = filePath.string(),
-                        "offset"_attr = offset,
-                        "size"_attr = size,
-                        "type"_attr = type);
-            backupInformation.at(filePath.string()).blocksToCopy.push_back({offset, size});
-        }
-
-        if (wtRet != WT_NOTFOUND) {
-            return wtRCToStatus(wtRet);
-        }
-
-        wtRet = dupCursor->close(dupCursor);
-        if (wtRet != 0) {
-            return wtRCToStatus(wtRet);
-        }
-    }
-
-    if (wtRet != WT_NOTFOUND) {
-        return wtRCToStatus(wtRet, statusPrefix);
-    }
-    return backupInformation;
-}
-
-}  // namespace
-
 StringData WiredTigerKVEngine::kTableUriPrefix = "table:"_sd;
 
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
@@ -1170,8 +1081,191 @@ Status WiredTigerKVEngine::disableIncrementalBackup(OperationContext* opCtx) {
     return Status::OK();
 }
 
-StatusWith<StorageEngine::BackupInformation> WiredTigerKVEngine::beginNonBlockingBackup(
-    OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
+namespace {
+
+const boost::filesystem::path constructFilePath(std::string path, std::string filename) {
+    const auto directoryPath = boost::filesystem::path(path);
+    const auto wiredTigerLogFilePrefix = "WiredTigerLog";
+
+    boost::filesystem::path filePath = directoryPath;
+    if (filename.find(wiredTigerLogFilePrefix) == 0) {
+        // TODO SERVER-13455: Replace `journal/` with the configurable journal path.
+        filePath /= boost::filesystem::path("journal");
+    }
+    filePath /= filename;
+
+    return filePath;
+}
+
+std::vector<std::string> getUniqueFiles(const std::vector<std::string>& files,
+                                        const std::set<std::string>& referenceFiles) {
+    std::vector<std::string> result;
+    for (auto& file : files) {
+        if (referenceFiles.find(file) == referenceFiles.end()) {
+            result.push_back(file);
+        }
+    }
+    return result;
+}
+
+class StreamingCursorImpl : public StorageEngine::StreamingCursor {
+public:
+    StreamingCursorImpl() = delete;
+    explicit StreamingCursorImpl(WT_SESSION* session,
+                                 std::string path,
+                                 StorageEngine::BackupOptions options,
+                                 WiredTigerBackup* wtBackup)
+        : StorageEngine::StreamingCursor(options),
+          _session(session),
+          _path(path),
+          _wtBackup(wtBackup){};
+
+    ~StreamingCursorImpl() = default;
+
+    StatusWith<std::vector<StorageEngine::BackupBlock>> getNextBatch(const std::size_t batchSize) {
+        int wtRet;
+        std::vector<StorageEngine::BackupBlock> backupBlocks;
+
+        stdx::lock_guard<Latch> backupCursorLk(_wtBackup->wtBackupCursorMutex);
+        while (backupBlocks.size() < batchSize) {
+            stdx::lock_guard<Latch> backupDupCursorLk(_wtBackup->wtBackupDupCursorMutex);
+
+            // We may still have backup blocks to retrieve for the existing file that
+            // _wtBackup->cursor is open on if _wtBackup->dupCursor exists. In this case, do not
+            // call next() on _wtBackup->cursor.
+            if (!_wtBackup->dupCursor) {
+                wtRet = (_wtBackup->cursor)->next(_wtBackup->cursor);
+                if (wtRet != 0) {
+                    break;
+                }
+            }
+
+            const char* filename;
+            invariantWTOK((_wtBackup->cursor)->get_key(_wtBackup->cursor, &filename));
+            const boost::filesystem::path filePath = constructFilePath(_path, {filename});
+
+            const auto wiredTigerLogFilePrefix = "WiredTigerLog";
+            if (std::string(filename).find(wiredTigerLogFilePrefix) == 0) {
+                // If extendBackupCursor() is called prior to the StreamingCursor running into log
+                // files, we must ensure that subsequent calls to getNextBatch() do not return
+                // duplicate files.
+                if ((_wtBackup->logFilePathsSeenByExtendBackupCursor).find(filePath.string()) !=
+                    (_wtBackup->logFilePathsSeenByExtendBackupCursor).end()) {
+                    break;
+                }
+                (_wtBackup->logFilePathsSeenByGetNextBatch).insert(filePath.string());
+            }
+
+            boost::system::error_code errorCode;
+            const std::uint64_t fileSize = boost::filesystem::file_size(filePath, errorCode);
+            uassert(31403,
+                    "Failed to get a file's size. Filename: {} Error: {}"_format(
+                        filePath.string(), errorCode.message()),
+                    !errorCode);
+
+            if (options.incrementalBackup && options.srcBackupName) {
+                // For a subsequent incremental backup, each BackupBlock corresponds to changes
+                // made to data files since the initial incremental backup. Each BackupBlock has a
+                // maximum size of options.blockSizeMB. Incremental backups open a duplicate cursor,
+                // which is stored in _wtBackup->dupCursor.
+                //
+                // 'backupBlocks' is an out parameter.
+                Status status = _getNextIncrementalBatchForFile(
+                    filename, filePath, fileSize, batchSize, &backupBlocks);
+
+                if (!status.isOK()) {
+                    return status;
+                }
+            } else {
+                // For a full backup or the initial incremental backup, each BackupBlock corresponds
+                // to an entire file. Full backups cannot open an incremental cursor, even if they
+                // are the initial incremental backup.
+                const std::uint64_t length = options.incrementalBackup ? fileSize : 0;
+                backupBlocks.push_back({filePath.string(), 0 /* offset */, length, fileSize});
+            }
+        }
+
+        if (wtRet != WT_NOTFOUND && backupBlocks.size() != batchSize) {
+            return wtRCToStatus(wtRet);
+        }
+
+        return backupBlocks;
+    }
+
+private:
+    Status _getNextIncrementalBatchForFile(const char* filename,
+                                           boost::filesystem::path filePath,
+                                           const std::uint64_t fileSize,
+                                           const std::size_t batchSize,
+                                           std::vector<StorageEngine::BackupBlock>* backupBlocks) {
+        // For each file listed, open a duplicate backup cursor and get the blocks to copy.
+        std::stringstream ss;
+        ss << "incremental=(file=" << filename << ")";
+        const std::string config = ss.str();
+
+        int wtRet;
+        bool fileUnchangedFlag = false;
+        if (!_wtBackup->dupCursor) {
+            wtRet = (_session)->open_cursor(
+                _session, nullptr, _wtBackup->cursor, config.c_str(), &_wtBackup->dupCursor);
+            if (wtRet != 0) {
+                return wtRCToStatus(wtRet);
+            }
+            fileUnchangedFlag = true;
+        }
+
+        while (backupBlocks->size() < batchSize) {
+            wtRet = (_wtBackup->dupCursor)->next(_wtBackup->dupCursor);
+            if (wtRet == WT_NOTFOUND) {
+                break;
+            }
+            invariantWTOK(wtRet);
+            fileUnchangedFlag = false;
+
+            uint64_t offset, size, type;
+            invariantWTOK(
+                (_wtBackup->dupCursor)->get_key(_wtBackup->dupCursor, &offset, &size, &type));
+            LOGV2_DEBUG(22311,
+                        2,
+                        "Block to copy for incremental backup: filename: {filePath_string}, "
+                        "offset: {offset}, size: {size}, type: {type}",
+                        "filePath_string"_attr = filePath.string(),
+                        "offset"_attr = offset,
+                        "size"_attr = size,
+                        "type"_attr = type);
+            backupBlocks->push_back({filePath.string(), offset, size, fileSize});
+        }
+
+        // If the file is unchanged, push a BackupBlock with offset=0 and length=0. This allows us
+        // to distinguish between an unchanged file and a deleted file in an incremental backup.
+        if (fileUnchangedFlag) {
+            backupBlocks->push_back({filePath.string(), 0 /* offset */, 0 /* length */, fileSize});
+        }
+
+        // If the duplicate backup cursor has been exhausted, close it and set
+        // _wtBackup->dupCursor=nullptr.
+        if (wtRet != 0) {
+            if (wtRet != WT_NOTFOUND ||
+                (wtRet = (_wtBackup->dupCursor)->close(_wtBackup->dupCursor)) != 0) {
+                return wtRCToStatus(wtRet);
+            }
+            _wtBackup->dupCursor = nullptr;
+            (_wtBackup->wtBackupDupCursorCV).notify_one();
+        }
+
+        return Status::OK();
+    }
+
+    WT_SESSION* _session;
+    std::string _path;
+    WiredTigerBackup* _wtBackup;  // '_wtBackup' is an out parameter.
+};
+
+}  // namespace
+
+StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>>
+WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
+                                           const StorageEngine::BackupOptions& options) {
     uassert(51034, "Cannot open backup cursor with in-memory mode.", !isEphemeral());
 
     std::stringstream ss;
@@ -1187,6 +1281,8 @@ StatusWith<StorageEngine::BackupInformation> WiredTigerKVEngine::beginNonBlockin
 
         ss << ")";
     }
+
+    stdx::lock_guard<Latch> backupCursorLk(_wtBackup.wtBackupCursorMutex);
 
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
     stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
@@ -1208,62 +1304,74 @@ StatusWith<StorageEngine::BackupInformation> WiredTigerKVEngine::beginNonBlockin
         return wtRCToStatus(wtRet);
     }
 
-    const bool fullBackup = !options.srcBackupName;
-    auto swBackupInfo = getBackupInformationFromBackupCursor(session,
-                                                             cursor,
-                                                             options.incrementalBackup,
-                                                             fullBackup,
-                                                             _path,
-                                                             "Error opening backup cursor.");
+    // A nullptr indicates that no duplicate cursor is open during an incremental backup.
+    stdx::lock_guard<Latch> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
+    _wtBackup.dupCursor = nullptr;
 
-    if (!swBackupInfo.isOK()) {
-        return swBackupInfo;
-    }
+    invariant(_wtBackup.logFilePathsSeenByExtendBackupCursor.empty());
+    invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
+    auto streamingCursor =
+        std::make_unique<StreamingCursorImpl>(session, _path, options, &_wtBackup);
 
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);
-    _backupCursor = cursor;
+    _wtBackup.cursor = cursor;
 
-    return swBackupInfo;
+    return streamingCursor;
 }
 
 void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
+    stdx::lock_guard<Latch> backupCursorLk(_wtBackup.wtBackupCursorMutex);
+    stdx::lock_guard<Latch> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
     _backupSession.reset();
-    // Oplog truncation thread can now remove the pinned oplog.
-    stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
-    _oplogPinnedByBackup = boost::none;
-    _backupCursor = nullptr;
+    {
+        // Oplog truncation thread can now remove the pinned oplog.
+        stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
+        _oplogPinnedByBackup = boost::none;
+    }
+    _wtBackup.cursor = nullptr;
+    _wtBackup.dupCursor = nullptr;
+    _wtBackup.logFilePathsSeenByExtendBackupCursor = {};
+    _wtBackup.logFilePathsSeenByGetNextBatch = {};
 }
 
 StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     OperationContext* opCtx) {
     uassert(51033, "Cannot extend backup cursor with in-memory mode.", !isEphemeral());
-    invariant(_backupCursor);
+    invariant(_wtBackup.cursor);
+    stdx::unique_lock<Latch> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
+
+    MONGO_IDLE_THREAD_BLOCK;
+    _wtBackup.wtBackupDupCursorCV.wait(backupDupCursorLk, [&] { return !_wtBackup.dupCursor; });
 
     // The "target=(\"log:\")" configuration string for the cursor will ensure that we only see the
     // log files when iterating on the cursor.
     WT_CURSOR* cursor = nullptr;
     WT_SESSION* session = _backupSession->getSession();
-    int wtRet = session->open_cursor(session, nullptr, _backupCursor, "target=(\"log:\")", &cursor);
+    int wtRet =
+        session->open_cursor(session, nullptr, _wtBackup.cursor, "target=(\"log:\")", &cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
 
-    StatusWith<StorageEngine::BackupInformation> swBackupInfo =
-        getBackupInformationFromBackupCursor(session,
-                                             cursor,
-                                             /*incrementalBackup=*/false,
-                                             /*fullBackup=*/true,
-                                             _path,
-                                             "Error extending backup cursor.");
+    const char* filename;
+    std::vector<std::string> filePaths;
+
+    while ((wtRet = cursor->next(cursor)) == 0) {
+        invariantWTOK(cursor->get_key(cursor, &filename));
+        std::string name(filename);
+        const boost::filesystem::path filePath = constructFilePath(_path, name);
+        filePaths.push_back(filePath.string());
+        _wtBackup.logFilePathsSeenByExtendBackupCursor.insert(filePath.string());
+    }
+
+    if (wtRet != WT_NOTFOUND) {
+        return wtRCToStatus(wtRet);
+    }
 
     wtRet = cursor->close(cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
-    }
-
-    if (!swBackupInfo.isOK()) {
-        return swBackupInfo.getStatus();
     }
 
     // Once all the backup cursors have been opened on a sharded cluster, we need to ensure that the
@@ -1271,12 +1379,7 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     // have a consistent view of the data. For shards that opened their backup cursor before the
     // established point-in-time for backup, they will need to create a full copy of the additional
     // journal files returned by this method to ensure a consistent backup of the data is taken.
-    std::vector<std::string> filenames;
-    for (const auto& entry : swBackupInfo.getValue()) {
-        filenames.push_back(entry.first);
-    }
-
-    return {filenames};
+    return getUniqueFiles(filePaths, _wtBackup.logFilePathsSeenByGetNextBatch);
 }
 
 void WiredTigerKVEngine::syncSizeInfo(bool sync) const {

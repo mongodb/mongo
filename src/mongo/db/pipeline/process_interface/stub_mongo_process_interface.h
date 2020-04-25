@@ -209,7 +209,7 @@ public:
 
     BackupCursorState openBackupCursor(OperationContext* opCtx,
                                        const StorageEngine::BackupOptions& options) final {
-        return BackupCursorState{UUID::gen(), boost::none, {}};
+        return BackupCursorState{UUID::gen(), boost::none, nullptr, {}};
     }
 
     void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {}

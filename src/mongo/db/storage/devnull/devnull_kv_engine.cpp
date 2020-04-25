@@ -253,12 +253,42 @@ void DevNullKVEngine::setCachePressureForTest(int pressure) {
     _cachePressureForTest = pressure;
 }
 
-StatusWith<StorageEngine::BackupInformation> DevNullKVEngine::beginNonBlockingBackup(
+namespace {
+
+class StreamingCursorImpl : public StorageEngine::StreamingCursor {
+public:
+    StreamingCursorImpl() = delete;
+    StreamingCursorImpl(StorageEngine::BackupOptions options)
+        : StorageEngine::StreamingCursor(options) {
+        _backupBlocks = {{"filename.wt"}};
+        _exhaustCursor = false;
+    };
+
+    ~StreamingCursorImpl() = default;
+
+    BSONObj getMetadataObject(UUID backupId) {
+        return BSONObj();
+    }
+
+    StatusWith<std::vector<StorageEngine::BackupBlock>> getNextBatch(const std::size_t batchSize) {
+        if (_exhaustCursor) {
+            std::vector<StorageEngine::BackupBlock> emptyVector;
+            return emptyVector;
+        }
+        _exhaustCursor = true;
+        return _backupBlocks;
+    }
+
+private:
+    std::vector<StorageEngine::BackupBlock> _backupBlocks;
+    bool _exhaustCursor;
+};
+
+}  // namespace
+
+StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> DevNullKVEngine::beginNonBlockingBackup(
     OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
-    StorageEngine::BackupInformation backupInformation;
-    StorageEngine::BackupFile backupFile(0);
-    backupInformation.insert({"filename.wt", backupFile});
-    return backupInformation;
+    return std::make_unique<StreamingCursorImpl>(options);
 }
 
 StatusWith<std::vector<std::string>> DevNullKVEngine::extendBackupCursor(OperationContext* opCtx) {

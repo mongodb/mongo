@@ -68,6 +68,24 @@ struct WiredTigerFileVersion {
     std::string getDowngradeString();
 };
 
+struct WiredTigerBackup {
+    WT_CURSOR* cursor = nullptr;
+    WT_CURSOR* dupCursor = nullptr;
+    std::set<std::string> logFilePathsSeenByExtendBackupCursor;
+    std::set<std::string> logFilePathsSeenByGetNextBatch;
+
+    // 'wtBackupCursorMutex' provides concurrency control between beginNonBlockingBackup(),
+    // endNonBlockingBackup(), and getNextBatch() because we stream the output of the backup cursor.
+    Mutex wtBackupCursorMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::wtBackupCursorMutex");
+
+    // 'wtBackupDupCursorMutex' provides concurrency control between getNextBatch() and
+    // extendBackupCursor() because WiredTiger only allows one duplicate cursor to be open at a
+    // time. extendBackupCursor() blocks on condition variable 'wtBackupDupCursorCV' if a duplicate
+    // cursor is already open.
+    Mutex wtBackupDupCursorMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::wtBackupDupCursorMutex");
+    stdx::condition_variable wtBackupDupCursorCV;
+};
+
 class WiredTigerKVEngine final : public KVEngine {
 public:
     static StringData kTableUriPrefix;
@@ -183,7 +201,7 @@ public:
 
     Status disableIncrementalBackup(OperationContext* opCtx) override;
 
-    StatusWith<StorageEngine::BackupInformation> beginNonBlockingBackup(
+    StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
         OperationContext* opCtx, const StorageEngine::BackupOptions& options) override;
 
     void endNonBlockingBackup(OperationContext* opCtx) override;
@@ -449,7 +467,8 @@ private:
     mutable Date_t _previousCheckedDropsQueued;
 
     std::unique_ptr<WiredTigerSession> _backupSession;
-    WT_CURSOR* _backupCursor;
+    WiredTigerBackup _wtBackup;
+
     mutable Mutex _oplogPinnedByBackupMutex =
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_oplogPinnedByBackupMutex");
     boost::optional<Timestamp> _oplogPinnedByBackup;
