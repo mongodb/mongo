@@ -354,6 +354,7 @@ variables:
   - enterprise-rhel-70-64-bit-kitchen-sink
   - enterprise-rhel-70-64-bit-no-libunwind
   - enterprise-rhel-71-ppc64le
+  - enterprise-rhel-81-ppc64le
   - enterprise-rhel-71-ppc64le-inmem
   - enterprise-rhel-72-s390x
   - enterprise-rhel-72-s390x-inmem
@@ -414,6 +415,7 @@ variables:
   - enterprise-rhel-70-64-bit
   - rhel-72-s390x
   - enterprise-rhel-71-ppc64le
+  - enterprise-rhel-81-ppc64le
   - enterprise-rhel-72-s390x
   - rhel80
   - enterprise-rhel-80-64-bit
@@ -10990,6 +10992,56 @@ buildvariants:
   - name: .integration !.audit
     distros:
     - rhel71-power8-build
+  - name: .jscore .common !.auth
+  - name: jsCore_op_query
+  - name: .read_write_concern
+  - name: replica_sets
+  - name: .replica_sets .common
+  - name: sasl
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.multiversion
+  - name: snmp
+  - name: .stitch
+  - name: .publish
+    distros:
+    - rhel70-small
+
+- name: enterprise-rhel-81-ppc64le
+  display_name: Enterprise RHEL 8.1 PPC64LE
+  modules:
+  - enterprise
+  run_on:
+  - rhel81-power8-small
+  stepback: false
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
+    compile_flags: --ssl MONGO_DISTMOD=rhel81 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    resmoke_jobs_factor: 0.25
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: ppc64le
+    packager_distro: rhel81
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: ppc64le-enterprise-rhel81
+    repo_edition: enterprise
+    multiversion_platform: rhel81
+    multiversion_architecture: ppc64le
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel81-power8-large
+  - name: .aggregation .common
+  - name: audit
+  - name: .auth !.multiversion !.jscore
+  - name: .misc_js
+  - name: .encrypt
+  - name: .integration !.audit
+    distros:
+    - rhel81-power8-large
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
