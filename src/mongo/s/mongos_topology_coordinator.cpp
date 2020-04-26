@@ -58,6 +58,25 @@ MONGO_INITIALIZER(GenerateMongosInstanceId)(InitializerContext*) {
 // topology change.
 MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
 
+template <typename T>
+StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
+                                                   SharedSemiFuture<T>& f,
+                                                   Date_t deadline,
+                                                   ErrorCodes::Error error) {
+    try {
+        return opCtx->runWithDeadline(deadline, error, [&] { return f.getNoThrow(opCtx); });
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+}
+
+/**
+ * ShutdownInProgress error
+ */
+
+const Status kQuiesceModeShutdownStatus =
+    Status(ErrorCodes::ShutdownInProgress, "Mongos is in quiesce mode and will shut down");
+
 }  // namespace
 
 // Make MongosTopologyCoordinator a decoration on the ServiceContext.
@@ -65,10 +84,19 @@ MongosTopologyCoordinator* MongosTopologyCoordinator::get(OperationContext* opCt
     return &getMongosTopologyCoordinator(opCtx->getClient()->getServiceContext());
 }
 
-MongosTopologyCoordinator::MongosTopologyCoordinator() : _topologyVersion(instanceId, 0) {}
+MongosTopologyCoordinator::MongosTopologyCoordinator()
+    : _topologyVersion(instanceId, 0),
+      _inQuiesceMode(false),
+      _promise(std::make_shared<SharedPromise<std::shared_ptr<const MongosIsMasterResponse>>>()) {}
 
 std::shared_ptr<MongosIsMasterResponse> MongosTopologyCoordinator::_makeIsMasterResponse(
     WithLock lock) const {
+    // It's possible for us to transition to Quiesce Mode after an isMaster request timed out.
+    // Check that we are not in Quiesce Mode before returning a response to avoid responding with
+    // a higher topology version, but no indication that we are shutting down.
+    uassert(
+        kQuiesceModeShutdownStatus.code(), kQuiesceModeShutdownStatus.reason(), !_inQuiesceMode);
+
     auto response = std::make_shared<MongosIsMasterResponse>(_topologyVersion);
     return response;
 }
@@ -76,8 +104,13 @@ std::shared_ptr<MongosIsMasterResponse> MongosTopologyCoordinator::_makeIsMaster
 std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIsMasterResponse(
     OperationContext* opCtx,
     boost::optional<TopologyVersion> clientTopologyVersion,
-    boost::optional<long long> maxAwaitTimeMS) const {
+    boost::optional<Date_t> deadline) const {
     stdx::unique_lock lk(_mutex);
+
+    // Fail all new isMaster requests with ShutdownInProgress if we've transitioned to Quiesce
+    // Mode.
+    uassert(
+        kQuiesceModeShutdownStatus.code(), kQuiesceModeShutdownStatus.reason(), !_inQuiesceMode);
 
     // Respond immediately if:
     // (1) There is no clientTopologyVersion, which indicates that the client is not using
@@ -96,32 +129,57 @@ std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIs
                           << _topologyVersion.getCounter(),
             clientTopologyVersion->getCounter() == _topologyVersion.getCounter());
 
-    lk.unlock();
-
+    auto future = _promise->getFuture();
     // At this point, we have verified that clientTopologyVersion is not none. It this is true,
-    // maxAwaitTimeMS must also be not none.
-    invariant(maxAwaitTimeMS);
+    // deadline must also be not none.
+    invariant(deadline);
 
     IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
-
-    ON_BLOCK_EXIT([&] { IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges(); });
+    lk.unlock();
 
     if (MONGO_unlikely(hangWhileWaitingForIsMasterResponse.shouldFail())) {
         LOGV2(4695501, "hangWhileWaitingForIsMasterResponse failpoint enabled");
         hangWhileWaitingForIsMasterResponse.pauseWhileSet(opCtx);
     }
 
-    // Sleep for maxTimeMS.
+    // Wait for a mongos topology change with timeout set to deadline.
     LOGV2_DEBUG(4695502,
                 1,
-                "Waiting for an isMaster response for maxAwaitTimeMS",
-                "maxAwaitTimeMS"_attr = maxAwaitTimeMS.get(),
+                "Waiting for an isMaster response from a topology change or until deadline",
+                "deadline"_attr = deadline.get(),
                 "currentMongosTopologyVersionCounter"_attr = _topologyVersion.getCounter());
 
-    opCtx->sleepFor(Milliseconds(*maxAwaitTimeMS));
+    auto statusWithIsMaster =
+        futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
+    auto status = statusWithIsMaster.getStatus();
 
-    lk.lock();
-    return _makeIsMasterResponse(lk);
+    if (status == ErrorCodes::ExceededTimeLimit) {
+        // Return a MongosIsMasterResponse with the current topology version on timeout when
+        // waiting for a topology change.
+        stdx::lock_guard lk(_mutex);
+        IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
+        return _makeIsMasterResponse(lk);
+    }
+
+    // A topology change has happened so we return an IsMasterResponse with the updated
+    // topology version.
+    uassertStatusOK(status);
+    return statusWithIsMaster.getValue();
+}
+
+void MongosTopologyCoordinator::enterQuiesceMode() {
+    stdx::lock_guard lk(_mutex);
+    _inQuiesceMode = true;
+
+    // Increment the topology version and respond to any waiting isMaster request with an error.
+    auto counter = _topologyVersion.getCounter();
+    _topologyVersion.setCounter(counter + 1);
+    _promise->setError(
+        {ErrorCodes::ShutdownInProgress, "Mongos is in quiesce mode and will shut down"});
+
+    // Reset counter to 0 since we will respond to all waiting isMaster requests with an error.
+    // All new isMaster requests will immediately fail with ShutdownInProgress.
+    IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
 }
 
 }  // namespace mongo

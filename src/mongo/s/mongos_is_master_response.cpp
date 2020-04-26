@@ -35,11 +35,13 @@ namespace mongo {
 
 MongosIsMasterResponse::MongosIsMasterResponse(TopologyVersion topologyVersion) {
     _topologyVersion = topologyVersion;
+    _isMaster = true;
+    _msg = "isdbgrid";
 }
 
 void MongosIsMasterResponse::appendToBuilder(BSONObjBuilder* builder) const {
-    builder->append(kIsMasterFieldName, true);
-    builder->append(kMsgFieldName, "isdbgrid");
+    builder->append(kIsMasterFieldName, _isMaster);
+    builder->append(kMsgFieldName, _msg);
 
     BSONObjBuilder topologyVersionBuilder(builder->subobjStart(kTopologyVersionFieldName));
     _topologyVersion.serialize(&topologyVersionBuilder);

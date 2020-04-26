@@ -63,8 +63,18 @@ public:
         return _topologyVersion;
     }
 
+    bool getIsMaster() const {
+        return _isMaster;
+    }
+
+    std::string getMsg() const {
+        return _msg;
+    }
+
 private:
     TopologyVersion _topologyVersion;
+    bool _isMaster;
+    std::string _msg;
 };
 
 }  // namespace mongo

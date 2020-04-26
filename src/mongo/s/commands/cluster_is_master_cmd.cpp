@@ -123,7 +123,7 @@ public:
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
         boost::optional<TopologyVersion> clientTopologyVersion;
-        boost::optional<long long> maxAwaitTimeMS;
+        boost::optional<Date_t> deadline;
         if (topologyVersionElement && maxAwaitTimeMSField) {
             clientTopologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
                                                            topologyVersionElement.Obj());
@@ -131,14 +131,13 @@ public:
                     "topologyVersion must have a non-negative counter",
                     clientTopologyVersion->getCounter() >= 0);
 
-            long long parsedMaxAwaitTimeMS;
-            uassertStatusOK(
-                bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &parsedMaxAwaitTimeMS));
+            long long maxAwaitTimeMS;
+            uassertStatusOK(bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMS));
 
-            uassert(
-                51759, "maxAwaitTimeMS must be a non-negative integer", parsedMaxAwaitTimeMS >= 0);
+            uassert(51759, "maxAwaitTimeMS must be a non-negative integer", maxAwaitTimeMS >= 0);
 
-            maxAwaitTimeMS = parsedMaxAwaitTimeMS;
+            deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                Milliseconds(maxAwaitTimeMS);
 
             LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
         } else {
@@ -153,7 +152,7 @@ public:
         const auto* mongosTopCoord = MongosTopologyCoordinator::get(opCtx);
 
         auto mongosIsMasterResponse =
-            mongosTopCoord->awaitIsMasterResponse(opCtx, clientTopologyVersion, maxAwaitTimeMS);
+            mongosTopCoord->awaitIsMasterResponse(opCtx, clientTopologyVersion, deadline);
 
         mongosIsMasterResponse->appendToBuilder(&result);
         // The isMaster response always includes a topologyVersion.

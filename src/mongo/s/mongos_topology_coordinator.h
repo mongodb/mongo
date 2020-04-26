@@ -60,13 +60,31 @@ public:
     std::shared_ptr<const MongosIsMasterResponse> awaitIsMasterResponse(
         OperationContext* opCtx,
         boost::optional<TopologyVersion> clientTopologyVersion,
-        boost::optional<long long> maxAwaitTimeMS) const;
+        boost::optional<Date_t> deadline) const;
+
+    /**
+     * We only enter quiesce mode during the shutdown process, which means the
+     * MongosTopologyCoordinator will never need to exit quiesce mode. While in quiesce mode, we
+     * allow operations to continue and accept new operations, but we fail isMaster requests with
+     * ShutdownInProgress. This function causes us to increment the topologyVersion and start
+     * failing isMaster requests with ShutdownInProgress.
+     */
+    void enterQuiesceMode();
+
+    TopologyVersion getTopologyVersion() const {
+        stdx::lock_guard lk(_mutex);
+        return _topologyVersion;
+    }
 
 private:
+    using SharedPromiseOfMongosIsMasterResponse =
+        SharedPromise<std::shared_ptr<const MongosIsMasterResponse>>;
+
     /**
      * Helper for constructing a MongosIsMasterResponse.
      **/
     std::shared_ptr<MongosIsMasterResponse> _makeIsMasterResponse(WithLock) const;
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -78,6 +96,12 @@ private:
 
     // Keeps track of the current mongos TopologyVersion.
     TopologyVersion _topologyVersion;  // (M)
+
+    // True if we're in quiesce mode.  If true, we'll respond to isMaster requests with ok:0.
+    bool _inQuiesceMode;  // (M)
+
+    // The promise waited on by awaitable isMaster requests on mongos.
+    std::shared_ptr<SharedPromiseOfMongosIsMasterResponse> _promise;  // (M)
 };
 
 }  // namespace mongo
