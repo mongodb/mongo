@@ -267,8 +267,6 @@ fi
 
 %{_bindir}/install_compass
 
-%{_mandir}/man1/mongoldap.1*
-
 %changelog
 * Thu Dec 19 2013 Ernie Hershey <ernie.hershey@mongodb.com>
 - Packaging file cleanup

@@ -281,8 +281,6 @@ fi
 
 %{_bindir}/install_compass
 
-%{_mandir}/man1/mongoldap.1*
-
 %changelog
 * Mon Oct 10 2016 Sam Kleinman <sam@mongodb.com>
 - Support for systemd init processes.
