@@ -739,7 +739,6 @@ MONGO_INITIALIZER(SetupDBClientBaseWithConnection)(InitializerContext*) {
         cb(conn.get());
         conn.done();
     };
-    return Status::OK();
 }
 
 }  // namespace mongo

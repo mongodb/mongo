@@ -298,8 +298,8 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 
     if (serverGlobalParams.logWithSyslog) {
 #ifdef _WIN32
-        return Status(ErrorCodes::InternalError,
-                      "Syslog requested in Windows build; command line processor logic error");
+        uasserted(ErrorCodes::InternalError,
+                  "Syslog requested in Windows build; command line processor logic error");
 #else
         lv2Config.consoleEnabled = false;
         lv2Config.syslogEnabled = true;
@@ -316,16 +316,16 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         try {
             exists = boost::filesystem::exists(absoluteLogpath);
         } catch (boost::filesystem::filesystem_error& e) {
-            return Status(ErrorCodes::FileNotOpen,
-                          str::stream() << "Failed probe for \"" << absoluteLogpath
-                                        << "\": " << e.code().message());
+            uasserted(ErrorCodes::FileNotOpen,
+                      str::stream() << "Failed probe for \"" << absoluteLogpath
+                                    << "\": " << e.code().message());
         }
 
         if (exists) {
             if (boost::filesystem::is_directory(absoluteLogpath)) {
-                return Status(ErrorCodes::FileNotOpen,
-                              str::stream() << "logpath \"" << absoluteLogpath
-                                            << "\" should name a file, not a directory.");
+                uasserted(ErrorCodes::FileNotOpen,
+                          str::stream() << "logpath \"" << absoluteLogpath
+                                        << "\" should name a file, not a directory.");
             }
 
             if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
@@ -339,12 +339,11 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                           "oldLogPath"_attr = absoluteLogpath,
                           "newLogPath"_attr = renameTarget);
                 } else {
-                    return Status(ErrorCodes::FileRenameFailed,
-                                  str::stream()
-                                      << "Could not rename preexisting log file \""
-                                      << absoluteLogpath << "\" to \"" << renameTarget
-                                      << "\"; run with --logappend or manually remove file: "
-                                      << ec.message());
+                    uasserted(ErrorCodes::FileRenameFailed,
+                              str::stream() << "Could not rename preexisting log file \""
+                                            << absoluteLogpath << "\" to \"" << renameTarget
+                                            << "\"; run with --logappend or manually remove file: "
+                                            << ec.message());
                 }
             }
         }
@@ -369,8 +368,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
     if (result.isOK() && writeServerRestartedAfterLogConfig) {
         LOGV2(20698, "***** SERVER RESTARTED *****");
     }
-
-    return result;
+    uassertStatusOK(result);
 }
 
 /**
@@ -389,8 +387,7 @@ static void shortCircuitExit() {
 
 MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
     if (std::atexit(&shortCircuitExit) != 0)
-        return Status(ErrorCodes::InternalError, "Failed setting short-circuit exit handler.");
-    return Status::OK();
+        uasserted(ErrorCodes::InternalError, "Failed setting short-circuit exit handler.");
 }
 
 bool initializeServerGlobalState(ServiceContext* service, PidFileWrite pidWrite) {
@@ -447,8 +444,6 @@ MONGO_INITIALIZER_GENERAL(MungeUmask, ("EndStartupOptionHandling"), ("ServerLogR
         // in order to pull out the user portion of the current umask.
         umask((umask(S_IRWXU | S_IRWXG | S_IRWXO) & S_IRWXU) | getUmaskOverride());
     }
-
-    return Status::OK();
 }
 }  // namespace
 #endif

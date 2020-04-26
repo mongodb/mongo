@@ -47,9 +47,7 @@
 namespace mongo {
 namespace crypto {
 
-MONGO_INITIALIZER(CreateKeyEntropySource)(InitializerContext* context) {
-    return Status::OK();
-}
+MONGO_INITIALIZER(CreateKeyEntropySource)(InitializerContext* context) {}
 
 size_t aesGetIVSize(crypto::aesMode mode) {
     switch (mode) {

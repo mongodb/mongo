@@ -138,7 +138,6 @@ Future<void> authMongoCRImpl(RunCommandHook runCommand, const BSONObj& params) {
 
 MONGO_INITIALIZER(RegisterAuthMongoCR)(InitializerContext* context) {
     authMongoCR = authMongoCRImpl;
-    return Status::OK();
 }
 
 }  // namespace

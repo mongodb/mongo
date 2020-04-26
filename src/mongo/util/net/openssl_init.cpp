@@ -177,8 +177,6 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
 
     // Setup OpenSSL multithreading callbacks and mutexes
     SSLThreadInfo::init();
-
-    return Status::OK();
 }
 
 }  // namespace

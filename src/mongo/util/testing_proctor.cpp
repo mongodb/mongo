@@ -73,7 +73,6 @@ MONGO_INITIALIZER(DisableTestingDiagnosticsByDefault)(InitializerContext*) {
     if (!TestingProctor::instance().isInitialized()) {
         TestingProctor::instance().setEnabled(false);
     }
-    return Status::OK();
 }
 
 }  // namespace

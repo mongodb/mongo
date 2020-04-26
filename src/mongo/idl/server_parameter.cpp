@@ -36,9 +36,7 @@
 namespace mongo {
 using SPT = ServerParameterType;
 
-MONGO_INITIALIZER_GROUP(BeginServerParameterRegistration,
-                        MONGO_NO_PREREQUISITES,
-                        ("EndServerParameterRegistration"))
+MONGO_INITIALIZER_GROUP(BeginServerParameterRegistration, (), ("EndServerParameterRegistration"))
 MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
                         ("BeginServerParameterRegistration"),
                         ("BeginStartupOptionHandling"))

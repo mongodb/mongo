@@ -69,7 +69,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterIsSelfCommand, ("GenerateInstanceId
 (InitializerContext* context) {
     // Leaked intentionally: a Command registers itself when constructed
     new IsSelfCommand();
-    return Status::OK();
 }
 
 }  // namespace mongo

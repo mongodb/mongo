@@ -41,7 +41,7 @@ using std::string;
 std::unique_ptr<MockConnRegistry> MockConnRegistry::_instance;
 
 MONGO_INITIALIZER(MockConnRegistry)(InitializerContext* context) {
-    return MockConnRegistry::init();
+    uassertStatusOK(MockConnRegistry::init());
 }
 
 Status MockConnRegistry::init() {

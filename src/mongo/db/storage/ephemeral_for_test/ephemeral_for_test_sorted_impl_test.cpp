@@ -104,7 +104,6 @@ std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper> makeSortedDataInterface
 
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
     mongo::registerSortedDataInterfaceHarnessHelperFactory(makeSortedDataInterfaceHarnessHelper);
-    return Status::OK();
 }
 }  // namespace
 }  // namespace ephemeral_for_test

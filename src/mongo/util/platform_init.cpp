@@ -113,8 +113,6 @@ MONGO_INITIALIZER(Behaviors_Win32)(InitializerContext*) {
             std::min(std::max(int(tc.wPeriodMin), targetResolution), int(tc.wPeriodMax));
         invariant(timeBeginPeriod(timerResolution) == TIMERR_NOERROR);
     }
-
-    return Status::OK();
 }
 
 }  // namespace mongo

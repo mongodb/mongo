@@ -259,8 +259,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::splitVector
         << ActionType::refineCollectionShardKey
         << ActionType::reshardCollection;
-
-    return Status::OK();
 }
 // clang-format on
 

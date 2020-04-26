@@ -38,7 +38,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
-#include "mongo/base/initializer_context.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/sha1_block.h"
@@ -1836,7 +1835,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManagerCoordinator = new SSLManagerCoordinator();
     }
-    return Status::OK();
 }
 
 }  // namespace mongo

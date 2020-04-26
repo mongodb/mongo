@@ -75,7 +75,6 @@ namespace moe = mongo::optionenvironment;
 MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
     // ssl_options_server.cpp has an initializer which depends on logging.
     // We can stub that dependency out for unit testing purposes.
-    return Status::OK();
 }
 
 class OptionsParserTester : public moe::OptionsParser {

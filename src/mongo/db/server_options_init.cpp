@@ -36,7 +36,7 @@ MONGO_INITIALIZER_GENERAL(ServerOptions_Setup,
                           ("BeginStartupOptionSetup"),
                           ("EndStartupOptionSetup"))
 (InitializerContext* context) {
-    return setupServerOptions(context->args());
+    uassertStatusOK(setupServerOptions(context->args()));
 }
 
 }  // namespace mongo

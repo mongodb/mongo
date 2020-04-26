@@ -147,7 +147,6 @@ std::unique_ptr<SortedDataInterfaceHarnessHelper> makeWTPrefixedIndexHarnessHelp
 
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
     mongo::registerSortedDataInterfaceHarnessHelperFactory(makeWTPrefixedIndexHarnessHelper);
-    return Status::OK();
 }
 }  // namespace
 }  // namespace mongo

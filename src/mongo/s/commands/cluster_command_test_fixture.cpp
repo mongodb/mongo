@@ -309,8 +309,6 @@ void ClusterCommandTestFixture::appendTxnResponseMetadata(BSONObjBuilder& bob) {
 }
 
 // Satisfies dependency from StoreSASLOPtions.
-MONGO_STARTUP_OPTIONS_STORE(CoreOptions)(InitializerContext*) {
-    return Status::OK();
-}
+MONGO_STARTUP_OPTIONS_STORE(CoreOptions)(InitializerContext*) {}
 
 }  // namespace mongo

@@ -54,22 +54,20 @@ bool shouldAlwaysRecordTraffic = false;
 
 MONGO_INITIALIZER(ShouldAlwaysRecordTraffic)(InitializerContext*) {
     if (!gAlwaysRecordTraffic.size()) {
-        return Status::OK();
+        return;
     }
 
     if (gTrafficRecordingDirectory.empty()) {
         if (serverGlobalParams.logpath.empty()) {
-            return Status(ErrorCodes::BadValue,
-                          "invalid to set AlwaysRecordTraffic without a logpath or "
-                          "trafficRecordingDirectory");
+            uasserted(ErrorCodes::BadValue,
+                      "invalid to set AlwaysRecordTraffic without a logpath or "
+                      "trafficRecordingDirectory");
         } else {
             gTrafficRecordingDirectory = serverGlobalParams.logpath;
         }
     }
 
     shouldAlwaysRecordTraffic = true;
-
-    return Status::OK();
 }
 
 }  // namespace

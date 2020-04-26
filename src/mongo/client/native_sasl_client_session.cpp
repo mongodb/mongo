@@ -54,7 +54,6 @@ SaslClientSession* createNativeSaslClientSession(const std::string mech) {
 
 MONGO_INITIALIZER(NativeSaslClientContext)(InitializerContext* context) {
     SaslClientSession::create = createNativeSaslClientSession;
-    return Status::OK();
 }
 
 // Global cache for SCRAM-SHA-1/256 credentials

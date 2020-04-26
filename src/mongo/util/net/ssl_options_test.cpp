@@ -36,7 +36,6 @@
 #include <boost/range/size.hpp>
 #include <ostream>
 
-#include "mongo/base/global_initializer.h"
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/server_options_base.h"
@@ -54,27 +53,18 @@ namespace moe = mongo::optionenvironment;
 namespace mongo {
 namespace {
 
-MONGO_INITIALIZER(ServerLogRedirection)(InitializerContext*) {
-    // ssl_options_server.cpp has an initializer which depends on logging.
-    // We can stub that dependency out for unit testing purposes.
-    return Status::OK();
-}
+// ssl_options_server.cpp has an initializer which depends on logging.
+// We can stub that dependency out for unit testing purposes.
+MONGO_INITIALIZER(ServerLogRedirection)(InitializerContext*) {}
 
 Status executeInitializer(const std::string& name) try {
-    const auto* node =
-        getGlobalInitializer().getInitializerDependencyGraph().getInitializerNode(name);
-    if (!node) {
-        return {ErrorCodes::BadValue, str::stream() << "Unknown initializer: '" << name << "'"};
-    }
-
-    const auto& fn = node->getInitializerFunction();
-    if (!fn) {
-        return {ErrorCodes::InternalError,
-                str::stream() << "Initializer node '" << name << "' has no associated function."};
-    }
-
-    // The initializers we call don't actually need a context currently.
-    return fn(nullptr);
+    InitializerFunction fn = getGlobalInitializer().getInitializerFunctionForTesting(name);
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "Initializer node '" << name << "' has no associated function.",
+            fn);
+    InitializerContext initContext({});
+    fn(&initContext);
+    return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }

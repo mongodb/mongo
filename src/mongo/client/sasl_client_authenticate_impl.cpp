@@ -289,7 +289,6 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
 
 MONGO_INITIALIZER(SaslClientAuthenticateFunction)(InitializerContext* context) {
     saslClientAuthenticate = saslClientAuthenticateImpl;
-    return Status::OK();
 }
 
 }  // namespace

@@ -695,7 +695,6 @@ MONGO_INITIALIZER(IgnoreEnableMajorityReadConcernWarning)
                       "Ignoring read concern override as config server requires majority read "
                       "concern");
     }
-    return Status::OK();
 }
 
 }  // namespace mongo

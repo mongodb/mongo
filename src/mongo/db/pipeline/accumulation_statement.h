@@ -46,13 +46,11 @@ namespace mongo {
 #define REGISTER_ACCUMULATOR(key, factory)                                            \
     MONGO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) {        \
         AccumulationStatement::registerAccumulator("$" #key, (factory), boost::none); \
-        return Status::OK();                                                          \
     }
 
 #define REGISTER_ACCUMULATOR_WITH_MIN_VERSION(key, factory, minVersion)                \
     MONGO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) {         \
         AccumulationStatement::registerAccumulator("$" #key, (factory), (minVersion)); \
-        return Status::OK();                                                           \
     }
 
 /**

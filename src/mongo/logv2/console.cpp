@@ -235,7 +235,6 @@ std::ostream* windowsOutputStream = getWindowsOutputStream();
 // the initalizer chain.
 MONGO_INITIALIZER(EnsureIosBaseInitConstructedV2)(InitializerContext*) {
     Console forInitializationOnly;
-    return Status::OK();
 }
 
 }  // namespace

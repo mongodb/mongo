@@ -85,12 +85,9 @@ bool shouldUseStrict() {
     return true;
 }
 
-MONGO_INITIALIZER_GENERAL(OptionsParseUseStrict,
-                          MONGO_NO_PREREQUISITES,
-                          ("BeginStartupOptionParsing"))
+MONGO_INITIALIZER_GENERAL(OptionsParseUseStrict, (), ("BeginStartupOptionParsing"))
 (InitializerContext* context) {
     OptionsParser::useStrict = shouldUseStrict;
-    return Status::OK();
 }
 
 // The following section contains utility functions that convert between the various objects

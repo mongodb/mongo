@@ -44,22 +44,10 @@
 
 namespace mongo {
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongosOptions)(InitializerContext* context) {
-    auto status = addGeneralServerOptions(&moe::startupOptions);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = addKeyfileServerOption(&moe::startupOptions);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = addClusterAuthModeServerOption(&moe::startupOptions);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return addNonGeneralServerOptions(&moe::startupOptions);
+    uassertStatusOK(addGeneralServerOptions(&moe::startupOptions));
+    uassertStatusOK(addKeyfileServerOption(&moe::startupOptions));
+    uassertStatusOK(addClusterAuthModeServerOption(&moe::startupOptions));
+    uassertStatusOK(addNonGeneralServerOptions(&moe::startupOptions));
 }
 
 MONGO_INITIALIZER_GENERAL(MongosOptions,
@@ -71,23 +59,10 @@ MONGO_INITIALIZER_GENERAL(MongosOptions,
     }
     // Run validation, but tell the Environment that we don't want it to be set as "valid",
     // since we may be making it invalid in the canonicalization process.
-    Status ret = moe::startupOptionsParsed.validate(false /*setValid*/);
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = validateMongosOptions(moe::startupOptionsParsed);
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = canonicalizeMongosOptions(&moe::startupOptionsParsed);
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = moe::startupOptionsParsed.validate();
-    if (!ret.isOK()) {
-        return ret;
-    }
-    return Status::OK();
+    uassertStatusOK(moe::startupOptionsParsed.validate(false /*setValid*/));
+    uassertStatusOK(validateMongosOptions(moe::startupOptionsParsed));
+    uassertStatusOK(canonicalizeMongosOptions(&moe::startupOptionsParsed));
+    uassertStatusOK(moe::startupOptionsParsed.validate());
 }
 
 MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
@@ -100,7 +75,6 @@ MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
         quickExit(EXIT_BADOPTIONS);
     }
-    return Status::OK();
 }
 
 }  // namespace mongo

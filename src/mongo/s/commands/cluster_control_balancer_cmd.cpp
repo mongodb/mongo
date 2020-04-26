@@ -141,8 +141,6 @@ MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
     new BalancerStartCommand();
     new BalancerStopCommand();
     new BalancerStatusCommand();
-
-    return Status::OK();
 }
 
 }  // namespace

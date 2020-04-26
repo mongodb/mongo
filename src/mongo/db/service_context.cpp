@@ -467,20 +467,16 @@ ServiceContext::ConstructorActionRegisterer::ConstructorActionRegisterer(
     DestructorAction destructor) {
     if (!destructor)
         destructor = [](ServiceContext*) {};
-    _registerer.emplace(std::move(name),
-                        [this, constructor, destructor](InitializerContext* context) {
-                            _iter = registeredConstructorActions().emplace(
-                                registeredConstructorActions().end(),
-                                std::move(constructor),
-                                std::move(destructor));
-                            return Status::OK();
-                        },
-                        [this](DeinitializerContext* context) {
-                            registeredConstructorActions().erase(_iter);
-                            return Status::OK();
-                        },
-                        std::move(prereqs),
-                        std::move(dependents));
+    _registerer.emplace(
+        std::move(name),
+        [this, constructor, destructor](InitializerContext*) {
+            _iter = registeredConstructorActions().emplace(registeredConstructorActions().end(),
+                                                           std::move(constructor),
+                                                           std::move(destructor));
+        },
+        [this](DeinitializerContext*) { registeredConstructorActions().erase(_iter); },
+        std::move(prereqs),
+        std::move(dependents));
 }
 
 ServiceContext::UniqueServiceContext ServiceContext::make() {

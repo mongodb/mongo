@@ -90,7 +90,7 @@ class Document;
 #define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, minVersion, ...) \
     MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                  \
         if (!__VA_ARGS__) {                                                                  \
-            return Status::OK();                                                             \
+            return;                                                                          \
         }                                                                                    \
         auto fullParserWrapper = [](BSONElement stageSpec,                                   \
                                     const boost::intrusive_ptr<ExpressionContext>& expCtx) { \
@@ -99,7 +99,6 @@ class Document;
         };                                                                                   \
         LiteParsedDocumentSource::registerParser("$" #key, liteParser);                      \
         DocumentSource::registerParser("$" #key, fullParserWrapper, minVersion);             \
-        return Status::OK();                                                                 \
     }
 
 #define REGISTER_DOCUMENT_SOURCE(key, liteParser, fullParser) \
@@ -129,7 +128,6 @@ class Document;
     MONGO_INITIALIZER(addAliasToDocSourceParserMap_##key)(InitializerContext*) { \
         LiteParsedDocumentSource::registerParser("$" #key, (liteParser));        \
         DocumentSource::registerParser("$" #key, (fullParser), boost::none);     \
-        return Status::OK();                                                     \
     }
 
 class DocumentSource : public RefCountable {

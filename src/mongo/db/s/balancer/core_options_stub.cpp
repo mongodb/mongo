@@ -35,8 +35,6 @@ namespace {
 MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
                           ("BeginStartupOptionStorage"),
                           ("EndStartupOptionStorage"))
-(InitializerContext* context) {
-    return Status::OK();
-}
+(InitializerContext* context) {}
 }  // namespace
 }  // namespace mongo

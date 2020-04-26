@@ -36,7 +36,7 @@ namespace mongo {
 namespace embedded {
 
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(EmbeddedOptions)(InitializerContext* context) {
-    return addOptions(&optionenvironment::startupOptions);
+    uassertStatusOK(addOptions(&optionenvironment::startupOptions));
 }
 
 GlobalInitializerRegisterer embeddedOptionsInitializer(

@@ -433,8 +433,6 @@ MONGO_INITIALIZER(PreSaslCommands)
 (InitializerContext*) {
     if (!sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism))
         disableAuthMechanism(kX509AuthMechanism);
-
-    return Status::OK();
 }
 
 }  // namespace

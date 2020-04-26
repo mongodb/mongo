@@ -56,7 +56,6 @@ namespace {
 
 MONGO_INITIALIZER(WireSpec)(InitializerContext*) {
     WireSpec::instance().initialize(WireSpec::Specification{});
-    return Status::OK();
 }
 
 }  // namespace

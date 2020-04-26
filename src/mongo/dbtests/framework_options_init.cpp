@@ -39,18 +39,14 @@
 
 namespace mongo {
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* context) {
-    return addTestFrameworkOptions(&moe::startupOptions);
+    uassertStatusOK(addTestFrameworkOptions(&moe::startupOptions));
 }
 
 MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
     if (!handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed, context->args())) {
         quickExit(EXIT_SUCCESS);
     }
-    Status ret = moe::startupOptionsParsed.validate();
-    if (!ret.isOK()) {
-        return ret;
-    }
-    return Status::OK();
+    uassertStatusOK(moe::startupOptionsParsed.validate());
 }
 
 MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
@@ -60,11 +56,8 @@ MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
         quickExit(EXIT_BADOPTIONS);
     }
-    return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
-(InitializerContext* context) {
-    return Status::OK();
-}
+MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())
+(InitializerContext* context) {}
 }  // namespace mongo

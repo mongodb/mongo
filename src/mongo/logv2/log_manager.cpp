@@ -104,7 +104,6 @@ MONGO_INITIALIZER(GlobalLogRotator)(InitializerContext*) {
     addLogRotator([](bool renameFiles, StringData suffix) {
         return LogManager::global().getGlobalDomainInternal().rotate(renameFiles, suffix);
     });
-    return Status::OK();
 }
 
 }  // namespace mongo::logv2

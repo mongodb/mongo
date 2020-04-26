@@ -55,10 +55,9 @@ const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
 MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
     if ((initialSyncOplogBuffer != kCollectionOplogBufferName) &&
         (initialSyncOplogBuffer != kBlockingQueueOplogBufferName)) {
-        return Status(ErrorCodes::BadValue,
-                      "unsupported initial sync oplog buffer option: " + initialSyncOplogBuffer);
+        uasserted(ErrorCodes::BadValue,
+                  "unsupported initial sync oplog buffer option: " + initialSyncOplogBuffer);
     }
-    return Status::OK();
 }
 
 }  // namespace

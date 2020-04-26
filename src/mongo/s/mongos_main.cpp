@@ -485,7 +485,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(Ini
     spec.isInternalClient = true;
 
     WireSpec::instance().initialize(std::move(spec));
-    return Status::OK();
 }
 
 class ShardingReplicaSetChangeListener final
@@ -876,7 +875,6 @@ ExitCode main(ServiceContext* serviceContext) {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     forkServerOrDie();
-    return Status::OK();
 }
 
 // Initialize the featureCompatibilityVersion server parameter since mongos does not have a
@@ -890,14 +888,12 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
 (InitializerContext* context) {
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);
-    return Status::OK();
 }
 
 #ifdef MONGO_CONFIG_SSL
-MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))
+MONGO_INITIALIZER_GENERAL(setSSLManagerType, (), ("SSLManager"))
 (InitializerContext* context) {
     isSSLServer = true;
-    return Status::OK();
 }
 #endif
 

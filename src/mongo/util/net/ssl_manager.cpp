@@ -633,8 +633,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager"))
                         "expiration"_attr = config.serverCertificateExpirationDate);
         }
     }
-
-    return Status::OK();
 }
 
 Status SSLX509Name::normalizeStrings() {

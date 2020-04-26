@@ -41,7 +41,6 @@
 #include "mongo/db/free_mon/free_mon_storage.h"
 
 #include "mongo/base/data_type_validated.h"
-#include "mongo/base/deinitializer_context.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"

@@ -43,11 +43,7 @@ MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) 
     if (!handlePreValidationMongoBridgeOptions(moe::startupOptionsParsed)) {
         quickExit(EXIT_SUCCESS);
     }
-    Status ret = moe::startupOptionsParsed.validate();
-    if (!ret.isOK()) {
-        return ret;
-    }
-    return Status::OK();
+    uassertStatusOK(moe::startupOptionsParsed.validate());
 }
 
 MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
@@ -66,7 +62,5 @@ MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
             quickExit(EXIT_BADOPTIONS);
         }
     }
-
-    return Status::OK();
 }
 }  // namespace mongo

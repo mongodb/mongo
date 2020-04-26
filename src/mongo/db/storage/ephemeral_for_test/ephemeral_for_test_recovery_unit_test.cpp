@@ -69,7 +69,6 @@ std::unique_ptr<mongo::RecoveryUnitHarnessHelper> makeRecoveryUnitHarnessHelper(
 
 MONGO_INITIALIZER(RegisterRecoveryUnitHarnessFactory)(InitializerContext* const) {
     mongo::registerRecoveryUnitHarnessHelperFactory(makeRecoveryUnitHarnessHelper);
-    return Status::OK();
 }
 
 }  // namespace

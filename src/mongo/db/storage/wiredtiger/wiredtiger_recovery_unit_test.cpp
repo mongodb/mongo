@@ -127,7 +127,6 @@ std::unique_ptr<RecoveryUnitHarnessHelper> makeWTRUHarnessHelper() {
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
     mongo::registerRecoveryUnitHarnessHelperFactory(makeWTRUHarnessHelper);
-    return Status::OK();
 }
 
 class WiredTigerRecoveryUnitTestFixture : public unittest::Test {

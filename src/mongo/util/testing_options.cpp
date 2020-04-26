@@ -58,8 +58,6 @@ MONGO_INITIALIZER_GENERAL(TestingDiagnostics,
                       "Testing behaviors are enabled. This has serious implications for both "
                       "performance and security.");
     }
-
-    return Status::OK();
 }
 
 }  // namespace

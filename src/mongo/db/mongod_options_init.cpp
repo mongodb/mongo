@@ -38,7 +38,7 @@
 
 namespace mongo {
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
-    return addMongodOptions(&moe::startupOptions);
+    uassertStatusOK(addMongodOptions(&moe::startupOptions));
 }
 
 MONGO_INITIALIZER_GENERAL(MongodOptions,
@@ -50,23 +50,10 @@ MONGO_INITIALIZER_GENERAL(MongodOptions,
     }
     // Run validation, but tell the Environment that we don't want it to be set as "valid",
     // since we may be making it invalid in the canonicalization process.
-    Status ret = moe::startupOptionsParsed.validate(false /*setValid*/);
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = validateMongodOptions(moe::startupOptionsParsed);
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = canonicalizeMongodOptions(&moe::startupOptionsParsed);
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = moe::startupOptionsParsed.validate();
-    if (!ret.isOK()) {
-        return ret;
-    }
-    return Status::OK();
+    uassertStatusOK(moe::startupOptionsParsed.validate(false /*setValid*/));
+    uassertStatusOK(validateMongodOptions(moe::startupOptionsParsed));
+    uassertStatusOK(canonicalizeMongodOptions(&moe::startupOptionsParsed));
+    uassertStatusOK(moe::startupOptionsParsed.validate());
 }
 
 MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
@@ -79,7 +66,6 @@ MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
         quickExit(EXIT_BADOPTIONS);
     }
-    return Status::OK();
 }
 
 }  // namespace mongo

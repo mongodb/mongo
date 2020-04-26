@@ -73,7 +73,6 @@ std::unique_ptr<mongo::KVHarnessHelper> makeHelper() {
 
 MONGO_INITIALIZER(RegisterEphemeralForTestKVHarnessFactory)(InitializerContext*) {
     KVHarnessHelper::registerFactory(makeHelper);
-    return Status::OK();
 }
 
 class EphemeralForTestKVEngineTest : public unittest::Test {

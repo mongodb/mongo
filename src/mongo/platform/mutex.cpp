@@ -155,8 +155,6 @@ void Mutex::_onUnlock() noexcept {
 MONGO_INITIALIZER(FinalizeDiagnosticListeners)(InitializerContext* context) {
     auto& state = latch_detail::getDiagnosticListenerState();
     state.isFinalized.store(true);
-
-    return Status::OK();
 }
 
 }  // namespace mongo::latch_detail

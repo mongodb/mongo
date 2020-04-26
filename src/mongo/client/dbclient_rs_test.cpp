@@ -65,7 +65,6 @@ using std::vector;
 
 MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
     ScanningReplicaSetMonitor::disableRefreshRetries_forTest();
-    return Status::OK();
 }
 
 /**

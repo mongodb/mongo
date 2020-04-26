@@ -93,7 +93,7 @@ MONGO_STARTUP_OPTIONS_PARSE(ConfigOption)(InitializerContext*) {
         "--testConfigOpt14",
         "set14",
     };
-    return parseArgv(argv, &moe::startupOptionsParsed);
+    uassertStatusOK(parseArgv(argv, &moe::startupOptionsParsed));
 }
 
 template <typename T>

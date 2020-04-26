@@ -1430,7 +1430,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOpt
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManagerCoordinator = new SSLManagerCoordinator();
     }
-    return Status::OK();
 }
 
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,

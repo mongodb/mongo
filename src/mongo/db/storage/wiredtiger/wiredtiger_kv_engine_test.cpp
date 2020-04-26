@@ -397,7 +397,6 @@ std::unique_ptr<KVHarnessHelper> makeHelper() {
 
 MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
     KVHarnessHelper::registerFactory(makeHelper);
-    return Status::OK();
 }
 
 }  // namespace

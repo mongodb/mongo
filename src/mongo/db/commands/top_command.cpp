@@ -88,7 +88,5 @@ public:
 
 MONGO_INITIALIZER(RegisterTopCommand)(InitializerContext* context) {
     new TopCommand();
-
-    return Status::OK();
 }
 }  // namespace

@@ -167,7 +167,6 @@ MONGO_INITIALIZER(RegisterBridgeCommands)(InitializerContext* context) {
     bridgeCommandMap["acceptConnectionsFrom"] = new CmdAcceptConnectionsFrom();
     bridgeCommandMap["rejectConnectionsFrom"] = new CmdRejectConnectionsFrom();
     bridgeCommandMap["discardMessagesFrom"] = new CmdDiscardMessagesFrom();
-    return Status::OK();
 }
 
 }  // namespace

@@ -94,14 +94,11 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(Ini
     spec.isInternalClient = true;
 
     WireSpec::instance().initialize(std::move(spec));
-    return Status::OK();
 }
 
 // Noop, to fulfill dependencies for other initializers.
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
-(InitializerContext* context) {
-    return Status::OK();
-}
+(InitializerContext* context) {}
 
 void setUpCatalog(ServiceContext* serviceContext) {
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
@@ -124,7 +121,6 @@ ServiceContext::ConstructorActionRegisterer replicationManagerInitializer(
 
 MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
     setLockedForWritingImpl([]() { return false; });
-    return Status::OK();
 }
 
 GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
@@ -135,7 +131,6 @@ GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
                 allowedIndexFieldNames.erase(IndexDescriptor::kBackgroundFieldName);
                 allowedIndexFieldNames.erase(IndexDescriptor::kExpireAfterSecondsFieldName);
             };
-        return Status::OK();
     },
     DeinitializerFunction(nullptr),
     {},

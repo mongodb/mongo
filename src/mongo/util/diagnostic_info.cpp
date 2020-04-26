@@ -216,8 +216,6 @@ MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (/* NO PREREQS */), ("FinalizeDiagnost
     };
 
     latch_detail::installDiagnosticListener<DiagnosticListener>();
-
-    return Status::OK();
 }
 
 MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
@@ -258,8 +256,6 @@ MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
     };
 
     Interruptible::installWaitListener<WaitListener>();
-
-    return Status::OK();
 }
 
 }  // namespace

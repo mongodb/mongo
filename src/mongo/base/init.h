@@ -35,39 +35,34 @@
  * Initializers are arranged in an acyclic directed dependency graph.  Declaring
  * a cycle will lead to a runtime error.
  *
- * Initializer functions take a parameter of type ::mongo::InitializerContext*, and return
- * a Status.  Any status other than Status::OK() is considered a failure that will stop further
- * intializer processing.
+ * Initializer functions take a parameter of type ::mongo::InitializerContext*.
+ * They throw to indicate failure, stopping further intializer processing.
  */
 
 #pragma once
 
-#include "mongo/base/deinitializer_context.h"
-#include "mongo/base/global_initializer.h"
-#include "mongo/base/global_initializer_registerer.h"
+#include <string>
+#include <vector>
+
 #include "mongo/base/initializer.h"
-#include "mongo/base/initializer_context.h"
-#include "mongo/base/initializer_function.h"
 #include "mongo/base/status.h"
 
 /**
- * Convenience parameter representing an empty set of prerequisites for an initializer function.
- */
-#define MONGO_NO_PREREQUISITES ()
-
-/**
- * Convenience parameter representing an empty set of dependents of an initializer function.
- */
-#define MONGO_NO_DEPENDENTS ()
-
-/**
- * Convenience parameter representing the default set of dependents for initializer functions.
- */
-#define MONGO_DEFAULT_PREREQUISITES (::mongo::defaultInitializerName().c_str())
-
-/**
- * Macro to define an initializer function named "NAME" with the default prerequisites, and
- * no explicit dependents.
+ * Macro to define an initializer function named "NAME" with the default
+ * prerequisite set, that is `("default")`, and no explicit dependents.
+ *
+ * The default set of prerequisites for initializer functions has one member,
+ * called "default". It refers to a do-nothing initializer called "default"
+ * defined by this init system, which serves as a partition point. It splits
+ * the graph into two broad phases. In practice, most initializers can omit
+ * their prerequisites and dependents, and use the MONGO_INITIALIZER macro, and
+ * such rules will be constrained to occur _after_ the "default" sequence
+ * point. Some special rules perform early preparation like options parsing,
+ * and several initializers might depend on these, so they will typically
+ * specify that they happen _before_ the "default" sequence point.
+ *
+ * The pre-"default" phase is further broken down into an orderly series of
+ * internal stages. (See util/options_parser/startup_option_init.cpp).
  *
  * See MONGO_INITIALIZER_GENERAL.
  *
@@ -76,8 +71,7 @@
  *         ...
  *     }
  */
-#define MONGO_INITIALIZER(NAME) \
-    MONGO_INITIALIZER_WITH_PREREQUISITES(NAME, MONGO_DEFAULT_PREREQUISITES)
+#define MONGO_INITIALIZER(NAME) MONGO_INITIALIZER_GENERAL(NAME, ("default"), ())
 
 /**
  * Macro to define an initializer function named "NAME" that depends on the initializers
@@ -92,7 +86,7 @@
  *    }
  */
 #define MONGO_INITIALIZER_WITH_PREREQUISITES(NAME, PREREQUISITES) \
-    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, MONGO_NO_DEPENDENTS)
+    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, ())
 
 #define MONGO_INITIALIZER_STRIP_PARENS_(...) __VA_ARGS__
 
@@ -101,12 +95,12 @@
  * dependents.
  *
  * NAME is any legitimate name for a C++ symbol.
- * PREREQUISITES is a tuple of 0 or more std::string literals, i.e., ("a", "b", "c"), or ()
- * DEPENDENTS is a tuple of 0 or more std::string literals.
+ * PREREQUISITES is a tuple of strings surrounded by parens, e.g., ("a", "b", "c"), or ().
+ * DEPENDENTS is a tuple of strings surrounded by parens.
  *
  * At run time, the full set of prerequisites for NAME will be computed as the union of the
  * explicit PREREQUISITES and the set of all other mongo initializers that name NAME in their
- * list of dependents.
+ * list of DEPENDENTS.
  *
  * Usage:
  *    MONGO_INITIALIZER_GENERAL(myInitializer,
@@ -119,17 +113,17 @@
  * A form that takes an existing function or that lets the programmer supply the name
  * of the function to declare would be options.
  */
-#define MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)                        \
-    ::mongo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)(::mongo::InitializerContext*); \
-    namespace {                                                                           \
-    ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer_##NAME(              \
-        std::string(#NAME),                                                               \
-        mongo::InitializerFunction(MONGO_INITIALIZER_FUNCTION_NAME_(NAME)),               \
-        mongo::DeinitializerFunction(nullptr),                                            \
-        std::vector<std::string>{MONGO_INITIALIZER_STRIP_PARENS_ PREREQUISITES},          \
-        std::vector<std::string>{MONGO_INITIALIZER_STRIP_PARENS_ DEPENDENTS});            \
-    }                                                                                     \
-    ::mongo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)
+#define MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)               \
+    void MONGO_INITIALIZER_FUNCTION_NAME_(NAME)(::mongo::InitializerContext*);   \
+    namespace {                                                                  \
+    ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer_##NAME(     \
+        std::string(#NAME),                                                      \
+        mongo::InitializerFunction(MONGO_INITIALIZER_FUNCTION_NAME_(NAME)),      \
+        mongo::DeinitializerFunction(nullptr),                                   \
+        std::vector<std::string>{MONGO_INITIALIZER_STRIP_PARENS_ PREREQUISITES}, \
+        std::vector<std::string>{MONGO_INITIALIZER_STRIP_PARENS_ DEPENDENTS});   \
+    }                                                                            \
+    void MONGO_INITIALIZER_FUNCTION_NAME_(NAME)
 
 /**
  * Macro to define an initializer group.
@@ -138,13 +132,68 @@
  * initialization steps into phases, such as "all global parameter declarations completed", "all
  * global parameters initialized".
  */
-#define MONGO_INITIALIZER_GROUP(NAME, PREREQUISITES, DEPENDENTS)                               \
-    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(::mongo::InitializerContext*) { \
-        return ::mongo::Status::OK();                                                          \
-    }
+#define MONGO_INITIALIZER_GROUP(NAME, PREREQUISITES, DEPENDENTS) \
+    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(::mongo::InitializerContext*) {}
 
 /**
  * Macro to produce a name for a mongo initializer function for an initializer operation
  * named "NAME".
  */
 #define MONGO_INITIALIZER_FUNCTION_NAME_(NAME) _mongoInitializerFunction_##NAME
+
+namespace mongo {
+
+/**
+ * Type representing the registration of a global initialization function.
+ *
+ * Create a nonlocal static storage duration instance of this type to register a new initializer, to
+ * be run by a call to a variant of mongo::runGlobalInitializers().
+ */
+class GlobalInitializerRegisterer {
+public:
+    /**
+     * Constructor parameters:
+     *
+     *     - std::string name
+     *
+     *     - InitializerFunction initFn
+     *         Must be nonnull.
+     *         Example expression:
+     *
+     *            [](InitializerContext* context) {
+     *                // initialization code
+     *            }
+     *
+     *     - DeinitializerFunction deinitFn
+     *         A deinitialization that will execute in reverse order from initialization and
+     *         support re-initialization. If not specified, defaults to `nullptr`.
+     *         Example expression:
+     *
+     *            [](DeinitializerContext* context) {
+     *                // deinitialization code
+     *            }
+     *
+     *     - std::vector<std::string> prerequisites
+     *         If not specified, defaults to {"default"}.
+     *
+     *     - std::vector<std::string> dependents
+     *         If not specified, defaults to {} (no dependents).
+     *
+     *
+     * At run time, the full set of prerequisites for `name` will be computed as the union of the
+     * `prerequisites` (which can be defaulted) and all other mongo initializers that list `name` in
+     * their `dependents`.
+     *
+     * A non-null `deinitFn` will tag the initializer as supporting re-initialization.
+     */
+    GlobalInitializerRegisterer(std::string name,
+                                InitializerFunction initFn,
+                                DeinitializerFunction deinitFn = nullptr,
+                                std::vector<std::string> prerequisites = {"default"},
+                                std::vector<std::string> dependents = {});
+
+    GlobalInitializerRegisterer(const GlobalInitializerRegisterer&) = delete;
+    GlobalInitializerRegisterer& operator=(const GlobalInitializerRegisterer&) = delete;
+};
+
+}  // namespace mongo

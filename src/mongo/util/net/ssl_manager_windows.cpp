@@ -43,7 +43,6 @@
 #include <winhttp.h>
 
 #include "mongo/base/init.h"
-#include "mongo/base/initializer_context.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"

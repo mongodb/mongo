@@ -64,7 +64,6 @@ MONGO_INITIALIZER(InitializeAdvanceClusterTimePrivilegeVector)(InitializerContex
     ActionSet actions;
     actions.addAction(ActionType::advanceClusterTime);
     advanceClusterTimePrivilege.emplace_back(ResourcePattern::forClusterResource(), actions);
-    return Status::OK();
 }
 
 Milliseconds kRefreshIntervalIfErrored(200);

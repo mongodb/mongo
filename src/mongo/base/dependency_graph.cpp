@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/base/initializer_dependency_graph.h"
+#include "mongo/base/dependency_graph.h"
 
 #include <algorithm>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <iostream>
 #include <iterator>
 #include <random>
@@ -41,49 +42,26 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
-
-InitializerDependencyGraph::InitializerDependencyGraph() {}
-InitializerDependencyGraph::~InitializerDependencyGraph() {}
-
-Status InitializerDependencyGraph::addInitializer(std::string name,
-                                                  InitializerFunction initFn,
-                                                  DeinitializerFunction deinitFn,
-                                                  std::vector<std::string> prerequisites,
-                                                  std::vector<std::string> dependents) {
-    if (!initFn)
-        return Status(ErrorCodes::BadValue, "Illegal to supply a NULL function");
-
-    invariant(!frozen());
-
-    InitializerDependencyNode& newNode = _nodes[name];
-    if (newNode.initFn) {
-        return Status(ErrorCodes::Error(50999), name);
+void DependencyGraph::addNode(std::string name,
+                              std::vector<std::string> prerequisites,
+                              std::vector<std::string> dependents,
+                              std::unique_ptr<Payload> payload) {
+    if (!payload) {
+        struct DummyPayload : Payload {};
+        payload = std::make_unique<DummyPayload>();
     }
-
-    newNode.initFn = std::move(initFn);
-    newNode.deinitFn = std::move(deinitFn);
-
-    for (size_t i = 0; i < prerequisites.size(); ++i) {
-        newNode.prerequisites.insert(prerequisites[i]);
-    }
-
-    for (size_t i = 0; i < dependents.size(); ++i) {
-        _nodes[dependents[i]].prerequisites.insert(name);
-    }
-
-    return Status::OK();
-}
-
-InitializerDependencyNode* InitializerDependencyGraph::getInitializerNode(const std::string& name) {
-    NodeMap::iterator iter = _nodes.find(name);
-    if (iter == _nodes.end())
-        return nullptr;
-
-    return &iter->second;
+    auto& newNode = _nodes[name];
+    uassert(ErrorCodes::Error(50999), name, !newNode.payload);  // collision
+    for (auto& otherNode : prerequisites)
+        newNode.prerequisites.insert(otherNode);
+    for (auto& otherNode : dependents)
+        _nodes[otherNode].prerequisites.insert(name);
+    newNode.payload = std::move(payload);
 }
 
 namespace {
+
+using namespace fmt::literals;
 
 template <typename Seq>
 void strAppendJoin(std::string& out, StringData separator, const Seq& sequence) {
@@ -95,26 +73,28 @@ void strAppendJoin(std::string& out, StringData separator, const Seq& sequence) 
     }
 }
 
-// In the case of a cycle, copy the cycle into `names`.
-// It's undocumented behavior, but it's cheap and a test wants it.
+// In the case of a cycle, copy the cycle node names into `*cycle`.
 template <typename Iter>
-void throwGraphContainsCycle(Iter first, Iter last, std::vector<std::string>& names) {
-    std::string desc = "Cycle in dependency graph: ";
+void throwGraphContainsCycle(Iter first, Iter last, std::vector<std::string>* cycle) {
+    std::vector<std::string> names;
     std::transform(first, last, std::back_inserter(names), [](auto& e) { return e->name(); });
-    names.push_back((*first)->name());  // Tests awkwardly want first element to be repeated.
-    strAppendJoin(desc, " -> ", names);
-    uasserted(ErrorCodes::GraphContainsCycle, desc);
+    if (cycle)
+        *cycle = names;
+    names.push_back((*first)->name());
+    uasserted(ErrorCodes::GraphContainsCycle,
+              format(FMT_STRING("Cycle in dependency graph: {}"), fmt::join(names, " -> ")));
 }
+
 }  // namespace
 
-Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames) const try {
+std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycle) const {
     // Topological sort via repeated depth-first traversal.
     // All nodes must have an initFn before running topSort, or we return BadValue.
     struct Element {
         const std::string& name() const {
-            return node->first;
+            return nodeIter->first;
         }
-        const Node* node;
+        stdx::unordered_map<std::string, Node>::const_iterator nodeIter;
         std::vector<Element*> children;
         std::vector<Element*>::iterator membership;  // Position of this in `elements`.
     };
@@ -131,13 +111,12 @@ Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames
     };
 
     elementsStore.reserve(_nodes.size());
-    std::transform(
-        _nodes.begin(), _nodes.end(), std::back_inserter(elementsStore), [](const Node& n) {
-            uassert(ErrorCodes::BadValue,
-                    "No implementation provided for initializer {}"_format(n.first),
-                    n.second.initFn);
-            return Element{&n};
-        });
+    for (auto iter = _nodes.begin(); iter != _nodes.end(); ++iter) {
+        uassert(ErrorCodes::BadValue,
+                "node {} was mentioned but never added"_format(iter->first),
+                iter->second.payload);
+        elementsStore.push_back(Element{iter});
+    }
 
     // Wire up all the child relationships by pointer rather than by string names.
     {
@@ -145,15 +124,15 @@ Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames
         for (Element& e : elementsStore)
             byName[e.name()] = &e;
         for (Element& element : elementsStore) {
-            const auto& prereqs = element.node->second.prerequisites;
+            const auto& prereqs = element.nodeIter->second.prerequisites;
             std::transform(prereqs.begin(),
                            prereqs.end(),
                            std::back_inserter(element.children),
                            [&](StringData childName) {
                                auto iter = byName.find(childName);
                                uassert(ErrorCodes::BadValue,
-                                       "Initializer {} depends on missing initializer {}"_format(
-                                           element.node->first, childName),
+                                       "node {} depends on missing node {}"_format(
+                                           element.nodeIter->first, childName),
                                        iter != byName.end());
                                return iter->second;
                            });
@@ -203,23 +182,25 @@ Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames
             if (picked->membership < unsortedBegin)
                 continue;
             if (picked->membership >= unsortedEnd) {  // O(1) cycle detection
-                sortedNames->clear();
-                throwGraphContainsCycle(unsortedEnd, elements.end(), *sortedNames);
+                throwGraphContainsCycle(unsortedEnd, elements.end(), cycle);
             }
             swapPositions(**--unsortedEnd, *picked);  // unsorted push to stack
             continue;
         }
         swapPositions(**unsortedEnd++, **unsortedBegin++);  // pop from stack to sorted
     }
-    sortedNames->clear();
-    sortedNames->reserve(_nodes.size());
+    std::vector<std::string> sortedNames;
+    sortedNames.reserve(_nodes.size());
     std::transform(elements.begin(),
                    elements.end(),
-                   std::back_inserter(*sortedNames),
+                   std::back_inserter(sortedNames),
                    [](const Element* e) { return e->name(); });
-    return Status::OK();
-} catch (const DBException& ex) {
-    return ex.toStatus();
+    return sortedNames;
+}
+
+DependencyGraph::Payload* DependencyGraph::find(const std::string& name) {
+    auto iter = _nodes.find(name);
+    return (iter == _nodes.end()) ? nullptr : iter->second.payload.get();
 }
 
 }  // namespace mongo

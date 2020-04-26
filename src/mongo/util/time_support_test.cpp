@@ -59,10 +59,9 @@ char tzEnvString[] = "TZ=America/New_York";
 #pragma warning(disable : 4996)
 MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
     if (-1 == putenv(tzEnvString)) {
-        return Status(ErrorCodes::BadValue, errnoWithDescription());
+        uasserted(ErrorCodes::BadValue, errnoWithDescription());
     }
     tzset();
-    return Status::OK();
 }
 #pragma warning(pop)
 

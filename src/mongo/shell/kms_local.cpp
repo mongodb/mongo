@@ -141,7 +141,6 @@ public:
 MONGO_INITIALIZER(LocalKMSRegister)(::mongo::InitializerContext* context) {
     KMSServiceController::registerFactory(KMSProviderEnum::local,
                                           std::make_unique<LocalKMSServiceFactory>());
-    return Status::OK();
 }
 
 }  // namespace mongo

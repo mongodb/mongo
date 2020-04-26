@@ -713,7 +713,6 @@ MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("de
 (InitializerContext* context) {
     if (HeapProfilingEnabled)
         HeapProfiler::heapProfiler = new HeapProfiler();
-    return Status::OK();
 }
 
 }  // namespace

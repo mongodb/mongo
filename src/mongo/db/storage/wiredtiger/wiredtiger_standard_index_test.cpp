@@ -148,7 +148,6 @@ std::unique_ptr<SortedDataInterfaceHarnessHelper> makeWTIndexHarnessHelper() {
 
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
     mongo::registerSortedDataInterfaceHarnessHelperFactory(makeWTIndexHarnessHelper);
-    return Status::OK();
 }
 
 TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {

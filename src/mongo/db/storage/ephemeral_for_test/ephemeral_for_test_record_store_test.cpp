@@ -91,9 +91,8 @@ std::unique_ptr<mongo::RecordStoreHarnessHelper> makeRecordStoreHarnessHelper() 
     return std::make_unique<RecordStoreHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {
+MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext*) {
     mongo::registerRecordStoreHarnessHelperFactory(makeRecordStoreHarnessHelper);
-    return Status::OK();
 }
 }  // namespace
 }  // namespace ephemeral_for_test

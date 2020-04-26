@@ -53,7 +53,6 @@ MONGO_INITIALIZER(ThreadPoolExecutorCommonTests)(InitializerContext*) {
     addTestsForExecutor("ThreadPoolExecutorCommon", [](std::unique_ptr<NetworkInterfaceMock> net) {
         return makeSharedThreadPoolTestExecutor(std::move(net));
     });
-    return Status::OK();
 }
 
 TEST_F(ThreadPoolExecutorTest, TimelyCancelationOfScheduleWorkAt) {

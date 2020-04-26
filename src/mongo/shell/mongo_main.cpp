@@ -120,12 +120,10 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
 (InitializerContext* context) {
     mongo::serverGlobalParams.mutableFeatureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);
-    return Status::OK();
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionSetup"))(InitializerContext*) {
     WireSpec::instance().initialize(WireSpec::Specification{});
-    return Status::OK();
 }
 
 const auto kAuthParam = "authSource"s;

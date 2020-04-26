@@ -817,8 +817,6 @@ MONGO_INITIALIZER(InitializeSchannelGetServerIdentityFn)(mongo::InitializerConte
 
     SSLHandshakeManager::setSslGetServerIdentityFn(
         sc->getFunctionAs<SslGetServerIdentityFn>("SslGetServerIdentity").getValue());
-
-    return mongo::Status::OK();
 }
 
 }  // namespace detail

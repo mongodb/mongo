@@ -58,7 +58,6 @@ MONGO_FAIL_POINT_DEFINE(dummy);  // used by tests in jstests/fail_point
 MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, (), ())
 (InitializerContext* context) {
     globalFailPointRegistry().freeze();
-    return Status::OK();
 }
 
 /** The per-thread PRNG used by fail-points. */

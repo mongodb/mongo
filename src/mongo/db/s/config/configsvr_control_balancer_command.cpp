@@ -148,8 +148,6 @@ MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
     new ConfigSvrBalancerStartCommand();
     new ConfigSvrBalancerStopCommand();
     new ConfigSvrBalancerStatusCommand();
-
-    return Status::OK();
 }
 
 }  // namespace

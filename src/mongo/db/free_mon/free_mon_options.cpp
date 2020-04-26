@@ -35,7 +35,6 @@
 #include "mongo/db/free_mon/free_mon_options.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/initializer_context.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -92,8 +91,8 @@ Status storeFreeMonitoringOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-MONGO_STARTUP_OPTIONS_STORE(FreeMonitoringOptions)(InitializerContext* /*unused*/) {
-    return storeFreeMonitoringOptions(moe::startupOptionsParsed);
+MONGO_STARTUP_OPTIONS_STORE(FreeMonitoringOptions)(InitializerContext*) {
+    uassertStatusOK(storeFreeMonitoringOptions(moe::startupOptionsParsed));
 }
 
 }  // namespace

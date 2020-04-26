@@ -26,109 +26,212 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/initializer.h"
 
+#include <fmt/format.h>
 #include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/deinitializer_context.h"
-#include "mongo/base/global_initializer.h"
-#include "mongo/base/initializer_context.h"
+#include "mongo/base/dependency_graph.h"
+#include "mongo/base/status.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
-Status Initializer::executeInitializers(const std::vector<std::string>& args) {
-    auto oldState = std::exchange(_lifecycleState, State::kInitializing);
-    invariant(oldState == State::kUninitialized, "invalid initializer state transition");
+class Initializer::Graph {
+public:
+    class Payload : public DependencyGraph::Payload {
+    public:
+        InitializerFunction initFn;
+        DeinitializerFunction deinitFn;
+        bool initialized = false;
+    };
 
-    if (_sortedNodes.empty()) {
-        if (Status status = _graph.topSort(&_sortedNodes); !status.isOK()) {
-            return status;
-        }
+    /**
+     * Note that cycles in the dependency graph are not discovered by this
+     * function. Rather, they're discovered by `topSort`, below.
+     */
+    void add(std::string name,
+             InitializerFunction initFn,
+             DeinitializerFunction deinitFn,
+             std::vector<std::string> prerequisites,
+             std::vector<std::string> dependents) {
+        auto data = std::make_unique<Payload>();
+        data->initFn = std::move(initFn);
+        data->deinitFn = std::move(deinitFn);
+        _graph.addNode(
+            std::move(name), std::move(prerequisites), std::move(dependents), std::move(data));
     }
-    _graph.freeze();
+
+    /**
+     * Returns the payload of the node that was added by `name`, or nullptr if no such node exists.
+     */
+    Payload* find(const std::string& name) {
+        return static_cast<Payload*>(_graph.find(name));
+    }
+
+    /**
+     * Returns a topological sort of the dependency graph, represented
+     * as an ordered vector of node names.
+     *
+     * - Throws with `ErrorCodes::GraphContainsCycle` if the graph contains a cycle.
+     *
+     * - Throws with `ErrorCodes::BadValue` if the graph is incomplete.
+     *   That is, a node named in a dependency edge was never added.
+     */
+    std::vector<std::string> topSort() const {
+        return _graph.topSort();
+    }
+
+private:
+    /**
+     * Map of all named nodes. Nodes named as dependency edges but not
+     * explicitly added will either be absent from this map or be present with
+     * a null-valude initFn.
+     */
+    DependencyGraph _graph;
+};
+
+Initializer::Initializer() : _graph(std::make_unique<Graph>()) {}
+Initializer::~Initializer() = default;
+
+void Initializer::_transition(State expected, State next) {
+    if (_lifecycleState != expected)
+        uasserted(
+            ErrorCodes::IllegalOperation,
+            format(
+                FMT_STRING(
+                    "Invalid initializer state transition. Expected {} -> {}, but currently at {}"),
+                expected,
+                next,
+                _lifecycleState));
+    _lifecycleState = next;
+}
+
+void Initializer::addInitializer(std::string name,
+                                 InitializerFunction initFn,
+                                 DeinitializerFunction deinitFn,
+                                 std::vector<std::string> prerequisites,
+                                 std::vector<std::string> dependents) {
+    uassert(ErrorCodes::BadValue, "Null-valued init function", initFn);
+    uassert(ErrorCodes::CannotMutateObject,
+            "Initializer dependency graph is frozen",
+            _lifecycleState == State::kNeverInitialized);
+    _graph->add(std::move(name),
+                std::move(initFn),
+                std::move(deinitFn),
+                std::move(prerequisites),
+                std::move(dependents));
+}
+
+
+void Initializer::executeInitializers(const std::vector<std::string>& args) {
+    if (_lifecycleState == State::kNeverInitialized)
+        _transition(State::kNeverInitialized, State::kUninitialized);  // freeze
+    _transition(State::kUninitialized, State::kInitializing);
+
+    if (_sortedNodes.empty())
+        _sortedNodes = _graph->topSort();
 
     InitializerContext context(args);
 
     for (const auto& nodeName : _sortedNodes) {
-        InitializerDependencyNode* node = _graph.getInitializerNode(nodeName);
+        auto* node = _graph->find(nodeName);
 
-        // If already initialized then this node is a legacy initializer without re-initialization
-        // support.
-        if (node->isInitialized())
-            continue;
+        if (node->initialized)
+            continue;  // Legacy initializer without re-initialization support.
 
-        auto const& fn = node->getInitializerFunction();
-        if (!fn) {
-            return Status(ErrorCodes::InternalError,
-                          "topSort returned a node that has no associated function: \"" + nodeName +
-                              '"');
-        }
-        try {
-            if (Status status = fn(&context); !status.isOK()) {
-                return status;
-            }
-        } catch (const DBException& xcp) {
-            return xcp.toStatus();
-        }
+        uassert(ErrorCodes::InternalError,
+                format(FMT_STRING("node has no init function: \"{}\""), nodeName),
+                node->initFn);
+        node->initFn(&context);
 
-        node->setInitialized(true);
+        node->initialized = true;
     }
 
-    oldState = std::exchange(_lifecycleState, State::kInitialized);
-    invariant(oldState == State::kInitializing, "invalid initializer state transition");
+    _transition(State::kInitializing, State::kInitialized);
 
-    return Status::OK();
+    // The order of the initializers is non-deterministic, so make it available.
+    // Must be after verbose has been parsed, or the Debug(2) severity won't be visible.
+    LOGV2_DEBUG_OPTIONS(4777800,
+                        2,
+                        {logv2::LogTruncation::Disabled},
+                        "Ran initializers",
+                        "nodes"_attr = _sortedNodes);
 }
 
-Status Initializer::executeDeinitializers() {
-    auto oldState = std::exchange(_lifecycleState, State::kDeinitializing);
-    invariant(oldState == State::kInitialized, "invalid initializer state transition");
+void Initializer::executeDeinitializers() {
+    _transition(State::kInitialized, State::kDeinitializing);
 
     DeinitializerContext context{};
 
     // Execute deinitialization in reverse order from initialization.
     for (auto it = _sortedNodes.rbegin(), end = _sortedNodes.rend(); it != end; ++it) {
-        InitializerDependencyNode* node = _graph.getInitializerNode(*it);
-        auto const& fn = node->getDeinitializerFunction();
-        if (fn) {
-            try {
-                if (Status status = fn(&context); !status.isOK()) {
-                    return status;
-                }
-            } catch (const DBException& xcp) {
-                return xcp.toStatus();
-            }
-
-            node->setInitialized(false);
+        auto* node = _graph->find(*it);
+        if (node->deinitFn) {
+            node->deinitFn(&context);
+            node->initialized = false;
         }
     }
 
-    oldState = std::exchange(_lifecycleState, State::kUninitialized);
-    invariant(oldState == State::kDeinitializing, "invalid initializer state transition");
+    _transition(State::kDeinitializing, State::kUninitialized);
+}
 
-    return Status::OK();
+InitializerFunction Initializer::getInitializerFunctionForTesting(const std::string& name) {
+    auto node = _graph->find(name);
+    return node ? node->initFn : nullptr;
+}
+
+
+Initializer& getGlobalInitializer() {
+    static auto g = new Initializer;
+    return *g;
 }
 
 Status runGlobalInitializers(const std::vector<std::string>& argv) {
-    return getGlobalInitializer().executeInitializers(argv);
+    try {
+        getGlobalInitializer().executeInitializers(argv);
+        return Status::OK();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 Status runGlobalDeinitializers() {
-    return getGlobalInitializer().executeDeinitializers();
+    try {
+        getGlobalInitializer().executeDeinitializers();
+        return Status::OK();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 void runGlobalInitializersOrDie(const std::vector<std::string>& argv) {
-    Status status = runGlobalInitializers(argv);
-    if (!status.isOK()) {
+    if (Status status = runGlobalInitializers(argv); !status.isOK()) {
         std::cerr << "Failed global initialization: " << status << std::endl;
         quickExit(1);
     }
 }
+
+namespace {
+
+// Make sure that getGlobalInitializer() is called at least once before main(), and so at least
+// once in a single-threaded context.  Otherwise, static initialization inside
+// getGlobalInitializer() won't be thread-safe.
+MONGO_COMPILER_VARIABLE_UNUSED const auto earlyCaller = [] {
+    getGlobalInitializer();
+    return 0;
+}();
+
+}  // namespace
 
 }  // namespace mongo

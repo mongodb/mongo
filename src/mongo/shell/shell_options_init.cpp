@@ -42,12 +42,7 @@ MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
     if (!handlePreValidationMongoShellOptions(moe::startupOptionsParsed, context->args())) {
         quickExit(EXIT_SUCCESS);
     }
-    Status ret = moe::startupOptionsParsed.validate();
-    if (!ret.isOK()) {
-        return ret;
-    }
-
-    return Status::OK();
+    uassertStatusOK(moe::startupOptionsParsed.validate());
 }
 
 MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
@@ -57,6 +52,5 @@ MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
         quickExit(EXIT_BADOPTIONS);
     }
-    return Status::OK();
 }
 }  // namespace mongo

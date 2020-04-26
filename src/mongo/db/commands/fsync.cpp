@@ -448,7 +448,6 @@ void FSyncLockThread::run() {
 
 MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
     setLockedForWritingImpl([]() { return fsyncCmd.fsyncLocked(); });
-    return Status::OK();
 }
 
 }  // namespace

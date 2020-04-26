@@ -142,7 +142,6 @@ void initTickSource() {}
 MONGO_INITIALIZER(SystemTickSourceInit)(InitializerContext* context) {
     initTickSource();
     SystemTickSource::get();
-    return Status::OK();
 }
 
 TickSource::Tick SystemTickSource::getTicks() {

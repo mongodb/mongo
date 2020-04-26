@@ -77,10 +77,7 @@ MONGO_INITIALIZER_GENERAL(GatherReadctionOptions,
     };
 
     std::vector<optionenvironment::OptionDescription> options;
-    auto status = optionenvironment::startupOptions.getAllOptions(&options);
-    if (!status.isOK()) {
-        return status;
-    }
+    uassertStatusOK(optionenvironment::startupOptions.getAllOptions(&options));
 
     for (const auto& opt : options) {
         if (!opt._redact) {
@@ -91,21 +88,14 @@ MONGO_INITIALIZER_GENERAL(GatherReadctionOptions,
         gRedactedDottedNames.insert(opt._deprecatedDottedNames.begin(),
                                     opt._deprecatedDottedNames.end());
         if (!opt._singleName.empty()) {
-            auto status = insertSingleName(opt._singleName);
-            if (!status.isOK()) {
-                return status;
-            }
+            uassertStatusOK(insertSingleName(opt._singleName));
         }
         for (const auto& name : opt._deprecatedSingleNames) {
-            auto status = insertSingleName(name);
-            if (!status.isOK()) {
-                return status;
-            }
+            uassertStatusOK(insertSingleName(name));
         }
     }
 
     gGatherOptionsDone = true;
-    return Status::OK();
 }
 
 bool _isPasswordArgument(const std::string& name) {

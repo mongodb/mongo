@@ -82,6 +82,5 @@ MONGO_INITIALIZER_GENERAL(SnappyMessageCompressorInit,
 (InitializerContext* context) {
     auto& compressorRegistry = MessageCompressorRegistry::get();
     compressorRegistry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
-    return Status::OK();
 }
 }  // namespace mongo

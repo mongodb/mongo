@@ -787,7 +787,6 @@ std::unique_ptr<DBClientBase> createEncryptedDBClientBase(std::unique_ptr<DBClie
 
 MONGO_INITIALIZER(setCallbacksForEncryptedDBClientBase)(InitializerContext*) {
     mongo::mozjs::setEncryptedDBClientCallback(createEncryptedDBClientBase);
-    return Status::OK();
 }
 
 }  // namespace

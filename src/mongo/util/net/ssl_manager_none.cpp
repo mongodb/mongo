@@ -33,10 +33,8 @@
 
 namespace mongo {
 namespace {
-MONGO_INITIALIZER(SSLManager)(InitializerContext*) {
-    // we need a no-op initializer so that we can depend on SSLManager as a prerequisite in
-    // non-SSL builds.
-    return Status::OK();
-}
+// we need a no-op initializer so that we can depend on SSLManager as a prerequisite in
+// non-SSL builds.
+MONGO_INITIALIZER(SSLManager)(InitializerContext*) {}
 }  // namespace
 }  // namespace mongo

@@ -63,7 +63,6 @@ ConnectionString fixtureConnectionString{};
 
 MONGO_INITIALIZER(WireSpec)(InitializerContext*) {
     WireSpec::instance().initialize(WireSpec::Specification{});
-    return Status::OK();
 }
 
 }  // namespace
@@ -95,60 +94,40 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     // Integration tests do not fork, however the init graph requires a deliberate initializer that
     // _could_ fork and here choses not to do so.
-    return Status::OK();
 }
 
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(IntegrationTestOptions)(InitializerContext*) {
     uassertStatusOK(addBaseServerOptions(&moe::startupOptions));
-
-    return Status::OK();
 }
 
 MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
     auto& env = moe::startupOptionsParsed;
     auto& opts = moe::startupOptions;
 
-    if (auto ret = env.validate(); !ret.isOK()) {
-        return ret;
-    }
-
-    if (auto ret = validateBaseOptions(env); !ret.isOK()) {
-        return ret;
-    }
+    uassertStatusOK(env.validate());
+    uassertStatusOK(validateBaseOptions(env));
 
     if (env.count("help")) {
         std::cout << opts.helpString() << std::endl;
         quickExit(EXIT_SUCCESS);
     }
-
-    return Status::OK();
 }
 
 MONGO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
     auto& env = moe::startupOptionsParsed;
 
-    if (auto ret = canonicalizeBaseOptions(&env); !ret.isOK()) {
-        return ret;
-    }
-
-    if (auto ret = storeBaseOptions(env); !ret.isOK()) {
-        return ret;
-    }
+    uassertStatusOK(canonicalizeBaseOptions(&env));
+    uassertStatusOK(storeBaseOptions(env));
 
     std::string connectionString = env["connectionString"].as<std::string>();
 
     auto swConnectionString = ConnectionString::parse(connectionString);
-    if (!swConnectionString.isOK()) {
-        return swConnectionString.getStatus();
-    }
+    uassertStatusOK(swConnectionString);
 
     fixtureConnectionString = std::move(swConnectionString.getValue());
     LOGV2(23050,
           "Using test fixture with connection string = {connectionString}",
           "connectionString"_attr = connectionString);
-
-
-    return Status::OK();
 }
 
 }  // namespace

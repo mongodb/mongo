@@ -111,8 +111,6 @@ Command* ftdcCommand;
 
 MONGO_INITIALIZER(CreateDiagnosticDataCommand)(InitializerContext* context) {
     ftdcCommand = new GetDiagnosticDataCommand();
-
-    return Status::OK();
 }
 
 }  // namespace

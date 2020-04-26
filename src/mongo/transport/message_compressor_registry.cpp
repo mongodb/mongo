@@ -134,13 +134,12 @@ MONGO_INITIALIZER_GENERAL(NoopMessageCompressorInit,
 (InitializerContext* context) {
     auto& compressorRegistry = MessageCompressorRegistry::get();
     compressorRegistry.registerImplementation(std::make_unique<NoopMessageCompressor>());
-    return Status::OK();
 }
 
 // This cleans up any compressors that were requested by the user, but weren't registered by
 // any compressor. It must be run after all the compressors have registered themselves with
 // the global registry.
 MONGO_INITIALIZER(AllCompressorsRegistered)(InitializerContext* context) {
-    return MessageCompressorRegistry::get().finalizeSupportedCompressors();
+    uassertStatusOK(MessageCompressorRegistry::get().finalizeSupportedCompressors());
 }
 }  // namespace mongo

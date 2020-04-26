@@ -200,7 +200,6 @@ std::unique_ptr<RecordStoreHarnessHelper> makeWTRSHarnessHelper() {
 
 MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {
     mongo::registerRecordStoreHarnessHelperFactory(makeWTRSHarnessHelper);
-    return Status::OK();
 }
 
 TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {

@@ -43,7 +43,6 @@ thread_local ThreadContext::Handle ThreadContext::_handle;
 
 MONGO_INITIALIZER(ThreadContextsInitialized)(InitializerContext*) {
     ThreadContext::initializeMain();
-    return Status::OK();
 }
 
 void ThreadContext::initializeMain() {

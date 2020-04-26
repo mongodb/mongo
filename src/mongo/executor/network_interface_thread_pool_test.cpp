@@ -82,7 +82,6 @@ private:
 MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
     addTestsForThreadPool("ThreadPoolCommon",
                           []() { return std::make_unique<NetworkInterfaceThreadPoolWithASIO>(); });
-    return Status::OK();
 }
 
 }  // namespace

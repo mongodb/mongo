@@ -51,11 +51,8 @@ MONGO_STARTUP_OPTIONS_STORE(SSLClientOptions)(InitializerContext*) {
     }
 
     if (params.count("tls.disabledProtocols")) {
-        const auto status =
-            storeSSLDisabledProtocols(params["tls.disabledProtocols"].as<std::string>());
-        if (!status.isOK()) {
-            return status;
-        }
+        uassertStatusOK(
+            storeSSLDisabledProtocols(params["tls.disabledProtocols"].as<std::string>()));
 #if ((MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL) || \
      (OPENSSL_VERSION_NUMBER >= 0x100000cf)) /* 1.0.0l */
     } else {
@@ -72,17 +69,12 @@ MONGO_STARTUP_OPTIONS_STORE(SSLClientOptions)(InitializerContext*) {
 
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
     if (params.count("tls.certificateSelector")) {
-        const auto status =
+        uassertStatusOK(
             parseCertificateSelector(&sslGlobalParams.sslCertificateSelector,
                                      "tls.certificateSelector",
-                                     params["tls.certificateSelector"].as<std::string>());
-        if (!status.isOK()) {
-            return status;
-        }
+                                     params["tls.certificateSelector"].as<std::string>()));
     }
 #endif
-
-    return Status::OK();
 }
 
 }  // namespace

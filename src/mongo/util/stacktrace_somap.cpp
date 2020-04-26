@@ -349,7 +349,6 @@ SharedObjectMapInfo& mutableGlobalSharedObjectMapInfo() {
 MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
     // Call buildObj() again now that there is better VersionInfo.
     mutableGlobalSharedObjectMapInfo().setObj(buildObj());
-    return Status::OK();
 }
 
 const bool dummyToForceEarlyInitializationOfSharedObjectMapInfo = [] {

@@ -85,8 +85,6 @@ MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v3SystemRolesIndexSpec.addKeys(v3SystemRolesKeyPattern);
     v3SystemRolesIndexSpec.unique();
     v3SystemRolesIndexSpec.name(v3SystemRolesIndexName);
-
-    return Status::OK();
 }
 
 void generateSystemIndexForExistingCollection(OperationContext* opCtx,

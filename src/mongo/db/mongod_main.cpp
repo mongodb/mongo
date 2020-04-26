@@ -290,7 +290,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(Ini
     spec.isInternalClient = true;
 
     WireSpec::instance().initialize(std::move(spec));
-    return Status::OK();
 }
 
 void initializeCommandHooks(ServiceContext* serviceContext) {
@@ -812,7 +811,6 @@ ExitCode initService() {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     mongo::forkServerOrDie();
-    return Status::OK();
 }
 
 /*
@@ -1022,10 +1020,9 @@ void setUpObservers(ServiceContext* serviceContext) {
 }
 
 #ifdef MONGO_CONFIG_SSL
-MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))
+MONGO_INITIALIZER_GENERAL(setSSLManagerType, (), ("SSLManager"))
 (InitializerContext* context) {
     isSSLServer = true;
-    return Status::OK();
 }
 #endif
 

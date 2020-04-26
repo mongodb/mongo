@@ -114,7 +114,6 @@ MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexes)(InitializerContext*) {
     sasl_set_alloc(saslOurMalloc, saslOurCalloc, saslOurRealloc, free);
 
     sasl_set_mutex(saslMutexAlloc, saslMutexLock, saslMutexUnlock, saslMutexFree);
-    return Status::OK();
 }
 
 int saslClientLogSwallow(void* context, int priority, const char* message) throw() {
@@ -145,13 +144,12 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
     // TODO: Call sasl_client_done() at shutdown when we have a story for orderly shutdown.
     int result = sasl_client_init(saslClientGlobalCallbacks);
     if (result != SASL_OK) {
-        return Status(ErrorCodes::UnknownError,
-                      str::stream() << "Could not initialize sasl client components ("
-                                    << sasl_errstring(result, nullptr, nullptr) << ")");
+        uasserted(ErrorCodes::UnknownError,
+                  str::stream() << "Could not initialize sasl client components ("
+                                << sasl_errstring(result, nullptr, nullptr) << ")");
     }
 
     SaslClientSession::create = createCyrusSaslClientSession;
-    return Status::OK();
 }
 
 /**

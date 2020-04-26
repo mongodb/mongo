@@ -52,7 +52,6 @@ namespace {
 MONGO_INITIALIZER_WITH_PREREQUISITES(InitSpeculativeCounters, ("EndStartupOptionStorage"))
 (InitializerContext*) {
     authCounter.initializeMechanismMap(saslGlobalParams.authenticationMechanisms);
-    return Status::OK();
 }
 }  // namespace
 

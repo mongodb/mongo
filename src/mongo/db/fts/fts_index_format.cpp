@@ -107,7 +107,6 @@ MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
     b.appendNull("");
     nullObj = b.obj();
     nullElt = nullObj.firstElement();
-    return Status::OK();
 }
 
 void FTSIndexFormat::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,

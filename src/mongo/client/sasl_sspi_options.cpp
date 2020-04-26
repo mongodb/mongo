@@ -64,7 +64,7 @@ Status storeSASLSSPIOptions(const moe::Environment& params) {
 }
 
 MONGO_STARTUP_OPTIONS_STORE(SASLSSPIOptions)(InitializerContext* context) {
-    return storeSASLSSPIOptions(moe::startupOptionsParsed);
+    uassertStatusOK(storeSASLSSPIOptions(moe::startupOptionsParsed));
 }
 
 }  // namespace mongo

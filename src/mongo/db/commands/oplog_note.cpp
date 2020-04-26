@@ -154,7 +154,6 @@ public:
 
 MONGO_INITIALIZER(RegisterAppendOpLogNoteCmd)(InitializerContext* context) {
     new AppendOplogNoteCmd();
-    return Status::OK();
 }
 
 }  // namespace mongo

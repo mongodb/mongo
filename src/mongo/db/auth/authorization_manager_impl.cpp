@@ -89,10 +89,8 @@ MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
     }
 
     internalSecurity.user = user;
-
-    return Status::OK();
 } catch (...) {
-    return exceptionToStatus();
+    uassertStatusOK(exceptionToStatus());
 }
 
 class PinnedUserSetParameter {

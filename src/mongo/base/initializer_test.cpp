@@ -31,418 +31,267 @@
  * Unit tests of the Initializer type.
  */
 
+#include <fmt/format.h>
+
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
-#include "mongo/base/initializer_dependency_graph.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-
-/*
- * Unless otherwise specified, all tests herein use the following
- * dependency graph.
- *
- * 0 <-  3 <- 7
- *  ^   / ^    ^
- *   \ v   \     \
- *    2     5 <-  8
- *   / ^   /     /
- *  v   \ v    v
- * 1 <-  4 <- 6
- *
- */
-
-#define STRIP_PARENS_(...) __VA_ARGS__
-
-#define ADD_INITIALIZER(GRAPH, NAME, INIT_FN, DEINIT_FN, PREREQS, DEPS)     \
-    (GRAPH).addInitializer((NAME),                                          \
-                           (INIT_FN),                                       \
-                           (DEINIT_FN),                                     \
-                           std::vector<std::string>{STRIP_PARENS_ PREREQS}, \
-                           std::vector<std::string>{STRIP_PARENS_ DEPS})
-
-#define ASSERT_ADD_INITIALIZER(GRAPH, NAME, INIT_FN, DEINIT_FN, PREREQS, DEPS) \
-    ASSERT_EQUALS(Status::OK(), ADD_INITIALIZER(GRAPH, NAME, INIT_FN, DEINIT_FN, PREREQS, DEPS))
-
-
-#define CONSTRUCT_DEPENDENCY_GRAPH(GRAPH,                                                         \
-                                   INIT_FN0,                                                      \
-                                   DEINIT_FN0,                                                    \
-                                   INIT_FN1,                                                      \
-                                   DEINIT_FN1,                                                    \
-                                   INIT_FN2,                                                      \
-                                   DEINIT_FN2,                                                    \
-                                   INIT_FN3,                                                      \
-                                   DEINIT_FN3,                                                    \
-                                   INIT_FN4,                                                      \
-                                   DEINIT_FN4,                                                    \
-                                   INIT_FN5,                                                      \
-                                   DEINIT_FN5,                                                    \
-                                   INIT_FN6,                                                      \
-                                   DEINIT_FN6,                                                    \
-                                   INIT_FN7,                                                      \
-                                   DEINIT_FN7,                                                    \
-                                   INIT_FN8,                                                      \
-                                   DEINIT_FN8)                                                    \
-    do {                                                                                          \
-        InitializerDependencyGraph& _graph_ = (GRAPH);                                            \
-        ASSERT_ADD_INITIALIZER(                                                                   \
-            _graph_, "n0", INIT_FN0, DEINIT_FN0, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);    \
-        ASSERT_ADD_INITIALIZER(                                                                   \
-            _graph_, "n1", INIT_FN1, DEINIT_FN1, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);    \
-        ASSERT_ADD_INITIALIZER(                                                                   \
-            _graph_, "n2", INIT_FN2, DEINIT_FN2, ("n0", "n1"), MONGO_NO_DEPENDENTS);              \
-        ASSERT_ADD_INITIALIZER(                                                                   \
-            _graph_, "n3", INIT_FN3, DEINIT_FN3, ("n0", "n2"), MONGO_NO_DEPENDENTS);              \
-        ASSERT_ADD_INITIALIZER(                                                                   \
-            _graph_, "n4", INIT_FN4, DEINIT_FN4, ("n2", "n1"), MONGO_NO_DEPENDENTS);              \
-        ASSERT_ADD_INITIALIZER(                                                                   \
-            _graph_, "n5", INIT_FN5, DEINIT_FN5, ("n3", "n4"), MONGO_NO_DEPENDENTS);              \
-        ASSERT_ADD_INITIALIZER(_graph_, "n6", INIT_FN6, DEINIT_FN6, ("n4"), MONGO_NO_DEPENDENTS); \
-        ASSERT_ADD_INITIALIZER(_graph_, "n7", INIT_FN7, DEINIT_FN7, ("n3"), MONGO_NO_DEPENDENTS); \
-        ASSERT_ADD_INITIALIZER(                                                                   \
-            _graph_, "n8", INIT_FN8, DEINIT_FN8, ("n5", "n6", "n7"), MONGO_NO_DEPENDENTS);        \
-    } while (false)
 
 namespace mongo {
 namespace {
 
-enum State {
-    UNSET = 0,
-    INITIALIZED = 1,
-    DEINITIALIZED = 2,
+using namespace fmt::literals;
+
+class InitializerTest : public unittest::Test {
+public:
+    enum State {
+        kUnset = 0,
+        kInitialized = 1,
+        kDeinitialized = 2,
+    };
+
+    struct Graph {
+        struct Node {
+            std::string name;
+            std::vector<size_t> prereqs;
+        };
+
+        /**
+         * The dependency graph expressed as a vector of vectors.
+         * Each row is a vector of the corresponding node's dependencies.
+         */
+        auto prerequisites() const {
+            std::vector<std::vector<size_t>> result;
+            for (const auto& node : nodes)
+                result.push_back(node.prereqs);
+            return result;
+        }
+
+        /** Invert the prereq edges. */
+        auto dependents() const {
+            std::vector<std::vector<size_t>> result(nodes.size());
+            for (size_t i = 0; i != nodes.size(); ++i)
+                for (auto& r : nodes[i].prereqs)
+                    result[r].push_back(i);
+            return result;
+        }
+
+        size_t size() const {
+            return nodes.size();
+        }
+
+        std::vector<Node> nodes;
+    };
+
+    /*
+     * Unless otherwise specified, all tests herein use the following
+     * dependency graph.
+     */
+    static inline const Graph graph{{
+        {"n0", {}},         // 0
+                            // |
+        {"n1", {}},         // |  1
+                            // |  |
+        {"n2", {0, 1}},     // +--+->2
+                            // |  |  |
+        {"n3", {0, 2}},     // +-----+->3
+                            //    |  |  |
+        {"n4", {1, 2}},     //    +--+---->4
+                            //          |  |
+        {"n5", {3, 4}},     //          +--+->5
+                            //          |  |  |
+        {"n6", {4}},        //          |  +---->6
+                            //          |     |  |
+        {"n7", {3}},        //          +---------->7
+                            //                |  |  |
+        {"n8", {5, 6, 7}},  //                +--+--+->8
+    }};
+
+    /** The arguments for an addInitializer call. */
+    struct NodeSpec {
+        std::string name;
+        std::function<void(InitializerContext*)> init;
+        std::function<void(DeinitializerContext*)> deinit;
+        std::vector<std::string> prerequisites;
+        std::vector<std::string> dependents;
+    };
+
+    void initImpl(size_t idx) {
+        auto reqs = graph.prerequisites()[idx];
+        for (auto req : reqs)
+            if (states[req] != kInitialized)
+                uasserted(ErrorCodes::UnknownError,
+                          "(init{0}) {1} not already initialized"_format(idx, req));
+        states[idx] = kInitialized;
+    }
+
+    void deinitImpl(size_t idx) {
+        if (states[idx] != kInitialized)
+            uasserted(ErrorCodes::UnknownError, "(deinit{0}) {0} not initialized"_format(idx));
+        auto deps = graph.dependents()[idx];
+        for (auto dep : deps)
+            if (states[dep] != kDeinitialized)
+                uasserted(ErrorCodes::UnknownError,
+                          "(deinit{0}) {1} not already deinitialized"_format(idx, dep));
+        states[idx] = kDeinitialized;
+    }
+
+    static void initNoop(InitializerContext*) {}
+    static void deinitNoop(DeinitializerContext*) {}
+
+    std::vector<NodeSpec> makeDependencyGraphSpecs(const Graph& graph) {
+        std::vector<NodeSpec> specs;
+        for (size_t idx = 0; idx != graph.size(); ++idx) {
+            std::vector<std::string> reqNames;
+            for (auto&& req : graph.nodes[idx].prereqs)
+                reqNames.push_back(graph.nodes[req].name);
+            specs.push_back({graph.nodes[idx].name,
+                             [this, idx](InitializerContext*) { initImpl(idx); },
+                             [this, idx](DeinitializerContext*) { deinitImpl(idx); },
+                             reqNames,
+                             {}});
+        }
+        return specs;
+    }
+
+    void constructDependencyGraph(Initializer& initializer,
+                                  const std::vector<NodeSpec>& nodeSpecs) {
+        for (const auto& n : nodeSpecs)
+            initializer.addInitializer(n.name, n.init, n.deinit, n.prerequisites, n.dependents);
+    }
+
+    void constructDependencyGraph(Initializer& initializer) {
+        constructDependencyGraph(initializer, makeDependencyGraphSpecs(graph));
+    }
+
+    std::vector<State> states = std::vector<State>(graph.size(), kUnset);
 };
 
-State globalStates[9];
-
-Status initNoop(InitializerContext*) {
-    return Status::OK();
-}
-
-Status deinitNoop(DeinitializerContext*) {
-    return Status::OK();
-}
-
-Status init0(InitializerContext*) {
-    globalStates[0] = INITIALIZED;
-    return Status::OK();
-}
-
-Status init1(InitializerContext*) {
-    globalStates[1] = INITIALIZED;
-    return Status::OK();
-}
-
-Status init2(InitializerContext*) {
-    if (globalStates[0] != INITIALIZED || globalStates[1] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(init2) one of 0 or 1 not already initialized");
-    globalStates[2] = INITIALIZED;
-    return Status::OK();
-}
-
-Status init3(InitializerContext*) {
-    if (globalStates[0] != INITIALIZED || globalStates[2] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(init3) one of 0 or 2 not already initialized");
-    globalStates[3] = INITIALIZED;
-    return Status::OK();
-}
-
-Status init4(InitializerContext*) {
-    if (globalStates[1] != INITIALIZED || globalStates[2] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(init4) one of 1 or 2 not already initialized");
-    globalStates[4] = INITIALIZED;
-    return Status::OK();
-}
-
-Status init5(InitializerContext*) {
-    if (globalStates[3] != INITIALIZED || globalStates[4] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(init5) one of 3 or 4 not already initialized");
-    globalStates[5] = INITIALIZED;
-    return Status::OK();
-}
-
-Status init6(InitializerContext*) {
-    if (globalStates[4] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(init6) 4 not already initialized");
-    globalStates[6] = INITIALIZED;
-    return Status::OK();
-}
-
-Status init7(InitializerContext*) {
-    if (globalStates[3] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(init7) 3 not already initialized");
-    globalStates[7] = INITIALIZED;
-    return Status::OK();
-}
-
-Status init8(InitializerContext*) {
-    if (globalStates[5] != INITIALIZED || globalStates[6] != INITIALIZED ||
-        globalStates[7] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(init8) one of 5, 6, 7 not already initialized");
-    globalStates[8] = INITIALIZED;
-    return Status::OK();
-}
-
-Status deinit8(DeinitializerContext*) {
-    if (globalStates[8] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit8) 8 not initialized");
-    globalStates[8] = DEINITIALIZED;
-    return Status::OK();
-}
-
-Status deinit7(DeinitializerContext*) {
-    if (globalStates[7] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit7) 7 not initialized");
-    if (globalStates[8] != DEINITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit7) 8 not already deinitialized");
-    globalStates[7] = DEINITIALIZED;
-    return Status::OK();
-}
-
-Status deinit6(DeinitializerContext*) {
-    if (globalStates[6] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit6) 6 not initialized");
-    if (globalStates[8] != DEINITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit6) 8 not already deinitialized");
-    globalStates[6] = DEINITIALIZED;
-    return Status::OK();
-}
-
-Status deinit5(DeinitializerContext*) {
-    if (globalStates[5] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit5) 5 not initialized");
-    if (globalStates[8] != DEINITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit5) 8 not already deinitialized");
-    globalStates[5] = DEINITIALIZED;
-    return Status::OK();
-}
-
-Status deinit4(DeinitializerContext*) {
-    if (globalStates[4] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit4) 4 not initialized");
-    if (globalStates[5] != DEINITIALIZED || globalStates[6] != DEINITIALIZED)
-        return Status(ErrorCodes::UnknownError,
-                      "(deinit4) one of 5 or 6 not already deinitialized");
-    globalStates[4] = DEINITIALIZED;
-    return Status::OK();
-}
-
-Status deinit3(DeinitializerContext*) {
-    if (globalStates[3] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit3) 3 not initialized");
-    if (globalStates[5] != DEINITIALIZED || globalStates[7] != DEINITIALIZED)
-        return Status(ErrorCodes::UnknownError,
-                      "(deinit3) one of 5 or 7 not already deinitialized");
-    globalStates[3] = DEINITIALIZED;
-    return Status::OK();
-}
-
-Status deinit2(DeinitializerContext*) {
-    if (globalStates[2] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit2) 2 not initialized");
-    if (globalStates[3] != DEINITIALIZED || globalStates[4] != DEINITIALIZED)
-        return Status(ErrorCodes::UnknownError,
-                      "(deinit2) one of 3 or 4 not already deinitialized");
-    globalStates[2] = DEINITIALIZED;
-    return Status::OK();
-}
-
-Status deinit1(DeinitializerContext*) {
-    if (globalStates[1] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit1) 1 not initialized");
-    if (globalStates[2] != DEINITIALIZED || globalStates[4] != DEINITIALIZED)
-        return Status(ErrorCodes::UnknownError,
-                      "(deinit1) one of 2 or 4 not already deinitialized");
-    globalStates[1] = DEINITIALIZED;
-    return Status::OK();
-}
-
-Status deinit0(DeinitializerContext*) {
-    if (globalStates[0] != INITIALIZED)
-        return Status(ErrorCodes::UnknownError, "(deinit0) 0 not initialized");
-    if (globalStates[2] != DEINITIALIZED || globalStates[3] != DEINITIALIZED)
-        return Status(ErrorCodes::UnknownError,
-                      "(deinit0) one of 2 or 3 not already deinitialized");
-    globalStates[0] = DEINITIALIZED;
-    return Status::OK();
-}
-
-void clearCounts() {
-    for (size_t i = 0; i < 9; ++i)
-        globalStates[i] = UNSET;
-}
-
-void constructNormalDependencyGraph(Initializer* initializer) {
-    CONSTRUCT_DEPENDENCY_GRAPH(initializer->getInitializerDependencyGraph(),
-                               init0,
-                               deinit0,
-                               init1,
-                               deinit1,
-                               init2,
-                               deinit2,
-                               init3,
-                               deinit3,
-                               init4,
-                               deinit4,
-                               init5,
-                               deinit5,
-                               init6,
-                               deinit6,
-                               init7,
-                               deinit7,
-                               init8,
-                               deinit8);
-}
-
-TEST(InitializerTest, SuccessfulInitializationAndDeinitialization) {
+TEST_F(InitializerTest, SuccessfulInitializationAndDeinitialization) {
     Initializer initializer;
-    constructNormalDependencyGraph(&initializer);
-    clearCounts();
+    constructDependencyGraph(initializer);
 
-    ASSERT_OK(initializer.executeInitializers({}));
+    initializer.executeInitializers({});
+    for (size_t i = 0; i != states.size(); ++i)
+        ASSERT_EQ(states[i], kInitialized) << i;
 
-    for (int i = 0; i < 9; ++i)
-        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
-
-    ASSERT_OK(initializer.executeDeinitializers());
-
-    for (int i = 0; i < 9; ++i)
-        ASSERT_EQUALS(DEINITIALIZED, globalStates[i]);
+    initializer.executeDeinitializers();
+    for (size_t i = 0; i != states.size(); ++i)
+        ASSERT_EQ(states[i], kDeinitialized) << i;
 }
 
-TEST(InitializerTest, Init5Misimplemented) {
+TEST_F(InitializerTest, Init5Misimplemented) {
+    auto specs = makeDependencyGraphSpecs(graph);
+    for (auto&& spec : specs)
+        spec.deinit = deinitNoop;
+    specs[5].init = initNoop;
     Initializer initializer;
-    CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
-                               init0,
-                               deinitNoop,
-                               init1,
-                               deinitNoop,
-                               init2,
-                               deinitNoop,
-                               init3,
-                               deinitNoop,
-                               init4,
-                               deinitNoop,
-                               initNoop,
-                               deinitNoop,
-                               init6,
-                               deinitNoop,
-                               init7,
-                               deinitNoop,
-                               init8,
-                               deinitNoop);
-    clearCounts();
+    constructDependencyGraph(initializer, specs);
 
-    ASSERT_EQUALS(ErrorCodes::UnknownError, initializer.executeInitializers({}));
+    ASSERT_THROWS_CODE(initializer.executeInitializers({}), DBException, ErrorCodes::UnknownError);
 
-    ASSERT_EQUALS(INITIALIZED, globalStates[0]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[1]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[2]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[3]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[4]);
-    ASSERT_EQUALS(UNSET, globalStates[5]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[6]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[7]);
-    ASSERT_EQUALS(UNSET, globalStates[8]);
+    std::vector<State> expected{
+        kInitialized,
+        kInitialized,
+        kInitialized,
+        kInitialized,
+        kInitialized,
+        kUnset,  // 5: noop init
+        kInitialized,
+        kInitialized,
+        kUnset,  // 8: depends on states[5] == kIninitialized, so fails.
+    };
+    for (size_t i = 0; i != states.size(); ++i)
+        ASSERT_EQ(states[i], expected[i]) << i;
 }
 
-TEST(InitializerTest, Deinit2Misimplemented) {
+TEST_F(InitializerTest, Deinit2Misimplemented) {
+    auto specs = makeDependencyGraphSpecs(graph);
+    specs[2].deinit = deinitNoop;
     Initializer initializer;
-    CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
-                               init0,
-                               deinit0,
-                               init1,
-                               deinit1,
-                               init2,
-                               deinitNoop,
-                               init3,
-                               deinit3,
-                               init4,
-                               deinit4,
-                               init5,
-                               deinit5,
-                               init6,
-                               deinit6,
-                               init7,
-                               deinit7,
-                               init8,
-                               deinit8);
-    clearCounts();
+    constructDependencyGraph(initializer, specs);
 
-    ASSERT_OK(initializer.executeInitializers({}));
+    initializer.executeInitializers({});
+    for (size_t i = 0; i != states.size(); ++i)
+        ASSERT_EQ(states[i], kInitialized) << i;
 
-    for (int i = 0; i < 9; ++i)
-        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
+    ASSERT_THROWS_CODE(initializer.executeDeinitializers(), DBException, ErrorCodes::UnknownError);
 
-    ASSERT_EQUALS(ErrorCodes::UnknownError, initializer.executeDeinitializers());
-
-    ASSERT_EQUALS(DEINITIALIZED, globalStates[8]);
-    ASSERT_EQUALS(DEINITIALIZED, globalStates[7]);
-    ASSERT_EQUALS(DEINITIALIZED, globalStates[6]);
-    ASSERT_EQUALS(DEINITIALIZED, globalStates[5]);
-    ASSERT_EQUALS(DEINITIALIZED, globalStates[4]);
-    ASSERT_EQUALS(DEINITIALIZED, globalStates[3]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[2]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[1]);
-    ASSERT_EQUALS(INITIALIZED, globalStates[0]);
+    // Since [2]'s deinit has been replaced with deinitNoop, it does not set states[2]
+    // to kDeinitialized. Its dependents [0] and [1] will check for this and fail
+    // with UnknownError, also remaining in the kInitialized state themselves.
+    std::vector<State> expected{
+        kInitialized,  // 0: depends on states[2] == kDeinitialized, so fails
+        kInitialized,  // 1: depends on states[2] == kDeinitialized, so fails
+        kInitialized,  // 2: noop deinit
+        kDeinitialized,
+        kDeinitialized,
+        kDeinitialized,
+        kDeinitialized,
+        kDeinitialized,
+        kDeinitialized,
+    };
+    for (size_t i = 0; i != states.size(); ++i)
+        ASSERT_EQ(states[i], expected[i]) << i;
 }
 
-DEATH_TEST(InitializerTest, CannotAddInitializerAfterInitializing, "!frozen()") {
+TEST_F(InitializerTest, InsertNullFunctionFails) {
     Initializer initializer;
-    constructNormalDependencyGraph(&initializer);
-    clearCounts();
-
-    ASSERT_OK(initializer.executeInitializers({}));
-
-    for (int i = 0; i < 9; ++i)
-        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
-
-    ASSERT_ADD_INITIALIZER(initializer.getInitializerDependencyGraph(),
-                           "test",
-                           initNoop,
-                           deinitNoop,
-                           MONGO_NO_PREREQUISITES,
-                           MONGO_NO_DEPENDENTS);
+    ASSERT_THROWS_CODE(initializer.addInitializer("A", nullptr, nullptr, {}, {}),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
-DEATH_TEST(InitializerTest, CannotDoubleInitialize, "invalid initializer state transition") {
+TEST_F(InitializerTest, CannotAddInitializerAfterInitializing) {
     Initializer initializer;
-    constructNormalDependencyGraph(&initializer);
-    clearCounts();
-
-    ASSERT_OK(initializer.executeInitializers({}));
-
-    for (int i = 0; i < 9; ++i)
-        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
-
-    initializer.executeInitializers({}).ignore();
+    constructDependencyGraph(initializer);
+    initializer.executeInitializers({});
+    ASSERT_THROWS_CODE(initializer.addInitializer("test", initNoop, deinitNoop, {}, {}),
+                       DBException,
+                       ErrorCodes::CannotMutateObject);
 }
 
-DEATH_TEST(InitializerTest,
-           CannotDeinitializeWithoutInitialize,
-           "invalid initializer state transition") {
+TEST_F(InitializerTest, CannotDoubleInitialize) {
     Initializer initializer;
-    constructNormalDependencyGraph(&initializer);
-    clearCounts();
-
-    initializer.executeDeinitializers().ignore();
+    constructDependencyGraph(initializer);
+    initializer.executeInitializers({});
+    ASSERT_THROWS_CODE(
+        initializer.executeInitializers({}), DBException, ErrorCodes::IllegalOperation);
 }
 
-DEATH_TEST(InitializerTest, CannotDoubleDeinitialize, "invalid initializer state transition") {
+TEST_F(InitializerTest, RepeatingInitializerCycle) {
     Initializer initializer;
-    constructNormalDependencyGraph(&initializer);
-    clearCounts();
+    constructDependencyGraph(initializer);
+    initializer.executeInitializers({});
+    initializer.executeDeinitializers();
+    initializer.executeInitializers({});
+    initializer.executeDeinitializers();
+}
 
-    ASSERT_OK(initializer.executeInitializers({}));
+TEST_F(InitializerTest, CannotDeinitializeWithoutInitialize) {
+    Initializer initializer;
+    constructDependencyGraph(initializer);
+    ASSERT_THROWS_CODE(
+        initializer.executeDeinitializers(), DBException, ErrorCodes::IllegalOperation);
+}
 
-    for (int i = 0; i < 9; ++i)
-        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
+TEST_F(InitializerTest, CannotDoubleDeinitialize) {
+    Initializer initializer;
+    constructDependencyGraph(initializer);
+    initializer.executeInitializers({});
+    initializer.executeDeinitializers();
+    ASSERT_THROWS_CODE(
+        initializer.executeDeinitializers(), DBException, ErrorCodes::IllegalOperation);
+}
 
-    ASSERT_OK(initializer.executeDeinitializers());
-
-    for (int i = 0; i < 9; ++i)
-        ASSERT_EQUALS(DEINITIALIZED, globalStates[i]);
-
-    initializer.executeDeinitializers().ignore();
+TEST_F(InitializerTest, CannotAddWhenFrozen) {
+    Initializer initializer;
+    constructDependencyGraph(initializer);
+    initializer.executeInitializers({});
+    initializer.executeDeinitializers();
+    ASSERT_THROWS_CODE(initializer.addInitializer("A", initNoop, nullptr, {}, {}),
+                       DBException,
+                       ErrorCodes::CannotMutateObject);
 }
 
 }  // namespace

@@ -45,7 +45,6 @@ void callback_fn(Scope& scope) {
 
 MONGO_INITIALIZER(setKeyvaultCallback)(InitializerContext*) {
     shell_utils::setEnterpriseShellCallback(mongo::callback_fn);
-    return Status::OK();
 }
 
 }  // namespace

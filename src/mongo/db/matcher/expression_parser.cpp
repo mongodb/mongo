@@ -1981,7 +1981,6 @@ MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
             {"text", &parseText},
             {"where", &parseWhere},
         });
-    return Status::OK();
 }
 
 // Maps from query operator string name to operator PathAcceptingKeyword.
@@ -2036,7 +2035,6 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"type", PathAcceptingKeyword::TYPE},
             {"within", PathAcceptingKeyword::WITHIN},
         });
-    return Status::OK();
 }
 
 /**

@@ -83,7 +83,6 @@ MONGO_INITIALIZER_GENERAL(ProfileFilterDefault,
         if (auto expr = serverGlobalParams.defaultProfileFilter) {
             ProfileFilter::setDefault(std::make_shared<ProfileFilterImpl>(*expr));
         }
-        return Status::OK();
     } catch (AssertionException& e) {
         // Add more context to the error
         uasserted(ErrorCodes::FailedToParse,

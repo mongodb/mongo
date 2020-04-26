@@ -51,7 +51,6 @@ OID instanceId;
 
 MONGO_INITIALIZER(GenerateMongosInstanceId)(InitializerContext*) {
     instanceId = OID::gen();
-    return Status::OK();
 }
 
 // Signals that a hello request has started waiting.

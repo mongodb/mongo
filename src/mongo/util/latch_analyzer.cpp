@@ -95,8 +95,6 @@ public:
 MONGO_INITIALIZER_GENERAL(LatchAnalysis, (/* NO PREREQS */), ("FinalizeDiagnosticListeners"))
 (InitializerContext* context) {
     latch_detail::installDiagnosticListener<DiagnosticListener>();
-
-    return Status::OK();
 }
 
 // Create a FailPoint to analyze latches more seriously for diagnostic purposes. This can be used

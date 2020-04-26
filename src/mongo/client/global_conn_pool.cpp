@@ -43,8 +43,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(InitializeGlobalConnectionPool, ("EndStartu
     globalConnPool.setMaxPoolSize(maxConnsPerHost);
     globalConnPool.setMaxInUse(maxInUseConnsPerHost);
     globalConnPool.setIdleTimeout(globalConnPoolIdleTimeout);
-
-    return Status::OK();
 }
 
 }  // namespace

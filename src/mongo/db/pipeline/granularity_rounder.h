@@ -55,7 +55,6 @@ namespace mongo {
 #define REGISTER_GRANULARITY_ROUNDER_GENERAL(name, key, rounder)               \
     MONGO_INITIALIZER(addToGranularityRounderMap_##key)(InitializerContext*) { \
         GranularityRounder::registerGranularityRounder(name, rounder);         \
-        return Status::OK();                                                   \
     }
 
 /**

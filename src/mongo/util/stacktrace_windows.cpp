@@ -142,9 +142,6 @@ MONGO_INITIALIZER(IntializeSymbolHandler)(::mongo::InitializerContext* ctx) {
     // context. The constructor of SymbolHandler does all the error handling, so we don't need to
     // do anything with the return value. Just make sure it gets called.
     SymbolHandler::instance();
-
-    // Initializing the symbol handler is not a fatal error, so we always return Status::OK() here.
-    return Status::OK();
 }
 
 /**

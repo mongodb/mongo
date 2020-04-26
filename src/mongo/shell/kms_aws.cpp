@@ -334,7 +334,6 @@ MONGO_INITIALIZER(KMSRegister)(::mongo::InitializerContext* context) {
     kms_message_init();
     KMSServiceController::registerFactory(KMSProviderEnum::aws,
                                           std::make_unique<AWSKMSServiceFactory>());
-    return Status::OK();
 }
 
 }  // namespace mongo

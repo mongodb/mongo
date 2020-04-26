@@ -2215,8 +2215,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._gen_server_parameter_deprecated_aliases(param_no, param)
                 self.write_empty_line()
 
-            self._writer.write_line('return Status::OK();')
-
     def gen_config_option(self, opt, section):
         # type: (ast.ConfigOption, str) -> None
         """Generate Config Option instance."""
@@ -2288,7 +2286,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-    def _gen_config_options_register(self, root_opts, sections):
+    def _gen_config_options_register(self, root_opts, sections, returns_status):
         self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
         self.write_empty_line()
 
@@ -2304,13 +2302,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self.gen_config_option(opt, 'section')
 
                 self._writer.write_line('auto status = options.addSection(section);')
-                with self._block('if (!status.isOK()) {', '}'):
-                    self._writer.write_line('return status;')
+
+                if returns_status:
+                    with self._block('if (!status.isOK()) {', '}'):
+                        self._writer.write_line('return status;')
+                else:
+                    self._writer.write_line('uassertStatusOK(status);')
+
             self.write_empty_line()
+        if returns_status:
+            self._writer.write_line('return Status::OK();')
 
-        self._writer.write_line('return Status::OK();')
-
-    def _gen_config_options_store(self, configs):
+    def _gen_config_options_store(self, configs, return_status):
         # Setup initializer for storing configured options in their variables.
         self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
         self.write_empty_line()
@@ -2327,7 +2330,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         '%s = params[%s].as<%s>();' % (opt.cpp_varname, _encaps(opt.name), vartype))
             self.write_empty_line()
 
-        self._writer.write_line('return Status::OK();')
+        if return_status:
+            self._writer.write_line('return Status::OK();')
 
     def gen_config_options(self, spec, header_file_name):
         # type: (ast.IDLAST, str) -> None
@@ -2369,14 +2373,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     'Status %s(optionenvironment::OptionSection* options_ptr) {' %
                     initializer.register, '}'):
                 self._writer.write_line('auto& options = *options_ptr;')
-                self._gen_config_options_register(root_opts, sections)
+                self._gen_config_options_register(root_opts, sections, True)
         else:
             with self.gen_namespace_block(''):
                 with self._block(
                         'MONGO_MODULE_STARTUP_OPTIONS_REGISTER(%s)(InitializerContext*) {' %
                     (blockname), '}'):
                     self._writer.write_line('auto& options = optionenvironment::startupOptions;')
-                    self._gen_config_options_register(root_opts, sections)
+                    self._gen_config_options_register(root_opts, sections, False)
 
         self.write_empty_line()
 
@@ -2385,7 +2389,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with self._block(
                         'Status %s(const optionenvironment::Environment& params) {' %
                         initializer.store, '}'):
-                    self._gen_config_options_store(spec.configs)
+                    self._gen_config_options_store(spec.configs, True)
             else:
                 with self.gen_namespace_block(''):
                     with self._block(
@@ -2395,7 +2399,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         self._writer.write_line(
                             'MONGO_COMPILER_VARIABLE_UNUSED const auto& params = optionenvironment::startupOptionsParsed;'
                         )
-                        self._gen_config_options_store(spec.configs)
+                        self._gen_config_options_store(spec.configs, False)
 
             self.write_empty_line()
 

@@ -402,8 +402,6 @@ MONGO_INITIALIZER(RegisterBenchmarks)(InitializerContext* context) {
             ->Args({1000, 50000})
             ->Args({2, 2});
     }
-
-    return Status::OK();
 }
 
 }  // namespace

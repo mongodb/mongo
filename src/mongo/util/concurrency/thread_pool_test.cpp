@@ -55,7 +55,6 @@ using namespace fmt::literals;
 MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
     addTestsForThreadPool("ThreadPoolCommon",
                           []() { return std::make_unique<ThreadPool>(ThreadPool::Options()); });
-    return Status::OK();
 }
 
 class ThreadPoolTest : public unittest::Test {

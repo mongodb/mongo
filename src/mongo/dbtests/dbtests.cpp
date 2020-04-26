@@ -85,7 +85,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(Ini
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
     WireSpec::instance().initialize(std::move(spec));
-    return Status::OK();
 }
 
 Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {

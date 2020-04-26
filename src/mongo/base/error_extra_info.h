@@ -100,12 +100,10 @@ private:
  * You must separately #include "mongo/base/init.h" since including it here would create an include
  * cycle.
  */
-#define MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(type)                            \
-    MONGO_INITIALIZER_GENERAL(                                                \
-        RegisterErrorExtraInfoFor##type, MONGO_NO_PREREQUISITES, ("default")) \
-    (InitializerContext * context) {                                          \
-        ErrorExtraInfo::registerType<type>();                                 \
-        return Status::OK();                                                  \
+#define MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(type)                              \
+    MONGO_INITIALIZER_GENERAL(RegisterErrorExtraInfoFor##type, (), ("default")) \
+    (InitializerContext*) {                                                     \
+        ErrorExtraInfo::registerType<type>();                                   \
     }
 
 /**

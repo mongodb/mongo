@@ -61,17 +61,16 @@ MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext* context) {
     }
 
     if (!boost::filesystem::exists(defaultRoot)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
-                                    << ") that doesn't exist");
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
+                                << ") that doesn't exist");
     }
 
     if (!boost::filesystem::is_directory(defaultRoot)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
-                                    << ") that exists, but isn't a directory");
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "Attempted to use a tempPath (" << defaultRoot.string()
+                                << ") that exists, but isn't a directory");
     }
-    return Status::OK();
 }
 }  // namespace
 

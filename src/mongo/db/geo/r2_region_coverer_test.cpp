@@ -59,7 +59,6 @@ MONGO_INITIALIZER(R2CellUnion_Test)(InitializerContext* context) {
     }
     generator.seed(seed);
     LOGV2(20640, "R2CellUnion Test - Random Number Generator Seed: {seed}", "seed"_attr = seed);
-    return Status::OK();
 }
 
 // Returns an integral number in [lower, upper]

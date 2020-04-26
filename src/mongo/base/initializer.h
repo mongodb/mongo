@@ -29,54 +29,139 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
-#include "mongo/base/initializer_context.h"
-#include "mongo/base/initializer_dependency_graph.h"
 #include "mongo/base/status.h"
 
 namespace mongo {
+
+/** Context of an initialization process. Passed as a parameter to initialization functions. */
+class InitializerContext {
+public:
+    explicit InitializerContext(std::vector<std::string> args) : _args(std::move(args)) {}
+
+    const std::vector<std::string>& args() const {
+        return _args;
+    }
+
+private:
+    std::vector<std::string> _args;
+};
+
+/** Context of a deinitialization process. Passed as a parameter to deinitialization functions. */
+class DeinitializerContext {
+public:
+    DeinitializerContext(const DeinitializerContext&) = delete;
+    DeinitializerContext& operator=(const DeinitializerContext&) = delete;
+};
+
+/**
+ * An InitializerFunction implements the behavior of an initializer operation.
+ * It may inspect and mutate the supplied InitializerContext.
+ * Throws on failure.
+ */
+using InitializerFunction = std::function<void(InitializerContext*)>;
+
+/**
+ * A DeinitializerFunction implements the behavior of a deinitializer operation.
+ * It may inspect and mutate the supplied DeinitializerContext.
+ * Throws on failure.
+ */
+using DeinitializerFunction = std::function<void(DeinitializerContext*)>;
+
 
 /**
  * Class representing an initialization process.
  *
  * Such a process is described by a directed acyclic graph of initialization operations, the
- * InitializerDependencyGraph.  One constructs an initialization process by adding nodes and
+ * InitializerDependencyGraph. One constructs an initialization process by adding nodes and
  * edges to the graph.  Then, one executes the process, causing each initialization operation to
  * execute in an order that respects the programmer-established prerequistes.
+ *
+ * The initialize and delinitialize process can repeat, a features which
+ * supports embedded contexts.  However, the graph cannot be modified with
+ * `addInitializer` after the first initialization. Latecomers are rejected.
  */
 class Initializer {
 public:
-    /**
-     * Get the initializer dependency graph, presumably for the purpose of adding more nodes.
-     */
-    InitializerDependencyGraph& getInitializerDependencyGraph() {
-        return _graph;
-    }
+    Initializer();
+    ~Initializer();
 
     /**
-     * Execute the initializer process, using the given argv and environment data as input.
+     * Add a new initializer node, with the specified `name`, to the dependency graph, with the
+     * given behavior, `initFn`, `deinitFn`, and with the given `prerequisites` and `dependents`,
+     * which are the names of other initializers which will be in the graph when `topSort`
+     * is called. `initFn` must be non-null, but null-valued `deinitFn` are allowed.
      *
-     * Returns Status::OK on success.  All other returns constitute initialization failures,
-     * and the thing being initialized should be considered dead in the water.
+     * - Throws `ErrorCodes::BadValue` if `initFn` is null-valued.
+     *
+     * - Throws with `ErrorCodes::CannotMutateObject` if the graph has been frozen
+     *   by a previous call to `executeInitializers`.
      */
-    Status executeInitializers(const std::vector<std::string>& args);
+    void addInitializer(std::string name,
+                        InitializerFunction initFn,
+                        DeinitializerFunction deinitFn,
+                        std::vector<std::string> prerequisites,
+                        std::vector<std::string> dependents);
 
-    Status executeDeinitializers();
+    /**
+     * Execute the initializer process, using the given args as input.
+     * This call freezes the graph, so that addInitializer will reject any latecomers.
+     *
+     * Throws on initialization failures, or on invalid call sequences
+     * (double-init, double-deinit, etc) and the thing being initialized should
+     * be considered dead in the water.
+     */
+    void executeInitializers(const std::vector<std::string>& args);
+
+    /**
+     * Executes all deinit functions in reverse order from init order.
+     * Note that this does not unfreeze the graph. Freezing is permanent.
+     */
+    void executeDeinitializers();
+
+    /**
+     * Returns the function mapped to `name`, for testing only.
+     *
+     * Throws with `ErrorCodes::BadValue` if name is not mapped to a node.
+     */
+    InitializerFunction getInitializerFunctionForTesting(const std::string& name);
 
 private:
+    class Graph;
+
+    /**
+     *  kNeverInitialized
+     *  |
+     *  +-> kUninitialized <----------+
+     *      |                         |
+     *      +-> kInitializing         |
+     *          |                     |
+     *          +-> kInitialized      |
+     *              |                 |
+     *              +-> kDeinitializing
+     */
     enum class State {
+        kNeverInitialized,  ///< still accepting addInitializer calls
         kUninitialized,
         kInitializing,
         kInitialized,
         kDeinitializing,
     };
 
-    InitializerDependencyGraph _graph;
+    void _transition(State expected, State next);
+
+    std::unique_ptr<Graph> _graph;  // pimpl
     std::vector<std::string> _sortedNodes;
-    State _lifecycleState{State::kUninitialized};
+    State _lifecycleState = State::kNeverInitialized;
 };
+
+/**
+ * Get the process-global initializer object.
+ */
+Initializer& getGlobalInitializer();
 
 /**
  * Run the global initializers.

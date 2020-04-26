@@ -84,7 +84,6 @@ OID instanceId;
 
 MONGO_INITIALIZER(GenerateInstanceId)(InitializerContext*) {
     instanceId = OID::gen();
-    return Status::OK();
 }
 
 namespace {

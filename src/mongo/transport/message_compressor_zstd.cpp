@@ -82,6 +82,5 @@ MONGO_INITIALIZER_GENERAL(ZstdMessageCompressorInit,
 (InitializerContext* context) {
     auto& compressorRegistry = MessageCompressorRegistry::get();
     compressorRegistry.registerImplementation(std::make_unique<ZstdMessageCompressor>());
-    return Status::OK();
 }
 }  // namespace mongo
