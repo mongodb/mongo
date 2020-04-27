@@ -2946,9 +2946,14 @@ var ReplSetTest = function(opts) {
      * with the intent to call start() with restart=true for the same node(s) n.
      * @param {boolean} [extraOptions.waitPid=true] if true, we will wait for the process to
      * terminate after stopping it.
+     * @param {number} [extraOptions.shutdownTimeoutMillis=100] the time for stepdown and quiesce
+     *     mode at shutdown.
      */
-    this.stop = _nodeParamToSingleNode(_nodeParamToConn(function(
-        n, signal, opts, {forRestart: forRestart = false, waitpid: waitPid = true} = {}) {
+    this.stop = _nodeParamToSingleNode(_nodeParamToConn(function(n, signal, opts, {
+        forRestart: forRestart = false,
+        waitpid: waitPid = true,
+        shutdownTimeoutMillis: shutdownTimeoutMillis = 100
+    } = {}) {
         // Can specify wait as second parameter, if using default signal
         if (signal == true || signal == false) {
             signal = undefined;
@@ -2957,6 +2962,23 @@ var ReplSetTest = function(opts) {
         n = this.getNodeId(n);
 
         var conn = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
+
+        // The default time for stepdown and quiesce mode in response to SIGTERM is 15 seconds.
+        // Reduce this to 100ms for faster shutdown.
+        try {
+            print(
+                "ReplSetTest stop setting 'shutdownTimeoutMillisForSignaledShutdown' for mongod on port " +
+                conn.port);
+            assert.commandWorked(conn.adminCommand({
+                setParameter: 1,
+                shutdownTimeoutMillisForSignaledShutdown: shutdownTimeoutMillis,
+            }));
+        } catch (e) {
+            // Ignore errors, since this setParameter does not exist in versions 4.4 and earlier.
+            print("Error in setParameter for shutdownTimeoutMillisForSignaledShutdown:");
+            print(e);
+        }
+
         print('ReplSetTest stop *** Shutting down mongod in port ' + conn.port +
               ', wait for process termination: ' + waitPid + ' ***');
         var ret = MongoRunner.stopMongod(conn, signal, opts, waitPid);
@@ -3041,7 +3063,9 @@ var ReplSetTest = function(opts) {
         }
 
         // Make shutdown faster in tests, especially when election handoff has no viable candidate.
-        // Ignore errors from setParameter, perhaps it's a pre-4.1.10 mongod.
+        // Ignore errors from setParameter, since this parameter does not exist before 4.1.10 or
+        // after 4.4.
+        // TODO(SERVER-47797): Remove reference to waitForStepDownOnNonCommandShutdown.
         if (_callIsMaster()) {
             asCluster(this._liveNodes, () => {
                 for (let node of this._liveNodes) {

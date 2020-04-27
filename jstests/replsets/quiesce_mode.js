@@ -116,7 +116,11 @@ findCmdFailPoint.wait();
 jsTestLog("Hang the primary in shutdown after stepdown.");
 let postStepdownFailpoint = configureFailPoint(primary, "hangInShutdownAfterStepdown");
 // We must skip validation due to the failpoint that hangs find commands.
-replTest.stop(primary, null /*signal*/, {skipValidation: true}, {forRestart: true, waitpid: false});
+// Allow extra time to ensure the stepdown is successful.
+replTest.stop(primary,
+              null /*signal*/,
+              {skipValidation: true},
+              {forRestart: true, waitpid: false, shutdownTimeoutMillis: 5000});
 postStepdownFailpoint.wait();
 
 jsTestLog("Create a hanging isMaster on the primary.");

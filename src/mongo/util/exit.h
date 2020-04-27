@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/platform/compiler.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/functional.h"
 
@@ -44,6 +45,9 @@ namespace mongo {
 struct ShutdownTaskArgs {
     // This should be set to true if we called shutdown from the shutdown command
     bool isUserInitiated = false;
+
+    // The time allowed for quiesce mode.
+    boost::optional<Milliseconds> quiesceTime;
 };
 
 /**

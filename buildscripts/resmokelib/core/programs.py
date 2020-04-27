@@ -169,10 +169,16 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     if "replSet" in kwargs and "writePeriodicNoops" not in suite_set_parameters:
         suite_set_parameters["writePeriodicNoops"] = False
 
-    # By default the primary waits up to 10 sec to complete a stepdown and to hand off its duties to
-    # a secondary before shutting down in response to SIGTERM. Make it shut down more abruptly.
-    if "replSet" in kwargs and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters:
-        suite_set_parameters["waitForStepDownOnNonCommandShutdown"] = False
+    # The default time for stepdown and quiesce mode in response to SIGTERM is 15 seconds. Reduce
+    # this to 100ms for faster shutdown. On branches 4.4 and earlier, there is no quiesce mode, but
+    # the default time for stepdown is 10 seconds.
+    # TODO(SERVER-47797): Remove reference to waitForStepDownOnNonCommandShutdown.
+    if ("replSet" in kwargs and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters
+            and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters):
+        if executable == LAST_STABLE_MONGOD_BINARY:
+            suite_set_parameters["waitForStepDownOnNonCommandShutdown"] = False
+        else:
+            suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
 
     if "enableFlowControl" not in suite_set_parameters and config.FLOW_CONTROL is not None:
         suite_set_parameters["enableFlowControl"] = (config.FLOW_CONTROL == "on")

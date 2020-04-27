@@ -1054,6 +1054,14 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     auto const client = Client::getCurrent();
     auto const serviceContext = client->getServiceContext();
 
+    Milliseconds shutdownTimeout;
+    if (shutdownArgs.quiesceTime) {
+        shutdownTimeout = *shutdownArgs.quiesceTime;
+    } else {
+        invariant(!shutdownArgs.isUserInitiated);
+        shutdownTimeout = Milliseconds(repl::shutdownTimeoutMillisForSignaledShutdown.load());
+    }
+
     // If we don't have shutdownArgs, we're shutting down from a signal, or other clean shutdown
     // path.
     //
@@ -1068,12 +1076,14 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             opCtx = uniqueOpCtx.get();
         }
 
-        // For faster tests, we allow a short wait time with setParameter.
-        auto waitTime = repl::waitForStepDownOnNonCommandShutdown.load() ? Milliseconds(Seconds(15))
-                                                                         : Milliseconds(100);
         const auto forceShutdown = true;
+        auto stepDownStartTime = opCtx->getServiceContext()->getPreciseClockSource()->now();
         // stepDown should never return an error during force shutdown.
-        invariantStatusOK(stepDownForShutdown(opCtx, waitTime, forceShutdown));
+        invariantStatusOK(stepDownForShutdown(opCtx, shutdownTimeout, forceShutdown));
+        shutdownTimeout = std::max(
+            Milliseconds::zero(),
+            shutdownTimeout -
+                (opCtx->getServiceContext()->getPreciseClockSource()->now() - stepDownStartTime));
     }
 
     if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
@@ -1089,8 +1099,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             hangDuringQuiesceMode.pauseWhileSet(opCtx);
         }
 
-        LOGV2(4695102, "Entering quiesce mode for shutdown");
-        opCtx->sleepFor(Milliseconds(100));
+        LOGV2(4695102, "Entering quiesce mode for shutdown", "quiesceTime"_attr = shutdownTimeout);
+        opCtx->sleepFor(shutdownTimeout);
         LOGV2(4695103, "Exiting quiesce mode for shutdown");
     }
 

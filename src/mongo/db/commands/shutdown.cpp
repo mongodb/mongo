@@ -41,9 +41,10 @@ namespace shutdown_detail {
 MONGO_FAIL_POINT_DEFINE(crashOnShutdown);
 int* volatile illegalAddress;  // NOLINT - used for fail point only
 
-void finishShutdown(bool force, long long timeoutSecs) {
+void finishShutdown(bool force, long long timeoutSecs, Milliseconds quiesceTime) {
     ShutdownTaskArgs shutdownArgs;
     shutdownArgs.isUserInitiated = true;
+    shutdownArgs.quiesceTime = quiesceTime;
 
     crashOnShutdown.execute([&](const BSONObj& data) {
         if (data["how"].str() == "fault") {

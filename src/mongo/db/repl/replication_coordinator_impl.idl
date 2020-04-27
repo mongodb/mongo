@@ -46,15 +46,15 @@ server_parameters:
         cpp_varname: enableElectionHandoff
         default: true
 
-    waitForStepDownOnNonCommandShutdown:
+    shutdownTimeoutMillisForSignaledShutdown:
         description: <-
-            Whether the primary waits to complete a stepdown and to hand off
-            its duties to a secondary before shutting down in response to
-            SIGTERM. If false, the primary shuts down more abruptly.
+            The time taken for stepdown and quiesce mode at shutdown in response to SIGTERM.
         set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: waitForStepDownOnNonCommandShutdown
-        default: true
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: shutdownTimeoutMillisForSignaledShutdown
+        default: 15000
+        validator:
+            gte: 0
 
     periodicNoopIntervalSecs:
         description: <-
