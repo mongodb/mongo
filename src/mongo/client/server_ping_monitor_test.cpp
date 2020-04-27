@@ -115,7 +115,7 @@ protected:
         executor::TaskExecutorTest::assertRemoteCommandNameEquals("ping", request);
         ASSERT_EQ(request.target, hostAndPort);
         LOGV2(23925,
-              "at {elapsed} got mock network operation {request}",
+              "Got mock network operation",
               "elapsed"_attr = elapsed(),
               "request"_attr = request.toString());
 
@@ -138,11 +138,11 @@ protected:
         // Operations can happen inline with advanceTime(), so log before and after the call.
         LOGV2_DEBUG(23926,
                     1,
-                    "Advancing time from {elapsed} to {elapsed_d}",
-                    "elapsed"_attr = elapsed(),
-                    "elapsed_d"_attr = (elapsed() + d));
+                    "About to advance time",
+                    "elapsedStart"_attr = elapsed(),
+                    "elapsedEnd"_attr = (elapsed() + d));
         _net->advanceTime(_net->now() + d);
-        LOGV2_DEBUG(23927, 1, "Advanced to {elapsed}", "elapsed"_attr = elapsed());
+        LOGV2_DEBUG(23927, 1, "Advanced time", "elapsed"_attr = elapsed());
     }
 
     /**

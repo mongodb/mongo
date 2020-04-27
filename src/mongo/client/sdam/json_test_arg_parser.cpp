@@ -86,12 +86,10 @@ ArgParser::ArgParser(int argc, char* argv[]) {
 }
 
 void ArgParser::LogParams() const {
-    LOGV2(20199, "Verbosity: {verbose}", "verbose"_attr = _verbose);
-    LOGV2(20200, "Source Directory: {sourceDirectory}", "sourceDirectory"_attr = _sourceDirectory);
+    LOGV2(20199, "Verbosity", "verbose"_attr = _verbose);
+    LOGV2(20200, "Source directory", "directory"_attr = _sourceDirectory);
     if (_testFilters.size()) {
-        LOGV2(20201,
-              "Filters: {boost_join_testFilters}",
-              "boost_join_testFilters"_attr = boost::join(_testFilters, ", "));
+        LOGV2(20201, "Test filters", "filters"_attr = boost::join(_testFilters, ", "));
     }
 }
 

@@ -235,6 +235,7 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
         _monitors.erase(it);
         LOGV2(20187,
               "Removed ReplicaSetMonitor for replica set {replicaSet}",
+              "Removed ReplicaSetMonitor for replica set",
               "replicaSet"_attr = setName);
     }
 }

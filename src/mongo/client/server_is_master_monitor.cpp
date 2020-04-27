@@ -79,6 +79,7 @@ SingleServerIsMasterMonitor::SingleServerIsMasterMonitor(
     LOGV2_DEBUG(4333217,
                 kLogLevel + 1,
                 "RSM {replicaSet} monitoring {host}",
+                "RSM monitoring host",
                 "host"_attr = host,
                 "replicaSet"_attr = _setUri.getSetName());
 }
@@ -104,6 +105,7 @@ void SingleServerIsMasterMonitor::requestImmediateCheck() {
             4333227,
             kLogLevel,
             "RSM {replicaSet} monitoring {host} in expedited mode until we detect a primary.",
+            "RSM monitoring host in expedited mode until we detect a primary",
             "host"_attr = _host,
             "replicaSet"_attr = _setUri.getSetName());
 
@@ -115,11 +117,13 @@ void SingleServerIsMasterMonitor::requestImmediateCheck() {
     const auto expeditedRefreshPeriod = _currentRefreshPeriod(lock, false);
 
     if (_isMasterOutstanding) {
-        LOGV2_DEBUG(4333216,
-                    kLogLevel + 2,
-                    "RSM {replicaSet} immediate isMaster check requested, but there "
-                    "is already an outstanding request.",
-                    "replicaSet"_attr = _setUri.getSetName());
+        LOGV2_DEBUG(
+            4333216,
+            kLogLevel + 2,
+            "RSM {replicaSet} immediate isMaster check requested, but there "
+            "is already an outstanding request",
+            "RSM immediate isMaster check requested, but there is already an outstanding request",
+            "replicaSet"_attr = _setUri.getSetName());
         return;
     }
 
@@ -167,7 +171,7 @@ void SingleServerIsMasterMonitor::_rescheduleNextIsMaster(WithLock lock, Millise
                 "Rescheduling the next replica set monitoring request",
                 "replicaSet"_attr = _setUri.getSetName(),
                 "host"_attr = _host,
-                "duration"_attr = delay);
+                "delay"_attr = delay);
     _cancelOutstandingRequest(lock);
     _scheduleNextIsMaster(lock, delay);
 }
@@ -250,8 +254,9 @@ SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
                     self->_isMasterOutstanding = false;
                     LOGV2_DEBUG(4495400,
                                 kLogLevel,
-                                "RSM {replicaSet} not processing response: {status}",
-                                "status"_attr = result.response.status,
+                                "RSM {replicaSet} not processing response: {error}",
+                                "RSM not processing response",
+                                "error"_attr = result.response.status,
                                 "replicaSet"_attr = self->_setUri.getSetName());
                     return;
                 }
@@ -307,8 +312,9 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleS
                 if (self->_isShutdown) {
                     LOGV2_DEBUG(4333219,
                                 kLogLevel,
-                                "RSM {replicaSet} not processing response: {status}",
-                                "status"_attr = result.response.status,
+                                "RSM {replicaSet} not processing response: {error}",
+                                "RSM not processing response",
+                                "error"_attr = result.response.status,
                                 "replicaSet"_attr = self->_setUri.getSetName());
                     return;
                 }
@@ -353,6 +359,7 @@ void SingleServerIsMasterMonitor::shutdown() {
     LOGV2_DEBUG(4333220,
                 kLogLevel + 1,
                 "RSM {replicaSet} Closing host {host}",
+                "RSM closing host",
                 "host"_attr = _host,
                 "replicaSet"_attr = _setUri.getSetName());
 
@@ -363,6 +370,7 @@ void SingleServerIsMasterMonitor::shutdown() {
     LOGV2_DEBUG(4333229,
                 kLogLevel + 1,
                 "RSM {replicaSet} Done Closing host {host}",
+                "RSM done closing host",
                 "host"_attr = _host,
                 "replicaSet"_attr = _setUri.getSetName());
 }
@@ -382,22 +390,25 @@ void SingleServerIsMasterMonitor::_cancelOutstandingRequest(WithLock) {
 void SingleServerIsMasterMonitor::_onIsMasterSuccess(const BSONObj bson) {
     LOGV2_DEBUG(4333221,
                 kLogLevel + 1,
-                "RSM {replicaSet} received successful isMaster for server {host}: {bson}",
+                "RSM {replicaSet} received successful isMaster for server {host}: {isMasterReply}",
+                "RSM received successful isMaster",
                 "host"_attr = _host,
                 "replicaSet"_attr = _setUri.getSetName(),
-                "bson"_attr = bson.toString());
+                "isMasterReply"_attr = bson.toString());
 
     _eventListener->onServerHeartbeatSucceededEvent(_host, bson);
 }
 
 void SingleServerIsMasterMonitor::_onIsMasterFailure(const Status& status, const BSONObj bson) {
-    LOGV2_DEBUG(4333222,
-                kLogLevel,
-                "RSM {replicaSet} received failed isMaster for server {host}: {status}: {bson}",
-                "host"_attr = _host,
-                "status"_attr = status.toString(),
-                "replicaSet"_attr = _setUri.getSetName(),
-                "bson"_attr = bson.toString());
+    LOGV2_DEBUG(
+        4333222,
+        kLogLevel,
+        "RSM {replicaSet} received failed isMaster for server {host}: {error}: {isMasterReply}",
+        "RSM received failed isMaster",
+        "host"_attr = _host,
+        "error"_attr = status.toString(),
+        "replicaSet"_attr = _setUri.getSetName(),
+        "isMasterReply"_attr = bson.toString());
 
     _eventListener->onServerHeartbeatFailureEvent(status, _host, bson);
 }
@@ -444,9 +455,10 @@ ServerIsMasterMonitor::ServerIsMasterMonitor(
       _setUri(setUri) {
     LOGV2_DEBUG(4333223,
                 kLogLevel,
-                "RSM {replicaSet} monitoring {size} members.",
+                "RSM {replicaSet} monitoring {nReplicaSetMembers} members.",
+                "RSM now monitoring replica set",
                 "replicaSet"_attr = _setUri.getSetName(),
-                "size"_attr = initialTopologyDescription->getServers().size());
+                "nReplicaSetMembers"_attr = initialTopologyDescription->getServers().size());
     onTopologyDescriptionChangedEvent(nullptr, initialTopologyDescription);
 }
 
@@ -484,9 +496,10 @@ void ServerIsMasterMonitor::onTopologyDescriptionChangedEvent(
             singleMonitor->shutdown();
             LOGV2_DEBUG(4333225,
                         kLogLevel,
-                        "RSM {replicaSet} host {addr} was removed from the topology.",
+                        "RSM {replicaSet} host {host} was removed from the topology",
+                        "RSM host was removed from the topology",
                         "replicaSet"_attr = _setUri.getSetName(),
-                        "addr"_attr = serverAddress);
+                        "host"_attr = serverAddress);
             it = _singleMonitors.erase(it, ++it);
         } else {
             ++it;
@@ -501,9 +514,10 @@ void ServerIsMasterMonitor::onTopologyDescriptionChangedEvent(
         if (isMissing) {
             LOGV2_DEBUG(4333226,
                         kLogLevel,
-                        "RSM {replicaSet} {addr} was added to the topology.",
+                        "RSM {replicaSet} {host} was added to the topology",
+                        "RSM host was added to the topology",
                         "replicaSet"_attr = _setUri.getSetName(),
-                        "addr"_attr = serverAddress);
+                        "host"_attr = serverAddress);
             _singleMonitors[serverAddress] = std::make_shared<SingleServerIsMasterMonitor>(
                 _setUri,
                 serverAddress,

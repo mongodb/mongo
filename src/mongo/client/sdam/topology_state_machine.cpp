@@ -35,6 +35,10 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo::sdam {
+namespace {
+static constexpr auto kLogLevel = 2;
+}  // namespace
+
 TopologyStateMachine::TopologyStateMachine(const SdamConfiguration& config) : _config(config) {
     initTransitionTable();
 }
@@ -147,11 +151,12 @@ void mongo::sdam::TopologyStateMachine::initTransitionTable() {
 void TopologyStateMachine::onServerDescription(TopologyDescription& topologyDescription,
                                                const ServerDescriptionPtr& serverDescription) {
     if (!topologyDescription.containsServerAddress(serverDescription->getAddress())) {
-        LOGV2(20219,
-              "{kLogPrefix}ignoring ismaster reply from server that is not in the topology: "
-              "{serverDescription_getAddress}",
-              "kLogPrefix"_attr = kLogPrefix,
-              "serverDescription_getAddress"_attr = serverDescription->getAddress());
+        LOGV2_DEBUG(20219,
+                    kLogLevel,
+                    "Ignoring isMaster reply from server that is not in the topology: "
+                    "{serverAddress}",
+                    "Ignoring isMaster reply from server that is not in the topology",
+                    "serverAddress"_attr = serverDescription->getAddress());
         return;
     }
 
@@ -365,59 +370,36 @@ void TopologyStateMachine::setTopologyTypeAndUpdateRSWithoutPrimary(
 void TopologyStateMachine::removeServerDescription(TopologyDescription& topologyDescription,
                                                    const HostAndPort serverAddress) {
     topologyDescription.removeServerDescription(serverAddress);
-    LOGV2(20220,
-          "{kLogPrefix}server '{serverAddress}' was removed from the topology.",
-          "kLogPrefix"_attr = kLogPrefix,
-          "serverAddress"_attr = serverAddress);
+    LOGV2_DEBUG(20220,
+                kLogLevel,
+                "Server '{serverAddress}' was removed from the topology",
+                "Server was removed from the topology",
+                "serverAddress"_attr = serverAddress);
 }
 
 void TopologyStateMachine::modifyTopologyType(TopologyDescription& topologyDescription,
                                               TopologyType topologyType) {
     topologyDescription._type = topologyType;
-    LOGV2(20221,
-          "{kLogPrefix}the topology type was set to {topologyType}",
-          "kLogPrefix"_attr = kLogPrefix,
-          "topologyType"_attr = toString(topologyType));
 }
 
 void TopologyStateMachine::modifySetName(TopologyDescription& topologyDescription,
                                          const boost::optional<std::string>& setName) {
     topologyDescription._setName = setName;
-    LOGV2(20222,
-          "{kLogPrefix}the topology setName was set to {setName_setName_null}",
-          "kLogPrefix"_attr = kLogPrefix,
-          "setName_setName_null"_attr = ((setName) ? *setName : "[null]"));
 }
 
 void TopologyStateMachine::installServerDescription(TopologyDescription& topologyDescription,
                                                     ServerDescriptionPtr newServerDescription,
                                                     bool newServer) {
     topologyDescription.installServerDescription(newServerDescription);
-    LOGV2_DEBUG(20223,
-                1,
-                "{kLogPrefix}{newServer_installed_new_updated_existing} server description: "
-                "{newServerDescription}",
-                "kLogPrefix"_attr = kLogPrefix,
-                "newServer_installed_new_updated_existing"_attr =
-                    ((newServer) ? "installed new" : "updated existing"),
-                "newServerDescription"_attr = newServerDescription->toString());
 }
 
 void TopologyStateMachine::modifyMaxElectionId(TopologyDescription& topologyDescription,
                                                const OID& newMaxElectionId) {
     topologyDescription._maxElectionId = newMaxElectionId;
-    LOGV2(20224,
-          "{kLogPrefix}topology max election id set to {newMaxElectionId}",
-          "kLogPrefix"_attr = kLogPrefix,
-          "newMaxElectionId"_attr = newMaxElectionId);
 }
 
 void TopologyStateMachine::modifyMaxSetVersion(TopologyDescription& topologyDescription,
                                                int& newMaxSetVersion) {
     topologyDescription._maxSetVersion = newMaxSetVersion;
-    LOGV2(20225,
-          "{kLogPrefix}topology max set version set to {newMaxSetVersion}",
-          "kLogPrefix"_attr = kLogPrefix,
-          "newMaxSetVersion"_attr = newMaxSetVersion);
 }
 }  // namespace mongo::sdam

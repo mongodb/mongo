@@ -232,8 +232,9 @@ void ScanningReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy s
     if (isDropped) {  // already removed so no need to refresh
         LOGV2_DEBUG(24070,
                     1,
-                    "Stopping refresh for replica set {name} because it's removed",
-                    "name"_attr = name);
+                    "Stopping refresh for replica set {replicaSet} because it's removed",
+                    "Stopping refresh for replica set because it's removed",
+                    "replicaSet"_attr = name);
         return;
     }
 
@@ -261,6 +262,7 @@ void ScanningReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy s
     LOGV2_DEBUG(24071,
                 1,
                 "Next replica set scan scheduled for {nextScanTime}",
+                "Next replica set scan scheduled",
                 "nextScanTime"_attr = nextScanTime);
     auto swHandle = scheduleWorkAt(nextScanTime, [this](const CallbackArgs& cbArgs) {
         if (cbArgs.myHandle != refresherHandle)
@@ -279,16 +281,18 @@ void ScanningReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy s
     if (ErrorCodes::isShutdownError(swHandle.getStatus().code())) {
         LOGV2_DEBUG(24072,
                     1,
-                    "Cant schedule refresh for {name}. Executor shutdown in progress",
-                    "name"_attr = name);
+                    "Can't schedule refresh for {replicaSet}. Executor shutdown in progress",
+                    "Can't schedule refresh for replica set. Executor shutdown in progress",
+                    "replicaSet"_attr = name);
         return;
     }
 
     if (!swHandle.isOK()) {
         LOGV2_FATAL(40140,
-                    "Can't continue refresh for replica set {name} due to {swHandle_getStatus}",
-                    "name"_attr = name,
-                    "swHandle_getStatus"_attr = redact(swHandle.getStatus()));
+                    "Can't continue refresh for replica set {replicaSet}: {error}",
+                    "Can't continue refresh for replica set",
+                    "error"_attr = redact(swHandle.getStatus()),
+                    "replicaSet"_attr = name);
     }
 
     refresherHandle = std::move(swHandle.getValue());
@@ -531,11 +535,11 @@ void Refresher::scheduleNetworkRequests() {
         }
 
         if (!swHandle.isOK()) {
-            LOGV2_FATAL(
-                31176,
-                "Can't continue scan for replica set {set_name} due to {swHandle_getStatus}",
-                "set_name"_attr = _set->name,
-                "swHandle_getStatus"_attr = redact(swHandle.getStatus()));
+            LOGV2_FATAL(31176,
+                        "Can't continue scan for replica set {replicaSet}: {error}",
+                        "Can't continue scan for replica set",
+                        "error"_attr = redact(swHandle.getStatus()),
+                        "replicaSet"_attr = _set->name);
         }
 
         node->scheduledIsMasterHandle = uassertStatusOK(std::move(swHandle));
@@ -635,8 +639,10 @@ Refresher::NextStep Refresher::getNextStep() {
     if (_scan->hostsToScan.empty()) {
         // We've tried all hosts we can, so nothing more to do in this round.
         if (!_scan->foundUpMaster) {
-            LOGV2_WARNING(
-                24089, "Unable to reach primary for set {set_name}", "set_name"_attr = _set->name);
+            LOGV2_WARNING(24089,
+                          "Unable to reach primary for replica set {replicaSet}",
+                          "Unable to reach primary for replica set",
+                          "replicaSet"_attr = _set->name);
 
             // Since we've talked to everyone we could but still didn't find a primary, we
             // do the best we can, and assume all unconfirmedReplies are actually from nodes
@@ -670,11 +676,13 @@ Refresher::NextStep Refresher::getNextStep() {
             auto nScans = _set->consecutiveFailedScans++;
             if (nScans <= 10 || nScans % 10 == 0) {
                 LOGV2(24073,
-                      "Cannot reach any nodes for set {set_name}. Please check network "
+                      "Cannot reach any nodes for replica set {replicaSet}. Please check network "
                       "connectivity and the status of the set. This has happened for "
-                      "{set_consecutiveFailedScans} checks in a row.",
-                      "set_name"_attr = _set->name,
-                      "set_consecutiveFailedScans"_attr = _set->consecutiveFailedScans);
+                      "{numConsecutiveFailedScans} checks in a row.",
+                      "Cannot reach any nodes for replica set. Please check network connectivity "
+                      "and the status of the set. A number of consecutive scan checks have failed",
+                      "replicaSet"_attr = _set->name,
+                      "numConsecutiveFailedScans"_attr = _set->consecutiveFailedScans);
             }
         }
 
@@ -684,9 +692,10 @@ Refresher::NextStep Refresher::getNextStep() {
 
         LOGV2_DEBUG(24074,
                     1,
-                    "Refreshing replica set {set_name} took {scan_timer_millis}ms",
-                    "set_name"_attr = _set->name,
-                    "scan_timer_millis"_attr = _scan->timer.millis());
+                    "Refreshing replica set {replicaSet} took {duration}",
+                    "Replica set refreshed",
+                    "duration"_attr = Milliseconds(_scan->timer.millis()),
+                    "replicaSet"_attr = _set->name);
 
         return NextStep(NextStep::DONE);
     }
@@ -724,13 +733,16 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
                 _scan->possibleNodes.insert(reply.members.begin(), reply.members.end());
             }
         } else {
-            LOGV2_ERROR(24091,
-                        "replset name mismatch: expected \"{set_name}\", but remote node {from} "
-                        "has replset name \"{reply_setName}\", ismaster: {replyObj}",
-                        "set_name"_attr = _set->name,
-                        "from"_attr = from,
-                        "reply_setName"_attr = reply.setName,
-                        "replyObj"_attr = replyObj);
+            LOGV2_ERROR(
+                24091,
+                "replset name mismatch: expected {expectedSetName}, but remote node "
+                "{fromRemoteNode} has replset name {receivedSetName}, isMaster: {isMasterReply}",
+                "replset name mismatch. The expected set name does not match the set name "
+                "received from the remote node",
+                "expectedSetName"_attr = _set->name,
+                "fromRemoteNode"_attr = from,
+                "receivedSetName"_attr = reply.setName,
+                "isMasterReply"_attr = replyObj);
         }
 
         failedHost(from,
@@ -859,10 +871,11 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
         !std::equal(_set->nodes.begin(), _set->nodes.end(), reply.members.begin(), hostsEqual)) {
         LOGV2_DEBUG(24075,
                     2,
-                    "Adjusting nodes in our view of replica set {set_name} based on master reply: "
-                    "{reply_raw}",
-                    "set_name"_attr = _set->name,
-                    "reply_raw"_attr = redact(reply.raw));
+                    "Adjusting nodes in our view of replica set {replicaSet} based on isMaster "
+                    "reply: {isMasterReply}",
+                    "Adjusting nodes in our view of the replica set based on isMaster reply",
+                    "replicaSet"_attr = _set->name,
+                    "isMasterReply"_attr = redact(reply.raw));
 
         // remove non-members from _set->nodes
         _set->nodes.erase(
@@ -901,9 +914,10 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
         // LogLevel can be pretty low, since replica set reconfiguration should be pretty rare
         // and we want to record our changes
         LOGV2(24076,
-              "Confirmed replica set for {set_name} is {set_seedConnStr}",
-              "set_name"_attr = _set->name,
-              "set_seedConnStr"_attr = _set->seedConnStr);
+              "Confirmed replica set for {replicaSet} is {connectionString}",
+              "Confirmed replica set",
+              "replicaSet"_attr = _set->name,
+              "connectionString"_attr = _set->seedConnStr);
 
         _set->notifier->onConfirmedSet(_set->seedConnStr, reply.host, reply.passives);
     }
@@ -975,9 +989,10 @@ void IsMasterReply::parse(const BSONObj& obj) {
     } catch (const std::exception& e) {
         ok = false;
         LOGV2(24077,
-              "exception while parsing isMaster reply: {e_what} {obj}",
-              "e_what"_attr = e.what(),
-              "obj"_attr = obj);
+              "Exception while parsing isMaster reply: {error} {isMasterReply}",
+              "Exception while parsing isMaster reply",
+              "error"_attr = e.what(),
+              "isMasterReply"_attr = obj);
     }
 }
 
@@ -986,9 +1001,10 @@ Node::Node(const HostAndPort& host) : host(host), latencyMicros(unknownLatency) 
 void Node::markFailed(const Status& status) {
     if (isUp) {
         LOGV2(24078,
-              "Marking host {host} as failed{causedBy_status}",
+              "Marking host {host} as failed: {error}",
+              "Marking host as failed",
               "host"_attr = host,
-              "causedBy_status"_attr = causedBy(redact(status)));
+              "error"_attr = redact(status));
 
         isUp = false;
     }
@@ -998,15 +1014,16 @@ void Node::markFailed(const Status& status) {
 
 bool Node::matches(const ReadPreference pref) const {
     if (!isUp) {
-        LOGV2_DEBUG(24079, 3, "Host {host} is not up", "host"_attr = host);
+        LOGV2_DEBUG(24079, 3, "Host {host} is not up", "Host is not up", "host"_attr = host);
         return false;
     }
 
     LOGV2_DEBUG(24080,
                 3,
-                "Host {host} is {isMaster_primary_not_primary}",
+                "Host {host} is primary? {isPrimary}",
+                "Host is primary?",
                 "host"_attr = host,
-                "isMaster_primary_not_primary"_attr = (isMaster ? "primary" : "not primary"));
+                "isPrimary"_attr = isMaster);
     if (pref == ReadPreference::PrimaryOnly) {
         return isMaster;
     }
@@ -1035,9 +1052,10 @@ void Node::update(const IsMasterReply& reply) {
 
     LOGV2_DEBUG(24081,
                 3,
-                "Updating host {host} based on ismaster reply: {reply_raw}",
+                "Updating host {host} based on isMaster reply: {isMasterReply}",
+                "Updating host based on isMaster reply",
                 "host"_attr = host,
-                "reply_raw"_attr = reply.raw);
+                "isMasterReply"_attr = reply.raw);
 
     // Nodes that are hidden or neither master or secondary are considered down since we can't
     // send any operations to them.
@@ -1062,16 +1080,18 @@ void Node::update(const IsMasterReply& reply) {
 
     LOGV2_DEBUG(24082,
                 3,
-                "Updating {host} lastWriteDate to {reply_lastWriteDate}",
+                "Updating {host} lastWriteDate to {lastWriteDate}",
+                "Updating host lastWriteDate",
                 "host"_attr = host,
-                "reply_lastWriteDate"_attr = reply.lastWriteDate);
+                "lastWriteDate"_attr = reply.lastWriteDate);
     lastWriteDate = reply.lastWriteDate;
 
     LOGV2_DEBUG(24083,
                 3,
-                "Updating {host} opTime to {reply_opTime}",
+                "Updating {host} opTime to {opTime}",
+                "Updating host opTime",
                 "host"_attr = host,
-                "reply_opTime"_attr = reply.opTime);
+                "opTime"_attr = reply.opTime);
     opTime = reply.opTime;
     lastWriteDateUpdateTime = Date_t::now();
 }
@@ -1091,8 +1111,9 @@ SetState::SetState(const MongoURI& uri,
 
     if (name.empty())
         LOGV2_WARNING(24090,
-                      "Replica set name empty, first node: {seedNodes_begin}",
-                      "seedNodes_begin"_attr = *(seedNodes.begin()));
+                      "Replica set name empty, first node: {firstNode}",
+                      "Replica set name empty, adding first node",
+                      "firstNode"_attr = *(seedNodes.begin()));
 
     // This adds the seed hosts to nodes, but they aren't usable for anything except seeding a
     // scan until we start a scan and either find a master or contact all hosts without finding
@@ -1297,9 +1318,10 @@ Node* SetState::findOrCreateNode(const HostAndPort& host) {
     if (it == nodes.end() || it->host != host) {
         LOGV2_DEBUG(24084,
                     2,
-                    "Adding node {host} to our view of replica set {name}",
+                    "Adding node {host} to our view of replica set {replicaSet}",
+                    "Adding node to our view of the replica set",
                     "host"_attr = host,
-                    "name"_attr = name);
+                    "replicaSet"_attr = name);
         it = nodes.insert(it, Node(host));
     }
     return &(*it);
@@ -1310,10 +1332,12 @@ void SetState::updateNodeIfInNodes(const IsMasterReply& reply) {
     if (!node) {
         LOGV2_DEBUG(24085,
                     2,
-                    "Skipping application of ismaster reply from {reply_host} since it isn't a "
-                    "confirmed member of set {name}",
-                    "reply_host"_attr = reply.host,
-                    "name"_attr = name);
+                    "Skipping application of isMaster reply from {host} since it isn't a "
+                    "confirmed member of set {replicaSet}",
+                    "Skipping application of isMaster reply from host since it isn't a confirmed "
+                    "member of the replica set",
+                    "host"_attr = reply.host,
+                    "replicaSet"_attr = name);
         return;
     }
 
@@ -1359,12 +1383,12 @@ void SetState::notify() {
             it->promise.emplaceValue(std::move(match));
             waiters.erase(it++);
         } else if (it->deadline <= cachedNow) {
-            LOGV2_DEBUG(
-                24086,
-                1,
-                "Unable to statisfy read preference {it_criteria} by deadline {it_deadline}",
-                "it_criteria"_attr = it->criteria,
-                "it_deadline"_attr = it->deadline);
+            LOGV2_DEBUG(24086,
+                        1,
+                        "Unable to statisfy read preference {criteria} by deadline {deadline}",
+                        "Unable to statisfy read preference by deadline",
+                        "criteria"_attr = it->criteria,
+                        "deadline"_attr = it->deadline);
             it->promise.setError(makeUnsatisfedReadPrefError(it->criteria));
             waiters.erase(it++);
         } else if (shouldQuickFail) {

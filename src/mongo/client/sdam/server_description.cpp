@@ -231,7 +231,8 @@ void ServerDescription::parseTypeFromIsMaster(const BSONObj isMaster) {
         t = ServerType::kRSGhost;
     } else {
         LOGV2_ERROR(23931,
-                    "unknown server type from successful ismaster reply: {isMaster}",
+                    "Unknown server type from successful isMaster reply: {isMaster}",
+                    "Unknown server type from successful isMaster reply",
                     "isMaster"_attr = isMaster.toString());
         t = ServerType::kUnknown;
     }

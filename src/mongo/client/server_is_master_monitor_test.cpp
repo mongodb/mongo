@@ -177,7 +177,7 @@ protected:
         }
 
         LOGV2(457991,
-              "got mock network operation",
+              "Got mock network operation",
               "elapsed"_attr = elapsed(),
               "request"_attr = request.toString());
 
@@ -198,10 +198,10 @@ protected:
         LOGV2_DEBUG(457992,
                     1,
                     "Advancing time",
-                    "from_time_elapsed"_attr = elapsed(),
-                    "to_time_elapsed"_attr = (elapsed() + d));
+                    "elpasedStart"_attr = elapsed(),
+                    "elapsedEnd"_attr = (elapsed() + d));
         _net->advanceTime(_net->now() + d);
-        LOGV2_DEBUG(457993, 1, "Advanced time", "time_elapsed"_attr = elapsed());
+        LOGV2_DEBUG(457993, 1, "Advanced time", "timeElapsed"_attr = elapsed());
     }
 
     /**
@@ -238,20 +238,6 @@ protected:
     void checkNoActivityBefore(Milliseconds deadline,
                                boost::optional<HostAndPort> hostAndPort = boost::none) {
         while (elapsed() < deadline) {
-            if (hasReadyRequests()) {
-                {
-                    InNetworkGuard guard(_net);
-                    _net->runReadyNetworkOperations();
-                    auto noi = _net->getNextReadyRequest();
-                    auto request = noi->getRequest();
-                    LOGV2_DEBUG(4579931,
-                                0,
-                                "mynameisrae about to fail because was activity",
-                                "request"_attr = request.toString(),
-                                "elapsed"_attr = elapsed());
-                }
-                ASSERT_FALSE(true);
-            }
             ASSERT_FALSE(hasReadyRequests());
             if (hostAndPort) {
                 ASSERT_FALSE(_topologyListener->hasIsMasterResponse(hostAndPort.get()));
