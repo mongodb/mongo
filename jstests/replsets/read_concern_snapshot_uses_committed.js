@@ -1,7 +1,11 @@
 /**
  * Test that non-transaction snapshot reads only see committed data.
  *
- * @tags: [requires_majority_read_concern]
+ * Non-transaction snapshot reads with atClusterTime (or afterClusterTime) will wait for
+ * the majority commit point to move past the atClusterTime (or afterClusterTime) before they can
+ * read.
+ *
+ * @tags: [requires_majority_read_concern, requires_fcv_46]
  */
 (function() {
 "use strict";
@@ -21,26 +25,53 @@ const secondary = replSet.getSecondary();
 const primaryDB = primary.getDB(dbName);
 const secondaryDB = secondary.getDB(dbName);
 
-assert.commandWorked(primaryDB[collName].insert({_id: 0}));
+const committedTimestamp =
+    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: 0}]}))
+        .operationTime;
 replSet.awaitLastOpCommitted();
 
 stopReplicationOnSecondaries(replSet);
 
 // This document will not replicate.
-assert.commandWorked(primaryDB[collName].insert({_id: 1}));
+const nonCommittedTimestamp =
+    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: 1}]}))
+        .operationTime;
 
 for (let db of [primaryDB, secondaryDB]) {
     jsTestLog(`Reading from ${db.getMongo()}`);
-    // Only the replicated document is visible to snapshot read, even on primary.
-    let res = assert.commandWorked(
-        primaryDB.runCommand({find: collName, readConcern: {level: "snapshot"}}));
-    print(tojson(res));
-    assert.sameMembers(res.cursor.firstBatch, [{_id: 0}]);
+    for (let readConcern of [{level: "snapshot"},
+                             {level: "snapshot", atClusterTime: committedTimestamp},
+                             {level: "snapshot", afterClusterTime: committedTimestamp}]) {
+        jsTestLog("Testing committed reads with readConcern " + tojson(readConcern));
+        // Only the replicated document is visible to snapshot read, even on primary.
+        let res = assert.commandWorked(db.runCommand({find: collName, readConcern: readConcern}));
+        assert.sameMembers(res.cursor.firstBatch, [{_id: 0}], tojson(res));
 
-    res = assert.commandWorked(primaryDB.runCommand(
-        {aggregate: collName, pipeline: [], cursor: {}, readConcern: {level: "snapshot"}}));
-    print(tojson(res));
-    assert.sameMembers(res.cursor.firstBatch, [{_id: 0}]);
+        res = assert.commandWorked(db.runCommand(
+            {aggregate: collName, pipeline: [], cursor: {}, readConcern: readConcern}));
+        assert.sameMembers(res.cursor.firstBatch, [{_id: 0}], tojson(res));
+    }
+
+    for (let readConcern of [{level: "snapshot", atClusterTime: nonCommittedTimestamp},
+                             {level: "snapshot", afterClusterTime: nonCommittedTimestamp}]) {
+        jsTestLog("Testing non-committed reads with readConcern " + tojson(readConcern));
+        // Test that snapshot reads ahead of the committed timestamp are blocked.
+        assert.commandFailedWithCode(db.runCommand({
+            find: collName,
+            readConcern: readConcern,
+            maxTimeMS: 1000,
+        }),
+                                     ErrorCodes.MaxTimeMSExpired);
+
+        assert.commandFailedWithCode(db.runCommand({
+            aggregate: collName,
+            pipeline: [],
+            cursor: {},
+            readConcern: readConcern,
+            maxTimeMS: 1000
+        }),
+                                     ErrorCodes.MaxTimeMSExpired);
+    }
 }
 
 restartReplicationOnSecondaries(replSet);
