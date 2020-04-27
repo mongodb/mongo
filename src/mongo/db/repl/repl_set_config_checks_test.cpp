@@ -286,22 +286,16 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigVersionNumberMustB
     ASSERT_OK(newConfig.validate());
 
     // Can reconfig from old to new.
-    ASSERT_OK(validateConfigForReconfig(
-                  &externalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-                  .getStatus());
+    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false));
 
 
     // Cannot reconfig from old to old (versions must be different).
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, oldConfig, getGlobalServiceContext(), false)
-                      .getStatus());
+                  validateConfigForReconfig(oldConfig, oldConfig, false));
 
     // Cannot reconfig from new to old (versions must increase).
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, newConfig, oldConfig, getGlobalServiceContext(), false)
-                      .getStatus());
+                  validateConfigForReconfig(newConfig, oldConfig, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetName) {
@@ -335,14 +329,10 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetNa
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-                      .getStatus());
+                  validateConfigForReconfig(oldConfig, newConfig, false));
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, newConfig, oldConfig, getGlobalServiceContext(), true)
-                      .getStatus());
+                  validateConfigForReconfig(newConfig, oldConfig, true));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetId) {
@@ -377,17 +367,13 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetId
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
-    const auto status = validateConfigForReconfig(
-                            &externalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-                            .getStatus();
+    const auto status = validateConfigForReconfig(oldConfig, newConfig, false);
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
     ASSERT_STRING_CONTAINS(status.reason(), "New and old configurations differ in replica set ID");
 
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, newConfig, oldConfig, getGlobalServiceContext(), true)
-                      .getStatus());
+                  validateConfigForReconfig(newConfig, oldConfig, true));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipBuildIndexesFlag) {
@@ -440,19 +426,13 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipBuildIn
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
     ASSERT_OK(oldConfigRefresh.validate());
-    ASSERT_OK(validateConfigForReconfig(
-                  &externalState, oldConfig, oldConfigRefresh, getGlobalServiceContext(), false)
-                  .getStatus());
+    ASSERT_OK(validateConfigForReconfig(oldConfig, oldConfigRefresh, false));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-                      .getStatus());
+                  validateConfigForReconfig(oldConfig, newConfig, false));
 
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-                      .getStatus());
+                  validateConfigForReconfig(oldConfig, newConfig, true));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipArbiterFlag) {
@@ -502,18 +482,12 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipArbiter
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
     ASSERT_OK(oldConfigRefresh.validate());
-    ASSERT_OK(validateConfigForReconfig(
-                  &externalState, oldConfig, oldConfigRefresh, getGlobalServiceContext(), false)
-                  .getStatus());
+    ASSERT_OK(validateConfigForReconfig(oldConfig, oldConfigRefresh, false));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-                      .getStatus());
+                  validateConfigForReconfig(oldConfig, newConfig, false));
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-                      .getStatus());
+                  validateConfigForReconfig(oldConfig, newConfig, true));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricted) {
@@ -557,13 +531,10 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
                                                                                    << "h3")))));
     ASSERT_OK(legalNewConfigWithNewHostAndId.validate());
     ASSERT_OK(
-        validateConfigForReconfig(&externalState,
-                                  oldConfig,
+        validateConfigForReconfig(oldConfig,
                                   legalNewConfigWithNewHostAndId,
-                                  getGlobalServiceContext(),
                                   // Use 'force' since we're adding and removing a node atomically.
-                                  true)
-            .getStatus());
+                                  true));
 
     //
     // Here, the new config is invalid because we've reused host name "h2" with
@@ -581,18 +552,10 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
                                                                                       << "h3")))));
     ASSERT_OK(illegalNewConfigReusingHost.validate());
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(&externalState,
-                                            oldConfig,
-                                            illegalNewConfigReusingHost,
-                                            getGlobalServiceContext(),
-                                            false)
-                      .getStatus());
+                  validateConfigForReconfig(oldConfig, illegalNewConfigReusingHost, false));
     // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(
-        ErrorCodes::NewReplicaSetConfigurationIncompatible,
-        validateConfigForReconfig(
-            &externalState, oldConfig, illegalNewConfigReusingHost, getGlobalServiceContext(), true)
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                  validateConfigForReconfig(oldConfig, illegalNewConfigReusingHost, true));
     //
     // Here, the new config is valid, because all we've changed is the name of
     // the host representing _id 2.
@@ -608,73 +571,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
                                                                       << BSON("_id" << 3 << "host"
                                                                                     << "h3")))));
     ASSERT_OK(illegalNewConfigReusingId.validate());
-    ASSERT_OK(
-        validateConfigForReconfig(
-            &externalState, oldConfig, illegalNewConfigReusingId, getGlobalServiceContext(), false)
-            .getStatus());
-}
-
-TEST_F(ServiceContextTest, ValidateConfigForReconfig_MustFindSelf) {
-    // Old and new config are same except for version change; this is just testing that we can
-    // find ourself in the new config.
-    ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
-
-    ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
-    ReplicationCoordinatorExternalStateMock notPresentExternalState;
-    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
-    presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ReplicationCoordinatorExternalStateMock presentThriceExternalState;
-    presentThriceExternalState.addSelf(HostAndPort("h3"));
-    presentThriceExternalState.addSelf(HostAndPort("h2"));
-    presentThriceExternalState.addSelf(HostAndPort("h1"));
-
-    ASSERT_EQUALS(
-        ErrorCodes::NodeNotFound,
-        validateConfigForReconfig(
-            &notPresentExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-            .getStatus());
-    ASSERT_EQUALS(
-        ErrorCodes::InvalidReplicaSetConfig,
-        validateConfigForReconfig(
-            &presentThriceExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-            .getStatus());
-    ASSERT_EQUALS(
-        1,
-        unittest::assertGet(validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)));
-    // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(
-        ErrorCodes::NodeNotFound,
-        validateConfigForReconfig(
-            &notPresentExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-            .getStatus());
-    ASSERT_EQUALS(
-        ErrorCodes::InvalidReplicaSetConfig,
-        validateConfigForReconfig(
-            &presentThriceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-            .getStatus());
-    ASSERT_EQUALS(
-        1,
-        unittest::assertGet(validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, illegalNewConfigReusingId, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_ArbiterPriorityValueMustBeZeroOrOne) {
@@ -735,60 +632,13 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_ArbiterPriorityValueMustBeZ
     ASSERT_OK(zeroConfig.validate());
     ASSERT_OK(oneConfig.validate());
     ASSERT_OK(twoConfig.validate());
-    ASSERT_OK(validateConfigForReconfig(
-                  &externalState, oldConfig, zeroConfig, getGlobalServiceContext(), false)
-                  .getStatus());
-    ASSERT_OK(validateConfigForReconfig(
-                  &externalState, oldConfig, oneConfig, getGlobalServiceContext(), false)
-                  .getStatus());
+    ASSERT_OK(validateConfigForReconfig(oldConfig, zeroConfig, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, oneConfig, false));
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, twoConfig, getGlobalServiceContext(), false)
-                      .getStatus());
+                  validateConfigForReconfig(oldConfig, twoConfig, false));
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, twoConfig, getGlobalServiceContext(), true)
-                      .getStatus());
-}
-
-TEST_F(ServiceContextTest, ValidateConfigForReconfig_SelfMustEndElectable) {
-    // Old and new config are same except for version change and the electability of one node;
-    // this is just testing that we must be electable in the new config.
-    ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
-
-    ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "priority" << 0)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
-    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
-    presentOnceExternalState.addSelf(HostAndPort("h2"));
-
-    ASSERT_EQUALS(
-        ErrorCodes::NodeNotElectable,
-        validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-            .getStatus());
-    // Forced reconfig does not require electability.
-    ASSERT_OK(validateConfigForReconfig(
-                  &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-                  .getStatus());
+                  validateConfigForReconfig(oldConfig, twoConfig, true));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
@@ -835,17 +685,9 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigInvalid) {
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(
-        ErrorCodes::BadValue,
-        validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, validateConfigForReconfig(oldConfig, newConfig, false));
     // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(
-        ErrorCodes::BadValue,
-        validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, validateConfigForReconfig(oldConfig, newConfig, true));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigWriteConcernNotSatisifiable) {
@@ -870,17 +712,11 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigWriteConcernNotSat
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(
-        ErrorCodes::UnsatisfiableWriteConcern,
-        validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
+                  validateConfigForReconfig(oldConfig, newConfig, false));
     // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(
-        ErrorCodes::UnsatisfiableWriteConcern,
-        validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
+                  validateConfigForReconfig(oldConfig, newConfig, true));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigInvalid) {
@@ -1029,42 +865,7 @@ TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsValidConfig) {
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(
-        ErrorCodes::BadValue,
-        validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-            .getStatus());
-}
-
-TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsSelfPresent) {
-    // The new config does not contain self. This tests that ValidateForReconfig fails
-    // if the member receiving it is absent from the config, even if force is true.
-    ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h3")))));
-
-
-    ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h3")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h4")))));
-
-    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
-    presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(
-        ErrorCodes::NodeNotFound,
-        validateConfigForReconfig(
-            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, validateConfigForReconfig(oldConfig, newConfig, true));
 }
 
 //
@@ -1114,9 +915,7 @@ Status validateMemberReconfig(BSONArray oldMembers, BSONArray newMembers, BSONOb
 
     // Do reconfig.
     const bool force = false;
-    return validateConfigForReconfig(
-               &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), force)
-        .getStatus();
+    return validateConfigForReconfig(oldConfig, newConfig, force);
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_SingleNodeAdditionAllowed) {
@@ -1189,6 +988,139 @@ TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionOfArbitersDisall
     BSONArray newMembers = BSON_ARRAY(m1 << m2 << m3_Arbiter << m4_Arbiter);  // add two arbiters.
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                   validateMemberReconfig(oldMembers, newMembers, m1));
+}
+
+TEST_F(ServiceContextTest, SameConfigContents) {
+    ReplSetConfig configA;
+    ReplSetConfig configB;
+    auto members1 = BSON_ARRAY(BSON("_id" << 1 << "host"
+                                          << "h1"));
+    auto members2 = BSON_ARRAY(BSON("_id" << 1 << "host"
+                                          << "h1")
+                               << BSON("_id" << 2 << "host"
+                                             << "2"));
+
+    // Same contents with different version.
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                      << "members" << members1)));
+    ASSERT_OK(configB.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 2 << "term" << 1 << "protocolVersion" << 1
+                                      << "members" << members1)));
+    ASSERT(sameConfigContents(configA, configB));
+
+    // Same contents with different term.
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                      << "members" << members1)));
+    ASSERT_OK(configB.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "term" << 2 << "protocolVersion" << 1
+                                      << "members" << members1)));
+    ASSERT(sameConfigContents(configA, configB));
+
+    // Same contents with different term and version.
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                      << "members" << members1)));
+    ASSERT_OK(configB.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 2 << "term" << 2 << "protocolVersion" << 1
+                                      << "members" << members1)));
+    ASSERT(sameConfigContents(configA, configB));
+
+    // Different config settings.
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                      << "members" << members1 << "settings"
+                                      << BSON("electionTimeoutMillis" << 1000))));
+    ASSERT_OK(configB.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                      << "members" << members1 << "settings"
+                                      << BSON("electionTimeoutMillis" << 2000))));
+    ASSERT_FALSE(sameConfigContents(configA, configB));
+
+    // Different members.
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                      << "members" << members1 << "settings"
+                                      << BSON("electionTimeoutMillis" << 1000))));
+    ASSERT_OK(configB.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                      << "members" << members2 << "settings"
+                                      << BSON("electionTimeoutMillis" << 2000))));
+    ASSERT_FALSE(sameConfigContents(configA, configB));
+}
+
+TEST_F(ServiceContextTest, FindSelfInConfig) {
+    // We must be able to find ourself in the new config.
+    ReplSetConfig newConfig;
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
+    ReplicationCoordinatorExternalStateMock notPresentExternalState;
+    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
+    presentOnceExternalState.addSelf(HostAndPort("h2"));
+    ReplicationCoordinatorExternalStateMock presentThriceExternalState;
+    presentThriceExternalState.addSelf(HostAndPort("h3"));
+    presentThriceExternalState.addSelf(HostAndPort("h2"));
+    presentThriceExternalState.addSelf(HostAndPort("h1"));
+
+    // Test 'findSelfInConfig'.
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                  findSelfInConfig(&notPresentExternalState, newConfig, getGlobalServiceContext())
+                      .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidReplicaSetConfig,
+        findSelfInConfig(&presentThriceExternalState, newConfig, getGlobalServiceContext())
+            .getStatus());
+    ASSERT_EQUALS(1,
+                  unittest::assertGet(findSelfInConfig(
+                      &presentOnceExternalState, newConfig, getGlobalServiceContext())));
+
+    // The same rules apply to 'findSelfInConfigIfElectable'.
+    ASSERT_EQUALS(
+        ErrorCodes::NodeNotFound,
+        findSelfInConfigIfElectable(&notPresentExternalState, newConfig, getGlobalServiceContext())
+            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                  findSelfInConfigIfElectable(
+                      &presentThriceExternalState, newConfig, getGlobalServiceContext())
+                      .getStatus());
+    ASSERT_EQUALS(1,
+                  unittest::assertGet(findSelfInConfigIfElectable(
+                      &presentOnceExternalState, newConfig, getGlobalServiceContext())));
+
+    // We must be electable in the new config.
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2"
+                                                                    << "priority" << 0)
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
+
+    ASSERT_EQUALS(
+        ErrorCodes::NodeNotElectable,
+        findSelfInConfigIfElectable(&presentOnceExternalState, newConfig, getGlobalServiceContext())
+            .getStatus());
 }
 
 }  // namespace

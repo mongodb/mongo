@@ -909,6 +909,69 @@ public:
     }
 };
 
+TEST_F(ReplCoordReconfigTest, MustFindSelfAndBeElectableInNewConfig) {
+    // Start up as a secondary and then get elected.
+    init();
+
+    // We only check for ourselves if the config contents actually change.
+    auto oldConfigObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "protocolVersion" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "h1:1")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "h2:1")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "h3:1"))
+                             << "settings" << BSON("heartbeatIntervalMillis" << 1000));
+    auto newConfigObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 2 << "protocolVersion" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "h1:1")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "h2:1")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "h3:1"
+                                                         << "priority" << 0))
+                             << "settings" << BSON("heartbeatIntervalMillis" << 2000));
+
+    assertStartSuccess(oldConfigObj, HostAndPort("h1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
+    simulateSuccessfulV1Election();
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
+
+    BSONObjBuilder result;
+    const auto opCtx = makeOperationContext();
+    ReplSetReconfigArgs args;
+    args.newConfigObj = newConfigObj;
+
+    // We must be present in the new config. Must hold for both safe and force reconfig.
+    getExternalState()->clearSelfHosts();
+    getExternalState()->addSelf(HostAndPort("nonself:1"));
+
+    args.force = false;
+    Status status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    ASSERT_EQUALS(status.code(), ErrorCodes::NodeNotFound);
+
+    args.force = true;
+    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    ASSERT_EQUALS(status.code(), ErrorCodes::NodeNotFound);
+
+    // We must be electable in the new config. Only required for safe reconfig.
+    getExternalState()->clearSelfHosts();
+    getExternalState()->addSelf(HostAndPort("h3:1"));  // h3 has priority 0 (unelectable).
+
+    args.force = false;
+    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    ASSERT_EQUALS(status.code(), ErrorCodes::NodeNotElectable);
+
+    args.force = true;
+    status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    ASSERT_OK(status.code());
+}
+
 TEST_F(ReplCoordReconfigTest,
        InitialReconfigAlwaysSucceedsOnlyRegardlessOfLastCommittedOpInPrevConfig) {
     // Start up as a secondary.
