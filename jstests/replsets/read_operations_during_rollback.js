@@ -43,8 +43,11 @@ const cursorIdToBeReadDuringRollback =
     assert.commandWorked(rollbackNode.getDB(dbName).runCommand({"find": collName, batchSize: 0}))
         .cursor.id;
 
-// Wait for 'getMore' to hang.
-checkLog.contains(rollbackNode, "GetMoreHangBeforeReadLock fail point enabled.");
+// Wait for 'getMore' to hang on the test collection.
+assert.soonNoExcept(() => {
+    const filter = {"command.getMore": {$exists: true}, "command.collection": collName};
+    return rollbackNode.getDB(dbName).adminCommand("currentOp", filter).inprog.length === 1;
+});
 
 // Start rollback.
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
