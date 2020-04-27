@@ -1208,9 +1208,10 @@ Future<void> HBStepdownAndReconfigTest::startReconfigCommand() {
 }
 
 void HBStepdownAndReconfigTest::assertSteppedDown() {
-    LOGV2(463811, "Waiting for background jobs");
-    // The clock is mocked, we don't actually sleep.
-    sleepFor(Seconds(1));
+    LOGV2(463811, "Waiting for step down to complete");
+    // Wait for step down to finish since it may be asynchronous.
+    auto timeout = Milliseconds(5 * 60 * 1000);
+    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, timeout));
 
     // Primary stepped down.
     ASSERT_EQUALS(2, getReplCoord()->getTerm());
@@ -1218,10 +1219,11 @@ void HBStepdownAndReconfigTest::assertSteppedDown() {
 }
 
 void HBStepdownAndReconfigTest::assertConfigStored() {
-    LOGV2(463812, "Waiting for background jobs");
-    // The clock is mocked, we don't actually sleep.
-    sleepFor(Seconds(1));
-
+    LOGV2(463812, "Waiting for config to be stored");
+    // Wait for new config since it may be installed asynchronously.
+    while (getReplCoord()->getConfig().getConfigVersionAndTerm() < ConfigVersionAndTerm(3, 1)) {
+        sleepFor(Milliseconds(10));
+    }
     ASSERT_EQUALS(ConfigVersionAndTerm(3, 1),
                   getReplCoord()->getConfig().getConfigVersionAndTerm());
 }
