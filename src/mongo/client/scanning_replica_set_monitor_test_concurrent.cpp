@@ -104,17 +104,17 @@ protected:
         _numChecks[request.target]++;
         LOGV2_DEBUG(20192,
                     2,
-                    "at {elapsed} got mock net operation {request}",
+                    "Got mock network operation",
                     "elapsed"_attr = elapsed(),
                     "request"_attr = request.toString());
         const auto node = replSet.getNode(request.target.toString());
         if (node->isRunning()) {
             const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
             const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
-            LOGV2_DEBUG(20193, 2, "replying {reply}", "reply"_attr = reply);
+            LOGV2_DEBUG(20193, 2, "Replying", "reply"_attr = reply);
             net->scheduleSuccessfulResponse(noi, RemoteCommandResponse(reply, Milliseconds(0)));
         } else {
-            LOGV2_DEBUG(20194, 2, "black hole");
+            LOGV2_DEBUG(20194, 2, "Black hole");
             net->blackHole(noi);
         }
         net->runReadyNetworkOperations();
@@ -128,11 +128,11 @@ protected:
         // Operations can happen inline with advanceTime(), so log before and after the call.
         LOGV2_DEBUG(20195,
                     3,
-                    "Advancing time from {elapsed} to {elapsed_d}",
-                    "elapsed"_attr = elapsed(),
-                    "elapsed_d"_attr = (elapsed() + d));
+                    "Advancing time",
+                    "elapsedStart"_attr = elapsed(),
+                    "elapsedEnd"_attr = (elapsed() + d));
         net->advanceTime(net->now() + d);
-        LOGV2_DEBUG(20196, 3, "Advanced to {elapsed}", "elapsed"_attr = elapsed());
+        LOGV2_DEBUG(20196, 3, "Advanced time", "elapsed"_attr = elapsed());
     }
 
     int getNumChecks(HostAndPort host) {

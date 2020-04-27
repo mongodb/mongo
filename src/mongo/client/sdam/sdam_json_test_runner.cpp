@@ -72,13 +72,6 @@ using namespace mongo::sdam;
 
 namespace mongo::sdam {
 
-std::string emphasize(const std::string text) {
-    std::stringstream output;
-    const auto border = std::string(3, '#');
-    output << border << " " << text << " " << border << std::endl;
-    return output.str();
-}
-
 /**
  * This class is responsible for parsing and executing a single 'phase' of the json test
  */
@@ -120,17 +113,16 @@ public:
             auto descriptionStr =
                 (response.getResponse()) ? response.getResponse()->toString() : "[ Network Error ]";
             LOGV2(20202,
-                  "Sending server description: {response_getServer} : {descriptionStr}",
-                  "response_getServer"_attr = response.getServer(),
-                  "descriptionStr"_attr = descriptionStr);
+                  "Sending server description",
+                  "server"_attr = response.getServer(),
+                  "description"_attr = descriptionStr);
             topology.onServerDescription(response);
         }
 
         LOGV2(20203,
-              "TopologyDescription after Phase {phaseNum}: {topology_getTopologyDescription}",
-              "phaseNum"_attr = _phaseNum,
-              "topology_getTopologyDescription"_attr =
-                  topology.getTopologyDescription()->toString());
+              "TopologyDescription after phase",
+              "phaseNumber"_attr = _phaseNum,
+              "topologyDescription"_attr = topology.getTopologyDescription()->toString());
 
         validateServers(
             &testResult, topology.getTopologyDescription(), _topologyOutcome["servers"].Obj());
@@ -465,16 +457,11 @@ public:
         TestCaseResult result{{}, _testFilePath, _testName};
 
         for (const auto& testPhase : _testPhases) {
-            LOGV2(20204,
-                  "{emphasize_Phase_std_to_string_testPhase_getPhaseNum}",
-                  "emphasize_Phase_std_to_string_testPhase_getPhaseNum"_attr =
-                      emphasize("Phase " + std::to_string(testPhase.getPhaseNum())));
+            LOGV2(20204, "### Phase Number ###", "phase"_attr = testPhase.getPhaseNum());
             auto phaseResult = testPhase.execute(topology);
             result.phaseResults.push_back(phaseResult);
             if (!result.Success()) {
-                LOGV2(20205,
-                      "Phase {phaseResult_phaseNumber} failed.",
-                      "phaseResult_phaseNumber"_attr = phaseResult.phaseNumber);
+                LOGV2(20205, "Phase failed", "phase"_attr = phaseResult.phaseNumber);
                 break;
             }
         }
@@ -489,11 +476,7 @@ public:
 private:
     void parseTest(fs::path testFilePath) {
         _testFilePath = testFilePath.string();
-        LOGV2(20206, "");
-        LOGV2(20207,
-              "{emphasize_Parsing_testFilePath_string}",
-              "emphasize_Parsing_testFilePath_string"_attr =
-                  emphasize("Parsing " + testFilePath.string()));
+        LOGV2(20207, "### Parsing Test File ###", "testFilePath"_attr = testFilePath.string());
         {
             std::ifstream testFile(_testFilePath);
             std::ostringstream json;
@@ -556,10 +539,7 @@ public:
         for (auto jsonTest : testFiles) {
             auto testCase = JsonTestCase(jsonTest);
             try {
-                LOGV2(20208,
-                      "{emphasize_Executing_testCase_Name}",
-                      "emphasize_Executing_testCase_Name"_attr =
-                          emphasize("Executing " + testCase.Name()));
+                LOGV2(20208, "### Executing Test Case ###", "test"_attr = testCase.Name());
                 results.push_back(testCase.execute());
             } catch (const DBException& ex) {
                 std::stringstream error;
@@ -584,9 +564,7 @@ public:
                 results.begin(), results.end(), [](const JsonTestCase::TestCaseResult& result) {
                     return !result.Success();
                 })) {
-            LOGV2(20209,
-                  "{emphasize_Failed_Test_Results}",
-                  "emphasize_Failed_Test_Results"_attr = emphasize("Failed Test Results"));
+            LOGV2(20209, "### Failed Test Results ###");
         }
 
         for (const auto result : results) {
@@ -596,20 +574,17 @@ public:
             if (result.Success()) {
                 ++numSuccess;
             } else {
-                LOGV2(
-                    20210, "{emphasize_testName}", "emphasize_testName"_attr = emphasize(testName));
-                LOGV2(20211, "error in file: {file}", "file"_attr = file);
+                LOGV2(20210, "### Test Name ###", "name"_attr = testName);
+                LOGV2(20211, "Error in file", "file"_attr = file);
                 ++numFailed;
                 for (auto phaseResult : phaseResults) {
-                    LOGV2(20212,
-                          "Phase {phaseResult_phaseNumber}: ",
-                          "phaseResult_phaseNumber"_attr = phaseResult.phaseNumber);
+                    LOGV2(20212, "Phase", "phaseNumber"_attr = phaseResult.phaseNumber);
                     if (!phaseResult.Success()) {
                         for (auto error : phaseResult.errorDescriptions) {
                             LOGV2(20213,
-                                  "\t{error_first}: {error_second}",
-                                  "error_first"_attr = error.first,
-                                  "error_second"_attr = error.second);
+                                  "Errors",
+                                  "errorFirst"_attr = error.first,
+                                  "errorSecond"_attr = error.second);
                         }
                     }
                 }
@@ -617,7 +592,7 @@ public:
             }
         }
         LOGV2(20215,
-              "{numTestCases} test cases; {numSuccess} success; {numFailed} failed.",
+              "Test cases summary",
               "numTestCases"_attr = numTestCases,
               "numSuccess"_attr = numSuccess,
               "numFailed"_attr = numFailed);
@@ -657,8 +632,8 @@ private:
             } else {
                 LOGV2_DEBUG(20216,
                             2,
-                            "'{filePath_string}' skipped due to filter configuration.",
-                            "filePath_string"_attr = filePath.string());
+                            "Test skipped due to filter configuration",
+                            "filePath"_attr = filePath.string());
             }
         }
 

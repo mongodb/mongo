@@ -73,13 +73,6 @@ using namespace mongo::sdam;
 
 namespace mongo::sdam {
 
-std::string emphasize(const std::string text) {
-    std::stringstream output;
-    const auto border = std::string(3, '#');
-    output << border << " " << text << " " << border << std::endl;
-    return output.str();
-}
-
 std::ostream& operator<<(std::ostream& os, const std::vector<HostAndPort>& input) {
     for (auto const& i : input) {
         os << i.toString() << " ";
@@ -119,8 +112,7 @@ public:
     ~JsonRttTestCase() = default;
 
     TestCaseResult execute() {
-        LOGV2(
-            4333500, "{testFilePath}", "testFilePath"_attr = emphasize("Running " + _testFilePath));
+        LOGV2(4333500, "### Running Test ###", "testFilePath"_attr = _testFilePath);
 
         ServerDescriptionPtr updatedServerDescription;
         if (_serverDescription) {
@@ -141,7 +133,7 @@ public:
         validateNewAvgRtt(&result, updatedServerDescription);
 
         if (!result.Success()) {
-            LOGV2(4333501, "Test {testFilePath} failed.", "testFilePath"_attr = _testFilePath);
+            LOGV2(4333501, "Test failed", "testFilePath"_attr = _testFilePath);
         }
 
         return result;
@@ -154,10 +146,7 @@ public:
 private:
     void parseTest(fs::path testFilePath) {
         _testFilePath = testFilePath.string();
-        LOGV2(4333502, "");
-        LOGV2(4333503,
-              "{testFilePath}",
-              "testFilePath"_attr = emphasize("Parsing " + testFilePath.string()));
+        LOGV2(4333503, "### Parsing Test ###", "testFilePath"_attr = testFilePath.string());
         {
             std::ifstream testFile(_testFilePath);
             std::ostringstream json;
@@ -222,8 +211,7 @@ public:
     ~JsonServerSelectionTestCase() = default;
 
     TestCaseResult execute() {
-        LOGV2(
-            4333504, "{testFilePath}", "testFilePath"_attr = emphasize("Running " + _testFilePath));
+        LOGV2(4333504, "### Running Test ###", "testFilePath"_attr = _testFilePath);
 
         SdamServerSelector serverSelector(
             sdam::ServerSelectionConfiguration::defaultConfiguration());
@@ -233,7 +221,7 @@ public:
         validateServersInLatencyWindow(&result, selectedServers);
 
         if (!result.Success()) {
-            LOGV2(4333505, "Test {testFilePath} failed.", "testFilePath"_attr = _testFilePath);
+            LOGV2(4333505, "Test failed", "testFilePath"_attr = _testFilePath);
         }
 
         return result;
@@ -246,10 +234,7 @@ public:
 private:
     void parseTest(fs::path testFilePath) {
         _testFilePath = testFilePath.string();
-        LOGV2(4333506, "");
-        LOGV2(4333507,
-              "{testFilePath}",
-              "testFilePath"_attr = emphasize("Parsing " + testFilePath.string()));
+        LOGV2(4333507, "### Parsing Test ###", "testFilePath"_attr = testFilePath.string());
         {
             std::ifstream testFile(_testFilePath);
             std::ostringstream json;
@@ -400,9 +385,8 @@ public:
             }();
 
             try {
-                LOGV2(4333508,
-                      "{testFilePath}",
-                      "testFilePath"_attr = emphasize("Executing " + testCase->FilePath()));
+                LOGV2(
+                    4333508, "### Executing Test ###", "testFilePath"_attr = testCase->FilePath());
                 results.push_back(testCase->execute());
             } catch (const DBException& ex) {
                 std::stringstream error;
@@ -425,9 +409,7 @@ public:
                 results.begin(), results.end(), [](const JsonTestCase::TestCaseResult& result) {
                     return !result.Success();
                 })) {
-            LOGV2(4333509,
-                  "{Failed_Test_Results}",
-                  "Failed_Test_Results"_attr = emphasize("Failed Test Results"));
+            LOGV2(4333509, "### Failed Test Results ###");
         }
 
         for (const auto result : results) {
@@ -435,14 +417,12 @@ public:
             if (result.Success()) {
                 ++numSuccess;
             } else {
-                LOGV2(4333510, "{testFilePath}", "testFilePath"_attr = emphasize(file));
-                LOGV2(4333511, "error in file: {file}", "file"_attr = file);
+                LOGV2(4333510, "### Failed Test File ###", "testFilePath"_attr = file);
                 ++numFailed;
-                LOGV2(4333512, "");
             }
         }
         LOGV2(4333513,
-              "{numTestCases} test cases; {numSuccess} success; {numFailed} failed.",
+              "Results summary",
               "numTestCases"_attr = numTestCases,
               "numSuccess"_attr = numSuccess,
               "numFailed"_attr = numFailed);
@@ -482,7 +462,7 @@ private:
             } else {
                 LOGV2_DEBUG(4333514,
                             2,
-                            "'{filePath}' skipped due to filter configuration.",
+                            "Test skipped due to filter configuration",
                             "filePath"_attr = filePath.string());
             }
         }
