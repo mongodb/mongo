@@ -105,7 +105,7 @@ try {
     // Confirm in the logs that the renameCollection dropped the target collection on the
     // secondary using two phase collection drop.
     if (isJsonLog(secondary)) {
-        checkLog.containsJson(secondary, 20315, {nss: toColl.getFullName()});
+        checkLog.containsJson(secondary, 20315, {namespace: toColl.getFullName()});
     } else {
         checkLog.contains(secondary, new RegExp('dropCollection:.*' + toColl.getFullName()));
     }
