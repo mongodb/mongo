@@ -198,7 +198,8 @@ private:
     /**
      * Executes the callback specified by "cbState". Will not mark cbState as finished.
      */
-    void runCallbackExhaust(std::shared_ptr<CallbackState> cbState);
+    void runCallbackExhaust(std::shared_ptr<CallbackState> cbState,
+                            WorkQueue::iterator expectedExhaustIter);
 
     bool _inShutdown_inlock() const;
     void _setState_inlock(State newState);

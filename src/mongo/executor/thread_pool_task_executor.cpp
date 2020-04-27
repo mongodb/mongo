@@ -765,12 +765,13 @@ void ThreadPoolTaskExecutor::scheduleExhaustIntoPool_inlock(std::shared_ptr<Call
                                                             stdx::unique_lock<Latch> lk) {
     _poolInProgressQueue.push_back(cbState);
     cbState->exhaustIter = --_poolInProgressQueue.end();
+    auto expectedExhaustIter = cbState->exhaustIter.get();
     lk.unlock();
 
     if (cbState->baton) {
-        cbState->baton->schedule([this, cbState](Status status) {
+        cbState->baton->schedule([this, cbState, expectedExhaustIter](Status status) {
             if (status.isOK()) {
-                runCallbackExhaust(cbState);
+                runCallbackExhaust(cbState, expectedExhaustIter);
                 return;
             }
 
@@ -779,14 +780,14 @@ void ThreadPoolTaskExecutor::scheduleExhaustIntoPool_inlock(std::shared_ptr<Call
                 cbState->canceled.store(1);
             }
 
-            _pool->schedule([this, cbState](auto status) {
+            _pool->schedule([this, cbState, expectedExhaustIter](auto status) {
                 invariant(status.isOK() || ErrorCodes::isCancelationError(status.code()));
 
-                runCallbackExhaust(cbState);
+                runCallbackExhaust(cbState, expectedExhaustIter);
             });
         });
     } else {
-        _pool->schedule([this, cbState](auto status) {
+        _pool->schedule([this, cbState, expectedExhaustIter](auto status) {
             if (ErrorCodes::isCancelationError(status.code())) {
                 stdx::lock_guard<Latch> lk(_mutex);
 
@@ -795,14 +796,15 @@ void ThreadPoolTaskExecutor::scheduleExhaustIntoPool_inlock(std::shared_ptr<Call
                 fassert(4615617, status);
             }
 
-            runCallbackExhaust(cbState);
+            runCallbackExhaust(cbState, expectedExhaustIter);
         });
     }
 
     _net->signalWorkAvailable();
 }
 
-void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> cbState) {
+void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> cbState,
+                                                WorkQueue::iterator expectedExhaustIter) {
     CallbackHandle cbHandle;
     setCallbackForHandle(&cbHandle, cbState);
     CallbackArgs args(this,
@@ -827,9 +829,16 @@ void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> c
     // handled in 'runCallback'.
     stdx::lock_guard<Latch> lk(_mutex);
 
+    // It is possible that we receive multiple responses in quick succession. If this happens, the
+    // later responses can overwrite the 'exhaustIter' value on the cbState when adding the cbState
+    // to the '_poolInProgressQueue' if the previous responses have not been run yet. We take in the
+    // 'expectedExhaustIter' so that we can still remove this task from the 'poolInProgressQueue' if
+    // this happens, but we do not want to reset the 'exhaustIter' value in this case.
     if (cbState->exhaustIter) {
-        _poolInProgressQueue.erase(cbState->exhaustIter.get());
-        cbState->exhaustIter = boost::none;
+        _poolInProgressQueue.erase(expectedExhaustIter);
+        if (cbState->exhaustIter.get() == expectedExhaustIter) {
+            cbState->exhaustIter = boost::none;
+        }
     }
 
     if (_inShutdown_inlock() && _poolInProgressQueue.empty()) {
