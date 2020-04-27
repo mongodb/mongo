@@ -191,12 +191,10 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             replset_settings = self.replset_config_options["settings"]
             repl_config["settings"] = replset_settings
 
-        # If not all nodes are electable and no election timeout was specified, then we increase
-        # the election timeout to 24 hours to prevent spurious elections.
-        if not self.all_nodes_electable:
-            repl_config.setdefault("settings", {})
-            if "electionTimeoutMillis" not in repl_config["settings"]:
-                repl_config["settings"]["electionTimeoutMillis"] = 24 * 60 * 60 * 1000
+        # Increase the election timeout to 24 hours to prevent spurious elections.
+        repl_config.setdefault("settings", {})
+        if "electionTimeoutMillis" not in repl_config["settings"]:
+            repl_config["settings"]["electionTimeoutMillis"] = 24 * 60 * 60 * 1000
 
         # Start up a single node replica set then reconfigure to the correct size (if the config
         # contains more than 1 node), so the primary is elected more quickly.
