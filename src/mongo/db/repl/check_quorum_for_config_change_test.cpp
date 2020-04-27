@@ -469,10 +469,11 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
-    ASSERT_REASON_CONTAINS(status,
-                           str::stream() << "Our replica set ID of " << replicaSetId
-                                         << " did not match that of " << incompatibleHost.toString()
-                                         << ", which is " << unexpectedId);
+    ASSERT_REASON_CONTAINS(
+        status,
+        str::stream() << "Our replica set ID did not match that of our request target, replSetId: "
+                      << replicaSetId << ", requestTarget: " << incompatibleHost.toString()
+                      << ", requestTargetReplSetId: " << unexpectedId);
     ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
@@ -530,8 +531,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNode) {
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
-    ASSERT_REASON_CONTAINS(status, "Our config version of");
-    ASSERT_REASON_CONTAINS(status, "is no larger than the version");
+    ASSERT_REASON_CONTAINS(
+        status, "Our config version is no larger than the version of the request target");
     ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
@@ -588,8 +589,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNodeOnlyOneRespo
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
-    ASSERT_REASON_CONTAINS(status, "Our config version of");
-    ASSERT_REASON_CONTAINS(status, "is no larger than the version");
+    ASSERT_REASON_CONTAINS(
+        status, "Our config version is no larger than the version of the request target");
     ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
@@ -640,8 +641,8 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToHigherConfigVersion) {
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
-    ASSERT_REASON_CONTAINS(status, "Our config version of");
-    ASSERT_REASON_CONTAINS(status, "is no larger than the version");
+    ASSERT_REASON_CONTAINS(
+        status, "Our config version is no larger than the version of the request target");
     ASSERT_REASON_CONTAINS(status, "h1:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h3:1");

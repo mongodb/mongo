@@ -1975,12 +1975,12 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
         stdx::lock_guard lock(_mutex);
         LOGV2(21339,
               "Replication failed for write concern: {writeConcern}, waiting for optime: {opTime}, "
-              "opID: {opID}, all_durable: {all_durable}, progress: {progress}",
+              "opID: {opID}, all_durable: {allDurable}, progress: {progress}",
               "Replication failed for write concern",
               "writeConcern"_attr = writeConcern.toBSON(),
               "opTime"_attr = opTime,
               "opID"_attr = opCtx->getOpID(),
-              "all_durable"_attr = _storage->getAllDurableTimestamp(_service),
+              "allDurable"_attr = _storage->getAllDurableTimestamp(_service),
               "progress"_attr = _getReplicationProgress(lock));
     }
     return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
@@ -3579,7 +3579,7 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
     lk.unlock();
 
     // Wait for the config document to be replicated to a majority of nodes in the current config.
-    LOGV2(4508702, "Waiting for the current config to propagate to a majority of nodes.");
+    LOGV2(4508702, "Waiting for the current config to propagate to a majority of nodes");
     StatusAndDuration configAwaitStatus =
         awaitReplication(opCtx, fakeOpTime, _getConfigReplicationWriteConcern());
 
@@ -3604,7 +3604,7 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
     // current config.
     LOGV2(51815,
           "Waiting for the last committed optime in the previous config "
-          "to be committed in the current config.",
+          "to be committed in the current config",
           "configOplogCommitmentOpTime"_attr = configOplogCommitmentOpTime);
     StatusAndDuration oplogAwaitStatus =
         awaitReplication(opCtx, configOplogCommitmentOpTime, oplogWriteConcern);

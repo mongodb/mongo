@@ -49,8 +49,9 @@ configA.members.push({_id: 11, host: primaryB.host});
 var reconfigResult =
     assert.commandFailedWithCode(primaryA.adminCommand({replSetReconfig: configA}),
                                  ErrorCodes.NewReplicaSetConfigurationIncompatible);
-var msgA = 'Our replica set ID of ' + configA.settings.replicaSetId + ' did not match that of ' +
-    primaryB.host + ', which is ' + configB.settings.replicaSetId;
+var msgA = 'Our replica set ID did not match that of our request target, replSetId: ' +
+    configA.settings.replicaSetId + ', requestTarget: ' + primaryB.host +
+    ', requestTargetReplSetId: ' + configB.settings.replicaSetId;
 assert.neq(-1, reconfigResult.errmsg.indexOf(msgA));
 
 var newPrimaryA = replSetA.getPrimary();
