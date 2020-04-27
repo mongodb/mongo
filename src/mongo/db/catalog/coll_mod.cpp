@@ -351,11 +351,6 @@ Status _collModInternal(OperationContext* opCtx,
     auto idx = cmrNew.idx;
 
     if (indexHidden) {
-        if (serverGlobalParams.featureCompatibility.getVersion() <
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46 &&
-            indexHidden.booleanSafe()) {
-            return Status(ErrorCodes::BadValue, "Hidden indexes can only be created with FCV 4.6");
-        }
         if (coll->ns().isSystem())
             return Status(ErrorCodes::BadValue, "Can't hide index on system collection");
         if (idx->isIdIndex())

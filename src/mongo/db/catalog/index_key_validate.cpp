@@ -271,12 +271,6 @@ StatusWith<BSONObj> validateIndexSpec(
 
     boost::optional<IndexVersion> resolvedIndexVersion;
 
-    // Allow hidden index only if FCV is 4.6.
-    const auto isFeatureDisabled =
-        (!featureCompatibility.isVersionInitialized() ||
-         featureCompatibility.getVersion() <
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
-
     for (auto&& indexSpecElem : indexSpec) {
         auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
         if (IndexDescriptor::kKeyPatternFieldName == indexSpecElemFieldName) {
@@ -326,10 +320,6 @@ StatusWith<BSONObj> validateIndexSpec(
 
             hasIndexNameField = true;
         } else if (IndexDescriptor::kHiddenFieldName == indexSpecElemFieldName) {
-            if (isFeatureDisabled) {
-                return {ErrorCodes::Error(31449),
-                        "Hidden indexes can only be created with FCV 4.6"};
-            }
             if (indexSpecElem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()

@@ -3,8 +3,6 @@
  * it will not be used in planning. It is handled in the same way as other indexes by the index
  * catalog and for TTL purposes.
  * @tags: [
- *  multiversion_incompatible,
- *  requires_fcv_44,
  *  requires_non_retryable_commands,    // CollMod is not retryable.
  * ]
  */
