@@ -332,6 +332,7 @@ variables:
   - enterprise-rhel-72-s390x
   - enterprise-rhel-72-s390x-inmem
   - enterprise-rhel-80-64-bit
+  - enterprise-rhel-81-ppc64le
   - enterprise-suse12-64
   - enterprise-suse15-64
   - enterprise-suse12-s390x
@@ -9506,6 +9507,65 @@ buildvariants:
   - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .aggfuzzer .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: .read_write_concern
+  - name: replica_sets
+  - name: .replica_sets .common
+  - name: sasl
+  - name: secondary_reads_passthrough_gen
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.mixed_version
+  - name: snmp
+  - name: .stitch
+  - name: .publish
+    distros:
+    - rhel70-small
+
+- name: enterprise-rhel-81-ppc64le
+  display_name: Enterprise RHEL 8.1 PPC64LE
+  modules:
+  - enterprise
+  run_on:
+  - rhel81-power8-small
+  batchtime: 1440 # 1 day
+  stepback: false
+  expansions:
+    # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
+    compile_flags: --ssl MONGO_DISTMOD=rhel81 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    resmoke_jobs_factor: 0.25
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: ppc64le
+    packager_distro: rhel81
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: ppc64le-enterprise-rhel81
+    repo_edition: enterprise
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+    multiversion_platform: rhel81
+    multiversion_architecture: ppc64le
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel81-power8-large
+  - name: .aggregation .common
+  - name: audit
+  - name: .auth !.multiversion !.jscore
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency
+  - name: .encrypt
+  - name: .integration !.audit
+    distros:
+    - rhel81-power8-large
+  - name: .jscore .common !.auth
+  - name: jsCore_op_query
+  - name: .aggfuzzer .common !.multiversion
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: .read_write_concern
