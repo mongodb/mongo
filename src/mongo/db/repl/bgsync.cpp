@@ -265,7 +265,7 @@ void BackgroundSync::_produce() {
         LOGV2(21079,
               "bgsync - stopReplProducer fail point "
               "enabled. Blocking until fail point is disabled.");
-        mongo::sleepsecs(1);
+        mongo::sleepmillis(_getRetrySleepMS());
         return;
     }
 
@@ -407,10 +407,7 @@ void BackgroundSync::_produce() {
         // out of date. In that case we sleep for 1 second to reduce the amount we spin waiting
         // for our map to update.
         if (oldSource == source) {
-            long long sleepMS = 1000;
-            forceBgSyncSyncSourceRetryWaitMS.execute(
-                [&](const BSONObj& data) { sleepMS = data["sleepMS"].numberInt(); });
-
+            long long sleepMS = _getRetrySleepMS();
             LOGV2(21087,
                   "Chose same sync source candidate as last time, {syncSource}. Sleeping for "
                   "{sleepDurationMillis}ms to avoid immediately choosing a new sync source for the "
@@ -439,10 +436,7 @@ void BackgroundSync::_produce() {
                   "error"_attr = syncSourceResp.syncSourceStatus.getStatus());
         }
 
-        long long sleepMS = 1000;
-        forceBgSyncSyncSourceRetryWaitMS.execute(
-            [&](const BSONObj& data) { sleepMS = data["sleepMS"].numberInt(); });
-
+        long long sleepMS = _getRetrySleepMS();
         // No sync source found.
         LOGV2_DEBUG(21090,
                     1,
@@ -962,6 +956,12 @@ void BackgroundSync::startProducerIfStopped() {
     }
 }
 
+long long BackgroundSync::_getRetrySleepMS() {
+    long long sleepMS = 1000;
+    forceBgSyncSyncSourceRetryWaitMS.execute(
+        [&](const BSONObj& data) { sleepMS = data["sleepMS"].numberInt(); });
+    return sleepMS;
+}
 
 }  // namespace repl
 }  // namespace mongo

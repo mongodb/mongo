@@ -43,6 +43,7 @@
 load("jstests/replsets/rslib.js");
 load("jstests/replsets/libs/two_phase_drops.js");
 load("jstests/hooks/validate_collections.js");
+load('jstests/libs/fail_point_util.js');
 
 /**
  *
@@ -90,6 +91,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
     const SIGTERM = 15;
     const kNumDataBearingNodes = 3;
     const kElectableNodes = 2;
+    const kRetryIntervalMS = 25;
 
     let awaitSecondaryNodesForRollbackTimeout;
 
@@ -154,6 +156,11 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         waitForState(curSecondary, ReplSetTest.State.SECONDARY);
         waitForState(tiebreakerNode, ReplSetTest.State.SECONDARY);
+
+        // Make sync source selection faster.
+        replSet.nodes.forEach((node) => {
+            setFailPoint(node, "forceBgSyncSyncSourceRetryWaitMS", {sleepMS: kRetryIntervalMS});
+        });
 
         rst = replSet;
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
@@ -271,10 +278,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
         assert.soonNoExcept(() => {
             const res = conn.adminCommand({replSetStepUp: 1});
             return res.ok;
-        }, `failed to step up node ${conn.host}`, ReplSetTest.kDefaultTimeoutMS, 25);
+        }, `failed to step up node ${conn.host}`, ReplSetTest.kDefaultTimeoutMS, kRetryIntervalMS);
 
         // Waits for the primary to accept new writes.
-        return rst.getPrimary(ReplSetTest.kDefaultTimeoutMS, 25);
+        return rst.getPrimary(ReplSetTest.kDefaultTimeoutMS, kRetryIntervalMS);
     }
 
     function oplogTop(conn) {
@@ -320,41 +327,45 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // suites, as it is possible in rare cases for the sync source to lose the entry
         // corresponding to the optime the rollback node chose as its minValid.
         log(`Wait for ${curSecondary.host} to finish rollback`);
-        assert.soonNoExcept(() => {
-            try {
-                log(`Wait for secondary ${curSecondary} and tiebreaker ${tiebreakerNode}`);
-                rst.awaitSecondaryNodesForRollbackTest(
-                    awaitSecondaryNodesForRollbackTimeout,
-                    [curSecondary, tiebreakerNode],
-                    curSecondary /* connToCheckForUnrecoverableRollback */);
-            } catch (e) {
-                if (e.unrecoverableRollbackDetected) {
-                    log(`Detected unrecoverable rollback on ${curSecondary.host}. Ending test.`,
-                        true /* important */);
-                    TestData.skipCheckDBHashes = true;
-                    rst.stopSet();
-                    quit();
+        assert.soonNoExcept(
+            () => {
+                try {
+                    log(`Wait for secondary ${curSecondary} and tiebreaker ${tiebreakerNode}`);
+                    rst.awaitSecondaryNodesForRollbackTest(
+                        awaitSecondaryNodesForRollbackTimeout,
+                        [curSecondary, tiebreakerNode],
+                        curSecondary /* connToCheckForUnrecoverableRollback */,
+                        kRetryIntervalMS);
+                } catch (e) {
+                    if (e.unrecoverableRollbackDetected) {
+                        log(`Detected unrecoverable rollback on ${curSecondary.host}. Ending test.`,
+                            true /* important */);
+                        TestData.skipCheckDBHashes = true;
+                        rst.stopSet();
+                        quit();
+                    }
+                    // Re-throw the original exception in all other cases.
+                    throw e;
                 }
-                // Re-throw the original exception in all other cases.
-                throw e;
-            }
 
-            let rbid = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
-            assert(rbid > lastRBID,
-                   `Expected RBID to increment past ${lastRBID} on ${curSecondary.host}`);
+                let rbid = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
+                assert(rbid > lastRBID,
+                       `Expected RBID to increment past ${lastRBID} on ${curSecondary.host}`);
 
-            assert.eq(oplogTop(curPrimary), oplogTop(curSecondary));
+                assert.eq(oplogTop(curPrimary), oplogTop(curSecondary));
 
-            return true;
-        });
-
+                return true;
+            },
+            `Waiting for rollback to complete on ${curSecondary.host} failed`,
+            ReplSetTest.kDefaultTimeoutMS,
+            kRetryIntervalMS);
         log(`Rollback on ${curSecondary.host} completed, reconnecting tiebreaker`, true);
         tiebreakerNode.reconnect([curPrimary, curSecondary]);
 
         // Allow replication temporarily so the following checks succeed.
         restartServerReplication(tiebreakerNode);
 
-        rst.awaitReplication(null, null, [curSecondary, tiebreakerNode]);
+        rst.awaitReplication(null, null, [curSecondary, tiebreakerNode], kRetryIntervalMS);
         log(`awaitReplication completed`, true);
 
         // We call transition to steady state ops after awaiting replication has finished,
@@ -373,7 +384,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         // Now that awaitReplication and checkDataConsistency are done, stop replication again so
         // tiebreakerNode is never part of w: majority writes, see comment at top.
-        stopServerReplication(tiebreakerNode);
+        stopServerReplication(tiebreakerNode, kRetryIntervalMS);
         log(`RollbackTest transition to ${curState} took ${(new Date() - start)} ms`);
         return curPrimary;
     };
@@ -496,8 +507,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
         log(`Reconnecting the secondary ${curSecondary.host} so it'll go into rollback`);
         // Reconnect the rollback node to the current primary, which is the node we want to sync
         // from. If we reconnect to both the current primary and the tiebreaker node, the rollback
-        // node may choose the tiebreaker.
+        // node may choose the tiebreaker. Send out a new round of heartbeats immediately so that
+        // the rollback node can find a sync source quickly.
         curSecondary.reconnect([curPrimary]);
+        assert.commandWorked(curSecondary.adminCommand({replSetTest: 1, restartHeartbeats: 1}));
 
         log(`RollbackTest transition to ${curState} took ${(new Date() - start)} ms`);
         return curPrimary;
@@ -566,6 +579,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         // Fail-point will clear on restart so do post-start.
         setFastGetMoreEnabled(rst.nodes[nodeId]);
+        // Make sync source selection faster.
+        setFailPoint(
+            rst.nodes[nodeId], "forceBgSyncSyncSourceRetryWaitMS", {sleepMS: kRetryIntervalMS});
 
         // Step up if the restarted node is the current primary.
         if (rst.getNodeId(curPrimary) === nodeId) {

@@ -682,9 +682,10 @@ var ReplSetTest = function(opts) {
      * if it throws.
      */
     this.awaitSecondaryNodesForRollbackTest = function(
-        timeout, slaves, connToCheckForUnrecoverableRollback) {
+        timeout, slaves, connToCheckForUnrecoverableRollback, retryIntervalMS) {
+        retryIntervalMS = retryIntervalMS || 200;
         try {
-            this.awaitSecondaryNodes(timeout, slaves);
+            this.awaitSecondaryNodes(timeout, slaves, retryIntervalMS);
         } catch (originalEx) {
             // There is a special case where we expect the (rare) possibility of unrecoverable
             // rollbacks with EMRC:false in rollback suites with unclean shutdowns.
@@ -1679,12 +1680,13 @@ var ReplSetTest = function(opts) {
     // Wait until the optime of the specified type reaches the primary's last applied optime. Blocks
     // on all secondary nodes or just 'slaves', if specified. The timeout will reset if any of the
     // secondaries makes progress.
-    this.awaitReplication = function(timeout, secondaryOpTimeType, slaves) {
+    this.awaitReplication = function(timeout, secondaryOpTimeType, slaves, retryIntervalMS) {
         if (slaves !== undefined && slaves !== self._slaves) {
             print("ReplSetTest awaitReplication: going to check only " + slaves.map(s => s.host));
         }
 
         timeout = timeout || self.kDefaultTimeoutMS;
+        retryIntervalMS = retryIntervalMS || 200;
 
         secondaryOpTimeType = secondaryOpTimeType || ReplSetTest.OpTimeType.LAST_APPLIED;
 
@@ -1878,7 +1880,7 @@ var ReplSetTest = function(opts) {
 
                     return false;
                 }
-            }, "awaiting replication", timeout);
+            }, "awaitReplication timed out", timeout, retryIntervalMS);
         }
     };
 

@@ -211,6 +211,8 @@ private:
 
     OpTime _readLastAppliedOpTime(OperationContext* opCtx);
 
+    long long _getRetrySleepMS();
+
     // This OplogApplier applies oplog entries fetched from the sync source.
     OplogApplier* const _oplogApplier;
 

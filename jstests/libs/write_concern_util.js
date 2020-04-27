@@ -18,7 +18,8 @@ function shardCollectionWithChunks(st, coll, numDocs) {
 }
 
 // Stops replication on the given server(s).
-function stopServerReplication(conn) {
+function stopServerReplication(conn, retryIntervalMS) {
+    retryIntervalMS = retryIntervalMS || 300;
     if (conn.length) {
         conn.forEach(function(n) {
             stopServerReplication(n);
@@ -37,7 +38,10 @@ function stopServerReplication(conn) {
     // the fail point won't be hit until the node transitions from being the primary.
     if (assert.commandWorked(conn.adminCommand('replSetGetStatus')).myState !=
         ReplSetTest.State.PRIMARY) {
-        checkLog.contains(conn, 'bgsync - stopReplProducer fail point enabled');
+        checkLog.contains(conn,
+                          'bgsync - stopReplProducer fail point enabled',
+                          ReplSetTest.kDefaultTimeoutMS,
+                          retryIntervalMS);
     }
 }
 
