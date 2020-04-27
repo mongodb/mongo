@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <set>
@@ -35,16 +37,19 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_last_error_info.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 namespace {
 
-class CmdShardingResetError : public BasicCommand {
+// WARNING: This command is deprecated and will be removed in v4.6. (TODO SERVER-47817)
+class CmdShardingResetErrorDeprecated : public BasicCommand {
 public:
-    CmdShardingResetError() : BasicCommand("resetError", "reseterror") {}
+    CmdShardingResetErrorDeprecated() : BasicCommand("resetError", "reseterror") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -65,6 +70,10 @@ public:
                      const std::string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
+        if (_sampler.tick()) {
+            LOGV2_WARNING(47187006, "The resetError command is deprecated.");
+        }
+
         LastError::get(cc()).reset();
 
         const std::set<std::string>* shards = ClusterLastErrorInfo::get(cc())->getPrevShardHosts();
@@ -88,7 +97,10 @@ public:
         return true;
     }
 
-} cmdShardingResetError;
+private:
+    // Used to log occasional deprecation warnings when this command is invoked.
+    Rarely _sampler;
+} cmdShardingResetErrorDeprecated;
 
 }  // namespace
 }  // namespace mongo

@@ -38,17 +38,20 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
 
-class UnsetShardingCommand : public BasicCommand {
+// This command is deprecated and will be removed in v4.6. (TODO SERVER-47806)
+class UnsetShardingCommandDeprecated : public BasicCommand {
 public:
-    UnsetShardingCommand() : BasicCommand("unsetSharding") {}
+    UnsetShardingCommandDeprecated() : BasicCommand("unsetSharding") {}
 
     std::string help() const override {
-        return "internal";
+        return "WARNING: This command is deprecated. For internal use only.";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -75,11 +78,18 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        if (_sampler.tick()) {
+            LOGV2_WARNING(47187008, "The unsetSharding command is deprecated.");
+        }
+
         ShardedConnectionInfo::reset(opCtx->getClient());
         return true;
     }
 
-} unsetShardingCommand;
+private:
+    // Used to log occasional deprecation warnings when this command is invoked.
+    Rarely _sampler;
+} unsetShardingCommandDeprecated;
 
 }  // namespace
 }  // namespace mongo

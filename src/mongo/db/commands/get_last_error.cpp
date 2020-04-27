@@ -42,6 +42,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 namespace {
@@ -49,13 +50,15 @@ namespace {
 using std::string;
 using std::stringstream;
 
-/* reset any errors so that getlasterror comes back clean.
-
-   useful before performing a long series of operations where we want to
-   see if any of the operations triggered an error, but don't want to check
-   after each op as that woudl be a client/server turnaround.
-*/
-class CmdResetError : public BasicCommand {
+/*
+ * Resets any errors so that getLastError comes back clean.
+ *
+ * Useful before performing a long series of operations where we want to see if any of the
+ * operations triggered an error, but we don't want to check after as op, to avoid a round trip.
+ *
+ * WARNING: This command is deprecated and will be removed in v4.6. (TODO SERVER-47817)
+ */
+class CmdResetErrorDeprecated : public BasicCommand {
 public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -72,17 +75,24 @@ public:
     }
 
     std::string help() const override {
-        return "reset error state";
+        return "WARNING: This command is deprecated. Resets error state";
     }
-    CmdResetError() : BasicCommand("resetError", "reseterror") {}
+    CmdResetErrorDeprecated() : BasicCommand("resetError", "reseterror") {}
     bool run(OperationContext* opCtx,
              const string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
+        if (_sampler.tick()) {
+            LOGV2_WARNING(47187009, "The resetError command is deprecated.");
+        }
         LastError::get(opCtx->getClient()).reset();
         return true;
     }
-} cmdResetError;
+
+private:
+    // Used to log occasional deprecation warnings when this command is invoked.
+    Rarely _sampler;
+} cmdResetErrorDeprecated;
 
 class CmdGetLastError : public ErrmsgCommandDeprecated {
 public:

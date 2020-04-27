@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <string>
@@ -41,8 +43,10 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 namespace {
@@ -114,12 +118,13 @@ public:
 
 } poolStatsCmd;
 
-class ShardedPoolStats final : public BasicCommand {
+// Command is deprecated and will be removed in v4.6. (TODO: SERVER-47807)
+class ShardedPoolStatsDeprecated final : public BasicCommand {
 public:
-    ShardedPoolStats() : BasicCommand("shardConnPoolStats") {}
+    ShardedPoolStatsDeprecated() : BasicCommand("shardConnPoolStats") {}
 
     std::string help() const override {
-        return "stats about the shard connection pool";
+        return "WARNING: This command is deprecated. Shows stats about the shard connection pool";
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -145,6 +150,12 @@ public:
              const std::string& dbname,
              const mongo::BSONObj& cmdObj,
              mongo::BSONObjBuilder& result) override {
+        if (_sampler.tick()) {
+            LOGV2_WARNING(47187007,
+                          "The shardConnPoolStats command is deprecated. Use instead the "
+                          "connPoolStats command.");
+        }
+
         // Connection information
         executor::ConnectionPoolStats stats{};
         shardConnectionPool.appendConnectionStats(&stats);
@@ -155,7 +166,11 @@ public:
         return true;
     }
 
-} shardedPoolStatsCmd;
+private:
+    // Used to log occasional deprecation warnings when this command is invoked.
+    Rarely _sampler;
+
+} shardedPoolStatsCmdDeprecated;
 
 }  // namespace
 }  // namespace mongo
