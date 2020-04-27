@@ -72,6 +72,7 @@ public:
     static const char kAwaitDataField[];
     static const char kPartialResultsField[];
     static const char kRuntimeConstantsField[];
+    static const char kLetField[];
     static const char kTermField[];
     static const char kOptionsField[];
     static const char kReadOnceField[];
@@ -367,6 +368,14 @@ public:
         return _runtimeConstants;
     }
 
+    void setLetParameters(BSONObj letParams) {
+        _letParameters = std::move(letParams);
+    }
+
+    const boost::optional<BSONObj>& getLetParameters() const {
+        return _letParameters;
+    }
+
     bool isSlaveOk() const {
         return _slaveOk;
     }
@@ -564,6 +573,10 @@ private:
 
     // Runtime constants which may be referenced by $expr, if present.
     boost::optional<RuntimeConstants> _runtimeConstants;
+
+    // A document containing user-specified constants. For a find query, these are accessed only
+    // inside $expr.
+    boost::optional<BSONObj> _letParameters;
 
     // Options that can be specified in the OP_QUERY 'flags' header.
     TailableModeEnum _tailableMode = TailableModeEnum::kNormal;

@@ -129,6 +129,14 @@ public:
         return _runtimeConstants;
     }
 
+    void setLetParameters(const boost::optional<BSONObj>& letParameters) {
+        _letParameters = letParameters;
+    }
+
+    const boost::optional<BSONObj>& getLetParameters() const {
+        return _letParameters;
+    }
+
     void setArrayFilters(const std::vector<BSONObj>& arrayFilters) {
         _updateOp.setArrayFilters(arrayFilters);
     }
@@ -287,6 +295,9 @@ private:
     // System-defined constant values which may be required by the query or update operation.
     boost::optional<RuntimeConstants> _runtimeConstants;
 
+    // User-defined constant values to be used with a pipeline-style update. These can be specified
+    // by the user for each individual element of the 'updates' array in the 'update' command.
+    boost::optional<BSONObj> _letParameters;
 
     // The statement id of this request.
     StmtId _stmtId = kUninitializedStmtId;

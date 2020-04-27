@@ -613,6 +613,7 @@ Update CommonMongodProcessInterface::buildUpdateOp(
         return wcb;
     }());
     updateOp.setRuntimeConstants(expCtx->getRuntimeConstants());
+    updateOp.setLet(expCtx->variables.serializeLetParameters(expCtx->variablesParseState));
     return updateOp;
 }
 

@@ -140,6 +140,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      std::unique_ptr<CollatorInterface> collator,
                                      const NamespaceString& nss,
                                      const boost::optional<RuntimeConstants>& runtimeConstants,
+                                     const boost::optional<BSONObj>& letParameters,
                                      bool mayDbProfile)
     : ns(nss),
       opCtx(opCtx),
@@ -157,6 +158,16 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     }
 
     jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
+    if (letParameters) {
+        // TODO SERVER-47713: One possible fix is to change the interface of everything that needs
+        // an expression context intrusive_ptr to take a raw ptr.
+        auto intrusiveThis = boost::intrusive_ptr{this};
+        ON_BLOCK_EXIT([&] {
+            intrusiveThis.detach();
+            unsafeRefDecRefCountTo(0u);
+        });
+        variables.seedVariablesWithLetParameters(intrusiveThis, *letParameters);
+    }
 }
 
 void ExpressionContext::checkForInterrupt() {

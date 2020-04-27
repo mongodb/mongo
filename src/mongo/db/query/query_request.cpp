@@ -102,6 +102,7 @@ const char QueryRequest::kNoCursorTimeoutField[] = "noCursorTimeout";
 const char QueryRequest::kAwaitDataField[] = "awaitData";
 const char QueryRequest::kPartialResultsField[] = "allowPartialResults";
 const char QueryRequest::kRuntimeConstantsField[] = "runtimeConstants";
+const char QueryRequest::kLetField[] = "let";
 const char QueryRequest::kTermField[] = "term";
 const char QueryRequest::kOptionsField[] = "options";
 const char QueryRequest::kReadOnceField[] = "readOnce";
@@ -353,6 +354,10 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
             qr->_runtimeConstants =
                 RuntimeConstants::parse(IDLParserErrorContext(kRuntimeConstantsField),
                                         cmdObj.getObjectField(kRuntimeConstantsField));
+        } else if (fieldName == kLetField) {
+            if (auto status = checkFieldType(el, Object); !status.isOK())
+                return status;
+            qr->_letParameters = el.Obj().getOwned();
         } else if (fieldName == kOptionsField) {
             // 3.0.x versions of the shell may generate an explain of a find command with an
             // 'options' field. We accept this only if the 'options' field is empty so that
@@ -579,6 +584,10 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
         BSONObjBuilder rtcBuilder(cmdBuilder->subobjStart(kRuntimeConstantsField));
         _runtimeConstants->serialize(&rtcBuilder);
         rtcBuilder.doneFast();
+    }
+
+    if (_letParameters) {
+        cmdBuilder->append(kLetField, *_letParameters);
     }
 
     if (_replicationTerm) {
@@ -1123,6 +1132,9 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
         BSONObjBuilder rtcBuilder(aggregationBuilder.subobjStart(kRuntimeConstantsField));
         _runtimeConstants->serialize(&rtcBuilder);
         rtcBuilder.doneFast();
+    }
+    if (_letParameters) {
+        aggregationBuilder.append(QueryRequest::kLetField, *_letParameters);
     }
     return StatusWith<BSONObj>(aggregationBuilder.obj());
 }

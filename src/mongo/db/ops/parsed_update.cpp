@@ -45,8 +45,11 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const ExtensionsCallback& extensionsCallback)
     : _opCtx(opCtx),
       _request(request),
-      _expCtx(make_intrusive<ExpressionContext>(
-          opCtx, nullptr, _request->getNamespaceString(), _request->getRuntimeConstants())),
+      _expCtx(make_intrusive<ExpressionContext>(opCtx,
+                                                nullptr,
+                                                _request->getNamespaceString(),
+                                                _request->getRuntimeConstants(),
+                                                _request->getLetParameters())),
       _driver(_expCtx),
       _canonicalQuery(),
       _extensionsCallback(extensionsCallback) {}
@@ -146,9 +149,13 @@ Status ParsedUpdate::parseQueryToCQ() {
         allowedMatcherFeatures &= ~MatchExpressionParser::AllowedFeatures::kExpr;
     }
 
-    // If the update request has runtime constants attached to it, pass them to the QueryRequest.
+    // If the update request has runtime constants or let parameters attached to it, pass them to
+    // the QueryRequest.
     if (auto& runtimeConstants = _request->getRuntimeConstants()) {
         qr->setRuntimeConstants(*runtimeConstants);
+    }
+    if (auto& letParams = _request->getLetParameters()) {
+        qr->setLetParameters(*letParams);
     }
 
     auto statusWithCQ = CanonicalQuery::canonicalize(

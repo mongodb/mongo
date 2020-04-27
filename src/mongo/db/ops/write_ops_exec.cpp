@@ -708,11 +708,13 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 /**
  * Performs a single update, retrying failure due to DuplicateKeyError when eligible.
  */
-static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* opCtx,
-                                                              const NamespaceString& ns,
-                                                              StmtId stmtId,
-                                                              const write_ops::UpdateOpEntry& op,
-                                                              RuntimeConstants runtimeConstants) {
+static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    StmtId stmtId,
+    const write_ops::UpdateOpEntry& op,
+    RuntimeConstants runtimeConstants,
+    const boost::optional<BSONObj>& letParams) {
     globalOpCounters.gotUpdate();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
@@ -732,6 +734,9 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
     UpdateRequest request(op);
     request.setNamespaceString(ns);
     request.setRuntimeConstants(std::move(runtimeConstants));
+    if (letParams) {
+        request.setLetParameters(std::move(letParams));
+    }
     request.setStmtId(stmtId);
     request.setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
                                                                : PlanExecutor::YIELD_AUTO);
@@ -817,8 +822,12 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
         ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp); });
         try {
             lastOpFixer.startingOp();
-            out.results.emplace_back(performSingleUpdateOpWithDupKeyRetry(
-                opCtx, wholeOp.getNamespace(), stmtId, singleOp, runtimeConstants));
+            out.results.emplace_back(performSingleUpdateOpWithDupKeyRetry(opCtx,
+                                                                          wholeOp.getNamespace(),
+                                                                          stmtId,
+                                                                          singleOp,
+                                                                          runtimeConstants,
+                                                                          wholeOp.getLet()));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue =

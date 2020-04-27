@@ -417,6 +417,7 @@ private:
             updateRequest.setNamespaceString(_batch.getNamespace());
             updateRequest.setRuntimeConstants(
                 _batch.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+            updateRequest.setLetParameters(_batch.getLet());
             updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
             updateRequest.setExplain();
 

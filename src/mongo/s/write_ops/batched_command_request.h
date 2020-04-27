@@ -148,6 +148,18 @@ public:
         return _updateReq->getRuntimeConstants();
     }
 
+    void setLet(BSONObj let) {
+        _updateReq->setLet(std::move(let));
+    }
+
+    bool hasLet() const {
+        return _updateReq->getLet().is_initialized();
+    }
+
+    const boost::optional<BSONObj>& getLet() const {
+        return _updateReq->getLet();
+    }
+
     const write_ops::WriteCommandBase& getWriteCommandBase() const;
     void setWriteCommandBase(write_ops::WriteCommandBase writeCommandBase);
 

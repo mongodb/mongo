@@ -142,6 +142,7 @@ public:
                       std::unique_ptr<CollatorInterface> collator,
                       const NamespaceString& ns,
                       const boost::optional<RuntimeConstants>& runtimeConstants = boost::none,
+                      const boost::optional<BSONObj>& letParameters = boost::none,
                       bool mayDbProfile = true);
 
     /**

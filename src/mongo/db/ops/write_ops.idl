@@ -184,6 +184,11 @@ commands:
                 description: "An array of one or more update statements to perform."
                 type: array<UpdateOpEntry>
                 supports_doc_sequence: true
+            let:
+                description: "A set of user-specified constants used by pipeline-style update
+                              operations and $expr."
+                type: object
+                optional: true
             runtimeConstants:
                 description: "A collection of values that do not change once computed. These are
                               used by pipeline-style update operations."
