@@ -178,6 +178,17 @@ public:
         return _provenance;
     }
 
+    /**
+     * Set atClusterTime, clear afterClusterTime. The BSON representation becomes
+     * {level: "snapshot", atClusterTime: <ts>}.
+     */
+    void setArgsAtClusterTimeForSnapshot(Timestamp ts) {
+        invariant(_level && _level == ReadConcernLevel::kSnapshotReadConcern);
+        invariant(!_atClusterTime);
+        _afterClusterTime = boost::none;
+        _atClusterTime = LogicalTime(ts);
+    }
+
 private:
     /**
      * Appends level, afterOpTime, and the other "inner" fields of the read concern args.

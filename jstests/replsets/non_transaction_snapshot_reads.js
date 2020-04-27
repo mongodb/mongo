@@ -8,50 +8,17 @@
 (function() {
 "use strict";
 
-const replSet = new ReplSetTest({nodes: 2});
+load("jstests/libs/global_snapshot_reads_util.js");
 
+// TODO(SERVER-47672): Use minSnapshotHistoryWindowInSeconds instead.
+const options = {
+    setParameter: "maxTargetSnapshotHistoryWindowInSeconds=600",
+};
+const replSet = new ReplSetTest({nodes: 3, nodeOptions: options});
 replSet.startSet();
 replSet.initiateWithHighElectionTimeout();
-
-const collName = "coll";
 const primary = replSet.getPrimary();
-const secondary = replSet.getSecondary();
-const primaryDB = primary.getDB('test');
-const secondaryDB = secondary.getDB('test');
-
-const initialDocuments = [{x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}];
-const initialInsertOperationTime =
-    assert
-        .commandWorked(primaryDB.runCommand(
-            {insert: collName, documents: initialDocuments, writeConcern: {w: 2}}))
-        .operationTime;
-
-// Do some updates against the initial documents.
-for (let i = 0; i < 10; i++) {
-    assert.commandWorked(
-        primaryDB.getCollection(collName).updateMany({}, {$inc: {x: 1}}, {writeConcern: {w: 2}}));
-}
-
-// Tests that updates are not visible to a snapshot read at the initialInsertOperationTime.
-jsTestLog("Testing snapshot on primary with atClusterTime " + initialInsertOperationTime);
-let cmdRes = assert.commandWorked(primaryDB.runCommand({
-    find: collName,
-    projection: {_id: 0},
-    readConcern: {level: "snapshot", atClusterTime: initialInsertOperationTime},
-    // TODO(SERVER-47575): Use a smaller batch size and test getMore.
-    batchSize: NumberInt(100)
-}));
-assert.sameMembers(cmdRes.cursor.firstBatch, initialDocuments, tojson(cmdRes));
-
-jsTestLog("Testing snapshot on secondary with atClusterTime " + initialInsertOperationTime);
-cmdRes = assert.commandWorked(secondaryDB.runCommand({
-    find: collName,
-    projection: {_id: 0},
-    readConcern: {level: "snapshot", atClusterTime: initialInsertOperationTime},
-    // TODO(SERVER-47575): Use a smaller batch size and test getMore.
-    batchSize: NumberInt(100)
-}));
-assert.sameMembers(cmdRes.cursor.firstBatch, initialDocuments, tojson(cmdRes));
-
+const testDB = primary.getDB('test');
+snapshotReadsTest(jsTestName(), testDB, "test");
 replSet.stopSet();
 })();

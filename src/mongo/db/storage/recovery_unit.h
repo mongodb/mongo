@@ -391,7 +391,7 @@ public:
          */
         kNoTimestamp,
         /**
-         * Read from the majority all-commmitted timestamp.
+         * Read from the majority all-committed timestamp.
          */
         kMajorityCommitted,
         /**

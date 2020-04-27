@@ -362,9 +362,19 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
         }
     }
 
+    auto ru = opCtx->recoveryUnit();
     if (atClusterTime) {
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                      atClusterTime->asTimestamp());
+        ru->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                   atClusterTime->asTimestamp());
+    } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
+               replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet &&
+               !opCtx->inMultiDocumentTransaction()) {
+        auto opTime = replCoord->getCurrentCommittedSnapshotOpTime();
+        uassert(ErrorCodes::SnapshotUnavailable,
+                "No committed OpTime for snapshot read",
+                !opTime.isNull());
+        ru->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, opTime.getTimestamp());
+        repl::ReadConcernArgs::get(opCtx).setArgsAtClusterTimeForSnapshot(opTime.getTimestamp());
     } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
                replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet) {
         // This block is not used for kSnapshotReadConcern because snapshots are always speculative;
@@ -379,7 +389,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             // always reading at the minimum of the all-committed and lastApplied timestamps. This
             // allows for safe behavior on both primaries and secondaries, where the behavior of the
             // all-committed and lastApplied timestamps differ significantly.
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+            ru->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
             auto& speculativeReadInfo = repl::SpeculativeMajorityReadInfo::get(opCtx);
             speculativeReadInfo.setIsSpeculativeRead();
             return Status::OK();
@@ -393,14 +403,14 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             "Waiting for 'committed' snapshot to be available for reading: {readConcernArgs}",
             "readConcernArgs"_attr = readConcernArgs);
 
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        Status status = opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot();
+        ru->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
+        Status status = ru->obtainMajorityCommittedSnapshot();
 
         // Wait until a snapshot is available.
         while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
             LOGV2_DEBUG(20992, debugLevel, "Snapshot not available yet.");
             replCoord->waitUntilSnapshotCommitted(opCtx, Timestamp());
-            status = opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot();
+            status = ru->obtainMajorityCommittedSnapshot();
         }
 
         if (!status.isOK()) {
@@ -413,7 +423,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                     "{opCtx_recoveryUnit_getPointInTimeReadTimestamp}",
                     "CurOp_get_opCtx_opDescription"_attr = CurOp::get(opCtx)->opDescription(),
                     "opCtx_recoveryUnit_getPointInTimeReadTimestamp"_attr =
-                        opCtx->recoveryUnit()->getPointInTimeReadTimestamp());
+                        ru->getPointInTimeReadTimestamp());
     }
     return Status::OK();
 }
