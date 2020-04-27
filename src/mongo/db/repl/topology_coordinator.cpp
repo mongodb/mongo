@@ -425,7 +425,7 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
         return _syncSource;
     }
     _syncSource = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
-    LOGV2(21799, "sync source candidate chosen.", "syncSource"_attr = _syncSource);
+    LOGV2(21799, "Sync source candidate chosen", "syncSource"_attr = _syncSource);
     std::string msg(str::stream() << "syncing from: " << _syncSource.toString(), 0);
     setMyHeartbeatMessage(now, msg);
     return _syncSource;
@@ -470,7 +470,6 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
 
         auto syncSource = _rsConfig.getMemberAt(syncSourceIndex).getHostAndPort();
         LOGV2(21781,
-              "choosing sync source candidate due to 'forceSyncSourceCandidate' parameter.",
               "Choosing sync source candidate due to 'forceSyncSourceCandidate' parameter",
               "syncSource"_attr = syncSource);
         std::string msg(str::stream() << "syncing from: " << syncSource.toString()
@@ -484,7 +483,7 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
         invariant(_forceSyncSourceIndex < _rsConfig.getNumMembers());
         auto syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
         _forceSyncSourceIndex = -1;
-        LOGV2(21782, "choosing sync source candidate by request", "syncSource"_attr = syncSource);
+        LOGV2(21782, "Choosing sync source candidate by request", "syncSource"_attr = syncSource);
         std::string msg(str::stream()
                         << "syncing from: " << syncSource.toString() << " by request");
         setMyHeartbeatMessage(now, msg);
@@ -516,11 +515,11 @@ HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
                     " the primary is unknown/down.");
         return HostAndPort();
     } else if (_memberIsBlacklisted(*getCurrentPrimaryMember(), now)) {
-        LOGV2_DEBUG(3873116,
-                    1,
-                    "Cannot select the primary as sync source because the primary "
-                    "member is blacklisted.",
-                    "primary"_attr = getCurrentPrimaryMember()->getHostAndPort());
+        LOGV2_DEBUG(
+            3873116,
+            1,
+            "Cannot select the primary as sync source because the primary member is blacklisted",
+            "primary"_attr = getCurrentPrimaryMember()->getHostAndPort());
         return HostAndPort();
     } else if (_currentPrimaryIndex == _selfIndex) {
         LOGV2_DEBUG(
@@ -538,7 +537,7 @@ HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
         return HostAndPort();
     } else {
         auto syncSource = getCurrentPrimaryMember()->getHostAndPort();
-        LOGV2(3873117, "Choosing primary as sync source.", "primary"_attr = syncSource);
+        LOGV2(3873117, "Choosing primary as sync source", "primary"_attr = syncSource);
         std::string msg(str::stream() << "syncing from primary: " << syncSource.toString());
         setMyHeartbeatMessage(now, msg);
         return syncSource;
