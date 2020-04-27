@@ -236,14 +236,16 @@ function isRetryableShardCollectionResponse(res) {
 // Returns true if the given response could have come from moveChunk being interrupted by a
 // failover.
 function isRetryableMoveChunkResponse(res) {
-    return res.code === ErrorCodes.OperationFailed &&
-        (RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
-         // The transaction number is bumped by the migration coordinator when its commit or abort
-         // decision is being made durable.
-         res.errmsg.includes("TransactionTooOld") ||
-         // The range deletion task may have been interrupted. This error can occur even when
-         // _waitForDelete=false.
-         res.errmsg.includes("operation was interrupted"));
+    return (res.code === ErrorCodes.OperationFailed &&
+            (RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
+             // The transaction number is bumped by the migration coordinator when its commit or
+             // abort decision is being made durable.
+             res.errmsg.includes("TransactionTooOld") ||
+             // The range deletion task may have been interrupted. This error can occur even when
+             // _waitForDelete=false.
+             res.errmsg.includes("operation was interrupted"))) ||
+        // This error may occur when the node is shutting down.
+        res.code === ErrorCodes.CallbackCanceled;
 }
 
 function hasError(res) {
