@@ -87,8 +87,13 @@ public:
         return _fromShardCS;
     }
 
+    bool hasMigrationId() const {
+        return _migrationId.is_initialized();
+    }
+
     const UUID& getMigrationId() const {
-        return _migrationId;
+        invariant(_migrationId);
+        return *_migrationId;
     }
 
     const LogicalSessionId& getLsid() const {
@@ -129,14 +134,13 @@ public:
 
 private:
     StartChunkCloneRequest(NamespaceString nss,
-                           UUID migrationId,
                            MigrationSessionId sessionId,
                            MigrationSecondaryThrottleOptions secondaryThrottle);
 
     // The collection for which this request applies
     NamespaceString _nss;
 
-    UUID _migrationId;
+    boost::optional<UUID> _migrationId;
     LogicalSessionId _lsid;
     TxnNumber _txnNumber;
 

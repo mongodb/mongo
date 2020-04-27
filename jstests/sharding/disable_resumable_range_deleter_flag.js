@@ -91,14 +91,14 @@ function testDisabledSourceFailsMigration() {
     // Move chunk [50, inf) to shard1 should fail since migration id is missing.
     assert.commandFailedWithCode(
         st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}),
-        ErrorCodes.IllegalOperation);
+        [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.IllegalOperation]);
 
     // Re-enable resumable range deleter on shard0.
     st.rs0.stopSet(null /* signal */, true /* forRestart */);
     st.rs0.startSet({restart: true, setParameter: {disableResumableRangeDeleter: false}});
 }
 
-function testDisabledRecipientFailsMigration() {
+function testDisabledRecipientSucceedsMigration() {
     jsTestLog("Test that disabled recipient succeeds migration");
 
     const [collName, ns] = getNewNs(dbName);
@@ -117,9 +117,8 @@ function testDisabledRecipientFailsMigration() {
     st.rs1.startSet({restart: true, setParameter: {disableResumableRangeDeleter: true}});
 
     // Move chunk [50, inf) to shard1 should succeed.
-    assert.commandFailedWithCode(
-        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}),
-        ErrorCodes.IllegalOperation);
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {x: 50}, to: st.shard1.shardName}));
 
     // Re-enable resumable range deleter on shard1.
     st.rs1.stopSet(null /* signal */, true /* forRestart */);
@@ -128,7 +127,7 @@ function testDisabledRecipientFailsMigration() {
 
 testBothDisabledSucceeds();
 testDisabledSourceFailsMigration();
-testDisabledRecipientFailsMigration();
+testDisabledRecipientSucceedsMigration();
 
 st.stop();
 })();
