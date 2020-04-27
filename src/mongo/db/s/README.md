@@ -37,6 +37,95 @@ on each of these collections for efficient querying
 
 ## Shard versioning and database versioning
 
+In a sharded cluster, the placement of collections is determined by a versioning protocol. We use
+this versioning protocol in tracking the location of both chunks for sharded collections and
+databases for unsharded collections.
+
+### Shard versioning
+
+The shard versioning protocol tracks the placement of chunks for sharded collections.
+
+Each chunk has a version called the "chunk version." A chunk version consists of three elements:
+
+1. The major version - an integer incremented when a chunk moves shards.
+1. The minor version - an integer incremented when a chunk is split.
+1. The epoch - an object ID shared among all chunks for a collection that distinguishes a unique instance of the collection. The epoch remains unchanged for the lifetime of the chunk, unless the collection is dropped or the collection's shard key has been refined using the refineCollectionShardKey command.
+
+To completely define the shard versioning protocol, we introduce two extra terms - the "shard
+version" and "collection version."
+
+1. Shard version - For a sharded collection, this is the highest chunk version seen on a particular shard.
+1. Collection version - For a sharded collection, this is the highest chunk version seen across all shards.
+
+### Database versioning
+
+The database versioning protocol tracks the placement of databases for unsharded collections. The
+“database version” indicates on which shard a database currently exists. A database version
+consists of two elements:
+
+1. The UUID - a unique identifier to distinguish different instances of the database. The UUID remains unchanged for the lifetime of the database, unless the database is dropped and recreated.
+1. The last modified field - an integer incremented when the database changes its primary shard.
+
+### Versioning updates
+
+Nodes that track chunk/database versions “lazily” load versioning information. A router or shard
+will only find out that its internally-stored versioning information is stale via receiving changed
+version information from another node.
+
+For each request sent from an origin node to a remote node, the origin node will attach its cached
+version information for the corresponding chunk or database. There are two possible versioning
+scenarios: 
+
+1. If the remote node detects a shard version mismatch, the remote node will return a message to the origin node stating as such. Whichever node that reports having an older version will attempt to refresh. The origin node will then retry the request.
+1. If the remote node and the origin node have the same version, the request will proceed.
+
+### Types of operations that will cause the versioning information to become stale
+
+Operation Type                            | Version Modification Behavior                                                                                             |
+--------------                            | -----------------------------                                                                                             |
+Moving a chunk                            | Incremements the chunk's major version                                                                                    |
+Splitting a chunk                         | If the shard version is equal to the collection version, increases the major version; always increments the minor version |
+Merging a chunk                           | Sets the chunk's major version to the collection version plus one; will set the chunk's minor version to zero             |
+Dropping a collection                     | Sets the chunk's version and epoch to the unsharded constant defined below                                                |
+Refining a collection’s shard key         | Creates a new epoch while maintaining the chunk’s major and minor version                                                 |
+Changing the primary shard for a database | Increments the database’s last modified field                                                                             |
+Dropping a database                       | Creates a new UUID and set the last modified field to one                                                                 |
+
+Refer to [SERVER-41480](https://jira.mongodb.org/browse/SERVER-41480) for the reasoning behind the
+complicated behavior with splitting a chunk.
+
+### Special versioning conventions
+
+Chunk versioning conventions
+
+Convention Type                           | Major Version | Minor Version | Epoch        |
+---------------                           | ------------- | ------------- | -----        |
+First chunk for sharded collection        | 1             | 0             | ObjectId()   |
+Collection is unsharded                   | 0             | 0             | ObjectId()   |
+Collection was dropped                    | 0             | 0             | ObjectId()   |
+Ignore the chunk version for this request | 0             | 0             | Max DateTime |
+
+Database version conventions
+
+Convention Type | UUID   | Last Modified | 
+--------------- | ----   | ------------- |
+New database    | UUID() | 1             |
+Config database | UUID() | 0             |
+Admin database  | UUID() | 0             |
+
+#### Code references
+
+* [The chunk version class](https://github.com/mongodb/mongo/blob/master/src/mongo/s/chunk_version.h)
+* [The database version IDL](https://github.com/mongodb/mongo/blob/master/src/mongo/s/database_version.idl)
+* [The database version helpers class](https://github.com/mongodb/mongo/blob/master/src/mongo/s/database_version_helpers.h)
+* [Where shard versions are stored in a routing table cache](https://github.com/mongodb/mongo/blob/1df41757d5d1e04c51eeeee786a17b005e025b93/src/mongo/s/catalog_cache.h#L499-L500)
+* [Where database versions are stored in a routing table cache](https://github.com/mongodb/mongo/blob/1df41757d5d1e04c51eeeee786a17b005e025b93/src/mongo/s/catalog_cache.h#L497-L498)
+* [Method used to attach the shard version to outbound requests](https://github.com/mongodb/mongo/blob/1df41757d5d1e04c51eeeee786a17b005e025b93/src/mongo/s/cluster_commands_helpers.h#L118-L121)
+* [Where shard versions are parsed in the ServiceEntryPoint and put on the OperationShardingState](https://github.com/mongodb/mongo/blob/1df41757d5d1e04c51eeeee786a17b005e025b93/src/mongo/db/service_entry_point_common.cpp#L1136-L1150)
+* [Where shard versions are stored in a shard's filtering cache](https://github.com/mongodb/mongo/blob/554ec671f7acb6a4df62664f80f68ec3a85bccac/src/mongo/db/s/collection_sharding_runtime.h#L249-L253)
+* [The method that checks the equality of a shard version on a shard](https://github.com/mongodb/mongo/blob/554ec671f7acb6a4df62664f80f68ec3a85bccac/src/mongo/db/s/collection_sharding_state.h#L126-L131)
+* [The method that checks the equality of a database version on a shard](https://github.com/mongodb/mongo/blob/554ec671f7acb6a4df62664f80f68ec3a85bccac/src/mongo/db/s/database_sharding_state.h#L98-L103)
+
 ## The shards list cache
 
 ## Targeting a specific host within a shard
