@@ -4,7 +4,7 @@
  * maxAwaitTimeMS to much higher than the default (5 mins). This will allow us to assert that the
  * RSM receives the isMaster replies because of a topology change rather than maxAwaitTimeMS being
  * hit. A replica set node should send a response to the mongos as soon as it processes a topology
- * change, so "immediately"/"quickly" can vary - we specify 3 seconds in this test ('timeoutMS').
+ * change, so "immediately"/"quickly" can vary - we specify 5 seconds in this test ('timeoutMS').
  *
  * @tags: [requires_streamable_rsm]
  */
@@ -27,7 +27,7 @@ let st = new ShardingTest({
     shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}}
 });
 
-let timeoutMS = 3000;
+let timeoutMS = 5000;
 let mongos = st.s;
 let rsPrimary = st.rs0.getPrimary();
 let electableRsSecondary;
