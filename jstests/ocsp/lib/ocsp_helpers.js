@@ -13,6 +13,10 @@ const OCSP_SERVER_MUSTSTAPLE_CERT = "jstests/libs/ocsp/server_ocsp_mustStaple.pe
 const OCSP_SERVER_CERT_REVOKED = "jstests/libs/ocsp/server_ocsp_revoked.pem";
 const OCSP_RESPONDER_CERT = "jstests/libs/ocsp/ocsp_responder.crt";
 const OCSP_RESPONDER_KEY = "jstests/libs/ocsp/ocsp_responder.key";
+const OCSP_INTERMEDIATE_CA_PEM = "jstests/libs/ocsp/intermediate_ca_ocsp.pem";
+const OCSP_INTERMEDIATE_CA_CERT = "jstests/libs/ocsp/intermediate_ca_ocsp.crt";
+const OCSP_INTERMEDIATE_CA_KEY = "jstests/libs/ocsp/intermediate_ca_ocsp.key";
+const OCSP_SERVER_INTERMEDIATE_CA_CERT = "jstests/libs/ocsp/server_intermediate_ca_ocsp.pem";
 
 var clearOCSPCache = function() {
     let provider = determineSSLProvider();
