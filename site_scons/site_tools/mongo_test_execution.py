@@ -24,11 +24,10 @@ import os
 
 
 def generate_test_execution_aliases(env, test):
-    hygienic = env.GetOption("install-mode") == "hygienic"
-    if hygienic and getattr(test.attributes, "AIB_INSTALL_ACTIONS", []):
-        installed = getattr(test.attributes, "AIB_INSTALL_ACTIONS")
-    else:
-        installed = [test]
+
+    installed = [test]
+    if env.get("AUTO_INSTALL_ENABLED", False) and env.GetAutoInstalledFiles(test):
+        installed = env.GetAutoInstalledFiles(test)
 
     target_name = os.path.basename(installed[0].get_path())
     command = env.Command(
