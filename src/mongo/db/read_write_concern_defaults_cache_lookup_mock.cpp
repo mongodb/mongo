@@ -34,7 +34,7 @@
 namespace mongo {
 
 ReadWriteConcernDefaults::FetchDefaultsFn ReadWriteConcernDefaultsLookupMock::getFetchDefaultsFn() {
-    return std::bind(&ReadWriteConcernDefaultsLookupMock::lookup, this, std::placeholders::_1);
+    return [this](OperationContext* opCtx) { return lookup(opCtx); };
 }
 
 boost::optional<RWConcernDefault> ReadWriteConcernDefaultsLookupMock::lookup(

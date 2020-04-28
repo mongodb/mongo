@@ -28,6 +28,8 @@
  */
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <vector>
 
 #include "mongo/client/sdam/server_description.h"
