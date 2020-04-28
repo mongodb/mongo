@@ -441,13 +441,9 @@ env.Library(
     source=[
         'sessions_collection_sharded.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/sessions_collection',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/sessions_collection_rs',
         'sharding_api',
     ],
 )
