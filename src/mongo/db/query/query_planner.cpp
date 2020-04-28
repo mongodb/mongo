@@ -569,10 +569,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 "Running with 'notablescan', so tailable cursors (which always do a table "
                 "scan) are not allowed");
         }
-        if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
-            return Status(ErrorCodes::NoQueryExecutionPlans,
-                          "Tailable cursors and geo $near cannot be used together");
-        }
         auto soln = buildCollscanSoln(query, isTailable, params);
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,

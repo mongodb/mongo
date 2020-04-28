@@ -401,6 +401,12 @@ StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
         return Status(ErrorCodes::BadValue, "text and tailable cursor not allowed in same query");
     }
 
+    // NEAR and tailable are incompatible.
+    if (numGeoNear > 0 && request.isTailable()) {
+        return Status(ErrorCodes::BadValue,
+                      "Tailable cursors and geo $near cannot be used together");
+    }
+
     // $natural sort order must agree with hint.
     if (sortNaturalElt) {
         if (!hintObj.isEmpty() && !hintNaturalElt) {
