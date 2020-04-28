@@ -291,7 +291,7 @@ error_codes:
     - {code: 260,name: InvalidResumeToken}
     - {code: 261,name: TooManyLogicalSessions}
     - {code: 262,name: ExceededTimeLimit,categories: [Interruption,ExceededTimeLimitError,RetriableError]}
-    - {code: 263,name: OperationNotSupportedInTransaction}
+    - {code: 263,name: OperationNotSupportedInTransaction,categories: [VoteAbortError]}
     - {code: 264,name: TooManyFilesOpen}
     - {code: 265,name: OrphanedRangeCleanUpFailed}
     - {code: 266,name: FailPointSetFailed}
@@ -359,6 +359,9 @@ error_codes:
     - {code: 308,name: CurrentConfigNotCommittedYet}
     - {code: 309,name: ExhaustCommandFinished}
     - {code: 310,name: PeriodicJobIsStopped,categories: [CancelationError]}
+
+    # The code below is for internal use only and must never be returned in a network response.
+    - {code: 311,name: TransactionCoordinatorCanceled}
 
     # Error codes 4000-8999 are reserved.
 

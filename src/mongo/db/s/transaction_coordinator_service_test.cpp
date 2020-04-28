@@ -183,7 +183,8 @@ protected:
         }
 
         // Wait for abort to complete.
-        commitDecisionFuture.get();
+        ASSERT_THROWS_CODE(
+            commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
     }
 
     auto* service() const {
@@ -379,8 +380,10 @@ TEST_F(TransactionCoordinatorServiceTest,
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
 
-    ASSERT_EQ(static_cast<int>(commitDecisionFuture1.get()),
-              static_cast<int>(commitDecisionFuture2.get()));
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture1.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture2.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
@@ -422,8 +425,10 @@ TEST_F(TransactionCoordinatorServiceTest, RecoverCommitJoinsOngoingCoordinationT
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
 
-    ASSERT_EQ(static_cast<int>(commitDecisionFuture1.get()),
-              static_cast<int>(commitDecisionFuture2.get()));
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture1.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture2.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionCoordinatorServiceTest, RecoverCommitJoinsOngoingCoordinationThatLeadsToCommit) {
@@ -461,7 +466,7 @@ TEST_F(TransactionCoordinatorServiceTest,
         operationContext(), _lsid, _txnNumber + 1, kCommitDeadline);
 
     ASSERT_THROWS_CODE(
-        commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+        commitDecisionFuture.get(), AssertionException, ErrorCodes::TransactionCoordinatorCanceled);
 }
 
 TEST_F(
@@ -483,8 +488,9 @@ TEST_F(
 
     // The old transaction should now be committed.
     if (oldTxnCommitDecisionFuture) {
-        ASSERT_THROWS_CODE(
-            oldTxnCommitDecisionFuture->get(), AssertionException, ErrorCodes::NoSuchTransaction);
+        ASSERT_THROWS_CODE(oldTxnCommitDecisionFuture->get(),
+                           AssertionException,
+                           ErrorCodes::TransactionCoordinatorCanceled);
     }
 
     // Make sure the newly created one works fine too.
@@ -548,8 +554,8 @@ TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorT
     assertAbortSentAndRespondWithNoSuchTransaction();
 
     // The transaction should now be aborted.
-    ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
-              static_cast<int>(txn::CommitDecision::kAbort));
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorToCommit) {
@@ -622,7 +628,8 @@ TEST_F(TransactionCoordinatorServiceTest, CoordinatorAbortsIfDeadlinePassesAndSt
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
 
-    ASSERT_EQ(int(txn::CommitDecision::kAbort), int(commitDecisionFuture->get()));
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture->get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
@@ -687,8 +694,8 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
 
-    auto commitDecision = commitDecisionFuture.get();
-    ASSERT_EQ(static_cast<int>(commitDecision), static_cast<int>(txn::CommitDecision::kAbort));
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
@@ -732,8 +739,10 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
 
     abortTransaction(*coordinatorService(), _lsid, _txnNumber, kTwoShardIdSet, kTwoShardIdList[0]);
 
-    ASSERT_EQ(static_cast<int>(commitDecisionFuture1.get()),
-              static_cast<int>(commitDecisionFuture2.get()));
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture1.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture2.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 }  // namespace
