@@ -287,8 +287,8 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        auto collDesc =
-            CollectionShardingState::get(opCtx, canonicalQuery->nss())->getCollectionDescription();
+        auto collDesc = CollectionShardingState::get(opCtx, canonicalQuery->nss())
+                            ->getCollectionDescription_DEPRECATED();
         if (collDesc.isSharded()) {
             plannerParams->shardKey = collDesc.getKeyPattern();
         } else {
