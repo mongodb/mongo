@@ -32,7 +32,7 @@ function verifyInvalidGetMoreAttempts(mainDb, collName, cursorId, lsid, txnNumbe
                                  ErrorCodes.NoSuchTransaction);
 }
 
-var snapshotReadsCursorTest;
+var snapshotReadsCursorTest, snapshotReadsDistinctTest;
 
 (function() {
 function makeSnapshotReadConcern(atClusterTime) {
@@ -165,6 +165,88 @@ snapshotReadsCursorTest = function(testScenarioName, primaryDB, secondaryDB, col
                 assert.commandWorked(
                     primaryDB[collName].remove({}, {writeConcern: {w: "majority"}}));
             }
+        }
+    }
+};
+
+snapshotReadsDistinctTest = function(testScenarioName, primaryDB, secondaryDB, collName) {
+    // Note: this test sets documents' "x" field, the test above uses "_id".
+    const docs = [...Array(10).keys()].map((i) => ({"x": i}));
+
+    function distinctCommand(readPreferenceMode, atClusterTime) {
+        return {
+            distinct: collName,
+            key: "x",
+            readConcern: makeSnapshotReadConcern(atClusterTime),
+            $readPreference: {mode: readPreferenceMode}
+        };
+    }
+
+    for (let useCausalConsistency of [false, true]) {
+        for (let [db, readPreferenceMode] of [[primaryDB, "primary"], [secondaryDB, "secondary"]]) {
+            jsTestLog(`Testing "distinct" on collection ` +
+                      `${collName} with read preference ${readPreferenceMode} and causal` +
+                      ` consistency ${useCausalConsistency}`);
+
+            let res =
+                assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs}));
+            const insertTimestamp = res.operationTime;
+            assert(insertTimestamp);
+
+            jsTestLog(`Inserted 10 documents at timestamp ${insertTimestamp}`);
+            awaitCommitted(db, insertTimestamp);
+
+            // Create a session if useCausalConsistency is true.
+            let causalDb, sessionTimestamp;
+
+            if (useCausalConsistency) {
+                let session = db.getMongo().startSession({causalConsistency: true});
+                causalDb = session.getDatabase(db.getName());
+                // Establish timestamp.
+                causalDb[collName].findOne({});
+                sessionTimestamp = session.getOperationTime();
+            } else {
+                causalDb = db;
+            }
+
+            // Execute "distinct".
+            res = assert.commandWorked(causalDb.runCommand(distinctCommand(readPreferenceMode)));
+            const xs = [...Array(10).keys()];
+            assert.sameMembers(xs, res.values);
+            assert(res.hasOwnProperty("atClusterTime"));
+            let atClusterTime = res.atClusterTime;
+            assert.neq(atClusterTime, Timestamp(0, 0));
+            if (useCausalConsistency) {
+                assert.gte(atClusterTime, sessionTimestamp);
+            } else {
+                assert.gte(atClusterTime, insertTimestamp);
+            }
+
+            // Set all "x" fields to 42. This update is not visible to reads at insertTimestamp.
+            res = assert.commandWorked(primaryDB.runCommand(
+                {update: collName, updates: [{q: {}, u: {$set: {x: 42}}, multi: true}]}));
+
+            jsTestLog(`Updated collection "${collName}" at timestamp ${res.operationTime}`);
+            awaitCommitted(db, res.operationTime);
+
+            // This read shows the updated docs.
+            res = assert.commandWorked(causalDb.runCommand(distinctCommand(readPreferenceMode)));
+            assert(res.hasOwnProperty("atClusterTime"));
+            // Selected atClusterTime at or after first read's atClusterTime.
+            assert.gte(res.atClusterTime, atClusterTime);
+            assert.sameMembers([42], res.values);
+
+            jsTestLog(`Reading with original insert timestamp ${insertTimestamp}`);
+            // Use non-causal database handle.
+            res = assert.commandWorked(
+                db.runCommand(distinctCommand(readPreferenceMode, insertTimestamp)));
+
+            assert.sameMembers(xs, res.values);
+            assert(res.hasOwnProperty("atClusterTime"));
+            assert.eq(res.atClusterTime, insertTimestamp);
+
+            // Reset.
+            assert.commandWorked(primaryDB[collName].remove({}, {writeConcern: {w: "majority"}}));
         }
     }
 };

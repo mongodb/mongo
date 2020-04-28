@@ -20,11 +20,14 @@ replSet.initiateWithHighElectionTimeout();
 const primaryDB = replSet.getPrimary().getDB('test');
 const secondaryDB = replSet.getSecondary().getDB('test');
 snapshotReadsCursorTest(jsTestName(), primaryDB, secondaryDB, "test");
+snapshotReadsDistinctTest(jsTestName(), primaryDB, secondaryDB, "test");
 
-// Ensure "atClusterTime" is omitted from a regular (non-snapshot) cursor.
+// Ensure "atClusterTime" is omitted from a regular (non-snapshot) reads.
 primaryDB["collection"].insertOne({});
 const cursor = assert.commandWorked(primaryDB.runCommand({find: "test"})).cursor;
 assert(!cursor.hasOwnProperty("atClusterTime"));
+const distinctResult = assert.commandWorked(primaryDB.runCommand({distinct: "test", key: "_id"}));
+assert(!distinctResult.hasOwnProperty("atClusterTime"));
 
 replSet.stopSet();
 })();
