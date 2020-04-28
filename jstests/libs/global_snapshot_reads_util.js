@@ -70,17 +70,6 @@ function snapshotReadsTest(testScenarioName, db, collName) {
                       `${collName} with read preference ${readPreferenceMode} and causal` +
                       ` consistency ${useCausalConsistency}`);
 
-            let causalDb;
-
-            if (useCausalConsistency) {
-                let session = db.getMongo().startSession({causalConsistency: true});
-                causalDb = session.getDatabase(db.getName());
-                // Establish timestamp.
-                causalDb[collName].findOne({});
-            } else {
-                causalDb = db;
-            }
-
             for (let commandKey in commands) {
                 assert(commandKey);
                 jsTestLog("Testing the " + commandKey + " command.");
@@ -93,15 +82,33 @@ function snapshotReadsTest(testScenarioName, db, collName) {
 
                 jsTestLog(`Inserted 10 documents at timestamp ${insertTimestamp}`);
 
+                // Create a session if useCausalConsistency is true.
+                let causalDb, sessionTimestamp;
+
+                if (useCausalConsistency) {
+                    let session = db.getMongo().startSession({causalConsistency: true});
+                    causalDb = session.getDatabase(db.getName());
+                    // Establish timestamp.
+                    causalDb["otherCollection"].insertOne({});
+                    sessionTimestamp = session.getOperationTime();
+                } else {
+                    causalDb = db;
+                }
+
                 // Establish a snapshot cursor, fetching the first 5 documents.
                 res = assert.commandWorked(causalDb.runCommand(command(5, readPreferenceMode)));
-
-                // TODO(SERVER-47576): Check atClusterTime is present, and >= findOne's timestamp if
-                // causal.
                 assert.sameMembers(res.cursor.firstBatch, docs.slice(0, 5), res);
                 assert(res.cursor.hasOwnProperty("id"));
                 const cursorId = res.cursor.id;
                 assert.neq(cursorId, 0);
+                assert(res.cursor.hasOwnProperty("atClusterTime"));
+                let atClusterTime = res.cursor.atClusterTime;
+                assert.neq(atClusterTime, Timestamp(0, 0));
+                if (useCausalConsistency) {
+                    assert.gte(atClusterTime, sessionTimestamp);
+                } else {
+                    assert.gte(atClusterTime, insertTimestamp);
+                }
 
                 // This update is not visible to reads at insertTimestamp.
                 res = assert.commandWorked(causalDb.runCommand({
@@ -118,6 +125,7 @@ function snapshotReadsTest(testScenarioName, db, collName) {
 
                 // The cursor has been exhausted. The remaining docs don't show updated field.
                 assert.eq(0, res.cursor.id);
+                assert.eq(atClusterTime, res.cursor.atClusterTime);
                 assert.sameMembers(res.cursor.nextBatch, docs.slice(5), res);
 
                 jsTestLog(`Starting new snapshot read`);
@@ -125,6 +133,9 @@ function snapshotReadsTest(testScenarioName, db, collName) {
                 // This read shows the updated docs.
                 res = assert.commandWorked(causalDb.runCommand(command(20, readPreferenceMode)));
                 assert.eq(0, res.cursor.id);
+                assert(res.cursor.hasOwnProperty("atClusterTime"));
+                // Selected atClusterTime at or after first cursor's atClusterTime.
+                assert.gte(res.cursor.atClusterTime, atClusterTime);
                 assert.sameMembers(res.cursor.firstBatch,
                                    [...Array(10).keys()].map((i) => ({"_id": i, "x": true})),
                                    res);
@@ -135,6 +146,9 @@ function snapshotReadsTest(testScenarioName, db, collName) {
                     db.runCommand(command(20, readPreferenceMode, insertTimestamp)));
 
                 assert.sameMembers(res.cursor.firstBatch, docs, res);
+                assert.eq(0, res.cursor.id);
+                assert(res.cursor.hasOwnProperty("atClusterTime"));
+                assert.eq(res.cursor.atClusterTime, insertTimestamp);
 
                 // Reset.
                 assert.commandWorked(db[collName].remove({}, {writeConcern: {w: "majority"}}));

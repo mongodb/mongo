@@ -577,8 +577,9 @@ public:
                 });
 
             CursorId respondWithId = 0;
-
-            CursorResponseBuilder nextBatch(reply, CursorResponseBuilder::Options());
+            CursorResponseBuilder::Options options;
+            options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+            CursorResponseBuilder nextBatch(reply, options);
             BSONObj obj;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             std::uint64_t numResults = 0;

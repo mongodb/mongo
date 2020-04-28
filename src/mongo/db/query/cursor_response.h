@@ -54,6 +54,7 @@ public:
     struct Options {
         bool isInitialResponse = false;
         bool useDocumentSequences = false;
+        boost::optional<LogicalTime> atClusterTime = boost::none;
     };
 
     /**

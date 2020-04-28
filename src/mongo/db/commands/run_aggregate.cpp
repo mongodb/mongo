@@ -162,6 +162,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
+    options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     CursorResponseBuilder responseBuilder(result, options);
 
     auto curOp = CurOp::get(opCtx);

@@ -20,5 +20,11 @@ replSet.initiateWithHighElectionTimeout();
 const primary = replSet.getPrimary();
 const testDB = primary.getDB('test');
 snapshotReadsTest(jsTestName(), testDB, "test");
+
+// Ensure "atClusterTime" is omitted from a regular (non-snapshot) cursor.
+testDB["collection"].insertOne({});
+const cursor = assert.commandWorked(testDB.runCommand({find: "collection"})).cursor;
+assert(!cursor.hasOwnProperty("atClusterTime"));
+
 replSet.stopSet();
 })();

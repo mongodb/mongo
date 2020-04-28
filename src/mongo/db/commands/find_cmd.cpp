@@ -499,6 +499,7 @@ public:
             // Stream query results, adding them to a BSONArray as we go.
             CursorResponseBuilder::Options options;
             options.isInitialResponse = true;
+            options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
             CursorResponseBuilder firstBatch(result, options);
             Document doc;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
