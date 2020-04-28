@@ -73,11 +73,16 @@ std::vector<RemoteCursor> establishCursors(
     Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent);
 
 /**
- * Schedules a remote killCursor command for 'cursor'.
+ * Schedules a remote killCursor command for each of the cursors in 'remoteCursors'.
  *
  * Note that this method is optimistic and does not check the return status for the killCursors
- * command.
+ * commands.
  */
+void killRemoteCursors(OperationContext* opCtx,
+                       executor::TaskExecutor* executor,
+                       std::vector<RemoteCursor>&& remoteCursors,
+                       const NamespaceString& nss);
+
 void killRemoteCursor(OperationContext* opCtx,
                       executor::TaskExecutor* executor,
                       RemoteCursor&& cursor,

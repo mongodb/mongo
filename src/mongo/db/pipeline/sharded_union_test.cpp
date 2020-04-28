@@ -100,17 +100,10 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
     expCtx()->opCtx->setDeadlineAfterNowBy(Milliseconds(15), ErrorCodes::MaxTimeMSExpired);
 
     auto future = launchAsync([&] {
-        // Expect one result from each host.
         auto next = unionWith.getNext();
         ASSERT_TRUE(next.isAdvanced());
         auto result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
-
-        next = unionWith.getNext();
-        ASSERT_TRUE(next.isAdvanced());
-        result = next.releaseDocument();
-        ASSERT_DOCUMENT_EQ(result, expectedResult);
-
         ASSERT(unionWith.getNext().isEOF());
         ASSERT(unionWith.getNext().isEOF());
         ASSERT(unionWith.getNext().isEOF());
@@ -126,8 +119,6 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
 
     onCommand(assertHasExpectedMaxTimeMSAndReturnResult);
     onCommand(assertHasExpectedMaxTimeMSAndReturnResult);
-
-    future.default_timed_get();
 }
 
 TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
@@ -157,8 +148,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     // Mock out one error response, then expect a refresh of the sharding catalog for that
     // namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        return Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"};
     });
 
     // Mock the expected config server queries.
@@ -231,8 +221,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     // sharding catalog for that namespace.
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, HostAndPort(shards[1].getHost()));
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        return Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"};
     });
 
     // Mock the expected config server queries. Update the distribution as if a chunk [0, 10] was
@@ -316,13 +305,12 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     // Mock out an error response from both shards, then expect a refresh of the sharding catalog
     // for that namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        return Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"};
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        return Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"};
     });
+
 
     // Mock the expected config server queries. Update the distribution so that all chunks are on
     // the same shard.
@@ -385,15 +373,14 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     // Mock out one error response, then expect a refresh of the sharding catalog for that
     // namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{ResolvedView{expectedBackingNs,
-                                {fromjson("{$group: {_id: '$groupKey'}}"),
-                                 // Prevent the $match from being pushed into the shards where it
-                                 // would not execute in this mocked environment.
-                                 fromjson("{$_internalInhibitOptimization: {}}"),
-                                 fromjson("{$match: {_id: 'unionResult'}}")},
-                                BSONObj()},
-                   "It was a view!"_sd});
+        return Status{ResolvedView{expectedBackingNs,
+                                   {fromjson("{$group: {_id: '$groupKey'}}"),
+                                    // Prevent the $match from being pushed into the shards where it
+                                    // would not execute in this mocked environment.
+                                    fromjson("{$_internalInhibitOptimization: {}}"),
+                                    fromjson("{$match: {_id: 'unionResult'}}")},
+                                   BSONObj()},
+                      "It was a view!"_sd};
     });
 
     // That error should be incorporated, then we should target both shards. The results should be

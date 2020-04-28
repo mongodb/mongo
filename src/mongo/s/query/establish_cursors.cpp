@@ -33,64 +33,20 @@
 
 #include "mongo/s/query/establish_cursors.h"
 
-#include "mongo/client/connpool.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/killcursors_request.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-namespace {
-
-void killOpOnShards(std::shared_ptr<executor::TaskExecutor> executor,
-                    const NamespaceString& nss,
-                    std::vector<HostAndPort> remotes,
-                    const ReadPreferenceSetting& readPref,
-                    UUID opKey) noexcept {
-    try {
-        ThreadClient tc("establishCursors cleanup", getGlobalServiceContext());
-        auto opCtx = tc->makeOperationContext();
-
-        for (auto&& host : remotes) {
-            executor::RemoteCommandRequest request(
-                host,
-                "admin",
-                BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(opKey)),
-                opCtx.get(),
-                executor::RemoteCommandRequestBase::kNoTimeout,
-                boost::none,
-                executor::RemoteCommandRequestBase::FireAndForgetMode::kOn);
-
-            // We do not process the response to the killOperations request (we make a good-faith
-            // attempt at cleaning up the cursors, but ignore any returned errors).
-            uassertStatusOK(executor->scheduleRemoteCommand(request, [&](auto const& args) {
-                if (!args.response.isOK()) {
-                    LOGV2_DEBUG(4625504,
-                                2,
-                                "killOperations for {remote} failed with {status}",
-                                "remote"_attr = host.toString(),
-                                "error"_attr = args.response);
-                    return;
-                }
-            }));
-        }
-    } catch (const AssertionException& ex) {
-        LOGV2_DEBUG(4625503,
-                    2,
-                    "Failed to cleanup remote operations: {error}",
-                    "error"_attr = ex.toStatus());
-    }
-}
-
-}  // namespace
 
 std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            std::shared_ptr<executor::TaskExecutor> executor,
@@ -101,49 +57,25 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            Shard::RetryPolicy retryPolicy) {
     // Construct the requests
     std::vector<AsyncRequestsSender::Request> requests;
-
-    // Generate an OperationKey to attach to each remote request. This will allow us to kill any
-    // outstanding requests in case we're interrupted or one of the remotes returns an error. Note
-    // that although the opCtx may have an OperationKey set on it already, do not inherit it here
-    // because we may target ourselves which implies the same node receiving multiple operations
-    // with the same opKey.
-    // TODO SERVER-47261 management of the opKey should move to the ARS.
-    auto opKey = UUID::gen();
     for (const auto& remote : remotes) {
-        BSONObjBuilder requestWithOpKey(remote.second);
-        opKey.appendToBuilder(&requestWithOpKey, "clientOperationKey");
-        requests.emplace_back(remote.first, requestWithOpKey.obj());
+        requests.emplace_back(remote.first, remote.second);
     }
-
-    LOGV2_DEBUG(4625502,
-                3,
-                "Establishing cursors on {opId} for {nRemotes} remotes with operation key {opKey}",
-                "opId"_attr = opCtx->getOpID(),
-                "nRemotes"_attr = remotes.size(),
-                "opKey"_attr = opKey);
 
     // Send the requests
     MultiStatementTransactionRequestsSender ars(
         opCtx, executor, nss.db().toString(), std::move(requests), readPref, retryPolicy);
 
     std::vector<RemoteCursor> remoteCursors;
-
-    // Keep track of any remotes which may have an open cursor.
-    std::vector<HostAndPort> remotesToClean;
-
     try {
         // Get the responses
         while (!ars.done()) {
             auto response = ars.next();
-
             try {
-                if (response.shardHostAndPort)
-                    remotesToClean.push_back(*response.shardHostAndPort);
-
                 // Note the shardHostAndPort may not be populated if there was an error, so be sure
                 // to do this after parsing the cursor response to ensure the response was ok.
                 // Additionally, be careful not to push into 'remoteCursors' until we are sure we
-                // have a valid cursor.
+                // have a valid cursor, since the error handling path will attempt to clean up
+                // anything in 'remoteCursors'
                 auto cursors = CursorResponse::parseFromBSONMany(
                     uassertStatusOK(std::move(response.swResponse)).data);
 
@@ -154,11 +86,6 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                         remoteCursor.setShardId(std::move(response.shardId));
                         remoteCursor.setHostAndPort(*response.shardHostAndPort);
                         remoteCursors.push_back(std::move(remoteCursor));
-                    } else {
-                        // Remote responded with a failure, do not attempt to clean up.
-                        remotesToClean.erase(std::remove(remotesToClean.begin(),
-                                                         remotesToClean.end(),
-                                                         *response.shardHostAndPort));
                     }
                 }
 
@@ -166,12 +93,12 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                 for (auto& cursor : cursors) {
                     uassertStatusOK(cursor.getStatus());
                 }
+
             } catch (const AssertionException& ex) {
                 // Retriable errors are swallowed if 'allowPartialResults' is true. Targeting shard
                 // replica sets can also throw FailedToSatisfyReadPreference, so we swallow it too.
                 bool isEligibleException = (isMongosRetriableError(ex.code()) ||
                                             ex.code() == ErrorCodes::FailedToSatisfyReadPreference);
-
                 // Fail if the exception is something other than a retriable or read preference
                 // error, or if the 'allowPartialResults' query parameter was not enabled.
                 if (!allowPartialResults || !isEligibleException) {
@@ -184,9 +111,10 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
             }
         }
         return remoteCursors;
-    } catch (const DBException& ex) {
+    } catch (const DBException&) {
         // If one of the remotes had an error, we make a best effort to finish retrieving responses
-        // for other requests that were already sent.
+        // for other requests that were already sent, so that we can send killCursors to any cursors
+        // that we know were established.
         try {
             // Do not schedule any new requests.
             ars.stopRetrying();
@@ -195,57 +123,37 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
             while (!ars.done()) {
                 auto response = ars.next();
 
-                if (response.shardHostAndPort)
-                    remotesToClean.push_back(*response.shardHostAndPort);
+                // Check if the response contains an established cursor, and if so, store it.
+                StatusWith<CursorResponse> swCursorResponse(
+                    response.swResponse.isOK()
+                        ? CursorResponse::parseFromBSON(response.swResponse.getValue().data)
+                        : response.swResponse.getStatus());
 
-                if (response.swResponse.isOK()) {
-                    // Check if the response contains an established cursor, and if so, store it.
-                    StatusWith<CursorResponse> swCursorResponse =
-                        CursorResponse::parseFromBSON(response.swResponse.getValue().data);
-
-                    if (swCursorResponse.isOK()) {
-                        RemoteCursor cursor;
-                        cursor.setShardId(std::move(response.shardId));
-                        cursor.setHostAndPort(*response.shardHostAndPort);
-                        cursor.setCursorResponse(std::move(swCursorResponse.getValue()));
-                        remoteCursors.push_back(std::move(cursor));
-                    } else {
-                        // Remote responded with a failure, do not attempt to clean up.
-                        remotesToClean.erase(std::remove(remotesToClean.begin(),
-                                                         remotesToClean.end(),
-                                                         *response.shardHostAndPort));
-                    }
+                if (swCursorResponse.isOK()) {
+                    RemoteCursor cursor;
+                    cursor.setShardId(std::move(response.shardId));
+                    cursor.setHostAndPort(*response.shardHostAndPort);
+                    cursor.setCursorResponse(std::move(swCursorResponse.getValue()));
+                    remoteCursors.push_back(std::move(cursor));
                 }
             }
 
-            LOGV2(4625501,
-                  "ARS failed with {status}, attempting to clean up {nRemotes} remote operations",
-                  "status"_attr = ex.toStatus(),
-                  "nRemotes"_attr = remotesToClean.size());
-
-            // Check whether we have any remote operations to kill.
-            if (remotesToClean.size() > 0) {
-                // Schedule killOperations against all cursors that were established. Make sure to
-                // capture arguments by value since the cleanup work may get scheduled after
-                // returning from this function.
-                MONGO_COMPILER_VARIABLE_UNUSED auto cbHandle = uassertStatusOK(
-                    executor->scheduleWork([executor,
-                                            nss,
-                                            readPref,
-                                            remotesToClean{std::move(remotesToClean)},
-                                            opKey{std::move(opKey)}](
-                                               const executor::TaskExecutor::CallbackArgs& args) {
-                        uassertStatusOKWithContext(args.status,
-                                                   "Failed to schedule remote cursor cleanup");
-                        killOpOnShards(
-                            executor, nss, std::move(remotesToClean), readPref, std::move(opKey));
-                    }));
-            }
+            // Schedule killCursors against all cursors that were established.
+            killRemoteCursors(opCtx, executor.get(), std::move(remoteCursors), nss);
         } catch (const DBException&) {
             // Ignore the new error and rethrow the original one.
         }
 
         throw;
+    }
+}
+
+void killRemoteCursors(OperationContext* opCtx,
+                       executor::TaskExecutor* executor,
+                       std::vector<RemoteCursor>&& remoteCursors,
+                       const NamespaceString& nss) {
+    for (auto&& remoteCursor : remoteCursors) {
+        killRemoteCursor(opCtx, executor, std::move(remoteCursor), nss);
     }
 }
 

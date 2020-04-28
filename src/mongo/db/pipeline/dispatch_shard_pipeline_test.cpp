@@ -209,8 +209,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     // Mock out one error response, then expect a refresh of the sharding catalog for that
     // namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"});
+        return Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"};
     });
 
     // Mock the expected config server queries.
