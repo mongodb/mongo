@@ -145,7 +145,7 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
         auto shardResults = sharded_agg_helpers::shardVersionRetry(
             expCtx->opCtx,
             catalogCache,
-            expCtx->ns,
+            foreignExpCtx->ns,
             str::stream() << "Looking up document matching " << redact(filter.toBson()),
             [&]() -> std::vector<RemoteCursor> {
                 // Verify that the collection exists, with the correct UUID.
