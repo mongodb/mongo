@@ -636,12 +636,22 @@ TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
     heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot1, hbRTT300);
 
     // Should choose h3 as it is a voter
-    auto newSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    auto first = now()++;
+    auto newSource = getTopoCoord().chooseNewSyncSource(first, OpTime(), ReadPreference::Nearest);
     ASSERT_EQUALS(h3, newSource);
 
+    // Since a new sync source was chosen, recentSyncSourceChanges should be updated
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    ASSERT(std::queue<Date_t>({first}) == recentSyncSourceChanges->getChanges_forTest());
+
     // Can't choose h2 as it is not a voter
-    newSource = getTopoCoord().chooseNewSyncSource(now()++, ot10, ReadPreference::Nearest);
+    auto second = now()++;
+    newSource = getTopoCoord().chooseNewSyncSource(second, ot10, ReadPreference::Nearest);
     ASSERT_EQUALS(HostAndPort(), newSource);
+
+    // Since no new sync source was chosen, recentSyncSourceChanges shouldn't be updated.
+    recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    ASSERT(std::queue<Date_t>({first}) == recentSyncSourceChanges->getChanges_forTest());
 
     // Should choose h3 as it is a voter, and ahead
     heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot5, hbRTT300);
@@ -893,6 +903,10 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::PrimaryOnly));
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
+    // Since no new sync source was chosen, recentSyncSourceChanges shouldn't be updated.
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    ASSERT(recentSyncSourceChanges->getChanges_forTest().empty());
+
     // Add primary
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     heartbeatFromMember(HostAndPort("h3"),
@@ -909,6 +923,10 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
                       now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryOnly));
     ASSERT_EQUALS(HostAndPort(), getTopoCoord().getSyncSourceAddress());
 
+    // Since no new sync source was chosen, recentSyncSourceChanges shouldn't be updated.
+    recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    ASSERT(recentSyncSourceChanges->getChanges_forTest().empty());
+
     // Update the primary's position.
     heartbeatFromMember(HostAndPort("h3"),
                         "rs0",
@@ -918,10 +936,15 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
 
     // h3 is primary and should be chosen as the sync source, despite being further away than h2
     // and the primary (h3) being at our most recently applied optime.
+    auto changeTime = now()++;
     ASSERT_EQUALS(HostAndPort("h3"),
                   getTopoCoord().chooseNewSyncSource(
-                      now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryOnly));
+                      changeTime, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryOnly));
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+
+    // Since a new sync source was chosen, recentSyncSourceChanges should be updated.
+    recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    ASSERT(std::queue<Date_t>({changeTime}) == recentSyncSourceChanges->getChanges_forTest());
 
     // Become primary: should not choose self as sync source.
     heartbeatFromMember(HostAndPort("h3"),
@@ -1058,10 +1081,16 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
                         Milliseconds(300));
 
     // No primary situation: should choose h2.
+    auto first = now()++;
     ASSERT_EQUALS(
         HostAndPort("h2"),
-        getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::PrimaryPreferred));
+        getTopoCoord().chooseNewSyncSource(first, OpTime(), ReadPreference::PrimaryPreferred));
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+
+    // Make sure that recentSyncSourceChanges is updated even though the primary is not chosen as
+    // the next sync source.
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    ASSERT(std::queue<Date_t>({first}) == recentSyncSourceChanges->getChanges_forTest());
 
     // Add primary
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
@@ -1074,10 +1103,16 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
 
     // h3 is primary, but its last applied isn't as up-to-date as ours, so it cannot be chosen
     // as the sync source.
+    auto second = now()++;
     ASSERT_EQUALS(HostAndPort("h2"),
                   getTopoCoord().chooseNewSyncSource(
-                      now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryPreferred));
+                      second, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryPreferred));
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+
+    // Make sure that recentSyncSourceChanges is updated even though the primary is not chosen as
+    // the next sync source.
+    recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    ASSERT(std::queue<Date_t>({first, second}) == recentSyncSourceChanges->getChanges_forTest());
 
     // Update the primary's position.
     heartbeatFromMember(HostAndPort("h3"),
@@ -1088,10 +1123,17 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
 
     // h3 is primary and should be chosen as the sync source, despite being further away than h2
     // and the primary (h3) being at our most recently applied optime.
+    auto third = now()++;
     ASSERT_EQUALS(HostAndPort("h3"),
                   getTopoCoord().chooseNewSyncSource(
-                      now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryPreferred));
+                      third, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryPreferred));
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+
+    // Make sure that recentSyncSourceChanges is updated when the primary is chosen as the next
+    // sync source.
+    recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    ASSERT(std::queue<Date_t>({first, second, third}) ==
+           recentSyncSourceChanges->getChanges_forTest());
 
     // Sanity check: the same test as above should return the secondary "h2" if primary is not
     // preferred.
@@ -2117,6 +2159,128 @@ TEST_F(TopoCoordTest, PrepareStepDownAttemptFailsIfNotLeader) {
     Status expectedStatus(ErrorCodes::NotMaster, "This node is not a primary. ");
 
     ASSERT_EQUALS(expectedStatus, getTopoCoord().prepareForStepDownAttempt().getStatus());
+}
+
+/**
+ * Checks that the queue contains the expected entries in the correct order.
+ */
+void assertTimesEqual(const std::initializer_list<Date_t>& expectedTimes,
+                      std::queue<Date_t> actualQueue) {
+    std::queue<Date_t> expectedQueue(expectedTimes);
+    ASSERT(expectedQueue == actualQueue);
+}
+
+TEST_F(TopoCoordTest, RecordSyncSourceChangeMaintainsSizeWhenAtCapacity) {
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+
+    auto first = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(first);
+
+    auto second = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(second);
+
+    auto third = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(third);
+
+    auto fourth = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(fourth);
+
+    assertTimesEqual({second, third, fourth}, recentSyncSourceChanges->getChanges_forTest());
+}
+
+TEST_F(TopoCoordTest, ChangedTooOftenRecentlyReturnsTrue) {
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+
+    auto first = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(first);
+
+    auto second = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(second);
+
+    auto third = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(third);
+
+    assertTimesEqual({first, second, third}, recentSyncSourceChanges->getChanges_forTest());
+    ASSERT(recentSyncSourceChanges->changedTooOftenRecently(Date_t::now()));
+}
+
+TEST_F(TopoCoordTest, ChangedTooOftenRecentlyReturnsFalse) {
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+
+    // Make this two hours before now.
+    auto first = Date_t::now() - Hours(2);
+    recentSyncSourceChanges->addNewEntry(first);
+
+    auto second = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(second);
+
+    auto third = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(third);
+
+    assertTimesEqual({first, second, third}, recentSyncSourceChanges->getChanges_forTest());
+    ASSERT_FALSE(recentSyncSourceChanges->changedTooOftenRecently(Date_t::now()));
+}
+
+TEST_F(TopoCoordTest, AddNewEntryReducesSizeIfMaxNumSyncSourceChangesPerHourChanged) {
+    // Make sure to restore the default value at the end of this test.
+    ON_BLOCK_EXIT([]() { maxNumSyncSourceChangesPerHour.store(3); });
+
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+
+    auto first = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(first);
+
+    auto second = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(second);
+
+    auto third = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(third);
+
+    maxNumSyncSourceChangesPerHour.store(2);
+
+    auto fourth = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(fourth);
+
+    assertTimesEqual({third, fourth}, recentSyncSourceChanges->getChanges_forTest());
+    ASSERT(recentSyncSourceChanges->changedTooOftenRecently(Date_t::now()));
+}
+
+TEST_F(TopoCoordTest, ChangedTooOftenRecentlyReducesSizeIfMaxNumSyncSourceChangesPerHourChanged) {
+    // Make sure to restore the default value at the end of this test.
+    ON_BLOCK_EXIT([]() { maxNumSyncSourceChangesPerHour.store(3); });
+
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+
+    auto first = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(first);
+
+    auto second = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(second);
+
+    auto third = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(third);
+
+    maxNumSyncSourceChangesPerHour.store(1);
+
+    ASSERT(recentSyncSourceChanges->changedTooOftenRecently(Date_t::now()));
+
+    assertTimesEqual({third}, recentSyncSourceChanges->getChanges_forTest());
+}
+
+TEST_F(TopoCoordTest, ChangedTooOftenRecentlyReturnsFalseWhenEmpty) {
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+    assertTimesEqual({}, recentSyncSourceChanges->getChanges_forTest());
+    ASSERT_FALSE(recentSyncSourceChanges->changedTooOftenRecently(Date_t::now()));
+}
+
+TEST_F(TopoCoordTest, ChangedTooOftenRecentlyReturnsFalseWhenNotFilled) {
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+
+    auto first = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(first);
+
+    assertTimesEqual({first}, recentSyncSourceChanges->getChanges_forTest());
+    ASSERT_FALSE(recentSyncSourceChanges->changedTooOftenRecently(Date_t::now()));
 }
 
 class PrepareHeartbeatResponseV1Test : public TopoCoordTest {

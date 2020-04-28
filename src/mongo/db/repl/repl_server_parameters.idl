@@ -313,3 +313,15 @@ server_parameters:
         default: 5
         validator:
             gte: 0
+
+    maxNumSyncSourceChangesPerHour:
+        description: >-
+            The number of sync source changes that can happen per hour before the node temporarily
+            turns off reevaluating its sync source. This will only affect sync source changes while
+            a node has a valid sync source.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: maxNumSyncSourceChangesPerHour
+        default: 3
+        validator:
+            gt: 0

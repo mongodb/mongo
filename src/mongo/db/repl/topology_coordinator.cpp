@@ -173,6 +173,38 @@ void TopologyCoordinator::PingStats::miss() {
     }
 }
 
+bool TopologyCoordinator::RecentSyncSourceChanges::changedTooOftenRecently(Date_t now) {
+    size_t maxSize = maxNumSyncSourceChangesPerHour.load();
+
+    // Return false if we have fewer than maxNumSyncSourceChangesPerHour entries.
+    if (_recentChanges.empty() || _recentChanges.size() < maxSize) {
+        return false;
+    }
+
+    // Remove additional entries in case maxNumSyncSourceChangesPerHour was changed.
+    while (_recentChanges.size() > maxSize) {
+        _recentChanges.pop();
+    }
+
+    // Return whether all entries in the queue happened within the last hour by checking the oldest
+    // entry.
+    auto hourBefore = now - Hours(1);
+    return _recentChanges.front() > hourBefore;
+}
+
+void TopologyCoordinator::RecentSyncSourceChanges::addNewEntry(Date_t now) {
+    // Remove additional entries if the queue already has maxNumSyncSourceChangerPerHour entries.
+    while (_recentChanges.size() >= static_cast<size_t>(maxNumSyncSourceChangesPerHour.load())) {
+        _recentChanges.pop();
+    }
+    _recentChanges.push(now);
+    return;
+}
+
+std::queue<Date_t> TopologyCoordinator::RecentSyncSourceChanges::getChanges_forTest() {
+    return _recentChanges;
+}
+
 TopologyCoordinator::TopologyCoordinator(Options options)
     : _role(Role::kFollower),
       _topologyVersion(instanceId, 0),
@@ -209,6 +241,12 @@ HostAndPort TopologyCoordinator::getSyncSourceAddress() const {
 HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                                                      const OpTime& lastOpTimeFetched,
                                                      ReadPreference readPreference) {
+    ON_BLOCK_EXIT([&]() {
+        // If we chose another sync source, update the recent sync source changes.
+        if (!_syncSource.empty()) {
+            _recentSyncSourceChanges.addNewEntry(now);
+        }
+    });
     // Check to make sure we can choose a sync source, and choose a forced one if
     // set.
     auto maybeSyncSource = _chooseSyncSourceInitialStep(now);
@@ -307,14 +345,14 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
         }
         setMyHeartbeatMessage(now, message);
 
-        _syncSource = HostAndPort();
-        return _syncSource;
+        return HostAndPort();
     }
-    _syncSource = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
-    LOGV2(21799, "Sync source candidate chosen", "syncSource"_attr = _syncSource);
-    std::string msg(str::stream() << "syncing from: " << _syncSource.toString(), 0);
+
+    auto syncSource = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
+    LOGV2(21799, "Sync source candidate chosen", "syncSource"_attr = syncSource);
+    std::string msg(str::stream() << "syncing from: " << syncSource.toString(), 0);
     setMyHeartbeatMessage(now, msg);
-    return _syncSource;
+    return syncSource;
 }
 
 const OpTime TopologyCoordinator::_getOldestSyncOpTime() const {
@@ -1683,6 +1721,11 @@ void TopologyCoordinator::populateAllMembersConfigVersionAndTerm_forTest() {
             member.setMemberId(memberConfig.getId());
         }
     }
+}
+
+TopologyCoordinator::RecentSyncSourceChanges*
+TopologyCoordinator::getRecentSyncSourceChanges_forTest() {
+    return &_recentSyncSourceChanges;
 }
 
 std::string TopologyCoordinator::_getReplSetStatusString() {
