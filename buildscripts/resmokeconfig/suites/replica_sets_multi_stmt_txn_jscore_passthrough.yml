@@ -274,6 +274,9 @@ selector:
   - jstests/core/cursora.js
   - jstests/core/bench_test1.js
 
+  # It is illegal to open a tailable cursor in a transaction
+  - jstests/core/geo_near_tailable.js
+
   exclude_with_any_tags:
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged

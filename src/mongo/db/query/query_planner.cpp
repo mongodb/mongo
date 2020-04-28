@@ -544,7 +544,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // If the query requests a tailable cursor, the only solution is a collscan + filter with
     // tailable set on the collscan.
     if (isTailable) {
-        if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) && canTableScan) {
+        if (canTableScan) {
             auto soln = buildCollscanSoln(query, isTailable, params);
             if (soln) {
                 out.push_back(std::move(soln));
