@@ -49,6 +49,18 @@ function testDowngrade(enableMajorityReadConcern) {
         {_id: 0}, {writeConcern: {w: "majority"}}));
     assert.eq(rollbackNode.getDB(dbName)[sourceCollName].find({_id: 0}).itcount(), 1);
 
+    // SERVER-47219: The following unclean shutdown followed by a restart into last-stable is not a
+    // legal downgrade scenario. However, this illegal downgrade is only prevented when a change
+    // across versions requires it. There exists a patch for this test in v4.4 when illegal
+    // downgrades are prevented. The patch for that case however requires demonstrating the illegal
+    // downgrade is prevented as expected. Applying that here results in a hang. The testing
+    // infrastructure for running mongod processes in sufficiently complex scenarios, cannot express
+    // both expecting a startup to fail with an error as well as failing immediately if startup
+    // succeeds.
+    //
+    // If this test starts failing on the restart below due to an illegal downgrade, forward-porting
+    // the v4.4 patch for SERVER-47219 should be the first thing to try.
+    //
     // Kill the rollback node and restart it on the last-stable version.
     rollbackTest.restartNode(
         0, 9, {binVersion: "last-stable", enableMajorityReadConcern: enableMajorityReadConcern});
