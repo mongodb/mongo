@@ -14,11 +14,11 @@ if (!supportsStapling()) {
     return;
 }
 
-var test = function(responderCA) {
+function test(serverCert, caCert, responderCertPair) {
     const ocsp_options = {
         sslMode: "requireSSL",
-        sslPEMKeyFile: OCSP_SERVER_CERT,
-        sslCAFile: OCSP_CA_PEM,
+        sslPEMKeyFile: serverCert,
+        sslCAFile: caCert,
         sslAllowInvalidHostnames: "",
         setParameter: {
             "ocspEnabled": "true",
@@ -35,7 +35,7 @@ var test = function(responderCA) {
 
     MongoRunner.stopMongod(conn);
 
-    let mock_ocsp = new MockOCSPServer("", 1000, responderCA);
+    let mock_ocsp = new MockOCSPServer("", 1000, responderCertPair);
     mock_ocsp.start();
 
     // In this scenario, the Mongod has the ocsp response stapled
@@ -48,7 +48,7 @@ var test = function(responderCA) {
     });
     mock_ocsp.stop();
 
-    mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1000, responderCA);
+    mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1000, responderCertPair);
     mock_ocsp.start();
     assert.doesNotThrow(() => {
         new Mongo(conn.host);
@@ -70,7 +70,7 @@ var test = function(responderCA) {
     });
     mock_ocsp.stop();
 
-    mock_ocsp = new MockOCSPServer("", 1000, responderCA);
+    mock_ocsp = new MockOCSPServer("", 1000, responderCertPair);
     mock_ocsp.start();
 
     assert.throws(() => {
@@ -84,8 +84,9 @@ var test = function(responderCA) {
     // sleep to make sure that the threads don't interfere with each other.
     sleep(1000);
     mock_ocsp.stop();
-};
+}
 
-test(false);
-test(true);
+test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_DELEGATE_RESPONDER);
+test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_CA_RESPONDER);
+test(OCSP_SERVER_INTERMEDIATE_CA_CERT, OCSP_INTERMEDIATE_CA_PEM, OCSP_INTERMEDIATE_RESPONDER);
 }());

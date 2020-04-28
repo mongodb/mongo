@@ -281,6 +281,10 @@ inline void X509_OBJECT_free(X509_OBJECT* a) {
     OPENSSL_free(a);
 }
 
+void X509_STORE_CTX_set0_untrusted(X509_STORE_CTX* ctx, STACK_OF(X509) * sk) {
+    X509_STORE_CTX_set_chain(ctx, sk);
+}
+
 X509_OBJECT* X509_STORE_CTX_get_obj_by_subject(X509_STORE_CTX* vs, int type, X509_NAME* name) {
     X509_OBJECT* ret;
     ret = (X509_OBJECT*)OPENSSL_malloc(sizeof(X509_OBJECT));
@@ -460,18 +464,32 @@ struct X509_OBJECTFree {
 
 using UniqueX509Object = std::unique_ptr<X509_OBJECT, X509_OBJECTFree>;
 
-StatusWith<UniqueCertId> getCertIdForCert(SSL_CTX* context, X509* cert) {
-    // Look in the certificate store for the certificate that issued cert
+StatusWith<UniqueCertId> getCertIdForCert(SSL_CTX* context,
+                                          X509* cert,
+                                          STACK_OF(X509) * intermediateCerts) {
+    // First search the intermediate certificates for the issuer.
+    for (int i = 0; i < sk_X509_num(intermediateCerts); i++) {
+        if (X509_NAME_cmp(X509_get_issuer_name(cert),
+                          X509_get_subject_name(sk_X509_value(intermediateCerts, i))) == 0) {
+            return UniqueCertId(
+                OCSP_cert_to_id(nullptr, cert, sk_X509_value(intermediateCerts, i)));
+        }
+    }
+
     UniqueX509StoreCtx storeCtx(X509_STORE_CTX_new());
+
     if (!storeCtx) {
         return getSSLFailure("Could not create X509 store.");
     }
+
+    // Look in the certificate store for the certificate that issued cert
     if (X509_STORE_CTX_init(storeCtx.get(), SSL_CTX_get_cert_store(context), NULL, NULL) == 0) {
-        return getSSLFailure("Could not initialize the X509 Store Context.");
+        return getSSLFailure("Could not initialize the X509 Store Context for the SSL Context.");
     }
 
     UniqueX509Object obj(X509_STORE_CTX_get_obj_by_subject(
         storeCtx.get(), X509_LU_X509, X509_get_issuer_name(cert)));
+
     if (obj == nullptr) {
         return getSSLFailure("Could not get X509 Object from store.");
     }
@@ -595,7 +613,8 @@ StatusWith<std::vector<std::string>> addOCSPUrlToMap(
     SSL_CTX* context,
     X509* cert,
     std::map<std::string, OCSPRequestAndIDs>& ocspRequestMap,
-    OCSPCertIDSet& uniqueCertIds) {
+    OCSPCertIDSet& uniqueCertIds,
+    STACK_OF(X509) * intermediateCerts) {
 
     UniqueOpenSSLStringStack aiaOCSP(X509_get1_ocsp(cert));
     std::vector<std::string> responders;
@@ -627,7 +646,7 @@ StatusWith<std::vector<std::string>> addOCSPUrlToMap(
 
         HostAndPort hostAndPort(str::stream() << host << ":" << port);
 
-        auto swCertId = getCertIdForCert(context, cert);
+        auto swCertId = getCertIdForCert(context, cert, intermediateCerts);
         if (!swCertId.isOK()) {
             return swCertId.getStatus();
         }
@@ -637,7 +656,7 @@ StatusWith<std::vector<std::string>> addOCSPUrlToMap(
             return getSSLFailure("Could not get certificate ID for Map.");
         }
 
-        swCertId = getCertIdForCert(context, cert);
+        swCertId = getCertIdForCert(context, cert, intermediateCerts);
         if (!swCertId.isOK()) {
             return swCertId.getStatus();
         }
@@ -658,7 +677,7 @@ StatusWith<std::vector<std::string>> addOCSPUrlToMap(
         mapIter->second.certIDs.insert(std::move(certIDForArray));
     }
 
-    auto swCertId = getCertIdForCert(context, cert);
+    auto swCertId = getCertIdForCert(context, cert, intermediateCerts);
     if (!swCertId.isOK()) {
         return swCertId.getStatus();
     }
@@ -894,7 +913,8 @@ StatusWith<OCSPValidationContext> extractOcspUris(SSL_CTX* context,
     std::map<std::string, OCSPRequestAndIDs> ocspRequestMap;
     OCSPCertIDSet uniqueCertIds;
 
-    auto swLeafResponders = addOCSPUrlToMap(context, peerCert, ocspRequestMap, uniqueCertIds);
+    auto swLeafResponders =
+        addOCSPUrlToMap(context, peerCert, ocspRequestMap, uniqueCertIds, intermediateCerts);
     if (!swLeafResponders.isOK()) {
         return swLeafResponders.getStatus();
     }
@@ -1477,7 +1497,7 @@ StatusWith<bool> verifyStapledResponse(SSL* conn, X509* peerCert, OCSP_RESPONSE*
     auto intermediateCerts = SSLgetVerifiedChain(conn);
     OCSPCertIDSet emptyCertIDSet{};
 
-    auto swCertId = getCertIdForCert(SSL_get_SSL_CTX(conn), peerCert);
+    auto swCertId = getCertIdForCert(SSL_get_SSL_CTX(conn), peerCert, intermediateCerts.get());
     if (!swCertId.isOK()) {
         return swCertId.getStatus();
     }
@@ -1545,11 +1565,16 @@ int ocspClientCallback(SSL* ssl, void* arg) {
         if (swStapleOK.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
             LOGV2_DEBUG(23225,
                         1,
-                        "Stapled Certificate validation failed: {error}",
-                        "Stapled Certificate validation failed",
+                        "Stapled OCSP Response validation failed: {error}",
+                        "Stapled OCSP Response validation failed",
                         "error"_attr = swStapleOK.getStatus());
             return OCSP_CLIENT_RESPONSE_NOT_ACCEPTABLE;
         }
+
+        LOGV2_ERROR(4781101,
+                    "Stapled OCSP Response validation threw an error: {error}",
+                    "Stapled OCSP Response validation threw an error",
+                    "error"_attr = swStapleOK.getStatus());
 
         return OCSP_CLIENT_RESPONSE_ERROR;
     } else if (!swStapleOK.getValue()) {

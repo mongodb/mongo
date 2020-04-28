@@ -427,6 +427,39 @@ certs:
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [clientAuth]
 
+# Intermediate OCSP tree
+- name: 'intermediate_ca_ocsp.pem'
+  description: CA issued by the primary OCSP CA, which then issues its own server OCSP cert.
+  Subject: {CN: 'Intermediate CA for OCSP'}
+  Issuer: 'ca_ocsp.pem'
+  include_header: false
+  append_cert: 'ca_ocsp.pem'
+  output_path: 'jstests/libs/ocsp/'
+  keyfile: 'intermediate_ca_ocsp.key'
+  crtfile: 'intermediate_ca_ocsp.crt'
+  extensions:
+    subjectKeyIdentifier: hash
+    basicConstraints:
+      critical: true
+      CA: true
+
+- name: 'server_intermediate_ca_ocsp.pem'
+  description: Server OCSP certificate signed by intermediate CA.
+  Subject: {CN: 'Server OCSP Via Intermediate'}
+  Issuer: 'intermediate_ca_ocsp.pem'
+  include_header: false
+  output_path: 'jstests/libs/ocsp/'
+  extensions:
+    basicConstraints: {CA: false}
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status'
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth, clientAuth]
+
+# OCSP Responder Certificate
 - name: 'ocsp_responder.pem'
   description: Certificate and key for the OCSP responder
   Subject:
