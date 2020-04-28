@@ -103,6 +103,10 @@ void ReplicationCoordinatorExternalStateMock::addSelf(const HostAndPort& host) {
     _selfHosts.push_back(host);
 }
 
+void ReplicationCoordinatorExternalStateMock::clearSelfHosts() {
+    _selfHosts.clear();
+}
+
 HostAndPort ReplicationCoordinatorExternalStateMock::getClientHostAndPort(
     const OperationContext* opCtx) {
     return _clientHostAndPort;

@@ -41,6 +41,31 @@ class ReplicationCoordinatorExternalState;
 class ReplSetConfig;
 
 /**
+ * Checks if two configs are the same in content, ignoring 'version' and 'term' fields.
+ */
+bool sameConfigContents(const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig);
+
+/**
+ * Finds the index of the one member configuration in "newConfig" that corresponds
+ * to the current node (as identified by "externalState").
+ *
+ * Returns an error if the current node does not appear or appears multiple times in
+ * "newConfig".
+ */
+StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalState,
+                                 const ReplSetConfig& newConfig,
+                                 ServiceContext* ctx);
+
+/**
+ * Like findSelfInConfig, above, but also returns an error if the member configuration
+ * for this node is not electable, as this is a requirement for nodes accepting
+ * reconfig or initiate commands.
+ */
+StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState* externalState,
+                                            const ReplSetConfig& newConfig,
+                                            ServiceContext* ctx);
+
+/**
  * Validates that "newConfig" is a legal configuration that the current
  * node can accept from its local storage during startup.
  *
@@ -66,17 +91,13 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
  * Validates that "newConfig" is a legal successor configuration to "oldConfig" that can be
  * initiated by the current node (identified via "externalState").
  *
- * If "force" is set to true, then compatibility with the old configuration and electability of
- * the current node in "newConfig" are not considered when determining if the reconfig is valid.
+ * If "force" is set to true, then the single node change requirement is not checked.
  *
- * Returns the index of the current node's member configuration in "newConfig",
- * on success, and an indicative error on failure.
+ * Returns an indicative error on validation failure.
  */
-StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* externalState,
-                                          const ReplSetConfig& oldConfig,
-                                          const ReplSetConfig& newConfig,
-                                          ServiceContext* ctx,
-                                          bool force);
+Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
+                                 const ReplSetConfig& newConfig,
+                                 bool force);
 
 /**
  * Validates that "newConfig" is an acceptable configuration when received in a heartbeat

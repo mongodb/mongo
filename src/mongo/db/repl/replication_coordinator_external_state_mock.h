@@ -111,6 +111,12 @@ public:
     void addSelf(const HostAndPort& host);
 
     /**
+     * Remove all hosts from the list of hosts that this mock will match when responding to "isSelf"
+     * messages.
+     */
+    void clearSelfHosts();
+
+    /**
      * Sets the return value for subsequent calls to loadLocalConfigDocument().
      */
     void setLocalConfigDocument(const StatusWith<BSONObj>& localConfigDocument);
