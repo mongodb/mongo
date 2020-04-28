@@ -160,6 +160,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // Make sync source selection faster.
         replSet.nodes.forEach((node) => {
             setFailPoint(node, "forceBgSyncSyncSourceRetryWaitMS", {sleepMS: kRetryIntervalMS});
+            setFastGetMoreEnabled(node);
         });
 
         rst = replSet;
