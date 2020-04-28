@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/sessions_collection_config_server.h"
+#include "mongo/db/s/sessions_collection_config_server.h"
 
 #include "mongo/client/query.h"
 #include "mongo/db/commands.h"
