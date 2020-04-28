@@ -1,7 +1,4 @@
 // Tests basic use cases for all $merge modes.
-//
-// Cannot implicitly shard accessed collections because a collection can be implictly created and
-// exists when none is expected.
 (function() {
 "use strict";
 
@@ -96,6 +93,7 @@ const target = db.all_modes_target;
     // before the DuplicateKey error is raised.
     const error = assert.throws(() => source.aggregate([
         {$sort: {_id: 1}},
+        {$_internalInhibitOptimization: {}},
         {$merge: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"}}
     ]));
     assert.commandFailedWithCode(error, ErrorCodes.DuplicateKey);
