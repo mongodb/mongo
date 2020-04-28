@@ -1,20 +1,25 @@
-// Tests that it is illegal to read from system.views within a transaction.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
+// Tests that it is illegal to read from system.views and system.profile within a transaction.
+// @tags: [requires_fcv_46, uses_transactions, uses_snapshot_read_concern]
 (function() {
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 
-const session = db.getMongo().startSession({causalConsistency: false});
+const session = db.getMongo().startSession();
 
-// Use a custom database to avoid conflict with other tests that use system.views.
-const testDB = session.getDatabase("no_reads_from_system_dot_views_in_txn");
+// Use a custom database to avoid conflict with other tests.
+const testDB = session.getDatabase("no_reads_from_system_colls_in_txn");
 assert.commandWorked(testDB.dropDatabase());
 
 testDB.runCommand({create: "foo", viewOn: "bar", pipeline: []});
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(testDB.runCommand({find: "system.views", filter: {}}), 51071);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+
+session.startTransaction({readConcern: {level: "snapshot"}});
+assert.commandFailedWithCode(testDB.runCommand({find: "system.profile", filter: {}}),
+                             ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 if (FixtureHelpers.isMongos(testDB)) {

@@ -494,6 +494,11 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
                 (dbName != NamespaceString::kAdminDb ||
                  txnAdminCommands.find(cmdName) != txnAdminCommands.cend()));
 
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot run command against the '" << nss
+                          << "' collection in a transaction.",
+            !nss.isSystemDotProfile());
+
     if (allowTransactionsOnConfigDatabase) {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot run command against the config.transactions namespace in a transaction"

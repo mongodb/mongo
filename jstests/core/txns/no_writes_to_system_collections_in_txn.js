@@ -1,5 +1,5 @@
 // Tests that it is illegal to write to system collections within a transaction.
-// @tags: [uses_transactions, uses_snapshot_read_concern]
+// @tags: [requires_fcv_46, uses_transactions, uses_snapshot_read_concern]
 (function() {
 "use strict";
 
@@ -43,6 +43,11 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(systemColl.insert({name: "new"}), 50791);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+
+session.startTransaction({readConcern: {level: "snapshot"}});
+assert.commandFailedWithCode(testDB.getCollection("system.profile").insert({name: "new"}),
+                             ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});

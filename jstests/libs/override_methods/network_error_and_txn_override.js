@@ -614,6 +614,16 @@ function isCommandNonTxnGetMore(cmdName, cmdObj) {
     return cmdName === "getMore" && nonTxnAggCursorSet[cmdObj.getMore];
 }
 
+function isNamespaceSystemDotProfile(cmdObj) {
+    // No operations on system.profile are permitted inside transactions (see SERVER-46900).
+    for (let val of Object.values(cmdObj)) {
+        if (typeof val === 'string' && val.endsWith('system.profile')) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function setupTransactionCommand(conn, dbName, cmdName, cmdObj, lsid) {
     // We want to overwrite whatever read and write concern is already set.
     delete cmdObj.readConcern;
@@ -623,8 +633,10 @@ function setupTransactionCommand(conn, dbName, cmdName, cmdObj, lsid) {
     // use transactions.
     const driverSession = conn.getDB(dbName).getSession();
     const commandSupportsTransaction = TransactionsUtil.commandSupportsTxn(dbName, cmdName, cmdObj);
-    if (commandSupportsTransaction && driverSession.getSessionId() !== null &&
-        !isCommandNonTxnGetMore(cmdName, cmdObj)) {
+    const isSystemDotProfile = isNamespaceSystemDotProfile(cmdObj);
+
+    if (commandSupportsTransaction && !isSystemDotProfile &&
+        driverSession.getSessionId() !== null && !isCommandNonTxnGetMore(cmdName, cmdObj)) {
         if (isNested()) {
             // Nested commands should never start a new transaction.
         } else if (ops.length === 0) {
@@ -643,7 +655,10 @@ function setupTransactionCommand(conn, dbName, cmdName, cmdObj, lsid) {
         continueTransaction(conn, dbName, cmdName, cmdObj);
 
     } else {
-        if (ops.length > 0 && !isNested()) {
+        if (ops.length > 0 && !isNested() && !isSystemDotProfile) {
+            // Operations on system.profile must be allowed to execute in parallel with open
+            // transactions, so operations on system.profile should not commit the current open
+            // transaction.
             logMsgFull('setupTransactionCommand',
                        `Committing transaction ${txnOptions.txnNumber} on session` +
                            ` ${tojsononeline(lsid)} to run a command that does not support` +
