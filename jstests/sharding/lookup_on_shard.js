@@ -1,4 +1,9 @@
 // Test that a pipeline with a $lookup stage on a sharded foreign collection may be run on a mongod.
+
+// This test uses the flag-guarded sharded $lookup parameter, which results in cursors being
+// established from a shard instead of mongos. As of SERVER-46255, these requests will include the
+// 'clientOperationKey' which is not recognizable on 'last-stable' shards.
+// @tags: [requires_fcv_44]
 (function() {
 
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.

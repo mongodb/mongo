@@ -31,6 +31,11 @@ selector:
   - jstests/sharding/retryable_write_error_labels.js
   # Enable when SERVER-43310 is backported
   - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
+  # These tests use the flag-guarded sharded $lookup parameter, which results in cursors being
+  # established from a shard instead of mongos. As of SERVER-46255, these requests will include the
+  # 'clientOperationKey' which is not recognizable on 'last-stable' shards.
+  - jstests/sharding/lookup_on_shard.js
+  - jstests/sharding/lookup_stale_mongos.js
 
 executor:
   config:

@@ -2,6 +2,11 @@
 // local and/or foreign collections.  This includes when mongos thinks the collection is sharded
 // when it's not, and likewise when mongos thinks the collection is unsharded but is actually
 // sharded.
+
+// This test uses the flag-guarded sharded $lookup parameter, which results in cursors being
+// established from a shard instead of mongos. As of SERVER-46255, these requests will include the
+// 'clientOperationKey' which is not recognizable on 'last-stable' shards.
+// @tags: [requires_fcv_44]
 (function() {
 "use strict";
 

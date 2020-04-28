@@ -3,8 +3,11 @@
 // when it's not, and likewise when it thinks the collection is unsharded but is actually sharded.
 //
 // We restart a mongod to cause it to forget that a collection was sharded. When restarted, we
-// expect it to still have all the previous data.
-// @tags: [requires_persistence]
+// expect it to still have all the previous data. Also, this test uses the flag-guarded sharded
+// $lookup parameter, which results in cursors being established from a shard instead of mongos. As
+// of SERVER-46255, these requests will include the 'clientOperationKey' which is not recognizable
+// on 'last-stable' shards.
+// @tags: [requires_persistence, requires_fcv_44]
 (function() {
 "use strict";
 
