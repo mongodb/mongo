@@ -25,7 +25,8 @@ const tryFiveTimes = function(name, f) {
                 continue;
             }
 
-            jsTestLog(`Failed 5 times in test ${name}. There is probably a bug here.`);
+            jsTestLog(`Failed 5 times in test ${
+                name}. There is probably a bug here. Latest assertion: ${tojson(e)}`);
             throw e;
         }
     }

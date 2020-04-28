@@ -171,6 +171,17 @@ public:
                           const Timestamp& expectedTS,
                           long long expectedTerm) const;
 
+    /**
+     * Mocks an error cursor response from a remote with the given 'status'.
+     */
+    BSONObj createErrorCursorResponse(Status status) {
+        invariant(!status.isOK());
+        BSONObjBuilder result;
+        status.serializeErrorToBSON(&result);
+        result.appendBool("ok", false);
+        return result.obj();
+    }
+
 private:
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
