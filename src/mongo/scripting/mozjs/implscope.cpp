@@ -224,13 +224,13 @@ void MozJSImplScope::_gcCallback(JSContext* rt, JSGCStatus status, void* data) {
         return;
     }
 
-    LOGV2(22787,
-          "MozJS GC {status_JSGC_BEGIN_prologue_epilogue} heap stats -  total: "
-          "{mongo_sm_get_total_bytes} limit: {mongo_sm_get_max_bytes}",
-          "status_JSGC_BEGIN_prologue_epilogue"_attr =
-              (status == JSGC_BEGIN ? "prologue" : "epilogue"),
-          "mongo_sm_get_total_bytes"_attr = mongo::sm::get_total_bytes(),
-          "mongo_sm_get_max_bytes"_attr = mongo::sm::get_max_bytes());
+    LOGV2_INFO(22787,
+               "MozJS GC {status_JSGC_BEGIN_prologue_epilogue} heap stats -  total: "
+               "{mongo_sm_get_total_bytes} limit: {mongo_sm_get_max_bytes}",
+               "status_JSGC_BEGIN_prologue_epilogue"_attr =
+                   (status == JSGC_BEGIN ? "prologue" : "epilogue"),
+               "mongo_sm_get_total_bytes"_attr = mongo::sm::get_total_bytes(),
+               "mongo_sm_get_max_bytes"_attr = mongo::sm::get_max_bytes());
 }
 
 #if __has_feature(address_sanitizer)
@@ -928,10 +928,11 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     }
 
     if (reportError)
-        LOGV2_OPTIONS(4635900,
-                      logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
-                      "{message}",
-                      "message"_attr = redact(_error));
+        LOGV2_INFO_OPTIONS(
+            4635900,
+            logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
+            "{message}",
+            "message"_attr = redact(_error));
 
     // Clear the status state
     auto status = std::move(_status);

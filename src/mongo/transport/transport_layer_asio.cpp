@@ -829,16 +829,16 @@ Status validateFastOpenOnce() noexcept {
                                       kPrefixString,
                                       "reason"_attr = maybeTcpFastOpenStatus->reason());
             } else {
-                LOGV2_INFO(4648601,
-                           "Implicit TCP FastOpen unavailable. "
-                           "If TCP FastOpen is required, set tcpFastOpenServer, tcpFastOpenClient, "
-                           "and tcpFastOpenQueueSize.");
+                LOGV2(4648601,
+                      "Implicit TCP FastOpen unavailable. "
+                      "If TCP FastOpen is required, set tcpFastOpenServer, tcpFastOpenClient, "
+                      "and tcpFastOpenQueueSize.");
             }
 
             maybeTcpFastOpenStatus->addContext(kPrefixString);
         } else {
             if (!tcpFastOpenIsConfigured) {
-                LOGV2_INFO(4648602, "Implicit TCP FastOpen in use.");
+                LOGV2(4648602, "Implicit TCP FastOpen in use.");
             }
         }
     }

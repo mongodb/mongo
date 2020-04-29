@@ -152,10 +152,10 @@ void SessionInfo::finalize(js::FreeOp* fop, JSObject* obj) {
             auto status = exceptionToStatus();
 
             try {
-                LOGV2(22791,
-                      "Failed to end session {lsid} due to {status}",
-                      "lsid"_attr = lsid,
-                      "status"_attr = status);
+                LOGV2_INFO(22791,
+                           "Failed to end session {lsid} due to {status}",
+                           "lsid"_attr = lsid,
+                           "status"_attr = status);
             } catch (...) {
                 // This is here in case logging fails.
             }

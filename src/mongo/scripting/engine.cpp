@@ -353,7 +353,7 @@ public:
 
         if (scope->hasOutOfMemoryException()) {
             // make some room
-            LOGV2(22777, "Clearing all idle JS contexts due to out of memory");
+            LOGV2_INFO(22777, "Clearing all idle JS contexts due to out of memory");
             _pools.clear();
             return;
         }

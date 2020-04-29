@@ -63,7 +63,7 @@ namespace {
 
 auto makeSeveritySuppressor() {
     return std::make_unique<logv2::KeyedSeveritySuppressor<HostAndPort>>(
-        Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2));
+        Seconds{1}, logv2::LogSeverity::Log(), logv2::LogSeverity::Debug(2));
 }
 
 template <typename Map, typename Key>
