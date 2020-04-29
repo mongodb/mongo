@@ -124,6 +124,17 @@ const staleMongoS = st.s1;
     session.getDatabase(kDatabaseName).TestTransactionColl.insert({Key: 1});
     session.commitTransaction();
 }
+{
+    jsTest.log('Testing: Create collection as first op inside transaction works');
+    st.restartShardRS(0);
+    st.restartShardRS(1);
+
+    var session = staleMongoS.startSession();
+    session.startTransaction();
+    session.getDatabase(kDatabaseName).createCollection('TestTransactionCollCreation');
+    session.getDatabase(kDatabaseName).TestTransactionCollCreation.insertOne({Key: 0});
+    session.commitTransaction();
+}
 
 st.stop();
 })();

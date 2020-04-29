@@ -463,6 +463,20 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
+void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
+                                               Collection* coll,
+                                               const NamespaceString& collectionName,
+                                               const CollectionOptions& options,
+                                               const BSONObj& idIndex,
+                                               const OplogSlot& createOpTime) {
+    // By the time the collection is being created, the caller has already determined whether it is
+    // sharded or unsharded and set it on the CSR. If this method is called with the metadata as
+    // UNKNOWN, this means an internal collection creation, which can only be UNSHARDED
+    auto* csr = CollectionShardingRuntime::get(opCtx, collectionName);
+    if (!csr->getCurrentMetadataIfKnown())
+        csr->setFilteringMetadata(opCtx, CollectionMetadata());
+}
+
 repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                      const NamespaceString& collectionName,
                                                      OptionalCollectionUUID uuid,
