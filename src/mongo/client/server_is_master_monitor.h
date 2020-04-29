@@ -135,8 +135,7 @@ public:
     /**
      * Add/Remove Single Monitors based on the current topology membership.
      */
-    void onTopologyDescriptionChangedEvent(UUID topologyId,
-                                           TopologyDescriptionPtr previousDescription,
+    void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,
                                            TopologyDescriptionPtr newDescription) override;
 
     void disableExpeditedChecking();

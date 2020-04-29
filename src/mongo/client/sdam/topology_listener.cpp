@@ -47,14 +47,11 @@ void TopologyEventsPublisher::close() {
 }
 
 void TopologyEventsPublisher::onTopologyDescriptionChangedEvent(
-    UUID topologyId,
-    TopologyDescriptionPtr previousDescription,
-    TopologyDescriptionPtr newDescription) {
+    TopologyDescriptionPtr previousDescription, TopologyDescriptionPtr newDescription) {
     {
         stdx::lock_guard lock(_eventQueueMutex);
         EventPtr event = std::make_unique<Event>();
         event->type = EventType::TOPOLOGY_DESCRIPTION_CHANGED;
-        event->topologyId = std::move(topologyId);
         event->previousDescription = previousDescription;
         event->newDescription = newDescription;
         _eventQueue.push_back(std::move(event));
@@ -191,9 +188,8 @@ void TopologyEventsPublisher::_sendEvent(TopologyListenerPtr listener, const Eve
             listener->onServerHeartbeatFailureEvent(event.status, event.hostAndPort, event.reply);
             break;
         case EventType::TOPOLOGY_DESCRIPTION_CHANGED:
-            // TODO SERVER-46497: fix uuid or just remove
-            listener->onTopologyDescriptionChangedEvent(
-                UUID::gen(), event.previousDescription, event.newDescription);
+            listener->onTopologyDescriptionChangedEvent(event.previousDescription,
+                                                        event.newDescription);
             break;
         case EventType::HANDSHAKE_COMPLETE:
             listener->onServerHandshakeCompleteEvent(

@@ -37,8 +37,7 @@ class StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor fin
 public:
     void shutdown();
 
-    void onTopologyDescriptionChangedEvent(UUID topologyId,
-                                           sdam::TopologyDescriptionPtr previousDescription,
+    void onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
                                            sdam::TopologyDescriptionPtr newDescription) override;
 
 private:

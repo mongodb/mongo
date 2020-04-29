@@ -210,8 +210,8 @@ protected:
         }
         auto sdamConfigNew = sdam::SdamConfiguration(hostsNew);
         auto topologyDescriptionNew = std::make_shared<sdam::TopologyDescription>(sdamConfigNew);
-        pingMonitor->onTopologyDescriptionChangedEvent(
-            UUID::gen(), topologyDescriptionOld, topologyDescriptionNew);
+        pingMonitor->onTopologyDescriptionChangedEvent(topologyDescriptionOld,
+                                                       topologyDescriptionNew);
     }
 
 private:

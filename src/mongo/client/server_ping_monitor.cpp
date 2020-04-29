@@ -248,9 +248,7 @@ void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::IsMasterRTT duratio
 }
 
 void ServerPingMonitor::onTopologyDescriptionChangedEvent(
-    UUID topologyId,
-    sdam::TopologyDescriptionPtr previousDescription,
-    sdam::TopologyDescriptionPtr newDescription) {
+    sdam::TopologyDescriptionPtr previousDescription, sdam::TopologyDescriptionPtr newDescription) {
     stdx::lock_guard lk(_mutex);
     if (_isShutdown) {
         return;

@@ -374,8 +374,8 @@ TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorOnTopologyDescript
     auto sdamConfigAllHosts = sdam::SdamConfiguration(allHostsVec);
     auto topologyDescriptionAllHosts =
         std::make_shared<sdam::TopologyDescription>(sdamConfigAllHosts);
-    isMasterMonitor->onTopologyDescriptionChangedEvent(
-        UUID::gen(), topologyDescription0, topologyDescriptionAllHosts);
+    isMasterMonitor->onTopologyDescriptionChangedEvent(topologyDescription0,
+                                                       topologyDescriptionAllHosts);
     // Ensure expedited checking is disabled for the SingleServerIsMasterMonitor corresponding to
     // host1 as well.
     isMasterMonitor->disableExpeditedChecking();
@@ -427,8 +427,8 @@ TEST_F(ServerIsMasterMonitorTestFixture,
     std::vector<sdam::ServerAddress> host0Vec{host0};
     auto sdamConfig0 = sdam::SdamConfiguration(host0Vec);
     auto topologyDescription0 = std::make_shared<sdam::TopologyDescription>(sdamConfig0);
-    isMasterMonitor->onTopologyDescriptionChangedEvent(
-        UUID::gen(), topologyDescriptionAllHosts, topologyDescription0);
+    isMasterMonitor->onTopologyDescriptionChangedEvent(topologyDescriptionAllHosts,
+                                                       topologyDescription0);
 
     checkNoActivityBefore(deadline);
     waitForNextIsMaster(getTimeoutMS());

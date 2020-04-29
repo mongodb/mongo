@@ -161,8 +161,7 @@ public:
      * Drop corresponding SingleServerPingMonitors if the server is not included in the
      * newDescritpion.
      */
-    void onTopologyDescriptionChangedEvent(UUID topologyId,
-                                           sdam::TopologyDescriptionPtr previousDescription,
+    void onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
                                            sdam::TopologyDescriptionPtr newDescription);
 
 private:
