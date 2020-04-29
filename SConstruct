@@ -4216,7 +4216,7 @@ if get_option('lint-scope') == 'changed':
             "buildscripts/pylinters.py",
             patch_file,
         ],
-        action="$PYTHON ${SOURCES[0]} lint-patch ${SOURCES[1]}"
+        action="REVISION=$REVISION ENTERPRISE_REV=$ENTERPRISE_REV $PYTHON ${SOURCES[0]} lint-git-diff"
     )
 
     clang_format = env.Command(
@@ -4225,7 +4225,7 @@ if get_option('lint-scope') == 'changed':
             "buildscripts/clang_format.py",
             patch_file,
         ],
-        action="$PYTHON ${SOURCES[0]} lint-patch ${SOURCES[1]}"
+        action="REVISION=$REVISION ENTERPRISE_REV=$ENTERPRISE_REV $PYTHON ${SOURCES[0]} lint-git-diff"
     )
 
     eslint = env.Command(

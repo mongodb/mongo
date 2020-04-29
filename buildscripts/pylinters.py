@@ -5,22 +5,25 @@ import argparse
 import logging
 import os
 import sys
-import threading
-from abc import ABCMeta, abstractmethod
-from typing import Any, Dict, List
+from typing import Dict, List
+
+import structlog
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-from buildscripts.linter import base  # pylint: disable=wrong-import-position
-from buildscripts.linter import git  # pylint: disable=wrong-import-position
-from buildscripts.linter import mypy  # pylint: disable=wrong-import-position
-from buildscripts.linter import parallel  # pylint: disable=wrong-import-position
-from buildscripts.linter import pydocstyle  # pylint: disable=wrong-import-position
-from buildscripts.linter import pylint  # pylint: disable=wrong-import-position
-from buildscripts.linter import runner  # pylint: disable=wrong-import-position
-from buildscripts.linter import yapf  # pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position
+from buildscripts.linter.filediff import gather_changed_files_for_lint
+from buildscripts.linter import base
+from buildscripts.linter import git
+from buildscripts.linter import mypy
+from buildscripts.linter import parallel
+from buildscripts.linter import pydocstyle
+from buildscripts.linter import pylint
+from buildscripts.linter import runner
+from buildscripts.linter import yapf
+# pylint: enable=wrong-import-position
 
 # List of supported linters
 _LINTERS = [
@@ -92,6 +95,16 @@ def lint_patch(linters, config_dict, file_name):
     # type: (str, Dict[str, str], List[str]) -> None
     """Lint patch command entry point."""
     file_names = git.get_files_to_check_from_patch(file_name, is_interesting_file)
+
+    # Patch may have files that we do not want to check which is fine
+    if file_names:
+        _lint_files(linters, config_dict, file_names)
+
+
+def lint_git_diff(linters, config_dict, _):
+    # type: (str, Dict[str, str], List[str]) -> None
+    """Lint git diff command entry point."""
+    file_names = gather_changed_files_for_lint(is_interesting_file)
 
     # Patch may have files that we do not want to check which is fine
     if file_names:
@@ -185,6 +198,11 @@ def main():
     parser_lint_patch.add_argument("file_names", nargs="*", help="Globs of files to check")
     parser_lint_patch.set_defaults(func=lint_patch)
 
+    parser_lint_patch = sub.add_parser('lint-git-diff',
+                                       help='Lint the files since the last git commit')
+    parser_lint_patch.add_argument("file_names", nargs="*", help="Globs of files to check")
+    parser_lint_patch.set_defaults(func=lint_git_diff)
+
     parser_fix = sub.add_parser('fix', help='Fix files if possible')
     parser_fix.add_argument("file_names", nargs="*", help="Globs of files to check")
     parser_fix.set_defaults(func=fix_func)
@@ -201,6 +219,7 @@ def main():
 
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
+    structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
 
     args.func(args.linters, config_dict, args.file_names)
 

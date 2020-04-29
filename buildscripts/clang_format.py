@@ -10,7 +10,7 @@
 
 import difflib
 import glob
-from io import StringIO
+import logging
 import os
 import re
 import shutil
@@ -24,16 +24,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from distutils import spawn  # pylint: disable=no-name-in-module
 from optparse import OptionParser
-from multiprocessing import cpu_count
+import structlog
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-from buildscripts.linter import git  # pylint: disable=wrong-import-position
-from buildscripts.linter import parallel  # pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position
+from buildscripts.linter.filediff import gather_changed_files_for_lint
+from buildscripts.linter import git, parallel
+# pylint: enable=wrong-import-position
 
 ##############################################################################
 #
@@ -349,6 +350,18 @@ def lint_patch(clang_format, infile):
         _lint_files(clang_format, files)
 
 
+def lint_git_diff(clang_format):
+    """
+    Lint the files that have changes since the last git commit.
+
+    :param clang_format: Path to clang_format command.
+    """
+    files = gather_changed_files_for_lint(is_interesting_file)
+
+    if files:
+        _lint_files(clang_format, files)
+
+
 def lint(clang_format):
     """Lint files command entry point."""
     files = git.get_files_to_check([], is_interesting_file)
@@ -548,6 +561,9 @@ def usage():
 
 def main():
     """Execute Main entry point."""
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
+
     parser = OptionParser()
     parser.add_option("-c", "--clang-format", type="string", dest="clang_format")
 
@@ -562,6 +578,8 @@ def main():
             lint_all(options.clang_format)
         elif command == "lint-patch":
             lint_patch(options.clang_format, args[2:])
+        elif command == "lint-git-diff":
+            lint_git_diff(options.clang_format)
         elif command == "format":
             format_func(options.clang_format)
         elif command == "format-my":
