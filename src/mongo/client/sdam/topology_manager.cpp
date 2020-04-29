@@ -156,7 +156,7 @@ void TopologyManager::_publishTopologyDescriptionChanged(
     const TopologyDescriptionPtr& oldTopologyDescription,
     const TopologyDescriptionPtr& newTopologyDescription) const {
     if (_topologyEventsPublisher)
-        _topologyEventsPublisher->onTopologyDescriptionChangedEvent(
-            newTopologyDescription->getId(), oldTopologyDescription, newTopologyDescription);
+        _topologyEventsPublisher->onTopologyDescriptionChangedEvent(oldTopologyDescription,
+                                                                    newTopologyDescription);
 }
 };  // namespace mongo::sdam

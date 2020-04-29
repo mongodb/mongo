@@ -447,8 +447,7 @@ ServerIsMasterMonitor::ServerIsMasterMonitor(
                 "RSM {replicaSet} monitoring {size} members.",
                 "replicaSet"_attr = _setUri.getSetName(),
                 "size"_attr = initialTopologyDescription->getServers().size());
-    onTopologyDescriptionChangedEvent(
-        initialTopologyDescription->getId(), nullptr, initialTopologyDescription);
+    onTopologyDescriptionChangedEvent(nullptr, initialTopologyDescription);
 }
 
 void ServerIsMasterMonitor::shutdown() {
@@ -463,9 +462,7 @@ void ServerIsMasterMonitor::shutdown() {
 }
 
 void ServerIsMasterMonitor::onTopologyDescriptionChangedEvent(
-    UUID topologyId,
-    sdam::TopologyDescriptionPtr previousDescription,
-    sdam::TopologyDescriptionPtr newDescription) {
+    sdam::TopologyDescriptionPtr previousDescription, sdam::TopologyDescriptionPtr newDescription) {
     stdx::lock_guard lock(_mutex);
     if (_isShutdown)
         return;

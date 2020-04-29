@@ -569,9 +569,7 @@ void StreamableReplicaSetMonitor::_setConfirmedNotifierState(
 }
 
 void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
-    UUID topologyId,
-    TopologyDescriptionPtr previousDescription,
-    TopologyDescriptionPtr newDescription) {
+    TopologyDescriptionPtr previousDescription, TopologyDescriptionPtr newDescription) {
     stdx::lock_guard lock(_mutex);
     if (_isDropped.load())
         return;

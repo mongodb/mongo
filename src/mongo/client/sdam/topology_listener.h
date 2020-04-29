@@ -33,7 +33,6 @@
 
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo::sdam {
 
@@ -48,8 +47,7 @@ public:
      * Called when a TopologyDescriptionChangedEvent is published - The TopologyDescription changed
      * and the new TopologyDescription does not match the old.
      */
-    virtual void onTopologyDescriptionChangedEvent(UUID topologyId,
-                                                   TopologyDescriptionPtr previousDescription,
+    virtual void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,
                                                    TopologyDescriptionPtr newDescription){};
 
     virtual void onServerHeartbeatFailureEvent(Status errorStatus,
@@ -104,8 +102,7 @@ public:
     void removeListener(TopologyListenerPtr listener);
     void close();
 
-    void onTopologyDescriptionChangedEvent(UUID topologyId,
-                                           TopologyDescriptionPtr previousDescription,
+    void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,
                                            TopologyDescriptionPtr newDescription) override;
     virtual void onServerHandshakeCompleteEvent(IsMasterRTT durationMs,
                                                 const sdam::ServerAddress& address,
@@ -142,7 +139,6 @@ private:
         BSONObj reply;
         TopologyDescriptionPtr previousDescription;
         TopologyDescriptionPtr newDescription;
-        boost::optional<UUID> topologyId;
         Status status = Status::OK();
     };
     using EventPtr = std::unique_ptr<Event>;

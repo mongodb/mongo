@@ -41,8 +41,7 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor::shu
 }
 
 void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor::
-    onTopologyDescriptionChangedEvent(UUID topologyId,
-                                      sdam::TopologyDescriptionPtr previousDescription,
+    onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
                                       sdam::TopologyDescriptionPtr newDescription) {
     {
         stdx::lock_guard lock(_mutex);

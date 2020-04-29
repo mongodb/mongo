@@ -162,8 +162,7 @@ private:
     boost::optional<std::vector<HostAndPort>> _getHosts(const ReadPreferenceSetting& criteria);
 
     // Incoming Events
-    void onTopologyDescriptionChangedEvent(UUID topologyId,
-                                           sdam::TopologyDescriptionPtr previousDescription,
+    void onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
                                            sdam::TopologyDescriptionPtr newDescription) override;
 
     void onServerHeartbeatSucceededEvent(const sdam::ServerAddress& hostAndPort,
