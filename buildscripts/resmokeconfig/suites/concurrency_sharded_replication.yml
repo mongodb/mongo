@@ -1,5 +1,5 @@
 test_kind: fsm_workload_test
-use_in_multiversion: concurrency_sharded_replication_multiversion
+# use_in_multiversion: concurrency_sharded_replication_multiversion
 
 selector:
   roots:

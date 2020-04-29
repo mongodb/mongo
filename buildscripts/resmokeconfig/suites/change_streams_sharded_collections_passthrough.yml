@@ -1,5 +1,5 @@
 test_kind: js_test
-use_in_multiversion: change_streams_sharded_collections_multiversion_passthrough
+# use_in_multiversion: change_streams_sharded_collections_multiversion_passthrough
 
 selector:
   roots:

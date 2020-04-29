@@ -6,10 +6,6 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_46
-  exclude_files:
-  - jstests/replsets/*.js
-  # Enable when 4.4 becomes last stable
-  - jstests/replsets/no_disconnect_on_stepdown.js
 executor:
   config:
     shell_options:

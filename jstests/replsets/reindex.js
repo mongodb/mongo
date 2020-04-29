@@ -2,6 +2,8 @@
  * Test that the reindex command only runs on a node in standalone mode. First it will make sure
  * that the command can't be run on a primary or a secondary. Then it will make sure that the
  * reindex command can be successfully run on a standalone node.
+ *
+ * @tags: [requires_fcv_46]
  */
 
 (function() {

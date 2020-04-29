@@ -1,6 +1,6 @@
 // Tests that commands like find, aggregate and update accepts a 'let' parameter which defines
 // variables for use in expressions within the command.
-// @tags: [assumes_against_mongod_not_mongos]
+// @tags: [assumes_against_mongod_not_mongos, requires_fcv_46]
 
 (function() {
 "use strict";

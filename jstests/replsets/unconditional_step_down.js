@@ -1,7 +1,7 @@
 /**
  * Tests that unconditional step down terminates writes, but not reads. And, doesn't disconnect
  * the connections if primary is stepping down to secondary.
- * @tags: [requires_document_locking]
+ * @tags: [requires_document_locking, requires_fcv_46]
  */
 (function() {
 "use strict";

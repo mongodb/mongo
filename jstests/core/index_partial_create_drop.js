@@ -5,6 +5,8 @@
 //
 //     # Builds index in the background
 //     requires_background_index,
+//
+//     requires_fcv_46,
 // ]
 
 // Test partial index creation and drops.

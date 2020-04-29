@@ -1,6 +1,8 @@
 /*
  * Test that replSetReconfig prohibits w:0 in getLastErrorDefaults,
  * SERVER-13055.
+ *
+ * @tags: [requires_fcv_46]
  */
 
 var replTest = new ReplSetTest({name: 'prohibit_w0', nodes: 1});

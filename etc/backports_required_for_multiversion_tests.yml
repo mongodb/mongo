@@ -65,6 +65,10 @@ replica_sets_multiversion:
   test_file: jstests/replsets/apply_ops_inserts_do_not_include_fromMigrate_field.js
 - ticket: SERVER-47190
   test_file: jstests/replsets/force_shutdown_primary.js
+- ticket: SERVER-47394
+  test_file: jstests/replsets/awaitable_ismaster_errors_on_horizon_change.js
+- ticket: SERVER-47394
+  test_file: jstests/replsets/awaitable_ismaster_on_nodes_with_invalid_configs.js
 
 sharding_multiversion:
 - ticket: SERVER-31368
