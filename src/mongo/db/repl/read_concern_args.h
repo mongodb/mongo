@@ -185,8 +185,18 @@ public:
     void setArgsAtClusterTimeForSnapshot(Timestamp ts) {
         invariant(_level && _level == ReadConcernLevel::kSnapshotReadConcern);
         invariant(!_atClusterTime);
+        invariant(!_atClusterTimeSelected);
         _afterClusterTime = boost::none;
         _atClusterTime = LogicalTime(ts);
+        _atClusterTimeSelected = true;
+    }
+
+    /**
+     * Return whether an atClusterTime has been selected by the server for a snapshot read. This
+     * function returns false if the atClusterTime was specified by the client.
+     */
+    bool wasAtClusterTimeSelected() const {
+        return _atClusterTimeSelected;
     }
 
 private:
@@ -223,6 +233,8 @@ private:
     bool _specified;
 
     ReadWriteConcernProvenance _provenance;
+
+    bool _atClusterTimeSelected = false;
 };
 
 }  // namespace repl

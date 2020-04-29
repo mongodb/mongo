@@ -5,38 +5,113 @@
 
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
-    assert(serverStatusResponse.hasOwnProperty("opReadConcernCounters"),
-           "Expected the serverStatus response to have a 'opReadConcernCounters' field\n" +
-               tojson(serverStatusResponse));
+    assert(serverStatusResponse.hasOwnProperty("readConcernCounters"),
+           "Missing 'readConcernCounters' from serverStatus\n" + tojson(serverStatusResponse));
+
+    assert(serverStatusResponse.readConcernCounters.hasOwnProperty("nonTransactionOps"),
+           "Missing 'nonTransactionOps' from 'readConcernCounters'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.nonTransactionOps.hasOwnProperty("none"),
+           "Missing 'none' from 'readConcernCounters.nonTransactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.nonTransactionOps.hasOwnProperty("local"),
+           "Missing 'local' from 'readConcernCounters.nonTransactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.nonTransactionOps.hasOwnProperty("available"),
+           "Missing 'available' from 'readConcernCounters.nonTransactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.nonTransactionOps.hasOwnProperty("majority"),
+           "Missing 'majority' from 'readConcernCounters.nonTransactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.nonTransactionOps.hasOwnProperty("snapshot"),
+           "Missing 'snapshot' from 'readConcernCounters.nonTransactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.nonTransactionOps.snapshot.hasOwnProperty(
+               "withClusterTime"),
+           "Missing 'withClusterTime' from 'readConcernCounters.nonTransactionOps.snapshot'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.nonTransactionOps.snapshot.hasOwnProperty(
+               "withoutClusterTime"),
+           "Missing 'withoutClusterTime' from 'readConcernCounters.nonTransactionOps.snapshot'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
     assert(
-        serverStatusResponse.opReadConcernCounters.hasOwnProperty("available"),
-        "The 'opReadConcernCounters' field in serverStatus did not have the 'available' field\n" +
-            tojson(serverStatusResponse.opReadConcernCounters));
-    assert(
-        serverStatusResponse.opReadConcernCounters.hasOwnProperty("linearizable"),
-        "The 'opReadConcernCounters' field in serverStatus did not have the 'linearizable' field\n" +
-            tojson(serverStatusResponse.opReadConcernCounters));
-    assert(serverStatusResponse.opReadConcernCounters.hasOwnProperty("local"),
-           "The 'opReadConcernCounters' field in serverStatus did not have the 'local' field\n" +
-               tojson(serverStatusResponse.opReadConcernCounters));
-    assert(serverStatusResponse.opReadConcernCounters.hasOwnProperty("majority"),
-           "The 'opReadConcernCounters' field in serverStatus did not have the 'majority' field\n" +
-               tojson(serverStatusResponse.opReadConcernCounters));
-    assert(serverStatusResponse.opReadConcernCounters.hasOwnProperty("snapshot"),
-           "The 'opReadConcernCounters' field in serverStatus did not have the 'snapshot' field\n" +
-               tojson(serverStatusResponse.opReadConcernCounters));
-    assert(serverStatusResponse.opReadConcernCounters.hasOwnProperty("none"),
-           "The 'opReadConcernCounters' field in serverStatus did not have the 'none' field\n" +
-               tojson(serverStatusResponse.opReadConcernCounters));
+        serverStatusResponse.readConcernCounters.nonTransactionOps.hasOwnProperty("linearizable"),
+        "Missing 'linearizable' from 'readConcernCounters.nonTransactionOps'\n" +
+            tojson(serverStatusResponse.readConcernCounters));
+
+    assert(serverStatusResponse.readConcernCounters.hasOwnProperty("transactionOps"),
+           "Missing 'transactionOps' from 'readConcernCounters'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.transactionOps.hasOwnProperty("none"),
+           "Missing 'none' from 'readConcernCounters.transactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.transactionOps.hasOwnProperty("local"),
+           "Missing 'local' from 'readConcernCounters.transactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.transactionOps.hasOwnProperty("majority"),
+           "Missing 'majority' from 'readConcernCounters.transactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.transactionOps.hasOwnProperty("snapshot"),
+           "Missing 'snapshot' from 'readConcernCounters.transactionOps'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.transactionOps.snapshot.hasOwnProperty(
+               "withClusterTime"),
+           "Missing 'withClusterTime' from 'readConcernCounters.transactionOps.snapshot'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
+    assert(serverStatusResponse.readConcernCounters.transactionOps.snapshot.hasOwnProperty(
+               "withoutClusterTime"),
+           "Missing 'withoutClusterTime' from 'readConcernCounters.transactionOps.snapshot'\n" +
+               tojson(serverStatusResponse.readConcernCounters));
 }
 
 // Verifies that the given value of the server status response is incremented in the way
 // we expect.
-function verifyServerStatusChange(initialStats, newStats, valueName, expectedIncrement) {
-    assert.eq(initialStats[valueName] + expectedIncrement,
-              newStats[valueName],
-              "expected " + valueName + " to increase by " + expectedIncrement +
-                  ", initialStats: " + tojson(initialStats) + ", newStats: " + tojson(newStats));
+function verifyServerStatusChange(initialStatus,
+                                  newStatus,
+                                  field,
+                                  expectedIncrement,
+                                  {isTransaction = false, atClusterTime = false} = {}) {
+    verifyServerStatusFields(newStatus);
+    let initialCounters = initialStatus.readConcernCounters;
+    let newCounters = newStatus.readConcernCounters;
+    let initialOps, newOps;
+    let fieldPath = "serverStatus.readConcernCounters";
+    if (isTransaction) {
+        initialOps = initialCounters.transactionOps;
+        newOps = newCounters.transactionOps;
+        fieldPath = fieldPath + ".transactionOps";
+    } else {
+        initialOps = initialCounters.nonTransactionOps;
+        newOps = newCounters.nonTransactionOps;
+        fieldPath = fieldPath + ".nonTransactionOps";
+    }
+
+    if (field === "snapshot") {
+        initialOps = initialOps.snapshot;
+        newOps = newOps.snapshot;
+        fieldPath = fieldPath + ".snapshot";
+        if (atClusterTime) {
+            field = "withClusterTime";
+        } else {
+            field = "withoutClusterTime";
+        }
+    }
+
+    fieldPath = fieldPath + "." + field;
+    assert.eq(initialOps[field] + expectedIncrement,
+              newOps[field],
+              "expected " + fieldPath + " to increase by " + expectedIncrement +
+                  ", initialStats: " + tojson(initialCounters) +
+                  ", newStats: " + tojson(newCounters));
+
+    // Update the value of the field to the new value so we can compare the rest of the fields using
+    // assert.docEq.
+    initialOps[field] = newOps[field];
+
+    assert.docEq(initialCounters,
+                 newCounters,
+                 "Expected docEq after updating " + fieldPath + ", initialCounters: " +
+                     tojson(initialCounters + ", newCounters: " + tojson(newCounters)));
 }
 
 const rst = new ReplSetTest({nodes: 1});
@@ -53,7 +128,14 @@ const sessionOptions = {
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
-testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
+
+testDB.runCommand({drop: collName});
+assert.commandWorked(testDB.createCollection(collName));
+assert.commandWorked(testDB.runCommand({
+    createIndexes: collName,
+    indexes: [{key: {haystack: "geoHaystack", a: 1}, name: "haystack_geo", bucketSize: 1}],
+    writeConcern: {w: "majority"}
+}));
 assert.commandWorked(testColl.insert({_id: 0}));
 
 // Run an initial transaction to get config.transactions state into memory.
@@ -71,293 +153,152 @@ function getServerStatus(conn) {
 let serverStatus = getServerStatus(testDB);
 verifyServerStatusFields(serverStatus);
 
-// Run a find with no readConcern.
-assert.eq(testColl.find().itcount(), 1);
-let newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 1);
-serverStatus = newStatus;
-
-// Run a find with a readConcern with no level.
-assert.commandWorked(
-    testDB.runCommand({find: collName, readConcern: {afterClusterTime: Timestamp(1, 1)}}));
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 1);
-serverStatus = newStatus;
+let newStatus;
 
 // Run a legacy query.
 primary.forceReadMode("legacy");
 assert.eq(testColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 1);
+verifyServerStatusChange(serverStatus, newStatus, "none", 1);
 primary.forceReadMode("commands");
 serverStatus = newStatus;
 
-// Run a find with a readConcern level available.
-assert.eq(testColl.find().readConcern("available").itcount(), 1);
+// Run a command without a readConcern.
+assert.eq(testColl.find().itcount(), 1);
 newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 1);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
+verifyServerStatusChange(serverStatus, newStatus, "none", 1);
 serverStatus = newStatus;
 
-// Run a find with a readConcern level linearizable.
-assert.eq(testColl.find().readConcern("linearizable").itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 1);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-serverStatus = newStatus;
+// Non-transaction reads.
+for (let level of ["none", "local", "available", "snapshot", "majority", "linearizable"]) {
+    jsTestLog("Testing non-transaction reads with readConcern " + level);
+    let readConcern = {};
+    if (level !== "none") {
+        readConcern = {level: level};
+    }
 
-// Run a find with a readConcern level local.
-assert.eq(testColl.find().readConcern("local").itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 1);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-serverStatus = newStatus;
+    assert.commandWorked(testDB.runCommand({find: collName, readConcern: readConcern}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1);
+    serverStatus = newStatus;
 
-// Run a find with a readConcern level majority.
-assert.eq(testColl.find().readConcern("majority").itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 1);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-serverStatus = newStatus;
+    assert.commandWorked(testDB.runCommand(
+        {aggregate: collName, pipeline: [], cursor: {}, readConcern: readConcern}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1);
+    serverStatus = newStatus;
 
-// Run a find in a transaction with readConcern level snapshot.
-session.startTransaction({readConcern: {level: "snapshot"}});
-assert.eq(sessionColl.find().itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 1);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-assert.commandWorked(session.abortTransaction_forTesting());
-serverStatus = newStatus;
+    assert.commandWorked(testDB.runCommand({count: collName, readConcern: readConcern}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1);
+    serverStatus = newStatus;
 
-// Run a find in a transaction with no specified readConcern level.
-session.startTransaction();
-assert.eq(sessionColl.find().itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 1);
-assert.commandWorked(session.abortTransaction_forTesting());
-serverStatus = newStatus;
+    assert.commandWorked(
+        testDB.runCommand({distinct: collName, key: "_id", readConcern: readConcern}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1);
+    serverStatus = newStatus;
 
-// Run a find in a transaction with readConcern level local.
-session.startTransaction({readConcern: {level: "local"}});
-assert.eq(sessionColl.find().itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 1);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-assert.commandWorked(session.abortTransaction_forTesting());
-serverStatus = newStatus;
+    assert.commandWorked(testDB.runCommand({
+        geoSearch: collName,
+        near: [0, 0],
+        maxDistance: 1,
+        search: {a: 1},
+        readConcern: readConcern
+    }));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1);
+    serverStatus = newStatus;
 
-// Run a find in a transaction with readConcern level majority.
-session.startTransaction({readConcern: {level: "majority"}});
-assert.eq(sessionColl.find().itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 1);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-serverStatus = newStatus;
+    if (level in ["none", "local", "available"]) {
+        // mapReduce only support local and available.
+        assert.commandWorked(testDB.runCommand({
+            mapReduce: collName,
+            map: function() {
+                emit(this.a, this.a);
+            },
+            reduce: function(key, vals) {
+                return 1;
+            },
+            out: {inline: 1},
+            readConcern: readConcern
+        }));
+        newStatus = getServerStatus(testDB);
+        verifyServerStatusChange(serverStatus, newStatus, level, 1);
+        serverStatus = newStatus;
+    }
 
-// Run a second find in the same transaction. It will inherit the readConcern from the
-// transaction.
-assert.eq(sessionColl.find().itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 1);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-assert.commandWorked(session.abortTransaction_forTesting());
-serverStatus = newStatus;
+    // getMore does not count toward readConcern metrics. getMore inherits the readConcern of the
+    // originating command.
+    let res = assert.commandWorked(
+        testDB.runCommand({find: collName, batchSize: 0, readConcern: readConcern}));
+    serverStatus = getServerStatus(testDB);
+    assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: collName}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 0);
+}
 
-// Aggregation does not count toward readConcern metrics. Aggregation is counted as a 'command'
-// in the 'opCounters' serverStatus section, and we only track the readConcern of queries
-// tracked in 'opCounters.query'.
-assert.eq(testColl.aggregate([]).itcount(), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-serverStatus = newStatus;
-
-// The count command does not count toward readConcern metrics. The count command is counted as
-// a 'command' in the 'opCounters' serverStatus section, and we only track the readConcern of
-// queries tracked in 'opCounters.query'.
-assert.eq(testColl.count({_id: 0}), 1);
-newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
-serverStatus = newStatus;
-
-// getMore does not count toward readConcern metrics. getMore inherits the readConcern of the
-// originating command. It is not counted in 'opCounters.query'.
-let res = assert.commandWorked(testDB.runCommand({find: collName, batchSize: 0}));
+// Test non-transaction snapshot with atClusterTime.
+let insertTimestamp =
+    assert.commandWorked(testDB.runCommand({insert: "atClusterTime", documents: [{_id: 0}]}))
+        .operationTime;
+jsTestLog("Testing non-transaction reads with atClusterTime");
 serverStatus = getServerStatus(testDB);
-assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: collName}));
+assert.commandWorked(testDB.runCommand(
+    {find: "atClusterTime", readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}));
 newStatus = getServerStatus(testDB);
-verifyServerStatusFields(newStatus);
+verifyServerStatusChange(serverStatus, newStatus, "snapshot", 1, {atClusterTime: true});
+serverStatus = newStatus;
+
+// Transaction reads.
+for (let level of ["none", "local", "snapshot", "majority"]) {
+    jsTestLog("Testing transaction reads with readConcern " + level);
+    if (level === "none") {
+        session.startTransaction();
+    } else {
+        session.startTransaction({readConcern: {level: level}});
+    }
+    assert.eq(sessionColl.find().itcount(), 1);
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1, {isTransaction: true});
+    serverStatus = newStatus;
+
+    // Run a second find in the same transaction. It will inherit the readConcern from the
+    // transaction.
+    assert.eq(sessionColl.find().itcount(), 1);
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 1, {isTransaction: true});
+    serverStatus = newStatus;
+
+    // Run an insert in the same transaction. This should not count toward the readConcern metrics.
+    assert.commandWorked(
+        sessionDb.runCommand({insert: "transaction", documents: [{level: level}]}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, level, 0, {isTransaction: true});
+    assert.commandWorked(session.abortTransaction_forTesting());
+    serverStatus = newStatus;
+}
+
+// Test transaction snapshot with atClusterTime.
+insertTimestamp =
+    assert.commandWorked(testDB.runCommand({insert: "atClusterTime", documents: [{_id: 1}]}))
+        .operationTime;
+jsTestLog("Testing transaction reads with atClusterTime");
+session.startTransaction({readConcern: {level: "snapshot", atClusterTime: insertTimestamp}});
+serverStatus = getServerStatus(testDB);
+
+assert.eq(sessionColl.find().itcount(), 1);
+newStatus = getServerStatus(testDB);
 verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "available", 0);
+    serverStatus, newStatus, "snapshot", 1, {isTransaction: true, atClusterTime: true});
+serverStatus = newStatus;
+
+// Perform another read in the same transaction.
+assert.eq(sessionColl.find().itcount(), 1);
+newStatus = getServerStatus(testDB);
 verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "linearizable", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "local", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "majority", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "snapshot", 0);
-verifyServerStatusChange(
-    serverStatus.opReadConcernCounters, newStatus.opReadConcernCounters, "none", 0);
+    serverStatus, newStatus, "snapshot", 1, {isTransaction: true, atClusterTime: true});
+assert.commandWorked(session.abortTransaction_forTesting());
 
 session.endSession();
 rst.stopSet();

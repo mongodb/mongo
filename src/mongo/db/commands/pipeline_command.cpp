@@ -78,6 +78,10 @@ public:
             this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
     }
 
+    bool shouldAffectReadConcernCounter() const override {
+        return true;
+    }
+
     class Invocation final : public CommandInvocation {
     public:
         Invocation(Command* cmd,

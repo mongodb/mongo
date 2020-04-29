@@ -93,6 +93,10 @@ public:
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
+    bool shouldAffectReadConcernCounter() const override {
+        return true;
+    }
+
     bool supportsReadMirroring(const BSONObj&) const override {
         return true;
     }

@@ -62,6 +62,10 @@ public:
                 {kDefaultReadConcernNotPermitted}};
     }
 
+    bool shouldAffectReadConcernCounter() const override {
+        return true;
+    }
+
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return map_reduce_common::mrSupportsWriteConcern(cmd);
     }

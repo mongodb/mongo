@@ -169,6 +169,10 @@ public:
         return false;
     }
 
+    bool shouldAffectReadConcernCounter() const override {
+        return true;
+    }
+
     class Invocation final : public CommandInvocation {
     public:
         Invocation(const FindCmd* definition, const OpMsgRequest& request, StringData dbName)
@@ -301,8 +305,6 @@ public:
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
             // Although it is a command, a find command gets counted as a query.
             globalOpCounters.gotQuery();
-            ServerReadConcernMetrics::get(opCtx)->recordReadConcern(
-                repl::ReadConcernArgs::get(opCtx));
 
             // Parse the command BSON to a QueryRequest. Pass in the parsedNss in case _request.body
             // does not have a UUID.

@@ -382,6 +382,14 @@ public:
     }
 
     /**
+     * Override and return true if the readConcernCounters in serverStatus should not be incremented
+     * on behalf of this command.
+     */
+    virtual bool shouldAffectReadConcernCounter() const {
+        return false;
+    }
+
+    /**
      * Return true if the command requires auth.
      */
     virtual bool requiresAuth() const {

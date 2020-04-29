@@ -615,13 +615,21 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     if (!opCtx->getClient()->isInDirectClient()) {
         const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
+        auto command = invocation->definition();
+        // Record readConcern usages for commands run inside transactions after unstashing the
+        // transaction resources.
+        if (command->shouldAffectReadConcernCounter() && opCtx->inMultiDocumentTransaction()) {
+            ServerReadConcernMetrics::get(opCtx)->recordReadConcern(readConcernArgs,
+                                                                    true /* isTransaction */);
+        }
+
         // For replica sets, we do not receive the readConcernArgs of our parent transaction
         // statements until we unstash the transaction resources. The below check is necessary to
         // ensure commands, including those occurring after the first statement in their respective
         // transactions, are checked for readConcern support. Presently, only `create` and
         // `createIndexes` do not support readConcern inside transactions.
         // TODO(SERVER-46971): Consider how to extend this check to other commands.
-        auto cmdName = invocation->definition()->getName();
+        auto cmdName = command->getName();
         auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel());
         if (readConcernArgs.hasLevel() &&
             (cmdName == "create"_sd || cmdName == "createIndexes"_sd)) {
@@ -713,6 +721,15 @@ bool runCommandImpl(OperationContext* opCtx,
     // only performed reads then we will not need to wait at all.
     const bool shouldWaitForWriteConcern =
         invocation->supportsWriteConcern() || command->getLogicalOp() == LogicalOp::opGetMore;
+
+    // Record readConcern usages for commands run outside of transactions, excluding DBDirectClient.
+    // For commands inside a transaction, they inherit the readConcern from the transaction. So we
+    // will record their readConcern usages after we have unstashed the transaction resources.
+    if (!opCtx->getClient()->isInDirectClient() && command->shouldAffectReadConcernCounter() &&
+        !opCtx->inMultiDocumentTransaction()) {
+        ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx),
+                                                                false /* isTransaction */);
+    }
 
     if (shouldWaitForWriteConcern) {
         auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -1436,7 +1453,11 @@ DbResponse receivedQuery(OperationContext* opCtx,
                          const ServiceEntryPointCommon::Hooks& behaviors) {
     invariant(!nss.isCommand());
     globalOpCounters.gotQuery();
-    ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx));
+
+    if (!opCtx->getClient()->isInDirectClient()) {
+        ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx),
+                                                                false /* isTransaction */);
+    }
 
     DbMessage d(m);
     QueryMessage q(d);

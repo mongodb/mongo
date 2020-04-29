@@ -52,7 +52,7 @@ public:
     /**
      * Updates counter for the level of 'readConcernArgs'.
      */
-    void recordReadConcern(const repl::ReadConcernArgs& readConcernArgs);
+    void recordReadConcern(const repl::ReadConcernArgs& readConcernArgs, bool isTransaction);
 
     /**
      * Appends the accumulated stats to a readConcern stats object.
@@ -60,12 +60,17 @@ public:
     void updateStats(ReadConcernStats* stats, OperationContext* opCtx);
 
 private:
-    AtomicWord<unsigned long long> _levelAvailableCount{0};
-    AtomicWord<unsigned long long> _levelLinearizableCount{0};
-    AtomicWord<unsigned long long> _levelLocalCount{0};
-    AtomicWord<unsigned long long> _levelMajorityCount{0};
-    AtomicWord<unsigned long long> _levelSnapshotCount{0};
-    AtomicWord<unsigned long long> _noLevelCount{0};
+    struct readConcernCounters {
+        AtomicWord<unsigned long long> levelAvailableCount{0};
+        AtomicWord<unsigned long long> levelLinearizableCount{0};
+        AtomicWord<unsigned long long> levelLocalCount{0};
+        AtomicWord<unsigned long long> levelMajorityCount{0};
+        AtomicWord<unsigned long long> levelSnapshotCount{0};
+        AtomicWord<unsigned long long> atClusterTimeCount{0};
+        AtomicWord<unsigned long long> noLevelCount{0};
+    };
+    readConcernCounters _nonTransactionOps;
+    readConcernCounters _transactionOps;
 };
 
 }  // namespace mongo

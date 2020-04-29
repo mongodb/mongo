@@ -38,26 +38,45 @@ imports:
 
 structs:
 
-  ReadConcernStats:
-    description: "A struct representing the section of the server status
-                  command with information about readConcern levels used by operations"
+  SnapshotOps:
+    description: "A struct representing the number of operations used with snapshot readConcern"
     strict: true
     fields:
-      available:
+      withClusterTime:
         type: long
         default: 0
-      linearizable:
+      withoutClusterTime:
+        type: long
+        default: 0
+
+  ReadConcernOps:
+    description: "A struct representing readConcern level usages by read operations"
+    strict: true
+    fields:
+      none:
         type: long
         default: 0
       local:
         type: long
         default: 0
+      available:
+        type: long
+        optional: true
       majority:
         type: long
         default: 0
       snapshot:
+        type: SnapshotOps
+      linearizable:
         type: long
-        default: 0
-      none:
-        type: long
-        default: 0
+        optional: true
+
+  ReadConcernStats:
+    description: "A struct representing the section of the server status
+                  command with information about readConcern levels used by operations"
+    strict: true
+    fields:
+      nonTransactionOps:
+        type: ReadConcernOps
+      transactionOps:
+        type: ReadConcernOps

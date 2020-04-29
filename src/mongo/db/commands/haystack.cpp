@@ -85,6 +85,10 @@ public:
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
+    bool shouldAffectReadConcernCounter() const override {
+        return true;
+    }
+
     ReadWriteType getReadWriteType() const {
         return ReadWriteType::kRead;
     }
