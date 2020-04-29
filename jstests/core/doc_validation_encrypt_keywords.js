@@ -3,7 +3,8 @@
 //
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_non_retryable_commands]
+// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_non_retryable_commands,
+// requires_fcv_44]
 (function() {
 "use strict";
 
@@ -92,7 +93,7 @@ assert.commandFailedWithCode(
     ErrorCodes.QueryFeatureNotAllowed);
 assert.commandFailedWithCode(
     db.runCommand(
-        {collMod: collName, validator: encryptMetadataSchema, validationModerate: "moderate"}),
+        {collMod: collName, validator: encryptMetadataSchema, validationLevel: "moderate"}),
     ErrorCodes.QueryFeatureNotAllowed);
 coll.drop();
 })();
