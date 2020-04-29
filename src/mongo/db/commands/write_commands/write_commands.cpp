@@ -496,6 +496,9 @@ private:
 
             auto deleteRequest = DeleteRequest{};
             deleteRequest.setNsString(_batch.getNamespace());
+            deleteRequest.setRuntimeConstants(
+                _batch.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+            deleteRequest.setLet(_batch.getLet());
             deleteRequest.setQuery(_batch.getDeletes()[0].getQ());
             deleteRequest.setCollation(write_ops::collationOf(_batch.getDeletes()[0]));
             deleteRequest.setMulti(_batch.getDeletes()[0].getMulti());

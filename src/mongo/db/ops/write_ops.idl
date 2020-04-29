@@ -206,3 +206,12 @@ commands:
                 description: "An array of one or more delete statements to perform."
                 type: array<DeleteOpEntry>
                 supports_doc_sequence: true
+            let:
+                description: "A set of user-specified constants used by $expr."
+                type: object
+                optional: true
+            runtimeConstants:
+                description: "A collection of values that do not change once computed. These are 
+                              used by $expr."
+                type: RuntimeConstants
+                optional: true

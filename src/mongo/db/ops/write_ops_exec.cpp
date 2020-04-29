@@ -843,7 +843,9 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
 static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
-                                               const write_ops::DeleteOpEntry& op) {
+                                               const write_ops::DeleteOpEntry& op,
+                                               const RuntimeConstants& runtimeConstants,
+                                               const boost::optional<BSONObj>& letParams) {
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with limit=0",
             opCtx->inMultiDocumentTransaction() || !opCtx->getTxnNumber() || !op.getMulti());
@@ -862,6 +864,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     auto request = DeleteRequest{};
     request.setNsString(ns);
+    request.setRuntimeConstants(runtimeConstants);
+    if (letParams)
+        request.setLet(letParams);
     request.setQuery(op.getQ());
     request.setCollation(write_ops::collationOf(op));
     request.setMulti(op.getMulti());
@@ -950,6 +955,11 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     WriteResult out;
     out.results.reserve(wholeOp.getDeletes().size());
 
+    // If the delete command specified runtime constants, we adopt them. Otherwise, we set them to
+    // the current local and cluster time. These constants are applied to each delete in the batch.
+    const auto& runtimeConstants =
+        wholeOp.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
+
     for (auto&& singleOp : wholeOp.getDeletes()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
@@ -984,8 +994,12 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         });
         try {
             lastOpFixer.startingOp();
-            out.results.emplace_back(
-                performSingleDeleteOp(opCtx, wholeOp.getNamespace(), stmtId, singleOp));
+            out.results.emplace_back(performSingleDeleteOp(opCtx,
+                                                           wholeOp.getNamespace(),
+                                                           stmtId,
+                                                           singleOp,
+                                                           runtimeConstants,
+                                                           wholeOp.getLet()));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue =

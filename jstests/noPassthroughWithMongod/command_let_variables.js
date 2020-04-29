@@ -110,6 +110,13 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              ErrorCodes.TypeMismatch);
 
+// Delete
+const result = assert.commandWorked(db.runCommand({
+    delete: coll.getName(),
+    let : {target_species: "not_a_bird"},
+    deletes: [{q: {$expr: {$eq: ["$Species", "$$target_species"]}}, limit: 0}]
+}));
+
 // Update
 assert.commandWorked(db.runCommand({
     update: coll.getName(),

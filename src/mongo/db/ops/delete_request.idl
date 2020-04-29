@@ -77,6 +77,12 @@ structs:
                 description: "A collection of values that do not change once computed."
                 type: RuntimeConstants
                 optional: true
+            let:
+                description: "User-defined constant values to be used within $expr. These can be 
+                              specified by the user for each individual element of the 'deletes' 
+                              array."
+                type: object
+                optional: true
             stmtId:
                 description: "The statement ID for the delete."
                 type: stmt_id
