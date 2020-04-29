@@ -738,7 +738,7 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
                 ops.push_back(opFromBson(i.next().Obj()));
             }
         } else {
-            LOGV2(22793, "benchRun passed an unsupported field: {name}", "name"_attr = name);
+            LOGV2_INFO(22793, "benchRun passed an unsupported field: {name}", "name"_attr = name);
             uassert(34376, "benchRun passed an unsupported configuration field", false);
         }
     }
@@ -917,12 +917,12 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                         (!_config->noWatchPattern && _config->watchPattern &&
                          yesWatch) ||  // If we're just watching things
                         (_config->watchPattern && _config->noWatchPattern && yesWatch && !noWatch))
-                        LOGV2(22794,
-                              "Error in benchRun thread for op "
-                              "{kOpTypeNames_find_op_op_second}{causedBy_ex}",
-                              "kOpTypeNames_find_op_op_second"_attr =
-                                  kOpTypeNames.find(op.op)->second,
-                              "causedBy_ex"_attr = causedBy(ex));
+                        LOGV2_INFO(22794,
+                                   "Error in benchRun thread for op "
+                                   "{kOpTypeNames_find_op_op_second}{causedBy_ex}",
+                                   "kOpTypeNames_find_op_op_second"_attr =
+                                       kOpTypeNames.find(op.op)->second,
+                                   "causedBy_ex"_attr = causedBy(ex));
                 }
 
                 bool yesTrap = (_config->trapPattern && _config->trapPattern->FullMatch(ex.what()));
@@ -948,10 +948,11 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                 ++opState.stats->errCount;
             } catch (...) {
                 if (!_config->hideErrors || op.showError)
-                    LOGV2(22795,
-                          "Error in benchRun thread caused by unknown error for op "
-                          "{kOpTypeNames_find_op_op_second}",
-                          "kOpTypeNames_find_op_op_second"_attr = kOpTypeNames.find(op.op)->second);
+                    LOGV2_INFO(22795,
+                               "Error in benchRun thread caused by unknown error for op "
+                               "{kOpTypeNames_find_op_op_second}",
+                               "kOpTypeNames_find_op_op_second"_attr =
+                                   kOpTypeNames.find(op.op)->second);
                 if (!_config->handleErrors && !op.handleError)
                     return;
 
@@ -1021,9 +1022,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             }
 
             if (!config.hideResults || this->showResult)
-                LOGV2(22796,
-                      "Result from benchRun thread [findOne] : {result}",
-                      "result"_attr = result);
+                LOGV2_INFO(22796,
+                           "Result from benchRun thread [findOne] : {result}",
+                           "result"_attr = result);
         } break;
         case OpType::COMMAND: {
             bool ok;
@@ -1152,16 +1153,17 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             }
 
             if (this->expected >= 0 && count != this->expected) {
-                LOGV2(22797,
-                      "bench query on: {this_ns} expected: {this_expected} got: {count}",
-                      "this_ns"_attr = this->ns,
-                      "this_expected"_attr = this->expected,
-                      "count"_attr = count);
+                LOGV2_INFO(22797,
+                           "bench query on: {this_ns} expected: {this_expected} got: {count}",
+                           "this_ns"_attr = this->ns,
+                           "this_expected"_attr = this->expected,
+                           "count"_attr = count);
                 verify(false);
             }
 
             if (!config.hideResults || this->showResult)
-                LOGV2(22798, "Result from benchRun thread [query] : {count}", "count"_attr = count);
+                LOGV2_INFO(
+                    22798, "Result from benchRun thread [query] : {count}", "count"_attr = count);
         } break;
         case OpType::UPDATE: {
             BSONObj result;
@@ -1231,9 +1233,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
             if (this->safe) {
                 if (!config.hideResults || this->showResult)
-                    LOGV2(22799,
-                          "Result from benchRun thread [safe update] : {result}",
-                          "result"_attr = result);
+                    LOGV2_INFO(22799,
+                               "Result from benchRun thread [safe update] : {result}",
+                               "result"_attr = result);
 
                 if (!result["err"].eoo() && result["err"].type() == String &&
                     (config.throwGLE || this->throwGLE))
@@ -1297,9 +1299,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
             if (this->safe) {
                 if (!config.hideResults || this->showResult)
-                    LOGV2(22800,
-                          "Result from benchRun thread [safe insert] : {result}",
-                          "result"_attr = result);
+                    LOGV2_INFO(22800,
+                               "Result from benchRun thread [safe insert] : {result}",
+                               "result"_attr = result);
 
                 if (!result["err"].eoo() && result["err"].type() == String &&
                     (config.throwGLE || this->throwGLE))
@@ -1344,9 +1346,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
             if (this->safe) {
                 if (!config.hideResults || this->showResult)
-                    LOGV2(22801,
-                          "Result from benchRun thread [safe remove] : {result}",
-                          "result"_attr = result);
+                    LOGV2_INFO(22801,
+                               "Result from benchRun thread [safe remove] : {result}",
+                               "result"_attr = result);
 
                 if (!result["err"].eoo() && result["err"].type() == String &&
                     (config.throwGLE || this->throwGLE))

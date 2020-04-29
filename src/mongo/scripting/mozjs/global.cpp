@@ -82,10 +82,11 @@ void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
 
     args.rval().setUndefined();
 
-    LOGV2_OPTIONS(4615635,
-                  logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
-                  "{message}",
-                  "message"_attr = ss.str());
+    LOGV2_INFO_OPTIONS(
+        4615635,
+        logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
+        "{message}",
+        "message"_attr = ss.str());
 }
 
 void GlobalInfo::Functions::version::call(JSContext* cx, JS::CallArgs args) {
