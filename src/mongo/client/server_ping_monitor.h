@@ -44,7 +44,7 @@ namespace mongo {
 class SingleServerPingMonitor : public std::enable_shared_from_this<SingleServerPingMonitor> {
 public:
     explicit SingleServerPingMonitor(const MongoURI& setUri,
-                                     const sdam::ServerAddress& hostAndPort,
+                                     const HostAndPort& hostAndPort,
                                      sdam::TopologyListener* rttListener,
                                      Milliseconds pingFrequency,
                                      std::shared_ptr<executor::TaskExecutor> executor);
@@ -91,7 +91,7 @@ private:
 
     MongoURI _setUri;
 
-    sdam::ServerAddress _hostAndPort;
+    HostAndPort _hostAndPort;
 
     /**
      * Listens for when new RTT (Round Trip Time) values are published.
@@ -154,7 +154,7 @@ public:
      * SingleServerPingMonitor to monitor the new replica set member.
      */
     void onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
-                                        const sdam::ServerAddress& address,
+                                        const HostAndPort& address,
                                         const BSONObj reply = BSONObj());
 
     /**
@@ -191,7 +191,7 @@ private:
      * Note: SingleServerPingMonitor's drop() should always be called before removing it from the
      * _serverPingMonitorMap.
      */
-    stdx::unordered_map<sdam::ServerAddress, std::shared_ptr<SingleServerPingMonitor>>
+    stdx::unordered_map<HostAndPort, std::shared_ptr<SingleServerPingMonitor>>
         _serverPingMonitorMap;
 
     bool _isShutdown{false};

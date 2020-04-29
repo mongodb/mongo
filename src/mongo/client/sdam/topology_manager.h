@@ -72,7 +72,7 @@ public:
      *   3. Installs the cloned ServerDescription into the TopologyDescription from step 1
      *   4. Installs the cloned TopologyDescription as the current one.
      */
-    void onServerRTTUpdated(ServerAddress hostAndPort, IsMasterRTT rtt);
+    void onServerRTTUpdated(HostAndPort hostAndPort, IsMasterRTT rtt);
 
     /**
      * Get the current TopologyDescription. This is safe to call from multiple threads.

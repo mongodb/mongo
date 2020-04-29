@@ -145,7 +145,7 @@ const std::vector<TopologyType> allTopologyTypes() {
     return result;
 }
 
-const ServerAddress& IsMasterOutcome::getServer() const {
+const HostAndPort& IsMasterOutcome::getServer() const {
     return _server;
 }
 bool IsMasterOutcome::isSuccess() const {
@@ -166,7 +166,7 @@ const std::string& IsMasterOutcome::getErrorMsg() const {
 
 BSONObj IsMasterOutcome::toBSON() const {
     BSONObjBuilder builder;
-    builder.append("host", _server);
+    builder.append("host", _server.toString());
     builder.append("success", _success);
 
     if (_errorMsg != "")

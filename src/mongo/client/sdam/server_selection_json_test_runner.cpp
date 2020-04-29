@@ -80,9 +80,9 @@ std::string emphasize(const std::string text) {
     return output.str();
 }
 
-std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& input) {
+std::ostream& operator<<(std::ostream& os, const std::vector<HostAndPort>& input) {
     for (auto const& i : input) {
-        os << i << " ";
+        os << i.toString() << " ";
     }
     return os;
 }
@@ -130,7 +130,7 @@ public:
             auto clockSource = std::make_unique<ClockSourceMock>();
             updatedServerDescription = std::make_shared<ServerDescription>(
                 ServerDescription(clockSource.get(),
-                                  IsMasterOutcome(ServerAddress("dummy"),
+                                  IsMasterOutcome(HostAndPort("dummy"),
                                                   BSON("ok" << 1 << "setname"
                                                             << "replSet"
                                                             << "ismaster" << true),
@@ -171,7 +171,7 @@ private:
         std::string origRttAsString = _jsonTest.getStringField("avg_rtt_ms");
         if (origRttAsString.compare("NULL") != 0) {
             auto serverDescription = ServerDescriptionBuilder()
-                                         .withAddress("dummy")
+                                         .withAddress(HostAndPort("dummy"))
                                          .withType(ServerType::kRSPrimary)
                                          .instance();
             auto origAvgRtt = Milliseconds(_jsonTest["avg_rtt_ms"].numberInt());
@@ -272,14 +272,14 @@ private:
         auto topologyDescriptionObj = _jsonTest.getObjectField("topology_description");
 
         std::vector<ServerDescriptionPtr> serverDescriptions;
-        std::vector<ServerAddress> serverAddresses;
+        std::vector<HostAndPort> serverAddresses;
         const std::vector<BSONElement>& bsonServers = topologyDescriptionObj["servers"].Array();
         for (auto bsonServer : bsonServers) {
             auto server = bsonServer.Obj();
 
             auto serverType = uassertStatusOK(parseServerType(server.getStringField("type")));
             auto serverDescription = ServerDescriptionBuilder()
-                                         .withAddress(server.getStringField("address"))
+                                         .withAddress(HostAndPort(server.getStringField("address")))
                                          .withType(serverType)
                                          .withRtt(Milliseconds(server["avg_rtt_ms"].numberInt()))
                                          .withMinWireVersion(8)
@@ -292,7 +292,7 @@ private:
             }
 
             serverDescriptions.push_back(serverDescription.instance());
-            serverAddresses.push_back(server.getStringField("address"));
+            serverAddresses.push_back(HostAndPort(server.getStringField("address")));
         }
 
         TopologyType initType =
@@ -301,7 +301,7 @@ private:
         if (initType == TopologyType::kReplicaSetNoPrimary || initType == TopologyType::kSingle)
             setName = "replset";
 
-        boost::optional<std::vector<ServerAddress>> seedList = boost::none;
+        boost::optional<std::vector<HostAndPort>> seedList = boost::none;
         if (serverAddresses.size() > 0)
             seedList = serverAddresses;
 
@@ -316,7 +316,7 @@ private:
             for (auto bsonServer : bsonLatencyWindow) {
                 auto server = bsonServer.Obj();
                 if (serverDescription->getAddress() ==
-                    ServerAddress(server.getStringField("address"))) {
+                    HostAndPort(server.getStringField("address"))) {
                     _inLatencyWindow.push_back(serverDescription);
                 }
             }
@@ -343,27 +343,27 @@ private:
             // _inLatencyWindow vectors. We do not need to compare the entire server description
             // because we only need to make sure that the correct server was chosen and are not
             // manipulating the ServerDescriptions at all.
-            std::vector<std::string> selectedServerAddresses;
-            std::vector<std::string> expectedServerAddresses;
+            std::vector<HostAndPort> selectedHostAndPortes;
+            std::vector<HostAndPort> expectedHostAndPortes;
 
             auto selectedServersIt = selectedServers->begin();
             for (auto expectedServersIt = _inLatencyWindow.begin();
                  expectedServersIt != _inLatencyWindow.end();
                  ++expectedServersIt) {
-                selectedServerAddresses.push_back((*selectedServersIt)->getAddress());
-                expectedServerAddresses.push_back((*expectedServersIt)->getAddress());
+                selectedHostAndPortes.push_back((*selectedServersIt)->getAddress());
+                expectedHostAndPortes.push_back((*expectedServersIt)->getAddress());
 
                 selectedServersIt++;
             }
 
-            std::sort(selectedServerAddresses.begin(), selectedServerAddresses.end());
-            std::sort(expectedServerAddresses.begin(), expectedServerAddresses.end());
-            if (!std::equal(selectedServerAddresses.begin(),
-                            selectedServerAddresses.end(),
-                            expectedServerAddresses.begin())) {
+            std::sort(selectedHostAndPortes.begin(), selectedHostAndPortes.end());
+            std::sort(expectedHostAndPortes.begin(), expectedHostAndPortes.end());
+            if (!std::equal(selectedHostAndPortes.begin(),
+                            selectedHostAndPortes.end(),
+                            expectedHostAndPortes.begin())) {
                 std::stringstream errorMessage;
-                errorMessage << "selected servers with addresses '" << selectedServerAddresses
-                             << "' server(s), but expected '" << expectedServerAddresses
+                errorMessage << "selected servers with addresses '" << selectedHostAndPortes
+                             << "' server(s), but expected '" << expectedHostAndPortes
                              << "' to be selected.";
                 auto errorDescription =
                     std::make_pair("servers in latency window", errorMessage.str());

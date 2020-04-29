@@ -88,7 +88,7 @@ public:
         auto bsonResponses = phase.getField("responses").Array();
         for (auto& response : bsonResponses) {
             const auto pair = response.Array();
-            const auto address = pair[0].String();
+            const auto address = HostAndPort(pair[0].String());
             const auto bsonIsMaster = pair[1].Obj();
 
             if (bsonIsMaster.nFields() == 0) {
@@ -297,7 +297,7 @@ private:
         }
 
         for (const BSONElement& bsonExpectedServer : bsonServers) {
-            const auto& serverAddress = bsonExpectedServer.fieldName();
+            const auto& serverAddress = HostAndPort(bsonExpectedServer.fieldName());
             const auto& expectedServerDescriptionFields = bsonExpectedServer.Obj();
 
             const auto& serverDescription = topologyDescription->findServerByAddress(serverAddress);
@@ -525,10 +525,10 @@ private:
         }
     }
 
-    std::vector<ServerAddress> getSeedList() {
-        std::vector<ServerAddress> result;
+    std::vector<HostAndPort> getSeedList() {
+        std::vector<HostAndPort> result;
         for (const auto& hostAndPort : _testUri.getServers()) {
-            result.push_back(hostAndPort.toString());
+            result.push_back(hostAndPort);
         }
         return result;
     }

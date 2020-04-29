@@ -103,7 +103,7 @@ protected:
     /**
      * Checks that a ping has been made to the server at hostAndPort and schedules a response.
      */
-    void processPingRequest(const sdam::ServerAddress& hostAndPort, MockReplicaSet* replSet) {
+    void processPingRequest(const HostAndPort& hostAndPort, MockReplicaSet* replSet) {
         ASSERT(hasReadyRequests());
 
         InNetworkGuard guard(_net);
@@ -113,13 +113,13 @@ protected:
 
         // Check that it is a ping request from the expected hostAndPort.
         executor::TaskExecutorTest::assertRemoteCommandNameEquals("ping", request);
-        ASSERT_EQ(request.target.toString(), hostAndPort);
+        ASSERT_EQ(request.target, hostAndPort);
         LOGV2(23925,
               "at {elapsed} got mock network operation {request}",
               "elapsed"_attr = elapsed(),
               "request"_attr = request.toString());
 
-        const auto node = replSet->getNode(hostAndPort);
+        const auto node = replSet->getNode(hostAndPort.toString());
         node->setCommandReply("ping", BSON("ok" << 1));
 
         if (node->isRunning()) {
@@ -150,7 +150,7 @@ protected:
      * no additional pings are issued for at least pingFrequency.
      */
     void checkSinglePing(Milliseconds pingFrequency,
-                         const sdam::ServerAddress& hostAndPort,
+                         const HostAndPort& hostAndPort,
                          MockReplicaSet* replSet) {
         processPingRequest(hostAndPort, replSet);
 
@@ -172,7 +172,7 @@ protected:
      * Confirms no more ping requests are sent between elapsed() and deadline. Confirms no more ping
      * responses are received between elapsed() and deadline.
      */
-    void checkNoActivityBefore(Milliseconds deadline, const sdam::ServerAddress& hostAndPort) {
+    void checkNoActivityBefore(Milliseconds deadline, const HostAndPort& hostAndPort) {
         while (elapsed() < deadline) {
             ASSERT_FALSE(hasReadyRequests());
             ASSERT_FALSE(_topologyListener->hasPingResponse(hostAndPort));
@@ -185,20 +185,13 @@ protected:
      * prompt the event with a new TopologyDescription that does not include hostToDrop.
      */
     void closeMonitor(MockReplicaSet* replSet,
-                      sdam::ServerAddress hostToDrop,
+                      HostAndPort hostToDrop,
                       ServerPingMonitor* pingMonitor) {
-        auto hostAndPorts = replSet->getHosts();
-        std::vector<sdam::ServerAddress> hosts;
-        std::transform(hostAndPorts.begin(),
-                       hostAndPorts.end(),
-                       std::back_inserter(hosts),
-                       [](const auto& hostAndPort) { return hostAndPort.toString(); });
-
+        auto hosts = replSet->getHosts();
         auto sdamConfigOld = sdam::SdamConfiguration(hosts);
         auto topologyDescriptionOld = std::make_shared<sdam::TopologyDescription>(sdamConfigOld);
 
-
-        std::vector<sdam::ServerAddress> hostsNew(hosts.begin(), hosts.end());
+        std::vector<HostAndPort> hostsNew(hosts.begin(), hosts.end());
         hostsNew.erase(std::remove_if(hostsNew.begin(),
                                       hostsNew.end(),
                                       [&](auto host) { return host == hostToDrop; }),
@@ -206,7 +199,7 @@ protected:
         // Since the seedlist cannot be empty, the new TopologyDescription contains an empty
         // HostAndPort.
         if (hostsNew.size() == 0) {
-            hostsNew.emplace_back(HostAndPort().toString());
+            hostsNew.emplace_back(HostAndPort());
         }
         auto sdamConfigNew = sdam::SdamConfiguration(hostsNew);
         auto topologyDescriptionNew = std::make_shared<sdam::TopologyDescription>(sdamConfigNew);
@@ -227,7 +220,7 @@ protected:
         ServerPingMonitorTestFixture::setUp();
         _replSet.reset(new MockReplicaSet(
             "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false));
-        _hostAndPort = HostAndPort(_replSet->getSecondaries()[0]).toString();
+        _hostAndPort = HostAndPort(_replSet->getSecondaries()[0]);
     }
 
     void tearDown() {
@@ -239,7 +232,7 @@ protected:
         return _replSet.get();
     }
 
-    sdam::ServerAddress getHostAndPort() {
+    HostAndPort getHostAndPort() {
         return _hostAndPort;
     }
 
@@ -276,9 +269,9 @@ private:
     std::unique_ptr<MockReplicaSet> _replSet;
 
     /**
-     * Stores the ServerAddress of the node ping requests are sent to.
+     * Stores the HostAndPort of the node ping requests are sent to.
      */
-    sdam::ServerAddress _hostAndPort;
+    HostAndPort _hostAndPort;
 };
 
 TEST_F(SingleServerPingMonitorTest, pingFrequencyCheck) {
@@ -300,7 +293,7 @@ TEST_F(SingleServerPingMonitorTest, pingDeadServer) {
     auto hostAndPort = getHostAndPort();
     {
         NetworkInterfaceMock::InNetworkGuard ing(getNet());
-        getReplSet()->kill(hostAndPort);
+        getReplSet()->kill(hostAndPort.toString());
     }
 
     auto pingFrequency = Seconds(10);
@@ -326,7 +319,7 @@ TEST_F(SingleServerPingMonitorTest, pingDeadServer) {
     {
 
         NetworkInterfaceMock::InNetworkGuard ing(getNet());
-        getReplSet()->restore(hostAndPort);
+        getReplSet()->restore(hostAndPort.toString());
     }
     checkSinglePing(pingFrequency);
     checkSinglePing(pingFrequency);
@@ -364,8 +357,7 @@ TEST_F(ServerPingMonitorTest, singleNodeServerPingMonitorCycle) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
     auto serverPingMonitor = makeServerPingMonitor(replSet->getURI(), pingFrequency);
-
-    auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]).toString();
+    auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]);
 
     // Add a SingleServerPingMonitor to the ServerPingMonitor. Confirm pings are sent to the server
     // at pingFrequency.
@@ -390,8 +382,8 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneClosed) {
     auto serverPingMonitor = makeServerPingMonitor(replSet->getURI(), pingFrequency);
 
     auto hosts = replSet->getHosts();
-    auto host0 = hosts[0].toString();
-    auto host1 = hosts[1].toString();
+    auto host0 = hosts[0];
+    auto host1 = hosts[1];
 
     // Add SingleServerPingMonitors for host0 and host1 where host1 is added host1Delay seconds
     // after host0.
@@ -421,8 +413,8 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorMutlipleShutdown) {
     auto serverPingMonitor = makeServerPingMonitor(replSet->getURI(), pingFrequency);
 
     auto hosts = replSet->getHosts();
-    auto host0 = hosts[0].toString();
-    auto host1 = hosts[1].toString();
+    auto host0 = hosts[0];
+    auto host1 = hosts[1];
 
     // Add SingleServerPingMonitors for host0 and host1 where host1 is added host1Delay seconds
     // after host0.

@@ -61,7 +61,7 @@ protected:
     sdam::IsMasterOutcome _createErrorIsMasterOutcome(const HostAndPort& host,
                                                       boost::optional<BSONObj> bson,
                                                       const Status& status) const {
-        return sdam::IsMasterOutcome(host.toString(), bson ? *bson : BSONObj(), status.toString());
+        return sdam::IsMasterOutcome(host, bson ? *bson : BSONObj(), status.toString());
     }
 };
 

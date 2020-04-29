@@ -119,7 +119,7 @@ public:
     inline static const std::string kErrorMessage = "an error message";
     inline static const BSONObj kErrorBson = BSONObjBuilder().append("ok", 0).obj();
     inline static const sdam::IsMasterOutcome kErrorIsMasterOutcome =
-        sdam::IsMasterOutcome(kHost.toString(), kErrorBson, kErrorMessage);
+        sdam::IsMasterOutcome(kHost, kErrorBson, kErrorMessage);
 
     static constexpr bool kApplicationOperation = true;
     static constexpr bool kMonitoringOperation = false;

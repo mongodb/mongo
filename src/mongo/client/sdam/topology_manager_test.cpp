@@ -37,8 +37,7 @@
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo {
-template std::ostream& operator<<(std::ostream& os,
-                                  const std::vector<mongo::sdam::ServerAddress>& s);
+template std::ostream& operator<<(std::ostream& os, const std::vector<HostAndPort>& s);
 
 namespace sdam {
 using mongo::operator<<;
@@ -49,7 +48,7 @@ protected:
 
     static inline const auto kSetName = std::string("mySetName");
 
-    static inline const std::vector<ServerAddress> kOneServer{"foo:1234"};
+    static inline const std::vector<HostAndPort> kOneServer{HostAndPort("foo:1234")};
 
     static BSONObjBuilder okBuilder() {
         return std::move(BSONObjBuilder().append("ok", 1));
