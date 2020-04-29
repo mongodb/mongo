@@ -45,9 +45,9 @@ public:
     ServerDescriptionPtr instance() const;
 
     // server identity
-    ServerDescriptionBuilder& withAddress(const ServerAddress& address);
+    ServerDescriptionBuilder& withAddress(const HostAndPort& address);
     ServerDescriptionBuilder& withType(const ServerType type);
-    ServerDescriptionBuilder& withMe(const ServerAddress& me);
+    ServerDescriptionBuilder& withMe(const HostAndPort& me);
     ServerDescriptionBuilder& withTag(const std::string key, const std::string value);
     ServerDescriptionBuilder& withSetName(const std::string setName);
 
@@ -69,17 +69,17 @@ public:
     ServerDescriptionBuilder& withLastUpdateTime(const Date_t& lastUpdateTime);
 
     // topology membership
-    ServerDescriptionBuilder& withPrimary(const ServerAddress& primary);
-    ServerDescriptionBuilder& withHost(const ServerAddress& host);
-    ServerDescriptionBuilder& withPassive(const ServerAddress& passive);
-    ServerDescriptionBuilder& withArbiter(const ServerAddress& arbiter);
+    ServerDescriptionBuilder& withPrimary(const HostAndPort& primary);
+    ServerDescriptionBuilder& withHost(const HostAndPort& host);
+    ServerDescriptionBuilder& withPassive(const HostAndPort& passive);
+    ServerDescriptionBuilder& withArbiter(const HostAndPort& arbiter);
     ServerDescriptionBuilder& withSetVersion(const int setVersion);
     ServerDescriptionBuilder& withElectionId(const OID& electionId);
     ServerDescriptionBuilder& withTopologyVersion(TopologyVersion topologyVersion);
 
 private:
-    constexpr static auto kServerAddressNotSet = "address.not.set:1234";
+    constexpr static auto kHostAndPortNotSet = "address.not.set:1234";
     ServerDescriptionPtr _instance =
-        std::shared_ptr<ServerDescription>(new ServerDescription(kServerAddressNotSet));
+        std::shared_ptr<ServerDescription>(new ServerDescription(HostAndPort(kHostAndPortNotSet)));
 };
 }  // namespace mongo::sdam

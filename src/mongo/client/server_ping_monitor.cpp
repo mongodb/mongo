@@ -53,7 +53,7 @@ using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
 
 SingleServerPingMonitor::SingleServerPingMonitor(const MongoURI& setUri,
-                                                 const sdam::ServerAddress& hostAndPort,
+                                                 const HostAndPort& hostAndPort,
                                                  sdam::TopologyListener* rttListener,
                                                  Milliseconds pingFrequency,
                                                  std::shared_ptr<TaskExecutor> executor)
@@ -151,7 +151,8 @@ void SingleServerPingMonitor::_doServerPing() {
 
                 if (MONGO_unlikely(serverPingMonitorFailWithHostUnreachable.shouldFail(
                         [&](const BSONObj& data) {
-                            return anchor->_hostAndPort == data.getStringField("hostAndPort");
+                            return anchor->_hostAndPort.toString() ==
+                                data.getStringField("hostAndPort");
                         }))) {
                     const std::string reason = str::stream()
                         << "Failing the ping command to " << (anchor->_hostAndPort);
@@ -223,7 +224,7 @@ void ServerPingMonitor::shutdown() {
 }
 
 void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
-                                                       const sdam::ServerAddress& address,
+                                                       const HostAndPort& address,
                                                        const BSONObj reply) {
     stdx::lock_guard lk(_mutex);
     if (_isShutdown) {

@@ -63,7 +63,7 @@ bool exhaustEnabled(boost::optional<TopologyVersion> topologyVersion) {
 
 SingleServerIsMasterMonitor::SingleServerIsMasterMonitor(
     const MongoURI& setUri,
-    const sdam::ServerAddress& host,
+    const HostAndPort& host,
     boost::optional<TopologyVersion> topologyVersion,
     Milliseconds heartbeatFrequencyMS,
     sdam::TopologyEventsPublisherPtr eventListener,

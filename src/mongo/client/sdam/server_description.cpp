@@ -92,7 +92,7 @@ ServerDescription::ServerDescription(ClockSource* clockSource,
 
         auto primaryField = response.getField("primary");
         if (primaryField.type() == BSONType::String) {
-            _primary = response.getStringField("primary");
+            _primary = HostAndPort(response.getStringField("primary"));
         }
 
         if (poolResetCounter) {
@@ -109,20 +109,20 @@ ServerDescription::ServerDescription(ClockSource* clockSource,
 
 void ServerDescription::storeHostListIfPresent(const std::string key,
                                                const BSONObj response,
-                                               std::set<ServerAddress>& destination) {
+                                               std::set<HostAndPort>& destination) {
     if (response.hasField(key)) {
         auto hostsBsonArray = response[key].Array();
         std::transform(hostsBsonArray.begin(),
                        hostsBsonArray.end(),
                        std::inserter(destination, destination.begin()),
-                       [](const BSONElement e) { return e.String(); });
+                       [](const BSONElement e) { return HostAndPort(e.String()); });
     }
 }
 
 void ServerDescription::saveHosts(const BSONObj response) {
     if (response.hasField("me")) {
         auto me = response.getField("me");
-        _me = me.str();
+        _me = HostAndPort(me.str());
     }
 
     storeHostListIfPresent("hosts", response, _hosts);
@@ -238,7 +238,7 @@ void ServerDescription::parseTypeFromIsMaster(const BSONObj isMaster) {
     _type = t;
 }
 
-const ServerAddress& ServerDescription::getAddress() const {
+const HostAndPort& ServerDescription::getAddress() const {
     return _address;
 }
 
@@ -262,19 +262,19 @@ ServerType ServerDescription::getType() const {
     return _type;
 }
 
-const boost::optional<ServerAddress>& ServerDescription::getMe() const {
+const boost::optional<HostAndPort>& ServerDescription::getMe() const {
     return _me;
 }
 
-const std::set<ServerAddress>& ServerDescription::getHosts() const {
+const std::set<HostAndPort>& ServerDescription::getHosts() const {
     return _hosts;
 }
 
-const std::set<ServerAddress>& ServerDescription::getPassives() const {
+const std::set<HostAndPort>& ServerDescription::getPassives() const {
     return _passives;
 }
 
-const std::set<ServerAddress>& ServerDescription::getArbiters() const {
+const std::set<HostAndPort>& ServerDescription::getArbiters() const {
     return _arbiters;
 }
 
@@ -294,7 +294,7 @@ const boost::optional<mongo::OID>& ServerDescription::getElectionId() const {
     return _electionId;
 }
 
-const boost::optional<ServerAddress>& ServerDescription::getPrimary() const {
+const boost::optional<HostAndPort>& ServerDescription::getPrimary() const {
     return _primary;
 }
 
@@ -368,7 +368,7 @@ bool ServerDescription::isDataBearingServer() const {
 // output server description to bson. This is primarily used for debugging.
 BSONObj ServerDescription::toBson() const {
     BSONObjBuilder bson;
-    bson.append("address", _address);
+    bson.append("address", _address.toString());
 
     if (_topologyVersion) {
         bson.append("topologyVersion", _topologyVersion->toBSON());
@@ -398,7 +398,7 @@ BSONObj ServerDescription::toBson() const {
 
 
     if (_me) {
-        bson.append("me", *_me);
+        bson.append("me", (*_me).toString());
     }
     if (_setName) {
         bson.append("setName", *_setName);
@@ -410,7 +410,7 @@ BSONObj ServerDescription::toBson() const {
         bson.append("electionId", *_electionId);
     }
     if (_primary) {
-        bson.append("primary", *_primary);
+        bson.append("primary", (*_primary).toString());
     }
     if (_lastUpdateTime) {
         bson.append("lastUpdateTime", *_lastUpdateTime);
@@ -419,9 +419,23 @@ BSONObj ServerDescription::toBson() const {
         bson.append("logicalSessionTimeoutMinutes", *_logicalSessionTimeoutMinutes);
     }
 
-    bson.append("hosts", _hosts);
-    bson.append("arbiters", _arbiters);
-    bson.append("passives", _passives);
+    BSONArrayBuilder hostsBuilder;
+    for (const auto& host : _hosts) {
+        hostsBuilder.append(host.toString());
+    }
+    bson.append("hosts", hostsBuilder.obj());
+
+    BSONArrayBuilder arbitersBuilder;
+    for (const auto& arbiter : _arbiters) {
+        hostsBuilder.append(arbiter.toString());
+    }
+    bson.append("arbiters", arbitersBuilder.obj());
+
+    BSONArrayBuilder passivesBuilder;
+    for (const auto& passive : _passives) {
+        hostsBuilder.append(passive.toString());
+    }
+    bson.append("passives", passivesBuilder.obj());
 
     if (getTags().size()) {
         BSONObjBuilder tagsBuilder(bson.subobjStart("tags"));

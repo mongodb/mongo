@@ -40,43 +40,43 @@ public:
     TopologyListenerMock() = default;
     virtual ~TopologyListenerMock() = default;
 
-    void onServerHeartbeatSucceededEvent(const ServerAddress& hostAndPort,
+    void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                          const BSONObj reply) override;
 
     void onServerHeartbeatFailureEvent(Status errorStatus,
-                                       const ServerAddress& hostAndPort,
+                                       const HostAndPort& hostAndPort,
                                        const BSONObj reply) override;
 
     /**
      * Returns true if _serverIsMasterReplies contains an element corresponding to hostAndPort.
      */
-    bool hasIsMasterResponse(const ServerAddress& hostAndPort);
-    bool _hasIsMasterResponse(WithLock, const ServerAddress& hostAndPort);
+    bool hasIsMasterResponse(const HostAndPort& hostAndPort);
+    bool _hasIsMasterResponse(WithLock, const HostAndPort& hostAndPort);
 
     /**
      * Returns the responses for the most recent onServerHeartbeat events.
      */
-    std::vector<Status> getIsMasterResponse(const ServerAddress& hostAndPort);
+    std::vector<Status> getIsMasterResponse(const HostAndPort& hostAndPort);
 
-    void onServerPingSucceededEvent(IsMasterRTT latency, const ServerAddress& hostAndPort) override;
+    void onServerPingSucceededEvent(IsMasterRTT latency, const HostAndPort& hostAndPort) override;
 
-    void onServerPingFailedEvent(const ServerAddress& hostAndPort, const Status& status) override;
+    void onServerPingFailedEvent(const HostAndPort& hostAndPort, const Status& status) override;
 
     /**
      * Returns true if _serverPingRTTs contains an element corresponding to hostAndPort.
      */
-    bool hasPingResponse(const ServerAddress& hostAndPort);
-    bool _hasPingResponse(WithLock, const ServerAddress& hostAndPort);
+    bool hasPingResponse(const HostAndPort& hostAndPort);
+    bool _hasPingResponse(WithLock, const HostAndPort& hostAndPort);
 
     /**
      * Returns the responses for the most recent onServerPing events.
      */
-    std::vector<StatusWith<IsMasterRTT>> getPingResponse(const ServerAddress& hostAndPort);
+    std::vector<StatusWith<IsMasterRTT>> getPingResponse(const HostAndPort& hostAndPort);
 
 private:
     Mutex _mutex;
-    stdx::unordered_map<ServerAddress, std::vector<Status>> _serverIsMasterReplies;
-    stdx::unordered_map<ServerAddress, std::vector<StatusWith<IsMasterRTT>>> _serverPingRTTs;
+    stdx::unordered_map<HostAndPort, std::vector<Status>> _serverIsMasterReplies;
+    stdx::unordered_map<HostAndPort, std::vector<StatusWith<IsMasterRTT>>> _serverPingRTTs;
 };
 
 }  // namespace mongo::sdam

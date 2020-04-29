@@ -90,7 +90,7 @@ void TopologyDescription::setType(TopologyType type) {
     _type = type;
 }
 
-bool TopologyDescription::containsServerAddress(const ServerAddress& address) const {
+bool TopologyDescription::containsServerAddress(const HostAndPort& address) const {
     return findServerByAddress(address) != boost::none;
 }
 
@@ -102,7 +102,7 @@ std::vector<ServerDescriptionPtr> TopologyDescription::findServers(
 }
 
 const boost::optional<ServerDescriptionPtr> TopologyDescription::findServerByAddress(
-    ServerAddress address) const {
+    HostAndPort address) const {
     auto results = findServers([address](const ServerDescriptionPtr& serverDescription) {
         return serverDescription->getAddress() == address;
     });
@@ -146,10 +146,10 @@ boost::optional<ServerDescriptionPtr> TopologyDescription::installServerDescript
     return previousDescription;
 }
 
-void TopologyDescription::removeServerDescription(const ServerAddress& serverAddress) {
+void TopologyDescription::removeServerDescription(const HostAndPort& HostAndPort) {
     auto it = std::find_if(
-        _servers.begin(), _servers.end(), [serverAddress](const ServerDescriptionPtr& description) {
-            return description->getAddress() == serverAddress;
+        _servers.begin(), _servers.end(), [HostAndPort](const ServerDescriptionPtr& description) {
+            return description->getAddress() == HostAndPort;
         });
     if (it != _servers.end()) {
         _servers.erase(it);
@@ -245,7 +245,7 @@ BSONObj TopologyDescription::toBSON() {
 
     BSONObjBuilder bsonServers;
     for (auto server : this->getServers()) {
-        bsonServers << server->getAddress() << server->toBson();
+        bsonServers << server->getAddress().toString() << server->toBson();
     }
     bson.append("servers", bsonServers.obj());
 

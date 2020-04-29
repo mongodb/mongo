@@ -128,7 +128,7 @@ const std::shared_ptr<TopologyDescription> TopologyManager::getTopologyDescripti
     return _topologyDescription;
 }
 
-void TopologyManager::onServerRTTUpdated(ServerAddress hostAndPort, IsMasterRTT rtt) {
+void TopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, IsMasterRTT rtt) {
     {
         stdx::lock_guard<mongo::Mutex> lock(_mutex);
 

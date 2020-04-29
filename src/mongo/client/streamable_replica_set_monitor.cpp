@@ -154,10 +154,9 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
       _executor(executor),
       _random(PseudoRandom(SecureRandom().nextInt64())) {
 
-    // TODO SERVER-45395: sdam should use the HostAndPort type for ServerAddress
-    std::vector<ServerAddress> seeds;
+    std::vector<HostAndPort> seeds;
     for (const auto& seed : uri.getServers()) {
-        seeds.push_back(seed.toString());
+        seeds.push_back(seed);
     }
 
     _sdamConfig = SdamConfiguration(seeds);
@@ -409,12 +408,12 @@ boost::optional<ServerDescriptionPtr> StreamableReplicaSetMonitor::_currentPrima
 
 bool StreamableReplicaSetMonitor::isPrimary(const HostAndPort& host) const {
     const auto currentPrimary = _currentPrimary();
-    return (currentPrimary ? (*currentPrimary)->getAddress() == host.toString() : false);
+    return (currentPrimary ? (*currentPrimary)->getAddress() == host : false);
 }
 
 bool StreamableReplicaSetMonitor::isHostUp(const HostAndPort& host) const {
     auto currentTopology = _currentTopology();
-    const auto& serverDescription = currentTopology->findServerByAddress(host.toString());
+    const auto& serverDescription = currentTopology->findServerByAddress(host);
     return serverDescription && (*serverDescription)->getType() != ServerType::kUnknown;
 }
 
@@ -468,7 +467,7 @@ const MongoURI& StreamableReplicaSetMonitor::getOriginalUri() const {
 }
 
 bool StreamableReplicaSetMonitor::contains(const HostAndPort& host) const {
-    return static_cast<bool>(_currentTopology()->findServerByAddress(host.toString()));
+    return static_cast<bool>(_currentTopology()->findServerByAddress(host));
 }
 
 void StreamableReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder, bool forFTDC) const {
@@ -477,7 +476,7 @@ void StreamableReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder, boo
     BSONObjBuilder monitorInfo(bsonObjBuilder.subobjStart(getName()));
     if (forFTDC) {
         for (auto serverDescription : topologyDescription->getServers()) {
-            monitorInfo.appendNumber(serverDescription->getAddress(),
+            monitorInfo.appendNumber(serverDescription->getAddress().toString(),
                                      pingTimeMillis(serverDescription));
         }
         return;
@@ -517,7 +516,7 @@ void StreamableReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder, boo
         }
 
         BSONObjBuilder builder(hosts.subobjStart());
-        builder.append("addr", serverDescription->getAddress());
+        builder.append("addr", serverDescription->getAddress().toString());
         builder.append("ok", isUp);
         builder.append("ismaster", isMaster);  // intentionally not camelCase
         builder.append("hidden", isHidden);
@@ -543,29 +542,15 @@ void StreamableReplicaSetMonitor::_setConfirmedNotifierState(
     WithLock, const ServerDescriptionPtr& primaryDescription) {
     invariant(primaryDescription && primaryDescription->getType() == sdam::ServerType::kRSPrimary);
 
-    const auto& hosts = primaryDescription->getHosts();
-    const auto& passives = primaryDescription->getPassives();
+    auto hosts = primaryDescription->getHosts();
+    auto passives = primaryDescription->getPassives();
+    hosts.insert(passives.begin(), passives.end());
 
-    // TODO SERVER-45395: remove need for HostAndPort conversion
-    std::set<HostAndPort> confirmedHosts;
-    std::transform(hosts.begin(),
-                   hosts.end(),
-                   std::inserter(confirmedHosts, confirmedHosts.end()),
-                   [](const ServerAddress& addr) -> HostAndPort { return HostAndPort(addr); });
-
-    std::set<HostAndPort> confirmedPassives;
-    std::transform(passives.begin(),
-                   passives.end(),
-                   std::inserter(confirmedPassives, confirmedPassives.end()),
-                   [](const ServerAddress& addr) -> HostAndPort { return HostAndPort(addr); });
-
-    confirmedHosts.insert(confirmedPassives.begin(), confirmedPassives.end());
-
-    _confirmedNotifierState = ChangeNotifierState{
-        HostAndPort(primaryDescription->getAddress()),
-        confirmedPassives,
-        ConnectionString::forReplicaSet(
-            getName(), std::vector<HostAndPort>(confirmedHosts.begin(), confirmedHosts.end()))};
+    _confirmedNotifierState =
+        ChangeNotifierState{primaryDescription->getAddress(),
+                            passives,
+                            ConnectionString::forReplicaSet(
+                                getName(), std::vector<HostAndPort>(hosts.begin(), hosts.end()))};
 }
 
 void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
@@ -614,7 +599,7 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
     }
 }
 
-void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(const ServerAddress& hostAndPort,
+void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                                   const BSONObj reply) {
     // After the inital handshake, isMasterResponses should not update the RTT with durationMs.
     IsMasterOutcome outcome(hostAndPort, reply, boost::none);
@@ -622,25 +607,25 @@ void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(const ServerAd
 }
 
 void StreamableReplicaSetMonitor::onServerHeartbeatFailureEvent(Status errorStatus,
-                                                                const ServerAddress& hostAndPort,
+                                                                const HostAndPort& hostAndPort,
                                                                 const BSONObj reply) {
     _failedHost(
         HostAndPort(hostAndPort), errorStatus, reply, HandshakeStage::kPostHandshake, false);
 }
 
-void StreamableReplicaSetMonitor::onServerPingFailedEvent(const ServerAddress& hostAndPort,
+void StreamableReplicaSetMonitor::onServerPingFailedEvent(const HostAndPort& hostAndPort,
                                                           const Status& status) {
     _failedHost(HostAndPort(hostAndPort), status, BSONObj(), HandshakeStage::kPostHandshake, false);
 }
 
-void StreamableReplicaSetMonitor::onServerHandshakeFailedEvent(const sdam::ServerAddress& address,
+void StreamableReplicaSetMonitor::onServerHandshakeFailedEvent(const HostAndPort& address,
                                                                const Status& status,
                                                                const BSONObj reply) {
     _failedHost(HostAndPort(address), status, reply, HandshakeStage::kPreHandshake, false);
 };
 
 void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::IsMasterRTT durationMS,
-                                                             const ServerAddress& hostAndPort) {
+                                                             const HostAndPort& hostAndPort) {
     LOGV2_DEBUG(4668132,
                 kLowerLogLevel,
                 "ReplicaSetMonitor ping success",
@@ -651,7 +636,7 @@ void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::IsMasterRTT d
 }
 
 void StreamableReplicaSetMonitor::onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
-                                                                 const ServerAddress& hostAndPort,
+                                                                 const HostAndPort& hostAndPort,
                                                                  const BSONObj reply) {
     IsMasterOutcome outcome(hostAndPort, reply, durationMs);
     _topologyManager->onServerDescription(outcome);

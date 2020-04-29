@@ -41,8 +41,7 @@
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {
-template std::ostream& operator<<(std::ostream& os,
-                                  const std::vector<mongo::sdam::ServerAddress>& s);
+template std::ostream& operator<<(std::ostream& os, const std::vector<HostAndPort>& s);
 
 bool operator==(const TopologyVersion& a, const TopologyVersion& b) {
     return a.getProcessId() == b.getProcessId() && a.getCounter() == b.getCounter();
@@ -58,11 +57,13 @@ protected:
 
     static inline const auto kSetName = std::string("mySetName");
 
-    static inline const std::vector<ServerAddress> kOneServer{"foo:1234"};
-    static inline const std::vector<ServerAddress> kTwoServersVaryCase{"FoO:1234", "BaR:1234"};
-    static inline const std::vector<ServerAddress> kTwoServersNormalCase{"foo:1234", "bar:1234"};
-    static inline const std::vector<ServerAddress> kThreeServers{
-        "foo:1234", "bar:1234", "baz:1234"};
+    static inline const std::vector<HostAndPort> kOneServer{HostAndPort("foo:1234")};
+    static inline const std::vector<HostAndPort> kTwoServersVaryCase{HostAndPort("FoO:1234"),
+                                                                     HostAndPort("BaR:1234")};
+    static inline const std::vector<HostAndPort> kTwoServersNormalCase{HostAndPort("foo:1234"),
+                                                                       HostAndPort("bar:1234")};
+    static inline const std::vector<HostAndPort> kThreeServers{
+        HostAndPort("foo:1234"), HostAndPort("bar:1234"), HostAndPort("baz:1234")};
 
     static inline const auto kDefaultConfig = SdamConfiguration();
     static inline const auto kSingleSeedConfig =
@@ -74,7 +75,7 @@ void TopologyDescriptionTestFixture::assertDefaultConfig(
     ASSERT_EQUALS(boost::none, topologyDescription.getSetName());
     ASSERT_EQUALS(boost::none, topologyDescription.getMaxElectionId());
 
-    auto expectedDefaultServer = ServerDescription("localhost:27017");
+    auto expectedDefaultServer = ServerDescription(HostAndPort("localhost:27017"));
     ASSERT_EQUALS(expectedDefaultServer, *topologyDescription.getServers().front());
     ASSERT_EQUALS(static_cast<std::size_t>(1), topologyDescription.getServers().size());
 
@@ -96,7 +97,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldHaveCorrectDefaultValues) {
 //
 //    auto expectedAddresses = kTwoServersNormalCase;
 //
-//    auto serverAddresses = map<ServerDescriptionPtr, ServerAddress>(
+//    auto serverAddresses = map<ServerDescriptionPtr, HostAndPort>(
 //        topologyDescription.getServers(),
 //        [](const ServerDescriptionPtr& description) { return description->getAddress(); });
 //
@@ -108,7 +109,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldAllowTypeSingleWithASingleSeed) {
 
     ASSERT(TopologyType::kSingle == topologyDescription.getType());
 
-    auto servers = map<ServerDescriptionPtr, ServerAddress>(
+    auto servers = map<ServerDescriptionPtr, HostAndPort>(
         topologyDescription.getServers(),
         [](const ServerDescriptionPtr& desc) { return desc->getAddress(); });
     ASSERT_EQUALS(kOneServer, servers);

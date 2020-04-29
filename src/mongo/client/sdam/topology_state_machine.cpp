@@ -200,9 +200,9 @@ void TopologyStateMachine::updateRSWithoutPrimary(TopologyDescription& topologyD
 
 void TopologyStateMachine::addUnknownServers(TopologyDescription& topologyDescription,
                                              const ServerDescriptionPtr& serverDescription) {
-    const std::set<ServerAddress>* addressSets[3]{&serverDescription->getHosts(),
-                                                  &serverDescription->getPassives(),
-                                                  &serverDescription->getArbiters()};
+    const std::set<HostAndPort>* addressSets[3]{&serverDescription->getHosts(),
+                                                &serverDescription->getPassives(),
+                                                &serverDescription->getArbiters()};
     for (const auto addresses : addressSets) {
         for (const auto& addressFromSet : *addresses) {
             if (!topologyDescription.containsServerAddress(addressFromSet)) {
@@ -294,7 +294,7 @@ void TopologyStateMachine::updateRSFromPrimary(TopologyDescription& topologyDesc
 
     addUnknownServers(topologyDescription, serverDescription);
 
-    std::vector<ServerAddress> toRemove;
+    std::vector<HostAndPort> toRemove;
     for (const auto& currentServerDescription : topologyDescription.getServers()) {
         const auto currentServerAddress = currentServerDescription->getAddress();
         auto hosts = serverDescription->getHosts().find(currentServerAddress);
@@ -363,7 +363,7 @@ void TopologyStateMachine::setTopologyTypeAndUpdateRSWithoutPrimary(
 }
 
 void TopologyStateMachine::removeServerDescription(TopologyDescription& topologyDescription,
-                                                   const ServerAddress serverAddress) {
+                                                   const HostAndPort serverAddress) {
     topologyDescription.removeServerDescription(serverAddress);
     LOGV2(20220,
           "{kLogPrefix}server '{serverAddress}' was removed from the topology.",

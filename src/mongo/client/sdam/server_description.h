@@ -50,7 +50,7 @@ public:
     /**
      * Construct an unknown ServerDescription with default values except the server's address.
      */
-    ServerDescription(ServerAddress address)
+    ServerDescription(HostAndPort address)
         : _address(std::move(address)), _type(ServerType::kUnknown) {}
 
     /**
@@ -71,9 +71,9 @@ public:
     bool isEquivalent(const ServerDescription& other) const;
 
     // server identity
-    const ServerAddress& getAddress() const;
+    const HostAndPort& getAddress() const;
     ServerType getType() const;
-    const boost::optional<ServerAddress>& getMe() const;
+    const boost::optional<HostAndPort>& getMe() const;
     const boost::optional<std::string>& getSetName() const;
     const std::map<std::string, std::string>& getTags() const;
     void appendBsonTags(BSONObjBuilder& builder) const;
@@ -96,10 +96,10 @@ public:
     const boost::optional<repl::OpTime>& getOpTime() const;
 
     // topology membership
-    const boost::optional<ServerAddress>& getPrimary() const;
-    const std::set<ServerAddress>& getHosts() const;
-    const std::set<ServerAddress>& getPassives() const;
-    const std::set<ServerAddress>& getArbiters() const;
+    const boost::optional<HostAndPort>& getPrimary() const;
+    const std::set<HostAndPort>& getHosts() const;
+    const std::set<HostAndPort>& getPassives() const;
+    const std::set<HostAndPort>& getArbiters() const;
     const boost::optional<int>& getSetVersion() const;
     const boost::optional<OID>& getElectionId() const;
     const boost::optional<TopologyVersion>& getTopologyVersion() const;
@@ -123,7 +123,7 @@ private:
 
     void storeHostListIfPresent(const std::string key,
                                 const BSONObj response,
-                                std::set<ServerAddress>& destination);
+                                std::set<HostAndPort>& destination);
     void saveHosts(const BSONObj response);
     void saveTags(BSONObj tagsObj);
     void saveElectionId(BSONElement electionId);
@@ -136,7 +136,7 @@ private:
     // address: the hostname or IP, and the port number, that the client connects to. Note that this
     // is not the server's ismaster.me field, in the case that the server reports an address
     // different from the address the client uses.
-    ServerAddress _address;
+    HostAndPort _address;
 
     // topologyVersion: the server's topology version. Updated upon a significant topology change.
     boost::optional<TopologyVersion> _topologyVersion;
@@ -166,14 +166,14 @@ private:
 
     // (=) me: The hostname or IP, and the port number, that this server was configured with in the
     // replica set. Default null.
-    boost::optional<ServerAddress> _me;
+    boost::optional<HostAndPort> _me;
 
     // (=) hosts, passives, arbiters: Sets of addresses. This server's opinion of the replica set's
     // members, if any. These hostnames are normalized to lower-case. Default empty. The client
     // monitors all three types of servers in a replica set.
-    std::set<ServerAddress> _hosts;
-    std::set<ServerAddress> _passives;
-    std::set<ServerAddress> _arbiters;
+    std::set<HostAndPort> _hosts;
+    std::set<HostAndPort> _passives;
+    std::set<HostAndPort> _arbiters;
 
     // (=) tags: map from string to string. Default empty.
     std::map<std::string, std::string> _tags;
@@ -189,7 +189,7 @@ private:
     boost::optional<OID> _electionId;
 
     // (=) primary: an address. This server's opinion of who the primary is. Default null.
-    boost::optional<ServerAddress> _primary;
+    boost::optional<HostAndPort> _primary;
 
     // lastUpdateTime: when this server was last checked. Default "infinity ago".
     boost::optional<Date_t> _lastUpdateTime = Date_t::min();

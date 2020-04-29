@@ -54,12 +54,12 @@ public:
      * If setName is not null, only TopologyType ReplicaSetNoPrimary and Single, are
      * allowed.
      */
-    explicit SdamConfiguration(boost::optional<std::vector<ServerAddress>> seedList,
+    explicit SdamConfiguration(boost::optional<std::vector<HostAndPort>> seedList,
                                TopologyType initialType = TopologyType::kUnknown,
                                Milliseconds heartBeatFrequencyMs = kDefaultHeartbeatFrequencyMs,
                                boost::optional<std::string> setName = boost::none);
 
-    const boost::optional<std::vector<ServerAddress>>& getSeedList() const;
+    const boost::optional<std::vector<HostAndPort>>& getSeedList() const;
     TopologyType getInitialType() const;
     Milliseconds getHeartBeatFrequency() const;
     const boost::optional<std::string>& getSetName() const;
@@ -69,7 +69,7 @@ public:
     static constexpr Milliseconds kDefaultConnectTimeoutMS = Milliseconds(10000);
 
 private:
-    boost::optional<std::vector<ServerAddress>> _seedList;
+    boost::optional<std::vector<HostAndPort>> _seedList;
     TopologyType _initialType;
     Milliseconds _heartBeatFrequencyMs;
     boost::optional<std::string> _setName;

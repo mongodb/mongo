@@ -39,7 +39,7 @@ class SingleServerIsMasterMonitor
     : public std::enable_shared_from_this<SingleServerIsMasterMonitor> {
 public:
     explicit SingleServerIsMasterMonitor(const MongoURI& setUri,
-                                         const ServerAddress& host,
+                                         const HostAndPort& host,
                                          boost::optional<TopologyVersion> topologyVersion,
                                          Milliseconds heartbeatFrequencyMS,
                                          TopologyEventsPublisherPtr eventListener,
@@ -96,7 +96,7 @@ private:
 
     Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SingleServerIsMasterMonitor::mutex");
-    ServerAddress _host;
+    HostAndPort _host;
     boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -155,7 +155,7 @@ private:
     SdamConfiguration _sdamConfiguration;
     TopologyEventsPublisherPtr _eventPublisher;
     std::shared_ptr<executor::TaskExecutor> _executor;
-    stdx::unordered_map<ServerAddress, SingleServerIsMasterMonitorPtr> _singleMonitors;
+    stdx::unordered_map<HostAndPort, SingleServerIsMasterMonitorPtr> _singleMonitors;
     bool _isShutdown;
     MongoURI _setUri;
 };

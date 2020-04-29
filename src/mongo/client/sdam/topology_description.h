@@ -67,20 +67,20 @@ public:
     const boost::optional<int>& getLogicalSessionTimeoutMinutes() const;
     const Milliseconds& getHeartBeatFrequency() const;
 
-    const boost::optional<ServerDescriptionPtr> findServerByAddress(ServerAddress address) const;
-    bool containsServerAddress(const ServerAddress& address) const;
+    const boost::optional<ServerDescriptionPtr> findServerByAddress(HostAndPort address) const;
+    bool containsServerAddress(const HostAndPort& address) const;
     std::vector<ServerDescriptionPtr> findServers(
         std::function<bool(const ServerDescriptionPtr&)> predicate) const;
     boost::optional<ServerDescriptionPtr> getPrimary();
 
     /**
      * Adds the given ServerDescription or swaps it with an existing one
-     * using the description's ServerAddress as the lookup key. If present, the previous server
+     * using the description's HostAndPort as the lookup key. If present, the previous server
      * description is returned.
      */
     boost::optional<ServerDescriptionPtr> installServerDescription(
         const ServerDescriptionPtr& newServerDescription);
-    void removeServerDescription(const ServerAddress& serverAddress);
+    void removeServerDescription(const HostAndPort& HostAndPort);
 
     void setType(TopologyType type);
 
@@ -153,7 +153,7 @@ private:
     // servers: a set of ServerDescription instances. Default contains one server:
     // "localhost:27017", ServerType Unknown.
     std::vector<ServerDescriptionPtr> _servers{
-        std::make_shared<ServerDescription>("localhost:27017")};
+        std::make_shared<ServerDescription>(HostAndPort("localhost:27017"))};
 
     // compatible: a boolean. False if any server's wire protocol version range is incompatible with
     // the client's. Default true.
