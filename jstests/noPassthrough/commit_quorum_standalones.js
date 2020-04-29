@@ -9,11 +9,17 @@
 const standalone = MongoRunner.runMongod();
 const db = standalone.getDB("test");
 
+assert.commandWorked(db.createCollection("coll"));
+
 jsTestLog("Create index");
 assert.commandFailedWithCode(
     db.runCommand(
         {createIndexes: "coll", indexes: [{name: "x_1", key: {x: 1}}], commitQuorum: "majority"}),
     ErrorCodes.BadValue);
+
+assert.commandFailedWithCode(
+    db.runCommand({setIndexCommitQuorum: "coll", indexNames: ["x_1"], commitQuorum: "majority"}),
+    ErrorCodes.IndexNotFound);
 
 MongoRunner.stopMongod(standalone);
 })();

@@ -110,5 +110,38 @@ awaitShell();
 
 IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
+// setIndexCommitQuorum should fail in FCV 4.2.
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+try {
+    assert.commandWorked(testDB.adminCommand(
+        {configureFailPoint: "hangAfterIndexBuildFirstDrain", mode: "alwaysOn"}));
+
+    // Starts parallel shell to run the command that will hang.
+    awaitShell = startParallelShell(function() {
+        // Use the index builds coordinator for a two-phase index build.
+        assert.commandWorked(db.runCommand({
+            createIndexes: 'twoPhaseIndexBuild',
+            indexes: [{key: {b: 1}, name: 'b_1_fcv42'}],
+        }));
+    }, testDB.getMongo().port);
+
+    checkLog.containsWithCount(replSet.getPrimary(), "Waiting for index build to complete", 6);
+
+    assert.commandFailedWithCode(testDB.runCommand({
+        setIndexCommitQuorum: 'twoPhaseIndexBuild',
+        indexNames: ['b_1_fcv42'],
+        commitQuorum: "majority",
+    }),
+                                 ErrorCodes.IndexNotFound);
+} finally {
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildFirstDrain", mode: "off"}));
+}
+
+// Wait for the parallel shell to complete.
+awaitShell();
+
+IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1", "b_1_fcv42"]);
+
 replSet.stopSet();
 })();
