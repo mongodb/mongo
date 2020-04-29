@@ -60,6 +60,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(migrationCommitVersionError);
+MONGO_FAIL_POINT_DEFINE(migrateCommitInvalidChunkQuery);
 MONGO_FAIL_POINT_DEFINE(skipExpiringOldChunkHistory);
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
@@ -208,8 +209,12 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         op.appendBool("b", false);  // No upserting
         op.append("ns", ChunkType::ConfigNS.ns());
 
+        auto chunkID = MONGO_unlikely(migrateCommitInvalidChunkQuery.shouldFail())
+            ? OID::gen()
+            : migratedChunk.getName();
+
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), migratedChunk.getName());
+        n.append(ChunkType::name(), chunkID);
         migratedChunk.getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), migratedChunk.getMin());
@@ -219,7 +224,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), migratedChunk.getName());
+        q.append(ChunkType::name(), chunkID);
         q.done();
 
         updates.append(op.obj());
@@ -252,8 +257,9 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
 
     // Do not give applyOps a write concern. If applyOps tries to wait for replication, it will
     // fail because of the GlobalWrite lock CommitChunkMigration already holds. Replication will
-    // not be able to take the lock it requires.
-    return BSON("applyOps" << updates.arr());
+    // not be able to take the lock it requires. Include "alwaysUpsert" false since it defaults
+    // to true and alwaysUpsert overrides the 'b' field.
+    return BSON("applyOps" << updates.arr() << "alwaysUpsert" << false);
 }
 
 /**

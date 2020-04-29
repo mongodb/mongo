@@ -131,7 +131,8 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
 
 (() => {
     const [collName, ns] = getNewNs(dbName);
-    jsTest.log("Test end-to-end migration when migration commit fails, ns is " + ns);
+    jsTest.log("Test end-to-end migration when migration commit fails due to StaleConfig, ns is " +
+               ns);
 
     // Insert some docs into the collection.
     const numDocs = 1000;
@@ -188,6 +189,23 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard1);
 
     migrationCommitVersionErrorFailpoint.off();
+})();
+
+(() => {
+    const [collName, ns] = getNewNs(dbName);
+    jsTest.log(
+        "Test end-to-end migration when migration commit fails to due to invalid chunk query, ns is " +
+        ns);
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
+    const invalidChunkQueryFailPoint =
+        configureFailPoint(st.configRS.getPrimary(), "migrateCommitInvalidChunkQuery");
+
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard1.shardName}),
+        ErrorCodes.UpdateOperationFailed);
+
+    invalidChunkQueryFailPoint.off();
 })();
 
 st.stop();
