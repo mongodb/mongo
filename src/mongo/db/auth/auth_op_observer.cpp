@@ -36,13 +36,12 @@
 #include "mongo/db/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 
 namespace {
 
-const auto documentKeyDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
 
 }  // namespace
 
@@ -70,18 +69,12 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         ->logOp(opCtx, "u", args.nss, args.updateArgs.update, &args.updateArgs.criteria);
 }
 
-BSONObj AuthOpObserver::getDocumentKey(OperationContext* opCtx,
-                                       NamespaceString const& nss,
-                                       BSONObj const& doc) {
-    const auto collDesc =
-        CollectionShardingState::get(opCtx, nss)->getCollectionDescription_DEPRECATED();
-    return collDesc.extractDocumentKey(doc).getOwned();
-}
-
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
                                    BSONObj const& doc) {
-    documentKeyDecoration(opCtx) = getDocumentKey(opCtx, nss, doc);
+    // Extract the _id field from the document. If it does not have an _id, use the
+    // document itself as the _id.
+    documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;
 }
 
 void AuthOpObserver::onDelete(OperationContext* opCtx,
@@ -90,10 +83,10 @@ void AuthOpObserver::onDelete(OperationContext* opCtx,
                               StmtId stmtId,
                               bool fromMigrate,
                               const boost::optional<BSONObj>& deletedDoc) {
-    auto& documentKey = documentKeyDecoration(opCtx);
-    invariant(!documentKey.isEmpty());
+    auto& documentId = documentIdDecoration(opCtx);
+    invariant(!documentId.isEmpty());
     AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "d", nss, documentKey, nullptr);
+        ->logOp(opCtx, "d", nss, documentId, nullptr);
 }
 
 void AuthOpObserver::onCreateCollection(OperationContext* opCtx,

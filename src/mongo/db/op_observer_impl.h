@@ -41,6 +41,22 @@ public:
     OpObserverImpl() = default;
     virtual ~OpObserverImpl() = default;
 
+    class DocumentKey {
+    public:
+        DocumentKey(BSONObj id, boost::optional<BSONObj> _shardKey)
+            : _id(id.getOwned()), _shardKey(std::move(_shardKey)) {
+            invariant(!id.isEmpty());
+        }
+
+        BSONObj getId() const;
+
+        BSONObj getShardKeyAndId() const;
+
+    private:
+        BSONObj _id;
+        boost::optional<BSONObj> _shardKey;
+    };
+
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        CollectionUUID uuid,
@@ -158,10 +174,13 @@ public:
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
-    // Contains the fields of the document that are in the collection's shard key, and "_id".
-    static BSONObj getDocumentKey(OperationContext* opCtx,
-                                  NamespaceString const& nss,
-                                  BSONObj const& doc);
+    /**
+     * Returns a DocumentKey constructed from the shard key fields, if the collection is sharded,
+     * and the _id field, of the given document.
+     */
+    static DocumentKey getDocumentKey(OperationContext* opCtx,
+                                      NamespaceString const& nss,
+                                      BSONObj const& doc);
 
 private:
     virtual void shardObserveAboutToDelete(OperationContext* opCtx,

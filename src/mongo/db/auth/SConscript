@@ -59,7 +59,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/op_observer',
         '$BUILD_DIR/mongo/db/op_observer_util',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
     ]
 )
 

@@ -57,7 +57,7 @@
 namespace mongo {
 namespace {
 
-const auto getDocumentKey = OperationContext::declareDecoration<BSONObj>();
+const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
 
 bool isStandaloneOrPrimary(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -411,7 +411,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           NamespaceString const& nss,
                                           BSONObj const& doc) {
-    getDocumentKey(opCtx) = OpObserverImpl::getDocumentKey(opCtx, nss, doc);
+    // Extract the _id field from the document. If it does not have an _id, use the
+    // document itself as the _id.
+    documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;
 }
 
 void ShardServerOpObserver::onDelete(OperationContext* opCtx,
@@ -420,10 +422,11 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      StmtId stmtId,
                                      bool fromMigrate,
                                      const boost::optional<BSONObj>& deletedDoc) {
-    auto& documentKey = getDocumentKey(opCtx);
+    auto& documentId = documentIdDecoration(opCtx);
+    invariant(!documentId.isEmpty());
 
     if (nss == NamespaceString::kShardConfigCollectionsNamespace) {
-        onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(opCtx, documentKey);
+        onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(opCtx, documentId);
     }
 
     if (nss == NamespaceString::kShardConfigDatabasesNamespace) {
@@ -435,7 +438,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         std::string deletedDatabase;
         fassert(
             50772,
-            bsonExtractStringField(documentKey, ShardDatabaseType::name.name(), &deletedDatabase));
+            bsonExtractStringField(documentId, ShardDatabaseType::name.name(), &deletedDatabase));
 
         AutoGetDb autoDb(opCtx, deletedDatabase, MODE_X);
         auto dss = DatabaseShardingState::get(opCtx, deletedDatabase);
@@ -444,7 +447,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {
-        if (auto idElem = documentKey["_id"]) {
+        if (auto idElem = documentId.firstElement()) {
             auto idStr = idElem.str();
             if (idStr == ShardIdentityType::IdName) {
                 if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {

@@ -222,6 +222,9 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
     if (isSystemDotProfile())
         return true;
 
+    if (isSystemDotViews())
+        return true;
+
     if (ns() == "config.cache.databases" || ns() == "config.cache.collections" ||
         (db() == "config" && coll().startsWith("cache.chunks")))
         return true;

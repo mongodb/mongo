@@ -705,6 +705,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsOrphanCleanupDelay) {
     auto queriesComplete = SemiFuture<void>::makeReady();
 
     // Insert documents in range.
+    setFilteringMetadataWithUUID(uuid());
     DBDirectClient dbclient(operationContext());
     for (auto i = 0; i < numDocsToInsert; ++i) {
         dbclient.insert(kNss.toString(), BSON(kShardKey << i));
