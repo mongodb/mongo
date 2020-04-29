@@ -93,7 +93,7 @@ assert.commandFailedWithCode(
     ErrorCodes.QueryFeatureNotAllowed);
 assert.commandFailedWithCode(
     db.runCommand(
-        {collMod: collName, validator: encryptMetadataSchema, validationModerate: "moderate"}),
+        {collMod: collName, validator: encryptMetadataSchema, validationLevel: "moderate"}),
     ErrorCodes.QueryFeatureNotAllowed);
 coll.drop();
 })();

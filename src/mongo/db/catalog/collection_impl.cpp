@@ -1036,15 +1036,15 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
     auto oldValidationLevel = _validationLevel;
     _validationLevel = levelSW.getValue();
 
-    // If setting the level to 'moderate', then reparse the validator to verify that there aren't
-    // any incompatible keywords.
-    if (_validationLevel == CollectionImpl::ValidationLevel::MODERATE) {
-        auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
+    // Reparse the validator as there are some features which are only supported with certain
+    // validation levels.
+    auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
+    if (_validationLevel == CollectionImpl::ValidationLevel::MODERATE)
         allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
-        auto validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
-        if (!validator.isOK()) {
-            return validator.getStatus();
-        }
+
+    _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
+    if (!_validator.isOK()) {
+        return _validator.getStatus();
     }
 
     DurableCatalog::get(opCtx)->updateValidator(opCtx,
@@ -1069,15 +1069,15 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
     auto oldValidationAction = _validationAction;
     _validationAction = actionSW.getValue();
 
-    // If setting the action to 'warn', then reparse the validator to verify that there aren't any
-    // incompatible keywords.
-    if (_validationAction == CollectionImpl::ValidationAction::WARN) {
-        auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
+    // Reparse the validator as there are some features which are only supported with certain
+    // validation actions.
+    auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
+    if (_validationAction == CollectionImpl::ValidationAction::WARN)
         allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
-        auto validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
-        if (!validator.isOK()) {
-            return validator.getStatus();
-        }
+
+    _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
+    if (!_validator.isOK()) {
+        return _validator.getStatus();
     }
 
     DurableCatalog::get(opCtx)->updateValidator(opCtx,
