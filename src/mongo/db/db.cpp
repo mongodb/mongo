@@ -215,6 +215,7 @@ using std::endl;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceMode);
+MONGO_FAIL_POINT_DEFINE(pauseWhileKillingOperationsAtShutdown);
 
 const NamespaceString startupLogCollectionName("local.startup_log");
 
@@ -1169,6 +1170,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // After this point, the opCtx will have been marked as killed and will not be usable other
         // than to kill all transactions directly below.
         serviceContext->setKillAllOperations();
+
+        if (MONGO_unlikely(pauseWhileKillingOperationsAtShutdown.shouldFail())) {
+            LOGV2(4701700, "pauseWhileKillingOperationsAtShutdown failpoint enabled");
+            sleepsecs(1);
+        }
 
         // Destroy all stashed transaction resources, in order to release locks.
         killSessionsLocalShutdownAllTransactions(opCtx);

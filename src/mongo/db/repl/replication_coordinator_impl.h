@@ -108,6 +108,8 @@ public:
 
     virtual bool enterQuiesceModeIfSecondary() override;
 
+    virtual bool inQuiesceMode() const override;
+
     virtual void shutdown(OperationContext* opCtx) override;
 
     void markAsCleanShutdownIfPossible(OperationContext* opCtx) override;

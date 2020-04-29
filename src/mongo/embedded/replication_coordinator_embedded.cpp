@@ -55,6 +55,10 @@ bool ReplicationCoordinatorEmbedded::enterQuiesceModeIfSecondary() {
     return true;
 }
 
+bool ReplicationCoordinatorEmbedded::inQuiesceMode() const {
+    return false;
+}
+
 void ReplicationCoordinatorEmbedded::shutdown(OperationContext* opCtx) {}
 
 void ReplicationCoordinatorEmbedded::markAsCleanShutdownIfPossible(OperationContext* opCtx) {}

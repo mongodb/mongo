@@ -1,5 +1,7 @@
 /**
- * This tests that NotMaster errors include a TopologyVersion field.
+ * This tests that NotMaster errors include a TopologyVersion field. (Note that shutdown errors
+ * include a TopologyVersion field when the server is in quiesce mode. This is tested in
+ * quiesce_mode.js)
  */
 
 (function() {

@@ -930,6 +930,11 @@ bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary() {
     return true;
 }
 
+bool ReplicationCoordinatorImpl::inQuiesceMode() const {
+    stdx::lock_guard lk(_mutex);
+    return _inQuiesceMode;
+}
+
 void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
     // Shutdown must:
     // * prevent new threads from blocking in awaitReplication

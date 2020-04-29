@@ -53,6 +53,8 @@ public:
 
     bool enterQuiesceModeIfSecondary() final;
 
+    bool inQuiesceMode() const final;
+
     void shutdown(OperationContext* opCtx) final;
 
     void markAsCleanShutdownIfPossible(OperationContext* opCtx) final;

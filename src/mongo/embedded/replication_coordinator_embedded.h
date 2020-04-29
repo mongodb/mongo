@@ -51,6 +51,8 @@ public:
 
     bool enterQuiesceModeIfSecondary() override;
 
+    bool inQuiesceMode() const override;
+
     void shutdown(OperationContext* opCtx) override;
 
     void markAsCleanShutdownIfPossible(OperationContext* opCtx) override;

@@ -45,6 +45,10 @@ bool ReplicationCoordinatorNoOp::enterQuiesceModeIfSecondary() {
     MONGO_UNREACHABLE;
 }
 
+bool ReplicationCoordinatorNoOp::inQuiesceMode() const {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::shutdown(OperationContext* opCtx) {}
 
 void ReplicationCoordinatorNoOp::markAsCleanShutdownIfPossible(OperationContext* opCtx) {}

@@ -136,6 +136,11 @@ public:
     virtual bool enterQuiesceModeIfSecondary() = 0;
 
     /**
+     * Returns whether the server is in quiesce mode.
+     */
+    virtual bool inQuiesceMode() const = 0;
+
+    /**
      * Does whatever cleanup is required to stop replication, including instructing the other
      * components of the replication system to shut down and stop any threads they are using,
      * blocking until all replication-related shutdown tasks are complete.

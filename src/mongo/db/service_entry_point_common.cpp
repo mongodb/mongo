@@ -498,20 +498,26 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
         getErrorLabels(opCtx, sessionOptions, commandName, code, wcCode, isInternalClient);
     commandBodyFieldsBob->appendElements(errorLabels);
 
-    auto isNotMasterError = false;
-    if (code) {
-        isNotMasterError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*code);
-    }
+    const auto isNotMasterError = (code && ErrorCodes::isA<ErrorCategory::NotMasterError>(*code)) ||
+        (wcCode && ErrorCodes::isA<ErrorCategory::NotMasterError>(*wcCode));
 
-    if (!isNotMasterError && wcCode) {
-        isNotMasterError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*wcCode);
-    }
+    const auto isShutdownError = (code && ErrorCodes::isA<ErrorCategory::ShutdownError>(*code)) ||
+        (wcCode && ErrorCodes::isA<ErrorCategory::ShutdownError>(*wcCode));
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-        !isNotMasterError) {
+    // NotMaster errors always include a topologyVersion, since we increment topologyVersion on
+    // stepdown. ShutdownErrors only include a topologyVersion if the server is in quiesce mode,
+    // since we only increment the topologyVersion at shutdown and alert waiting isMaster commands
+    // if the server enters quiesce mode.
+    const auto shouldAppendTopologyVersion =
+        (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+         isNotMasterError) ||
+        (replCoord->inQuiesceMode() && isShutdownError);
+
+    if (!shouldAppendTopologyVersion) {
         return;
     }
+
     const auto topologyVersion = replCoord->getTopologyVersion();
     BSONObjBuilder topologyVersionBuilder(commandBodyFieldsBob->subobjStart("topologyVersion"));
     topologyVersion.serialize(&topologyVersionBuilder);

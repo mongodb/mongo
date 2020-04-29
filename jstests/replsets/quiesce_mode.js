@@ -22,13 +22,20 @@ const secondaryDB = secondary.getDB(dbName);
 assert.commandWorked(primaryDB.coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}],
                                            {writeConcern: {w: "majority"}}));
 
+function checkTopologyVersion(res, topologyVersionField) {
+    assert(res.hasOwnProperty("topologyVersion"), res);
+    assert.eq(res.topologyVersion.counter, topologyVersionField.counter + 1);
+}
+
 function runAwaitableIsMaster(topologyVersionField) {
-    assert.commandFailedWithCode(db.runCommand({
+    let res = assert.commandFailedWithCode(db.runCommand({
         isMaster: 1,
         topologyVersion: topologyVersionField,
         maxAwaitTimeMS: 99999999,
     }),
-                                 ErrorCodes.ShutdownInProgress);
+                                           ErrorCodes.ShutdownInProgress);
+    assert(res.hasOwnProperty("topologyVersion"), res);
+    assert.eq(res.topologyVersion.counter, topologyVersionField.counter + 1);
 }
 
 function runFind() {
@@ -72,13 +79,16 @@ assert.commandFailedWithCode(secondaryDB.adminCommand({serverStatus: 1}),
                              ErrorCodes.ShutdownInProgress);
 
 jsTestLog("New isMaster commands return a ShutdownInProgress error.");
-assert.commandFailedWithCode(secondary.adminCommand({isMaster: 1}), ErrorCodes.ShutdownInProgress);
-assert.commandFailedWithCode(secondary.adminCommand({
+checkTopologyVersion(assert.commandFailedWithCode(secondary.adminCommand({isMaster: 1}),
+                                                  ErrorCodes.ShutdownInProgress),
+                     topologyVersionField);
+checkTopologyVersion(assert.commandFailedWithCode(secondary.adminCommand({
     isMaster: 1,
     topologyVersion: topologyVersionField,
     maxAwaitTimeMS: 99999999,
 }),
-                             ErrorCodes.ShutdownInProgress);
+                                                  ErrorCodes.ShutdownInProgress),
+                     topologyVersionField);
 
 // Test operation behavior during quiesce mode.
 jsTestLog("The running operation is allowed to finish.");
@@ -92,8 +102,19 @@ assert.eq(2, res.cursor.nextBatch.length, res);
 jsTestLog("New operations are allowed.");
 assert.eq(4, secondaryDB.coll.find().itcount());
 
-jsTestLog("Restart the secondary.");
+jsTestLog("Let shutdown progress to start killing operations.");
+let pauseWhileKillingOperationsFailPoint =
+    configureFailPoint(secondary, "pauseWhileKillingOperationsAtShutdown");
 quiesceModeFailPoint.off();
+// This throws because the configureFailPoint command is killed by the shutdown.
+assert.throws(() => pauseWhileKillingOperationsFailPoint.wait());
+
+jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");
+checkTopologyVersion(assert.commandFailedWithCode(secondaryDB.runCommand({find: collName}),
+                                                  ErrorCodes.InterruptedAtShutdown),
+                     topologyVersionField);
+
+jsTestLog("Restart the secondary.");
 replTest.restart(secondary);
 replTest.awaitSecondaryNodes();
 
@@ -145,13 +166,16 @@ assert.commandFailedWithCode(primaryDB.adminCommand({serverStatus: 1}),
                              ErrorCodes.ShutdownInProgress);
 
 jsTestLog("New isMaster commands return a ShutdownInProgress error.");
-assert.commandFailedWithCode(primary.adminCommand({isMaster: 1}), ErrorCodes.ShutdownInProgress);
-assert.commandFailedWithCode(primary.adminCommand({
+checkTopologyVersion(assert.commandFailedWithCode(primary.adminCommand({isMaster: 1}),
+                                                  ErrorCodes.ShutdownInProgress),
+                     topologyVersionField);
+checkTopologyVersion(assert.commandFailedWithCode(primary.adminCommand({
     isMaster: 1,
     topologyVersion: topologyVersionField,
     maxAwaitTimeMS: 99999999,
 }),
-                             ErrorCodes.ShutdownInProgress);
+                                                  ErrorCodes.ShutdownInProgress),
+                     topologyVersionField);
 
 // Test operation behavior during quiesce mode.
 jsTestLog("The running operation is allowed to finish.");
@@ -165,6 +189,17 @@ assert.eq(2, res.cursor.nextBatch.length, res);
 jsTestLog("New operations are allowed.");
 assert.eq(4, primaryDB.coll.find().itcount());
 
+jsTestLog("Let shutdown progress to start killing operations.");
+pauseWhileKillingOperationsFailPoint =
+    configureFailPoint(primary, "pauseWhileKillingOperationsAtShutdown");
 quiesceModeFailPoint.off();
+// This throws because the configureFailPoint command is killed by the shutdown.
+assert.throws(() => pauseWhileKillingOperationsFailPoint.wait());
+
+jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");
+checkTopologyVersion(assert.commandFailedWithCode(primaryDB.runCommand({find: collName}),
+                                                  ErrorCodes.InterruptedAtShutdown),
+                     topologyVersionField);
+
 replTest.stopSet();
 })();
