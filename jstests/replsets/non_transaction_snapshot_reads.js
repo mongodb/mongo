@@ -17,13 +17,13 @@ const options = {
 const replSet = new ReplSetTest({nodes: 3, nodeOptions: options});
 replSet.startSet();
 replSet.initiateWithHighElectionTimeout();
-const primary = replSet.getPrimary();
-const testDB = primary.getDB('test');
-snapshotReadsTest(jsTestName(), testDB, "test");
+const primaryDB = replSet.getPrimary().getDB('test');
+const secondaryDB = replSet.getSecondary().getDB('test');
+snapshotReadsCursorTest(jsTestName(), primaryDB, secondaryDB, "test");
 
 // Ensure "atClusterTime" is omitted from a regular (non-snapshot) cursor.
-testDB["collection"].insertOne({});
-const cursor = assert.commandWorked(testDB.runCommand({find: "collection"})).cursor;
+primaryDB["collection"].insertOne({});
+const cursor = assert.commandWorked(primaryDB.runCommand({find: "test"})).cursor;
 assert(!cursor.hasOwnProperty("atClusterTime"));
 
 replSet.stopSet();

@@ -32,16 +32,28 @@ function verifyInvalidGetMoreAttempts(mainDb, collName, cursorId, lsid, txnNumbe
                                  ErrorCodes.NoSuchTransaction);
 }
 
-function snapshotReadsTest(testScenarioName, db, collName) {
-    const docs = [...Array(10).keys()].map((i) => ({"_id": i}));
+var snapshotReadsCursorTest;
 
-    function makeSnapshotReadConcern(atClusterTime) {
-        if (atClusterTime === undefined) {
-            return {level: "snapshot"};
-        }
-
-        return {level: "snapshot", atClusterTime: atClusterTime};
+(function() {
+function makeSnapshotReadConcern(atClusterTime) {
+    if (atClusterTime === undefined) {
+        return {level: "snapshot"};
     }
+
+    return {level: "snapshot", atClusterTime: atClusterTime};
+}
+
+function awaitCommitted(db, ts) {
+    jsTestLog(`Wait for ${ts} to be committed on ${db.getMongo()}`);
+    assert.soonNoExcept(function() {
+        const replSetStatus =
+            assert.commandWorked(db.getSiblingDB("admin").runCommand({replSetGetStatus: 1}));
+        return timestampCmp(replSetStatus.optimes.readConcernMajorityOpTime.ts, ts) >= 0;
+    }, `${ts} was never committed on ${db.getMongo()}`);
+}
+
+snapshotReadsCursorTest = function(testScenarioName, primaryDB, secondaryDB, collName) {
+    const docs = [...Array(10).keys()].map((i) => ({"_id": i}));
 
     const commands = {
         aggregate: (batchSize, readPreferenceMode, atClusterTime) => {
@@ -65,7 +77,7 @@ function snapshotReadsTest(testScenarioName, db, collName) {
     };
 
     for (let useCausalConsistency of [false, true]) {
-        for (let readPreferenceMode of ["primary", "secondary"]) {
+        for (let [db, readPreferenceMode] of [[primaryDB, "primary"], [secondaryDB, "secondary"]]) {
             jsTestLog(`Running the ${testScenarioName} scenario on collection ` +
                       `${collName} with read preference ${readPreferenceMode} and causal` +
                       ` consistency ${useCausalConsistency}`);
@@ -75,12 +87,13 @@ function snapshotReadsTest(testScenarioName, db, collName) {
                 jsTestLog("Testing the " + commandKey + " command.");
                 const command = commands[commandKey];
 
-                let res = assert.commandWorked(db.runCommand(
-                    {insert: collName, documents: docs, writeConcern: {w: "majority"}}));
+                let res =
+                    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs}));
                 const insertTimestamp = res.operationTime;
                 assert(insertTimestamp);
 
                 jsTestLog(`Inserted 10 documents at timestamp ${insertTimestamp}`);
+                awaitCommitted(db, insertTimestamp);
 
                 // Create a session if useCausalConsistency is true.
                 let causalDb, sessionTimestamp;
@@ -89,7 +102,7 @@ function snapshotReadsTest(testScenarioName, db, collName) {
                     let session = db.getMongo().startSession({causalConsistency: true});
                     causalDb = session.getDatabase(db.getName());
                     // Establish timestamp.
-                    causalDb["otherCollection"].insertOne({});
+                    causalDb[collName].findOne({});
                     sessionTimestamp = session.getOperationTime();
                 } else {
                     causalDb = db;
@@ -111,13 +124,11 @@ function snapshotReadsTest(testScenarioName, db, collName) {
                 }
 
                 // This update is not visible to reads at insertTimestamp.
-                res = assert.commandWorked(causalDb.runCommand({
-                    update: collName,
-                    updates: [{q: {}, u: {$set: {x: true}}, multi: true}],
-                    writeConcern: {w: "majority"}
-                }));
+                res = assert.commandWorked(primaryDB.runCommand(
+                    {update: collName, updates: [{q: {}, u: {$set: {x: true}}, multi: true}]}));
 
                 jsTestLog(`Updated collection "${collName}" at timestamp ${res.operationTime}`);
+                awaitCommitted(db, res.operationTime);
 
                 // Retrieve the rest of the read command's result set.
                 res = assert.commandWorked(
@@ -151,8 +162,10 @@ function snapshotReadsTest(testScenarioName, db, collName) {
                 assert.eq(res.cursor.atClusterTime, insertTimestamp);
 
                 // Reset.
-                assert.commandWorked(db[collName].remove({}, {writeConcern: {w: "majority"}}));
+                assert.commandWorked(
+                    primaryDB[collName].remove({}, {writeConcern: {w: "majority"}}));
             }
         }
     }
-}
+};
+})();
