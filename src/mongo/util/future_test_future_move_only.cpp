@@ -40,8 +40,7 @@
 namespace mongo {
 namespace {
 
-// A move-only type that isn't default constructible. It has binary ops with int to make it easier
-// to have a common format with the above tests.
+// A move-only type that isn't default constructible. It has binary ops with int.
 struct Widget {
     explicit Widget(int val) : val(val) {}
 
@@ -63,8 +62,16 @@ struct Widget {
         return val == i;
     }
 
-    bool operator==(Widget w) const {
-        return val == w.val;
+    friend bool operator==(const Widget& a, const Widget& b) {
+        return a.val == b.val;
+    }
+    friend bool operator<(const Widget& a, const Widget& b) {
+        return a.val < b.val;
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const Widget& w) {
+        return H::combine(std::move(h), w.val);
     }
 
     int val;
@@ -745,7 +752,7 @@ TEST(Future_MoveOnly, Success_vector) {
             vec.emplace_back(1);
             return vec;
         },
-        [](/*Future<vector<Widget>>*/ auto&& fut) { ASSERT_EQ(fut.get()[0], 1); });
+        [](auto&& fut) { ASSERT_EQ(fut.get()[0], 1); });
 }
 
 TEST(Future_MoveOnly, Success_list) {
@@ -755,8 +762,80 @@ TEST(Future_MoveOnly, Success_list) {
             lst.emplace_back(1);
             return lst;
         },
-        [](/*Future<list<Widget>>*/ auto&& fut) { ASSERT_EQ(fut.get().front(), 1); });
+        [](auto&& fut) { ASSERT_EQ(fut.get().front(), 1); });
 }
+
+TEST(Future_MoveOnly, Success_set) {
+    FUTURE_SUCCESS_TEST(
+        [] {
+            std::set<Widget> set;
+            set.emplace(1);
+            return set;
+        },
+        [](auto&& fut) { ASSERT_EQ(fut.get().count(Widget{1}), 1); });
+}
+
+TEST(Future_MoveOnly, Success_unordered_set) {
+    FUTURE_SUCCESS_TEST(
+        [] {
+            stdx::unordered_set<Widget> set;
+            set.emplace(1);
+            return set;
+        },
+        [](auto&& fut) { ASSERT_EQ(fut.get().count(Widget{1}), 1); });
+}
+
+TEST(Future_MoveOnly, Success_pair) {
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return std::pair<Widget, Widget>{1, 1};
+        },
+        [](auto&& fut) {
+            auto&& pair = fut.get();
+            ASSERT_EQ(pair.first, 1);
+            ASSERT_EQ(pair.second, 1);
+        });
+}
+
+TEST(Future_MoveOnly, Success_map) {
+    FUTURE_SUCCESS_TEST(
+        [] {
+            std::map<Widget, Widget> map;
+            map.emplace(1, 1);
+            return map;
+        },
+        [](auto&& fut) { ASSERT_EQ(fut.get().at(Widget{1}).val, 1); });
+}
+
+TEST(Future_MoveOnly, Success_unordered_map) {
+    FUTURE_SUCCESS_TEST(
+        [] {
+            stdx::unordered_map<Widget, Widget> map;
+            map.emplace(1, 1);
+            return map;
+        },
+        [](auto&& fut) { ASSERT_EQ(fut.get().at(Widget{1}).val, 1); });
+}
+
+TEST(Future_MoveOnly, Success_nested_container) {
+    FUTURE_SUCCESS_TEST(
+        [] {
+            std::vector<std::vector<std::map<Widget, Widget>>> outer;
+            std::vector<std::map<Widget, Widget>> mid;
+            std::map<Widget, Widget> inner;
+            inner.emplace(1, 1);
+            mid.push_back(std::move(inner));
+            outer.push_back(std::move(mid));
+
+            return outer;
+        },
+        [](auto&& fut) {
+            auto&& outer = fut.get();
+            const auto& inner = outer[0][0];
+            ASSERT_EQ(inner.at(Widget{1}).val, 1);
+        });
+}
+
 
 }  // namespace
 }  // namespace mongo
