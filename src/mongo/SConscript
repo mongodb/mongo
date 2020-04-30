@@ -564,6 +564,7 @@ mongos = env.Program(
         's/committed_optime_metadata_hook',
         's/coreshard',
         's/is_mongos',
+        's/mongos_topology_coordinator',
         's/query/cluster_cursor_cleanup_job',
         's/sessions_collection_sharded',
         's/sharding_egress_metadata_hook_for_mongos',

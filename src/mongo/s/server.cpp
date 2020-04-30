@@ -85,6 +85,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/mongos_options.h"
+#include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/s/query/cluster_cursor_cleanup_job.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/service_entry_point_mongos.h"
@@ -266,6 +267,13 @@ void cleanupTask(ServiceContext* serviceContext) {
         if (!opCtx) {
             uniqueTxn = client.makeOperationContext();
             opCtx = uniqueTxn.get();
+        }
+
+        // Enter quiesce mode so that existing and new short operations are allowed to finish.
+        // At this point, we will start responding to any isMaster request with ShutdownInProgress
+        // so that clients can re-route their operations.
+        if (auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx)) {
+            mongosTopCoord->enterQuiesceModeAndWait(opCtx);
         }
 
         // Shutdown the TransportLayer so that new connections aren't accepted

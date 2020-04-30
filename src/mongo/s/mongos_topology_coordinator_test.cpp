@@ -48,7 +48,18 @@ class MongosTopoCoordTest : public ServiceContextTest {
 public:
     virtual void setUp() {
         _topo = std::make_unique<MongosTopologyCoordinator>();
+
+        getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _fastClock = dynamic_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
+
         getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
+        _preciseClock =
+            dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
+    }
+
+    virtual void tearDown() {
+        _fastClock = nullptr;
+        _preciseClock = nullptr;
     }
 
 protected:
@@ -60,14 +71,27 @@ protected:
     }
 
     /**
-     * Gets the clock used by MongosTopologyCoordinator.
+     * Advance the time by millis on both clock source mocks.
      */
-    ClockSourceMock* getClock() {
-        return dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
+    void advanceTime(Milliseconds millis) {
+        _fastClock->advance(millis);
+        _preciseClock->advance(millis);
+    }
+
+    /**
+     * Assumes that the times on both clock source mocks is the same.
+     */
+    Date_t now() {
+        invariant(_fastClock->now() == _preciseClock->now());
+        return _fastClock->now();
     }
 
 private:
     unique_ptr<MongosTopologyCoordinator> _topo;
+    // The fast clock is used by OperationContext::hasDeadlineExpired.
+    ClockSourceMock* _fastClock;
+    // The precise clock is used by waitForConditionOrInterruptNoAssertUntil.
+    ClockSourceMock* _preciseClock;
 };
 
 TEST_F(MongosTopoCoordTest, MongosTopologyVersionCounterInitializedAtStartup) {
@@ -96,8 +120,8 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterResponseReturnsCurrentMongosTopologyVer
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
     auto halfwayToMaxAwaitTime = maxAwaitTime / 2;
-    auto halfwayToDeadline = getClock()->now() + halfwayToMaxAwaitTime;
-    auto deadline = getClock()->now() + maxAwaitTime;
+    auto halfwayToDeadline = now() + halfwayToMaxAwaitTime;
+    auto deadline = now() + maxAwaitTime;
 
     // isMaster request with the current TopologyVersion should attempt to wait for maxAwaitTimeMS.
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
@@ -113,14 +137,14 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterResponseReturnsCurrentMongosTopologyVer
         ASSERT_EQUALS(topologyVersion.getProcessId(), currentTopologyVersion.getProcessId());
     });
 
-    // Advance the clock halfway and make sure awaitIsMasterResponse did not return yet.
-    getClock()->advance(halfwayToMaxAwaitTime);
-    ASSERT_EQUALS(halfwayToDeadline, getClock()->now());
+    // Advance the clocks halfway and make sure awaitIsMasterResponse did not return yet.
+    advanceTime(halfwayToMaxAwaitTime);
+    ASSERT_EQUALS(halfwayToDeadline, now());
     ASSERT_FALSE(isMasterReturned);
 
-    // Advance the clock the rest of the way so that awaitIsMasterResponse times out.
-    getClock()->advance(halfwayToMaxAwaitTime);
-    ASSERT_EQUALS(deadline, getClock()->now());
+    // Advance the clocks the rest of the way so that awaitIsMasterResponse times out.
+    advanceTime(halfwayToMaxAwaitTime);
+    ASSERT_EQUALS(deadline, now());
     getIsMasterThread.join();
     ASSERT_TRUE(isMasterReturned);
 }
@@ -128,7 +152,7 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterResponseReturnsCurrentMongosTopologyVer
 TEST_F(MongosTopoCoordTest, AwaitIsMasterErrorsWithHigherCounterAndSameProcessID) {
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
-    auto deadline = getClock()->now() + maxAwaitTime;
+    auto deadline = now() + maxAwaitTime;
 
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
 
@@ -147,7 +171,7 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterErrorsWithHigherCounterAndSameProcessID
 TEST_F(MongosTopoCoordTest, AwaitIsMasterReturnsImmediatelyWithHigherCounterAndDifferentProcessID) {
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
-    auto deadline = getClock()->now() + maxAwaitTime;
+    auto deadline = now() + maxAwaitTime;
 
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
 
@@ -168,7 +192,7 @@ TEST_F(MongosTopoCoordTest,
        AwaitIsMasterReturnsImmediatelyWithCurrentCounterAndDifferentProcessID) {
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
-    auto deadline = getClock()->now() + maxAwaitTime;
+    auto deadline = now() + maxAwaitTime;
 
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
 
@@ -200,13 +224,14 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterReturnsImmediatelyWithNoTopologyVersion
 
 TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorInQuiesceMode) {
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
-    getTopoCoord().enterQuiesceMode();
-    ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
-                  getTopoCoord().getTopologyVersion().getCounter());
-
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
-    auto deadline = getClock()->now() + maxAwaitTime;
+    auto deadline = now() + maxAwaitTime;
+
+    getTopoCoord().enterQuiesceMode();
+
+    ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
+                  getTopoCoord().getTopologyVersion().getCounter());
 
     // The following isMaster requests should fail immediately with ShutdownInProgress errors
     // instead of following the usual error precedence.
@@ -244,6 +269,7 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
     auto opCtx = makeOperationContext();
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
     auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = now() + maxAwaitTime;
 
     // This will cause the isMaster request to hang.
     auto waitForIsMasterFailPoint =
@@ -251,9 +277,6 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn);
     ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
     stdx::thread getIsMasterThread([&] {
-        auto maxAwaitTime = Milliseconds(5000);
-        auto deadline = getClock()->now() + maxAwaitTime;
-
         ASSERT_THROWS_CODE(
             getTopoCoord().awaitIsMasterResponse(opCtx.get(), currentTopologyVersion, deadline),
             AssertionException,
@@ -266,7 +289,7 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
     ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
                   getTopoCoord().getTopologyVersion().getCounter());
     waitForIsMasterFailPoint->setMode(FailPoint::off);
-    getClock()->advance(maxAwaitTime);
+    advanceTime(maxAwaitTime);
     getIsMasterThread.join();
 }
 

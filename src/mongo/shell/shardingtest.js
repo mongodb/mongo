@@ -711,13 +711,18 @@ var ShardingTest = function(params) {
 
     /**
      * Kills the mongos with index n.
+     *
+     * @param {boolean} [extraOptions.waitPid=true] if true, we will wait for the process to
+     * terminate after stopping it.
      */
-    this.stopMongos = function(n, opts) {
+    this.stopMongos = function(n, opts, {
+        waitpid: waitpid = true,
+    } = {}) {
         if (otherParams.useBridge) {
-            MongoRunner.stopMongos(unbridgedMongos[n], undefined, opts);
+            MongoRunner.stopMongos(unbridgedMongos[n], undefined, opts, waitpid);
             this["s" + n].stop();
         } else {
-            MongoRunner.stopMongos(this["s" + n], undefined, opts);
+            MongoRunner.stopMongos(this["s" + n], undefined, opts, waitpid);
         }
     };
 
