@@ -56,10 +56,13 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
     if (replCoord->isReplEnabled() && opCtx->writesAreReplicated()) {
         auto systemOpTime = replCoord->getMyLastAppliedOpTime();
 
-        // If the system optime has gone backwards, that must mean that there was a rollback.
-        // This is safe, but the last op for a Client should never go backwards, so just leave
-        // the last op for this Client as it was.
-        if (systemOpTime >= _lastOp) {
+        // If the system timestamp has gone backwards, that must mean that there was a rollback.
+        // If the system optime has a higher term but a lower timestamp than the client's lastOp, it
+        // means that this node's wallclock time was ahead of the current primary's before it rolled
+        // back. This is safe, but the timestamp of the last op for a Client should never go
+        // backwards, so just leave the last op for this Client as it was.
+        if (systemOpTime.getTerm() >= _lastOp.getTerm() &&
+            systemOpTime.getTimestamp() >= _lastOp.getTimestamp()) {
             _lastOp = systemOpTime;
         } else {
             log() << "Not setting the last OpTime for this Client from " << _lastOp
