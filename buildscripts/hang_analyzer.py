@@ -332,6 +332,7 @@ class GDBDumper(object):
         mongodb_javascript_stack = "mongodb-javascript-stack"
         mongod_dump_sessions = "mongod-dump-sessions"
         mongodb_dump_mutexes = "mongodb-dump-mutexes"
+        mongodb_dump_recovery_units = "mongodb-dump-recovery-units"
 
         # The following MongoDB python extensions do not run on Solaris.
         if sys.platform.startswith("sunos"):
@@ -383,6 +384,7 @@ class GDBDumper(object):
             mongodb_javascript_stack,
             mongod_dump_sessions,
             mongodb_dump_mutexes,
+            mongodb_dump_recovery_units,
             "set confirm off",
             "quit",
         ]

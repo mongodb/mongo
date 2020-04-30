@@ -433,6 +433,70 @@ class MongoDBDumpLocks(gdb.Command):
 MongoDBDumpLocks()
 
 
+class MongoDBDumpRecoveryUnits(gdb.Command):
+    """Dump recovery unit info for each client in a mongod process."""
+
+    def __init__(self):
+        """Initialize MongoDBDumpRecoveryUnits."""
+        RegisterMongoCommand.register(self, "mongodb-dump-recovery-units", gdb.COMMAND_DATA)
+
+    def invoke(self, arg, _from_tty):
+        """Invoke MongoDBDumpRecoveryUnits."""
+        print("Dumping recovery unit info for all clients")
+
+        if not arg:
+            arg = "mongo::WiredTigerRecoveryUnit"  # default to "mongo::WiredTigerRecoveryUnit"
+
+        main_binary_name = get_process_name()
+        if main_binary_name == "mongod":
+            self.dump_recovery_units(arg)
+        else:
+            print("Not invoking mongod recovery unit dump for: %s" % (main_binary_name))
+
+    @staticmethod
+    def dump_recovery_units(recovery_unit_impl_type):
+        """GDB in-process python supplement."""
+
+        # Temporarily disable printing static members to make the output more readable
+        out = gdb.execute("show print static-members", from_tty=False, to_string=True)
+        enabled_at_start = False
+        if out.startswith("Printing of C++ static members is on"):
+            enabled_at_start = True
+            gdb.execute("set print static-members off")
+
+        service_context = get_global_service_context()
+        client_set = absl_get_nodes(service_context["_clients"])  # pylint: disable=undefined-variable
+
+        for client_handle in client_set:
+            client = client_handle.dereference().dereference()
+
+            # Prepare structured output doc
+            client_name = str(client["_desc"])[1:-1]
+            operation_context_handle = client["_opCtx"]
+            output_doc = {"client": client_name, "opCtx": hex(operation_context_handle)}
+
+            recovery_unit_handle = None
+            recovery_unit = None
+            if operation_context_handle:
+                operation_context = operation_context_handle.dereference()
+                recovery_unit_handle = get_unique_ptr(operation_context["_recoveryUnit"])  # pylint: disable=undefined-variable
+                # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
+                recovery_unit = recovery_unit_handle.dereference().cast(
+                    gdb.lookup_type(recovery_unit_impl_type))
+
+            output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
+            print(json.dumps(output_doc))
+            if recovery_unit:
+                print(recovery_unit)
+
+        if enabled_at_start:
+            gdb.execute("set print static-members on")
+
+
+# Register command
+MongoDBDumpRecoveryUnits()
+
+
 class BtIfActive(gdb.Command):
     """Print stack trace or a short message if the current thread is idle."""
 
