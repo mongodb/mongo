@@ -736,6 +736,12 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
                           << nss << "' without providing any indexes.");
     }
 
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->isReplEnabled()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Standalones can't specify commitQuorum");
+    }
+
     AutoGetCollectionForRead autoColl(opCtx, nss);
     Collection* collection = autoColl.getCollection();
     if (!collection) {
@@ -773,8 +779,13 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
         replState = collIndexBuilds.front();
     }
 
+    if (!(IndexBuildProtocol::kTwoPhase == replState->protocol && enableIndexBuildCommitQuorum)) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "commitQuorum is supported only for two phase index builds "
+                                       "with commit quorum support enabled, and requires FCV 4.4");
+    }
+
     // See if the new commit quorum is satisfiable.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     Status status = replCoord->checkIfCommitQuorumCanBeSatisfied(newCommitQuorum);
     if (!status.isOK()) {
         return status;

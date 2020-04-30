@@ -132,7 +132,7 @@ try {
         indexNames: ['b_1_fcv42'],
         commitQuorum: "majority",
     }),
-                                 ErrorCodes.IndexNotFound);
+                                 ErrorCodes.BadValue);
 } finally {
     assert.commandWorked(
         testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildFirstDrain", mode: "off"}));

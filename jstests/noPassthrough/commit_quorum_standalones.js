@@ -19,7 +19,7 @@ assert.commandFailedWithCode(
 
 assert.commandFailedWithCode(
     db.runCommand({setIndexCommitQuorum: "coll", indexNames: ["x_1"], commitQuorum: "majority"}),
-    ErrorCodes.IndexNotFound);
+    ErrorCodes.BadValue);
 
 MongoRunner.stopMongod(standalone);
 })();
