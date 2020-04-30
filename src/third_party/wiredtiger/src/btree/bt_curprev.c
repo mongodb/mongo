@@ -577,7 +577,7 @@ restart_read_page:
           session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip), NULL, &upd));
         if (upd == NULL)
             continue;
-        if (upd != NULL && upd->type == WT_UPDATE_TOMBSTONE) {
+        if (upd->type == WT_UPDATE_TOMBSTONE) {
             if (upd->txnid != WT_TXN_NONE && __wt_txn_upd_visible_all(session, upd))
                 ++cbt->page_deleted_count;
             if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK))

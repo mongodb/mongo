@@ -9,6 +9,7 @@ conn_config="cache_size=16G,checkpoint=(wait=60,log_size=2GB),session_max=20000,
 create=false
 compression="snappy"
 sess_config="isolation=snapshot"
+table_config="type=file"
 table_count=2
 # close_conn as false allows this test to close/finish faster, but if running
 # as the set, the next test will need to run recovery.

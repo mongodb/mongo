@@ -9,7 +9,16 @@
 #include "util.h"
 
 static int copy(WT_SESSION *, const char *, const char *);
-static int usage(void);
+
+static int
+usage(void)
+{
+    static const char *options[] = {"-t uri",
+      "backup the named data sources (by default the entire database is backed up)", NULL, NULL};
+
+    util_usage("backup [-t uri] directory", "options:", options);
+    return (1);
+}
 
 int
 util_backup(WT_SESSION *session, int argc, char *argv[])
@@ -113,14 +122,4 @@ copy(WT_SESSION *session, const char *directory, const char *name)
 err:
     free(to);
     return (ret);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "backup [-t uri] directory\n",
-      progname, usage_prefix);
-    return (1);
 }

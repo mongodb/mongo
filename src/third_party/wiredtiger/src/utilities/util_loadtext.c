@@ -10,7 +10,16 @@
 
 static int insert(WT_CURSOR *, const char *, bool);
 static int text(WT_SESSION *, const char *);
-static int usage(void);
+
+static int
+usage(void)
+{
+    static const char *options[] = {
+      "-f", "read from the specified file (by default rows are read from stdin)", NULL, NULL};
+
+    util_usage("loadtext [-f input-file] uri", "options:", options);
+    return (1);
+}
 
 int
 util_loadtext(WT_SESSION *session, int argc, char *argv[])
@@ -150,14 +159,4 @@ insert(WT_CURSOR *cursor, const char *name, bool readkey)
         printf("\r\t%s: %" PRIu64 "\n", name, insert_count);
 
     return (0);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "loadtext [-f input-file] uri\n",
-      progname, usage_prefix);
-    return (1);
 }

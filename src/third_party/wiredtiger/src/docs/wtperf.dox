@@ -214,7 +214,7 @@ number of separate tables to be used for scanning. Zero indicates  that tables a
 session configuration string
 @par session_count_idle (unsigned int, default=0)
 number of idle sessions to create. Default 0.
-@par table_config (string, default="key_format=S,value_format=S,type=lsm,exclusive=true, allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb, split_pct=100")
+@par table_config (string, default="key_format=S,value_format=S,type=file,exclusive=true, leaf_value_max=64MB,memory_page_max=10m,split_pct=90,checksum=on")
 table configuration string
 @par table_count (unsigned int, default=1)
 number of tables to run operations over. Keys are divided evenly  over the tables. Cursors are held open on all tables. Default 1, maximum  99999.

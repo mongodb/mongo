@@ -513,7 +513,7 @@ int ThreadRunner::create_all(WT_CONNECTION *conn) {
     ASSERT(_session == NULL);
     if (_thread->options.synchronized)
         _thread->_op.synchronized_check();
-    WT_RET(conn->open_session(conn, NULL, NULL, &_session));
+    WT_RET(conn->open_session(conn, NULL, _thread->options.session_config.c_str(), &_session));
     _table_usage.clear();
     _stats.track_latency(_workload->options.sample_interval_ms > 0);
     WT_RET(workgen_random_alloc(_session, &_rand_state));
@@ -1096,9 +1096,10 @@ int Throttle::throttle(uint64_t op_count, uint64_t *op_limit) {
     return (0);
 }
 
-ThreadOptions::ThreadOptions() : name(), throttle(0.0), throttle_burst(1.0),
+ThreadOptions::ThreadOptions() : name(), session_config(), throttle(0.0), throttle_burst(1.0),
     synchronized(false), _options() {
     _options.add_string("name", name, "name of the thread");
+    _options.add_string("session_config", session_config, "session config which is passed to open_session");
     _options.add_double("throttle", throttle,
       "Limit to this number of operations per second");
     _options.add_double("throttle_burst", throttle_burst,
@@ -1106,7 +1107,7 @@ ThreadOptions::ThreadOptions() : name(), throttle(0.0), throttle_burst(1.0),
       "to having large bursts with lulls (10.0 or larger)");
 }
 ThreadOptions::ThreadOptions(const ThreadOptions &other) :
-    name(other.name), throttle(other.throttle),
+    name(other.name), session_config(other.session_config), throttle(other.throttle),
   throttle_burst(other.throttle_burst), synchronized(other.synchronized),
   _options(other._options) {}
 ThreadOptions::~ThreadOptions() {}

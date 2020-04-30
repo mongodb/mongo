@@ -141,12 +141,10 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     WT_BTREE *btree;
     WT_DECL_RET;
     WT_PAGE *page;
-    WT_PAGE_MODIFY *mod;
     WT_RECONCILE *r;
 
     btree = S2BT(session);
     page = ref->page;
-    mod = page->modify;
 
     /* Save the eviction state. */
     __reconcile_save_evict_state(session, ref, flags);
@@ -192,12 +190,6 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
         __rec_write_page_status(session, r);
     else
         WT_TRET(__rec_write_wrapup_err(session, r, page));
-
-    /*
-     * If reconciliation completes successfully, save the stable timestamp.
-     */
-    if (ret == 0 && S2C(session)->txn_global.has_stable_timestamp)
-        mod->last_stable_timestamp = S2C(session)->txn_global.stable_timestamp;
 
     /* Release the reconciliation lock. */
     *page_lockedp = false;

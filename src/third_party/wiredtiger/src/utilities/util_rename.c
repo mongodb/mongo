@@ -8,7 +8,12 @@
 
 #include "util.h"
 
-static int usage(void);
+static int
+usage(void)
+{
+    util_usage("rename uri newuri", NULL, NULL);
+    return (1);
+}
 
 int
 util_rename(WT_SESSION *session, int argc, char *argv[])
@@ -39,14 +44,4 @@ util_rename(WT_SESSION *session, int argc, char *argv[])
 
     free(uri);
     return (ret);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "rename uri newuri\n",
-      progname, usage_prefix);
-    return (1);
 }

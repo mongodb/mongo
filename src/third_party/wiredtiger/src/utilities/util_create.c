@@ -8,7 +8,15 @@
 
 #include "util.h"
 
-static int usage(void);
+static int
+usage(void)
+{
+    static const char *options[] = {
+      "-c config", "a configuration string to be passed to WT_SESSION.create", NULL, NULL};
+
+    util_usage("create [-c configuration] uri", "options:", options);
+    return (1);
+}
 
 int
 util_create(WT_SESSION *session, int argc, char *argv[])
@@ -43,14 +51,4 @@ util_create(WT_SESSION *session, int argc, char *argv[])
 
     free(uri);
     return (ret);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "create [-c configuration] uri\n",
-      progname, usage_prefix);
-    return (1);
 }

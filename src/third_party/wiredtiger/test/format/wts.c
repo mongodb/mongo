@@ -281,6 +281,9 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",split_8");
     CONFIG_APPEND(p, "]");
 
+    if (g.c_verify)
+        CONFIG_APPEND(p, ",verify_metadata=true");
+
     /* Extensions. */
     CONFIG_APPEND(p,
       ",extensions=["

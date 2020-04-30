@@ -12,6 +12,7 @@ compression="snappy"
 # as the set, the next test will need to run recovery.
 close_conn=false
 sess_config="isolation=snapshot"
+table_config="type=file"
 table_count=2
 key_sz=40
 value_sz=120

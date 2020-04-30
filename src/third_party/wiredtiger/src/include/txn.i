@@ -710,24 +710,58 @@ __wt_txn_upd_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_upd_alloc_tombstone --
- *     Allocate a tombstone update with default values.
+ * __wt_upd_alloc --
+ *     Allocate a WT_UPDATE structure and associated value and fill it in.
  */
 static inline int
-__wt_upd_alloc_tombstone(WT_SESSION_IMPL *session, WT_UPDATE **updp)
+__wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type, WT_UPDATE **updp,
+  size_t *sizep)
 {
-    size_t notused;
+    WT_UPDATE *upd;
+
+    *updp = NULL;
 
     /*
-     * The underlying allocation code clears memory, which is the equivalent of setting:
-     *
+     * The code paths leading here are convoluted: assert we never attempt to allocate an update
+     * structure if only intending to insert one we already have, or pass in a value with a type
+     * that doesn't support values.
+     */
+    WT_ASSERT(session, modify_type != WT_UPDATE_INVALID);
+    WT_ASSERT(session,
+      (value == NULL && (modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE)) ||
+        (value != NULL &&
+          !(modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE)));
+
+    /*
+     * Allocate the WT_UPDATE structure and room for the value, then copy any value into place.
+     * Memory is cleared, which is the equivalent of setting:
      *    WT_UPDATE.txnid = WT_TXN_NONE;
      *    WT_UPDATE.durable_ts = WT_TS_NONE;
      *    WT_UPDATE.start_ts = WT_TS_NONE;
      *    WT_UPDATE.prepare_state = WT_PREPARE_INIT;
      *    WT_UPDATE.flags = 0;
      */
-    return (__wt_update_alloc(session, NULL, updp, &notused, WT_UPDATE_TOMBSTONE));
+    WT_RET(__wt_calloc(session, 1, WT_UPDATE_SIZE + (value == NULL ? 0 : value->size), &upd));
+    if (value != NULL && value->size != 0) {
+        upd->size = WT_STORE_SIZE(value->size);
+        memcpy(upd->data, value->data, value->size);
+    }
+    upd->type = (uint8_t)modify_type;
+
+    *updp = upd;
+    if (sizep != NULL)
+        *sizep = WT_UPDATE_MEMSIZE(upd);
+    return (0);
+}
+
+/*
+ * __wt_upd_alloc_tombstone --
+ *     Allocate a tombstone update.
+ */
+static inline int
+__wt_upd_alloc_tombstone(WT_SESSION_IMPL *session, WT_UPDATE **updp, size_t *sizep)
+{
+    return (__wt_upd_alloc(session, NULL, WT_UPDATE_TOMBSTONE, updp, sizep));
 }
 
 /*
@@ -780,7 +814,6 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
     WT_DECL_RET;
     WT_ITEM buf;
     WT_TIME_PAIR start, stop;
-    size_t size;
 
     *updp = NULL;
     WT_RET(__wt_txn_read_upd_list(session, upd, updp));
@@ -789,7 +822,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
 
     /* If there is no ondisk value, there can't be anything in the history store either. */
     if (cbt->ref->page->dsk == NULL || cbt->slot == UINT32_MAX)
-        return (__wt_upd_alloc_tombstone(session, updp));
+        return (__wt_upd_alloc_tombstone(session, updp, NULL));
 
     buf.data = NULL;
     buf.size = 0;
@@ -822,7 +855,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
       (!WT_IS_HS(S2BT(session)) || !F_ISSET(session, WT_SESSION_IGNORE_HS_TOMBSTONE)) &&
       __wt_txn_visible(session, stop.txnid, stop.timestamp)) {
         __wt_buf_free(session, &buf);
-        WT_RET(__wt_upd_alloc_tombstone(session, updp));
+        WT_RET(__wt_upd_alloc_tombstone(session, updp, NULL));
         (*updp)->txnid = stop.txnid;
         /* FIXME: Reevaluate this as part of PM-1524. */
         (*updp)->durable_ts = (*updp)->start_ts = stop.timestamp;
@@ -837,8 +870,15 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
      * an update. This allocation is expensive and doesn't serve a purpose other than to work within
      * the current system.
      */
-    if (__wt_txn_visible(session, start.txnid, start.timestamp)) {
-        ret = __wt_update_alloc(session, &buf, updp, &size, WT_UPDATE_STANDARD);
+    if (__wt_txn_visible(session, start.txnid, start.timestamp) ||
+      F_ISSET(session, WT_SESSION_RESOLVING_MODIFY)) {
+
+        /* If we are resolving a modify then the btree must be the history store. */
+        WT_ASSERT(
+          session, (F_ISSET(session, WT_SESSION_RESOLVING_MODIFY) && WT_IS_HS(S2BT(session))) ||
+            !F_ISSET(session, WT_SESSION_RESOLVING_MODIFY));
+
+        ret = __wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, updp, NULL);
         __wt_buf_free(session, &buf);
         WT_RET(ret);
         (*updp)->txnid = start.txnid;

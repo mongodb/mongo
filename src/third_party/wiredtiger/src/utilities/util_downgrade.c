@@ -8,7 +8,15 @@
 
 #include "util.h"
 
-static int usage(void);
+static int
+usage(void)
+{
+    static const char *options[] = {
+      "-V", "a required option, the version to which the database is downgraded", NULL, NULL};
+
+    util_usage("downgrade -V release", "options:", options);
+    return (1);
+}
 
 int
 util_downgrade(WT_SESSION *session, int argc, char *argv[])
@@ -44,14 +52,4 @@ util_downgrade(WT_SESSION *session, int argc, char *argv[])
         return (util_err(session, ret, "WT_CONNECTION.downgrade"));
 
     return (0);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "downgrade -V release\n",
-      progname, usage_prefix);
-    return (1);
 }

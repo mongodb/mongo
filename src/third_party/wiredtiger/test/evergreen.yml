@@ -1098,20 +1098,21 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_rwlock 2>&1
 
-  - name: csuite-wt2246-col-append-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
+  # Temporarily disabled (WT-5790)
+  # - name: csuite-wt2246-col-append-test
+  #   tags: ["pull_request"]
+  #   depends_on:
+  #     - name: compile
+  #   commands:
+  #     - func: "fetch artifacts"
+  #     - command: shell.exec
+  #       params:
+  #         working_dir: "wiredtiger/build_posix"
+  #         script: |
+  #           set -o errexit
+  #           set -o verbose
 
-            ${test_env_vars|} $(pwd)/test/csuite/test_wt2246_col_append 2>&1
+  #           ${test_env_vars|} $(pwd)/test/csuite/test_wt2246_col_append 2>&1
 
   # Temporarily disabled
   # - name: csuite-wt2323-join-visibility-test
@@ -1543,7 +1544,7 @@ tasks:
             ulimit -c unlimited
             largescale/run-million-collection-test.sh .
 
-  - name: compatibility-test-for-mongodb-releases
+  - name: compatibility-test-for-releases
     commands:
       - func: "get project"
       - command: shell.exec
@@ -1552,7 +1553,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            test/evergreen/compatibility_test_for_mongodb_releases.sh
+            test/evergreen/compatibility_test_for_releases.sh
 
   # Temporarily disabled
   # - name: generate-datafile-little-endian
@@ -2209,14 +2210,6 @@ tasks:
               exit 1
             fi
 
-  - name: compatibility-test-for-wiredtiger-releases
-    commands:
-      - func: "get project"
-      - command: subprocess.exec
-        params:
-          working_dir: "wiredtiger"
-          command: bash test/evergreen/compatibility_test_for_wiredtiger_releases.sh
-
   - name: format-stress-sanitizer-ppc-test
     # Set 2.5 hours timeout (60 * 60 * 2.5)
     exec_timeout_secs: 9000
@@ -2410,8 +2403,7 @@ buildvariants:
   run_on:
   - ubuntu1804-test
   tasks:
-    - name: compatibility-test-for-mongodb-releases
-    - name: compatibility-test-for-wiredtiger-releases
+    - name: compatibility-test-for-releases
 
 - name: windows-64
   display_name: Windows 64-bit

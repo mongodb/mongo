@@ -34,7 +34,9 @@ from workgen import Key, Operation, OpList, Table, Transaction, Value
 # txn --
 #   Put the operation (and any suboperations) within a transaction.
 def txn(op, config=None):
-    t = Transaction(config)
+    t = Transaction()
+    if config != None:
+        t._begin_config = config
     op.transaction = t
     return op
 
@@ -159,13 +161,39 @@ def _op_get_group_list(op):
         result.extend(grouplist)
     return result
 
+# This function is used by op_copy to modify a "tree" of operations to change the table
+# and/or key for each operation to a given value.  It operates on the current operation,
+# and recursively on any in its groiup list.
+def _op_copy_mod(op, table, key):
+    if op._optype != Operation.OP_NONE:
+        if table != None:
+            op._table = table
+        if key != None:
+            op._key = key
+    if op._group != None:
+        newgroup = []
+        for subop in _op_get_group_list(op):
+            newgroup.append(_op_copy_mod(subop, table, key))
+        op._group = OpList(newgroup)
+    return op
+
+# This is a convenient function that copies an operation and all its
+# "sub-operations", as well as any attached transaction.
+def op_copy(src, table=None, key=None):
+    # Copy constructor does a deep copy, including subordinate
+    # operations and any attached transaction.
+    op = Operation(src)
+    if table != None or key != None:
+        _op_copy_mod(op, table, key)
+    return op
+
 def _op_multi_table_as_list(ops_arg, tables, pareto_tables, multiplier):
     result = []
     if ops_arg._optype != Operation.OP_NONE:
         if pareto_tables <= 0:
             for table in tables:
                 for i in range(0, multiplier):
-                    result.append(Operation(ops_arg._optype, table, ops_arg._key, ops_arg._value))
+                    result.append(op_copy(ops_arg, table=table))
         else:
             # Use the multiplier unless the length of the list will be large.
             # In any case, make sure there's at least a multiplier of 3, to
@@ -186,12 +214,21 @@ def _op_multi_table_as_list(ops_arg, tables, pareto_tables, multiplier):
                 key = Key(ops_arg._key)
                 key._pareto.range_low = (1.0 * i)/count
                 key._pareto.range_high = (1.0 * (i + 1))/count
-                result.append(Operation(ops_arg._optype, table, key, ops_arg._value))
+                result.append(op_copy(ops_arg, table=table, key=key))
     else:
-        for op in _op_get_group_list(ops_arg):
-            for o in _op_multi_table_as_list(op, tables, pareto_tables, \
-                                             multiplier):
-                result.append(Operation(o))
+        copy = op_copy(ops_arg, table=tables[1])
+        if ops_arg.transaction == None:
+            for op in _op_get_group_list(ops_arg):
+                for o in _op_multi_table_as_list(op, tables, pareto_tables, \
+                                                 multiplier):
+                    result.append(Operation(o))
+        elif pareto_tables <= 0:
+            entries = len(tables) * multiplier
+            for i in range(0, entries):
+                copy = op_copy(ops_arg, table=tables[i])
+                result.append(copy)
+        else:
+            raise Exception('(pareto, range partition, transaction) combination not supported')
     return result
 
 # A convenient way to build a list of operations
@@ -268,8 +305,14 @@ def _optype_is_write(optype):
         optype == Operation.OP_REMOVE
 
 # Emulate wtperf's log_like option.  For all operations, add a second
-# insert operation going to a log table.
+# insert operation going to a log table.  Ops_per_txn is only checked
+# for zero vs non-zero, non-zero says don't add new transactions.
+# If we have ops_per_txn, wtperf.py ensures that op_group_transactions was previous called
+# to insert needed transactions.
 def op_log_like(op, log_table, ops_per_txn):
+    if op.transaction != None:
+        # Any non-zero number indicates that we already have a transaction around this.
+        ops_per_txn = 1
     if op._optype != Operation.OP_NONE:
         if _optype_is_write(op._optype):
             op += _op_log_op(op, log_table)
@@ -279,10 +322,13 @@ def op_log_like(op, log_table, ops_per_txn):
         oplist = []
         for op2 in _op_get_group_list(op):
             if op2._optype == Operation.OP_NONE:
-                oplist.append(op_log_like(op2, log_table))
+                oplist.append(op_log_like(op2, log_table, ops_per_txn))
             elif ops_per_txn == 0 and _optype_is_write(op2._optype):
                 op2 += _op_log_op(op2, log_table)
-                oplist.append(txn(op2))       # txn for each action.
+                if op2.transaction == None:
+                    oplist.append(txn(op2))  # txn for each action.
+                else:
+                    oplist.append(op2)       # already have a txn
             else:
                 oplist.append(op2)
                 if _optype_is_write(op2._optype):

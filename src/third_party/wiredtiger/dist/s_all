@@ -72,6 +72,7 @@ run()
 # Non parallelizable scripts The following scripts either modify files or
 # already parallelize internally.
 run "sh ./s_readme $force"
+run "sh ./s_install $force"
 run "python api_config.py"
 run "python api_err.py"
 run "python flags.py"

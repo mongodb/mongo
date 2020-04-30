@@ -14,13 +14,26 @@ static int config_rename(WT_SESSION *, char **, const char *);
 static int format(WT_SESSION *);
 static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
-static int usage(void);
 
 static bool append = false;       /* -a append (ignore number keys) */
 static char *cmdname;             /* -r rename */
 static char **cmdconfig;          /* configuration pairs */
 static bool json = false;         /* -j input is JSON format */
 static bool no_overwrite = false; /* -n don't overwrite existing data */
+
+static int
+usage(void)
+{
+    static const char *options[] = {"-a",
+      "ignore record number keys in the input and assign new record number keys", "-f input",
+      "read from the specified file (by default records are read from stdin)", "-j",
+      "read in JSON format", "-n", "fail at any attempt to overwrite existing data", "-r name",
+      "use the argument as the table name, ignoring any name in the source", NULL, NULL};
+
+    util_usage(
+      "load [-as] [-f input-file] [-r name] [object configuration ...]", "options:", options);
+    return (1);
+}
 
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
@@ -560,14 +573,4 @@ err:
     free(value.mem);
 
     return (ret);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "load [-as] [-f input-file] [-r name] [object configuration ...]\n",
-      progname, usage_prefix);
-    return (1);
 }

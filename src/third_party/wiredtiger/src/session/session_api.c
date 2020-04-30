@@ -1563,14 +1563,11 @@ err:
 static int
 __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 {
-    WT_CONFIG_ITEM cval;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
-
     SESSION_API_CALL(session, verify, config, cfg);
-
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 
     /*
@@ -1581,24 +1578,10 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
     F_SET(session, WT_SESSION_IGNORE_HS_TOMBSTONE);
 
     /* Block out checkpoints to avoid spurious EBUSY errors. */
-    WT_ERR(__wt_config_gets(session, cfg, "history_store", &cval));
-    if (cval.val == true) {
-        /* Can't give a URI with history store verification. */
-        if (uri != NULL)
-            WT_ERR_MSG(session, EINVAL, "URI not applicable when verifying the history store");
-
-        WT_WITH_CHECKPOINT_LOCK(session,
-          WT_WITH_SCHEMA_LOCK(session, ret = __wt_verify_history_store_tree(session, NULL)));
-    } else {
-        WT_WITH_CHECKPOINT_LOCK(session,
-          WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_worker(session, uri, __wt_verify, NULL,
-                                         cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY)));
-        WT_ERR(ret);
-        /* TODO: WT-5643 Add history store verification for non file URI */
-        if (WT_PREFIX_MATCH(uri, "file:"))
-            WT_WITH_CHECKPOINT_LOCK(session,
-              WT_WITH_SCHEMA_LOCK(session, ret = __wt_verify_history_store_tree(session, uri)));
-    }
+    WT_WITH_CHECKPOINT_LOCK(
+      session, WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_worker(session, uri, __wt_verify,
+                                              NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY)));
+    WT_ERR(ret);
 err:
     F_CLR(session, WT_SESSION_IGNORE_HS_TOMBSTONE);
     if (ret != 0)

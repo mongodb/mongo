@@ -8,7 +8,12 @@
 
 #include "util.h"
 
-static int usage(void);
+static int
+usage(void)
+{
+    util_usage("alter uri configuration ...", NULL, NULL);
+    return (1);
+}
 
 int
 util_alter(WT_SESSION *session, int argc, char *argv[])
@@ -37,14 +42,4 @@ util_alter(WT_SESSION *session, int argc, char *argv[])
             return (1);
         }
     return (0);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "alter uri configuration ...\n",
-      progname, usage_prefix);
-    return (1);
 }

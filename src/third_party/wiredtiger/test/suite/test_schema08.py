@@ -28,7 +28,7 @@
 
 import fnmatch, os, shutil, sys
 from suite_subprocess import suite_subprocess
-import unittest, wiredtiger, wttest
+import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # test_schema08.py

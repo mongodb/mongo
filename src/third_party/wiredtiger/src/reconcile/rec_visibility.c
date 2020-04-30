@@ -58,12 +58,12 @@ __rec_append_orig_value(
 {
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    WT_UPDATE *append, *tombstone;
+    WT_UPDATE *append, *oldest_upd, *tombstone;
     size_t size, total_size;
 
     WT_ASSERT(session, upd != NULL && unpack != NULL && unpack->type != WT_CELL_DEL);
 
-    append = tombstone = NULL;
+    append = oldest_upd = tombstone = NULL;
     total_size = 0;
 
     /* Review the current update list, checking conditions that mean no work is needed. */
@@ -75,8 +75,13 @@ __rec_append_orig_value(
         if (F_ISSET(upd, WT_UPDATE_RESTORED_FOR_ROLLBACK))
             return (0);
 
-        /* Done if the on page value already appears on the update list. */
-        if (unpack->start_ts == upd->start_ts && unpack->start_txn == upd->txnid)
+        /*
+         * Done if the on page value already appears on the update list. We can't do the same check
+         * for stop time pair because we may still need to append the onpage value if only the
+         * tombstone is on the update chain.
+         */
+        if (unpack->start_ts == upd->start_ts && unpack->start_txn == upd->txnid &&
+          upd->type != WT_UPDATE_TOMBSTONE)
             return (0);
 
         /*
@@ -89,6 +94,9 @@ __rec_append_orig_value(
          */
         if (WT_UPDATE_DATA_VALUE(upd) && __wt_txn_upd_visible_all(session, upd))
             return (0);
+
+        if (upd->txnid != WT_TXN_ABORTED)
+            oldest_upd = upd;
 
         /* Leave reference pointing to the last item in the update list. */
         if (upd->next == NULL)
@@ -103,7 +111,7 @@ __rec_append_orig_value(
     /* We need the original on-page value for some reader: get a copy. */
     WT_ERR(__wt_scr_alloc(session, 0, &tmp));
     WT_ERR(__wt_page_cell_data_ref(session, page, unpack, tmp));
-    WT_ERR(__wt_update_alloc(session, tmp, &append, &size, WT_UPDATE_STANDARD));
+    WT_ERR(__wt_upd_alloc(session, tmp, WT_UPDATE_STANDARD, &append, &size));
     total_size += size;
     append->txnid = unpack->start_txn;
     append->start_ts = unpack->start_ts;
@@ -116,14 +124,19 @@ __rec_append_orig_value(
      * the tombstone to tell us there is no value between 10 and 20.
      */
     if (unpack->stop_ts != WT_TS_MAX || unpack->stop_txn != WT_TXN_MAX) {
-        WT_ERR(__wt_update_alloc(session, NULL, &tombstone, &size, WT_UPDATE_TOMBSTONE));
-        total_size += size;
-        tombstone->txnid = unpack->stop_txn;
-        tombstone->start_ts = unpack->stop_ts;
-        tombstone->durable_ts = unpack->durable_stop_ts;
+        /* No need to append the tombstone if it is already in the update chain. */
+        if (oldest_upd->type != WT_UPDATE_TOMBSTONE) {
+            WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &size));
+            total_size += size;
+            tombstone->txnid = unpack->stop_txn;
+            tombstone->start_ts = unpack->stop_ts;
+            tombstone->durable_ts = unpack->durable_stop_ts;
 
-        tombstone->next = append;
-        append = tombstone;
+            tombstone->next = append;
+            append = tombstone;
+        } else
+            WT_ASSERT(session,
+              unpack->stop_ts == oldest_upd->start_ts && unpack->stop_txn == oldest_upd->txnid);
     }
 
     /* Append the new entry into the update list. */
@@ -178,9 +191,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_PAGE *page;
-    WT_UPDATE *first_txn_upd, *first_upd, *upd, *last_upd;
+    WT_UPDATE *first_txn_upd, *first_upd, *upd, *last_upd, *tombstone;
     wt_timestamp_t max_ts;
-    size_t size, upd_memsize;
+    size_t upd_memsize;
     uint64_t max_txn, txnid;
     bool has_newer_updates, is_hs_page, supd_restore, upd_saved;
 
@@ -198,7 +211,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
     upd_select->prepare = false;
 
     page = r->page;
-    first_txn_upd = upd = last_upd = NULL;
+    first_txn_upd = upd = last_upd = tombstone = NULL;
     upd_memsize = 0;
     max_ts = WT_TS_NONE;
     max_txn = WT_TXN_NONE;
@@ -239,11 +252,21 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
          */
         if (!is_hs_page && (F_ISSET(r, WT_REC_VISIBLE_ALL) ? WT_TXNID_LE(r->last_running, txnid) :
                                                              !__txn_visible_id(session, txnid))) {
+            /*
+             * Rare case: when applications run at low isolation levels, eviction may see a
+             * committed update followed by uncommitted updates. Give up in that case because we
+             * can't move uncommitted updates to the history store.
+             */
+            if (upd_select->upd != NULL)
+                return (__wt_set_return(session, EBUSY));
+
             has_newer_updates = true;
             continue;
         }
+
         if (upd->prepare_state == WT_PREPARE_LOCKED ||
           upd->prepare_state == WT_PREPARE_INPROGRESS) {
+            WT_ASSERT(session, upd_select->upd == NULL);
             has_newer_updates = true;
             if (upd->start_ts > max_ts)
                 max_ts = upd->start_ts;
@@ -265,19 +288,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
         if (upd_select->upd == NULL)
             upd_select->upd = upd;
 
-        if (!__rec_update_stable(session, r, upd)) {
-            if (F_ISSET(r, WT_REC_EVICT))
-                ++r->updates_unstable;
-
-            /*
-             * Rare case: when applications run at low isolation levels, update/restore eviction may
-             * see a stable update followed by an uncommitted update. Give up in that case: we need
-             * to discard updates from the stable update and older for correctness and we can't
-             * discard an uncommitted update.
-             */
-            if (upd_select->upd != NULL && has_newer_updates)
-                return (__wt_set_return(session, EBUSY));
-        } else if (!F_ISSET(r, WT_REC_EVICT))
+        if (F_ISSET(r, WT_REC_EVICT) && !__rec_update_stable(session, r, upd))
+            ++r->updates_unstable;
+        else if (!F_ISSET(r, WT_REC_EVICT))
             break;
     }
 
@@ -339,6 +352,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             upd_select->stop_ts = upd->start_ts;
             upd_select->stop_txn = upd->txnid;
             upd_select->stop_durable_ts = upd->durable_ts;
+            tombstone = upd;
 
             /* Find the update this tombstone applies to. */
             if (!__wt_txn_visible_all(session, upd->txnid, upd->start_ts)) {
@@ -357,7 +371,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             upd_select->start_txn = upd->txnid;
         } else if (upd_select->stop_ts != WT_TS_NONE || upd_select->stop_txn != WT_TXN_NONE) {
             /* If we only have a tombstone in the update list, we must have an ondisk value. */
-            WT_ASSERT(session, vpack != NULL);
+            WT_ASSERT(session, vpack != NULL && tombstone != NULL);
             /*
              * It's possible to have a tombstone as the only update in the update list. If we
              * reconciled before with only a single update and then read the page back into cache,
@@ -368,25 +382,15 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
              * keep the same on-disk value but set the stop time pair to indicate that the validity
              * window ends when this tombstone started.
              */
-            upd_select->start_ts = vpack->start_ts;
-            upd_select->start_durable_ts = vpack->durable_start_ts;
-            upd_select->start_txn = vpack->start_txn;
-
-            /*
-             * Leaving the update unset means that we can skip reconciling. If we've set the stop
-             * time pair because of a tombstone after the on-disk value, we still have work to do so
-             * that is NOT ok. Let's append the on-disk value to the chain.
-             */
-            WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-            WT_ERR(__wt_page_cell_data_ref(session, page, vpack, tmp));
-            WT_ERR(__wt_update_alloc(session, tmp, &upd, &size, WT_UPDATE_STANDARD));
-            upd->durable_ts = vpack->durable_start_ts;
-            upd->start_ts = vpack->start_ts;
-            upd->txnid = vpack->start_txn;
-            WT_PUBLISH(last_upd->next, upd);
-            /* This is going in our update list so it should be accounted for in cache usage. */
-            __wt_cache_page_inmem_incr(session, page, size);
-            upd_select->upd = upd;
+            WT_ERR(__rec_append_orig_value(session, page, tombstone, vpack));
+            WT_ASSERT(session, last_upd->next != NULL &&
+                last_upd->next->txnid == vpack->start_txn &&
+                last_upd->next->start_ts == vpack->start_ts &&
+                last_upd->next->type == WT_UPDATE_STANDARD && last_upd->next->next == NULL);
+            upd_select->upd = last_upd->next;
+            upd_select->start_ts = last_upd->next->start_ts;
+            upd_select->start_durable_ts = last_upd->next->durable_ts;
+            upd_select->start_txn = last_upd->next->txnid;
         }
     }
 

@@ -33,7 +33,7 @@
 import shutil, os
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
-import unittest, wttest
+import wttest
 
 class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"

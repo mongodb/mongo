@@ -8,7 +8,20 @@
 
 #include "util.h"
 
-static int usage(void);
+static int
+usage(void)
+{
+    static const char *options[] = {"-a", "verify the history store", "-d config",
+      "display underlying information during verification", "-s",
+      "verify against the specified timestamp", NULL, NULL};
+
+    util_usage(
+      "verify [-as] [-d dump_address | dump_blocks | dump_history | dump_layout | dump_offsets=#,# "
+      "| dump_pages] [uri]",
+      "options:", options);
+
+    return (1);
+}
 
 int
 util_verify(WT_SESSION *session, int argc, char *argv[])
@@ -17,17 +30,12 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     size_t size;
     int ch;
     char *config, *dump_offsets, *uri;
-    bool dump_address, dump_blocks, dump_layout, dump_pages, dump_history, hs_verify,
-      stable_timestamp;
+    bool dump_address, dump_blocks, dump_layout, dump_pages, dump_history, stable_timestamp;
 
-    dump_address = dump_blocks = dump_history = dump_layout = dump_pages = hs_verify =
-      stable_timestamp = false;
+    dump_address = dump_blocks = dump_history = dump_layout = dump_pages = stable_timestamp = false;
     config = dump_offsets = uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "ad:s")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "d:s")) != EOF)
         switch (ch) {
-        case 'a':
-            hs_verify = true;
-            break;
         case 'd':
             if (strcmp(__wt_optarg, "dump_address") == 0)
                 dump_address = true;
@@ -65,22 +73,13 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
      * The remaining argument is the table name. If we are verifying the history store we do not
      * accept a URI. Otherwise, we need a URI top operate on.
      */
-    if (hs_verify && argc != 0)
-        (void)util_err(session, 0, "-a can't be used along with a uri");
-    if (!hs_verify) {
-        if (argc != 1)
-            return (usage());
-        if ((uri = util_uri(session, *argv, "table")) == NULL)
-            return (1);
-    }
-
-    if (hs_verify && (dump_address || dump_blocks || dump_layout || dump_offsets != NULL ||
-                       dump_pages || stable_timestamp)) {
-        (void)util_err(session, 0, "-a and -d are not supported together");
-    }
+    if (argc != 1)
+        return (usage());
+    if ((uri = util_uri(session, *argv, "table")) == NULL)
+        return (1);
 
     if (dump_address || dump_blocks || dump_history || dump_layout || dump_offsets != NULL ||
-      dump_pages || hs_verify || stable_timestamp) {
+      dump_pages || stable_timestamp) {
         size = strlen("dump_address,") + strlen("dump_blocks,") + strlen("dump_history") +
           strlen("dump_layout,") + strlen("dump_pages,") + strlen("dump_offsets[],") +
           (dump_offsets == NULL ? 0 : strlen(dump_offsets)) + strlen("history_store") +
@@ -89,13 +88,13 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
             ret = util_err(session, errno, NULL);
             goto err;
         }
-        if ((ret = __wt_snprintf(config, size, "%s%s%s%s%s%s%s%s%s%s",
+        if ((ret = __wt_snprintf(config, size, "%s%s%s%s%s%s%s%s%s",
                dump_address ? "dump_address," : "", dump_blocks ? "dump_blocks," : "",
                dump_history ? "dump_history," : "", dump_layout ? "dump_layout," : "",
                dump_offsets != NULL ? "dump_offsets=[" : "",
                dump_offsets != NULL ? dump_offsets : "", dump_offsets != NULL ? "]," : "",
-               dump_pages ? "dump_pages," : "", hs_verify ? "history_store" : "",
-               stable_timestamp ? "stable_timestamp," : "")) != 0) {
+               dump_pages ? "dump_pages," : "", stable_timestamp ? "stable_timestamp," : "")) !=
+          0) {
             (void)util_err(session, ret, NULL);
             goto err;
         }
@@ -114,16 +113,4 @@ err:
     free(config);
     free(uri);
     return (ret);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "verify %s\n",
-      progname, usage_prefix,
-      "[-d dump_address | dump_blocks | dump_history | dump_layout | "
-      "dump_offsets=#,# | dump_pages] [-s] -a|uri");
-    return (1);
 }

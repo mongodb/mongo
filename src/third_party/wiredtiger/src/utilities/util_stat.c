@@ -8,7 +8,15 @@
 
 #include "util.h"
 
-static int usage(void);
+static int
+usage(void)
+{
+    static const char *options[] = {
+      "-f", "include only \"fast\" statistics in the output", NULL, NULL};
+
+    util_usage("stat [-f] [uri]", "options:", options);
+    return (1);
+}
 
 int
 util_stat(WT_SESSION *session, int argc, char *argv[])
@@ -102,14 +110,4 @@ err:
     free(uri);
 
     return (ret);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "stat [-f] [uri]\n",
-      progname, usage_prefix);
-    return (1);
 }

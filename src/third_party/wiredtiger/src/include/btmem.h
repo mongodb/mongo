@@ -279,9 +279,6 @@ struct __wt_page_modify {
     uint64_t rec_max_txn;
     wt_timestamp_t rec_max_timestamp;
 
-    /* Stable timestamp at last reconciliation. */
-    wt_timestamp_t last_stable_timestamp;
-
     /* The largest update transaction ID (approximate). */
     uint64_t update_txn;
 
@@ -1290,8 +1287,9 @@ struct __wt_insert_head {
     for ((i) = 0, (v) = (i) < (dsk)->u.entries ?                             \
            __bit_getv(WT_PAGE_HEADER_BYTE(btree, dsk), 0, (btree)->bitcnt) : \
            0;                                                                \
-         (i) < (dsk)->u.entries;                                             \
-         ++(i), (v) = __bit_getv(WT_PAGE_HEADER_BYTE(btree, dsk), i, (btree)->bitcnt))
+         (i) < (dsk)->u.entries; ++(i), (v) = (i) < (dsk)->u.entries ?       \
+           __bit_getv(WT_PAGE_HEADER_BYTE(btree, dsk), i, (btree)->bitcnt) : \
+           0)
 
 /*
  * Manage split generation numbers. Splits walk the list of sessions to check when it is safe to

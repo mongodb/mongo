@@ -8,7 +8,12 @@
 
 #include "util.h"
 
-static int usage(void);
+static int
+usage(void)
+{
+    util_usage("compact uri", NULL, NULL);
+    return (1);
+}
 
 int
 util_compact(WT_SESSION *session, int argc, char *argv[])
@@ -38,14 +43,4 @@ util_compact(WT_SESSION *session, int argc, char *argv[])
 
     free(uri);
     return (ret);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "compact uri\n",
-      progname, usage_prefix);
-    return (1);
 }
