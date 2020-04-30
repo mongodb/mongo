@@ -4018,8 +4018,7 @@ if get_option('install-mode') == 'hygienic':
             map_entry = env["AIB_SUFFIX_MAP"].get(osuf)
             if map_entry:
                 return map_entry[0]
-
-        return "Unable to find debuginfo for {}".format(str(source))
+        env.FatalError("Unable to find debuginfo file in _aib_debugdir: (source='{}')".format(str(source)))
 
     env["PREFIX_DEBUGDIR"] = _aib_debugdir
 

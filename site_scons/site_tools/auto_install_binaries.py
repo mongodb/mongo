@@ -401,8 +401,14 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
             continue
 
         # We must do an early subst here so that the _aib_debugdir
-        # generator has a chance to run while seeing 'source'.
-        target_for_source = env.Dir(env.subst('$DESTDIR/$TARGET', target=target_for_source, source=s))
+        # generator has a chance to run while seeing 'source'. We need
+        # to do two substs here.  The first is to expand an variables
+        # in `target_for_source` while we can see `source`. This is
+        # needed for things like _aib_debugdir. Then, we need to do a
+        # second subst to expand DESTDIR, interpolating
+        # `target_for_source` in as $TARGET. Yes, this is confusing.
+        target_for_source = env.subst(target_for_source, source=s)
+        target_for_source = env.Dir(env.subst('$DESTDIR/$TARGET', target=target_for_source))
 
         aib_additional_directory = getattr(s.attributes, "aib_additional_directory", None)
         if aib_additional_directory is not None:
