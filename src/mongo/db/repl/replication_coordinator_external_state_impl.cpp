@@ -805,6 +805,10 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // above, if writing is imminent, so we must make sure that the code completes fully.
     StorageControl::waitForJournalFlush(opCtx);
 
+    // Writes to non-replicated collections do not need concurrency control with the OplogApplier
+    // that never accesses them. Skip taking the PBWM.
+    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
+
     // We can clear the oplogTruncateAfterPoint because we know there are no user writes during
     // stepdown and therefore presently no oplog holes.
     _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp());
