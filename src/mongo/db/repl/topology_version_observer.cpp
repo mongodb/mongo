@@ -42,7 +42,9 @@ namespace repl {
 
 void TopologyVersionObserver::init(ServiceContext* serviceContext,
                                    ReplicationCoordinator* replCoordinator) noexcept {
-    LOGV2_INFO(40440, "Starting the TopologyVersionObserver");
+    LOGV2_INFO(40440,
+               "Starting {topologyVersionObserverName}",
+               "topologyVersionObserverName"_attr = toString());
 
     stdx::unique_lock lk(_mutex);
 
@@ -71,7 +73,9 @@ void TopologyVersionObserver::shutdown() noexcept {
         return;
     }
 
-    LOGV2_INFO(40441, "Stopping TopologyVersionObserver");
+    LOGV2_INFO(40441,
+               "Stopping {topologyVersionObserverName}",
+               "topologyVersionObserverName"_attr = toString());
 
     // Wait for the thread to stop and steal it to the local stack
     auto thread = [&] {
@@ -147,16 +151,11 @@ void TopologyVersionObserver::_cacheIsMasterResponse(
     // the same purpose.
     opCtx->sleepFor(kDelayMS);
 } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-    LOGV2_DEBUG(40443,
-                1,
-                "Observer was interrupted by {error}",
-                "Observer was interrupted by an exception",
-                "error"_attr = e.toString());
+    LOGV2_INFO(40443, "Observer was interrupted by {exception}", "exception"_attr = e.toString());
 } catch (DBException& e) {
     LOGV2_WARNING(40444,
-                  "Observer could not retrieve isMasterResponse: {error}",
-                  "Observer could not retrieve isMasterResponse",
-                  "error"_attr = e.toString());
+                  "Observer could not retrieve isMasterResponse: {exception}",
+                  "exception"_attr = e.toString());
 }
 
 void TopologyVersionObserver::_workerThreadBody() noexcept {
@@ -172,7 +171,9 @@ void TopologyVersionObserver::_workerThreadBody() noexcept {
         return boost::none;
     };
 
-    LOGV2_INFO(40445, "Started TopologyVersionObserver");
+    LOGV2_INFO(40445,
+               "Started {topologyVersionObserverName}",
+               "topologyVersionObserverName"_attr = toString());
 
     {
         stdx::lock_guard lk(_mutex);
@@ -202,7 +203,9 @@ void TopologyVersionObserver::_workerThreadBody() noexcept {
             _cv.notify_all();
         }
 
-        LOGV2_INFO(40447, "Stopped TopologyVersionObserver");
+        LOGV2_INFO(40447,
+                   "Stopped {topologyVersionObserverName}",
+                   "topologyVersionObserverName"_attr = toString());
     });
 
     stdx::unique_lock lk(_mutex);

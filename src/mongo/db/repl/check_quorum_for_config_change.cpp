@@ -189,10 +189,9 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
     ++_numResponses;
     if (!response.isOK()) {
         LOGV2_WARNING(23722,
-                      "Failed to complete heartbeat request to {requestTarget}; {responseStatus}",
-                      "Failed to complete heartbeat request to target",
-                      "requestTarget"_attr = request.target,
-                      "responseStatus"_attr = response.status);
+                      "Failed to complete heartbeat request to {request_target}; {response_status}",
+                      "request_target"_attr = request.target,
+                      "response_status"_attr = response.status);
         _badResponses.push_back(std::make_pair(request.target, response.status));
         return;
     }
@@ -202,24 +201,19 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
     Status hbStatus = hbResp.initialize(resBSON, 0);
 
     if (hbStatus.code() == ErrorCodes::InconsistentReplicaSetNames) {
-        static constexpr char message[] = "Our set name did not match that of the request target";
-        _vetoStatus =
-            Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                   str::stream() << message << ", requestTarget:" << request.target.toString());
-        LOGV2_WARNING(23723,
-                      "Our set name did not match that of {requestTarget}",
-                      message,
-                      "requestTarget"_attr = request.target.toString());
+        std::string message = str::stream()
+            << "Our set name did not match that of " << request.target.toString();
+        _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
+        LOGV2_WARNING(23723, "{message}", "message"_attr = message);
         return;
     }
 
     if (!hbStatus.isOK() && hbStatus != ErrorCodes::InvalidReplicaSetConfig) {
         LOGV2_WARNING(
             23724,
-            "Got error ({hbStatus}) response on heartbeat request to {requestTarget}; {hbResp}",
-            "Got error response on heartbeat request",
+            "Got error ({hbStatus}) response on heartbeat request to {request_target}; {hbResp}",
             "hbStatus"_attr = hbStatus,
-            "requestTarget"_attr = request.target,
+            "request_target"_attr = request.target,
             "hbResp"_attr = hbResp);
         _badResponses.push_back(std::make_pair(request.target, hbStatus));
         return;
@@ -227,20 +221,12 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
 
     if (!hbResp.getReplicaSetName().empty()) {
         if (hbResp.getConfigVersion() >= _rsConfig->getConfigVersion()) {
-            static constexpr char message[] =
-                "Our config version is no larger than the version of the request target";
-            _vetoStatus = Status(
-                ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                str::stream() << message << ", rsConfigVersion: " << _rsConfig->getConfigVersion()
-                              << ", requestTarget: " << request.target.toString()
-                              << ", requestTargetConfigVersion: " << hbResp.getConfigVersion());
-            LOGV2_WARNING(23725,
-                          "Our config version of {rsConfigVersion} is no larger than the version "
-                          "on {requestTarget}, which is {requestTargetConfigVersion}",
-                          message,
-                          "rsConfigVersion"_attr = _rsConfig->getConfigVersion(),
-                          "requestTarget"_attr = request.target.toString(),
-                          "requestTargetConfigVersion"_attr = hbResp.getConfigVersion());
+            std::string message = str::stream()
+                << "Our config version of " << _rsConfig->getConfigVersion()
+                << " is no larger than the version on " << request.target.toString()
+                << ", which is " << hbResp.getConfigVersion();
+            _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
+            LOGV2_WARNING(23725, "{message}", "message"_attr = message);
             return;
         }
     }
@@ -250,22 +236,12 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
             rpc::ReplSetMetadata::readFromMetadata(response.data);
         if (replMetadata.isOK() && replMetadata.getValue().getReplicaSetId().isSet() &&
             _rsConfig->getReplicaSetId() != replMetadata.getValue().getReplicaSetId()) {
-            static constexpr char message[] =
-                "Our replica set ID did not match that of our request target";
-            _vetoStatus =
-                Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                       str::stream() << message << ", replSetId: " << _rsConfig->getReplicaSetId()
-                                     << ", requestTarget: " << request.target.toString()
-                                     << ", requestTargetReplSetId: "
-                                     << replMetadata.getValue().getReplicaSetId());
-            LOGV2_WARNING(23726,
-                          "Our replica set ID of {replSetId} did not match that of "
-                          "{requestTarget}, which is {requestTargetId}",
-                          message,
-                          "replSetId"_attr = _rsConfig->getReplicaSetId(),
-                          "requestTarget"_attr = request.target.toString(),
-                          "requestTargetReplSetId"_attr =
-                              replMetadata.getValue().getReplicaSetId());
+            std::string message = str::stream()
+                << "Our replica set ID of " << _rsConfig->getReplicaSetId()
+                << " did not match that of " << request.target.toString() << ", which is "
+                << replMetadata.getValue().getReplicaSetId();
+            _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
+            LOGV2_WARNING(23726, "{message}", "message"_attr = message);
         }
     }
 
