@@ -5,28 +5,19 @@
 (function() {
 'use strict';
 
-const CREATE_ADMIN = {
-    createUser: 'admin',
-    pwd: 'pwd',
-    roles: ['__system']
-};
-const CREATE_USER1 = {
-    createUser: 'user1',
-    pwd: 'pwd',
-    roles: []
-};
-const CREATE_USER2 = {
-    createUser: 'user2',
-    pwd: 'pwd',
-    roles: []
-};
-const CREATE_USER3 = {
-    createUser: 'user3',
-    pwd: 'pwd',
-    roles: []
-};
+const keyfile = 'jstests/libs/key1';
+const keyfileContents = cat(keyfile).replace(/[\011-\015\040]/g, '');
+
+function createUserCommand(user, roles, wc) {
+    return {createUser: user, pwd: 'pwd', roles: roles, writeConcern: wc};
+}
 
 function runTest(name, conns, restartCallback) {
+    const CREATE_ADMIN = createUserCommand('admin', ['__system'], conns.wc);
+    const CREATE_USER1 = createUserCommand('user1', [], conns.wc);
+    const CREATE_USER2 = createUserCommand('user2', [], conns.wc);
+    const CREATE_USER3 = createUserCommand('user3', [], conns.wc);
+
     jsTest.log('Starting: ' + name);
     assert(conns.primary);
     let admin = conns.primary.getDB('admin');
@@ -37,8 +28,6 @@ function runTest(name, conns, restartCallback) {
     // Localhost auth bypass is now closed.
     assert.commandFailed(admin.runCommand(CREATE_USER1));
     if (conns.replset) {
-        // Confirm bypass closure has reached secondary.
-        conns.replset.awaitSecondaryNodes();
         assert.commandFailed(conns.replset.getSecondary().getDB('admin').runCommand(CREATE_USER1));
     }
 
@@ -67,7 +56,7 @@ function runTest(name, conns, restartCallback) {
     const preDrop =
         assert.commandWorked(admin.runCommand({connectionStatus: 1})).authInfo.authenticatedUsers;
     assert.eq(preDrop.length, 1);
-    assert.writeOK(admin.system.users.remove({}));
+    assert.writeOK(admin.system.users.remove({}, {writeConcern: conns.wc}));
     const postDrop =
         assert.commandWorked(admin.runCommand({connectionStatus: 1})).authInfo.authenticatedUsers;
     assert.eq(postDrop.length, 0);
@@ -96,25 +85,38 @@ function runTest(name, conns, restartCallback) {
     jsTest.log('Finished: ' + name);
 }
 
+// Node will be bounced. Confirm write goes all the way to disk.
+const standaloneWC = {
+    w: 1,
+    j: true
+};
 let standalone = MongoRunner.runMongod({auth: ''});
-runTest('Standalone', {primary: standalone}, function() {
+runTest('Standalone', {primary: standalone, wc: standaloneWC}, function() {
     const dbpath = standalone.dbpath;
     MongoRunner.stopMongod(standalone);
     standalone = MongoRunner.runMongod({auth: '', restart: true, cleanData: false, dbpath: dbpath});
-    return {primary: standalone};
+    return {primary: standalone, wc: standaloneWC};
 });
 MongoRunner.stopMongod(standalone);
 
+const replsetNodes = 2;
+// We're going to b bouncing these nodes, make sure writes propagate.
+const replsetWC = {
+    w: replsetNodes,
+    j: true
+};
 const replset =
-    new ReplSetTest({name: 'rs0', nodes: 2, nodeOptions: {auth: ''}, keyFile: 'jstests/libs/key1'});
+    new ReplSetTest({name: 'rs0', nodes: replsetNodes, nodeOptions: {auth: ''}, keyFile: keyfile});
 replset.startSet();
 replset.initiate();
 replset.awaitSecondaryNodes();
-runTest('ReplSet', {primary: replset.getPrimary(), replset: replset}, function() {
-    const signalTerm = 15;
-    replset.restart([0, 1], undefined, signalTerm, false);
+runTest('ReplSet', {primary: replset.getPrimary(), replset: replset, wc: replsetWC}, function() {
+    // Need to be authed for restart.
+    // Only __system is guaranteed to be available, especially during 2nd restart.
+    replset.nodes.forEach((node) => assert(node.getDB('admin').auth('__system', keyfileContents)));
+    replset.restart(replset.nodes);
     replset.awaitSecondaryNodes();
-    return {primary: replset.getPrimary(), replset: replset};
+    return {primary: replset.getPrimary(), replset: replset, wc: replsetWC};
 });
 replset.stopSet();
 })();
