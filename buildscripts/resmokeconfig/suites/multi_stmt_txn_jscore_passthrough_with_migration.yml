@@ -160,13 +160,6 @@ selector:
   # TODO: SERVER-38207 Cannot insert document with MaxKey shard key.
   - jstests/core/type8.js
 
-  # TODO: SERVER-38686 createIndex should prioritize other errors over
-  # CannotImplicitlyCreateCollection
-  - jstests/core/fts_spanish.js
-  - jstests/core/geo_invalid_polygon.js
-  - jstests/core/geo_s2index.js
-  - jstests/core/wildcard_index_validindex.js
-
   # TODO: SERVER-38215 delx.js touches 2 different collections, which makes it susceptible for
   # migration to happen in between and cause the transaction to abort due to StaleConfigException
   # because it is not the first op of the transaction.
