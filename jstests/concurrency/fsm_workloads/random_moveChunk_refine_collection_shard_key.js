@@ -84,7 +84,11 @@ var $config = extendWorkload($config, function($config, $super) {
             // There is a race that could occur where two threads run refineCollectionShardKey
             // concurrently on the same collection. Since the epoch of the collection changes,
             // the later thread may receive a StaleEpoch error, which is an acceptable error.
-            if (e.code == ErrorCodes.StaleEpoch) {
+            //
+            // It is also possible to receive a LockBusy error if refineCollectionShardKey is unable
+            // to acquire the distlock before timing out due to ongoing migrations acquiring the
+            // distlock first.
+            if (e.code == ErrorCodes.StaleEpoch || e.code == ErrorCodes.LockBusy) {
                 print("Ignoring acceptable refineCollectionShardKey error: " + tojson(e));
                 return;
             }
