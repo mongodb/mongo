@@ -127,8 +127,16 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         auto minSnapshot = coll->getMinimumVisibleSnapshot();
         auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
 
-        // If we are reading at a provided timestamp earlier than the latest catalog changes, then
-        // we must return an error.
+        // TODO(SERVER-47824): Also ban transaction snapshot reads on capped collections.
+        uassert(ErrorCodes::SnapshotUnavailable,
+                "Reading from capped collections with readConcern snapshot is not supported "
+                "outside of transactions",
+                !coll->isCapped() ||
+                    readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern ||
+                    opCtx->inMultiDocumentTransaction());
+
+        // If we are reading at a provided timestamp earlier than the latest catalog changes,
+        // then we must return an error.
         if (readSource == RecoveryUnit::ReadSource::kProvided && minSnapshot &&
             (*mySnapshot < *minSnapshot)) {
             uasserted(ErrorCodes::SnapshotUnavailable,
