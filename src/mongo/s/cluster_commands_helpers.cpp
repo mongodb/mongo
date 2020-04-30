@@ -108,9 +108,10 @@ const auto kAllowImplicitCollectionCreation = "allowImplicitCollectionCreation"_
  * Constructs a requests vector targeting each of the specified shard ids. Each request contains the
  * same cmdObj combined with the default sharding parameters.
  */
-std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForShards(
+std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
     OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
     auto cmdToSend = cmdObj;
+    appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED());
 
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto&& shardId : shardIds)
@@ -123,7 +124,7 @@ std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForAllShards(
     OperationContext* opCtx, const BSONObj& cmdObj) {
     std::vector<ShardId> shardIds;
     Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
-    return buildUnversionedRequestsForShards(opCtx, std::move(shardIds), cmdObj);
+    return buildUnshardedRequestsForAllShards(opCtx, std::move(shardIds), cmdObj);
 }
 
 std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
@@ -348,7 +349,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
             ? appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED())
             : cmdToSend;
 
-        return buildUnversionedRequestsForShards(
+        return buildUnshardedRequestsForAllShards(
             opCtx,
             {primaryShardId},
             appendDbVersionIfPresent(cmdObjWithShardVersion, routingInfo.db()));
@@ -451,7 +452,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
                         dbName,
                         readPref,
                         retryPolicy,
-                        buildUnversionedRequestsForShards(
+                        buildUnshardedRequestsForAllShards(
                             opCtx, {dbInfo.primaryId()}, appendDbVersionIfPresent(cmdObj, dbInfo)));
     return std::move(responses.front());
 }
