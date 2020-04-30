@@ -202,7 +202,7 @@ public:
 
     void setIsSecondary(bool secondary);
 
-    void setReplSetName(const std::string& setName);
+    void setReplSetName(StringData setName);
 
     void setReplSetVersion(long long version);
 

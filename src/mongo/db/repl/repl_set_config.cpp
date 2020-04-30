@@ -52,35 +52,16 @@ const Milliseconds ReplSetConfig::kInfiniteCatchUpTimeout(-1);
 const Milliseconds ReplSetConfig::kCatchUpDisabled(0);
 const Milliseconds ReplSetConfig::kCatchUpTakeoverDisabled(-1);
 
-const std::string ReplSetConfig::kConfigServerFieldName = "configsvr";
-const std::string ReplSetConfig::kVersionFieldName = "version";
-const std::string ReplSetConfig::kTermFieldName = "term";
 const Milliseconds ReplSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplSetConfig::kDefaultElectionTimeoutPeriod(10000);
 const Milliseconds ReplSetConfig::kDefaultCatchUpTimeoutPeriod(kInfiniteCatchUpTimeout);
 const bool ReplSetConfig::kDefaultChainingAllowed(true);
 const Milliseconds ReplSetConfig::kDefaultCatchUpTakeoverDelay(30000);
-const std::string ReplSetConfig::kRepairedFieldName = "repaired";
 
 namespace {
 
-const std::string kIdFieldName = "_id";
-const std::string kMembersFieldName = "members";
-const std::string kSettingsFieldName = "settings";
 const std::string kStepDownCheckWriteConcernModeName = "$stepDownCheck";
-const std::string kProtocolVersionFieldName = "protocolVersion";
-const std::string kWriteConcernMajorityJournalDefaultFieldName =
-    "writeConcernMajorityJournalDefault";
-
-const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
-                                                 ReplSetConfig::kVersionFieldName,
-                                                 ReplSetConfig::kTermFieldName,
-                                                 kMembersFieldName,
-                                                 kSettingsFieldName,
-                                                 kProtocolVersionFieldName,
-                                                 ReplSetConfig::kConfigServerFieldName,
-                                                 kWriteConcernMajorityJournalDefaultFieldName};
 }  // namespace
 
 Status ReplSetConfig::initialize(const BSONObj& cfg,
@@ -89,8 +70,33 @@ Status ReplSetConfig::initialize(const BSONObj& cfg,
     return _initialize(cfg, false, forceTerm, defaultReplicaSetId);
 }
 
-Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg) {
-    return _initialize(cfg, true, OpTime::kInitialTerm, OID());
+Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg, OID newReplicaSetId) {
+    if (!newReplicaSetId.isSet()) {
+        return Status(ErrorCodes::Error(4709000),
+                      "A replica set ID must be provided to initializeForInitiate");
+    }
+
+    auto status = _initialize(cfg, true, OpTime::kInitialTerm, newReplicaSetId);
+    if (status.isOK() && newReplicaSetId != getReplicaSetId()) {
+        return Status(ErrorCodes::InvalidReplicaSetConfig,
+                      str::stream() << "replica set configuration cannot contain '"
+                                    << ReplSetConfigSettings::kReplicaSetIdFieldName
+                                    << "' "
+                                       "field when called from replSetInitiate: "
+                                    << cfg);
+    }
+    return status;
+}
+
+void ReplSetConfig::_setRequiredFields() {
+    // The three required fields need to be set to something valid to avoid a potential
+    // invariant if the uninitialized object is ever used with toBSON().
+    if (getReplSetName().empty())
+        setReplSetName("INVALID");
+    if (getConfigVersion() == -1)
+        setConfigVersion(2147483647);
+    if (getMembers().empty())
+        setMembers({});
 }
 
 Status ReplSetConfig::_initialize(const BSONObj& cfg,
@@ -98,133 +104,57 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
                                   boost::optional<long long> forceTerm,
                                   OID defaultReplicaSetId) {
     _isInitialized = false;
-    _members.clear();
+    // This line clears the base IDL class, and is necessary because an object may be re-used.
+    *static_cast<ReplSetConfigBase*>(this) = ReplSetConfigBase();
+    // The settings field is optional, but we always serialize it.  Because we can't default it in
+    // the IDL, we default it here.
+    setSettings(ReplSetConfigSettings());
+    try {
+        ReplSetConfigBase::parseProtected(IDLParserErrorContext("ReplSetConfig"), cfg);
+    } catch (const DBException& e) {
+        _setRequiredFields();
+        return e.toStatus();
+    }
 
-    if (cfg.hasField(kRepairedFieldName)) {
+    if (getRepaired()) {
         return {ErrorCodes::RepairedReplicaSetNode, "Replicated data has been repaired"};
     }
-
-    Status status =
-        bsonCheckOnlyHasFields("replica set configuration", cfg, kLegalConfigTopFieldNames);
-    if (!status.isOK())
-        return status;
-
-    //
-    // Parse replSetName
-    //
-    status = bsonExtractStringField(cfg, kIdFieldName, &_replSetName);
-    if (!status.isOK())
-        return status;
-
-    //
-    // Parse version
-    //
-    status = bsonExtractIntegerField(cfg, kVersionFieldName, &_version);
-    if (!status.isOK())
-        return status;
-
-    //
-    // Set term
-    //
+    Status status(Status::OK());
     if (forceTerm != boost::none) {
         // Set term to the value explicitly passed in.
-        _term = forceTerm.get();
-    } else {
-        // Parse term if an explicit term was not passed in. If we cannot find a term to parse,
-        // default to -1.
-        status = bsonExtractIntegerFieldWithDefault(
-            cfg, kTermFieldName, OpTime::kUninitializedTerm, &_term);
-        if (!status.isOK())
-            return status;
+        setConfigTerm(*forceTerm);
     }
 
     //
-    // Parse members
+    // Add tag data from members
     //
-    BSONElement membersElement;
-    status = bsonExtractTypedField(cfg, kMembersFieldName, Array, &membersElement);
-    if (!status.isOK())
-        return status;
-
-    for (auto&& memberElement : membersElement.Obj()) {
-        if (memberElement.type() != Object) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "Expected type of " << kMembersFieldName << "."
-                                        << memberElement.fieldName() << " to be Object, but found "
-                                        << typeName(memberElement.type()));
-        }
-        const auto& memberBSON = memberElement.Obj();
-        try {
-            _members.emplace_back(memberBSON, &_tagConfig);
-        } catch (const DBException& ex) {
-            return Status(ErrorCodes::InvalidReplicaSetConfig,
-                          str::stream()
-                              << ex.toStatus().toString() << " for member:" << memberBSON);
-        }
+    for (auto&& member : getMembers()) {
+        // The const_cast is necessary because "non_const_getter" in the IDL doesn't work for
+        // arrays.
+        const_cast<MemberConfig&>(member).addTagInfo(&_tagConfig);
     }
 
     //
-    // Parse configServer
+    // Initialize configServer
     //
-    status = bsonExtractBooleanFieldWithDefault(
-        cfg,
-        kConfigServerFieldName,
-        forInitiate ? serverGlobalParams.clusterRole == ClusterRole::ConfigServer : false,
-        &_configServer);
-    if (!status.isOK()) {
-        return status;
+    if (forInitiate && serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        !getConfigServer().has_value()) {
+        setConfigServer(true);
     }
 
     //
-    // Parse protocol version
+    // Put getLastErrorModes into the tag configuration.
     //
-    status = bsonExtractIntegerField(cfg, kProtocolVersionFieldName, &_protocolVersion);
-    // If 'protocolVersion' field is missing, then _protocolVersion defaults to 1.
-    if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
-        return status;
+    auto modesStatus = getSettings()->getGetLastErrorModes().convertToTagPatternMap(&_tagConfig);
+    if (!modesStatus.isOK()) {
+        return modesStatus.getStatus();
     }
+    _customWriteConcernModes = std::move(modesStatus.getValue());
 
-    //
-    // Parse writeConcernMajorityJournalDefault
-    //
-    status = bsonExtractBooleanFieldWithDefault(cfg,
-                                                kWriteConcernMajorityJournalDefaultFieldName,
-                                                true,
-                                                &_writeConcernMajorityJournalDefault);
-    if (!status.isOK())
-        return status;
-
-    //
-    // Parse settings
-    //
-    BSONElement settingsElement;
-    status = bsonExtractTypedField(cfg, kSettingsFieldName, Object, &settingsElement);
-    BSONObj settings;
-    if (status.isOK()) {
-        settings = settingsElement.Obj();
-    } else if (status != ErrorCodes::NoSuchKey) {
-        return status;
-    }
-    status = _parseSettingsSubdocument(settings);
-    if (!status.isOK())
-        return status;
-
-    //
-    // Generate replica set ID if called from replSetInitiate.
-    // Otherwise, uses 'defaultReplicaSetId' as default if 'cfg' doesn't have an ID.
-    //
-    if (forInitiate) {
-        if (_settings.getReplicaSetId()) {
-            return Status(ErrorCodes::InvalidReplicaSetConfig,
-                          str::stream() << "replica set configuration cannot contain '"
-                                        << ReplSetConfigSettings::kReplicaSetIdFieldName
-                                        << "' "
-                                           "field when called from replSetInitiate: "
-                                        << cfg);
-        }
-        _settings.setReplicaSetId(OID::gen());
-    } else if (!_settings.getReplicaSetId() && defaultReplicaSetId.isSet()) {
-        _settings.setReplicaSetId(defaultReplicaSetId);
+    if (!getSettings()->getReplicaSetId() && defaultReplicaSetId.isSet()) {
+        auto settings = *getSettings();
+        settings.setReplicaSetId(defaultReplicaSetId);
+        setSettings(settings);
     }
 
     _calculateMajorities();
@@ -234,45 +164,10 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
     return Status::OK();
 }
 
-Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
-    try {
-        _settings =
-            ReplSetConfigSettings::parse(IDLParserErrorContext("ReplSetConfig.settings"), settings);
-    } catch (const DBException& e) {
-        return e.toStatus();
-    }
-
-    //
-    // Put getLastErrorModes into the tag configuration.
-    //
-    auto modesStatus = _settings.getGetLastErrorModes().convertToTagPatternMap(&_tagConfig);
-    if (!modesStatus.isOK()) {
-        return modesStatus.getStatus();
-    }
-    _customWriteConcernModes = std::move(modesStatus.getValue());
-
-    return Status::OK();
-}
-
 Status ReplSetConfig::validate() const {
-    if (_version <= 0 || _version > std::numeric_limits<int>::max()) {
+    if (getMembers().size() > kMaxMembers || getMembers().empty()) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << kVersionFieldName << " field value of " << _version
-                                    << " is out of range");
-    }
-    if (_term < -1 || _term > std::numeric_limits<int>::max()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << kTermFieldName << " field value of " << _term << " is out of range");
-    }
-    if (_replSetName.empty()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Replica set configuration must have non-empty "
-                                    << kIdFieldName << " field");
-    }
-    if (_members.size() > kMaxMembers || _members.empty()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Replica set configuration contains " << _members.size()
+                      str::stream() << "Replica set configuration contains " << getMembers().size()
                                     << " members, but must have at least 1 and no more than  "
                                     << kMaxMembers);
     }
@@ -292,12 +187,12 @@ Status ReplSetConfig::validate() const {
         return rv;
     };
 
-    const auto expectedHorizonNameMapping = extractHorizonMembers(_members[0]);
+    const auto expectedHorizonNameMapping = extractHorizonMembers(getMembers()[0]);
 
     stdx::unordered_set<std::string> nonUniversalHorizons;
     std::map<HostAndPort, int> horizonHostNameCounts;
-    for (size_t i = 0; i < _members.size(); ++i) {
-        const MemberConfig& memberI = _members[i];
+    for (size_t i = 0; i < getMembers().size(); ++i) {
+        const MemberConfig& memberI = getMembers()[i];
 
         // Check the replica set configuration for errors in horizon specification:
         //   * Check that all members have the same set of horizon names
@@ -337,10 +232,10 @@ Status ReplSetConfig::validate() const {
         } else if (memberI.getPriority() > 0) {
             ++electableCount;
         }
-        for (size_t j = 0; j < _members.size(); ++j) {
+        for (size_t j = 0; j < getMembers().size(); ++j) {
             if (i == j)
                 continue;
-            const MemberConfig& memberJ = _members[j];
+            const MemberConfig& memberJ = getMembers()[j];
             if (memberI.getId() == memberJ.getId()) {
                 return Status(ErrorCodes::BadValue,
                               str::stream()
@@ -405,13 +300,13 @@ Status ReplSetConfig::validate() const {
     }
 
 
-    if (localhostCount != 0 && localhostCount != _members.size()) {
+    if (localhostCount != 0 && localhostCount != getMembers().size()) {
         return Status(
             ErrorCodes::BadValue,
             str::stream()
                 << "Either all host names in a replica set configuration must be localhost "
                    "references, or none must be; found "
-                << localhostCount << " out of " << _members.size());
+                << localhostCount << " out of " << getMembers().size());
     }
 
     if (voterCount > kMaxVotingMembers || voterCount == 0) {
@@ -429,7 +324,7 @@ Status ReplSetConfig::validate() const {
 
     // This validation must be done outside the IDL because we need to parse the settings object
     // completely to get the custom write modes.
-    const auto& defaultWriteConcern = _settings.getDefaultWriteConcern();
+    const auto& defaultWriteConcern = getSettings()->getDefaultWriteConcern();
     if (!defaultWriteConcern.wMode.empty() &&
         WriteConcernOptions::kMajority != defaultWriteConcern.wMode &&
         !findCustomWriteMode(defaultWriteConcern.wMode).isOK()) {
@@ -438,22 +333,7 @@ Status ReplSetConfig::validate() const {
                                     << defaultWriteConcern.wMode);
     }
 
-    if (_protocolVersion == 0) {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream()
-                << "Support for replication protocol version 0 was removed in MongoDB 4.0. "
-                << "Downgrade to MongoDB version 3.6 and upgrade your protocol "
-                   "version to 1 before upgrading your MongoDB version");
-    }
-    if (_protocolVersion != 1) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << kProtocolVersionFieldName
-                          << " of 1 is the only supported value. Found: " << _protocolVersion);
-    }
-
-    if (_configServer) {
+    if (getConfigServer()) {
         if (arbiterCount > 0) {
             return Status(ErrorCodes::BadValue,
                           "Arbiters are not allowed in replica set configurations being used for "
@@ -477,9 +357,9 @@ Status ReplSetConfig::validate() const {
                           "Nodes being used for config servers must be started with the "
                           "--configsvr flag");
         }
-        if (!_writeConcernMajorityJournalDefault) {
+        if (!getWriteConcernMajorityShouldJournal()) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << kWriteConcernMajorityJournalDefaultFieldName
+                          str::stream() << kWriteConcernMajorityShouldJournalFieldName
                                         << " must be true in replica set configurations being "
                                            "used for config servers");
         }
@@ -506,8 +386,8 @@ Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
         }
 
         ReplSetTagMatch matcher(tagPatternStatus.getValue());
-        for (size_t j = 0; j < _members.size(); ++j) {
-            const MemberConfig& memberConfig = _members[j];
+        for (size_t j = 0; j < getMembers().size(); ++j) {
+            const MemberConfig& memberConfig = getMembers()[j];
             for (MemberConfig::TagIterator it = memberConfig.tagsBegin();
                  it != memberConfig.tagsEnd();
                  ++it) {
@@ -523,8 +403,8 @@ Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
                                     << writeConcern.wMode << "\"");
     } else {
         int nodesRemaining = writeConcern.wNumNodes;
-        for (size_t j = 0; j < _members.size(); ++j) {
-            if (!_members[j].isArbiter()) {  // Only count data-bearing nodes
+        for (size_t j = 0; j < getMembers().size(); ++j) {
+            if (!getMembers()[j].isArbiter()) {  // Only count data-bearing nodes
                 --nodesRemaining;
                 if (nodesRemaining <= 0) {
                     return Status::OK();
@@ -536,18 +416,19 @@ Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
 }
 
 int ReplSetConfig::getNumDataBearingMembers() const {
-    int numArbiters =
-        std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isArbiter(); });
-    return _members.size() - numArbiters;
+    int numArbiters = std::count_if(
+        begin(getMembers()), end(getMembers()), [](const auto& x) { return x.isArbiter(); });
+    return getMembers().size() - numArbiters;
 }
 
 const MemberConfig& ReplSetConfig::getMemberAt(size_t i) const {
-    invariant(i < _members.size());
-    return _members[i];
+    invariant(i < getMembers().size());
+    return getMembers()[i];
 }
 
 const MemberConfig* ReplSetConfig::findMemberByID(int id) const {
-    for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
+    for (std::vector<MemberConfig>::const_iterator it = getMembers().begin();
+         it != getMembers().end();
          ++it) {
         if (it->getId() == MemberId(id)) {
             return &(*it);
@@ -557,9 +438,9 @@ const MemberConfig* ReplSetConfig::findMemberByID(int id) const {
 }
 
 MemberConfig* ReplSetConfig::_findMemberByID(MemberId id) {
-    for (std::vector<MemberConfig>::iterator it = _members.begin(); it != _members.end(); ++it) {
+    for (auto it = getMembers().begin(); it != getMembers().end(); ++it) {
         if (it->getId() == id) {
-            return &(*it);
+            return const_cast<MemberConfig*>(&(*it));
         }
     }
     return nullptr;
@@ -567,7 +448,8 @@ MemberConfig* ReplSetConfig::_findMemberByID(MemberId id) {
 
 int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     int x = 0;
-    for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
+    for (std::vector<MemberConfig>::const_iterator it = getMembers().begin();
+         it != getMembers().end();
          ++it) {
         if (it->getHostAndPort() == hap) {
             return x;
@@ -579,7 +461,7 @@ int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
 
 int ReplSetConfig::findMemberIndexByConfigId(long long configId) const {
     int x = 0;
-    for (const auto& member : _members) {
+    for (const auto& member : getMembers()) {
         if (member.getId() == MemberId(configId)) {
             return x;
         }
@@ -594,7 +476,7 @@ const MemberConfig* ReplSetConfig::findMemberByHostAndPort(const HostAndPort& ha
 }
 
 Milliseconds ReplSetConfig::getHeartbeatInterval() const {
-    auto heartbeatInterval = Milliseconds(_settings.getHeartbeatIntervalMillis());
+    auto heartbeatInterval = Milliseconds(getSettings()->getHeartbeatIntervalMillis());
     forceHeartbeatIntervalMS.execute([&](const BSONObj& data) {
         auto intervalMS = data["intervalMS"].numberInt();
         heartbeatInterval = Milliseconds(intervalMS);
@@ -605,7 +487,7 @@ Milliseconds ReplSetConfig::getHeartbeatInterval() const {
 bool ReplSetConfig::isLocalHostAllowed() const {
     // It is sufficient to check any one member's hostname, since in ReplSetConfig::validate,
     // it's ensured that either all members have hostname localhost or none do.
-    return _members.begin()->getHostAndPort().isLocalHost();
+    return getMembers().begin()->getHostAndPort().isLocalHost();
 }
 
 ReplSetTag ReplSetConfig::findTag(StringData key, StringData value) const {
@@ -625,10 +507,10 @@ StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patt
 }
 
 void ReplSetConfig::_calculateMajorities() {
-    const int voters =
-        std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isVoter(); });
-    const int arbiters =
-        std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isArbiter(); });
+    const int voters = std::count_if(
+        begin(getMembers()), end(getMembers()), [](const auto& x) { return x.isVoter(); });
+    const int arbiters = std::count_if(
+        begin(getMembers()), end(getMembers()), [](const auto& x) { return x.isArbiter(); });
     _totalVotingMembers = voters;
     _majorityVoteCount = voters / 2 + 1;
     _writableVotingMembersCount = voters - arbiters;
@@ -691,7 +573,7 @@ void ReplSetConfig::_addInternalWriteConcernModes() {
     // $configAll: all members including arbiters.
     pattern = _tagConfig.makePattern();
     status = _tagConfig.addTagCountConstraintToPattern(
-        &pattern, MemberConfig::kConfigAllTagName, _members.size());
+        &pattern, MemberConfig::kConfigAllTagName, getMembers().size());
     if (status.isOK()) {
         _customWriteConcernModes[kConfigAllWriteConcernName] = pattern;
     } else if (status != ErrorCodes::NoSuchKey) {
@@ -703,58 +585,19 @@ void ReplSetConfig::_addInternalWriteConcernModes() {
 
 void ReplSetConfig::_initializeConnectionString() {
     std::vector<HostAndPort> visibleMembers;
-    for (const auto& member : _members) {
+    for (const auto& member : getMembers()) {
         if (!member.isHidden() && !member.isArbiter()) {
             visibleMembers.push_back(member.getHostAndPort());
         }
     }
 
     try {
-        _connectionString = ConnectionString::forReplicaSet(_replSetName, visibleMembers);
+        _connectionString = ConnectionString::forReplicaSet(getReplSetName(), visibleMembers);
     } catch (const DBException& e) {
         invariant(e.code() == ErrorCodes::FailedToParse);
         // Failure to construct the ConnectionString means either an invalid replica set name
         // or members array, which should be caught in validate()
     }
-}
-
-BSONObj ReplSetConfig::toBSON() const {
-    return _toBSON(false /* omitNewlyAddedField */);
-}
-
-BSONObj ReplSetConfig::toBSONWithoutNewlyAdded() const {
-    return _toBSON(true /* omitNewlyAddedField */);
-}
-
-BSONObj ReplSetConfig::_toBSON(bool omitNewlyAddedField) const {
-    BSONObjBuilder configBuilder;
-    configBuilder.append(kIdFieldName, _replSetName);
-    configBuilder.appendIntOrLL(kVersionFieldName, _version);
-
-    if (_term != OpTime::kUninitializedTerm) {
-        configBuilder.appendIntOrLL(kTermFieldName, _term);
-    }
-
-    if (_configServer) {
-        // Only include "configsvr" field if true
-        configBuilder.append(kConfigServerFieldName, _configServer);
-    }
-
-    configBuilder.append(kProtocolVersionFieldName, _protocolVersion);
-    configBuilder.append(kWriteConcernMajorityJournalDefaultFieldName,
-                         _writeConcernMajorityJournalDefault);
-
-    BSONArrayBuilder members(configBuilder.subarrayStart(kMembersFieldName));
-    for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
-        members.append(mem->toBSON(getTagConfig(), omitNewlyAddedField));
-    }
-    members.done();
-
-    BSONObjBuilder settingsBuilder(configBuilder.subobjStart(kSettingsFieldName));
-    _settings.serialize(&settingsBuilder);
-    settingsBuilder.done();
-
-    return configBuilder.obj();
 }
 
 std::vector<std::string> ReplSetConfig::getWriteConcernNames() const {
@@ -765,6 +608,27 @@ std::vector<std::string> ReplSetConfig::getWriteConcernNames() const {
         names.push_back(mode->first);
     }
     return names;
+}
+
+BSONObj ReplSetConfig::toBSONWithoutNewlyAdded() const {
+    // This takes the toBSON() output and makes a new copy without the newlyAdded field, by
+    // re-serializing the member array.  So it is not too efficient, but this object isn't
+    // very big and this method not used too often.
+    auto obj = toBSON();
+    BSONObjBuilder bob;
+    BSONObjIterator it(obj);
+    while (it.more()) {
+        BSONElement e = it.next();
+        if (e.fieldName() == kMembersFieldName) {
+            BSONArrayBuilder memberBuilder(bob.subarrayStart(kMembersFieldName));
+            for (auto&& member : getMembers())
+                memberBuilder.append(member.toBSON(true /* omitNewlyAddedField */));
+            memberBuilder.done();
+            continue;
+        }
+        bob.append(e);
+    }
+    return bob.obj();
 }
 
 Milliseconds ReplSetConfig::getPriorityTakeoverDelay(int memberIdx) const {

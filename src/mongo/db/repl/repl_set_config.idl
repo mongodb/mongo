@@ -29,26 +29,20 @@
 global:
     cpp_namespace: "mongo::repl"
     cpp_includes:
+        - "mongo/db/repl/member_config.h"
         - "mongo/db/repl/repl_set_config_validators.h"
         - "mongo/db/repl/repl_set_tag.h"
         - "mongo/db/repl/repl_set_write_concern_mode_definitions.h"
-        - "mongo/db/repl/member_id.h"
         - "mongo/util/string_map.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/util/net/hostandport.idl"
     - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/repl/member_config.idl"
     - "mongo/db/write_concern_options.idl"
 
 types:
-    memberId:
-        bson_serialization_type: any
-        description: A wrapper around an integer for the MemberId of a MemberConfig.
-        cpp_type: "MemberId"
-        serializer: MemberId::serializeToBSON
-        deserializer: MemberId::parseFromBSON
-        
     smallExactInt64:
         bson_serialization_type: any
         description: "Accepts any numerical type within int64 range.  Serializes as NumberInt if it
@@ -58,78 +52,29 @@ types:
         serializer: ::smallExactInt64Append
         deserializer: ::parseSmallExactInt64
 
+    termType:
+        bson_serialization_type: any
+        description: "Same as smallExactInt64, only is only serialized if not -1."
+        cpp_type: std::int64_t
+        serializer: ::serializeTermField
+        deserializer: ::parseSmallExactInt64
+
+    optionalBoolSerializeIfTrue:
+        bson_serialization_type: any
+        description: "Same as optionalBool, except only written if true."
+        cpp_type: "mongo::OptionalBool"
+        default: "mongo::OptionalBool()"
+        deserializer: "mongo::OptionalBool::parseFromBSON"
+        serializer: "::serializeOptionalBoolIfTrue"
+
     replSetWriteConcernModeMap:
         bson_serialization_type: any
         description: "A BSON object mapping write concern mode names to tag sets"
         cpp_type: ReplSetWriteConcernModeDefinitions
         serializer: ReplSetWriteConcernModeDefinitions::serializeToBSON
         deserializer: ReplSetWriteConcernModeDefinitions::parseFromBSON
-        
+
 structs:
-    MemberConfigBase:
-        description: "The configuration for a given member inside of the replica set config"
-        fields:
-            _id:
-                cpp_name: id
-                type: memberId
-                description: "An integer identifier of every member in the replica set"
-            host:
-                type: string
-                description: "The hostname and, if specified, the port number, of the set member"
-            votes:
-                type: safeInt64
-                default: 1
-                validator: { gte: 0, lte: 1 }
-                description: "The number of votes a server will cast in a replica set election. The
-                              number of votes each member has is either 1 or 0, and arbiters always
-                              have exactly 1 vote"
-            newlyAdded:
-                type: bool
-                optional: true
-                validator: { callback: "validateTrue" }
-                description: "Set to true if the member was just added and is in initial sync.
-                              Must be true when specified. Indicates that the votes and priority
-                              fields should be considered '0' for the duration of the initial sync"
-            priority:
-                type: safeDouble
-                default: 1.0
-                validator: { gte: 0, lte: 1000 }
-                description: "A number that indicates the relative eligibility of a member to become
-                              a primary"
-            hidden:
-                type: safeBool
-                default: false
-                description: "When this value is true, the replica set hides this instance and does
-                             not include the member in the output of db.isMaster() or isMaster. This
-                             prevents read operations (i.e. queries) from ever reaching this host by
-                             way of secondary read preference"
-            slaveDelay:
-                cpp_name: slaveDelaySecs
-                type: safeInt64
-                default: 0
-                validator: { gte: 0, lte: 31622400 }
-                description: "The number of seconds 'behind' the primary that this replica set
-                              member should 'lag'"
-            arbiterOnly:
-                type: safeBool
-                default: false
-                description: "A boolean that identifies an arbiter. A value of true indicates that
-                              the member is an arbiter"
-            buildIndexes:
-                type: safeBool
-                default: true
-                description: "A boolean that indicates whether the mongod builds indexes on this
-                              member"
-            tags:
-                type: object
-                optional: true
-                description: "A tags document contains user-defined tag field and value pairs for
-                              the replica set member"
-            horizons:
-                type: object
-                optional: true
-                description: "The hostnames for the provided horizons"
-                
     ReplSetConfigSettings:
         description: "The configuration options that apply to the whole replica set"
         strict: false
@@ -184,3 +129,59 @@ structs:
                 type: objectid
                 optional: true
                 validator: { callback: "validateReplicaSetIdNotNull"}
+
+    ReplSetConfigBase:
+        description: "The complete configuration for the replica set"
+        fields:
+            _id:
+                cpp_name: replSetName
+                type: string
+                description: "The name of the replica set. Once set, you cannot change the name of
+                              a replica set"
+                validator: { callback: "validateReplSetNameNonEmpty"}
+            version:
+                cpp_name: configVersion
+                type: smallExactInt64
+                description: "An incrementing number used to distinguish revisions of the replica
+                              set configuration object from previous iterations of the
+                              configuration"
+                validator: { gt: 0, lt: 2147483648 }
+            term:
+                cpp_name: configTerm
+                type: termType
+                description: "The configuration term is the term of the primary that originally
+                              created this configuration. Configurations in a replica set are
+                              totally ordered by their term and configuration version."
+                default: -1
+                validator: { gte: -1, lt: 2147483648 }
+            members:
+                type: array<memberConfig>
+                description: "An array of member configuration documents, one for each member of
+                              the replica set"
+            configsvr:
+                cpp_name: configServer
+                type: optionalBoolSerializeIfTrue
+                description: "Indicates whether the replica set is used for a sharded cluster’s
+                              config servers. Set to true if the replica set is for a sharded
+                              cluster’s config servers"
+            protocolVersion:
+                description: "Election protocol version.  Always 1, as PV0 is no longer supported"
+                type: safeInt64
+                default: 1
+                validator: { gte: 1, lte: 1 }
+            writeConcernMajorityJournalDefault:
+                cpp_name: writeConcernMajorityShouldJournal
+                description: >-
+                    Determines the behavior of { w: "majority" } write concern if the write concern
+                    does not explicitly specify the journal option j
+                type: safeBool
+                default: true
+            settings:
+                description: "A document that contains configuration options that apply to the whole
+                              replica set."
+                type: ReplSetConfigSettings
+                optional: true
+            repaired:
+                description: "This field indicates the replicated data has been repaired, and
+                              prevents use of the configuration until it is removed."
+                type: optionalBool

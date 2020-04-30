@@ -54,12 +54,14 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
     rses.addSelf(HostAndPort("h1"));
 
     ReplSetConfig config;
+    OID newReplSetId = OID::gen();
     ASSERT_OK(
         config.initializeForInitiate(BSON("_id"
                                           << "rs0"
                                           << "version" << 2 << "protocolVersion" << 1 << "members"
                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                   << "h1")))));
+                                                                   << "h1"))),
+                                     newReplSetId));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                   validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
 }
@@ -69,19 +71,22 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
     rses.addSelf(HostAndPort("h1"));
 
     ReplSetConfig config;
+    OID newReplSetId = OID::gen();
     ASSERT_OK(
         config.initializeForInitiate(BSON("_id"
                                           << "rs0"
                                           << "version" << 1 << "term" << (OpTime::kInitialTerm + 1)
                                           << "protocolVersion" << 1 << "members"
                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                   << "h1")))));
+                                                                   << "h1"))),
+                                     newReplSetId));
     ASSERT_OK(validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
     ASSERT_EQUALS(config.getConfigTerm(), OpTime::kInitialTerm);
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
     ReplSetConfig config;
+    OID newReplSetId = OID::gen();
     ASSERT_OK(
         config.initializeForInitiate(BSON("_id"
                                           << "rs0"
@@ -91,7 +96,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
                                                         << BSON("_id" << 2 << "host"
                                                                       << "h2")
                                                         << BSON("_id" << 3 << "host"
-                                                                      << "h3")))));
+                                                                      << "h3"))),
+                                     newReplSetId));
     ReplicationCoordinatorExternalStateMock notPresentExternalState;
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -114,6 +120,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
     ReplSetConfig config;
+    OID newReplSetId = OID::gen();
     ASSERT_OK(
         config.initializeForInitiate(BSON("_id"
                                           << "rs0"
@@ -124,7 +131,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
                                                                       << "h2"
                                                                       << "priority" << 0)
                                                         << BSON("_id" << 3 << "host"
-                                                                      << "h3")))));
+                                                                      << "h3"))),
+                                     newReplSetId));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
@@ -136,6 +144,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiable) {
     ReplSetConfig config;
+    OID newReplSetId = OID::gen();
     ASSERT_OK(
         config.initializeForInitiate(BSON("_id"
                                           << "rs0"
@@ -143,7 +152,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiab
                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                    << "h1"))
                                           << "settings"
-                                          << BSON("getLastErrorDefaults" << BSON("w" << 2)))));
+                                          << BSON("getLastErrorDefaults" << BSON("w" << 2))),
+                                     newReplSetId));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
@@ -157,6 +167,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
     ReplSetConfig zeroConfig;
     ReplSetConfig oneConfig;
     ReplSetConfig twoConfig;
+    OID newReplSetId = OID::gen();
     ASSERT_OK(zeroConfig.initializeForInitiate(
         BSON("_id"
              << "rs0"
@@ -167,7 +178,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
                                          << "h2"
                                          << "priority" << 0 << "arbiterOnly" << true)
                            << BSON("_id" << 3 << "host"
-                                         << "h3")))));
+                                         << "h3"))),
+        newReplSetId));
 
     ASSERT_OK(oneConfig.initializeForInitiate(
         BSON("_id"
@@ -179,7 +191,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
                                          << "h2"
                                          << "priority" << 1 << "arbiterOnly" << true)
                            << BSON("_id" << 3 << "host"
-                                         << "h3")))));
+                                         << "h3"))),
+        newReplSetId));
 
     ASSERT_OK(twoConfig.initializeForInitiate(
         BSON("_id"
@@ -191,7 +204,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
                                          << "h2"
                                          << "priority" << 2 << "arbiterOnly" << true)
                            << BSON("_id" << 3 << "host"
-                                         << "h3")))));
+                                         << "h3"))),
+        newReplSetId));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
 
@@ -214,6 +228,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewlyAddedFieldNotAllowed) 
     ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
     ReplSetConfig firstNewlyAdded;
     ReplSetConfig lastNewlyAdded;
+    OID newReplSetId = OID::gen();
     ASSERT_OK(
         firstNewlyAdded.initializeForInitiate(BSON("_id"
                                                    << "rs0"
@@ -225,7 +240,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewlyAddedFieldNotAllowed) 
                                                                  << BSON("_id" << 2 << "host"
                                                                                << "h2")
                                                                  << BSON("_id" << 3 << "host"
-                                                                               << "h3")))));
+                                                                               << "h3"))),
+                                              newReplSetId));
 
     ASSERT_OK(lastNewlyAdded.initializeForInitiate(
         BSON("_id"
@@ -237,7 +253,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewlyAddedFieldNotAllowed) 
                                          << "h2")
                            << BSON("_id" << 3 << "host"
                                          << "newly_added_h3"
-                                         << "newlyAdded" << true)))));
+                                         << "newlyAdded" << true))),
+        newReplSetId));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
@@ -646,6 +663,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
     // config is invalid, validateConfigForInitiate will return a status indicating what is
     // wrong with the new config.
     ReplSetConfig newConfig;
+    OID newReplSetId = OID::gen();
     ASSERT_OK(newConfig.initializeForInitiate(BSON("_id"
                                                    << "rs0"
                                                    << "version" << 2 << "protocolVersion" << 1
@@ -653,7 +671,8 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                             << "h2")
                                                                  << BSON("_id" << 0 << "host"
-                                                                               << "h3")))));
+                                                                               << "h3"))),
+                                              newReplSetId));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));

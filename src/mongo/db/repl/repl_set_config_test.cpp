@@ -82,7 +82,7 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(ReplSetConfig::kDefaultElectionTimeoutPeriod, config.getElectionTimeoutPeriod());
     ASSERT_TRUE(config.isChainingAllowed());
     ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
-    ASSERT_FALSE(config.isConfigServer());
+    ASSERT_FALSE(config.getConfigServer());
     ASSERT_EQUALS(1, config.getProtocolVersion());
     ASSERT_EQUALS(
         ConnectionString::forReplicaSet("rs0", {HostAndPort{"localhost:12345"}}).toString(),
@@ -119,7 +119,7 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
     ASSERT_FALSE(config.isChainingAllowed());
     ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
-    ASSERT_FALSE(config.isConfigServer());
+    ASSERT_FALSE(config.getConfigServer());
     ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(Milliseconds(10), config.getElectionTimeoutPeriod());
@@ -256,27 +256,23 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingIdField) {
                                                                         << "localhost:12345")))));
 
     // Replica set name must be present.
-    ASSERT_EQUALS(
-        ErrorCodes::NoSuchKey,
+    ASSERT_NOT_OK(
         config.initialize(BSON("version" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345")))));
 
-    // Empty repl set name parses, but does not validate.
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << ""
-                                     << "version" << 1 << "protocolVersion" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
-
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    // Replica set name must be non-empty.
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
+                                         << ""
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345")))));
 }
 
 TEST(ReplSetConfig, ParseFailsWithBadOrMissingVersionField) {
     ReplSetConfig config;
     // Config version field must be present.
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
-                  config.initialize(BSON("_id"
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
                                          << "rs0"
                                          << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
@@ -296,20 +292,19 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingVersionField) {
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 0.0 << "protocolVersion" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version"
-                                     << static_cast<long long>(std::numeric_limits<int>::max()) + 1
-                                     << "protocolVersion" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 0.0 << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345")))));
+    ASSERT_NOT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version"
+                               << static_cast<long long>(std::numeric_limits<int>::max()) + 1
+                               << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345")))));
 }
 
 TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
@@ -322,7 +317,7 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
                                                               << "localhost:12345")))));
     ASSERT_EQUALS(config.getConfigTerm(), -1);
     // Serializing the config to BSON should omit a term field with value -1.
-    ASSERT_FALSE(config.toBSON().hasField(ReplSetConfig::kTermFieldName));
+    ASSERT_FALSE(config.toBSON().hasField(ReplSetConfig::kConfigTermFieldName));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   config.initialize(BSON("_id"
                                          << "rs0"
@@ -354,34 +349,21 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
-    ASSERT_FALSE(config.toBSON().hasField(ReplSetConfig::kTermFieldName));
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "term" << -2.0 << "protocolVersion" << 1
-                                     << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "term"
-                                     << static_cast<long long>(std::numeric_limits<int>::max()) + 1
-                                     << "protocolVersion" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-
-    // If we provide an explicit term field, then we should not fail initialize since we overwrite
-    // the invalid term. This tests the case where a reconfig command passes in an invalid term.
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "term"
-                                     << "1"
-                                     << "protocolVersion" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345"))),
-                                1 /* explicit term */));
-    ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.toBSON().hasField(ReplSetConfig::kConfigTermFieldName));
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "term" << -2.0 << "protocolVersion"
+                                         << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345")))));
+    ASSERT_NOT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "term"
+                               << static_cast<long long>(std::numeric_limits<int>::max()) + 1
+                               << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345")))));
 }
 
 TEST(ReplSetConfig, ParseFailsWithBadMembers) {
@@ -564,21 +546,22 @@ TEST(ReplSetConfig, ParseFailsWithTooManyNodes) {
 
 TEST(ReplSetConfig, ParseFailsWithUnexpectedField) {
     ReplSetConfig config;
-    Status status =
+    ASSERT_NOT_OK(
         config.initialize(BSON("_id"
                                << "rs0"
                                << "version" << 1 << "protocolVersion" << 1 << "unexpectedfield"
-                               << "value"));
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+                               << "value"
+                               << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345")))));
 }
 
 TEST(ReplSetConfig, ParseFailsWithNonArrayMembersField) {
     ReplSetConfig config;
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "version" << 1 << "protocolVersion" << 1 << "members"
-                                           << "value"));
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
+                                         << "value")));
 }
 
 TEST(ReplSetConfig, ParseFailsWithNonNumericHeartbeatIntervalMillisField) {
@@ -640,14 +623,13 @@ TEST(ReplSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
 
 TEST(ReplSetConfig, ParseFailsWithNonBoolConfigServerField) {
     ReplSetConfig config;
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "version" << 1 << "protocolVersion" << 1 << "members"
-                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345"))
-                                           << "configsvr"
-                                           << "no"));
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345"))
+                                         << "configsvr"
+                                         << "no")));
 }
 
 TEST(ReplSetConfig, ParseFailsWithNonObjectSettingsField) {
@@ -793,34 +775,26 @@ TEST(ReplSetConfig, ParseFailsWithRepairField) {
     ASSERT_EQUALS(ErrorCodes::RepairedReplicaSetNode, status);
 }
 
-TEST(ReplSetConfig, ValidateFailsWithBadProtocolVersion) {
+TEST(ReplSetConfig, ParseFailsWithBadProtocolVersion) {
     ReplSetConfig config;
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "protocolVersion" << 3 << "version" << 1 << "members"
-                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345")
-                                                         << BSON("_id" << 1 << "host"
-                                                                       << "localhost:54321"))));
-    ASSERT_OK(status);
-
-    status = config.validate();
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "protocolVersion" << 3 << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345")
+                                                       << BSON("_id" << 1 << "host"
+                                                                     << "localhost:54321")))));
 }
 
-TEST(ReplSetConfig, ValidateFailsWithProtocolVersion0) {
+TEST(ReplSetConfig, ParseFailsWithProtocolVersion0) {
     ReplSetConfig config;
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "protocolVersion" << 0 << "version" << 1 << "members"
-                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345")
-                                                         << BSON("_id" << 1 << "host"
-                                                                       << "localhost:54321"))));
-    ASSERT_OK(status);
-
-    status = config.validate();
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "protocolVersion" << 0 << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345")
+                                                       << BSON("_id" << 1 << "host"
+                                                                     << "localhost:54321")))));
 }
 
 TEST(ReplSetConfig, ValidateFailsWithDuplicateMemberId) {
@@ -840,13 +814,12 @@ TEST(ReplSetConfig, ValidateFailsWithDuplicateMemberId) {
 
 TEST(ReplSetConfig, InitializeFailsWithInvalidMember) {
     ReplSetConfig config;
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "version" << 1 << "protocolVersion" << 1 << "members"
-                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345"
-                                                                    << "hidden" << true))));
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
+    ASSERT_NOT_OK(config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345"
+                                                                  << "hidden" << true)))));
 }
 
 TEST(ReplSetConfig, ChainingAllowedField) {
@@ -878,7 +851,11 @@ TEST(ReplSetConfig, ConfigServerField) {
                                      << true << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
-    ASSERT_TRUE(config.isConfigServer());
+    ASSERT_TRUE(config.getConfigServer());
+    // When the field is true it should be serialized.
+    BSONObj configBSON = config.toBSON();
+    ASSERT_TRUE(configBSON.getField("configsvr").isBoolean());
+    ASSERT_TRUE(configBSON.getField("configsvr").boolean());
 
     ReplSetConfig config2;
     ASSERT_OK(config2.initialize(BSON("_id"
@@ -887,7 +864,10 @@ TEST(ReplSetConfig, ConfigServerField) {
                                       << false << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")))));
-    ASSERT_FALSE(config2.isConfigServer());
+    ASSERT_FALSE(config2.getConfigServer());
+    // When the field is false it should not be serialized.
+    configBSON = config2.toBSON();
+    ASSERT_FALSE(configBSON.hasField("configsvr"));
 
     // Configs in which configsvr is not the same as the --configsvr flag are invalid.
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
@@ -1059,6 +1039,46 @@ TEST(ReplSetConfig, NodeWithNewlyAddedFieldHasVotesZero) {
     ASSERT_EQ(1, config.getWritableVotingMembersCount());
 }
 
+TEST(ReplSetConfig, ToBSONWithoutNewlyAdded) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
+    // Create a config for a three-node set with one arbiter and one node with 'newlyAdded: true'.
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                              << "n1:1"
+                                                              << "newlyAdded" << true)
+                                                   << BSON("_id" << 2 << "host"
+                                                                 << "n2:1")
+                                                   << BSON("_id" << 3 << "host"
+                                                                 << "n3:1"
+                                                                 << "arbiterOnly" << true)))));
+
+    // same config, without "newlyAdded: true"
+    ReplSetConfig config_expected;
+    ASSERT_OK(
+        config_expected.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "n1:1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "n2:1")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "n3:1"
+                                                                    << "arbiterOnly" << true)))));
+    // Sanity check; these objects should not be equal with ordinary serialization, because of the
+    // newlyAdded field.
+    ASSERT_BSONOBJ_NE(config_expected.toBSON(), config.toBSON());
+    ASSERT_BSONOBJ_EQ(config_expected.toBSON(), config.toBSONWithoutNewlyAdded());
+    ASSERT_BSONOBJ_EQ(config_expected.toBSONWithoutNewlyAdded(), config.toBSONWithoutNewlyAdded());
+}
+
 TEST(ReplSetConfig, ConfigServerFieldDefaults) {
     serverGlobalParams.clusterRole = ClusterRole::None;
 
@@ -1068,7 +1088,10 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                      << "protocolVersion" << 1 << "version" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
-    ASSERT_FALSE(config.isConfigServer());
+    ASSERT_FALSE(config.getConfigServer());
+    // Default false configsvr field should not be serialized.
+    BSONObj configBSON = config.toBSON();
+    ASSERT_FALSE(configBSON.hasField("configsvr"));
 
     ReplSetConfig config2;
     ASSERT_OK(
@@ -1076,8 +1099,9 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                            << "rs0"
                                            << "protocolVersion" << 1 << "version" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345")))));
-    ASSERT_FALSE(config2.isConfigServer());
+                                                                    << "localhost:12345"))),
+                                      OID::gen()));
+    ASSERT_FALSE(config2.getConfigServer());
 
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
@@ -1088,7 +1112,7 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                       << "protocolVersion" << 1 << "version" << 1 << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")))));
-    ASSERT_FALSE(config3.isConfigServer());
+    ASSERT_FALSE(config3.getConfigServer());
 
     ReplSetConfig config4;
     ASSERT_OK(
@@ -1096,8 +1120,14 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                            << "rs0"
                                            << "protocolVersion" << 1 << "version" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345")))));
-    ASSERT_TRUE(config4.isConfigServer());
+                                                                    << "localhost:12345"))),
+                                      OID::gen()));
+    ASSERT_TRUE(config4.getConfigServer());
+    // Default true configsvr field should be serialized (even though it wasn't included
+    // originally).
+    configBSON = config4.toBSON();
+    ASSERT_TRUE(configBSON.hasField("configsvr"));
+    ASSERT_TRUE(configBSON.getField("configsvr").boolean());
 }
 
 TEST(ReplSetConfig, HeartbeatIntervalField) {
@@ -1293,7 +1323,7 @@ bool operator==(const ReplSetConfig& a, const ReplSetConfig& b) {
         a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
         a.getElectionTimeoutPeriod() == b.getElectionTimeoutPeriod() &&
         a.isChainingAllowed() == b.isChainingAllowed() &&
-        a.isConfigServer() == b.isConfigServer() &&
+        a.getConfigServer() == b.getConfigServer() &&
         a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
         a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode &&
         a.getProtocolVersion() == b.getProtocolVersion() &&
@@ -1384,25 +1414,23 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
 TEST(ReplSetConfig, toBSONRoundTripAbilityInvalid) {
     ReplSetConfig configA;
     ReplSetConfig configB;
-    ASSERT_EQUALS(
-        configA.initialize(BSON(
-            "_id"
-            << ""
-            << "version" << -3 << "protocolVersion" << 1 << "members"
-            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                     << "localhost:12345"
-                                     << "arbiterOnly" << true << "votes" << 0 << "priority" << 0)
-                          << BSON("_id" << 0 << "host"
-                                        << "localhost:3828"
-                                        << "arbiterOnly" << false << "buildIndexes" << false
-                                        << "priority" << 2)
-                          << BSON("_id" << 2 << "host"
-                                        << "localhost:3828"
-                                        << "votes" << 0 << "priority" << 0))
-            << "settings"
-            << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << 20
-                                              << "electionTimeoutMillis" << 2))),
-        ErrorCodes::InvalidReplicaSetConfig);
+    ASSERT_NOT_OK(configA.initialize(
+        BSON("_id"
+             << ""
+             << "version" << -3 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "arbiterOnly" << true << "votes" << 0 << "priority" << 0)
+                           << BSON("_id" << 0 << "host"
+                                         << "localhost:3828"
+                                         << "arbiterOnly" << false << "buildIndexes" << false
+                                         << "priority" << 2)
+                           << BSON("_id" << 2 << "host"
+                                         << "localhost:3828"
+                                         << "votes" << 0 << "priority" << 0))
+             << "settings"
+             << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << 20
+                                               << "electionTimeoutMillis" << 2))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());
@@ -1813,7 +1841,8 @@ TEST(ReplSetConfig, ReplSetId) {
     ASSERT_FALSE(ReplSetConfig().hasReplicaSetId());
 
     // Cannot provide replica set ID in configuration document when initialized from
-    // replSetInitiate.
+    // replSetInitiate, because it will not match the new one passed in.
+    OID newReplSetId = OID::gen();
     auto status =
         ReplSetConfig().initializeForInitiate(BSON("_id"
                                                    << "rs0"
@@ -1823,14 +1852,25 @@ TEST(ReplSetConfig, ReplSetId) {
                                                                             << "localhost:12345"
                                                                             << "priority" << 1))
                                                    << "settings"
-                                                   << BSON("replicaSetId" << OID::gen())));
+                                                   << BSON("replicaSetId" << OID::gen())),
+                                              newReplSetId);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_STRING_CONTAINS(status.reason(),
                            "replica set configuration cannot contain 'replicaSetId' field when "
                            "called from replSetInitiate");
 
+    // Cannot initiate with an empty ID.
+    ASSERT_NOT_OK(
+        ReplSetConfig().initializeForInitiate(BSON("_id"
+                                                   << "rs0"
+                                                   << "version" << 1 << "protocolVersion" << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                            << "localhost:12345"
+                                                                            << "priority" << 1))),
+                                              OID()));
 
-    // Configuration created by replSetInitiate should generate replica set ID.
+    // Configuration created by replSetInitiate should use passed-in replica set ID
     ReplSetConfig configInitiate;
     ASSERT_OK(
         configInitiate.initializeForInitiate(BSON("_id"
@@ -1839,10 +1879,12 @@ TEST(ReplSetConfig, ReplSetId) {
                                                   << "members"
                                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                            << "localhost:12345"
-                                                                           << "priority" << 1)))));
+                                                                           << "priority" << 1))),
+                                             newReplSetId));
     ASSERT_OK(configInitiate.validate());
     ASSERT_TRUE(configInitiate.hasReplicaSetId());
     OID replicaSetId = configInitiate.getReplicaSetId();
+    ASSERT_EQ(newReplSetId, replicaSetId);
 
     // Configuration initialized from local database can contain ID.
     ReplSetConfig configLocal;
@@ -1857,7 +1899,7 @@ TEST(ReplSetConfig, ReplSetId) {
     ASSERT_TRUE(configLocal.hasReplicaSetId());
     ASSERT_EQUALS(replicaSetId, configLocal.getReplicaSetId());
 
-    // When reconfiguring, we can provide an default ID if the configuration does not contain one.
+    // When reconfiguring, we can provide a default ID if the configuration does not contain one.
     OID defaultReplicaSetId = OID::gen();
     ASSERT_OK(configLocal.initialize(BSON("_id"
                                           << "rs0"
@@ -1871,7 +1913,37 @@ TEST(ReplSetConfig, ReplSetId) {
     ASSERT_TRUE(configLocal.hasReplicaSetId());
     ASSERT_EQUALS(defaultReplicaSetId, configLocal.getReplicaSetId());
 
-    // 'replicaSetId' field cannot be null.
+    // When reconfiguring, we can provide a default ID if the configuration contains a matching one.
+    ASSERT_OK(
+        configLocal.initialize(BSON("_id"
+                                    << "rs0"
+                                    << "version" << 1 << "protocolVersion" << 1 << "members"
+                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                             << "localhost:12345"
+                                                             << "priority" << 1))
+                                    << "settings" << BSON("replicaSetId" << defaultReplicaSetId)),
+                               boost::none,
+                               defaultReplicaSetId));
+    ASSERT_OK(configLocal.validate());
+    ASSERT_TRUE(configLocal.hasReplicaSetId());
+    ASSERT_EQUALS(defaultReplicaSetId, configLocal.getReplicaSetId());
+
+    // If the default config does not match the one in the BSON, the one passed-on should be used.
+    // (note: this will be rejected by validateConfigForReconfig)
+    OID bsonReplicaSetId = OID::gen();
+    status = configLocal.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345"
+                                                                  << "priority" << 1))
+                                         << "settings" << BSON("replicaSetId" << bsonReplicaSetId)),
+                                    boost::none,
+                                    defaultReplicaSetId);
+    ASSERT_OK(status);
+    ASSERT_EQ(bsonReplicaSetId, configLocal.getReplicaSetId());
+
+    // 'replicaSetId' field cannot be explicitly null.
     status = configLocal.initialize(BSON("_id"
                                          << "rs0"
                                          << "version" << 1 << "protocolVersion" << 1 << "members"

@@ -3729,7 +3729,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     lk.unlock();
 
     ReplSetConfig newConfig;
-    Status status = newConfig.initializeForInitiate(configObj);
+    Status status = newConfig.initializeForInitiate(configObj, OID::gen());
     if (!status.isOK()) {
         LOGV2_ERROR(21423,
                     "replSet initiate got {error} while parsing {config}",

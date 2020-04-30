@@ -48,7 +48,17 @@ const std::string MemberConfig::kInternalAllTagName = "$all";
 const std::string MemberConfig::kConfigAllTagName = "$configAll";
 const std::string MemberConfig::kConfigVoterTagName = "$configVoter";
 
-MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
+/* static */
+MemberConfig MemberConfig::parseFromBSON(const BSONObj& mcfg) {
+    try {
+        return MemberConfig(mcfg);
+    } catch (const DBException& e) {
+        uassertStatusOK(e.toStatus().withContext(str::stream() << "member: " << mcfg));
+        MONGO_UNREACHABLE;
+    }
+}
+
+MemberConfig::MemberConfig(const BSONObj& mcfg) {
     parseProtected(IDLParserErrorContext("MemberConfig"), mcfg);
 
     std::string hostAndPortString = getHost().toString();
@@ -70,6 +80,42 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
 
     _splitHorizon = SplitHorizon(host, getHorizons());
 
+    if (isArbiter()) {
+        if (MemberConfigBase::getPriority() == 1.0) {
+            setPriority(0);
+        }
+
+        if (!isVoter()) {
+            uasserted(ErrorCodes::BadValue, "Arbiter must vote (cannot have 0 votes)");
+        }
+
+        if (isNewlyAdded()) {
+            uasserted(ErrorCodes::BadValue, "Arbiter cannot have newlyAdded field set");
+        }
+    }
+
+    // Check for additional electable requirements, when priority is non zero.
+    if (getPriority() != 0) {
+        if (!isVoter()) {
+            uasserted(ErrorCodes::BadValue, "priority must be 0 when non-voting (votes:0)");
+        }
+        if (getSlaveDelay() > Seconds(0)) {
+            uasserted(ErrorCodes::BadValue, "priority must be 0 when slaveDelay is used");
+        }
+        if (isHidden()) {
+            uasserted(ErrorCodes::BadValue, "priority must be 0 when hidden=true");
+        }
+        if (!shouldBuildIndexes()) {
+            uasserted(ErrorCodes::BadValue, "priority must be 0 when buildIndexes=false");
+        }
+    }
+}
+
+MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) : MemberConfig(mcfg) {
+    addTagInfo(tagConfig);
+}
+
+void MemberConfig::addTagInfo(ReplSetTagConfig* tagConfig) {
     //
     // Parse "tags" field.
     //
@@ -114,55 +160,19 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
     // Add a tag for every node, including arbiters.
     _tags.push_back(tagConfig->makeTag(kConfigAllTagName, id));
 
-
     if (isArbiter()) {
-        if (MemberConfigBase::getPriority() == 1.0) {
-            setPriority(0);
-        }
-
-        if (!isVoter()) {
-            uasserted(ErrorCodes::BadValue, "Arbiter must vote (cannot have 0 votes)");
-        }
         // Arbiters have two internal tags.
         if (_tags.size() != 2) {
             uasserted(ErrorCodes::BadValue, "Cannot set tags on arbiters.");
         }
-
-        if (isNewlyAdded()) {
-            uasserted(ErrorCodes::BadValue, "Arbiter cannot have newlyAdded field set");
-        }
-    }
-
-    // Check for additional electable requirements, when priority is non zero.
-    if (getPriority() != 0) {
-        if (!isVoter()) {
-            uasserted(ErrorCodes::BadValue, "priority must be 0 when non-voting (votes:0)");
-        }
-        if (getSlaveDelay() > Seconds(0)) {
-            uasserted(ErrorCodes::BadValue, "priority must be 0 when slaveDelay is used");
-        }
-        if (isHidden()) {
-            uasserted(ErrorCodes::BadValue, "priority must be 0 when hidden=true");
-        }
-        if (!shouldBuildIndexes()) {
-            uasserted(ErrorCodes::BadValue, "priority must be 0 when buildIndexes=false");
-        }
     }
 }
 
-bool MemberConfig::hasTags(const ReplSetTagConfig& tagConfig) const {
-    for (std::vector<ReplSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end(); tag++) {
-        std::string tagKey = tagConfig.getTagKey(*tag);
-        if (tagKey[0] == '$') {
-            // Filter out internal tags
-            continue;
-        }
-        return true;
-    }
-    return false;
+bool MemberConfig::hasTags() const {
+    return getTags() && !getTags()->isEmpty();
 }
 
-BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig, bool omitNewlyAddedField) const {
+BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, getId().getData());
     configBuilder.append(kHostFieldName, _host().toString());
@@ -179,16 +189,9 @@ BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig, bool omitNewlyAd
     configBuilder.append(kHiddenFieldName, getHidden());
     configBuilder.append(kPriorityFieldName, MemberConfigBase::getPriority());
 
-    BSONObjBuilder tags(configBuilder.subobjStart(kTagsFieldName));
-    for (std::vector<ReplSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end(); tag++) {
-        std::string tagKey = tagConfig.getTagKey(*tag);
-        if (tagKey[0] == '$') {
-            // Filter out internal tags
-            continue;
-        }
-        tags.append(tagKey, tagConfig.getTagValue(*tag));
+    if (hasTags()) {
+        configBuilder.append(kTagsFieldName, *getTags());
     }
-    tags.done();
 
     _splitHorizon.toBSON(configBuilder);
 

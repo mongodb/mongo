@@ -308,7 +308,7 @@ public:
     // produce a reply to a V1 heartbeat
     Status prepareHeartbeatResponseV1(Date_t now,
                                       const ReplSetHeartbeatArgsV1& args,
-                                      const std::string& ourSetName,
+                                      StringData ourSetName,
                                       ReplSetHeartbeatResponse* response);
 
     struct ReplSetStatusArgs {
@@ -389,7 +389,7 @@ public:
      * processHeartbeatResponse for the same "target".
      */
     std::pair<ReplSetHeartbeatArgsV1, Milliseconds> prepareHeartbeatRequestV1(
-        Date_t now, const std::string& ourSetName, const HostAndPort& target);
+        Date_t now, StringData ourSetName, const HostAndPort& target);
 
     /**
      * Processes a heartbeat response from "target" that arrived around "now", having spent

@@ -143,7 +143,7 @@ public:
     void setHeartbeatVersion(long long newVal);
     void setSenderId(long long newVal);
     void setSenderHost(const HostAndPort& newVal);
-    void setSetName(const std::string& newVal);
+    void setSetName(StringData newVal);
     void setTerm(long long newVal);
     void setCheckEmpty();
 

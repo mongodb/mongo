@@ -258,7 +258,7 @@ void MockReplicaSet::mockIsMasterCmd() {
             }
 
             const ReplSetTagConfig tagConfig = _replConfig.getTagConfig();
-            if (member->hasTags(tagConfig)) {
+            if (member->hasTags()) {
                 BSONObjBuilder tagBuilder;
                 for (MemberConfig::TagIterator tag = member->tagsBegin(); tag != member->tagsEnd();
                      ++tag) {

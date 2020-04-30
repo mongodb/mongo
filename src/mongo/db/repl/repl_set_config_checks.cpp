@@ -189,7 +189,7 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
                                     << newConfig.getReplicaSetId());
     }
 
-    if (oldConfig.isConfigServer() && !newConfig.isConfigServer()) {
+    if (oldConfig.getConfigServer() && !newConfig.getConfigServer()) {
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       str::stream() << "Cannot remove \"" << ReplSetConfig::kConfigServerFieldName
                                     << "\" from replica set configuration on reconfig");

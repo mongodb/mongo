@@ -494,9 +494,9 @@ void IsMasterResponse::setIsSecondary(bool secondary) {
     _secondary = secondary;
 }
 
-void IsMasterResponse::setReplSetName(const std::string& setName) {
+void IsMasterResponse::setReplSetName(StringData setName) {
     _setNameSet = true;
-    _setName = setName;
+    _setName = setName.toString();
 }
 
 void IsMasterResponse::setReplSetVersion(long long version) {

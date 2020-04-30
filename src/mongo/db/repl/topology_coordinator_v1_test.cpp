@@ -105,7 +105,7 @@ protected:
     Date_t& now() {
         return _now;
     }
-    ReplSetConfig getCurrentConfig() {
+    const ReplSetConfig& getCurrentConfig() {
         return _currentConfig;
     }
 

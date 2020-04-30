@@ -684,7 +684,7 @@ void TopologyCoordinator::prepareSyncFromResponse(const HostAndPort& target,
 // produce a reply to a heartbeat
 Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
                                                        const ReplSetHeartbeatArgsV1& args,
-                                                       const std::string& ourSetName,
+                                                       StringData ourSetName,
                                                        ReplSetHeartbeatResponse* response) {
     // Verify that replica set names match
     const std::string rshb = args.getSetName();
@@ -790,7 +790,7 @@ int TopologyCoordinator::_getMemberIndex(int id) const {
 }
 
 std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHeartbeatRequestV1(
-    Date_t now, const std::string& ourSetName, const HostAndPort& target) {
+    Date_t now, StringData ourSetName, const HostAndPort& target) {
     PingStats& hbStats = _pings[target];
     Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
     if ((!_rsConfig.isInitialized()) || !hbStats.trying() ||
@@ -1845,7 +1845,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
         response->append("syncSourceId", -1);
     }
 
-    if (_rsConfig.isConfigServer()) {
+    if (_rsConfig.getConfigServer()) {
         response->append("configsvr", true);
     }
 
@@ -2023,7 +2023,7 @@ void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<IsMasterRespons
         response->setShouldBuildIndexes(false);
     }
     const ReplSetTagConfig tagConfig = _rsConfig.getTagConfig();
-    if (selfConfig.hasTags(tagConfig)) {
+    if (selfConfig.hasTags()) {
         for (MemberConfig::TagIterator tag = selfConfig.tagsBegin(); tag != selfConfig.tagsEnd();
              ++tag) {
             std::string tagKey = tagConfig.getTagKey(*tag);
@@ -2416,7 +2416,7 @@ MemberState TopologyCoordinator::getMemberState() const {
         return MemberState::RS_STARTUP;
     }
 
-    if (_rsConfig.isConfigServer()) {
+    if (_rsConfig.getConfigServer()) {
         if (_options.clusterRole != ClusterRole::ConfigServer && !skipShardingConfigurationChecks) {
             return MemberState::RS_REMOVED;
         } else {

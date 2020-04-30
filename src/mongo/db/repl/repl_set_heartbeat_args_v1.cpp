@@ -133,8 +133,8 @@ void ReplSetHeartbeatArgsV1::setSenderId(long long newVal) {
     _senderId = newVal;
 }
 
-void ReplSetHeartbeatArgsV1::setSetName(const std::string& newVal) {
-    _setName = newVal;
+void ReplSetHeartbeatArgsV1::setSetName(StringData newVal) {
+    _setName = newVal.toString();
 }
 
 void ReplSetHeartbeatArgsV1::setTerm(long long newVal) {

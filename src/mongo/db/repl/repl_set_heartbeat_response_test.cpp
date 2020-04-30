@@ -317,9 +317,8 @@ TEST(ReplSetHeartbeatResponse, InitializeBadConfig) {
                   << "v" << 2  // needs a version to get this far in initialize()
                   << "config" << BSON("illegalFieldName" << 2));
     Status result = hbResponse.initialize(initializerObj, 0);
-    ASSERT_EQUALS(ErrorCodes::BadValue, result);
-    ASSERT_EQUALS("Unexpected field illegalFieldName in replica set configuration",
-                  result.reason());
+    ASSERT_NOT_OK(result);
+    ASSERT_STRING_CONTAINS(result.reason(), "'ReplSetConfig.illegalFieldName' is an unknown field");
 }
 
 TEST(ReplSetHeartbeatResponse, NoConfigStillInitializing) {

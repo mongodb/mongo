@@ -278,13 +278,14 @@ TEST_F(ReplCoordTest,
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
     args.force = false;
+    // new config fails to validate because one node is localhost and another is not.
     args.newConfigObj = BSON("_id"
                              << "mySet"
-                             << "version" << -3 << "protocolVersion" << 1 << "members"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")));
+                                                         << "localhost:12345")));
 
     const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
