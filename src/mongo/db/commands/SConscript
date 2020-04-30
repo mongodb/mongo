@@ -309,6 +309,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/views/views_mongod',
+        '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/net/http_client',
         'core',
         'current_op_common',

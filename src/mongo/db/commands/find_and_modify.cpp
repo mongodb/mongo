@@ -42,6 +42,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/find_and_modify_common.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update_stage.h"
@@ -68,12 +69,17 @@
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
+
 namespace {
 
 /**
@@ -362,155 +368,216 @@ public:
         // return the document under concurrency, if a matching document exists.
         return writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
             if (args.isRemove()) {
-                auto request = DeleteRequest{};
-                request.setNsString(nsString);
-                const bool isExplain = false;
-                makeDeleteRequest(opCtx, args, isExplain, &request);
-
-                if (opCtx->getTxnNumber()) {
-                    request.setStmtId(stmtId);
-                }
-
-                ParsedDelete parsedDelete(opCtx, &request);
-                uassertStatusOK(parsedDelete.parseRequest());
-
-                AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
-
-                {
-                    boost::optional<int> dbProfilingLevel;
-                    if (autoColl.getDb())
-                        dbProfilingLevel = autoColl.getDb()->getProfilingLevel();
-
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
-                }
-
-                assertCanWrite(opCtx, nsString);
-
-                Collection* const collection = autoColl.getCollection();
-                checkIfTransactionOnCappedColl(collection, inTransaction);
-
-                const auto exec = uassertStatusOK(getExecutorDelete(
-                    opDebug, collection, &parsedDelete, boost::none /* verbosity */));
-
-                {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
-                }
-
-                auto docFound = advanceExecutor(opCtx, exec.get(), args.isRemove());
-                // Nothing after advancing the plan executor should throw a WriteConflictException,
-                // so the following bookkeeping with execution stats won't end up being done
-                // multiple times.
-
-                PlanSummaryStats summaryStats;
-                Explain::getSummaryStats(*exec, &summaryStats);
-                if (collection) {
-                    CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
-                }
-                opDebug->setPlanSummaryMetrics(summaryStats);
-
-                // Fill out OpDebug with the number of deleted docs.
-                opDebug->additiveMetrics.ndeleted = DeleteStage::getNumDeleted(*exec);
-
-                if (curOp->shouldDBProfile()) {
-                    BSONObjBuilder execStatsBob;
-                    Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-                    curOp->debug().execStats = execStatsBob.obj();
-                }
-                recordStatsForTopCommand(opCtx);
-
-                appendCommandResponse(exec.get(), args.isRemove(), docFound, &result);
+                return writeConflictRetryRemove(
+                    opCtx, nsString, args, stmtId, curOp, opDebug, inTransaction, result);
             } else {
-                auto request = UpdateRequest();
-                request.setNamespaceString(nsString);
-                const bool isExplain = false;
-                makeUpdateRequest(opCtx, args, isExplain, &request);
-
-                if (opCtx->getTxnNumber()) {
-                    request.setStmtId(stmtId);
+                if (MONGO_unlikely(hangBeforeFindAndModifyPerformsUpdate.shouldFail())) {
+                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                        &hangBeforeFindAndModifyPerformsUpdate,
+                        opCtx,
+                        "hangBeforeFindAndModifyPerformsUpdate");
                 }
 
-                const ExtensionsCallbackReal extensionsCallback(opCtx,
-                                                                &request.getNamespaceString());
-                ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
-                uassertStatusOK(parsedUpdate.parseRequest());
+                // Nested retry loop to handle concurrent conflicting upserts with equality match.
+                int retryAttempts = 0;
+                for (;;) {
+                    auto request = UpdateRequest();
+                    request.setNamespaceString(nsString);
+                    const bool isExplain = false;
+                    makeUpdateRequest(opCtx, args, isExplain, &request);
 
-                AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
-                Database* db = autoColl.ensureDbExists();
-
-                {
-                    boost::optional<int> dbProfilingLevel;
-                    dbProfilingLevel = db->getProfilingLevel();
-
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
-                }
-
-                assertCanWrite(opCtx, nsString);
-
-                Collection* collection = autoColl.getCollection();
-
-                // Create the collection if it does not exist when performing an upsert because the
-                // update stage does not create its own collection
-                if (!collection && args.isUpsert()) {
-                    assertCanWrite(opCtx, nsString);
-
-                    collection =
-                        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
-
-                    // If someone else beat us to creating the collection, do nothing
-                    if (!collection) {
-                        uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
-                        WriteUnitOfWork wuow(opCtx);
-                        CollectionOptions defaultCollectionOptions;
-                        uassertStatusOK(
-                            db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
-                        wuow.commit();
-
-                        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-                            opCtx, nsString);
+                    if (opCtx->getTxnNumber()) {
+                        request.setStmtId(stmtId);
                     }
 
-                    invariant(collection);
+                    const ExtensionsCallbackReal extensionsCallback(opCtx,
+                                                                    &request.getNamespaceString());
+                    ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
+                    uassertStatusOK(parsedUpdate.parseRequest());
+
+                    try {
+                        return writeConflictRetryUpsert(opCtx,
+                                                        nsString,
+                                                        args,
+                                                        curOp,
+                                                        opDebug,
+                                                        inTransaction,
+                                                        &parsedUpdate,
+                                                        result);
+                    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+                        if (!parsedUpdate.hasParsedQuery()) {
+                            uassertStatusOK(parsedUpdate.parseQueryToCQ());
+                        }
+
+                        if (!UpdateStage::shouldRetryDuplicateKeyException(
+                                parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
+                            throw;
+                        }
+
+                        ++retryAttempts;
+                        logAndBackoff(4721200,
+                                      ::mongo::logv2::LogComponent::kWrite,
+                                      logv2::LogSeverity::Debug(1),
+                                      retryAttempts,
+                                      "Caught DuplicateKey exception during findAndModify upsert",
+                                      "namespace"_attr = nsString.ns());
+                    }
                 }
-
-                checkIfTransactionOnCappedColl(collection, inTransaction);
-
-                const auto exec = uassertStatusOK(getExecutorUpdate(
-                    opDebug, collection, &parsedUpdate, boost::none /* verbosity */));
-
-                {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
-                }
-
-                auto docFound = advanceExecutor(opCtx, exec.get(), args.isRemove());
-                // Nothing after advancing the plan executor should throw a WriteConflictException,
-                // so the following bookkeeping with execution stats won't end up being done
-                // multiple times.
-
-                PlanSummaryStats summaryStats;
-                Explain::getSummaryStats(*exec, &summaryStats);
-                if (collection) {
-                    CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
-                }
-                UpdateStage::recordUpdateStatsInOpDebug(UpdateStage::getUpdateStats(exec.get()),
-                                                        opDebug);
-                opDebug->setPlanSummaryMetrics(summaryStats);
-
-                if (curOp->shouldDBProfile()) {
-                    BSONObjBuilder execStatsBob;
-                    Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-                    curOp->debug().execStats = execStatsBob.obj();
-                }
-                recordStatsForTopCommand(opCtx);
-
-                appendCommandResponse(exec.get(), args.isRemove(), docFound, &result);
             }
 
             return true;
         });
+    }
+
+    static bool writeConflictRetryRemove(OperationContext* opCtx,
+                                         const NamespaceString& nsString,
+                                         const FindAndModifyRequest& args,
+                                         const int stmtId,
+                                         CurOp* const curOp,
+                                         OpDebug* const opDebug,
+                                         const bool inTransaction,
+                                         BSONObjBuilder& result) {
+        auto request = DeleteRequest{};
+        request.setNsString(nsString);
+        const bool isExplain = false;
+        makeDeleteRequest(opCtx, args, isExplain, &request);
+
+        if (opCtx->getTxnNumber()) {
+            request.setStmtId(stmtId);
+        }
+
+        ParsedDelete parsedDelete(opCtx, &request);
+        uassertStatusOK(parsedDelete.parseRequest());
+
+        AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
+
+        {
+            boost::optional<int> dbProfilingLevel;
+            if (autoColl.getDb())
+                dbProfilingLevel = autoColl.getDb()->getProfilingLevel();
+
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
+        }
+
+        assertCanWrite(opCtx, nsString);
+
+        Collection* const collection = autoColl.getCollection();
+        checkIfTransactionOnCappedColl(collection, inTransaction);
+
+        const auto exec = uassertStatusOK(
+            getExecutorDelete(opDebug, collection, &parsedDelete, boost::none /* verbosity */));
+
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+        }
+
+        auto docFound = advanceExecutor(opCtx, exec.get(), args.isRemove());
+        // Nothing after advancing the plan executor should throw a WriteConflictException,
+        // so the following bookkeeping with execution stats won't end up being done
+        // multiple times.
+
+        PlanSummaryStats summaryStats;
+        Explain::getSummaryStats(*exec, &summaryStats);
+        if (collection) {
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
+        }
+        opDebug->setPlanSummaryMetrics(summaryStats);
+
+        // Fill out OpDebug with the number of deleted docs.
+        opDebug->additiveMetrics.ndeleted = DeleteStage::getNumDeleted(*exec);
+
+        if (curOp->shouldDBProfile()) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+            curOp->debug().execStats = execStatsBob.obj();
+        }
+        recordStatsForTopCommand(opCtx);
+
+        appendCommandResponse(exec.get(), args.isRemove(), docFound, &result);
+
+        return true;
+    }
+
+    static bool writeConflictRetryUpsert(OperationContext* opCtx,
+                                         const NamespaceString& nsString,
+                                         const FindAndModifyRequest& args,
+                                         CurOp* const curOp,
+                                         OpDebug* const opDebug,
+                                         const bool inTransaction,
+                                         ParsedUpdate* parsedUpdate,
+                                         BSONObjBuilder& result) {
+        AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
+        Database* db = autoColl.ensureDbExists();
+
+        {
+            boost::optional<int> dbProfilingLevel;
+            dbProfilingLevel = db->getProfilingLevel();
+
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
+        }
+
+        assertCanWrite(opCtx, nsString);
+
+        Collection* collection = autoColl.getCollection();
+
+        // Create the collection if it does not exist when performing an upsert because the
+        // update stage does not create its own collection
+        if (!collection && args.isUpsert()) {
+            assertCanWrite(opCtx, nsString);
+
+            collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
+
+            // If someone else beat us to creating the collection, do nothing
+            if (!collection) {
+                uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
+                WriteUnitOfWork wuow(opCtx);
+                CollectionOptions defaultCollectionOptions;
+                uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
+                wuow.commit();
+
+                collection =
+                    CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
+            }
+
+            invariant(collection);
+        }
+
+        checkIfTransactionOnCappedColl(collection, inTransaction);
+
+        const auto exec = uassertStatusOK(
+            getExecutorUpdate(opDebug, collection, parsedUpdate, boost::none /* verbosity */));
+
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+        }
+
+        auto docFound = advanceExecutor(opCtx, exec.get(), args.isRemove());
+        // Nothing after advancing the plan executor should throw a WriteConflictException,
+        // so the following bookkeeping with execution stats won't end up being done
+        // multiple times.
+
+        PlanSummaryStats summaryStats;
+        Explain::getSummaryStats(*exec, &summaryStats);
+        if (collection) {
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
+        }
+        UpdateStage::recordUpdateStatsInOpDebug(UpdateStage::getUpdateStats(exec.get()), opDebug);
+        opDebug->setPlanSummaryMetrics(summaryStats);
+
+        if (curOp->shouldDBProfile()) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+            curOp->debug().execStats = execStatsBob.obj();
+        }
+        recordStatsForTopCommand(opCtx);
+
+        appendCommandResponse(exec.get(), args.isRemove(), docFound, &result);
+
+        return true;
     }
 
     void appendMirrorableRequest(BSONObjBuilder* bob, const BSONObj& cmdObj) const override {
