@@ -38,6 +38,7 @@
 
 #include <fmt/format.h>
 
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 #include "mongo/util/invariant.h"
@@ -94,13 +95,9 @@ public:
      * the first 'len' characters starting at 'c'. The range of
      * characters in the half-open interval `[c, c + len)` must be valid.
      */
-    StringData(const char* c, size_t len) : StringData(c, len, TrustedInitTag()) {
-        invariant(_data || (_size == 0));
-    }
-
-    /** Helper for the `literals::operator""_sd` function below. Conceptually non-public. */
-    static constexpr StringData _literalHelper(const char* c, std::size_t len) {
-        return StringData(c, len, TrustedInitTag{});
+    constexpr StringData(const char* c, size_t len) : StringData(c, len, TrustedInitTag()) {
+        if (!MONGO_likely(_data || (_size == 0)))
+            invariant(0, "StringData(nullptr,len) requires len==0");
     }
 
     explicit operator std::string() const {
@@ -115,14 +112,8 @@ public:
      * We template the second parameter to ensure if StringData is called with 0 in the second
      * parameter, the (ptr,len) constructor is chosen instead.
      */
-    template <
-        typename InputIt,
-        typename = stdx::enable_if_t<std::is_same<StringData::const_iterator, InputIt>::value>>
-    StringData(InputIt begin, InputIt end) {
-        invariant(begin && end);
-        _data = begin;
-        _size = std::distance(begin, end);
-    }
+    template <typename T, std::enable_if_t<std::is_same_v<const char*, T>, int> = 0>
+    constexpr StringData(T begin, T end) : StringData(begin, end - begin) {}
 
     /**
      * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
@@ -139,7 +130,7 @@ public:
 
     void copyTo(char* dest, bool includeEndingNull) const;
 
-    StringData substr(size_t pos, size_t n = std::numeric_limits<size_t>::max()) const;
+    constexpr StringData substr(size_t pos, size_t n = std::numeric_limits<size_t>::max()) const;
 
     //
     // finders
@@ -313,7 +304,7 @@ inline size_t StringData::rfind(char c, size_t fromPos) const {
     return std::string::npos;
 }
 
-inline StringData StringData::substr(size_t pos, size_t n) const {
+constexpr StringData StringData::substr(size_t pos, size_t n) const {
     if (pos > size())
         throw std::out_of_range("out of range");
 
@@ -361,7 +352,7 @@ inline namespace literals {
  * This allows for constexpr creation of `StringData` that are known at compile time.
  */
 constexpr StringData operator"" _sd(const char* c, std::size_t len) {
-    return StringData::_literalHelper(c, len);
+    return {c, len};
 }
 }  // namespace literals
 

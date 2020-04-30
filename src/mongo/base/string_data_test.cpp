@@ -36,9 +36,11 @@
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 using std::string;
 
@@ -85,6 +87,33 @@ TEST(Construction, FromEmptyUserDefinedLiteral) {
     const auto strData = ""_sd;
     ASSERT_EQUALS(strData.size(), 0U);
     ASSERT_EQUALS(strData.toString(), string(""));
+}
+
+// Try some constexpr initializations
+TEST(Construction, Constexpr) {
+    constexpr StringData lit = "1234567"_sd;
+    ASSERT_EQUALS(lit, "1234567"_sd);
+    constexpr StringData sub = lit.substr(3, 2);
+    ASSERT_EQUALS(sub, "45"_sd);
+    constexpr StringData range(lit.begin() + 1, lit.end() - 1);
+    ASSERT_EQUALS(range, "23456"_sd);
+    constexpr char c = lit[1];
+    ASSERT_EQUALS(c, '2');
+    constexpr StringData nully{nullptr, 0};
+    ASSERT_EQUALS(nully, ""_sd);
+#if 0
+    constexpr StringData cxNully{nullptr, 1};  // must not compile
+#endif
+    constexpr StringData ptr{lit.rawData() + 1, 3};
+    ASSERT_EQUALS(ptr, "234"_sd);
+}
+
+class StringDataDeathTest : public unittest::Test {};
+
+DEATH_TEST(StringDataDeathTest,
+           InvariantNullRequiresEmpty,
+           "StringData(nullptr,len) requires len==0") {
+    StringData bad{nullptr, 1};
 }
 
 TEST(Comparison, BothEmpty) {
@@ -364,4 +393,5 @@ TEST(Ostream, StringDataMatchesStdString) {
     }
 }
 
+}  // namespace
 }  // namespace mongo
