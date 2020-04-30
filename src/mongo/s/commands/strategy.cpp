@@ -213,102 +213,105 @@ void execCommandClient(OperationContext* opCtx,
                        CommandInvocation* invocation,
                        const OpMsgRequest& request,
                        rpc::ReplyBuilderInterface* result) {
-    const Command* c = invocation->definition();
-    ON_BLOCK_EXIT([opCtx, &result] {
-        auto body = result->getBodyBuilder();
-        appendRequiredFieldsToResponse(opCtx, &body);
-    });
+    [&] {
+        const Command* c = invocation->definition();
 
-    const auto dbname = request.getDatabase();
-    uassert(ErrorCodes::IllegalOperation,
-            "Can't use 'local' database through mongos",
-            dbname != NamespaceString::kLocalDb);
-    uassert(ErrorCodes::InvalidNamespace,
+        const auto dbname = request.getDatabase();
+        uassert(ErrorCodes::IllegalOperation,
+                "Can't use 'local' database through mongos",
+                dbname != NamespaceString::kLocalDb);
+        uassert(
+            ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid database name: '" << dbname << "'",
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
-    StringMap<int> topLevelFields;
-    for (auto&& element : request.body) {
-        StringData fieldName = element.fieldNameStringData();
-        if (fieldName == "help" && element.type() == Bool && element.Bool()) {
-            std::stringstream help;
-            help << "help for: " << c->getName() << " " << c->help();
+        StringMap<int> topLevelFields;
+        for (auto&& element : request.body) {
+            StringData fieldName = element.fieldNameStringData();
+            if (fieldName == "help" && element.type() == Bool && element.Bool()) {
+                std::stringstream help;
+                help << "help for: " << c->getName() << " " << c->help();
+                auto body = result->getBodyBuilder();
+                body.append("help", help.str());
+                CommandHelpers::appendSimpleCommandStatus(body, true, "");
+                return;
+            }
+
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "Parsed command object contains duplicate top level key: "
+                                  << fieldName,
+                    topLevelFields[fieldName]++ == 0);
+        }
+
+        try {
+            invocation->checkAuthorization(opCtx, request);
+        } catch (const DBException& e) {
             auto body = result->getBodyBuilder();
-            body.append("help", help.str());
-            CommandHelpers::appendSimpleCommandStatus(body, true, "");
+            CommandHelpers::appendCommandStatusNoThrow(body, e.toStatus());
             return;
         }
 
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Parsed command object contains duplicate top level key: "
-                              << fieldName,
-                topLevelFields[fieldName]++ == 0);
-    }
+        auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "read concern snapshot is only supported in a multi-statement transaction",
+                    TransactionRouter::get(opCtx));
+        }
 
-    try {
-        invocation->checkAuthorization(opCtx, request);
-    } catch (const DBException& e) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatusNoThrow(body, e.toStatus());
-        return;
-    }
+        // attach tracking
+        rpc::TrackingMetadata trackingMetadata;
+        trackingMetadata.initWithOperName(c->getName());
+        rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
 
-    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        uassert(ErrorCodes::InvalidOptions,
-                "read concern snapshot is only supported in a multi-statement transaction",
-                TransactionRouter::get(opCtx));
-    }
+        auto metadataStatus = processCommandMetadata(opCtx, request.body);
+        if (!metadataStatus.isOK()) {
+            auto body = result->getBodyBuilder();
+            CommandHelpers::appendCommandStatusNoThrow(body, metadataStatus);
+            return;
+        }
 
-    // attach tracking
-    rpc::TrackingMetadata trackingMetadata;
-    trackingMetadata.initWithOperName(c->getName());
-    rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
+        auto txnRouter = TransactionRouter::get(opCtx);
+        if (txnRouter) {
+            invokeInTransactionRouter(opCtx, request, invocation, result);
+        } else {
+            CommandHelpers::runCommandInvocation(opCtx, request, invocation, result);
+        }
 
-    auto metadataStatus = processCommandMetadata(opCtx, request.body);
-    if (!metadataStatus.isOK()) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatusNoThrow(body, metadataStatus);
-        return;
-    }
-
-    auto txnRouter = TransactionRouter::get(opCtx);
-    if (txnRouter) {
-        invokeInTransactionRouter(opCtx, request, invocation, result);
-    } else {
-        CommandHelpers::runCommandInvocation(opCtx, request, invocation, result);
-    }
-
-    if (invocation->supportsWriteConcern()) {
-        failCommand.executeIf(
-            [&](const BSONObj& data) {
-                result->getBodyBuilder().append(data["writeConcernError"]);
-                if (data.hasField(kErrorLabelsFieldName) &&
-                    data[kErrorLabelsFieldName].type() == Array) {
-                    auto labels = data.getObjectField(kErrorLabelsFieldName).getOwned();
-                    if (!labels.isEmpty()) {
-                        result->getBodyBuilder().append(kErrorLabelsFieldName, BSONArray(labels));
+        if (invocation->supportsWriteConcern()) {
+            failCommand.executeIf(
+                [&](const BSONObj& data) {
+                    result->getBodyBuilder().append(data["writeConcernError"]);
+                    if (data.hasField(kErrorLabelsFieldName) &&
+                        data[kErrorLabelsFieldName].type() == Array) {
+                        auto labels = data.getObjectField(kErrorLabelsFieldName).getOwned();
+                        if (!labels.isEmpty()) {
+                            result->getBodyBuilder().append(kErrorLabelsFieldName,
+                                                            BSONArray(labels));
+                        }
                     }
-                }
-            },
-            [&](const BSONObj& data) {
-                return CommandHelpers::shouldActivateFailCommandFailPoint(
-                           data, invocation, opCtx->getClient()) &&
-                    data.hasField("writeConcernError");
-            });
-    }
+                },
+                [&](const BSONObj& data) {
+                    return CommandHelpers::shouldActivateFailCommandFailPoint(
+                               data, invocation, opCtx->getClient()) &&
+                        data.hasField("writeConcernError");
+                });
+        }
+
+        auto body = result->getBodyBuilder();
+
+        bool ok = CommandHelpers::extractOrAppendOk(body);
+        if (!ok) {
+            c->incrementCommandsFailed();
+
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                txnRouter.implicitlyAbortTransaction(opCtx,
+                                                     getStatusFromCommandResult(body.asTempObj()));
+            }
+        }
+    }();
 
     auto body = result->getBodyBuilder();
-
-    bool ok = CommandHelpers::extractOrAppendOk(body);
-    if (!ok) {
-        c->incrementCommandsFailed();
-
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter.implicitlyAbortTransaction(opCtx,
-                                                 getStatusFromCommandResult(body.asTempObj()));
-        }
-    }
+    appendRequiredFieldsToResponse(opCtx, &body);
 }
 
 MONGO_FAIL_POINT_DEFINE(doNotRefreshShardsOnRetargettingError);
@@ -326,11 +329,11 @@ void runCommand(OperationContext* opCtx,
     auto const command = CommandHelpers::findCommand(commandName);
     if (!command) {
         auto builder = replyBuilder->getBodyBuilder();
-        ON_BLOCK_EXIT([opCtx, &builder] { appendRequiredFieldsToResponse(opCtx, &builder); });
         CommandHelpers::appendCommandStatusNoThrow(
             builder,
             {ErrorCodes::CommandNotFound, str::stream() << "no such cmd: " << commandName});
         globalCommandRegistry()->incrementUnknownCommands();
+        appendRequiredFieldsToResponse(opCtx, &builder);
         return;
     }
 

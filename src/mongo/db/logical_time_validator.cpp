@@ -44,10 +44,14 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(throwClientDisconnectInSignLogicalTimeForExternalClients);
+
 const auto getLogicalClockValidator =
     ServiceContext::declareDecoration<std::unique_ptr<LogicalTimeValidator>>();
 
@@ -135,6 +139,16 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(OperationContext* opCtx,
         if (keyStatus == ErrorCodes::KeyNotFound) {
             sleepFor(kRefreshIntervalIfErrored);
         }
+    }
+
+    if (MONGO_unlikely(
+            throwClientDisconnectInSignLogicalTimeForExternalClients.shouldFail() &&
+            opCtx->getClient()->session() &&
+            !(opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient))) {
+        // KeysCollectionManager::refreshNow() can throw an exception if the client has
+        // already disconnected. We simulate such behavior using this failpoint.
+        keyStatus = {ErrorCodes::ClientDisconnect,
+                     "throwClientDisconnectInSignLogicalTimeForExternalClients failpoint enabled"};
     }
 
     uassertStatusOK(keyStatus);

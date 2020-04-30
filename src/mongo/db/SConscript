@@ -1573,6 +1573,7 @@ env.Library(
         'logical_time',
         'keys_collection_client_sharded',
         'repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
     ],
 )
 
