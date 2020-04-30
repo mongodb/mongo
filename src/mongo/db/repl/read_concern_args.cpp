@@ -209,8 +209,10 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
 
     if (_afterClusterTime && _atClusterTime) {
         return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "Can not specify both " << kAfterClusterTimeFieldName
-                                    << " and " << kAtClusterTimeFieldName);
+                      "Specifying a timestamp for readConcern snapshot in a causally consistent "
+                      "session is not allowed. See "
+                      "https://docs.mongodb.com/manual/core/read-isolation-consistency-recency/"
+                      "#causal-consistency");
     }
 
     // Note: 'available' should not be used with after cluster time, as cluster time can wait for
