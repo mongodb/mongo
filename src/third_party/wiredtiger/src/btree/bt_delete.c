@@ -263,7 +263,7 @@ __tombstone_update_alloc(
 {
     WT_UPDATE *upd;
 
-    WT_RET(__wt_update_alloc(session, NULL, &upd, sizep, WT_UPDATE_TOMBSTONE));
+    WT_RET(__wt_upd_alloc_tombstone(session, &upd, sizep));
 
     /*
      * Cleared memory matches the lowest possible transaction ID and timestamp, do nothing.

@@ -205,8 +205,6 @@ __wt_hs_cursor_open(WT_SESSION_IMPL *session)
 int
 __wt_hs_cursor(WT_SESSION_IMPL *session, uint32_t *session_flags, bool *is_owner)
 {
-    /* We should never reach here if working in context of the default session. */
-    WT_ASSERT(session, S2C(session)->default_session != session);
 
     /*
      * We don't want to get tapped for eviction after we start using the history store cursor; save
@@ -362,7 +360,6 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
     WT_UPDATE *hs_upd;
-    size_t notused;
     uint32_t session_flags;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
@@ -380,7 +377,7 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
      * Insert a delete record to represent stop time pair for the actual record to be inserted. Set
      * the stop time pair as the commit time pair of the history store delete record.
      */
-    WT_ERR(__wt_update_alloc(session, NULL, &hs_upd, &notused, WT_UPDATE_TOMBSTONE));
+    WT_ERR(__wt_upd_alloc_tombstone(session, &hs_upd, NULL));
     hs_upd->start_ts = stop_ts_pair.timestamp;
     hs_upd->durable_ts = stop_ts_pair.timestamp;
     hs_upd->txnid = stop_ts_pair.txnid;
@@ -389,7 +386,7 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
      * Append to the delete record, the actual record to be inserted into the history store. Set the
      * current update start time pair as the commit time pair to the history store record.
      */
-    WT_ERR(__wt_update_alloc(session, &cursor->value, &hs_upd->next, &notused, WT_UPDATE_STANDARD));
+    WT_ERR(__wt_upd_alloc(session, &cursor->value, WT_UPDATE_STANDARD, &hs_upd->next, NULL));
     hs_upd->next->start_ts = upd->start_ts;
     hs_upd->next->durable_ts = upd->durable_ts;
     hs_upd->next->txnid = upd->txnid;
@@ -880,7 +877,6 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
     WT_UPDATE *mod_upd, *upd;
     wt_timestamp_t durable_timestamp, durable_timestamp_tmp, hs_start_ts, hs_start_ts_tmp;
     wt_timestamp_t hs_stop_ts, hs_stop_ts_tmp, read_timestamp;
-    size_t notused, size;
     uint64_t hs_counter, hs_counter_tmp, upd_type_full;
     uint32_t hs_btree_id, session_flags;
     uint8_t *p, recno_key_buf[WT_INTPACK64_MAXSIZE], upd_type;
@@ -894,7 +890,6 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
     orig_hs_value_buf = NULL;
     __wt_modify_vector_init(session, &modifies);
     txn = session->txn;
-    notused = size = 0;
     hs_btree_id = S2BT(session)->id;
     session_flags = 0; /* [-Werror=maybe-uninitialized] */
     WT_NOT_READ(modify, false);
@@ -968,8 +963,16 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
         WT_NOT_READ(modify, true);
         /* Store this so that we don't have to make a special case for the first modify. */
         hs_stop_ts_tmp = hs_stop_ts;
+
+        /*
+         * Resolving update chains of reverse deltas requires the current transaction to look beyond
+         * its current snapshot in certain scenarios. This flag allows us to ignore transaction
+         * visibility checks when reading in order to construct the modify chain, so we can create
+         * the value we expect.
+         */
+        F_SET(session, WT_SESSION_RESOLVING_MODIFY);
         while (upd_type == WT_UPDATE_MODIFY) {
-            WT_ERR(__wt_update_alloc(session, hs_value, &mod_upd, &notused, upd_type));
+            WT_ERR(__wt_upd_alloc(session, hs_value, upd_type, &mod_upd, NULL));
             WT_ERR(__wt_modify_vector_push(&modifies, mod_upd));
             mod_upd = NULL;
 
@@ -1021,7 +1024,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
               hs_cursor, &hs_stop_ts_tmp, &durable_timestamp_tmp, &upd_type_full, hs_value));
             upd_type = (uint8_t)upd_type_full;
         }
-
+        F_CLR(session, WT_SESSION_RESOLVING_MODIFY);
         WT_ASSERT(session, upd_type == WT_UPDATE_STANDARD);
         while (modifies.size > 0) {
             __wt_modify_vector_pop(&modifies, &mod_upd);
@@ -1035,7 +1038,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
     }
 
     /* Allocate an update structure for the record found. */
-    WT_ERR(__wt_update_alloc(session, hs_value, &upd, &size, upd_type));
+    WT_ERR(__wt_upd_alloc(session, hs_value, upd_type, &upd, NULL));
     upd->txnid = WT_TXN_NONE;
     upd->durable_ts = durable_timestamp;
     upd->start_ts = hs_start_ts;
@@ -1050,6 +1053,8 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, uint64_t recno, WT_UPDA
 
 done:
 err:
+    F_CLR(session, WT_SESSION_RESOLVING_MODIFY);
+
     if (orig_hs_value_buf != NULL)
         __wt_scr_free(session, &orig_hs_value_buf);
     else
@@ -1196,7 +1201,6 @@ __hs_delete_key_from_pos(
     WT_ITEM hs_key;
     WT_UPDATE *upd;
     wt_timestamp_t hs_start_ts;
-    size_t size;
     uint64_t hs_counter;
     uint32_t hs_btree_id;
     int cmp;
@@ -1225,7 +1229,7 @@ __hs_delete_key_from_pos(
          * Append a globally visible tombstone to the update list. This will effectively make the
          * value invisible and the key itself will eventually get removed during reconciliation.
          */
-        WT_RET(__wt_update_alloc(session, NULL, &upd, &size, WT_UPDATE_TOMBSTONE));
+        WT_RET(__wt_upd_alloc_tombstone(session, &upd, NULL));
         upd->txnid = WT_TXN_NONE;
         upd->start_ts = upd->durable_ts = WT_TS_NONE;
         WT_ERR(__wt_hs_modify(hs_cbt, upd));
@@ -1240,121 +1244,186 @@ err:
 }
 
 /*
- * __wt_verify_history_store_tree --
- *     Verify the history store. There can't be an entry in the history store without having the
- *     latest value for the respective key in the data store. If given a uri, limit the verification
- *     to the corresponding btree.
+ * __verify_history_store_id --
+ *     Verify the history store for a single btree. Given a cursor to the tree, walk all history
+ *     store keys. This function assumes any caller has already opened a cursor to the history
+ *     store.
  */
-int
-__wt_verify_history_store_tree(WT_SESSION_IMPL *session, const char *uri)
+static int
+__verify_history_store_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint32_t this_btree_id)
 {
-    WT_CURSOR *cursor, *data_cursor;
+    WT_CURSOR *cursor;
     WT_DECL_ITEM(hs_key);
     WT_DECL_ITEM(prev_hs_key);
+    WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     wt_timestamp_t hs_start_ts;
     uint64_t hs_counter;
-    uint32_t btree_id, btree_id_given_uri, session_flags, prev_btree_id;
-    int exact, cmp;
-    char *uri_itr;
-    bool is_owner;
+    uint32_t btree_id;
+    int cmp;
+    bool found;
 
-    cursor = data_cursor = NULL;
-    btree_id_given_uri = 0; /* [-Wconditional-uninitialized] */
-    session_flags = 0;      /* [-Wconditional-uninitialized] */
-    prev_btree_id = 0;      /* [-Wconditional-uninitialized] */
-    uri_itr = NULL;
-    is_owner = false; /* [-Wconditional-uninitialized] */
+    cursor = session->hs_cursor;
 
     WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
     WT_ERR(__wt_scr_alloc(session, 0, &prev_hs_key));
 
-    WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
-    cursor = session->hs_cursor;
-
     /*
-     * If a uri has been provided, limit verification to the corresponding btree by jumping to the
-     * first record for that btree in the history store. Otherwise scan the whole history store.
+     * The caller is responsible for positioning the history store cursor at the first record to
+     * verify. When we return after moving to a new key the caller is responsible for keeping the
+     * cursor there or deciding they're done.
      */
-    if (uri != NULL) {
-        ret = __wt_metadata_uri_to_btree_id(session, uri, &btree_id_given_uri);
-        if (ret != 0)
-            WT_ERR_MSG(session, ret, "Unable to locate the URI %s in the metadata file", uri);
-
-        /*
-         * Position the cursor at the first record of the specified btree, or one after. It is
-         * possible there are no records in the history store for this btree.
-         */
-        cursor->set_key(cursor, btree_id_given_uri, hs_key, 0, 0, 0, 0);
-        ret = cursor->search_near(cursor, &exact);
-        if (ret == 0 && exact < 0)
-            ret = cursor->next(cursor);
-    } else
-        ret = cursor->next(cursor);
-
-    /* We have the history store cursor positioned at the first record that we want to verify. */
     for (; ret == 0; ret = cursor->next(cursor)) {
         WT_ERR(cursor->get_key(cursor, &btree_id, hs_key, &hs_start_ts, &hs_counter));
 
-        /* When limiting our verification to a uri, bail out if the btree-id doesn't match. */
-        if (uri != NULL && btree_id != btree_id_given_uri)
+        /*
+         * If the btree id does not match the preview one, we're done. It is up to the caller to set
+         * up for the next tree and call us, if they choose. For a full history store walk, the
+         * caller sends in WT_BTREE_ID_INVALID and this function will set and use the first btree id
+         * it finds and will return once it walks off that tree, leaving the cursor set to the first
+         * key of that new tree.
+         */
+        if (btree_id != this_btree_id)
             break;
 
         /*
-         *  Keep track of the previous comparison. The history store is stored in order, so we can
-         *  avoid redundant comparisons. Previous btree ID isn't set, until data cursor is open.
+         * If we have already checked against this key, keep going to the next key. We only need to
+         * check the key once.
          */
-        if (data_cursor == NULL || (prev_btree_id != btree_id)) {
-            /*
-             * Check whether this btree-id exists in the metadata. We do that by finding what uri
-             * this btree belongs to. Using this URI, verify the history store key with the data
-             * store.
-             */
-            if (data_cursor != NULL) {
-                WT_ERR(data_cursor->close(data_cursor));
-                /* Setting data_cursor to null, to avoid double free */
-                data_cursor = NULL;
-            }
-            /*
-             * Using the btree-id find the metadata entry and extract the URI for this btree. Don't
-             * forget to free the copy of the URI returned.
-             *
-             * Re-purpose the previous-key buffer on error, safe because we're about to error out.
-             */
-            __wt_free(session, uri_itr);
-            if ((ret = __wt_metadata_btree_id_to_uri(session, btree_id, &uri_itr)) != 0)
-                WT_ERR_MSG(session, ret,
-                  "Unable to find btree-id %" PRIu32
-                  " in the metadata file for the associated history store key %s",
-                  btree_id,
-                  __wt_buf_set_printable(session, hs_key->data, hs_key->size, prev_hs_key));
-
-            WT_ERR(__wt_open_cursor(session, uri_itr, NULL, NULL, &data_cursor));
-            F_SET(data_cursor, WT_CURSOR_RAW_OK);
-        } else {
-            WT_ERR(__wt_compare(session, NULL, hs_key, prev_hs_key, &cmp));
-            if (cmp == 0)
-                continue;
-        }
-        WT_ERR(__wt_buf_set(session, prev_hs_key, hs_key->data, hs_key->size));
-        prev_btree_id = btree_id;
-
-        /* Re-purpose the previous-key buffer on error, safe because we're about to error out. */
-        data_cursor->set_key(data_cursor, hs_key);
-        if ((ret = data_cursor->search(data_cursor)) == WT_NOTFOUND)
-            WT_ERR_MSG(session, ret,
-              "In %s, the associated history store key %s was not found in the data store", uri_itr,
-              __wt_buf_set_printable(session, hs_key->data, hs_key->size, prev_hs_key));
+        WT_ERR(__wt_compare(session, NULL, hs_key, prev_hs_key, &cmp));
+        if (cmp == 0)
+            continue;
+        WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, hs_key, false, NULL, false, NULL));
         WT_ERR(ret);
-    }
-    WT_ERR_NOTFOUND_OK(ret, false);
-err:
-    if (data_cursor != NULL)
-        WT_TRET(data_cursor->close(data_cursor));
-    WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
 
+/* FIXME: temporarily disable hs verification. */
+#if 0
+        found = cbt->compare == 0;
+#else
+        found = true;
+#endif
+        WT_ERR(__cursor_reset(cbt));
+
+        if (!found)
+            WT_ERR_MSG(session, WT_PANIC,
+              "the associated history store key %s was not found in the data store %s",
+              __wt_buf_set_printable(session, hs_key->data, hs_key->size, prev_hs_key),
+              session->dhandle->name);
+
+        /* Swap current/previous buffers. */
+        tmp = hs_key;
+        hs_key = prev_hs_key;
+        prev_hs_key = tmp;
+    }
+    WT_ERR_NOTFOUND_OK(ret, true);
+err:
     __wt_scr_free(session, &hs_key);
     __wt_scr_free(session, &prev_hs_key);
-    __wt_free(session, uri_itr);
+    return (ret);
+}
+
+/*
+ * __wt_history_store_verify_one --
+ *     Verify the history store for the btree that is set up in this session. This must be called
+ *     when we are known to have exclusive access to the btree.
+ */
+int
+__wt_history_store_verify_one(WT_SESSION_IMPL *session)
+{
+    WT_CURSOR *cursor;
+    WT_CURSOR_BTREE cbt;
+    WT_DECL_RET;
+    WT_ITEM hs_key;
+    uint32_t btree_id;
+    int exact;
+
+    cursor = session->hs_cursor;
+    btree_id = S2BT(session)->id;
+
+    /*
+     * We are required to position the history store cursor. Set it to the first record of our btree
+     * in the history store.
+     */
+    memset(&hs_key, 0, sizeof(hs_key));
+    cursor->set_key(cursor, btree_id, &hs_key, 0, 0, 0, 0);
+    ret = cursor->search_near(cursor, &exact);
+    if (ret == 0 && exact < 0)
+        ret = cursor->next(cursor);
+
+    /* If we positioned the cursor there is something to verify. */
+    if (ret == 0) {
+        __wt_btcur_init(session, &cbt);
+        __wt_btcur_open(&cbt);
+        ret = __verify_history_store_id(session, &cbt, btree_id);
+        WT_TRET(__wt_btcur_close(&cbt, false));
+    }
+    return (ret == WT_NOTFOUND ? 0 : ret);
+}
+
+/*
+ * __wt_history_store_verify --
+ *     Verify the history store. There can't be an entry in the history store without having the
+ *     latest value for the respective key in the data store.
+ */
+int
+__wt_history_store_verify(WT_SESSION_IMPL *session)
+{
+    WT_CURSOR *cursor, *data_cursor;
+    WT_DECL_ITEM(buf);
+    WT_DECL_ITEM(hs_key);
+    WT_DECL_RET;
+    wt_timestamp_t hs_start_ts;
+    uint64_t hs_counter;
+    uint32_t btree_id, session_flags;
+    char *uri_data;
+    bool is_owner, stop;
+
+    /* We should never reach here if working in context of the default session. */
+    WT_ASSERT(session, S2C(session)->default_session != session);
+
+    cursor = data_cursor = NULL;
+    btree_id = WT_BTREE_ID_INVALID;
+    session_flags = 0; /* [-Wconditional-uninitialized] */
+    uri_data = NULL;
+    is_owner = false; /* [-Wconditional-uninitialized] */
+
+    WT_ERR(__wt_scr_alloc(session, 0, &buf));
+    WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
+    WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
+    cursor = session->hs_cursor;
+    ret = cursor->next(cursor);
+    WT_ERR_NOTFOUND_OK(ret, true);
+    stop = ret == WT_NOTFOUND ? true : false;
+    ret = 0;
+
+    /*
+     * We have the history store cursor positioned at the first record that we want to verify. The
+     * internal function is expecting a btree cursor, so open and initialize that.
+     */
+    while (!stop) {
+        /*
+         * The cursor is positioned either from above or left over from the internal call on the
+         * first key of a new btree id.
+         */
+        WT_ERR(cursor->get_key(cursor, &btree_id, hs_key, &hs_start_ts, &hs_counter));
+        if ((ret = __wt_metadata_btree_id_to_uri(session, btree_id, &uri_data)) != 0)
+            WT_ERR_MSG(session, WT_PANIC,
+              "Unable to find btree id %" PRIu32
+              " in the metadata file for the associated history store key %s",
+              btree_id, __wt_buf_set_printable(session, hs_key->data, hs_key->size, buf));
+        WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &data_cursor));
+        F_SET(data_cursor, WT_CURSOR_RAW_OK);
+        ret = __verify_history_store_id(session, (WT_CURSOR_BTREE *)data_cursor, btree_id);
+        if (ret == WT_NOTFOUND)
+            stop = true;
+        WT_TRET(data_cursor->close(data_cursor));
+        WT_ERR_NOTFOUND_OK(ret, false);
+    }
+err:
+    WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
+
+    __wt_scr_free(session, &buf);
+    __wt_scr_free(session, &hs_key);
+    __wt_free(session, uri_data);
     return (ret);
 }

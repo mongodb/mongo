@@ -535,8 +535,7 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
             #  But, immediately after the corruption, if we run
             #  wiredtiger_open with salvage, it will fail.
             # This anomoly should be fixed or explained.
-            if salvagedir == newdir and self.kind == 'removal' and \
-               self.filename == 'WiredTiger.turtle':
+            if self.kind == 'removal' and self.filename == 'WiredTiger.turtle':
                 continue
 
             if self.is_salvageable():

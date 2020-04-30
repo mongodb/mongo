@@ -797,8 +797,7 @@ restart:
      * it's potentially used when discarding other open data handles. Close it before discarding the
      * underlying metadata handle.
      */
-    if (session->meta_cursor != NULL)
-        WT_TRET(session->meta_cursor->close(session->meta_cursor));
+    WT_TRET(__wt_metadata_cursor_close(session));
 
     /* Close the remaining handles. */
     WT_TAILQ_SAFE_REMOVE_BEGIN(dhandle, &conn->dhqh, q, dhandle_tmp)

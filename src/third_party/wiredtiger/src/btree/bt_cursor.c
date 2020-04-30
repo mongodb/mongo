@@ -386,33 +386,13 @@ __cursor_row_search(WT_CURSOR_BTREE *cbt, bool insert, WT_REF *leaf, bool *leaf_
 }
 
 /*
- * __cursor_col_modify_v --
- *     Column-store modify from a cursor, with a separate value.
- */
-static inline int
-__cursor_col_modify_v(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
-{
-    return (__wt_col_modify(cbt, cbt->iface.recno, value, NULL, modify_type, false));
-}
-
-/*
- * __cursor_row_modify_v --
- *     Row-store modify from a cursor, with a separate value.
- */
-static inline int
-__cursor_row_modify_v(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
-{
-    return (__wt_row_modify(cbt, &cbt->iface.key, value, NULL, modify_type, false));
-}
-
-/*
  * __cursor_col_modify --
  *     Column-store modify from a cursor.
  */
 static inline int
-__cursor_col_modify(WT_CURSOR_BTREE *cbt, u_int modify_type)
+__cursor_col_modify(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 {
-    return (__wt_col_modify(cbt, cbt->iface.recno, &cbt->iface.value, NULL, modify_type, false));
+    return (__wt_col_modify(cbt, cbt->iface.recno, value, NULL, modify_type, false));
 }
 
 /*
@@ -420,9 +400,9 @@ __cursor_col_modify(WT_CURSOR_BTREE *cbt, u_int modify_type)
  *     Row-store modify from a cursor.
  */
 static inline int
-__cursor_row_modify(WT_CURSOR_BTREE *cbt, u_int modify_type)
+__cursor_row_modify(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 {
-    return (__wt_row_modify(cbt, &cbt->iface.key, &cbt->iface.value, NULL, modify_type, false));
+    return (__wt_row_modify(cbt, &cbt->iface.key, value, NULL, modify_type, false));
 }
 
 /*
@@ -845,8 +825,9 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
          * Correct to an exact match so we can update whatever we're pointing at.
          */
         cbt->compare = 0;
-        ret = btree->type == BTREE_ROW ? __cursor_row_modify(cbt, WT_UPDATE_STANDARD) :
-                                         __cursor_col_modify(cbt, WT_UPDATE_STANDARD);
+        ret = btree->type == BTREE_ROW ?
+          __cursor_row_modify(cbt, &cbt->iface.value, WT_UPDATE_STANDARD) :
+          __cursor_col_modify(cbt, &cbt->iface.value, WT_UPDATE_STANDARD);
         if (ret == 0)
             goto done;
 
@@ -883,7 +864,7 @@ retry:
                 WT_ERR(WT_DUPLICATE_KEY);
         }
 
-        ret = __cursor_row_modify(cbt, WT_UPDATE_STANDARD);
+        ret = __cursor_row_modify(cbt, &cbt->iface.value, WT_UPDATE_STANDARD);
     } else if (append_key) {
         /*
          * Optionally insert a new record (ignoring the application's record number). The real
@@ -892,7 +873,7 @@ retry:
         cbt->iface.recno = WT_RECNO_OOB;
         cbt->compare = 1;
         WT_ERR(__cursor_col_search(cbt, NULL, NULL));
-        WT_ERR(__cursor_col_modify(cbt, WT_UPDATE_STANDARD));
+        WT_ERR(__cursor_col_modify(cbt, &cbt->iface.value, WT_UPDATE_STANDARD));
         cursor->recno = cbt->recno;
     } else {
         WT_ERR(__cursor_col_search(cbt, NULL, NULL));
@@ -911,7 +892,7 @@ retry:
                 WT_ERR(WT_DUPLICATE_KEY);
         }
 
-        WT_ERR(__cursor_col_modify(cbt, WT_UPDATE_STANDARD));
+        WT_ERR(__cursor_col_modify(cbt, &cbt->iface.value, WT_UPDATE_STANDARD));
     }
 
 err:
@@ -1073,8 +1054,8 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
          * Correct to an exact match so we can remove whatever we're pointing at.
          */
         cbt->compare = 0;
-        ret = btree->type == BTREE_ROW ? __cursor_row_modify(cbt, WT_UPDATE_TOMBSTONE) :
-                                         __cursor_col_modify(cbt, WT_UPDATE_TOMBSTONE);
+        ret = btree->type == BTREE_ROW ? __cursor_row_modify(cbt, NULL, WT_UPDATE_TOMBSTONE) :
+                                         __cursor_col_modify(cbt, NULL, WT_UPDATE_TOMBSTONE);
         if (ret == 0)
             goto done;
         goto err;
@@ -1108,7 +1089,7 @@ retry:
         if (!valid)
             goto search_notfound;
 
-        ret = __cursor_row_modify(cbt, WT_UPDATE_TOMBSTONE);
+        ret = __cursor_row_modify(cbt, NULL, WT_UPDATE_TOMBSTONE);
     } else {
         WT_ERR_NOTFOUND_OK(__cursor_col_search(cbt, NULL, NULL), true);
         if (ret == WT_NOTFOUND)
@@ -1137,7 +1118,7 @@ retry:
              */
             cbt->recno = cursor->recno;
         } else
-            ret = __cursor_col_modify(cbt, WT_UPDATE_TOMBSTONE);
+            ret = __cursor_col_modify(cbt, NULL, WT_UPDATE_TOMBSTONE);
     }
 
 err:
@@ -1250,8 +1231,8 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
          * Correct to an exact match so we can update whatever we're pointing at.
          */
         cbt->compare = 0;
-        ret = btree->type == BTREE_ROW ? __cursor_row_modify_v(cbt, value, modify_type) :
-                                         __cursor_col_modify_v(cbt, value, modify_type);
+        ret = btree->type == BTREE_ROW ? __cursor_row_modify(cbt, value, modify_type) :
+                                         __cursor_col_modify(cbt, value, modify_type);
         if (ret == 0)
             goto done;
 
@@ -1310,7 +1291,7 @@ update_local:
             if (!valid)
                 WT_ERR(WT_NOTFOUND);
         }
-        ret = __cursor_row_modify_v(cbt, value, modify_type);
+        ret = __cursor_row_modify(cbt, value, modify_type);
     } else {
         /*
          * If not overwriting, fail if the key doesn't exist. If we find an update for the key,
@@ -1326,7 +1307,7 @@ update_local:
             if ((cbt->compare != 0 || !valid) && !__cursor_fix_implicit(btree, cbt))
                 WT_ERR(WT_NOTFOUND);
         }
-        ret = __cursor_col_modify_v(cbt, value, modify_type);
+        ret = __cursor_col_modify(cbt, value, modify_type);
     }
 
 err:
@@ -1542,7 +1523,7 @@ __wt_btcur_reserve(WT_CURSOR_BTREE *cbt)
     /* WT_CURSOR.reserve is update-without-overwrite and a special value. */
     overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
     F_CLR(cursor, WT_CURSTD_OVERWRITE);
-    ret = __btcur_update(cbt, &cursor->value, WT_UPDATE_RESERVE);
+    ret = __btcur_update(cbt, NULL, WT_UPDATE_RESERVE);
     if (overwrite)
         F_SET(cursor, WT_CURSTD_OVERWRITE);
     return (ret);
@@ -1686,7 +1667,7 @@ __wt_btcur_equals(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *equalp)
  */
 static int
 __cursor_truncate(
-  WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, int (*rmfunc)(WT_CURSOR_BTREE *, u_int))
+  WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, int (*rmfunc)(WT_CURSOR_BTREE *, WT_ITEM *, u_int))
 {
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
@@ -1715,7 +1696,7 @@ retry:
     WT_ASSERT(session, F_MASK((WT_CURSOR *)start, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
 
     for (;;) {
-        WT_ERR(rmfunc(start, WT_UPDATE_TOMBSTONE));
+        WT_ERR(rmfunc(start, NULL, WT_UPDATE_TOMBSTONE));
 
         if (stop != NULL && __cursor_equals(start, stop))
             return (0);
@@ -1741,7 +1722,7 @@ err:
  */
 static int
 __cursor_truncate_fix(
-  WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, int (*rmfunc)(WT_CURSOR_BTREE *, u_int))
+  WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, int (*rmfunc)(WT_CURSOR_BTREE *, WT_ITEM *, u_int))
 {
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
@@ -1774,7 +1755,7 @@ retry:
     for (;;) {
         value = (const uint8_t *)start->iface.value.data;
         if (*value != 0)
-            WT_ERR(rmfunc(start, WT_UPDATE_TOMBSTONE));
+            WT_ERR(rmfunc(start, NULL, WT_UPDATE_TOMBSTONE));
 
         if (stop != NULL && __cursor_equals(start, stop))
             return (0);

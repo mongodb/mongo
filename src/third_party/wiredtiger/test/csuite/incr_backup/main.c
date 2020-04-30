@@ -58,9 +58,8 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
  */
 static bool slow_incremental = false;
 
-/* TODO: rename and drop are not currently working, they give resource busy. */
-static bool do_rename = false;
-static bool do_drop = false;
+static bool do_drop = true;
+static bool do_rename = true;
 
 #define VERBOSE(level, fmt, ...)      \
     do {                              \

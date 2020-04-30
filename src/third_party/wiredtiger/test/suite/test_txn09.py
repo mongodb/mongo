@@ -30,7 +30,7 @@
 #   Transactions: recovery toggling logging
 #
 
-import fnmatch, os, shutil, time, unittest
+import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 import wttest

@@ -31,7 +31,7 @@
 #
 
 from suite_subprocess import suite_subprocess
-import unittest, wiredtiger, wttest
+import wiredtiger, wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 

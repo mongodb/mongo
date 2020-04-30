@@ -1528,7 +1528,6 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     mod->last_eviction_timestamp = orig->modify->last_eviction_timestamp;
     mod->rec_max_txn = orig->modify->rec_max_txn;
     mod->rec_max_timestamp = orig->modify->rec_max_timestamp;
-    mod->last_stable_timestamp = orig->modify->last_stable_timestamp;
 
     /* Add the update/restore flag to any previous state. */
     mod->restore_state = orig->modify->restore_state;
@@ -1767,6 +1766,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
      */
     WT_ASSERT(session, __wt_leaf_page_can_split(session, page));
     WT_ASSERT(session, __wt_page_is_modified(page));
+    WT_ASSERT(session, __wt_page_del_active(session, ref, true) == false);
     F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
     /* Find the last item on the page. */
@@ -1796,9 +1796,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     child->addr = ref->addr;
     F_SET(child, WT_REF_FLAG_LEAF);
     child->state = WT_REF_MEM;
-
-    WT_ERR_ASSERT(session, ref->page_del == NULL, WT_PANIC,
-      "unexpected page-delete structure when splitting a page");
 
     /*
      * The address has moved to the replacement WT_REF. Make sure it isn't freed when the original

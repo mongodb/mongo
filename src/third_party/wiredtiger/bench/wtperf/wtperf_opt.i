@@ -170,10 +170,10 @@ DEF_OPT_AS_UINT32(scan_table_count, 0,
   "that tables are shared with other operations")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
 DEF_OPT_AS_UINT32(session_count_idle, 0, "number of idle sessions to create. Default 0.")
+/* The following table configuration is based on the configuration MongoDB uses for collections. */
 DEF_OPT_AS_CONFIG_STRING(table_config,
-  "key_format=S,value_format=S,type=lsm,exclusive=true,"
-  "allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,"
-  "split_pct=100",
+  "key_format=S,value_format=S,type=file,exclusive=true,"
+  "leaf_value_max=64MB,memory_page_max=10m,split_pct=90,checksum=on",
   "table configuration string")
 DEF_OPT_AS_UINT32(table_count, 1,
   "number of tables to run operations over. Keys are divided evenly "

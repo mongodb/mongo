@@ -8,7 +8,15 @@
 
 #include "util.h"
 
-static int usage(void);
+static int
+usage(void)
+{
+    static const char *options[] = {"-f", "output to the specified file", "-x",
+      "display key and value items in hexadecimal format", NULL, NULL};
+
+    util_usage("printlog [-x] [-f output-file]", "options:", options);
+    return (1);
+}
 
 int
 util_printlog(WT_SESSION *session, int argc, char *argv[])
@@ -42,14 +50,4 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
         (void)util_err(session, ret, "printlog");
 
     return (ret);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "printlog [-x] [-f output-file]\n",
-      progname, usage_prefix);
-    return (1);
 }

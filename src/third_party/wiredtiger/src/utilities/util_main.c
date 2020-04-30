@@ -11,7 +11,7 @@
 const char *home = "."; /* Home directory */
 const char *progname;   /* Program name */
                         /* Global arguments */
-const char *usage_prefix = "[-LRrSVv] [-C config] [-E secretkey] [-h home]";
+const char *usage_prefix = "[-LmRrSVv] [-C config] [-E secretkey] [-h home]";
 bool verbose = false; /* Verbose flag */
 
 static const char *command; /* Command name */
@@ -25,85 +25,32 @@ static const char *command; /* Command name */
 static void
 usage(void)
 {
-    fprintf(stderr, "WiredTiger Data Engine (version %d.%d)\n", WIREDTIGER_VERSION_MAJOR,
-      WIREDTIGER_VERSION_MINOR);
-    fprintf(stderr,
-      "global options:\n"
-      "\t"
-      "-C\t"
-      "wiredtiger_open configuration\n"
-      "\t"
-      "-E\t"
-      "secret encryption key\n"
-      "\t"
-      "-h\t"
-      "database directory\n"
-      "\t"
-      "-L\t"
-      "turn logging off for debug-mode\n"
-      "\t"
-      "-R\t"
-      "run recovery (if recovery configured)\n"
-      "\t"
-      "-r\t"
-      "access the database via a readonly connection\n"
-      "\t"
-      "-S\t"
-      "run salvage recovery (if recovery configured)\n"
-      "\t"
-      "-V\t"
-      "display library version and exit\n"
-      "\t"
-      "-v\t"
-      "verbose\n");
-    fprintf(stderr,
-      "commands:\n"
-      "\t"
-      "alter\t  alter an object\n"
-      "\t"
-      "backup\t  database backup\n"
-      "\t"
-      "compact\t  compact an object\n"
-      "\t"
-      "copyright copyright information\n"
-      "\t"
-      "create\t  create an object\n"
-      "\t"
-      "downgrade downgrade a database\n"
-      "\t"
-      "drop\t  drop an object\n"
-      "\t"
-      "dump\t  dump an object\n"
+    static const char *options[] = {"-B", "maintain release 3.3 log file compatibility",
+      "-C config", "wiredtiger_open configuration", "-E key", "secret encryption key", "-h home",
+      "database directory", "-L", "turn logging off for debug-mode", "-m", "run verify on metadata",
+      "-R", "run recovery (if recovery configured)", "-r",
+      "access the database via a readonly connection", "-S",
+      "run salvage recovery (if recovery configured)", "-V", "display library version and exit",
+      "-v", "verbose", NULL, NULL};
+    static const char *commands[] = {"alter", "alter an object", "backup", "database backup",
+      "compact", "compact an object", "copyright", "display copyright information", "create",
+      "create an object", "downgrade", "downgrade a database", "drop", "drop an object", "dump",
+      "dump an object",
       /*
        * Import is not documented.
-       * "\t" "import\t  import an object\n"
+       * "import", "import an object"
        */
-      "\t"
-      "list\t  list database objects\n"
-      "\t"
-      "load\t  load an object\n"
-      "\t"
-      "loadtext  load an object from a text file\n"
-      "\t"
-      "printlog  display the database log\n"
-      "\t"
-      "read\t  read values from an object\n"
-      "\t"
-      "rebalance rebalance an object\n"
-      "\t"
-      "rename\t  rename an object\n"
-      "\t"
-      "salvage\t  salvage a file\n"
-      "\t"
-      "stat\t  display statistics for an object\n"
-      "\t"
-      "truncate  truncate an object, removing all content\n"
-      "\t"
-      "upgrade\t  upgrade an object\n"
-      "\t"
-      "verify\t  verify an object\n"
-      "\t"
-      "write\t  write values to an object\n");
+      "list", "list database objects", "load", "load an object", "loadtext",
+      "load an object from a text file", "printlog", "display the database log", "read",
+      "read values from an object", "rebalance", "rebalance an object", "rename",
+      "rename an object", "salvage", "salvage a file", "stat", "display statistics for an object",
+      "truncate", "truncate an object, removing all content", "upgrade", "upgrade an object",
+      "verify", "verify an object", "write", "write values to an object", NULL, NULL};
+
+    fprintf(stderr, "WiredTiger Data Engine (version %d.%d)\n", WIREDTIGER_VERSION_MAJOR,
+      WIREDTIGER_VERSION_MINOR);
+    util_usage(NULL, "global_options:", options);
+    util_usage(NULL, "commands:", commands);
 }
 
 int
@@ -116,7 +63,7 @@ main(int argc, char *argv[])
     int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
     char *p, *secretkey;
     const char *cmd_config, *config, *p1, *p2, *p3, *readonly_config, *rec_config;
-    bool logoff, readonly, recover, salvage;
+    bool backward_compatible, logoff, meta_verify, readonly, recover, salvage;
 
     conn = NULL;
     p = NULL;
@@ -145,10 +92,13 @@ main(int argc, char *argv[])
      * needed, the user can specify -R to run recovery.
      */
     rec_config = REC_ERROR;
-    logoff = readonly = recover = salvage = false;
+    backward_compatible = logoff = meta_verify = readonly = recover = salvage = false;
     /* Check for standard options. */
-    while ((ch = __wt_getopt(progname, argc, argv, "C:E:h:LRrSVv")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "BC:E:h:LmRrSVv")) != EOF)
         switch (ch) {
+        case 'B': /* backward compatibility */
+            backward_compatible = true;
+            break;
         case 'C': /* wiredtiger_open config */
             cmd_config = __wt_optarg;
             break;
@@ -166,6 +116,10 @@ main(int argc, char *argv[])
         case 'L': /* no logging */
             rec_config = REC_LOGOFF;
             logoff = true;
+            break;
+        case 'm': /* verify metadata on connection open */
+            cmd_config = "verify_metadata=true";
+            meta_verify = true;
             break;
         case 'R': /* recovery */
             rec_config = REC_RECOVER;
@@ -201,8 +155,11 @@ main(int argc, char *argv[])
     argc -= __wt_optind;
     argv += __wt_optind;
 
+    func = NULL;
     /* The next argument is the command name. */
     if (argc < 1) {
+        if (meta_verify)
+            goto open;
         usage();
         goto err;
     }
@@ -210,7 +167,6 @@ main(int argc, char *argv[])
 
     /* Reset getopt. */
     __wt_optreset = __wt_optind = 1;
-    func = NULL;
     switch (command[0]) {
     case 'a':
         if (strcmp(command, "alter") == 0)
@@ -300,6 +256,7 @@ main(int argc, char *argv[])
         goto err;
     }
 
+open:
     /* Build the configuration string. */
     len = 10; /* some slop */
     p1 = p2 = p3 = "";
@@ -329,17 +286,21 @@ main(int argc, char *argv[])
     }
     config = p;
 
-    /* Open the database and a session. */
     if ((ret = wiredtiger_open(home, verbose ? verbose_handler : NULL, config, &conn)) != 0) {
         (void)util_err(NULL, ret, NULL);
         goto err;
     }
+
+    /* If we only want to verify the metadata, that is done in wiredtiger_open. We're done. */
+    if (func == NULL && meta_verify)
+        goto done;
+
     if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
         (void)util_err(NULL, ret, NULL);
         goto err;
     }
 
-    /* Call the function. */
+    /* Call the function after opening the database and session. */
     ret = func(session, argc, argv);
 
     if (0) {
@@ -348,9 +309,16 @@ err:
     }
 done:
 
-    /* Close the database. */
-    if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
-        ret = tret;
+    if (conn != NULL) {
+        /* Maintain backward compatibility. */
+        if (backward_compatible &&
+          (tret = conn->reconfigure(conn, "compatibility=(release=3.3)")) != 0 && ret == 0)
+            ret = tret;
+
+        /* Close the database. */
+        if ((tret = conn->close(conn, NULL)) != 0 && ret == 0)
+            ret = tret;
+    }
 
     free(p);
     free(secretkey);

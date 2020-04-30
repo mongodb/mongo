@@ -26,7 +26,24 @@ static int dump_table_parts_config(WT_SESSION *, WT_CURSOR *, const char *, cons
 static int dup_json_string(const char *, char **);
 static int print_config(WT_SESSION *, const char *, const char *, bool, bool);
 static int time_pair_to_timestamp(WT_SESSION_IMPL *, char *, WT_ITEM *);
-static int usage(void);
+
+static int
+usage(void)
+{
+    static const char *options[] = {"-c checkpoint",
+      "dump as of the named checkpoint (the default is the most recent version of the data)",
+      "-f output", "dump to the specified file (the default is stdout)", "-j",
+      "dump in JSON format", "-r", "dump in reverse order", "-t timestamp",
+      "dump as of the specified timestamp (the default is the most recent version of the data)",
+      "-x",
+      "dump all characters in a hexadecimal encoding (by default printable characters are not "
+      "encoded)",
+      NULL, NULL};
+
+    util_usage(
+      "dump [-jrx] [-c checkpoint] [-f output-file] [-t timestamp] uri", "options:", options);
+    return (1);
+}
 
 static FILE *fp;
 
@@ -54,14 +71,14 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         case 'f':
             ofile = __wt_optarg;
             break;
-        case 't':
-            timestamp = __wt_optarg;
-            break;
         case 'j':
             json = true;
             break;
         case 'r':
             reverse = true;
+            break;
+        case 't':
+            timestamp = __wt_optarg;
             break;
         case 'x':
             hex = true;
@@ -663,14 +680,4 @@ print_config(WT_SESSION *session, const char *key, const char *cfg, bool json, b
     if (ret < 0)
         return (util_err(session, EIO, NULL));
     return (0);
-}
-
-static int
-usage(void)
-{
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "dump [-jrx] [-c checkpoint] [-f output-file] [-t timestamp] uri\n",
-      progname, usage_prefix);
-    return (1);
 }

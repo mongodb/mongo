@@ -31,7 +31,6 @@
 #
 
 import wiredtiger, wttest
-from wttest import unittest
 
 class test_sweep02(wttest.WiredTigerTestCase):
     base_config = 'create,'

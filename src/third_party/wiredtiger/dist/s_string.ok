@@ -220,7 +220,6 @@ LOGREC
 LOGSCAN
 LOOKASIDE
 LRU
-LRrSVv
 LSB
 LSM
 LSN
@@ -232,6 +231,7 @@ LZO
 LeafGreen
 LevelDB
 Levyx
+LmRrSVv
 LmT
 LoadLoad
 LockFile

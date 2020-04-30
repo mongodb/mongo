@@ -30,7 +30,7 @@
 #   Test that compact reduces the file size.
 #
 
-import time, unittest, wiredtiger, wttest
+import time, wiredtiger, wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
@@ -109,7 +109,6 @@ class test_compact02(wttest.WiredTigerTestCase):
         self.session = self.conn.open_session(None)
 
     # Create a table, add keys with both big and small values.
-    @unittest.skip("Temporarily disabled")
     def test_compact02(self):
         self.ConnectionOpen(self.cacheSize)
 

@@ -9,6 +9,7 @@ conn_config="cache_size=16G,checkpoint=(wait=60,log_size=2GB),session_max=20000,
 create=false
 compression="snappy"
 sess_config="isolation=snapshot"
+table_config="type=file"
 table_count=2
 key_sz=40
 value_sz=120

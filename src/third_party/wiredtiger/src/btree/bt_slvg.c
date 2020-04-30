@@ -1761,10 +1761,8 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
     WT_REF *ref, **refp;
     WT_TRACK *trk;
     uint32_t i;
-    u_int decr_cnt;
 
     addr = NULL;
-    decr_cnt = 0;
 
     /* Allocate a row-store root (internal) page and fill it in. */
     WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, true, &page));
@@ -1828,21 +1826,14 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * the reconciliation of the root page. For now, make sure the eviction threads don't see us
          * as a threat.
          */
-        if (page->memory_footprint > WT_MEGABYTE) {
-            ++decr_cnt;
+        if (page->memory_footprint > WT_MEGABYTE * 2)
             __wt_cache_page_inmem_decr(session, page, WT_MEGABYTE);
-        }
     }
-    if (decr_cnt != 0)
-        __wt_cache_page_inmem_incr(session, page, decr_cnt * WT_MEGABYTE);
-
     __wt_root_ref_init(session, &ss->root_ref, page, false);
 
     if (0) {
 err:
         __wt_free(session, addr);
-        if (decr_cnt != 0)
-            __wt_cache_page_inmem_incr(session, page, decr_cnt * WT_MEGABYTE);
         __wt_page_out(session, &page);
     }
     return (ret);

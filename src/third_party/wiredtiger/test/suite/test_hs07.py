@@ -28,7 +28,7 @@
 
 import time
 from helper import copy_wiredtiger_home
-import unittest, wiredtiger, wttest
+import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
 def timestamp_str(t):

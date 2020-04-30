@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import copy_wiredtiger_home
-import wiredtiger, wttest, unittest
+import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios

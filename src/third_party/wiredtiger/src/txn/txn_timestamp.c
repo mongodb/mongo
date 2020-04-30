@@ -817,13 +817,13 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
 {
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
-    WT_TXN_SHARED *prev_shared, *txn_shared;
+    WT_TXN_SHARED *prev_shared;
     wt_timestamp_t oldest_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     txn = session->txn;
     txn_global = &S2C(session)->txn_global;
-    prev_shared = txn_shared = WT_SESSION_TXN_SHARED(session);
+    prev_shared = WT_SESSION_TXN_SHARED(session);
 
     WT_RET(__wt_txn_context_prepare_check(session));
 

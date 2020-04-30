@@ -378,7 +378,7 @@ usage(void)
       progname);
     fprintf(stderr, "%s",
       "\t-1 run once then quit\n"
-      "\t-B create backward compatible configurations\n"
+      "\t-B maintain 3.3 release log and configuration option compatibility\n"
       "\t-C specify wiredtiger_open configuration arguments\n"
       "\t-c read test program configuration from a file (default 'CONFIG')\n"
       "\t-h home directory (default 'RUNDIR')\n"

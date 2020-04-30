@@ -28,7 +28,7 @@
 
 import time
 from helper import copy_wiredtiger_home
-import unittest, wiredtiger, wttest
+import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
