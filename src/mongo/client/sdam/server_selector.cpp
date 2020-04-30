@@ -71,7 +71,6 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
             if (maxOpTime && maxOpTime < criteria.minOpTime) {
                 // ignore minOpTime
                 const_cast<ReadPreferenceSetting&>(criteria) = ReadPreferenceSetting(criteria.pref);
-                LOGV2(46712001, "Ignoring minOpTime", "readPreference"_attr = criteria);
             }
         }
     }
