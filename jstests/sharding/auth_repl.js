@@ -1,4 +1,4 @@
-// TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+// Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
 var replTest = new ReplSetTest({nodes: 3, useHostName: false, keyFile: 'jstests/libs/key1'});

@@ -9,8 +9,8 @@ in jstests/auth/lib/commands_lib.js.
 
 */
 
-// TODO SERVER-35447: This test involves killing all sessions, which will not work as expected if
-// the kill command is sent with an implicit session.
+// This test involves killing all sessions, which will not work as expected if the kill command is
+// sent with an implicit session.
 TestData.disableImplicitSessions = true;
 
 // constants

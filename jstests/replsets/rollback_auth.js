@@ -20,7 +20,7 @@
 // TODO SERVER-32639: remove this flag.
 TestData.skipGossipingClusterTime = true;
 
-// TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+// Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
 // helper function for verifying contents at the end of the test

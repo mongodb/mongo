@@ -17,7 +17,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
 (function() {
 "use strict";
 
-// TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+// Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
 var st = new ShardingTest({
