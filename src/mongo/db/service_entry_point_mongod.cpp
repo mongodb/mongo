@@ -238,15 +238,13 @@ public:
             repl::OpTime lastOpTimeFromClient =
                 repl::ReplClientInfo::forClient(opCtx->getClient()).getMaxKnownOpTime();
             replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
-            // For commands from mongos, append some info to help getLastError(w) work.
-            // TODO: refactor out of here as part of SERVER-18236
+
             if (isShardingAware || isConfig) {
+                // For commands from mongos, append some info to help getLastError(w) work.
                 rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
                     .writeToMetadata(metadataBob)
                     .transitional_ignore();
-            }
 
-            if (isShardingAware || isConfig) {
                 auto lastCommittedOpTime = replCoord->getLastCommittedOpTime();
                 metadataBob->append(kLastCommittedOpTimeFieldName,
                                     lastCommittedOpTime.getTimestamp());
