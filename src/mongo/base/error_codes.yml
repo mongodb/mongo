@@ -360,8 +360,9 @@ error_codes:
     - {code: 309,name: ExhaustCommandFinished}
     - {code: 310,name: PeriodicJobIsStopped,categories: [CancelationError]}
 
-    # The code below is for internal use only and must never be returned in a network response.
+    # The codes below are for internal use only and must never be returned in a network response.
     - {code: 311,name: TransactionCoordinatorCanceled}
+    - {code: 312,name: OperationIsKilledAndDelisted,categories: [CancelationError]}
 
     # Error codes 4000-8999 are reserved.
 
