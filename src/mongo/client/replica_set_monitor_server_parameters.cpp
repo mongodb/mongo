@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-ReplicaSetMonitorProtocol gReplicaSetMonitorProtocol{ReplicaSetMonitorProtocol::kSdam};
+ReplicaSetMonitorProtocol gReplicaSetMonitorProtocol{ReplicaSetMonitorProtocol::kStreamable};
 
 std::string toString(ReplicaSetMonitorProtocol protocol) {
     if (protocol == ReplicaSetMonitorProtocol::kScanning) {

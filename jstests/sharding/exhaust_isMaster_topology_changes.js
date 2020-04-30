@@ -23,7 +23,6 @@ let st = new ShardingTest({
     mongos: {
         s0: {
             setParameter: {
-                replicaSetMonitorProtocol: "streamable",
                 "failpoint.overrideMaxAwaitTimeMS":
                     "{'mode': 'alwaysOn', 'data': {'maxAwaitTimeMS': 300000}}"
             }
