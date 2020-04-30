@@ -431,6 +431,19 @@ public:
                        ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
+     * Kills the operation "opCtx" with the code "killCode", if opCtx has not already been killed,
+     * and delists the operation by removing it from "_clientByOperationId" and its client. Both
+     * "opCtx->getClient()->getServiceContext()" and "this" must point to the same instance of
+     * service context. Also, "opCtx" should never be deleted before this method returns. Finally,
+     * the thread invoking this method must not hold (own) the client and the service context locks.
+     * It is highly recommended to use "ErrorCodes::OperationIsKilledAndDelisted" as the error code
+     * to facilitate debugging.
+     */
+    void killAndDelistOperation(
+        OperationContext* opCtx,
+        ErrorCodes::Error killError = ErrorCodes::OperationIsKilledAndDelisted) noexcept;
+
+    /**
      * Registers a listener to be notified each time an op is killed.
      *
      * listener does not become owned by the environment. As there is currently no way to
@@ -607,6 +620,14 @@ private:
     private:
         std::unique_ptr<ClientObserver> _observer;
     };
+
+    /**
+     * Removes the operation from its client and the `_clientByOperationId` of its service context.
+     * It will acquire both client and service context locks, and should only be used internally by
+     * other ServiceContext methods. To ensure delisted operations are shortly deleted, this method
+     * should only be called after killing an operation or in its destructor.
+     */
+    void _delistOperation(OperationContext* opCtx) noexcept;
 
     Mutex _mutex = MONGO_MAKE_LATCH(/*HierarchicalAcquisitionLevel(2), */ "ServiceContext::_mutex");
 

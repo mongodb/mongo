@@ -474,9 +474,12 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
     // database work for this request.
     DbResponse dbresponse = _sep->handleRequest(opCtx.get(), _inMessage);
 
-    // opCtx must be destroyed here so that the operation cannot show
-    // up in currentOp results after the response reaches the client
-    opCtx.reset();
+    // opCtx must be killed and delisted here so that the operation cannot show up in currentOp
+    // results after the response reaches the client. The destruction is postponed for later to
+    // mitigate its performance impact on the critical path of execution.
+    _serviceContext->killAndDelistOperation(opCtx.get(), ErrorCodes::OperationIsKilledAndDelisted);
+    invariant(!_killedOpCtx);
+    _killedOpCtx = std::move(opCtx);
 
     // Format our response, if we have one
     Message& toSink = dbresponse.response;
@@ -540,6 +543,12 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
     if (curState == State::Created) {
         curState = State::Source;
         _state.store(curState);
+    }
+
+    // Destroy the opCtx (already killed) here, to potentially use the delay between clients'
+    // requests to hide the destruction cost.
+    if (MONGO_likely(_killedOpCtx)) {
+        _killedOpCtx.reset();
     }
 
     // Make sure the current Client got set correctly
@@ -676,6 +685,12 @@ void ServiceStateMachine::_cleanupExhaustResources() noexcept try {
 }
 
 void ServiceStateMachine::_cleanupSession(ThreadGuard guard) {
+    // Ensure the delayed destruction of opCtx always happens before doing the cleanup.
+    if (MONGO_likely(_killedOpCtx)) {
+        _killedOpCtx.reset();
+    }
+    invariant(!_killedOpCtx);
+
     _cleanupExhaustResources();
 
     _state.store(State::Ended);
