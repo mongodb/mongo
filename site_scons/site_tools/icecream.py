@@ -71,7 +71,7 @@ def generate(env):
         return
 
     env["ICECCENVCOMSTR"] = env.get("ICECCENVCOMSTR", "Generating environment: $TARGET")
-    env["ICECC_COMPILTER_TYPE"] = env.get(
+    env["ICECC_COMPILER_TYPE"] = env.get(
         "ICECC_COMPILER_TYPE", os.path.basename(env.WhereIs("${CC}"))
     )
     env.Append(
@@ -120,82 +120,90 @@ def generate(env):
     env["CC"] = env.WhereIs("$CC")
     env["CXX"] = env.WhereIs("$CXX")
 
-    # Generate the deterministic name for our tarball
-    icecc_version_target_filename = env.subst("${CC}${CXX}.tar.gz").replace("/", "_")[
-        1:
-    ]
-    icecc_version_dir = env.Dir("$BUILD_ROOT/scons/icecc")
-    icecc_known_version = icecc_version_dir.File(icecc_version_target_filename)
+    have_explicit_icecc_version = 'ICECC_VERSION' in env and bool(env['ICECC_VERSION'])
+    have_icecc_version_url = have_explicit_icecc_version and env["ICECC_VERSION"].startswith("http")
 
-    if "ICECC_VERSION" not in env:
-        # Make a predictable name for the toolchain
-        env["ICECC_VERSION"] = icecc_known_version
-
-    # Do this weaker validation as opposed to urllib.urlparse (or similar). We
-    # really only support http URLs here and any other validation either
-    # requires a third party module or accepts things we don't.
-    elif env["ICECC_VERSION"].startswith("http"):
-        env["ICECC_VERSION_URL"] = env["ICECC_VERSION"]
-        env["ICECC_VERSION"] = icecc_known_version
-
-    if env.get("ICECC_VERSION_URL"):
-
-        # Use curl / wget to download the toolchain because SCons (and ninja)
-        # are better at running shell commands than Python functions.
-        curl = env.WhereIs("curl")
-        wget = env.WhereIs("wget")
-        if curl:
-            cmdstr = "curl -L"
-        elif wget:
-            cmdstr = "wget"
-        else:
+    if have_explicit_icecc_version and not have_icecc_version_url:
+        icecc_version_file = env.File('$ICECC_VERSION')
+        if not icecc_version_file.exists():
             raise Exception(
-                "You have specified an ICECC_VERSION that is a URL but you have neither wget nor curl installed."
+                'The ICECC_VERSION variable set set to {}, but this file does not exist'.format(icecc_version_file)
             )
-
-        env.Command(
-            target="$ICECC_VERSION",
-            source=["$CC", "$CXX"],
-            action=[
-                SCons.Defaults.Mkdir("${ICECC_VERSION.Dir('').abspath}"),
-                cmdstr + " -o $TARGET $ICECC_VERSION_URL",
-            ],
-        )
+        env['ICECC_VERSION'] = icecc_version_file
     else:
-        env["ICECC_VERSION"] = env.File("$ICECC_VERSION")
-        env.IcecreamEnv(
-            target="$ICECC_VERSION",
-            source=["$ICECC_CREATE_ENV", "$CC", "$CXX"],
-        )
+        # Generate the deterministic name for our tarball
+        icecc_version_target_filename = env.subst("${CC}${CXX}.tar.gz").replace("/", "_")[
+            1:
+        ]
+        icecc_version_dir = env.Dir("$BUILD_ROOT/scons/icecc")
+        icecc_known_version = icecc_version_dir.File(icecc_version_target_filename)
 
-    # Create an emitter that makes all of the targets depend on the
-    # icecc_version_target (ensuring that we have read the link), which in turn
-    # depends on the toolchain (ensuring that we have packaged it).
-    def icecc_toolchain_dependency_emitter(target, source, env):
-        if "conftest" not in str(target[0]):
-            env.Requires(target, "$ICECC_VERSION")
-        return target, source
+        if have_icecc_version_url:
+            # We do the above weaker validation as opposed to
+            # urllib.urlparse (or similar). We really only support http
+            # URLs here and any other validation either requires a third
+            # party module or accepts things we don't.
+            env["ICECC_VERSION_URL"] = env["ICECC_VERSION"]
+            env["ICECC_VERSION"] = icecc_known_version
 
-    # Cribbed from Tool/cc.py and Tool/c++.py. It would be better if
-    # we could obtain this from SCons.
-    _CSuffixes = [".c"]
-    if not SCons.Util.case_sensitive_suffixes(".c", ".C"):
-        _CSuffixes.append(".C")
+            # Use curl / wget to download the toolchain because SCons (and ninja)
+            # are better at running shell commands than Python functions.
+            curl = env.WhereIs("curl")
+            wget = env.WhereIs("wget")
 
-    _CXXSuffixes = [".cpp", ".cc", ".cxx", ".c++", ".C++"]
-    if SCons.Util.case_sensitive_suffixes(".c", ".C"):
-        _CXXSuffixes.append(".C")
+            if curl:
+                cmdstr = "curl -L"
+            elif wget:
+                cmdstr = "wget"
+            else:
+                raise Exception(
+                    "You have specified an ICECC_VERSION that is a URL but you have neither wget nor curl installed."
+                )
 
-    suffixes = _CSuffixes + _CXXSuffixes
-    for object_builder in SCons.Tool.createObjBuilders(env):
-        emitterdict = object_builder.builder.emitter
-        for suffix in emitterdict.keys():
-            if not suffix in suffixes:
-                continue
-            base = emitterdict[suffix]
-            emitterdict[suffix] = SCons.Builder.ListEmitter(
-                [base, icecc_toolchain_dependency_emitter]
+            env.Command(
+                target="$ICECC_VERSION",
+                source=["$CC", "$CXX"],
+                action=[
+                    cmdstr + " -o $TARGET $ICECC_VERSION_URL",
+                ],
             )
+        else:
+            # Make a predictable name for the toolchain
+            env["ICECC_VERSION"] = env.File(icecc_known_version)
+            env.IcecreamEnv(
+                target="$ICECC_VERSION",
+                source=["$ICECC_CREATE_ENV", "$CC", "$CXX"],
+            )
+
+        # Our ICECC_VERSION isn't just a file, so we need to make
+        # things depend on it to ensure that it comes into being at
+        # the right time. Don't do that for conftests though: we never
+        # want to run them remote.
+        def icecc_toolchain_dependency_emitter(target, source, env):
+            if "conftest" not in str(target[0]):
+                env.Requires(target, "$ICECC_VERSION")
+            return target, source
+
+        # Cribbed from Tool/cc.py and Tool/c++.py. It would be better if
+        # we could obtain this from SCons.
+        _CSuffixes = [".c"]
+        if not SCons.Util.case_sensitive_suffixes(".c", ".C"):
+            _CSuffixes.append(".C")
+
+        _CXXSuffixes = [".cpp", ".cc", ".cxx", ".c++", ".C++"]
+        if SCons.Util.case_sensitive_suffixes(".c", ".C"):
+            _CXXSuffixes.append(".C")
+
+        suffixes = _CSuffixes + _CXXSuffixes
+        for object_builder in SCons.Tool.createObjBuilders(env):
+            emitterdict = object_builder.builder.emitter
+            for suffix in emitterdict.keys():
+                if not suffix in suffixes:
+                    continue
+                base = emitterdict[suffix]
+                emitterdict[suffix] = SCons.Builder.ListEmitter(
+                    [base, icecc_toolchain_dependency_emitter]
+                )
 
     if env.ToolchainIs("clang"):
         env["ENV"]["ICECC_CLANG_REMOTE_CPP"] = 1
