@@ -1023,7 +1023,12 @@ var ReplSetTest = function(opts) {
         return this.start(nextId, config);
     };
 
+    /**
+     * Calls stop() on the node identifed by nodeId and removes it from the list of nodes managed by
+     * ReplSetTest.
+     */
     this.remove = function(nodeId) {
+        this.stop(nodeId);
         nodeId = this.getNodeId(nodeId);
         this.nodes.splice(nodeId, 1);
         this.ports.splice(nodeId, 1);
