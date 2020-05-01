@@ -822,6 +822,21 @@ TEST(MemberConfig, ParseEmptyTags) {
                     &tagConfig);
     ASSERT_EQUALS(5U, mc.getNumTags());
     ASSERT_FALSE(mc.hasTags());
+    BSONObj obj = mc.toBSON();
+    BSONElement tagField = obj.getField("tags");
+    ASSERT_TRUE(tagField.type() == Object);
+    ASSERT_TRUE(tagField.Obj().isEmpty());
+}
+
+TEST(MemberConfig, TagsSerializedWhenMissing) {
+    ReplSetTagConfig tagConfig;
+    MemberConfig mc(BSON("_id" << 0 << "host"
+                               << "localhost:12345"),
+                    &tagConfig);
+    BSONObj obj = mc.toBSON();
+    BSONElement tagField = obj.getField("tags");
+    ASSERT_TRUE(tagField.type() == Object);
+    ASSERT_TRUE(tagField.Obj().isEmpty());
 }
 
 TEST(MemberConfig, ParseHorizonFields) {

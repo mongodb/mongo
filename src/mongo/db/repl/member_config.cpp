@@ -189,9 +189,8 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
     configBuilder.append(kHiddenFieldName, getHidden());
     configBuilder.append(kPriorityFieldName, MemberConfigBase::getPriority());
 
-    if (hasTags()) {
-        configBuilder.append(kTagsFieldName, *getTags());
-    }
+    // For historical reasons we always emit a tag field; some jstests expect it.
+    configBuilder.append(kTagsFieldName, getTags() ? *getTags() : BSONObj());
 
     _splitHorizon.toBSON(configBuilder);
 
