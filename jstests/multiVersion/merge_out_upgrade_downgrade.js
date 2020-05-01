@@ -135,10 +135,19 @@ function awaitCluster(st) {
 // cluster, but works as expected when the cluster is fully upgraded.
 let testSharding = function() {
     // Test that $merge/$out fail with a clear message on a mixed version sharded cluster.
+
+    // One potential issue that can occur when upgrading/downgrading a single shard is that when the
+    // primary is waiting on a secondary to finish upgrading and restart, the restart can take too
+    // long, which causes the primary to step down and potentially have another node step up and
+    // become the new primary. This causes 'upgradeSet' to fail as it assumes that the replica
+    // set topology will remain unchanged during upgrade as replica set members are upgraded
+    // sequentially (first the secondaries and then the primary). As such, we configure each
+    // shard to have a high election timeout to avoid any unexpected topology changes during
+    // the upgrade/downgrade process.
     const st = new ShardingTest({
         shards: 2,
         mongos: 1,
-        rs: {nodes: 2},
+        rs: {nodes: 2, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}},
         other: {
             mongosOptions: {binVersion: "last-stable"},
             configOptions: {binVersion: "last-stable"},
