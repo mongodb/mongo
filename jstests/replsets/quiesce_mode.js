@@ -9,7 +9,11 @@
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/fail_point_util.js");
 
-const replTest = new ReplSetTest({name: "quiesce_mode", nodes: 2});
+const replTest = new ReplSetTest({
+    name: "quiesce_mode",
+    nodes: 2,
+    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"}
+});
 replTest.startSet();
 replTest.initiateWithHighElectionTimeout();
 
@@ -137,11 +141,7 @@ findCmdFailPoint.wait();
 jsTestLog("Hang the primary in shutdown after stepdown.");
 let postStepdownFailpoint = configureFailPoint(primary, "hangInShutdownAfterStepdown");
 // We must skip validation due to the failpoint that hangs find commands.
-// Allow extra time to ensure the stepdown is successful.
-replTest.stop(primary,
-              null /*signal*/,
-              {skipValidation: true},
-              {forRestart: true, waitpid: false, shutdownTimeoutMillis: 5000});
+replTest.stop(primary, null /*signal*/, {skipValidation: true}, {forRestart: true, waitpid: false});
 postStepdownFailpoint.wait();
 
 jsTestLog("Create a hanging isMaster on the primary.");
