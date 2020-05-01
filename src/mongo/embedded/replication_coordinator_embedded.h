@@ -285,7 +285,7 @@ public:
     getIsMasterResponseFuture(const repl::SplitHorizon::Parameters& horizonParams,
                               boost::optional<TopologyVersion> clientTopologyVersion);
 
-    repl::OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
+    StatusWith<repl::OpTime> getLatestWriteOpTime(OperationContext* opCtx) const noexcept override;
 
     HostAndPort getCurrentPrimaryHostAndPort() const override;
 

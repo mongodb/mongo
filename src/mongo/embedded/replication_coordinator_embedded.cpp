@@ -526,7 +526,8 @@ ReplicationCoordinatorEmbedded::getIsMasterResponseFuture(
     UASSERT_NOT_IMPLEMENTED;
 }
 
-OpTime ReplicationCoordinatorEmbedded::getLatestWriteOpTime(OperationContext* opCtx) const {
+StatusWith<OpTime> ReplicationCoordinatorEmbedded::getLatestWriteOpTime(
+    OperationContext* opCtx) const noexcept {
     return getMyLastAppliedOpTime();
 }
 
