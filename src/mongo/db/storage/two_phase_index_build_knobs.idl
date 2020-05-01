@@ -30,15 +30,6 @@ global:
   cpp_namespace: "mongo"
 
 server_parameters:
-  # If enabled, index builds will become two phased - an index build will begin and end
-  # with the startIndexBuild and commitIndexBuild oplog entries respectively.
-  enableTwoPhaseIndexBuild:
-    description: "Support for using startIndexBuild and commitIndexBuild to build new indexes."
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: "enableTwoPhaseIndexBuild"
-    default: true
-
   # Commit quorum option is supported only for two phase index builds.
   enableIndexBuildCommitQuorum:
     description: "Support for using commit quorum for two phase index builds."

@@ -122,7 +122,7 @@ public:
 
     /**
      * Returns true if two phase index builds are supported.
-     * This is determined by the current FCV and the server parameter 'enableTwoPhaseIndexBuild'.
+     * This is determined by the current FCV.
      */
     static bool supportsTwoPhaseIndexBuild();
 

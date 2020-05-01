@@ -46,7 +46,6 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/unclean_shutdown.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
@@ -856,9 +855,6 @@ void StorageEngineImpl::clearDropPendingState() {
 }
 
 bool StorageEngineImpl::supportsTwoPhaseIndexBuild() const {
-    if (!enableTwoPhaseIndexBuild) {
-        return false;
-    }
     return true;
 }
 
