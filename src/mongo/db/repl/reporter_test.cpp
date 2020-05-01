@@ -234,6 +234,44 @@ void ReporterTest::assertReporterDone() {
     ASSERT_EQUALS(reporter->join(), reporter->trigger());
 }
 
+TEST(UpdatePositionArgs, AcceptsUnknownField) {
+    UpdatePositionArgs updatePositionArgs;
+    BSONObjBuilder bob;
+    bob.append(UpdatePositionArgs::kCommandFieldName, 1);
+    bob.append(UpdatePositionArgs::kUpdateArrayFieldName, BSONArray());
+    bob.append("unknownField", 1);  // append an unknown field.
+    BSONObj cmdObj = bob.obj();
+    ASSERT_OK(updatePositionArgs.initialize(cmdObj));
+}
+TEST(UpdatePositionArgs, AcceptsUnknownFieldInUpdateInfo) {
+    UpdatePositionArgs updatePositionArgs;
+    BSONObjBuilder bob;
+    bob.append(UpdatePositionArgs::kCommandFieldName, 1);
+    auto now = Date_t();
+    auto updateInfo =
+        BSON(UpdatePositionArgs::kConfigVersionFieldName
+             << 1 << UpdatePositionArgs::kMemberIdFieldName << 1
+             << UpdatePositionArgs::kDurableOpTimeFieldName << OpTime()
+             << UpdatePositionArgs::kAppliedOpTimeFieldName << OpTime()
+             << UpdatePositionArgs::kAppliedWallTimeFieldName << now
+             << UpdatePositionArgs::kDurableWallTimeFieldName << now << "unknownField" << 1);
+    bob.append(UpdatePositionArgs::kUpdateArrayFieldName, BSON_ARRAY(updateInfo));
+    BSONObj cmdObj = bob.obj();
+    ASSERT_OK(updatePositionArgs.initialize(cmdObj));
+
+    // The serialized object should be the same as the original except for the unknown field.
+    BSONObjBuilder bob2;
+    auto updateArgsObj = updatePositionArgs.toBSON();
+    auto updatesArr =
+        BSONArray(updateArgsObj.getObjectField(UpdatePositionArgs::kUpdateArrayFieldName));
+    ASSERT_EQ(updatesArr.nFields(), 1);
+    bob2.appendElements(updatesArr[0].Obj());
+    bob2.append(UpdatePositionArgs::kAppliedWallTimeFieldName, now);
+    bob2.append(UpdatePositionArgs::kDurableWallTimeFieldName, now);
+    bob2.append("unknownField", 1);
+    ASSERT_EQ(bob2.obj().woCompare(updateInfo), 0);
+}
+
 TEST_F(ReporterTestNoTriggerAtSetUp, InvalidConstruction) {
     // null PrepareReplSetUpdatePositionCommandFn
     ASSERT_THROWS(Reporter(&getExecutor(),

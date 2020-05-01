@@ -73,7 +73,12 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);
 
-    auto cloneStatus = ReplSetMetadata::readFromMetadata(serializedObj);
+    // Verify that we allow unknown fields.
+    BSONObjBuilder bob;
+    bob.appendElements(serializedObj);
+    bob.append("unknownField", 1);
+
+    auto cloneStatus = ReplSetMetadata::readFromMetadata(bob.obj());
     ASSERT_OK(cloneStatus.getStatus());
 
     const auto& clonedMetadata = cloneStatus.getValue();

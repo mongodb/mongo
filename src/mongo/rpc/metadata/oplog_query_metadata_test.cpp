@@ -62,7 +62,12 @@ TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);
 
-    auto cloneStatus = OplogQueryMetadata::readFromMetadata(serializedObj);
+    // Verify that we allow unknown fields.
+    BSONObjBuilder bob;
+    bob.appendElements(serializedObj);
+    bob.append("unknownField", 1);
+
+    auto cloneStatus = OplogQueryMetadata::readFromMetadata(bob.obj());
     ASSERT_OK(cloneStatus.getStatus());
 
     const auto& clonedMetadata = cloneStatus.getValue();
