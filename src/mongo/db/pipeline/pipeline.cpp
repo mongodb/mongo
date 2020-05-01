@@ -537,13 +537,14 @@ DepsTracker Pipeline::getDependencies(QueryMetadataBitSet unavailableMetadata) c
         deps.needWholeDocument = true;  // don't know all fields we need
 
     if (!unavailableMetadata[DocumentMetadataFields::kTextScore]) {
-        // If there is a text score, assume we need to keep it if we can't prove we don't. If we are
-        // the first half of a pipeline which has been split, future stages might need it.
-        if (!knowAllMeta) {
+        // There is a text score available. If we are the first half of a split pipeline, then we
+        // have to assume future stages might depend on the textScore (unless we've encountered a
+        // stage that doesn't preserve metadata).
+        if (getContext()->needsMerge && !knowAllMeta) {
             deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
         }
     } else {
-        // If there is no text score available, then we don't need to ask for it.
+        // There is no text score available, so we don't need to ask for it.
         deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
     }
 
