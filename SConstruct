@@ -3845,6 +3845,52 @@ elif env.ToolchainIs("gcc"):
 
 env.Tool('icecream')
 
+# Defaults for SCons provided flags. SetOption only sets the option to our value
+# if the user did not provide it. So for any flag here if it's explicitly passed
+# the values below set with SetOption will be overwritten.
+#
+# Default j to the number of CPUs on the system. Note: in containers this
+# reports the number of CPUs for the host system. Perhaps in a future version of
+# psutil it will instead report the correct number when in a container.
+#
+# The presence of the variable ICECC means the icecream tool is
+# enabled and so the default j value should scale accordingly. In this
+# scenario multiply the cpu count by 8 to set a reasonable default since the
+# cluster can handle many more jobs than your local machine but is
+# still throttled by your cpu count in the sense that you can only
+# handle so many python threads sending out jobs.
+#
+# Capitalize on the weird way SCons handles arguments to determine if
+# the user configured it or not. If not, it is under our control. Try
+# to set some helpful defaults.
+initial_num_jobs = env.GetOption('num_jobs')
+altered_num_jobs = initial_num_jobs + 1
+env.SetOption('num_jobs', altered_num_jobs)
+if env.GetOption('num_jobs') == altered_num_jobs:
+    # psutil.cpu_count returns None when it can't determine the
+    # number. This always fails on BSD's for example. If the user
+    # didn't specify, and we can't determine for a parallel build, it
+    # is better to make the user restart and be explicit, rather than
+    # give them a very slow build.
+    cpu_count = psutil.cpu_count()
+    if cpu_count is None:
+        if get_option("ninja") != "disabled":
+            env.FatalError("Cannot auto-determine the appropriate size for the Ninja local_job pool. Please regenerate with an explicit -j argument to SCons")
+        else:
+            env.FatalError("Cannot auto-determine the appropriate build paralleism on this platform. Please build with an explicit -j argument to SCons")
+
+    if 'ICECC' in env and env['ICECC'] and get_option("ninja") == "disabled":
+        # If SCons is driving and we are using icecream, scale up the
+        # number of jobs. The icerun integration will prevent us from
+        # overloading the local system.
+        env.SetOption('num_jobs', 8 * cpu_count)
+    else:
+        # Otherwise, either icecream isn't in play, so just use local
+        # concurrency for SCons builds, or we are generating for
+        # Ninja, in which case num_jobs controls the size of the local
+        # pool. Scale that up to the number of local CPUs.
+        env.SetOption('num_jobs', cpu_count)
+
 if get_option('ninja') != 'disabled':
 
     if 'ICECREAM_VERSION' in env and not env.get('CCACHE', None):
@@ -4415,30 +4461,6 @@ env.NoCache(distSrcZip)
 env.Alias("distsrc-zip", distSrcZip)
 
 env.Alias("distsrc", "distsrc-tgz")
-
-# Defaults for SCons provided flags. SetOption only sets the option to our value
-# if the user did not provide it. So for any flag here if it's explicitly passed
-# the values below set with SetOption will be overwritten.
-#
-# Default j to the number of CPUs on the system. Note: in containers this
-# reports the number of CPUs for the host system. Perhaps in a future version of
-# psutil it will instead report the correct number when in a container.
-#
-# The presence of the variable ICECC means the icecream tool is
-# enabled and so the default j value should scale accordingly. In this
-# scenario multiply the cpu count by 8 to set a reasonable default since the
-# cluster can handle many more jobs than your local machine but is
-# still throttled by your cpu count in the sense that you can only
-# handle so many python threads sending out jobs.
-#
-# psutil.cpu_count returns None when it can't determine the number. This always
-# fails on BSD's for example.
-cpu_count = psutil.cpu_count()
-if cpu_count is not None and 'ICECC' in env and get_option("ninja") == "disabled":
-    env.SetOption('num_jobs', 8 * cpu_count)
-elif cpu_count is not None:
-    env.SetOption('num_jobs', cpu_count)
-
 
 # Do this as close to last as possible before reading SConscripts, so
 # that any tools that may have injected other things via emitters are included
