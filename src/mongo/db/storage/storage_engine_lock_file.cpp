@@ -34,7 +34,7 @@
 
 #include "mongo/db/storage/storage_engine_lock_file.h"
 
-#include "mongo/util/str.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
