@@ -18,8 +18,8 @@ const rollbackTest = new RollbackTest(dbName);
 let primary = rollbackTest.getPrimary();
 
 // Create collection we're using beforehand.
-const testDB = primary.getDB(dbName);
-const testColl = testDB.getCollection(collName);
+let testDB = primary.getDB(dbName);
+let testColl = testDB.getCollection(collName);
 assert.commandWorked(testDB.runCommand({create: collName}));
 
 // Start a session on the primary.
@@ -82,6 +82,8 @@ arrayEq(testColl.find().toArray(), [{_id: 0}, {_id: 2}]);
 
 // Get the correct primary after the topology changes.
 primary = rollbackTest.getPrimary();
+testDB = primary.getDB(dbName);
+testColl = testDB.getCollection(collName);
 rollbackTest.awaitReplication();
 
 // Make sure we can successfully commit the recovered prepared transaction.
