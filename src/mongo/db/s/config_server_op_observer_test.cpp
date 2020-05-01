@@ -95,5 +95,18 @@ TEST_F(ConfigServerOpObserverTest, NodeDoesNotClearClusterIDWhenConfigVersionNot
     ASSERT_EQ(ClusterIdentityLoader::get(operationContext())->getClusterId(), _clusterId);
 }
 
+TEST_F(ConfigServerOpObserverTest, ConfigOpTimeAdvancedWhenMajorityCommitPointAdvanced) {
+    ConfigServerOpObserver opObserver;
+
+    repl::OpTime a(Timestamp(1, 1), 1);
+    repl::OpTime b(Timestamp(1, 2), 1);
+
+    opObserver.onMajorityCommitPointUpdate(getServiceContext(), a);
+    // TODO SERVER-46200: Verify that configOpTime is a.
+
+    opObserver.onMajorityCommitPointUpdate(getServiceContext(), b);
+    // TODO SERVER-46200: Verify that configOpTime is b.
+}
+
 }  // namespace
 }  // namespace mongo

@@ -962,6 +962,7 @@ void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
     if (manager) {
         manager->setCommittedSnapshot(newCommitPoint.getTimestamp());
     }
+    _service->getOpObserver()->onMajorityCommitPointUpdate(_service, newCommitPoint);
     notifyOplogMetadataWaiters(newCommitPoint);
 }
 

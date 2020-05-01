@@ -395,6 +395,16 @@ public:
     virtual void onReplicationRollback(OperationContext* opCtx,
                                        const RollbackObserverInfo& rbInfo) = 0;
 
+    /**
+     * Called when the majority commit point is updated by replication.
+     *
+     * This is called while holding a very hot mutex (the ReplicationCoordinator mutex). Therefore
+     * it should avoid doing any work that can be done later, and avoid calling back into any
+     * replication functions that take this mutex (which would cause self-deadlock).
+     */
+    virtual void onMajorityCommitPointUpdate(ServiceContext* service,
+                                             const repl::OpTime& newCommitPoint) = 0;
+
     struct Times;
 
 protected:

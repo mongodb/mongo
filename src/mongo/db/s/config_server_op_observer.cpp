@@ -36,6 +36,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/cluster_identity_loader.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
@@ -89,6 +90,12 @@ void ConfigServerOpObserver::onReplicationRollback(OperationContext* opCtx,
         ShardingCatalogManager::get(opCtx)->discardCachedConfigDatabaseInitializationState();
         ClusterIdentityLoader::get(opCtx)->discardCachedClusterId();
     }
+}
+
+void ConfigServerOpObserver::onMajorityCommitPointUpdate(ServiceContext* service,
+                                                         const repl::OpTime& newCommitPoint) {
+    // TODO SERVER-46200: tick the VectorClock's ConfigTime.
+    Grid::get(service)->advanceConfigOpTimeAuthoritative(newCommitPoint);
 }
 
 }  // namespace mongo

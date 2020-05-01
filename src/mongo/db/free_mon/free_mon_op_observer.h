@@ -179,6 +179,9 @@ public:
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final {}
 
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo);
+
+    void onMajorityCommitPointUpdate(ServiceContext* service,
+                                     const repl::OpTime& newCommitPoint) final {}
 };
 
 }  // namespace mongo

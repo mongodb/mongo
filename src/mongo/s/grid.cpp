@@ -124,6 +124,7 @@ repl::OpTime Grid::configOpTime() const {
 boost::optional<repl::OpTime> Grid::advanceConfigOpTime(OperationContext* opCtx,
                                                         repl::OpTime opTime,
                                                         StringData what) {
+    invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
     const auto prevOpTime = _advanceConfigOpTime(opTime);
     if (prevOpTime && prevOpTime->getTerm() != opTime.getTerm()) {
         std::string clientAddr = "(unknown)";
@@ -142,9 +143,12 @@ boost::optional<repl::OpTime> Grid::advanceConfigOpTime(OperationContext* opCtx,
     return prevOpTime;
 }
 
-boost::optional<repl::OpTime> Grid::_advanceConfigOpTime(const repl::OpTime& opTime) {
-    invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+boost::optional<repl::OpTime> Grid::advanceConfigOpTimeAuthoritative(repl::OpTime opTime) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    return _advanceConfigOpTime(opTime);
+}
 
+boost::optional<repl::OpTime> Grid::_advanceConfigOpTime(const repl::OpTime& opTime) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_configOpTime < opTime) {
         repl::OpTime prev = _configOpTime;

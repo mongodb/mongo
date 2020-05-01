@@ -155,6 +155,8 @@ public:
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final;
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
+    void onMajorityCommitPointUpdate(ServiceContext* service,
+                                     const repl::OpTime& newCommitPoint) final {}
 
     // Contains the fields of the document that are in the collection's shard key, and "_id".
     static BSONObj getDocumentKey(OperationContext* opCtx,

@@ -163,6 +163,15 @@ public:
                                                       StringData what);
 
     /**
+     * Called whenever a config server's majority committed optime changes.
+     * If the config optime was updated, returns the previous value.
+     * NOTE: This is ONLY valid to call on a config server instance.
+     */
+    // TODO SERVER-46200: remove this once the ConfigServerOpObserver is calling into the
+    // VectorClock, rather than here.
+    boost::optional<repl::OpTime> advanceConfigOpTimeAuthoritative(repl::OpTime opTime);
+
+    /**
      * Clears the grid object so that it can be reused between test executions. This will not
      * be necessary if grid is hanging off the global ServiceContext and each test gets its
      * own service context.

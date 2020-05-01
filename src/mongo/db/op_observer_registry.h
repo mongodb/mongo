@@ -311,6 +311,12 @@ public:
             o->onReplicationRollback(opCtx, rbInfo);
     }
 
+    void onMajorityCommitPointUpdate(ServiceContext* service,
+                                     const repl::OpTime& newCommitPoint) override {
+        for (auto& o : _observers)
+            o->onMajorityCommitPointUpdate(service, newCommitPoint);
+    }
+
 private:
     static repl::OpTime _getOpTimeToReturn(const std::vector<repl::OpTime>& times) {
         if (times.empty()) {
