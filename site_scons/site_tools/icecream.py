@@ -290,4 +290,7 @@ def exists(env):
         if icecc_version >= _icecream_version_min:
             validated = True
 
+    if validated:
+        env['ICECREAM_VERSION'] = icecc_version
+
     return validated

@@ -14,6 +14,8 @@ import sys
 import textwrap
 import uuid
 
+from pkg_resources import parse_version
+
 import SCons
 
 # This must be first, even before EnsureSConsVersion, if
@@ -3844,6 +3846,11 @@ elif env.ToolchainIs("gcc"):
 env.Tool('icecream')
 
 if get_option('ninja') != 'disabled':
+
+    if 'ICECREAM_VERSION' in env and not env.get('CCACHE', None):
+        if env['ICECREAM_VERSION'] < parse_version("1.2"):
+            env.FatalError("Use of ccache is mandatory with --ninja and icecream older than 1.2. You are running {}.".format(env['ICECREAM_VERSION']))
+
     if get_option('ninja') == 'stable':
         ninja_builder = Tool("ninja")
         ninja_builder.generate(env)
