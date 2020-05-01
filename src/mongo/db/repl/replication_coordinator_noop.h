@@ -280,7 +280,7 @@ public:
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion) final;
 
-    OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
+    StatusWith<OpTime> getLatestWriteOpTime(OperationContext* opCtx) const noexcept override;
 
     HostAndPort getCurrentPrimaryHostAndPort() const override;
 

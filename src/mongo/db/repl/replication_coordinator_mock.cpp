@@ -606,7 +606,8 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorMock::awaitIsMaste
     return response;
 }
 
-OpTime ReplicationCoordinatorMock::getLatestWriteOpTime(OperationContext* opCtx) const {
+StatusWith<OpTime> ReplicationCoordinatorMock::getLatestWriteOpTime(OperationContext* opCtx) const
+    noexcept {
     return getMyLastAppliedOpTime();
 }
 

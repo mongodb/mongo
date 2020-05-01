@@ -1007,14 +1007,14 @@ public:
     /**
      * Returns the OpTime that consists of the timestamp of the latest oplog entry and the current
      * term.
-     * This function throws if:
+     * This function returns a non-ok status if:
      * 1. It is called on secondaries.
      * 2. OperationContext times out or is interrupted.
      * 3. Oplog collection does not exist.
      * 4. Oplog collection is empty.
      * 5. Getting latest oplog timestamp is not supported by the storage engine.
      */
-    virtual OpTime getLatestWriteOpTime(OperationContext* opCtx) const = 0;
+    virtual StatusWith<OpTime> getLatestWriteOpTime(OperationContext* opCtx) const noexcept = 0;
 
     /**
      * Returns the HostAndPort of the current primary, or an empty HostAndPort if there is no

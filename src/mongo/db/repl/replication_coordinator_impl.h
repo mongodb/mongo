@@ -366,7 +366,8 @@ public:
         boost::optional<TopologyVersion> clientTopologyVersion,
         boost::optional<Date_t> deadline) override;
 
-    virtual OpTime getLatestWriteOpTime(OperationContext* opCtx) const override;
+    virtual StatusWith<OpTime> getLatestWriteOpTime(OperationContext* opCtx) const
+        noexcept override;
 
     virtual HostAndPort getCurrentPrimaryHostAndPort() const override;
 

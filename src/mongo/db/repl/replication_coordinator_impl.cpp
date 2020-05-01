@@ -2305,18 +2305,25 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     return statusWithIsMaster.getValue();
 }
 
-OpTime ReplicationCoordinatorImpl::getLatestWriteOpTime(OperationContext* opCtx) const {
+StatusWith<OpTime> ReplicationCoordinatorImpl::getLatestWriteOpTime(OperationContext* opCtx) const
+    noexcept try {
     ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
     Lock::GlobalLock globalLock(opCtx, MODE_IS);
     // Check if the node is primary after acquiring global IS lock.
-    uassert(ErrorCodes::NotMaster,
-            "Not primary so can't get latest write optime",
-            canAcceptNonLocalWrites());
+    if (!canAcceptNonLocalWrites()) {
+        return {ErrorCodes::NotMaster, "Not primary so can't get latest write optime"};
+    }
     auto oplog = LocalOplogInfo::get(opCtx)->getCollection();
-    uassert(ErrorCodes::NamespaceNotFound, "oplog collection does not exist.", oplog);
-    auto latestOplogTimestamp =
-        uassertStatusOK(oplog->getRecordStore()->getLatestOplogTimestamp(opCtx));
-    return OpTime(latestOplogTimestamp, getTerm());
+    if (!oplog) {
+        return {ErrorCodes::NamespaceNotFound, "oplog collection does not exist"};
+    }
+    auto latestOplogTimestampSW = oplog->getRecordStore()->getLatestOplogTimestamp(opCtx);
+    if (!latestOplogTimestampSW.isOK()) {
+        return latestOplogTimestampSW.getStatus();
+    }
+    return OpTime(latestOplogTimestampSW.getValue(), getTerm());
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 HostAndPort ReplicationCoordinatorImpl::getCurrentPrimaryHostAndPort() const {

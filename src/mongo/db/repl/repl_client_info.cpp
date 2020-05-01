@@ -69,33 +69,33 @@ void ReplClientInfo::setLastOp(OperationContext* opCtx, const OpTime& ot) {
 void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
     if (replCoord->isReplEnabled() && opCtx->writesAreReplicated()) {
+        auto latestWriteOpTimeSW = replCoord->getLatestWriteOpTime(opCtx);
+        auto status = latestWriteOpTimeSW.getStatus();
         OpTime systemOpTime;
-        auto status = [&] {
-            try {
-                // Get the latest OpTime from oplog.
-                systemOpTime = replCoord->getLatestWriteOpTime(opCtx);
-                return Status::OK();
-            } catch (const DBException& e) {
-                // Fall back to use my lastAppliedOpTime if we failed to get the latest OpTime from
-                // storage. In most cases, it is safe to ignore errors because if
-                // getLatestWriteOpTime throws, we cannot use the same opCtx to wait for
-                // writeConcern anyways. But getLastError from the same client could use a different
-                // opCtx to wait for the lastOp. So this is a best effort attempt to set the lastOp
-                // to the in-memory lastAppliedOpTime (which could be lagged). And this is a known
-                // bug in getLastError.
-                systemOpTime = replCoord->getMyLastAppliedOpTime();
-                if (e.toStatus() == ErrorCodes::OplogOperationUnsupported ||
-                    e.toStatus() == ErrorCodes::NamespaceNotFound ||
-                    e.toStatus() == ErrorCodes::CollectionIsEmpty ||
-                    ErrorCodes::isNotMasterError(e.toStatus())) {
-                    // It is ok if the storage engine does not support getLatestOplogTimestamp() or
-                    // if the oplog is empty. If the node stepped down in between, it is correct to
-                    // use lastAppliedOpTime as last OpTime.
-                    return Status::OK();
-                }
-                return e.toStatus();
+        if (status.isOK()) {
+            systemOpTime = latestWriteOpTimeSW.getValue();
+        } else {
+            // Fall back to use my lastAppliedOpTime if we failed to get the latest OpTime from
+            // storage. In most cases, it is safe to ignore errors because if
+            // getLatestWriteOpTime returns an error, we cannot use the same opCtx to wait for
+            // writeConcern anyways. But getLastError from the same client could use a different
+            // opCtx to wait for the lastOp. So this is a best effort attempt to set the lastOp
+            // to the in-memory lastAppliedOpTime (which could be lagged). And this is a known
+            // bug in getLastError.
+            systemOpTime = replCoord->getMyLastAppliedOpTime();
+            if (status == ErrorCodes::OplogOperationUnsupported ||
+                status == ErrorCodes::NamespaceNotFound ||
+                status == ErrorCodes::CollectionIsEmpty || ErrorCodes::isNotMasterError(status)) {
+                // It is ok if the storage engine does not support getLatestOplogTimestamp() or
+                // if the oplog is empty. If the node stepped down in between, it is correct to
+                // use lastAppliedOpTime as last OpTime.
+                status = Status::OK();
             }
-        }();
+            // We will continue trying to set client's lastOp to lastAppliedOpTime as a best-effort
+            // alternative to getLatestWriteOpTime. And we will then throw after setting client's
+            // lastOp if getLatestWriteOpTime has failed with a error code other than the ones
+            // above.
+        }
 
         // If the system timestamp has gone backwards, that must mean that there was a rollback.
         // If the system optime has a higher term but a lower timestamp than the client's lastOp, it

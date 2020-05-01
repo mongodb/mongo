@@ -505,7 +505,8 @@ ReplicationCoordinatorNoOp::getIsMasterResponseFuture(
     MONGO_UNREACHABLE;
 }
 
-OpTime ReplicationCoordinatorNoOp::getLatestWriteOpTime(OperationContext* opCtx) const {
+StatusWith<OpTime> ReplicationCoordinatorNoOp::getLatestWriteOpTime(OperationContext* opCtx) const
+    noexcept {
     return getMyLastAppliedOpTime();
 }
 
