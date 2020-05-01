@@ -659,6 +659,14 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     }
 
     builder->append("numYields", _numYields);
+
+    if (_debug.dataThroughputLastSecond) {
+        builder->append("dataThroughputLastSecond", *_debug.dataThroughputLastSecond);
+    }
+
+    if (_debug.dataThroughputAverage) {
+        builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
+    }
 }
 
 namespace {
