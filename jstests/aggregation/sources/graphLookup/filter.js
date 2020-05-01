@@ -91,4 +91,28 @@
               .toArray()[0];
 
     assert.eq(res.results.length, 1);
+
+    // $expr within `restrictSearchWithMatch` has access to variables declared at a higher level.
+    res = local
+              .aggregate([{
+                  $lookup: {
+                      from: "local",
+                      let : {foo: true},
+                      pipeline: [{
+                          $graphLookup: {
+                              from: "foreign",
+                              startWith: "$starting",
+                              connectFromField: "to",
+                              connectToField: "from",
+                              as: "results",
+                              restrictSearchWithMatch:
+                                  {$expr: {$eq: ["$shouldBeIncluded", "$$foo"]}}
+                          }
+                      }],
+                      as: "array"
+                  }
+              }])
+              .toArray()[0];
+
+    assert.eq(res.array[0].results.length, 1);
 })();

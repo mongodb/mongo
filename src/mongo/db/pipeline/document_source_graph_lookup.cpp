@@ -482,6 +482,10 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
                          boost::none,
                          expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr);
 
+    _fromExpCtx->variables = expCtx->variables;
+    _fromExpCtx->variablesParseState =
+        expCtx->variablesParseState.copyWith(expCtx->variables.useIdGenerator());
+
     // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
     // we'll eventually construct from the input document.
     _fromPipeline = resolvedNamespace.pipeline;
