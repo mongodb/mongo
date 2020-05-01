@@ -102,10 +102,25 @@ def generate(env):
     # but it doesn't work or is out of date.
     env["CCACHE_VERSION"] = _ccache_version_found
 
+    # Make a generator to expand to CCACHE in the case where we are
+    # not a conftest. We don't want to use ccache for configure tests
+    # because we don't want to use icecream for configure tests, but
+    # when icecream and ccache are combined we can't easily filter out
+    # configure tests for icecream since in that combination we use
+    # CCACHE_PREFIX to express the icecc tool, and at that point it is
+    # too late for us to meaningfully filter out conftests. So we just
+    # disable ccache for conftests entirely.  Which feels safer
+    # somehow anyway.
+    def ccache_generator(target, source, env, for_signature):
+        if "conftest" not in str(target[0]):
+            return '$CCACHE'
+        return ''
+    env['CCACHE_GENERATOR'] = ccache_generator
+
     # Add ccache to the relevant command lines. Wrap the reference to
     # ccache in the $( $) pattern so that turning ccache on or off
     # doesn't invalidate your build.
-    env["CCCOM"] = "$( $CCACHE $)" + env["CCCOM"]
-    env["CXXCOM"] = "$( $CCACHE $)" + env["CXXCOM"]
-    env["SHCCCOM"] = "$( $CCACHE $)" + env["SHCCCOM"]
-    env["SHCXXCOM"] = "$( $CCACHE $)" + env["SHCXXCOM"]
+    env["CCCOM"] = "$( $CCACHE_GENERATOR $)" + env["CCCOM"]
+    env["CXXCOM"] = "$( $CCACHE_GENERATOR $)" + env["CXXCOM"]
+    env["SHCCCOM"] = "$( $CCACHE_GENERATOR $)" + env["SHCCCOM"]
+    env["SHCXXCOM"] = "$( $CCACHE_GENERATOR $)" + env["SHCXXCOM"]

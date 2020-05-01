@@ -234,7 +234,21 @@ def generate(env):
     if ccache_enabled:
         env["ENV"]["CCACHE_PREFIX"] = _BoundSubstitution(env, "$ICECC")
     else:
-        icecc_string = "$( $ICECC $)"
+        # Make a generator to expand to ICECC in the case where we are
+        # not a conftest. We never want to run conftests
+        # remotely. Ideally, we would do this for the CCACHE_PREFIX
+        # case above, but unfortunately if we did we would never
+        # actually see the conftests, because the BoundSubst means
+        # that we will never have a meaningful `target` variable when
+        # we are in ENV. Instead, rely on the ccache.py tool to do
+        # it's own filtering out of conftests.
+        def icecc_generator(target, source, env, for_signature):
+            if "conftest" not in str(target[0]):
+                return '$ICECC'
+            return ''
+        env['ICECC_GENERATOR'] = icecc_generator
+
+        icecc_string = "$( $ICECC_GENERATOR $)"
         env["CCCOM"] = " ".join([icecc_string, env["CCCOM"]])
         env["CXXCOM"] = " ".join([icecc_string, env["CXXCOM"]])
         env["SHCCCOM"] = " ".join([icecc_string, env["SHCCCOM"]])
