@@ -254,15 +254,24 @@ def generate(env):
         env["SHCCCOM"] = " ".join([icecc_string, env["SHCCCOM"]])
         env["SHCXXCOM"] = " ".join([icecc_string, env["SHCXXCOM"]])
 
-    # Make link like jobs flow through icerun so we don't kill the
-    # local machine.
-    #
-    # TODO: Should we somehow flow SPAWN or other universal shell launch through
-    # ICERUN to avoid saturating the local machine, and build something like
-    # ninja pools?
-    env["ARCOM"] = "$( $ICERUN $) " + env["ARCOM"]
-    env["LINKCOM"] = "$( $ICERUN $) " + env["LINKCOM"]
-    env["SHLINKCOM"] = "$( $ICERUN $) " + env["SHLINKCOM"]
+    # Make common non-compile jobs flow through icerun so we don't
+    # kill the local machine. It would be nice to plumb ICERUN in via
+    # SPAWN or SHELL but it is too much. You end up running `icerun
+    # icecc ...`, and icecream doesn't handle that. We could try to
+    # filter and only apply icerun if icecc wasn't present but that
+    # seems fragile. If you find your local machine being overrun by
+    # jobs, figure out what sort they are and extend this part of the
+    # setup.
+    icerun_commands = [
+        "ARCOM",
+        "LINKCOM",
+        "PYTHON",
+        "SHLINKCOM",
+    ]
+
+    for command in icerun_commands:
+        if command in env:
+            env[command] = " ".join(["$( $ICERUN $)", env[command]])
 
     # Uncomment these to debug your icecc integration
     # env['ENV']['ICECC_DEBUG'] = 'debug'
