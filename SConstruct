@@ -4155,7 +4155,7 @@ if get_option('install-mode') == 'hygienic':
             ],
         )
 
-        env.Default(env.Alias("install-default"))
+    env.Default(env.Alias("install-default"))
 
 elif get_option('separate-debug') == "on":
     env.FatalError('Cannot use --separate-debug without --install-mode=hygienic')
