@@ -95,9 +95,6 @@ selector:
   - jstests/concurrency/fsm_workloads/yield_and_hashed.js
   - jstests/concurrency/fsm_workloads/yield_and_sorted.js
 
-  # TODO Unblacklist (SERVER-35538).
-  - jstests/concurrency/fsm_workloads/database_versioning.js
-
   # TODO Unblacklist (SERVER-38852).
   - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
 

@@ -158,10 +158,6 @@ selector:
   # much value in running it.
   - jstests/concurrency/fsm_workloads/drop_collection.js
 
-  # It fails with PooledConnectionsDropped when setFCV is run concurrently with movePrimary, which
-  # seems like it's due to a race condition in the NetworkInterfaceTL.
-  - jstests/concurrency/fsm_workloads/database_versioning.js
-
   # serverStatus does not include transaction metrics on mongos.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
