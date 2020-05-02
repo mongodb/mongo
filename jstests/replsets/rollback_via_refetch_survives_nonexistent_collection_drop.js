@@ -60,12 +60,13 @@ jsTestLog("Turning off the rollbackExitEarlyAfterCollectionDrop fail point");
 assert.commandWorked(rollbackDB.adminCommand(
     {configureFailPoint: 'rollbackExitEarlyAfterCollectionDrop', mode: 'off'}));
 
-rollbackTest.transitionToSteadyStateOperations();
-
 // After a successful rollback attempt, we should have seen the following log message to ensure
 // that we tried to drop a non-existent collection and continued without acquiring a database
-// lock.
-checkLog.contains(rollbackDB.getMongo(), "This collection does not exist");
+// lock. This check has to be before transitionToSteadyStateOperations() to make sure ram logs
+// are not overwritten due to oplog fether retry error.
+checkLog.containsJson(rollbackDB.getMongo(), 21696);  // This collection does not exist
+
+rollbackTest.transitionToSteadyStateOperations();
 
 rollbackTest.stop();
 }());
