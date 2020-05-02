@@ -122,16 +122,20 @@ void recordEndAndRemove(BgInfoMap& bgiMap, StringData key) {
 }
 
 void awaitNoBgOps(stdx::unique_lock<Latch>& lk, BgInfoMap* bgiMap, StringData key) {
-    if (auto iter = bgiMap->find(key); iter != bgiMap->end())
-        iter->second->awaitNoBgOps(lk);
+    if (auto iter = bgiMap->find(key); iter != bgiMap->end() && iter->second) {
+        auto ptr = iter->second;  // hold a reference while waiting
+        ptr->awaitNoBgOps(lk);
+    }
 }
 
 }  // namespace
 
 void BackgroundOperation::waitUntilAnIndexBuildFinishes(OperationContext* opCtx, StringData ns) {
     stdx::unique_lock<Latch> lk(m);
-    if (auto iter = nsInProg.find(ns); iter != nsInProg.end())
-        iter->second->waitForAnOpRemoval(lk, opCtx);
+    if (auto iter = nsInProg.find(ns); iter != nsInProg.end() && iter->second) {
+        auto ptr = iter->second;  // hold a reference while waiting
+        ptr->waitForAnOpRemoval(lk, opCtx);
+    }
 }
 
 bool BackgroundOperation::inProgForDb(StringData db) {
@@ -141,8 +145,9 @@ bool BackgroundOperation::inProgForDb(StringData db) {
 
 int BackgroundOperation::numInProgForDb(StringData db) {
     stdx::lock_guard<Latch> lk(m);
-    auto iter = dbsInProg.find(db);
-    return iter == dbsInProg.end() ? 0 : iter->second->getOpsInProgCount();
+    if (auto iter = dbsInProg.find(db); iter != dbsInProg.end() && iter->second)
+        return iter->second->getOpsInProgCount();
+    return 0;
 }
 
 bool BackgroundOperation::inProgForNs(StringData ns) {

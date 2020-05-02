@@ -501,7 +501,8 @@ public:
         result.append("readOnly", storageGlobalParams.readOnly);
 
         const auto& params = ServerParameterSet::getGlobal()->getMap();
-        if (auto iter = params.find("automationServiceDescriptor"); iter != params.end())
+        if (auto iter = params.find("automationServiceDescriptor");
+            iter != params.end() && iter->second)
             iter->second->append(opCtx, result, "automationServiceDescriptor");
 
         if (opCtx->getClient()->session()) {

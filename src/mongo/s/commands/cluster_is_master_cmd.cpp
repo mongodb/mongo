@@ -172,7 +172,7 @@ public:
         {
             const auto& serverParams = ServerParameterSet::getGlobal()->getMap();
             auto iter = serverParams.find("automationServiceDescriptor");
-            if (iter != serverParams.end())
+            if (iter != serverParams.end() && iter->second)
                 iter->second->append(opCtx, result, "automationServiceDescriptor");
         }
 
