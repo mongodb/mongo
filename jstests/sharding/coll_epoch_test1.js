@@ -24,11 +24,8 @@ var shards = [st.shard0, st.shard1, st.shard2];
 jsTest.log("Enabling sharding for the first time...");
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-// TODO(PM-85): Make sure we *always* move the primary after collection lifecyle project is
-// complete
 st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
-st.configRS.awaitLastOpCommitted();  // TODO: Remove after collection lifecyle project (PM-85)
 
 var bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
@@ -50,7 +47,6 @@ jsTest.log("Re-enabling sharding with a different key...");
 st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 assert.commandWorked(coll.ensureIndex({notId: 1}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {notId: 1}}));
-st.configRS.awaitLastOpCommitted();
 
 bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
