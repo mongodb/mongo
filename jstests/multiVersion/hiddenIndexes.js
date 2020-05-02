@@ -198,7 +198,7 @@ try {
 // Verify that a clean restart on 4.2 binary fails when the initial sync encounters a hidden index.
 try {
     restartReplSetNode(
-        st.rs0, secondaryNodeOfShard, Object.assign(nodeOptionsLatest, {startClean: true}));
+        st.rs0, secondaryNodeOfShard, Object.assign(nodeOptionsLastStable, {startClean: true}));
     assert(false, "Expected 'restartReplSetNode' to throw");
 } catch (err) {
     assert.eq(err.message, "MongoDB process stopped with exit code: 14");
@@ -207,10 +207,46 @@ try {
 }
 
 // Start that node and mongos with the latest binary for a clean shutdown.
-st.rs0.start(secondaryNodeOfShard, Object.assign(nodeOptionsLatest, {startClean: true}));
+st.rs0.start(secondaryNodeOfShard,
+             Object.assign(nodeOptionsLatest, {startClean: true, shardsvr: ""}));
 st.rs0.awaitReplication();
 st.upgradeCluster(nodeOptionsLatest.binVersion,
                   {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
+})();
+
+//
+// Can successfully downgrade mongod from 4.4 to 4.2 with an index explicitly set option 'hidden' to
+// 'false' on 'createIndex()'.
+(function() {
+mongosDB = st.s.getDB(kDbName);
+coll = mongosDB.coll;
+coll.dropIndexes();
+
+assert.commandWorked(coll.insert({s: 1, t: 1}));
+assert.commandWorked(mongosDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+assertVersionAndFCV(["4.4", "4.3"], latestFCV);
+
+const createAsUnhiddenIndexName = "createAsUnhidden";
+assert.commandWorked(coll.createIndex({s: 1}, {hidden: false, name: createAsUnhiddenIndexName}));
+assert.eq(getIndex(createAsUnhiddenIndexName).hidden, undefined);
+assert.commandWorked(coll.createIndex({t: 1}));
+assert.commandWorked(mongosDB.runCommand({
+    "collMod": coll.getName(),
+    "index": {"name": "t_1", "hidden": false},
+}));
+
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+
+// Test that we can downgrade the cluster to 4.2.
+st.upgradeCluster(nodeOptionsLastStable.binVersion,
+                  {upgradeMongos: true, upgradeShards: true, upgradeConfigs: true});
+
+mongosDB = st.s.getDB(kDbName);
+coll = mongosDB.coll;
+
+// The unhidden index created with option 'hidden: false' can still be used by the query planner.
+assertStagesForExplainOfCommand(
+    {coll: coll, cmdObj: {find: coll.getName(), filter: {s: 1}}, expectedStages: ["IXSCAN"]});
 })();
 
 st.stop();

@@ -28,8 +28,12 @@ const primaryDB = rst.getPrimary().getDB(dbName);
 primaryDB.coll.drop();
 
 // Create a hidden index.
-primaryDB.coll.createIndex({a: 1}, {hidden: true});
+assert.commandWorked(primaryDB.coll.createIndex({a: 1}, {hidden: true}));
 assert(isIndexHidden(primaryDB.coll.getIndexes(), "a_1"));
+
+// Explicitly create an unhidden index.
+assert.commandWorked(primaryDB.coll.createIndex({b: 1}, {hidden: false}));
+assert(!isIndexHidden(primaryDB.coll.getIndexes(), "b_1"));
 
 // Wait for the replication finishes before stopping the replica set.
 rst.awaitReplication();
@@ -39,12 +43,19 @@ rst.stopSet(/* signal */ undefined, /* forRestart */ true);
 rst.startSet(/* signal */ undefined, /* forRestart */ true);
 const secondaryDB = rst.getSecondary().getDB(dbName);
 
+// Test that after restart the index is still hidden.
 assert(isIndexHidden(secondaryDB.coll.getIndexes(), "a_1"));
+
+// Test that 'hidden: false' shouldn't be written to the index catalog.
+let idxSpec = GetIndexHelpers.findByName(secondaryDB.coll.getIndexes(), "b_1");
+assert.eq(idxSpec.hidden, undefined);
 
 rst.stopSet();
 
 //
-// Test that hidden index status will be persisted into the index catalog in a standalone mongod.
+// Test that hidden index status will be persisted into the index catalog in a standalone mongod,
+// whereas, an unhidden index will not write 'hidden: false' to the index catalog even when
+// createIndexes specifies 'hidden: false' explicitly.
 //
 // Start a mongod.
 let conn = MongoRunner.runMongod();
@@ -53,8 +64,12 @@ let db = conn.getDB(dbName);
 db.coll.drop();
 
 // Create a hidden index.
-db.coll.createIndex({a: 1}, {hidden: true});
+assert.commandWorked(db.coll.createIndex({a: 1}, {hidden: true}));
 assert(isIndexHidden(db.coll.getIndexes(), "a_1"));
+
+// Explicitly create an unhidden index.
+assert.commandWorked(db.coll.createIndex({b: 1}, {hidden: false}));
+assert(!isIndexHidden(db.coll.getIndexes(), "b_1"));
 
 // Restart the mongod.
 MongoRunner.stopMongod(conn);
@@ -63,6 +78,10 @@ db = conn.getDB(dbName);
 
 // Test that after restart the index is still hidden.
 assert(isIndexHidden(db.coll.getIndexes(), "a_1"));
+
+// Test that 'hidden: false' shouldn't be written to the index catalog.
+idxSpec = GetIndexHelpers.findByName(db.coll.getIndexes(), "b_1");
+assert.eq(idxSpec.hidden, undefined);
 
 MongoRunner.stopMongod(conn);
 })();
