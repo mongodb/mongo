@@ -3,7 +3,9 @@
  * it will not be used in planning. It is handled in the same way as other indexes by the index
  * catalog and for TTL purposes.
  * @tags: [
- *  requires_non_retryable_commands,    // CollMod is not retryable.
+ *  requires_non_retryable_commands,    # CollMod is not retryable.
+ *  # TODO SERVER-47960: Remove this tag after SERVER-47840 is backported to 4.4.
+ *  multiversion_incompatible,
  * ]
  */
 
@@ -121,4 +123,21 @@ db.runCommand({
 idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "tm_1");
 assert(idxSpec.hidden);
 assert.eq(idxSpec.expireAfterSeconds, 1);
+
+//
+// Ensure that "hidden: false" won't be added to index specification.
+//
+assert.commandWorked(
+    db.runCommand({createIndexes: collName, indexes: [{key: {y: 1}, name: "y", hidden: false}]}));
+idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "y");
+assert.eq(idxSpec.hidden, undefined);
+
+assert.commandWorked(coll.hideIndex("y"));
+idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "y");
+assert(idxSpec.hidden);
+
+// Ensure that unhiding the hidden index won't add 'hidden: false' to the index spec as well.
+assert.commandWorked(coll.unhideIndex("y"));
+idxSpec = GetIndexHelpers.findByName(coll.getIndexes(), "y");
+assert.eq(idxSpec.hidden, undefined);
 })();
