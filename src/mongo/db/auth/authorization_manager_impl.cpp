@@ -655,11 +655,16 @@ AuthorizationManagerImpl::AuthSchemaVersionCache::AuthSchemaVersionCache(
     ServiceContext* service,
     ThreadPoolInterface& threadPool,
     AuthzManagerExternalState* externalState)
-    : ReadThroughCache(_mutex, service, threadPool, 1 /* cacheSize */),
+    : ReadThroughCache(
+          _mutex,
+          service,
+          threadPool,
+          [this](OperationContext* opCtx, int unusedKey) { return _lookup(opCtx, unusedKey); },
+          1 /* cacheSize */),
       _externalState(externalState) {}
 
-boost::optional<int> AuthorizationManagerImpl::AuthSchemaVersionCache::lookup(
-    OperationContext* opCtx, const int& unusedKey) {
+boost::optional<int> AuthorizationManagerImpl::AuthSchemaVersionCache::_lookup(
+    OperationContext* opCtx, int unusedKey) {
     invariant(unusedKey == 0);
 
     int authzVersion;
@@ -674,12 +679,18 @@ AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
     int cacheSize,
     AuthSchemaVersionCache* authSchemaVersionCache,
     AuthzManagerExternalState* externalState)
-    : UserCache(_mutex, service, threadPool, cacheSize),
+    : UserCache(_mutex,
+                service,
+                threadPool,
+                [this](OperationContext* opCtx, const UserRequest& userReq) {
+                    return _lookup(opCtx, userReq);
+                },
+                cacheSize),
       _authSchemaVersionCache(authSchemaVersionCache),
       _externalState(externalState) {}
 
-boost::optional<User> AuthorizationManagerImpl::UserCacheImpl::lookup(OperationContext* opCtx,
-                                                                      const UserRequest& userReq) {
+boost::optional<User> AuthorizationManagerImpl::UserCacheImpl::_lookup(OperationContext* opCtx,
+                                                                       const UserRequest& userReq) {
     LOGV2_DEBUG(20238, 1, "Getting user record", "user"_attr = userReq.name);
 
     // Number of times to retry a user document that fetches due to transient AuthSchemaIncompatible

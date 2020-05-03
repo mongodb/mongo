@@ -55,23 +55,60 @@ class InvalidatingLRUCache {
          * The 'owningCache' and 'key' values can be nullptr/boost::none in order to support the
          * detached mode of ValueHandle below.
          */
-        StoredValue(InvalidatingLRUCache* in_owningCache,
-                    boost::optional<Key> in_key,
-                    Value&& in_value)
-            : owningCache(in_owningCache), key(in_key), value(std::move(in_value)) {}
+        StoredValue(InvalidatingLRUCache* owningCache,
+                    uint64_t epoch,
+                    boost::optional<Key>&& key,
+                    Value&& value)
+            : owningCache(owningCache),
+              epoch(epoch),
+              key(std::move(key)),
+              value(std::move(value)) {}
 
         ~StoredValue() {
-            if (owningCache) {
-                stdx::lock_guard<Latch> lg(owningCache->_mutex);
-                owningCache->_evictedCheckedOutValues.erase(*key);
+            if (!owningCache)
+                return;
+
+            stdx::unique_lock<Latch> ul(owningCache->_mutex);
+            auto& evictedCheckedOutValues = owningCache->_evictedCheckedOutValues;
+            auto it = evictedCheckedOutValues.find(*key);
+
+            // The lookup above can encounter the following cases:
+            //
+            // 1) The 'key' is not on the evictedCheckedOutValues map, because a second value for it
+            // was inserted, which was also evicted and all its handles expired (so it got removed)
+            if (it == evictedCheckedOutValues.end())
+                return;
+            auto storedValue = it->second.lock();
+            // 2) There are no more references to 'key', but it is stil on the map, which means
+            // either we are running its destrutor, or some other thread is running the destructor
+            // of a different epoch. In either case it is fine to remove the 'it' because we are
+            // under a mutex.
+            if (!storedValue) {
+                evictedCheckedOutValues.erase(it);
+                return;
             }
+            ul.unlock();
+            // 3) The value for 'key' is for a different epoch, in which case we must dereference
+            // the '.lock()'ed storedValue outside of the mutex in order to avoid reentrancy while
+            // holding a mutex.
+            invariant(storedValue->epoch != epoch);
         }
 
+        // Copy and move constructors need to be deleted in order to avoid having to make the
+        // destructor to account for the object having been moved
+        StoredValue(StoredValue&) = delete;
+        StoredValue& operator=(StoredValue&) = delete;
+        StoredValue(StoredValue&&) = delete;
+        StoredValue& operator=(StoredValue&&) = delete;
+
         // The cache which stores this key/value pair
-        InvalidatingLRUCache* owningCache;
+        InvalidatingLRUCache* const owningCache;
+
+        // Identity associated with this value. See the destructor for its usage.
+        const uint64_t epoch;
 
         // The key/value pair. See the comments on the constructor about why the key is optional.
-        boost::optional<Key> key;
+        const boost::optional<Key> key;
         Value value;
 
         // Initially set to true to indicate that the entry is valid and can be read without
@@ -105,7 +142,7 @@ public:
         // support pinning items. Their only usage must be in the authorization mananager for the
         // internal authentication user.
         explicit ValueHandle(Value&& value)
-            : _value(std::make_shared<StoredValue>(nullptr, boost::none, std::move(value))) {}
+            : _value(std::make_shared<StoredValue>(nullptr, 0, boost::none, std::move(value))) {}
 
         ValueHandle() = default;
 
@@ -159,7 +196,8 @@ public:
         LockGuardWithPostUnlockDestructor guard(_mutex);
         _invalidate(&guard, key, _cache.find(key));
         if (auto evicted = _cache.add(
-                key, std::make_shared<StoredValue>(this, key, std::forward<Value>(value)))) {
+                key,
+                std::make_shared<StoredValue>(this, ++_epoch, key, std::forward<Value>(value)))) {
             const auto& evictedKey = evicted->first;
             auto& evictedValue = evicted->second;
 
@@ -192,7 +230,8 @@ public:
         LockGuardWithPostUnlockDestructor guard(_mutex);
         _invalidate(&guard, key, _cache.find(key));
         if (auto evicted = _cache.add(
-                key, std::make_shared<StoredValue>(this, key, std::forward<Value>(value)))) {
+                key,
+                std::make_shared<StoredValue>(this, ++_epoch, key, std::forward<Value>(value)))) {
             const auto& evictedKey = evicted->first;
             auto& evictedValue = evicted->second;
 
@@ -372,6 +411,10 @@ private:
     // look-up into that map.
     using EvictedCheckedOutValuesMap = stdx::unordered_map<Key, std::weak_ptr<StoredValue>>;
     EvictedCheckedOutValuesMap _evictedCheckedOutValues;
+
+    // An always-incrementing counter from which to obtain "identities" for each value stored in the
+    // cache, so that different instantiations for the same key can be differentiated
+    uint64_t _epoch{0};
 
     Cache _cache;
 };

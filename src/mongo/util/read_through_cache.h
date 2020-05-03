@@ -115,8 +115,6 @@ class ReadThroughCache : public ReadThroughCacheBase {
     using Cache = InvalidatingLRUCache<Key, StoredValue>;
 
 public:
-    using LookupFn = std::function<boost::optional<Value>(OperationContext*, const Key&)>;
-
     /**
      * Common type for values returned from the cache.
      */
@@ -175,6 +173,14 @@ public:
 
         typename Cache::ValueHandle _valueHandle;
     };
+
+    /**
+     * Signature for a blocking function to provide the value for a key when there is a cache miss.
+     *
+     * The implementation must throw a uassertion to indicate an error while looking up the value,
+     * return boost::none if the key is not found, or return an actual value.
+     */
+    using LookupFn = unique_function<boost::optional<Value>(OperationContext*, const Key&)>;
 
     /**
      * If 'key' is found in the cache, returns a set ValueHandle (its operator bool will be true).
@@ -337,21 +343,17 @@ protected:
     ReadThroughCache(Mutex& mutex,
                      ServiceContext* service,
                      ThreadPoolInterface& threadPool,
+                     LookupFn lookupFn,
                      int cacheSize)
-        : ReadThroughCacheBase(mutex, service, threadPool), _cache(cacheSize) {}
+        : ReadThroughCacheBase(mutex, service, threadPool),
+          _lookupFn(std::move(lookupFn)),
+          _cache(cacheSize) {}
 
     ~ReadThroughCache() {
         invariant(_inProgressLookups.empty());
     }
 
 private:
-    /**
-     * Provide the value for a key when there is a cache miss.  Sub-classes must implement this
-     * function appropriately.  Throw a uassertion to indicate an error while looking up the value,
-     * or return value for this key, or boost::none if this key has no value.
-     */
-    virtual boost::optional<Value> lookup(OperationContext* opCtx, const Key& key) = 0;
-
     // Refer to the comments on '_asyncLookupWhileInvalidated' for more detail on how this structure
     // is used.
     struct InProgressLookup {
@@ -414,7 +416,7 @@ private:
                 OperationContext * opCtx, const Status& status) mutable noexcept {
                 p->setWith([&]() mutable {
                     uassertStatusOK(status);
-                    auto value = lookup(opCtx, inProgressLookup.key);
+                    auto value = _lookupFn(opCtx, inProgressLookup.key);
                     uassert(ErrorCodes::ReadThroughCacheKeyNotFound,
                             "Internal only: key not found",
                             value);
@@ -432,6 +434,9 @@ private:
 
         return std::move(future);
     };
+
+    // Blocking function which will be invoked to retrieve entries from the backing store
+    const LookupFn _lookupFn;
 
     // Contains all the currently cached keys. This structure is self-synchronising and doesn't
     // require a mutex. However, on cache miss it is accessed under '_mutex', which is safe, because

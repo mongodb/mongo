@@ -229,6 +229,34 @@ TEST(InvalidatingLRUCacheTest, CheckedOutItemsAreInvalidatedWithPredicateWhenEvi
     }
 }
 
+TEST(InvalidatingLRUCacheTest, OrderOfDestructionOfHandlesDiffersFromOrderOfInsertion) {
+    TestValueCache cache(1);
+
+    boost::optional<TestValueCache::ValueHandle> firstValue(
+        cache.insertOrAssignAndGet(100, {"Key 100, Value 1"}));
+    ASSERT(*firstValue);
+    ASSERT(firstValue->isValid());
+
+    // This will invalidate the first value of key 100
+    auto secondValue = cache.insertOrAssignAndGet(100, {"Key 100, Value 2"});
+    ASSERT(secondValue);
+    ASSERT(secondValue.isValid());
+    ASSERT(!firstValue->isValid());
+
+    // This will evict the second value of key 100
+    cache.insertOrAssignAndGet(200, {"Key 200, Value 1"});
+    ASSERT(secondValue);
+    ASSERT(secondValue.isValid());
+    ASSERT(!firstValue->isValid());
+
+    // This makes the first value of 100's handle go away before the second value's hande
+    firstValue.reset();
+    ASSERT(secondValue.isValid());
+
+    cache.invalidate(100);
+    ASSERT(!secondValue.isValid());
+}
+
 TEST(InvalidatingLRUCacheTest, AssignWhileValueIsCheckedOutInvalidatesFirstValue) {
     TestValueCache cache(1);
 
