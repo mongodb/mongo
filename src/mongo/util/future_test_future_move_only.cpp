@@ -820,20 +820,14 @@ TEST(Future_MoveOnly, Success_unordered_map) {
 TEST(Future_MoveOnly, Success_nested_container) {
     FUTURE_SUCCESS_TEST(
         [] {
-            std::vector<std::vector<std::map<Widget, Widget>>> outer;
-            std::vector<std::map<Widget, Widget>> mid;
-            std::map<Widget, Widget> inner;
-            inner.emplace(1, 1);
-            mid.push_back(std::move(inner));
-            outer.push_back(std::move(mid));
+            std::vector<std::vector<Widget>> outer;
+            std::vector<Widget> inner;
+            inner.emplace_back(1);
+            outer.push_back(std::move(inner));
 
             return outer;
         },
-        [](auto&& fut) {
-            auto&& outer = fut.get();
-            const auto& inner = outer[0][0];
-            ASSERT_EQ(inner.at(Widget{1}).val, 1);
-        });
+        [](auto&& fut) { ASSERT_EQ(fut.get()[0][0], 1); });
 }
 
 
