@@ -94,12 +94,6 @@ var workerThread = (function() {
                     // readPreference={mode: "secondary"} when there's only a single node in
                     // the CSRS.
                     load('jstests/libs/override_methods/set_read_preference_secondary.js');
-
-                    // Reads after an index build completes on a secondary should be causally
-                    // consistent.
-                    if (session.getOptions().isCausalConsistency()) {
-                        load('jstests/libs/override_methods/causally_consistent_index_builds.js');
-                    }
                 }
 
                 if (typeof initialClusterTime !== 'undefined') {
