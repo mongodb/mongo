@@ -54,7 +54,7 @@ public:
     using ReadConcern = repl::ReadConcernArgs;
     using WriteConcern = WriteConcernOptions;
 
-    using FetchDefaultsFn = std::function<boost::optional<RWConcernDefault>(OperationContext*)>;
+    using FetchDefaultsFn = unique_function<boost::optional<RWConcernDefault>(OperationContext*)>;
 
     static constexpr StringData readConcernFieldName = ReadConcern::kReadConcernFieldName;
     static constexpr StringData writeConcernFieldName = WriteConcern::kWriteConcernField;
@@ -162,15 +162,17 @@ private:
         Cache& operator=(const Cache&) = delete;
 
     public:
-        Cache(ServiceContext* service, ThreadPoolInterface& threadPool, LookupFn lookupFn);
+        Cache(ServiceContext* service,
+              ThreadPoolInterface& threadPool,
+              FetchDefaultsFn fetchDefaultsFn);
         virtual ~Cache() = default;
 
-        boost::optional<RWConcernDefault> lookup(OperationContext* opCtx, const Type& key) override;
+        boost::optional<RWConcernDefault> lookup(OperationContext* opCtx);
 
     private:
         Mutex _mutex = MONGO_MAKE_LATCH("ReadWriteConcernDefaults::Cache");
 
-        LookupFn _lookupFn;
+        FetchDefaultsFn _fetchDefaultsFn;
     };
 
     Cache _defaults;

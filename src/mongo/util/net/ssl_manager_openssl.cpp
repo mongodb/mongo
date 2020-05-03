@@ -934,7 +934,7 @@ StatusWith<OCSPValidationContext> extractOcspUris(SSL_CTX* context,
 class OCSPCache : public ReadThroughCache<OCSPCacheKey, OCSPFetchResponse> {
 public:
     OCSPCache(ServiceContext* service)
-        : ReadThroughCache(_mutex, service, _threadPool, tlsOCSPCacheSize) {
+        : ReadThroughCache(_mutex, service, _threadPool, _lookup, tlsOCSPCacheSize) {
         _threadPool.startup();
     }
 
@@ -951,8 +951,8 @@ public:
     }
 
 private:
-    boost::optional<OCSPFetchResponse> lookup(OperationContext* opCtx,
-                                              const OCSPCacheKey& key) final {
+    static boost::optional<OCSPFetchResponse> _lookup(OperationContext* opCtx,
+                                                      const OCSPCacheKey& key) {
         // If there is a CRL file, we expect the CRL file to cover the certificate status
         // information, and therefore we don't need to make a roundtrip.
         if (!getSSLGlobalParams().sslCRLFile.empty()) {

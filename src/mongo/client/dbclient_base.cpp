@@ -48,7 +48,6 @@
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"

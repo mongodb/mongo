@@ -51,16 +51,10 @@ struct CachedValue {
 class Cache : public ReadThroughCache<std::string, CachedValue> {
 public:
     Cache(ServiceContext* service, ThreadPoolInterface& threadPool, size_t size, LookupFn lookupFn)
-        : ReadThroughCache(_mutex, service, threadPool, size), _lookupFn(std::move(lookupFn)) {}
+        : ReadThroughCache(_mutex, service, threadPool, std::move(lookupFn), size) {}
 
 private:
-    boost::optional<CachedValue> lookup(OperationContext* opCtx, const std::string& key) override {
-        return _lookupFn(opCtx, key);
-    }
-
     Mutex _mutex = MONGO_MAKE_LATCH("ReadThroughCacheTest::Cache");
-
-    LookupFn _lookupFn;
 };
 
 /**
