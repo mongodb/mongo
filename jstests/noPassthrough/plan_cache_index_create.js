@@ -62,7 +62,7 @@ function runTest({rst, readDB, writeDB}) {
         writeConcern: {w: "majority"}
     }));
 
-    rst.waitForAllIndexBuildsToFinish(dbName, collName);
+    rst.awaitReplication();
 
     //
     // Confirm that the plan cache is reset on start and completion of a background index build.
@@ -122,7 +122,7 @@ function runTest({rst, readDB, writeDB}) {
     assert.soon(() => !indexBuildIsRunning(readDB, "most_selective"));
     createIdxShell({checkExitSuccess: true});
 
-    rst.waitForAllIndexBuildsToFinish(dbName, collName);
+    rst.awaitReplication();
 
     // Confirm that there are no cached plans post index build.
     assertDoesNotHaveCachedPlan(readColl, filter);
@@ -152,7 +152,7 @@ function runTest({rst, readDB, writeDB}) {
         writeConcern: {w: "majority"}
     }));
 
-    rst.waitForAllIndexBuildsToFinish(dbName, collName);
+    rst.awaitReplication();
 
     // Confirm that there are no cached plans post index build.
     assertDoesNotHaveCachedPlan(readColl, filter);

@@ -104,7 +104,7 @@ if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
 }
 
 // Wait for the index builds to finish.
-replSet.waitForAllIndexBuildsToFinish(dbName, collName);
+replSet.awaitReplication();
 jsTest.log("Checking if the indexes match between the new node and the secondary node");
 
 let newNodeDB = newNode.getDB(dbName);

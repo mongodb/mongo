@@ -29,7 +29,7 @@ assert.commandWorked(primaryColl.insert({a: 1000}));
 assert.commandWorked(primaryColl.ensureIndex({a: 1}));
 
 replTest.awaitReplication();
-replTest.waitForAllIndexBuildsToFinish(dbName, collName);
+replTest.awaitReplication();
 
 assert.eq(2,
           primaryColl.getIndexes().length,

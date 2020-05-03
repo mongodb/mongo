@@ -1884,10 +1884,6 @@ var ReplSetTest = function(opts) {
         }
     };
 
-    this.waitForAllIndexBuildsToFinish = function(dbName, collName) {
-        this.awaitReplication();
-    };
-
     this.getHashesUsingSessions = function(sessions, dbName, {
         filterCapped: filterCapped = true,
         readAtClusterTime,

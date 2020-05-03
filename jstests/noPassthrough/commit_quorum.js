@@ -61,7 +61,7 @@ assert.eq("votingMembers", res.commitQuorum);
 res = assert.commandWorked(testDB[collName].createIndexes([{j: 1}], {}, 1));
 assert.eq(1, res.commitQuorum);
 
-replSet.waitForAllIndexBuildsToFinish(testDB.getName(), collName);
+replSet.awaitReplication();
 
 let awaitShell;
 try {

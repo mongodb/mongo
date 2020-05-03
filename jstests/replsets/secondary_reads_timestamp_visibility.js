@@ -36,7 +36,7 @@ for (let i = 0; i < 100; i++) {
 
 replSet.awaitLastOpCommitted();
 // This function includes a call to awaitReplication().
-replSet.waitForAllIndexBuildsToFinish(primaryDB.getName(), collName);
+replSet.awaitReplication();
 
 // Sanity check.
 assert.eq(secondaryDB.getCollection(collName).find({x: 0}).itcount(), 100);

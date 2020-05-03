@@ -124,7 +124,7 @@ var doTest = function(signal) {
 
     t.save({a: 1000});
     t.ensureIndex({a: 1});
-    replTest.waitForAllIndexBuildsToFinish('foo', 'foo');
+    replTest.awaitReplication();
 
     ts.forEach(function(z) {
         assert.eq(2, z.getIndexKeys().length, "A " + z.getMongo());

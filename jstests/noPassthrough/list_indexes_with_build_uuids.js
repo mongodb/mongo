@@ -52,7 +52,7 @@ replSet.awaitReplication();
 // Build and finish the first index.
 assert.commandWorked(primaryDB.runCommand(
     {createIndexes: collName, indexes: [{key: {i: 1}, name: firstIndexName, background: true}]}));
-replSet.waitForAllIndexBuildsToFinish(dbName, collName);
+replSet.awaitReplication();
 
 // Start hanging index builds on the secondary.
 IndexBuildTest.pauseIndexBuilds(secondary);

@@ -17,7 +17,7 @@ var t = db.text_index_limits;
 t.drop();
 
 assert.commandWorked(t.createIndex({comments: "text"}));
-replTest.waitForAllIndexBuildsToFinish(t.getDB(), t.getName());
+replTest.awaitReplication();
 
 // 1. Test number of unique terms exceeds 400,000
 let commentsWithALotOfUniqueWords = "";
