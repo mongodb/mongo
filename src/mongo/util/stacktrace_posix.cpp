@@ -428,12 +428,10 @@ void printStackTraceImpl(const Options& options, StackTraceSink* sink = nullptr)
 
     BSONObj obj = bob.done();
     if (!err.empty()) {
-        static constexpr char fmtErr[] = "Error collecting stack trace: {err}";
         if (sink) {
-            *sink << fmt::format(fmtErr, "err"_a = err);
-        } else {
-            LOGV2(31430, fmtErr, "err"_attr = err);
+            *sink << fmt::format(FMT_STRING("Error collecting stack trace: {}"), err);
         }
+        LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = err);
         return;
     }
     static constexpr char fmtBt[] = "BACKTRACE: {bt}";
