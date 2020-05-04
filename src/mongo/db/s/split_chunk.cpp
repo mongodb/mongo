@@ -137,8 +137,9 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     //
     // TODO(SERVER-25086): Remove distLock acquisition from split chunk
     //
-    const std::string whyMessage(str::stream() << "splitting chunk " << chunkRange.toString()
-                                               << " in " << nss.toString());
+    const std::string whyMessage(str::stream()
+                                 << "splitting chunk " << redact(chunkRange.toString()) << " in "
+                                 << nss.toString());
     auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
         opCtx, nss.ns(), whyMessage, DistLockManager::kDefaultLockTimeout);
     if (!scopedDistLock.isOK()) {
