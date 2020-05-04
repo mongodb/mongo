@@ -3258,62 +3258,62 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
             auto newMutableConfig = newConfig.getMutable();
             newMutableConfig.setConfigVersion(version);
             newConfig = ReplSetConfig(std::move(newMutableConfig));
-        } else {
-            // Only append 'newlyAdded' to nodes during safe reconfig.
-            if (enableAutomaticReconfig) {
-                boost::optional<MutableReplSetConfig> newMutableConfig;
+        }
 
-                // Set the 'newlyAdded' field to true for all new voting nodes.
-                for (int i = 0; i < newConfig.getNumMembers(); i++) {
-                    const auto newMem = newConfig.getMemberAt(i);
+        if (enableAutomaticReconfig) {
+            boost::optional<MutableReplSetConfig> newMutableConfig;
 
-                    // In a safe reconfig, the 'newlyAdded' flag should never already be set for
-                    // this member. If it is set, throw an error.
-                    if (newMem.isNewlyAdded()) {
-                        str::stream errmsg;
-                        errmsg << "Cannot provide " << MemberConfig::kNewlyAddedFieldName
-                               << " field to member config during safe reconfig.";
-                        LOGV2_ERROR(
-                            4634900,
-                            "Initializing 'newlyAdded' field to member has failed with bad status.",
-                            "errmsg"_attr = std::string(errmsg));
-                        return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
-                    }
+            // Set the 'newlyAdded' field to true for all new voting nodes.
+            for (int i = 0; i < newConfig.getNumMembers(); i++) {
+                const auto newMem = newConfig.getMemberAt(i);
 
-                    // We should never set the 'newlyAdded' field for arbiters.
-                    if (newMem.isArbiter()) {
-                        continue;
-                    }
-                    const auto newMemId = newMem.getId();
-                    const auto oldMem = oldConfig.findMemberByID(newMemId.getData());
-
-                    const bool isNewVotingMember = (oldMem == nullptr && newMem.isVoter());
-                    const bool isCurrentlyNewlyAdded =
-                        (oldMem != nullptr && oldMem->isNewlyAdded());
-
-                    // Append the 'newlyAdded' field if the node:
-                    // 1) Is a new, voting node
-                    // 2) Already has a 'newlyAdded' field in the old config
-                    if (isNewVotingMember || isCurrentlyNewlyAdded) {
-                        if (!newMutableConfig) {
-                            newMutableConfig = newConfig.getMutable();
-                        }
-                        newMutableConfig->addNewlyAddedFieldForMember(newMemId);
-                    }
+                // In a reconfig, the 'newlyAdded' flag should never already be set for
+                // this member. If it is set, throw an error.
+                if (newMem.isNewlyAdded()) {
+                    str::stream errmsg;
+                    errmsg << "Cannot provide " << MemberConfig::kNewlyAddedFieldName
+                           << " field to member config during reconfig.";
+                    LOGV2_ERROR(
+                        4634900,
+                        "Initializing 'newlyAdded' field to member has failed with bad status.",
+                        "errmsg"_attr = std::string(errmsg));
+                    return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
                 }
 
-                if (newMutableConfig) {
-                    newConfig = ReplSetConfig(*std::move(newMutableConfig));
-                    LOGV2(4634400,
-                          "Appended the 'newlyAdded' field to a node in the new config. Nodes with "
-                          "the 'newlyAdded' field will be considered to have 'votes:0'. Upon "
-                          "transition to SECONDARY, this field will be automatically removed.",
-                          "newConfigObj"_attr = newConfig.toBSON(),
-                          "userProvidedConfig"_attr = args.newConfigObj,
-                          "oldConfig"_attr = oldConfig.toBSON());
+                // We should never set the 'newlyAdded' field for arbiters, or during force
+                // reconfigs.
+                if (newMem.isArbiter() || args.force) {
+                    continue;
+                }
+                const auto newMemId = newMem.getId();
+                const auto oldMem = oldConfig.findMemberByID(newMemId.getData());
+
+                const bool isNewVotingMember = (oldMem == nullptr && newMem.isVoter());
+                const bool isCurrentlyNewlyAdded = (oldMem != nullptr && oldMem->isNewlyAdded());
+
+                // Append the 'newlyAdded' field if the node:
+                // 1) Is a new, voting node
+                // 2) Already has a 'newlyAdded' field in the old config
+                if (isNewVotingMember || isCurrentlyNewlyAdded) {
+                    if (!newMutableConfig) {
+                        newMutableConfig = newConfig.getMutable();
+                    }
+                    newMutableConfig->addNewlyAddedFieldForMember(newMemId);
                 }
             }
+
+            if (newMutableConfig) {
+                newConfig = ReplSetConfig(*std::move(newMutableConfig));
+                LOGV2(4634400,
+                      "Appended the 'newlyAdded' field to a node in the new config. Nodes with "
+                      "the 'newlyAdded' field will be considered to have 'votes:0'. Upon "
+                      "transition to SECONDARY, this field will be automatically removed.",
+                      "newConfigObj"_attr = newConfig.toBSON(),
+                      "userProvidedConfig"_attr = args.newConfigObj,
+                      "oldConfig"_attr = oldConfig.toBSON());
+            }
         }
+
         return newConfig;
     };
 

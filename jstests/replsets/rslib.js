@@ -762,12 +762,18 @@ waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex, force
     }, () => tojson(node.getDB("local").system.replset.findOne()));
 };
 
-assertVoteCount = function(
-    node, {votingMembersCount, majorityVoteCount, writableVotingMembersCount, writeMajorityCount}) {
+assertVoteCount = function(node, {
+    votingMembersCount,
+    majorityVoteCount,
+    writableVotingMembersCount,
+    writeMajorityCount,
+    totalMembersCount
+}) {
     const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
-    assert.eq(status["votingMembersCount"], votingMembersCount, tojson(status));
-    assert.eq(status["majorityVoteCount"], majorityVoteCount, tojson(status));
-    assert.eq(status["writableVotingMembersCount"], writableVotingMembersCount, tojson(status));
-    assert.eq(status["writeMajorityCount"], writeMajorityCount, tojson(status));
+    assert.eq(status["votingMembersCount"], votingMembersCount, status);
+    assert.eq(status["majorityVoteCount"], majorityVoteCount, status);
+    assert.eq(status["writableVotingMembersCount"], writableVotingMembersCount, status);
+    assert.eq(status["writeMajorityCount"], writeMajorityCount, status);
+    assert.eq(status["members"].length, totalMembersCount, status);
 };
 }());

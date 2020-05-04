@@ -56,7 +56,8 @@ assertVoteCount(primary, {
     votingMembersCount: 1,
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
-    writeMajorityCount: 1
+    writeMajorityCount: 1,
+    totalMembersCount: 2,
 });
 
 jsTestLog("Waiting for initial sync to complete");
@@ -71,7 +72,8 @@ assertVoteCount(primary, {
     votingMembersCount: 1,
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
-    writeMajorityCount: 1
+    writeMajorityCount: 1,
+    totalMembersCount: 2,
 });
 
 jsTestLog("Making sure the set can accept w:2 writes");
@@ -103,7 +105,8 @@ assertVoteCount(primary, {
     votingMembersCount: 1,
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
-    writeMajorityCount: 1
+    writeMajorityCount: 1,
+    totalMembersCount: 3,
 });
 
 jsTestLog("Reconfiguring new node to have 0 votes");
@@ -121,7 +124,8 @@ assertVoteCount(primary, {
     votingMembersCount: 1,
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
-    writeMajorityCount: 1
+    writeMajorityCount: 1,
+    totalMembersCount: 3,
 });
 
 jsTestLog("Waiting for second initial sync to complete");
@@ -138,7 +142,8 @@ assertVoteCount(primary, {
     votingMembersCount: 1,
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
-    writeMajorityCount: 1
+    writeMajorityCount: 1,
+    totalMembersCount: 3,
 });
 
 jsTestLog("Making sure the set can accept w:3 writes");

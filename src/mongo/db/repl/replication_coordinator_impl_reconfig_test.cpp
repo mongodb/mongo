@@ -1700,7 +1700,7 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotAppendNewlyAddedFieldToNewNode
                       "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
-TEST_F(ReplCoordReconfigTest, ForceReconfigSucceedsWhenNewlyAddedFieldIsSetToTrue) {
+TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldIsSetToTrue) {
     // Set the flag to add the 'newlyAdded' field to MemberConfigs.
     enableAutomaticReconfig = true;
     // Set the flag back to false after this test exits.
@@ -1721,23 +1721,8 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigSucceedsWhenNewlyAddedFieldIsSetToTru
                                                                      << "n3:1"
                                                                      << "newlyAdded" << true)));
 
-    startCapturingLogMessages();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
-    stopCapturingLogMessages();
-
-    const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
-    const auto newMember = rsConfig.findMemberByID(3);
-
-    // Verify that the 'newlyAdded' field is set and that the member is considered a non-voting
-    // node.
-    ASSERT_TRUE(newMember->isNewlyAdded());
-    ASSERT_FALSE(newMember->isVoter());
-
-    // Verify that a log message was not created for adding the 'newlyAdded' field, since a force
-    // reconfig should not attempt to append the field.
-    ASSERT_EQUALS(0,
-                  countTextFormatLogLinesContaining(
-                      "Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldSetToFalse) {

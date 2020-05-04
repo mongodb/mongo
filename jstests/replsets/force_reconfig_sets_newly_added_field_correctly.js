@@ -1,16 +1,7 @@
 /**
- * Verify that force reconfigs set the 'newlyAdded' field correctly in a replica set. We test this
- * by starting with a two node replica set. We first do a force reconfig that adds a node with
- * 'newlyAdded: true' and verify that it correctly sets the 'newlyAdded' field for that member. We
- * then do another force reconfig that adds a second node without the 'newlyAdded' field passed in
- * and verify that the node does not have 'newlyAdded' appended to it.
+ * Verify that force reconfigs overwrite the 'newlyAdded' field correctly in a replica set.
  *
- * @tags: [
- *   requires_fcv_46,
- * ]
- *
- * TODO (SERVER-47331): Determine if this test needs to be altered, since this test will do a force
- *                      reconfig followed by a safe reconfig.
+ * @tags: [ requires_fcv_46 ]
  */
 
 (function() {
@@ -18,13 +9,10 @@
 load("jstests/replsets/rslib.js");
 load('jstests/libs/fail_point_util.js');
 
-const rst = new ReplSetTest({
-    name: jsTestName(),
-    nodes: [{}, {rsConfig: {priority: 0}}],
-    nodeOptions: {setParameter: {enableAutomaticReconfig: true}}
-});
+const rst = new ReplSetTest(
+    {name: jsTestName(), nodes: 1, nodeOptions: {setParameter: {enableAutomaticReconfig: true}}});
 rst.startSet();
-rst.initiate();
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 
@@ -35,23 +23,22 @@ const primaryColl = primaryDb.getCollection(collName);
 
 // TODO (SERVER-46808): Move this into ReplSetTest.initiate
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 0);
-waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 1);
-waitForConfigReplication(primary, rst.nodes);
-
-// Verify that the 'newlyAdded' fields of the first two nodes in the repl set have been removed.
 assert.eq(false, isMemberNewlyAdded(primary, 0));
-assert.eq(false, isMemberNewlyAdded(primary, 1));
 
-assert.commandWorked(primaryColl.insert({"starting": "doc"}, {writeConcern: {w: 2}}));
+assert.commandWorked(primaryColl.insert({"starting": "doc"}));
 
-// Verify that the counts and majorities were set correctly after spinning up the repl set.
-let status = assert.commandWorked(primaryDb.adminCommand({replSetGetStatus: 1}));
-assert.eq(status["votingMembersCount"], 2, status);
-assert.eq(status["majorityVoteCount"], 2, status);
-assert.eq(status["writableVotingMembersCount"], 2, status);
-assert.eq(status["writeMajorityCount"], 2, status);
+assertVoteCount(primary, {
+    votingMembersCount: 1,
+    majorityVoteCount: 1,
+    writableVotingMembersCount: 1,
+    writeMajorityCount: 1,
+    totalMembersCount: 1,
+});
 
-const addNodeThroughForceReconfig = (id, setNewlyAdded) => {
+const addNode = (id, {newlyAdded, force, shouldSucceed, failureCode} = {}) => {
+    jsTestLog(`Adding node ${id}, newlyAdded: ${newlyAdded}, force: ${force}, shouldSucceed: ${
+        shouldSucceed}, failureCode: ${failureCode}`);
+
     const newNode = rst.add({
         rsConfig: {priority: 0},
         setParameter: {
@@ -63,96 +50,133 @@ const addNodeThroughForceReconfig = (id, setNewlyAdded) => {
         }
     });
 
-    const newNodeObj = {
+    let newNodeObj = {
         _id: id,
         host: newNode.host,
         priority: 0,
     };
 
-    // Do not set the 'newlyAdded' field if 'setNewlyAdded' is false.
-    if (setNewlyAdded) {
+    if (newlyAdded) {
         newNodeObj.newlyAdded = true;
     }
 
-    // Get the config from disk in case there are any 'newlyAdded' fields we should preserve.
-    let config = primary.getDB("local").system.replset.findOne();
+    let config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
     config.version++;
     config.members.push(newNodeObj);
 
-    assert.commandWorked(primary.adminCommand({replSetReconfig: config, force: true}));
+    if (!shouldSucceed) {
+        jsTestLog("Running reconfig with bad config " + tojsononeline(config));
+
+        assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config, force: force}),
+                                     failureCode);
+        rst.remove(newNode);
+        return null;
+    }
+
+    jsTestLog("Running reconfig with valid config " + tojsononeline(config));
+    assert(!failureCode);
+    assert.commandWorked(primary.adminCommand({replSetReconfig: config, force: force}));
     waitForConfigReplication(primary, rst.nodes);
+
+    assert.commandWorked(newNode.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }));
 
     return newNode;
 };
 
-jsTestLog("Adding the first new node to config (with 'newlyAdded' set)");
-const firstNewNodeId = 2;
-const firstNewNode = addNodeThroughForceReconfig(firstNewNodeId, true /* newlyAdded */);
+jsTestLog("Fail adding a new node with 'newlyAdded' with force reconfig");
+addNode(2, {
+    newlyAdded: true,
+    force: true,
+    shouldSucceed: false,
+    failureCode: ErrorCodes.InvalidReplicaSetConfig
+});
+assertVoteCount(primary, {
+    votingMembersCount: 1,
+    majorityVoteCount: 1,
+    writableVotingMembersCount: 1,
+    writeMajorityCount: 1,
+    totalMembersCount: 1,
+});
 
-assert.commandWorked(firstNewNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout,
-}));
+jsTestLog("Fail adding a new node with 'newlyAdded' with safe reconfig");
+addNode(2, {
+    newlyAdded: true,
+    force: false,
+    shouldSucceed: false,
+    failureCode: ErrorCodes.InvalidReplicaSetConfig
+});
+assertVoteCount(primary, {
+    votingMembersCount: 1,
+    majorityVoteCount: 1,
+    writableVotingMembersCount: 1,
+    writeMajorityCount: 1,
+    totalMembersCount: 1,
+});
 
-jsTestLog("Checking for 'newlyAdded' field on the first new node");
-assert.eq(true, isMemberNewlyAdded(primary, firstNewNodeId, true /* force */));
+jsTestLog("Add a new node without 'newlyAdded' with force reconfig");
+const firstNewNode = addNode(2, {newlyAdded: false, force: true, shouldSucceed: true});
+assert.eq(false, isMemberNewlyAdded(primary, 1, true /* force */));
+assertVoteCount(primary, {
+    votingMembersCount: 2,
+    majorityVoteCount: 2,
+    writableVotingMembersCount: 2,
+    writeMajorityCount: 2,
+    totalMembersCount: 2,
+});
 
-// Verify that the counts and majorities were not changed after adding the first new node, since the
-// node should not be treated as a voting node.
-status = assert.commandWorked(primaryDb.adminCommand({replSetGetStatus: 1}));
-assert.eq(status["votingMembersCount"], 2, status);
-assert.eq(status["majorityVoteCount"], 2, status);
-assert.eq(status["writableVotingMembersCount"], 2, status);
-assert.eq(status["writeMajorityCount"], 2, status);
+jsTestLog("Add a new node without 'newlyAdded' with safe reconfig");
+const secondNewNode = addNode(3, {newlyAdded: false, force: false, shouldSucceed: true});
+assert.eq(false, isMemberNewlyAdded(primary, 1, false /* force */));
+assert.eq(true, isMemberNewlyAdded(primary, 2, false /* force */));
+assertVoteCount(primary, {
+    votingMembersCount: 2,
+    majorityVoteCount: 2,
+    writableVotingMembersCount: 2,
+    writeMajorityCount: 2,
+    totalMembersCount: 3,
+});
 
-jsTestLog("Adding the second new node to config (with 'newlyAdded' not set)");
-const secondNewNodeId = 3;
-const secondNewNode = addNodeThroughForceReconfig(secondNewNodeId, false /* newlyAdded */);
-
-assert.commandWorked(secondNewNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout,
-}));
-
-jsTestLog("Verifying that 'newlyAdded' field is still set on the first node");
-assert.eq(true, isMemberNewlyAdded(primary, firstNewNodeId, true /* force */));
-
-jsTestLog("Verifying that 'newlyAdded' field is not set on the second node");
-assert.eq(false, isMemberNewlyAdded(primary, secondNewNodeId, true /* force */));
-
-// Verify that the counts and majorities were updated correctly after the second node was added to
-// the repl set.
-status = assert.commandWorked(primaryDb.adminCommand({replSetGetStatus: 1}));
-assert.eq(status["votingMembersCount"], 3, status);
-assert.eq(status["majorityVoteCount"], 2, status);
-assert.eq(status["writableVotingMembersCount"], 3, status);
-assert.eq(status["writeMajorityCount"], 2, status);
+jsTestLog(
+    "Add a new node without 'newlyAdded' with force reconfig, squashing old 'newlyAdded' fields");
+const thirdNewNode = addNode(4, {newlyAdded: false, force: true, shouldSucceed: true});
+assert.eq(false, isMemberNewlyAdded(primary, 1, true /* force */));
+assert.eq(false, isMemberNewlyAdded(primary, 2, true /* force */));
+assert.eq(false, isMemberNewlyAdded(primary, 3, true /* force */));
+assertVoteCount(primary, {
+    votingMembersCount: 4,
+    majorityVoteCount: 3,
+    writableVotingMembersCount: 4,
+    writeMajorityCount: 3,
+    totalMembersCount: 4,
+});
 
 assert.commandWorked(
     firstNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 assert.commandWorked(
     secondNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(
+    thirdNewNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 
 rst.waitForState(firstNewNode, ReplSetTest.State.SECONDARY);
 rst.waitForState(secondNewNode, ReplSetTest.State.SECONDARY);
+rst.waitForState(thirdNewNode, ReplSetTest.State.SECONDARY);
 
-waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 2, true /* force */);
-
-jsTestLog("Making sure the set can accept w:4 writes");
+jsTestLog("Making sure the set can accept writes with write concerns");
 assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 4}}));
+assert.commandWorked(
+    primaryColl.insert({"steady": "state_majority"}, {writeConcern: {w: 'majority'}}));
 
-// Verify that the first new node had its 'newlyAdded' field removed.
-assert.eq(false, isMemberNewlyAdded(primary, firstNewNodeId, true /* force */));
-
-// Verify that the counts and majorities were updated correctly after the 'newlyAdded' field was
-// removed.
-status = assert.commandWorked(primaryDb.adminCommand({replSetGetStatus: 1}));
-assert.eq(status["votingMembersCount"], 4, status);
-assert.eq(status["majorityVoteCount"], 3, status);
-assert.eq(status["writableVotingMembersCount"], 4, status);
-assert.eq(status["writeMajorityCount"], 3, status);
+assertVoteCount(primary, {
+    votingMembersCount: 4,
+    majorityVoteCount: 3,
+    writableVotingMembersCount: 4,
+    writeMajorityCount: 3,
+    totalMembersCount: 4,
+});
 
 rst.stopSet();
 })();
