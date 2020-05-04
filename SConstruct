@@ -3051,8 +3051,11 @@ def doConfigure(myenv):
         # probably built with GCC. That combination appears to cause
         # false positives for the ODR detector. See SERVER-28133 for
         # additional details.
-        if (get_option('detect-odr-violations') and
-                not (myenv.ToolchainIs('clang') and usingLibStdCxx)):
+        if has_option('detect-odr-violations'):
+            if myenv.ToolchainIs('clang') and usingLibStdCxx:
+                env.FatalError('The --detect-odr-violations flag does not work with clang and libstdc++')
+            if optBuild:
+                env.FatalError('The --detect-odr-violations flag is expected to only be reliable with --opt=off')
             AddToLINKFLAGSIfSupported(myenv, '-Wl,--detect-odr-violations')
 
         # Disallow an executable stack. Also, issue a warning if any files are found that would

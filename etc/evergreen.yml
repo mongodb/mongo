@@ -3438,7 +3438,6 @@ tasks:
           install-dist-test-debug
           ${additional_compile_targets|}
         task_compile_flags: >-
-          --detect-odr-violations
           --separate-debug
           PREFIX=dist-test
 
@@ -3453,7 +3452,6 @@ tasks:
           archive-dist-test-debug
           ${additional_compile_targets|}
         task_compile_flags: >-
-          --detect-odr-violations
           --separate-debug
           PREFIX=dist-test
 
@@ -3530,7 +3528,6 @@ tasks:
         targets: install-dist-test
         compiling_for_test: true
         task_compile_flags: >-
-          --detect-odr-violations
           --separate-debug
 
 - name: compile_ninja
@@ -3559,7 +3556,6 @@ tasks:
         targets: install-all-meta
         compiling_for_test: true
         task_compile_flags: >-
-          --detect-odr-violations
           --separate-debug
     - command: s3.put
       params:
@@ -3580,8 +3576,6 @@ tasks:
     - func: "scons compile"
       vars:
         targets: generated-sources compiledb
-        task_compile_flags: >-
-          --detect-odr-violations
         compiling_for_test: true
     - command: shell.exec
       type: test
@@ -3611,7 +3605,6 @@ tasks:
       vars:
         targets: install-unittests install-unittests-debug
         task_compile_flags: >-
-          --detect-odr-violations
           --separate-debug
         compiling_for_test: true
     - func: "run diskstats"
@@ -3627,8 +3620,6 @@ tasks:
     - func: "scons compile"
       vars:
         targets: archive-fuzzertests
-        task_compile_flags: >-
-          --detect-odr-violations
         compiling_for_test: true
     - command: s3.put
       params:
@@ -3655,8 +3646,6 @@ tasks:
     - func: "scons compile"
       vars:
         targets: install-sdam-json-test
-        task_compile_flags: >-
-          --detect-odr-violations
         compiling_for_test: true
     - func: "run tests"
       vars:
@@ -3667,8 +3656,6 @@ tasks:
     - func: "scons compile"
       vars:
         targets: install-server-selection-json-test
-        task_compile_flags: >-
-          --detect-odr-violations
         compiling_for_test: true
     - func: "run tests"
       vars:
@@ -3683,7 +3670,6 @@ tasks:
       vars:
         targets: install-dbtest install-dbtest-debug
         task_compile_flags: >-
-          --detect-odr-violations
           --separate-debug
         compiling_for_test: true
     - func: "run diskstats"
@@ -3702,7 +3688,6 @@ tasks:
       vars:
         targets: archive-dbtest archive-dbtest-debug
         task_compile_flags: >-
-          --detect-odr-violations
           --separate-debug
         compiling_for_test: true
 
@@ -5453,8 +5438,6 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
       bypass_compile: false
-      task_compile_flags: >-
-        --detect-odr-violations
   - func: "attach scons logs"
   - func: "run tests"
     vars:
@@ -5475,8 +5458,6 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
       bypass_compile: false
-      task_compile_flags: >-
-        --detect-odr-violations
   - func: "attach scons logs"
   - func: "run tests"
     vars:
@@ -5497,8 +5478,6 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
       bypass_compile: false
-      task_compile_flags: >-
-        --detect-odr-violations
   - func: "attach scons logs"
   - func: "run tests"
     vars:
@@ -5519,8 +5498,6 @@ tasks:
       targets: install-integration-tests
       compiling_for_test: true
       bypass_compile: false
-      task_compile_flags: >-
-        --detect-odr-violations
   - func: "attach scons logs"
   - func: "run tests"
     vars:
@@ -7452,7 +7429,6 @@ tasks:
           archive-shell-debug
           ${additional_package_targets|}
         task_compile_flags: >-
-          --detect-odr-violations
           --separate-debug
           --legacy-tarball
     - command: shell.exec
@@ -12389,7 +12365,7 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --detect-odr-violations
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
