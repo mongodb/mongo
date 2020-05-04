@@ -347,16 +347,6 @@ public:
         return _clockSource;
     }
 
-    void addIndividuallyCheckpointedIndexToList(const std::string& ident) override {
-        _checkpointedIndexes.push_back(ident);
-    }
-
-    void clearIndividuallyCheckpointedIndexesList() override {
-        _checkpointedIndexes.clear();
-    }
-
-    bool isInIndividuallyCheckpointedIndexesList(const std::string& ident) const override;
-
 private:
     class WiredTigerSessionSweeper;
     class WiredTigerCheckpointThread;
@@ -473,15 +463,6 @@ private:
     // Timestamp of data at startup. Used internally to advise checkpointing and recovery to a
     // timestamp. Provided by replication layer because WT does not persist timestamps.
     AtomicWord<std::uint64_t> _initialDataTimestamp;
-
-    // Required for taking a checkpoint; and can be used to ensure multiple checkpoint cursors
-    // target the same checkpoint.
-    Lock::ResourceMutex _checkpointMutex = Lock::ResourceMutex("checkpointCursorMutex");
-
-    // A list of indexes that were individually checkpoint'ed and are not consistent with the rest
-    // of the checkpoint's PIT view of the storage data. This list is reset when a storage-wide WT
-    // checkpoint is taken that makes the PIT view consistent again.
-    std::list<std::string> _checkpointedIndexes;
 
     std::unique_ptr<WiredTigerEngineRuntimeConfigParameter> _runTimeConfigParam;
     std::unique_ptr<WiredTigerMaxHistoryFileSizeGBParameter> _maxHistoryFileSizeGBParam;

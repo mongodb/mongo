@@ -595,12 +595,6 @@ public:
     virtual const KVEngine* getEngine() const = 0;
     virtual DurableCatalog* getCatalog() = 0;
     virtual const DurableCatalog* getCatalog() const = 0;
-
-    virtual void addIndividuallyCheckpointedIndexToList(const std::string& ident) = 0;
-
-    virtual void clearIndividuallyCheckpointedIndexesList() = 0;
-
-    virtual bool isInIndividuallyCheckpointedIndexesList(const std::string& ident) const = 0;
 };
 
 }  // namespace mongo

@@ -179,11 +179,6 @@ public:
     const DurableCatalog* getCatalog() const final {
         return nullptr;
     }
-    void addIndividuallyCheckpointedIndexToList(const std::string& ident) final {}
-    void clearIndividuallyCheckpointedIndexesList() final {}
-    bool isInIndividuallyCheckpointedIndexesList(const std::string& ident) const final {
-        return false;
-    }
 };
 
 }  // namespace mongo

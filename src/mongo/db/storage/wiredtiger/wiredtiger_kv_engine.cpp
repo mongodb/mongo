@@ -324,7 +324,6 @@ public:
                 if (initialDataTimestamp.asULL() <= 1) {
                     UniqueWiredTigerSession session = _sessionCache->getSession();
                     WT_SESSION* s = session->getSession();
-                    _wiredTigerKVEngine->clearIndividuallyCheckpointedIndexesList();
                     invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
                 } else if (stableTimestamp < initialDataTimestamp) {
                     LOGV2_FOR_RECOVERY(
@@ -348,10 +347,7 @@ public:
 
                     UniqueWiredTigerSession session = _sessionCache->getSession();
                     WT_SESSION* s = session->getSession();
-                    {
-                        _wiredTigerKVEngine->clearIndividuallyCheckpointedIndexesList();
-                        invariantWTOK(s->checkpoint(s, "use_timestamp=true"));
-                    }
+                    invariantWTOK(s->checkpoint(s, "use_timestamp=true"));
 
                     if (oplogNeededForRollback.isOK()) {
                         // Now that the checkpoint is durable, publish the oplog needed to recover
@@ -2157,15 +2153,6 @@ Timestamp WiredTigerKVEngine::getPinnedOplog() const {
 
     // If getOplogNeededForRollback fails, don't truncate any oplog right now.
     return Timestamp::min();
-}
-
-bool WiredTigerKVEngine::isInIndividuallyCheckpointedIndexesList(const std::string& ident) const {
-    for (auto it = _checkpointedIndexes.begin(); it != _checkpointedIndexes.end(); ++it) {
-        if (*it == ident) {
-            return true;
-        }
-    }
-    return false;
 }
 
 bool WiredTigerKVEngine::supportsReadConcernSnapshot() const {
