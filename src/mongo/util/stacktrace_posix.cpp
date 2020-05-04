@@ -432,7 +432,6 @@ void printStackTraceImpl(const Options& options, StackTraceSink* sink = nullptr)
             *sink << fmt::format(FMT_STRING("Error collecting stack trace: {}"), err);
         }
         LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = err);
-        return;
     }
     static constexpr char fmtBt[] = "BACKTRACE: {bt}";
     if (sink) {
