@@ -340,8 +340,9 @@ bool CommandHelpers::extractOrAppendOk(BSONObjBuilder& reply) {
         // If ok is present, use its truthiness.
         return okField.trueValue();
     }
+
     // Missing "ok" field is an implied success.
-    CommandHelpers::appendSimpleCommandStatus(reply, true);
+    reply.append("ok", 1.0);
     return true;
 }
 
