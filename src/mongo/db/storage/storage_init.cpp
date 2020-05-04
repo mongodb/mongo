@@ -66,11 +66,10 @@ public:
                            << "supportsPendingDrops" << engine->supportsPendingDrops()
                            << "dropPendingIdents"
                            << static_cast<long long>(engine->getDropPendingIdents().size())
-                           << "supportsTwoPhaseIndexBuild" << engine->supportsTwoPhaseIndexBuild()
-                           << "supportsSnapshotReadConcern" << engine->supportsReadConcernSnapshot()
-                           << "readOnly" << storageGlobalParams.readOnly << "persistent"
-                           << !engine->isEphemeral() << "backupCursorOpen"
-                           << backupCursorHooks->isBackupCursorOpen());
+                           << "supportsTwoPhaseIndexBuild" << true << "supportsSnapshotReadConcern"
+                           << engine->supportsReadConcernSnapshot() << "readOnly"
+                           << storageGlobalParams.readOnly << "persistent" << !engine->isEphemeral()
+                           << "backupCursorOpen" << backupCursorHooks->isBackupCursorOpen());
     }
 
 } storageSSS;
