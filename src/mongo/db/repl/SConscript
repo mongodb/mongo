@@ -1153,9 +1153,8 @@ env.Library(
         'replica_set_messages',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authservercommon',
-        '$BUILD_DIR/mongo/db/commands/authentication_commands',
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/repl/speculative_authenticate',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/transport/message_compressor',
         'replication_auth',
@@ -1462,5 +1461,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         'repl_coordinator_interface',
         'replica_set_messages',
+    ],
+)
+
+env.Library(
+    target='speculative_authenticate',
+    source=[
+        'speculative_auth.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authservercommon',
+        '$BUILD_DIR/mongo/db/commands/authentication_commands',
     ],
 )

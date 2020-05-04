@@ -37,6 +37,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/speculative_auth.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -213,6 +214,8 @@ public:
                 replyBuilder->setNextInvocation(nextInvocationBuilder.obj());
             }
         }
+
+        handleIsMasterSpeculativeAuth(opCtx, cmdObj, &result);
 
         return true;
     }
