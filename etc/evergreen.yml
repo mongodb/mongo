@@ -252,7 +252,6 @@ variables:
   - func: "update bypass expansions"
   - func: "get buildnumber"
   - func: "set up credentials"
-  - func: "fetch and build OpenSSL"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
   - func: "set up win mount script"
   - func: "generate compile expansions"
@@ -861,17 +860,6 @@ functions:
       remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
-
-  "fetch and build OpenSSL":
-    command: shell.exec
-    params:
-        working_dir: src
-        script: |
-            set -o errexit
-            set -o verbose
-            if [ "${build_openssl|}" = "true" ]; then
-                bash buildscripts/fetch_and_build_openssl.sh "${python|python3}" "${openssl_make_flags|}" "${openssl_config_flags|}"
-            fi
 
   "use WiredTiger develop":
     command: shell.exec
