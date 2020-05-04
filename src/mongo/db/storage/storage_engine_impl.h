@@ -328,10 +328,6 @@ public:
         return _catalog.get();
     }
 
-    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) override {
-        return _engine->getCheckpointLock(opCtx);
-    }
-
     void addIndividuallyCheckpointedIndexToList(const std::string& ident) override {
         return _engine->addIndividuallyCheckpointedIndexToList(ident);
     }

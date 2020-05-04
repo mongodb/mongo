@@ -179,9 +179,6 @@ public:
     const DurableCatalog* getCatalog() const final {
         return nullptr;
     }
-    std::unique_ptr<CheckpointLock> getCheckpointLock(OperationContext* opCtx) final {
-        return nullptr;
-    }
     void addIndividuallyCheckpointedIndexToList(const std::string& ident) final {}
     void clearIndividuallyCheckpointedIndexesList() final {}
     bool isInIndividuallyCheckpointedIndexesList(const std::string& ident) const final {

@@ -347,12 +347,6 @@ public:
         return _clockSource;
     }
 
-    /**
-     * Returns a CheckpointLockImpl RAII instance holding the _checkpointMutex.
-     */
-    std::unique_ptr<StorageEngine::CheckpointLock> getCheckpointLock(
-        OperationContext* opCtx) override;
-
     void addIndividuallyCheckpointedIndexToList(const std::string& ident) override {
         _checkpointedIndexes.push_back(ident);
     }
@@ -487,8 +481,6 @@ private:
     // A list of indexes that were individually checkpoint'ed and are not consistent with the rest
     // of the checkpoint's PIT view of the storage data. This list is reset when a storage-wide WT
     // checkpoint is taken that makes the PIT view consistent again.
-    //
-    // Access must be protected by the CheckpointLock.
     std::list<std::string> _checkpointedIndexes;
 
     std::unique_ptr<WiredTigerEngineRuntimeConfigParameter> _runTimeConfigParam;

@@ -696,8 +696,6 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
             // checkpoint.
             //
             // TODO (SERVER-44012): to remove this workaround.
-            auto checkpointLock =
-                opCtx->getServiceContext()->getStorageEngine()->getCheckpointLock(opCtx);
             auto indexIdent =
                 opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
                     opCtx, collection->getCatalogId(), _indexes[i].block->getIndexName());

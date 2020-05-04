@@ -252,15 +252,6 @@ public:
                       "The current storage engine doesn't support backup mode");
     }
 
-    /**
-     * See StorageEngine::getCheckpointLock for details.
-     */
-    virtual std::unique_ptr<StorageEngine::CheckpointLock> getCheckpointLock(
-        OperationContext* opCtx) {
-        uasserted(ErrorCodes::CommandNotSupported,
-                  "The current storage engine does not support checkpoints");
-    }
-
     virtual void addIndividuallyCheckpointedIndexToList(const std::string& ident) {
         uasserted(ErrorCodes::CommandNotSupported,
                   "The current storage engine does not support checkpoints");
