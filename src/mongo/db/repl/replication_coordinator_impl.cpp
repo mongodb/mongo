@@ -2262,9 +2262,9 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     // If clientTopologyVersion is not none, deadline must also be not none.
     invariant(deadline);
     const TopologyVersion topologyVersion = _topCoord->getTopologyVersion();
-    lk.unlock();
 
     IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
+    lk.unlock();
 
     if (MONGO_unlikely(waitForIsMasterResponse.shouldFail())) {
         // Used in tests that wait for this failpoint to be entered before triggering a topology
