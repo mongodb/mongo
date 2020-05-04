@@ -163,8 +163,6 @@ public:
 
     void clearDropPendingState() final;
 
-    bool supportsTwoPhaseIndexBuild() const final;
-
     SnapshotManager* getSnapshotManager() const final;
 
     void setJournalListener(JournalListener* jl) final;

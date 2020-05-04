@@ -329,8 +329,7 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
 }
 
 bool IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() {
-    auto storageEngine = getGlobalServiceContext()->getStorageEngine();
-    return storageEngine->supportsTwoPhaseIndexBuild();
+    return true;
 }
 
 std::vector<std::string> IndexBuildsCoordinator::extractIndexNames(

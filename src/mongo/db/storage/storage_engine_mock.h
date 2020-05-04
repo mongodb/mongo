@@ -123,9 +123,6 @@ public:
         return false;
     }
     void clearDropPendingState() final {}
-    bool supportsTwoPhaseIndexBuild() const final {
-        return false;
-    }
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) final {
         fassertFailed(40547);
     }

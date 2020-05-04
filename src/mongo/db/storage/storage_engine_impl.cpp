@@ -854,10 +854,6 @@ void StorageEngineImpl::clearDropPendingState() {
     _dropPendingIdentReaper.clearDropPendingState();
 }
 
-bool StorageEngineImpl::supportsTwoPhaseIndexBuild() const {
-    return true;
-}
-
 Timestamp StorageEngineImpl::getAllDurableTimestamp() const {
     return _engine->getAllDurableTimestamp();
 }
