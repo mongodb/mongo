@@ -656,12 +656,14 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     invariant(!opCtx->shouldParticipateInFlowControl());
 
     try {
+        // If we are casting a vote in a new election immediately after stepping down, we
+        // don't want to have this process interrupted due to us stepping down, since we
+        // want to be able to cast our vote for a new primary right away. Both the write's lock
+        // acquisition and the "waitUntilDurable" lock acquisition must be uninterruptible.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
         Status status =
             writeConflictRetry(opCtx, "save replica set lastVote", lastVoteCollectionName, [&] {
-                // If we are casting a vote in a new election immediately after stepping down, we
-                // don't want to have this process interrupted due to us stepping down, since we
-                // want to be able to cast our vote for a new primary right away.
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                 AutoGetCollection coll(opCtx, NamespaceString(lastVoteCollectionName), MODE_IX);
                 WriteUnitOfWork wunit(opCtx);
 
