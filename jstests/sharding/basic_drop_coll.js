@@ -1,6 +1,8 @@
 /**
  * Basic test from the drop collection command on a sharded cluster that verifies collections are
  * cleaned up properly.
+ *
+ * @tags: [requires_fcv_46]
  */
 (function() {
 "use strict";

@@ -41,9 +41,6 @@ selector:
   - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
   # TODO SERVER-46040: Enable when SERVER-46040 is backported
   - jstests/sharding/drop_indexes_with_stale_config_error.js
-  # TODO SERVER-35504 enable after backported to last-stable
-  - jstests/sharding/basic_drop_coll.js
-  - jstests/sharding/drop_configdb.js
 
 executor:
   config:
