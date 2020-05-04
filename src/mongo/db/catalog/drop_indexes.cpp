@@ -63,7 +63,8 @@ Status checkView(OperationContext* opCtx,
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "Cannot drop indexes on view " << nss);
         }
-        return Status(ErrorCodes::NamespaceNotFound, str::stream() << "ns not found " << nss);
+        return Status(ErrorCodes::NamespaceNotFound,
+                      "Namespace '" + nss.ns() + "' does not exists (ns not found)");
     }
     return Status::OK();
 }
@@ -357,8 +358,9 @@ Status dropIndexes(OperationContext* opCtx,
         collection = autoColl->getCollection();
         if (!collection) {
             return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "ns not found on database " << dbAndUUID.db()
-                                        << " with collection " << dbAndUUID.uuid());
+                          str::stream()
+                              << "Collection '" << nss << "' with UUID " << dbAndUUID.uuid()
+                              << " in database " << dbAndUUID.db() << " does not exist.");
         }
 
         status = checkReplState(opCtx, dbAndUUID);
