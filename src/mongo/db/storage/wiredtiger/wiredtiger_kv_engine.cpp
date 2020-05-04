@@ -406,33 +406,6 @@ private:
         std::make_unique<SharedPromise<void>>();
 };
 
-namespace {
-
-/**
- * RAII class that holds an exclusive lock on the checkpoint resource mutex.
- *
- * Instances are created via getCheckpointLock(), which passes in the checkpoint resource mutex.
- */
-class CheckpointLockImpl : public StorageEngine::CheckpointLock {
-    CheckpointLockImpl(const CheckpointLockImpl&) = delete;
-    CheckpointLockImpl& operator=(const CheckpointLockImpl&) = delete;
-    CheckpointLockImpl(CheckpointLockImpl&& other) = delete;
-
-public:
-    CheckpointLockImpl() = delete;
-    CheckpointLockImpl(OperationContext* opCtx, Lock::ResourceMutex mutex)
-        : _lk(opCtx->lockState(), mutex) {
-        invariant(_lk.isLocked());
-    }
-
-    ~CheckpointLockImpl() = default;
-
-private:
-    Lock::ExclusiveLock _lk;
-};
-
-}  // namespace
-
 std::string toString(const StorageEngine::OldestActiveTransactionTimestampResult& r) {
     if (r.isOK()) {
         if (r.getValue()) {
@@ -519,7 +492,6 @@ public:
                 if (initialDataTimestamp.asULL() <= 1) {
                     UniqueWiredTigerSession session = _sessionCache->getSession();
                     WT_SESSION* s = session->getSession();
-                    auto checkpointLock = _wiredTigerKVEngine->getCheckpointLock(opCtx.get());
                     _wiredTigerKVEngine->clearIndividuallyCheckpointedIndexesList();
                     invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
                 } else if (stableTimestamp < initialDataTimestamp) {
@@ -545,7 +517,6 @@ public:
                     UniqueWiredTigerSession session = _sessionCache->getSession();
                     WT_SESSION* s = session->getSession();
                     {
-                        auto checkpointLock = _wiredTigerKVEngine->getCheckpointLock(opCtx.get());
                         _wiredTigerKVEngine->clearIndividuallyCheckpointedIndexesList();
                         invariantWTOK(s->checkpoint(s, "use_timestamp=true"));
                     }
@@ -2371,11 +2342,6 @@ Timestamp WiredTigerKVEngine::getPinnedOplog() const {
 
     // If getOplogNeededForRollback fails, don't truncate any oplog right now.
     return Timestamp::min();
-}
-
-std::unique_ptr<StorageEngine::CheckpointLock> WiredTigerKVEngine::getCheckpointLock(
-    OperationContext* opCtx) {
-    return std::make_unique<CheckpointLockImpl>(opCtx, _checkpointMutex);
 }
 
 bool WiredTigerKVEngine::isInIndividuallyCheckpointedIndexesList(const std::string& ident) const {
