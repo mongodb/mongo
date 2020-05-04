@@ -477,8 +477,7 @@ Status validate(OperationContext* opCtx,
             return Status::OK();
         }
 
-        // Validate in-memory catalog information with persisted info prior to setting the read
-        // source to kCheckpoint otherwise we'd use a checkpointed MDB catalog file.
+        // Validate in-memory catalog information with persisted info.
         _validateCatalogEntry(opCtx, &validateState, results);
 
         // Open all cursors at once before running non-full validation code so that all steps of

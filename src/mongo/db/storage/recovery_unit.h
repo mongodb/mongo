@@ -411,11 +411,7 @@ public:
         /**
          * Read from the timestamp provided to setTimestampReadSource.
          */
-        kProvided,
-        /**
-         * Read from the latest checkpoint.
-         */
-        kCheckpoint
+        kProvided
     };
 
     /**
