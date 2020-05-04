@@ -225,7 +225,6 @@ variables:
   - func: "update bypass expansions"
   - func: "get buildnumber"
   - func: "set up credentials"
-  - func: "fetch and build OpenSSL"
   - func: "set up win mount script"
   - func: "generate compile expansions"
   teardown_group:
@@ -732,17 +731,6 @@ functions:
             rm -r mongodb*/*.$file_ext 2>/dev/null || true
         done
         rm mongo-debugsymbols.tgz 2>/dev/null || true
-
-  "fetch and build OpenSSL":
-    command: shell.exec
-    params:
-        working_dir: src
-        script: |
-            set -o errexit
-            set -o verbose
-            if [ "${build_openssl|}" = "true" ]; then
-                bash buildscripts/fetch_and_build_openssl.sh "${python|python3}" "${openssl_make_flags|}" "${openssl_config_flags|}"
-            fi
 
   "shared scons cache pruning":
     command: shell.exec
