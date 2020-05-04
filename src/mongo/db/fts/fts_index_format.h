@@ -45,7 +45,8 @@ class FTSSpec;
 
 class FTSIndexFormat {
 public:
-    static void getKeys(const FTSSpec& spec,
+    static void getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                        const FTSSpec& spec,
                         const BSONObj& document,
                         KeyStringSet* keys,
                         KeyString::Version keyStringVersion,
@@ -84,7 +85,8 @@ private:
      * 'term' is the std::string term in the entry.
      * 'textIndexVersion' is index version, affects key format.
      */
-    static void _appendIndexKey(KeyString::Builder& keyString,
+    template <typename KeyStringBuilder>
+    static void _appendIndexKey(KeyStringBuilder& keyString,
                                 double weight,
                                 const std::string& term,
                                 TextIndexVersion textIndexVersion);

@@ -71,7 +71,8 @@ public:
     // FTS
     //
 
-    static void getFTSKeys(const BSONObj& obj,
+    static void getFTSKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                           const BSONObj& obj,
                            const fts::FTSSpec& ftsSpec,
                            KeyStringSet* keys,
                            KeyString::Version keyStringVersion,

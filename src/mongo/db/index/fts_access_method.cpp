@@ -46,7 +46,8 @@ void FTSAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
                                 KeyStringSet* multikeyMetadataKeys,
                                 MultikeyPaths* multikeyPaths,
                                 boost::optional<RecordId> id) const {
-    ExpressionKeysPrivate::getFTSKeys(obj,
+    ExpressionKeysPrivate::getFTSKeys(pooledBufferBuilder,
+                                      obj,
                                       _ftsSpec,
                                       keys,
                                       getSortedDataInterface()->getKeyStringVersion(),

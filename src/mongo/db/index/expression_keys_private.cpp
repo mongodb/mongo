@@ -363,13 +363,15 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
 }
 
 // static
-void ExpressionKeysPrivate::getFTSKeys(const BSONObj& obj,
+void ExpressionKeysPrivate::getFTSKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                       const BSONObj& obj,
                                        const fts::FTSSpec& ftsSpec,
                                        KeyStringSet* keys,
                                        KeyString::Version keyStringVersion,
                                        Ordering ordering,
                                        boost::optional<RecordId> id) {
-    fts::FTSIndexFormat::getKeys(ftsSpec, obj, keys, keyStringVersion, ordering, id);
+    fts::FTSIndexFormat::getKeys(
+        pooledBufferBuilder, ftsSpec, obj, keys, keyStringVersion, ordering, id);
 }
 
 // static
