@@ -157,9 +157,8 @@ class TestRunner(interface.Subcommand):  # pylint: disable=too-many-instance-att
 
     def run_tests(self):
         """Run the suite and tests specified."""
-        self._resmoke_logger.info(
-            "verbatim resmoke.py invocation: %s",
-            " ".join([shlex.quote(arg) for arg in shlex.split(" ".join(sys.argv))]))
+        self._resmoke_logger.info("verbatim resmoke.py invocation: %s",
+                                  " ".join([shlex.quote(arg) for arg in sys.argv]))
 
         # TODO: SERVER-47611
         # if config.EVERGREEN_TASK_ID:
