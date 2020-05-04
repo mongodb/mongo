@@ -104,6 +104,7 @@ class WindowsDumper(Dumper):
 
         cmds = [
             ".symfix",  # Fixup symbol path
+            "!sym noisy",  # Enable noisy symbol loading
             ".symopt +0x10",  # Enable line loading (off by default in CDB, on by default in WinDBG)
             ".reload",  # Reload symbols
             "!peb",  # Dump current exe, & environment variables
