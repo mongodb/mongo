@@ -22,7 +22,6 @@ icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.7'
 timelibSuffix = '-2018.01'
 tomcryptSuffix = '-1.18.2'
-benchmarkSuffix = '-1.4.1'
 
 thirdPartyEnvironmentModifications = {
    'fmt' : {
@@ -123,7 +122,7 @@ if not use_system_version_of_library('zstd'):
 
 if not use_system_version_of_library('google-benchmark'):
     thirdPartyEnvironmentModifications['benchmark'] = {
-        'CPPPATH' : ['#/src/third_party/benchmark' + benchmarkSuffix + '/benchmark/include'],
+        'CPPPATH' : ['#/src/third_party/benchmark/dist/include'],
     }
 
 # TODO: figure out if we want to offer system versions of mozjs.  Mozilla
@@ -466,11 +465,11 @@ else:
     benchmarkEnv = env.Clone()
     benchmarkEnv.InjectThirdParty(libraries=['benchmark'])
     benchmarkEnv.SConscript(
-        'benchmark' + benchmarkSuffix + '/SConscript',
+        'benchmark/SConscript',
         exports={ 'env' : benchmarkEnv })
     benchmarkEnv = benchmarkEnv.Clone(
         LIBDEPS_INTERFACE=[
-            'benchmark' + benchmarkSuffix + '/benchmark',
+            'benchmark/benchmark',
         ])
 
 benchmarkEnv.Library(

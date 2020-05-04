@@ -24,7 +24,7 @@ a notice will be included in
 | [abseil-cpp]               | Apache-2.0        |                  | 070f6e47b3        |                      |                ✗                |
 | Aladdin MD5                | Zlib              |                  | Unknown           |          ✗           |                ✗                |
 | [ASIO]                     | BSL-1.0           | 1.14.0           | b0926b61b0        |                      |                ✗                |
-| [benchmark]                | Apache-2.0        | 1.5.0            | 1.4.1             |                      |                                 |
+| [benchmark]                | Apache-2.0        | 1.5.0            | 1.5.0             |                      |                                 |
 | [Boost]                    | BSL-1.0           | 1.72.0           | 1.70.0            |                      |                ✗                |
 | [fmt]                      | BSD-2-Clause      | 6.1.2            | 6.1.1             |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.7               |                      |                ✗                |
