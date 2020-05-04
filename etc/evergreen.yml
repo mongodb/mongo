@@ -3567,10 +3567,10 @@ functions:
         fi
 
         ${activate_virtualenv}
-        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $python buildscripts/hang_analyzer.py $hang_analyzer_option"
-        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/hang_analyzer.py $hang_analyzer_option
+        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option"
+        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option
 
-        # Call hang_analyzer.py script for tasks that are running remote mongo processes
+        # Call hang analyzer for tasks that are running remote mongo processes
         if [ -n "${private_ip_address}" ]; then
           core_ext=core
           if [ "Windows_NT" = "$OS" ]; then
@@ -3605,7 +3605,7 @@ functions:
           # we don't want to evaluate the local python variable, but instead pass the python string
           # so the remote host will use the right python when the virtualenv is sourced.
           cmds="$cmds; cd ${remote_dir}"
-          cmds="$cmds; PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" python buildscripts/hang_analyzer.py $hang_analyzer_option"
+          cmds="$cmds; PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \

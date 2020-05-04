@@ -22,6 +22,7 @@ def _make_parser():
     _add_run(subparsers)
     _add_list_suites(subparsers)
     _add_find_suites(subparsers)
+    _add_hang_analyzer(subparsers)
 
     return parser
 
@@ -439,6 +440,41 @@ def _add_find_suites(subparsers):
               " configurations."))
 
 
+def _add_hang_analyzer(subparsers):
+    """Create and add the parser for the hang analyzer subcommand."""
+
+    parser = subparsers.add_parser("hang-analyzer", help=commands.hang_analyzer.__doc__)
+
+    parser.add_argument(
+        '-m', '--process-match', dest='process_match', choices=('contains', 'exact'),
+        default='contains', help="Type of match for process names (-p & -g), specify 'contains', or"
+        " 'exact'. Note that the process name match performs the following"
+        " conversions: change all process names to lowecase, strip off the file"
+        " extension, like '.exe' on Windows. Default is 'contains'.")
+    parser.add_argument('-p', '--process-names', dest='process_names',
+                        help='Comma separated list of process names to analyze')
+    parser.add_argument('-g', '--go-process-names', dest='go_process_names',
+                        help='Comma separated list of go process names to analyze')
+    parser.add_argument(
+        '-d', '--process-ids', dest='process_ids', default=None,
+        help='Comma separated list of process ids (PID) to analyze, overrides -p &'
+        ' -g')
+    parser.add_argument('-c', '--dump-core', dest='dump_core', action="store_true", default=False,
+                        help='Dump core file for each analyzed process')
+    parser.add_argument('-s', '--max-core-dumps-size', dest='max_core_dumps_size', default=10000,
+                        help='Maximum total size of core dumps to keep in megabytes')
+    parser.add_argument(
+        '-o', '--debugger-output', dest='debugger_output', action="append", choices=('file',
+                                                                                     'stdout'),
+        default=None, help="If 'stdout', then the debugger's output is written to the Python"
+        " process's stdout. If 'file', then the debugger's output is written"
+        " to a file named debugger_<process>_<pid>.log for each process it"
+        " attaches to. This option can be specified multiple times on the"
+        " command line to have the debugger's output written to multiple"
+        " locations. By default, the debugger's output is written only to the"
+        " Python process's stdout.")
+
+
 # def to_local_args(args=None):  # pylint: disable=too-many-branches,too-many-locals
 #     """
 #     Return a command line invocation for resmoke.py suitable for being run outside of Evergreen.
@@ -543,25 +579,22 @@ def parse_command_line(sys_args, **kwargs):
     """Parse the command line arguments passed to resmoke.py and return the subcommand object to execute."""
     parser, parsed_args = _parse(sys_args)
 
-    def create_subcommand(parser, parsed_args, **kwargs):
-        """Create a subcommand object based on args passed into resmoke.py."""
+    subcommand = parsed_args.command
+    subcommand_obj = None
+    if subcommand in ('find-suites', 'list-suites', 'run'):
+        configure_resmoke.validate_and_update_config(parser, parsed_args)
+        if _config.EVERGREEN_TASK_ID is not None:
+            subcommand_obj = commands.run.TestRunnerEvg(subcommand, **kwargs)
+        else:
+            subcommand_obj = commands.run.TestRunner(subcommand, **kwargs)
+    elif subcommand == 'hang-analyzer':
+        subcommand_obj = commands.hang_analyzer.HangAnalyzer(parsed_args)
 
-        subcommand = parsed_args.command
-        subcommand_obj = None
-        if subcommand in ('find-suites', 'list-suites', 'run'):
-            configure_resmoke.validate_and_update_config(parser, parsed_args)
-            if _config.EVERGREEN_TASK_ID is not None:
-                subcommand_obj = commands.run.TestRunnerEvg(subcommand, **kwargs)
-            else:
-                subcommand_obj = commands.run.TestRunner(subcommand, **kwargs)
+    if subcommand_obj is None:
+        raise RuntimeError(
+            f"Resmoke configuration has invalid subcommand: {subcommand}. Try '--help'")
 
-        if subcommand_obj is None:
-            raise RuntimeError(
-                f"Resmoke configuration has invalid subcommand: {subcommand}. Try '--help'")
-
-        return subcommand_obj
-
-    return create_subcommand(parser, parsed_args, **kwargs)
+    return subcommand_obj
 
 
 def set_run_options(argstr=''):
