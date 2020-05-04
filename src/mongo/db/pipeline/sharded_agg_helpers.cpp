@@ -114,7 +114,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     auto configCursor = establishCursors(expCtx->opCtx,
                                          expCtx->mongoProcessInterface->taskExecutor,
                                          aggReq.getNamespaceString(),
-                                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                         ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
                                          {{configShard->getId(), cmdObjWithRWC}},
                                          false);
     invariant(configCursor.size() == 1);

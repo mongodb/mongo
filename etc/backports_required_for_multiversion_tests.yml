@@ -26,6 +26,8 @@
 change_streams_multiversion:
 
 change_streams_sharded_collections_multiversion_passthrough:
+- ticket: SERVER-47810
+  test_file: jstests/change_streams/report_post_batch_resume_token.js
 
 concurrency_replication_multiversion:
 

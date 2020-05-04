@@ -40,6 +40,7 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/query/results_merger_test_fixture.h"
 #include "mongo/unittest/death_test.h"
@@ -1663,6 +1664,126 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     scheduleNetworkResponse(
         {kTestNss, CursorId(789), emptyBatch, boost::none, boost::none, pbrtThirdCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtFirstCursor);
+    ASSERT_FALSE(arm->ready());
+
+    // Clean up the cursors.
+    std::vector<BSONObj> cleanupBatch = {};
+    scheduleNetworkResponse({kTestNss, CursorId(0), cleanupBatch});
+    scheduleNetworkResponse({kTestNss, CursorId(0), cleanupBatch});
+    scheduleNetworkResponse({kTestNss, CursorId(0), cleanupBatch});
+}
+
+TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkForIneligibleCursor) {
+    AsyncResultsMergerParams params;
+    params.setNss(kTestNss);
+    std::vector<RemoteCursor> cursors;
+    // Create three cursors with empty initial batches. Each batch has a PBRT. The third cursor is
+    // the $changeStream opened on "config.shards" to monitor for the addition of new shards.
+    auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[0],
+        kTestShardHosts[0],
+        CursorResponse(kTestNss, 123, {}, boost::none, boost::none, pbrtFirstCursor)));
+    auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 3));
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[1],
+        kTestShardHosts[1],
+        CursorResponse(kTestNss, 456, {}, boost::none, boost::none, pbrtSecondCursor)));
+    auto pbrtConfigCursor = makePostBatchResumeToken(Timestamp(1, 1));
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[2],
+        kTestShardHosts[2],
+        CursorResponse(ShardType::ConfigNS, 789, {}, boost::none, boost::none, pbrtConfigCursor)));
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+    auto arm =
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+
+    // We have no results to return, so the ARM is not ready.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // For a change stream cursor on "config.shards", the first batch is not eligible to provide the
+    // HWM. Despite the fact that 'pbrtConfigCursor' has the lowest PBRT, the ARM returns the PBRT
+    // of 'pbrtSecondCursor' as the current high water mark. This guards against the possibility
+    // that the user requests a start time in the future. The "config.shards" cursor must start
+    // monitoring for shards at the current point in time, and so its initial PBRT will be lower
+    // than that of the shards. We do not wish to return a high water mark to the client that is
+    // earlier than the start time they specified in their request.
+    auto initialHighWaterMark = arm->getHighWaterMark();
+    ASSERT_BSONOBJ_EQ(initialHighWaterMark, pbrtSecondCursor);
+
+    // Advance the PBRT of the 'pbrtConfigCursor'. It is still the lowest, but is ineligible to
+    // provide the high water mark because it is still lower than the high water mark that was
+    // already returned. As above, the guards against the possibility that the user requested a
+    // stream with a start point at an arbitrary point in the future.
+    pbrtConfigCursor = makePostBatchResumeToken(Timestamp(1, 2));
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(123), {}, boost::none, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(456), {}, boost::none, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse(
+        {ShardType::ConfigNS, CursorId(789), {}, boost::none, boost::none, pbrtConfigCursor});
+
+    // The high water mark has not advanced from its previous value.
+    ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
+    ASSERT_FALSE(arm->ready());
+
+    // If the "config.shards" cursor returns a result, this document does not advance the HWM. We
+    // consume this event internally but do not return it to the client, and its resume token is not
+    // actually resumable. We therefore do not want to expose it to the client via the PBRT.
+    const auto configUUID = UUID::gen();
+    auto configEvent = fromjson("{_id: 'shard_add_event'}");
+    pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 15));
+    pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 13));
+    pbrtConfigCursor = makeResumeToken(Timestamp(1, 11), configUUID, configEvent);
+    configEvent =
+        configEvent.addField(BSON("$sortKey" << BSON_ARRAY(pbrtConfigCursor)).firstElement());
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(123), {}, boost::none, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(456), {}, boost::none, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse({ShardType::ConfigNS,
+                             CursorId(789),
+                             {configEvent},
+                             boost::none,
+                             boost::none,
+                             pbrtConfigCursor});
+
+    // The config cursor has a lower sort key than the other shards, so we can retrieve the event.
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(configEvent, *unittest::assertGet(arm->nextReady()).getResult());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Reading the config cursor event document does not advance the high water mark.
+    ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
+    ASSERT_FALSE(arm->ready());
+
+    // If the next config batch is empty but the PBRT is still the resume token of the addShard
+    // event, it does not advance the ARM's high water mark sort key.
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(123), {}, boost::none, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(456), {}, boost::none, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse(
+        {ShardType::ConfigNS, CursorId(789), {}, boost::none, boost::none, pbrtConfigCursor});
+    ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
+    ASSERT_FALSE(arm->ready());
+
+    // If none of the above criteria obtain, then the "config.shards" cursor is eligible to advance
+    // the ARM's high water mark. The only reason we allow the config.shards cursor to participate
+    // in advancing of the high water mark at all is so that we cannot end up in a situation where
+    // the config cursor is always the lowest and the high water mark can therefore never advance.
+    pbrtConfigCursor = makePostBatchResumeToken(Timestamp(1, 12));
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(123), {}, boost::none, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(456), {}, boost::none, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse(
+        {ShardType::ConfigNS, CursorId(789), {}, boost::none, boost::none, pbrtConfigCursor});
+    ASSERT_BSONOBJ_GT(arm->getHighWaterMark(), initialHighWaterMark);
+    ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtConfigCursor);
     ASSERT_FALSE(arm->ready());
 
     // Clean up the cursors.
