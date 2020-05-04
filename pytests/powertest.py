@@ -1708,7 +1708,7 @@ def resmoke_client(  # pylint: disable=too-many-arguments
     log_output = ">> {} 2>&1".format(log_file) if log_file else ""
     cmds = ("cd {}; "
             "python buildscripts/resmoke.py"
-            "run"
+            " run"
             " --mongo {}"
             " --suites {}"
             " --shellConnString mongodb://{}"
