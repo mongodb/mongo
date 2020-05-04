@@ -282,6 +282,9 @@ private:
         // result with a sort key lower than this.
         boost::optional<BSONObj> promisedMinSortKey;
 
+        // True if this remote is eligible to provide a high water mark sort key; false otherwise.
+        bool eligibleForHighWaterMark = false;
+
         // The cursor id for the remote cursor. If a remote cursor is not yet exhausted, this member
         // will be set to a valid non-zero cursor id. If a remote cursor is now exhausted, this
         // member will be set to zero.
@@ -438,10 +441,10 @@ private:
     bool _haveOutstandingBatchRequests(WithLock);
 
     /**
-     * If a promisedMinSortKey has been obtained from all remotes, returns the lowest such key.
-     * Otherwise, returns an empty BSONObj.
+     * If a promisedMinSortKey has been received from all remotes, returns the lowest such key.
+     * Otherwise, returns boost::none.
      */
-    BSONObj _getMinPromisedSortKey(WithLock);
+    boost::optional<MinSortKeyRemoteIdPair> _getMinPromisedSortKey(WithLock);
 
     /**
      * Schedules a getMore on any remote hosts which we need another batch from.
@@ -457,6 +460,20 @@ private:
      * Updates the given remote's metadata (e.g. the cursor id) based on information in 'response'.
      */
     void _updateRemoteMetadata(WithLock, size_t remoteIndex, const CursorResponse& response);
+
+    /**
+     * Returns true if the given batch is eligible to provide a high water mark resume token for the
+     * stream, false otherwise.
+     */
+    bool _checkHighWaterMarkEligibility(WithLock,
+                                        BSONObj newMinSortKey,
+                                        const RemoteCursorData& remote,
+                                        const CursorResponse& response);
+
+    /**
+     * Sets the initial value of the high water mark sort key, if applicable.
+     */
+    void _setInitialHighWaterMark();
 
     OperationContext* _opCtx;
     std::shared_ptr<executor::TaskExecutor> _executor;

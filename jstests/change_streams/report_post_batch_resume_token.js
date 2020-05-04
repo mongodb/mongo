@@ -44,8 +44,7 @@ assert.neq(undefined, initialAggPBRT);
 for (let i = 0; i < 5; ++i) {
     assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
     const getMorePBRT = csCursor.getResumeToken();
-    // TODO SERVER-47810: this should also be true on mongoS.
-    assert.eqIfNotMongos(bsonWoCompare(initialAggPBRT, getMorePBRT), 0);
+    assert.eq(bsonWoCompare(initialAggPBRT, getMorePBRT), 0);
     assert.commandWorked(testCollection.insert({_id: docId++}));
 }
 
