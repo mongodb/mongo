@@ -2064,39 +2064,6 @@ var ReplSetTest = function(opts) {
         var primary = this.getPrimary();
         assert(primary, 'calling getPrimary() failed');
 
-        // Since we cannot determine if there is a background index in progress (SERVER-26624), we
-        // use the "collMod" command to wait for any index builds that may be in progress on the
-        // primary or on one of the secondaries to complete.
-        for (let dbName of primary.getDBNames()) {
-            if (dbName === "local") {
-                continue;
-            }
-
-            let dbHandle = primary.getDB(dbName);
-            dbHandle.getCollectionInfos({$or: [{type: "collection"}, {type: {$exists: false}}]})
-                .forEach(function(collInfo) {
-                    // Skip system collections. We handle here rather than in the getCollectionInfos
-                    // filter to take advantage of the fact that a simple 'collection' filter will
-                    // skip view evaluation, and therefore won't fail on an invalid view.
-                    if (!collInfo.name.startsWith('system.')) {
-                        // We intentionally await replication without doing any I/O to avoid any
-                        // overhead. We call awaitReplication() later on to ensure the collMod
-                        // is replicated to all nodes.
-                        try {
-                            assert.commandWorked(dbHandle.runCommand(
-                                {collMod: collInfo.name, writeConcern: {w: 1}}));
-                        } catch (e) {
-                            // Ignore NamespaceNotFound errors because a background thread could
-                            // have dropped the collection after getCollectionInfos but before
-                            // running collMod.
-                            if (e.code != ErrorCodes.NamespaceNotFound) {
-                                throw e;
-                            }
-                        }
-                    }
-                });
-        }
-
         // Prevent an election, which could start, then hang due to the fsyncLock.
         jsTestLog(`Freezing nodes: [${slaves.map((n) => n.host)}]`);
         self.freeze(slaves);
