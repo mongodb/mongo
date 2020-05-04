@@ -59,6 +59,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -270,6 +271,12 @@ void CollectionImpl::init(OperationContext* opCtx) {
 
     // Enforce that the validator can be used on this namespace.
     uassertStatusOK(checkValidatorCanBeUsedOnNs(_validatorDoc, ns(), _uuid));
+
+    // Make sure to parse the action and level before the MatchExpression, since certain features
+    // are not supported with certain combinations of action and level.
+    _validationAction = uassertStatusOK(_parseValidationAction(collectionOptions.validationAction));
+    _validationLevel = uassertStatusOK(_parseValidationLevel(collectionOptions.validationLevel));
+
     // Store the result (OK / error) of parsing the validator, but do not enforce that the result is
     // OK. This is intentional, as users may have validators on disk which were considered well
     // formed in older versions but not in newer versions.
@@ -280,8 +287,6 @@ void CollectionImpl::init(OperationContext* opCtx) {
         warning() << "Collection " << _ns
                   << " has malformed validator: " << _swValidator.getStatus() << startupWarningsLog;
     }
-    _validationAction = uassertStatusOK(_parseValidationAction(collectionOptions.validationAction));
-    _validationLevel = uassertStatusOK(_parseValidationLevel(collectionOptions.validationLevel));
 
     getIndexCatalog()->init(opCtx).transitional_ignore();
     infoCache()->init(opCtx);
@@ -382,6 +387,12 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
 
     // Enforce a maximum feature version if requested.
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
+
+    // If the validation action is "warn" or the level is "moderate", then disallow any encryption
+    // keywords. This is to prevent any plaintext data from showing up in the logs.
+    if (_validationAction == CollectionImpl::ValidationAction::WARN ||
+        _validationLevel == CollectionImpl::ValidationLevel::MODERATE)
+        allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
     auto statusWithMatcher =
         MatchExpressionParser::parse(validator, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
@@ -942,6 +953,17 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
     auto oldValidationLevel = _validationLevel;
     _validationLevel = levelSW.getValue();
 
+    // Reparse the validator as there are some features which are only supported with certain
+    // validation levels.
+    auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
+    if (_validationLevel == CollectionImpl::ValidationLevel::MODERATE)
+        allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
+
+    _swValidator = parseValidator(opCtx, _validatorDoc, allowedFeatures);
+    if (!_swValidator.isOK()) {
+        return _swValidator.getStatus();
+    }
+
     DurableCatalog::get(opCtx)->updateValidator(
         opCtx, ns(), _validatorDoc, getValidationLevel(), getValidationAction());
     opCtx->recoveryUnit()->onRollback(
@@ -961,6 +983,16 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
     auto oldValidationAction = _validationAction;
     _validationAction = actionSW.getValue();
 
+    // Reparse the validator as there are some features which are only supported with certain
+    // validation actions.
+    auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
+    if (_validationAction == CollectionImpl::ValidationAction::WARN)
+        allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
+
+    _swValidator = parseValidator(opCtx, _validatorDoc, allowedFeatures);
+    if (!_swValidator.isOK()) {
+        return _swValidator.getStatus();
+    }
 
     DurableCatalog::get(opCtx)->updateValidator(
         opCtx, ns(), _validatorDoc, getValidationLevel(), getValidationAction());

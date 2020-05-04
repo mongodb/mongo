@@ -69,9 +69,9 @@ struct CollModRequest {
     BSONElement indexExpireAfterSeconds = {};
     BSONElement viewPipeLine = {};
     std::string viewOn = {};
-    BSONElement collValidator = {};
-    std::string collValidationAction = {};
-    std::string collValidationLevel = {};
+    boost::optional<BSONObj> collValidator;
+    boost::optional<std::string> collValidationAction;
+    boost::optional<std::string> collValidationLevel;
 };
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -181,15 +181,14 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
                 maxFeatureCompatibilityVersion = currentFCV;
             }
-            auto statusW = coll->parseValidator(opCtx,
-                                                e.Obj(),
-                                                MatchExpressionParser::kDefaultSpecialFeatures,
-                                                maxFeatureCompatibilityVersion);
-            if (!statusW.isOK()) {
-                return statusW.getStatus();
+            auto swValidator = coll->parseValidator(opCtx,
+                                                    e.Obj(),
+                                                    MatchExpressionParser::kDefaultSpecialFeatures,
+                                                    maxFeatureCompatibilityVersion);
+            if (!swValidator.isOK()) {
+                return swValidator.getStatus();
             }
-
-            cmr.collValidator = e;
+            cmr.collValidator = e.embeddedObject().getOwned();
         } else if (fieldName == "validationLevel" && !isView) {
             auto status = coll->parseValidationLevel(e.String());
             if (!status.isOK())
@@ -358,20 +357,22 @@ Status _collModInternal(OperationContext* opCtx,
             }
         }
 
-
         // Save previous TTL index expiration.
         ttlInfo = TTLCollModInfo{Seconds(newExpireSecs.safeNumberLong()),
                                  Seconds(oldExpireSecs.safeNumberLong()),
                                  cmr.idx->indexName()};
     }
 
-    // The Validator, ValidationAction and ValidationLevel are already parsed and must be OK.
-    if (!cmr.collValidator.eoo())
-        invariant(coll->setValidator(opCtx, cmr.collValidator.Obj()));
-    if (!cmr.collValidationAction.empty())
-        invariant(coll->setValidationAction(opCtx, cmr.collValidationAction));
-    if (!cmr.collValidationLevel.empty())
-        invariant(coll->setValidationLevel(opCtx, cmr.collValidationLevel));
+    if (cmr.collValidator) {
+        uassertStatusOK(coll->setValidator(opCtx, std::move(*cmr.collValidator)));
+    }
+    if (cmr.collValidationAction)
+        uassertStatusOKWithContext(coll->setValidationAction(opCtx, *cmr.collValidationAction),
+                                   "Failed to set validationAction");
+    if (cmr.collValidationLevel) {
+        uassertStatusOKWithContext(coll->setValidationLevel(opCtx, *cmr.collValidationLevel),
+                                   "Failed to set validationLevel");
+    }
 
     // Upgrade unique indexes
     if (upgradeUniqueIndexes) {
