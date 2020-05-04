@@ -469,6 +469,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         }
 
         IndexBuildsManager::SetupOptions options;
+        options.protocol = protocol;
         status = _indexBuildsManager.setUpIndexBuild(
             opCtx, collection, specs, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
         if (!status.isOK()) {
