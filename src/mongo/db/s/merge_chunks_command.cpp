@@ -77,8 +77,8 @@ void mergeChunks(OperationContext* opCtx,
                  const BSONObj& minKey,
                  const BSONObj& maxKey,
                  const OID& expectedEpoch) {
-    const std::string whyMessage = str::stream()
-        << "merging chunks in " << nss.ns() << " from " << minKey << " to " << maxKey;
+    const std::string whyMessage = str::stream() << "merging chunks in " << nss.ns() << " from "
+                                                 << redact(minKey) << " to " << redact(maxKey);
     auto scopedDistLock = uassertStatusOKWithContext(
         Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
             opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout),
