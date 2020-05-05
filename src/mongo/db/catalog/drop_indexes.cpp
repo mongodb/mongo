@@ -51,6 +51,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangAfterAbortingIndexes);
+
 // Field name in dropIndexes command for indexes to drop.
 constexpr auto kIndexFieldName = "index"_sd;
 
@@ -346,6 +348,11 @@ Status dropIndexes(OperationContext* opCtx,
         abortedIndexBuilders.insert(
             abortedIndexBuilders.end(), justAborted.begin(), justAborted.end());
 
+        if (MONGO_unlikely(hangAfterAbortingIndexes.shouldFail())) {
+            LOGV2(4731900, "Hanging on hangAfterAbortingIndexes fail point");
+            hangAfterAbortingIndexes.pauseWhileSet();
+        }
+
         // Take an exclusive lock on the collection now to be able to perform index catalog writes
         // when removing ready indexes from disk.
         autoColl.emplace(opCtx, dbAndUUID, MODE_X);
@@ -381,25 +388,36 @@ Status dropIndexes(OperationContext* opCtx,
         }
     }
 
-    // If the "*" wildcard was not specified, verify that all the index names belonging to the
-    // index builder were aborted.
+    // Drop any ready indexes that were created while we yielded our locks while aborting using
+    // similar index specs.
     if (!isWildcard && !abortedIndexBuilders.empty()) {
-        // This is necessary to check shard version.
-        OldClientContext ctx(opCtx, collection->ns().ns());
+        return writeConflictRetry(opCtx, "dropIndexes", dbAndUUID.toString(), [&] {
+            WriteUnitOfWork wuow(opCtx);
 
-        // Iterate through all aborted indexes and verify none of them are ready. This would
-        // indicate a flaw with the abort logic that allows indexes to complete despite the
-        // dropIndexes command reporting they were aborted.
-        auto indexCatalog = collection->getIndexCatalog();
-        const bool includeUnfinished = false;
-        const bool noneReady = std::none_of(indexNames.begin(), indexNames.end(), [&](auto name) {
-            return indexCatalog->findIndexByName(opCtx, name, includeUnfinished);
+            // This is necessary to check shard version.
+            OldClientContext ctx(opCtx, collection->ns().ns());
+
+            // Iterate through all the aborted indexes and drop any indexes that are ready in the
+            // index catalog. This would indicate that while we yielded our locks during the abort
+            // phase, a new identical index was created.
+            auto indexCatalog = collection->getIndexCatalog();
+            const bool includeUnfinished = false;
+            for (const auto& indexName : indexNames) {
+                auto desc = indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
+                if (!desc) {
+                    // A similar index wasn't created while we yielded the locks during abort.
+                    continue;
+                }
+
+                Status status = dropIndexByDescriptor(opCtx, collection, indexCatalog, desc);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+
+            wuow.commit();
+            return Status::OK();
         });
-
-        invariant(noneReady,
-                  str::stream() << "Found completed indexes despite aborting index build: "
-                                << abortedIndexBuilders.front());
-        return Status::OK();
     }
 
     if (!abortedIndexBuilders.empty()) {
