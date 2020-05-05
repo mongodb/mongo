@@ -11,15 +11,12 @@ requireSSLProvider('apple', function() {
         sslMode: "requireSSL",
         sslPEMKeyPassword: "qwerty",
         sslCAFile: "jstests/libs/ca.pem",
-        useLogFiles: true,
     });
 
     const mongod = MongoRunner.runMongod(config);
     assert(mongod === null, "MongoD unexpectedly started up");
 
-    const logFile = cat(config.logFile);
-    assert.eq(logFile.includes(
+    assert.eq(rawMongoProgramOutput().includes(
                   "Using encrypted PKCS#1/PKCS#8 PEM files is not supported on this platform"),
-              true,
-              logFile);
+              true);
 });
