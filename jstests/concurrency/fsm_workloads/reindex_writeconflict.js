@@ -21,8 +21,12 @@ var $config = (function() {
         }
         // Log traces for each WriteConflictException encountered in case they are not handled
         // properly.
+
+        /*
+          So long as there are no BFs, leave WCE tracing disabled.
         assertAlways.commandWorked(
             db.adminCommand({setParameter: 1, traceWriteConflictExceptions: true}));
+        */
 
         // Set up failpoint to trigger WriteConflictException during write operations.
         assertAlways.commandWorked(db.adminCommand(
