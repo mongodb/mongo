@@ -48,7 +48,10 @@ void registerMongoDCollectors(FTDCController* controller) {
         repl::ReplicationCoordinator::modeNone) {
         // CmdReplSetGetStatus
         controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-            "replSetGetStatus", "replSetGetStatus", "", BSON("replSetGetStatus" << 1)));
+            "replSetGetStatus",
+            "replSetGetStatus",
+            "",
+            BSON("replSetGetStatus" << 1 << "initialSync" << 0)));
 
         // CollectionStats
         controller->addPeriodicCollector(
