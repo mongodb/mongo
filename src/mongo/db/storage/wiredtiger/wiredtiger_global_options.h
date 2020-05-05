@@ -66,6 +66,13 @@ public:
 
     static Status validateWiredTigerCompressor(const std::string&);
     static Status validateMaxCacheOverflowFileSizeGB(double);
+
+    /**
+     * Returns current history file size in MB.
+     */
+    std::size_t getMaxHistoryFileSizeMB() const {
+        return 1024 * maxCacheOverflowFileSizeGB;
+    }
 };
 
 extern WiredTigerGlobalOptions wiredTigerGlobalOptions;
