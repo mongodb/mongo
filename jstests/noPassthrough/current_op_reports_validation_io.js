@@ -1,6 +1,8 @@
 /**
  * Verifies that the 'dataThroughputLastSecond' and 'dataThroughputAverage' fields appear in the
  * currentOp output while running validation.
+ *
+ * @tags: [requires_document_locking]
  */
 (function() {
 const dbName = "test";
