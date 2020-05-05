@@ -64,7 +64,7 @@ using ServerSelectorPtr = std::unique_ptr<ServerSelector>;
 
 class SdamServerSelector : public ServerSelector {
 public:
-    explicit SdamServerSelector(const ServerSelectionConfiguration& config);
+    explicit SdamServerSelector(const SdamConfiguration& config);
 
     boost::optional<std::vector<ServerDescriptionPtr>> selectServers(
         const TopologyDescriptionPtr topologyDescription,
@@ -113,7 +113,7 @@ private:
 
             auto result = (serverDescription->getLastUpdateTime() - lastWriteDate) -
                 (primaryDescription->getLastUpdateTime() - primaryLastWriteDate) +
-                _config.getHeartBeatFrequencyMs();
+                _config.getHeartBeatFrequency();
             return duration_cast<Milliseconds>(result);
         } else if (topologyDescription->getType() == TopologyType::kReplicaSetNoPrimary) {
             //  SMax.lastWriteDate - S.lastWriteDate + heartbeatFrequencyMS
@@ -132,7 +132,7 @@ private:
                 }
             }
 
-            auto result = (maxLastWriteDate - lastWriteDate) + _config.getHeartBeatFrequencyMs();
+            auto result = (maxLastWriteDate - lastWriteDate) + _config.getHeartBeatFrequency();
             return duration_cast<Milliseconds>(result);
         } else {
             // Not a replica set
@@ -170,7 +170,7 @@ private:
         };
     };
 
-    ServerSelectionConfiguration _config;
+    SdamConfiguration _config;
     mutable PseudoRandom _random;
 };
 

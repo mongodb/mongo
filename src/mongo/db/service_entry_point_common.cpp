@@ -1720,7 +1720,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         if (auto command = currentOp.getCommand();
             command && (command->getName() == "ismaster" || command->getName() == "isMaster")) {
             slowMsOverride =
-                2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTimeMs);
+                2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
         }
     } else if (op == dbQuery) {
         invariant(!isCommand);

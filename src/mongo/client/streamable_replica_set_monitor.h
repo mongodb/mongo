@@ -243,8 +243,6 @@ private:
     boost::optional<ChangeNotifierState> _confirmedNotifierState;
     mutable PseudoRandom _random;
 
-    static inline const auto kServerSelectionConfig =
-        sdam::ServerSelectionConfiguration::defaultConfiguration();
     static constexpr auto kDefaultLogLevel = 0;
     static constexpr auto kLowerLogLevel = 1;
     static constexpr auto kLogPrefix = "[ReplicaSetMonitor]";

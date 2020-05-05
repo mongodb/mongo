@@ -41,7 +41,7 @@ public:
     explicit SingleServerIsMasterMonitor(const MongoURI& setUri,
                                          const HostAndPort& host,
                                          boost::optional<TopologyVersion> topologyVersion,
-                                         Milliseconds heartbeatFrequencyMS,
+                                         const SdamConfiguration& sdamConfig,
                                          TopologyEventsPublisherPtr eventListener,
                                          std::shared_ptr<executor::TaskExecutor> executor);
 
@@ -50,8 +50,8 @@ public:
 
     /**
      * Request an immediate check. The server will be checked immediately if we haven't completed
-     * an isMaster less than SdamConfiguration::kMinHeartbeatFrequencyMS ago. Otherwise,
-     * we schedule a check that runs after SdamConfiguration::kMinHeartbeatFrequencyMS since
+     * an isMaster less than SdamConfiguration::kMinHeartbeatFrequency ago. Otherwise,
+     * we schedule a check that runs after SdamConfiguration::kMinHeartbeatFrequency since
      * the last isMaster.
      */
     void requestImmediateCheck();
@@ -68,7 +68,7 @@ public:
 
     // Sent in the initial isMaster request when using the streamable exhaust protocol. The max
     // duration a server should wait for a significant topology change before sending a response.
-    static constexpr Milliseconds kMaxAwaitTimeMs = Milliseconds(10000);
+    static constexpr Milliseconds kMaxAwaitTime = Milliseconds(10000);
 
 private:
     void _scheduleNextIsMaster(WithLock, Milliseconds delay);
@@ -100,8 +100,8 @@ private:
     boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
     std::shared_ptr<executor::TaskExecutor> _executor;
-    Milliseconds _heartbeatFrequencyMS;
-    Milliseconds _timeoutMS = SdamConfiguration::kDefaultConnectTimeoutMS;
+    Milliseconds _heartbeatFrequency;
+    Milliseconds _connectTimeout;
 
     boost::optional<Date_t> _lastIsMasterAt;
     bool _isMasterOutstanding = false;

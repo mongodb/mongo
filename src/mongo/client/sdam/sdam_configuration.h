@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 
 namespace mongo::sdam {
@@ -54,47 +55,61 @@ public:
      * If setName is not null, only TopologyType ReplicaSetNoPrimary and Single, are
      * allowed.
      */
-    explicit SdamConfiguration(boost::optional<std::vector<HostAndPort>> seedList,
-                               TopologyType initialType = TopologyType::kUnknown,
-                               Milliseconds heartBeatFrequencyMs = kDefaultHeartbeatFrequencyMs,
-                               boost::optional<std::string> setName = boost::none);
+    explicit SdamConfiguration(
+        boost::optional<std::vector<HostAndPort>> seedList,
+        TopologyType initialType = TopologyType::kUnknown,
+        Milliseconds heartBeatFrequencyMs = Milliseconds(sdamHeartBeatFrequencyMs),
+        Milliseconds connectTimeoutMs = Milliseconds(sdamConnectTimeoutMs),
+        Milliseconds localThreshholdMs = Milliseconds(sdamLocalThreshholdMs),
+        boost::optional<std::string> setName = boost::none);
 
+    /**
+     * The initial set of servers to monitor in the replica set.
+     */
     const boost::optional<std::vector<HostAndPort>>& getSeedList() const;
+
+    /**
+     * The initial type of the replica set.
+     */
     TopologyType getInitialType() const;
-    Milliseconds getHeartBeatFrequency() const;
+
+    /**
+     * The replica set name.
+     */
     const boost::optional<std::string>& getSetName() const;
 
-    static constexpr Milliseconds kDefaultHeartbeatFrequencyMs = Seconds(10);
-    static constexpr Milliseconds kMinHeartbeatFrequencyMS = Milliseconds(500);
-    static constexpr Milliseconds kDefaultConnectTimeoutMS = Milliseconds(10000);
+    /**
+     * The frequency at which we measure RTT and IsMaster responses.
+     */
+    Milliseconds getHeartBeatFrequency() const;
 
-private:
-    boost::optional<std::vector<HostAndPort>> _seedList;
-    TopologyType _initialType;
-    Milliseconds _heartBeatFrequencyMs;
-    boost::optional<std::string> _setName;
-};
+    /**
+     * How long to wait to obtain a connection.
+     */
+    Milliseconds getConnectionTimeout() const;
 
-class ServerSelectionConfiguration {
-public:
-    explicit ServerSelectionConfiguration(const Milliseconds localThresholdMs,
-                                          const Milliseconds serverSelectionTimeoutMs);
+    /**
+     * The width of the latency window used in server selection.
+     */
+    Milliseconds getLocalThreshold() const;
 
-    Milliseconds getLocalThresholdMs() const;
-    Milliseconds getServerSelectionTimeoutMs() const;
-    Milliseconds getHeartBeatFrequencyMs() const;
-
-    static constexpr Milliseconds kDefaultLocalThresholdMS = Milliseconds(15);
-    static constexpr Milliseconds kDefaultServerSelectionTimeoutMs = Milliseconds(30000);
-
-    static ServerSelectionConfiguration defaultConfiguration() {
-        return ServerSelectionConfiguration{kDefaultLocalThresholdMS,
-                                            kDefaultServerSelectionTimeoutMs};
+    const BSONObj& toBson() const {
+        return _bsonDoc;
     }
 
+    static constexpr Milliseconds kMinHeartbeatFrequency = Milliseconds(500);
+
 private:
-    Milliseconds _localThresholdMs = kDefaultLocalThresholdMS;
-    Milliseconds _serverSelectionTimeoutMs = kDefaultServerSelectionTimeoutMs;
-    Milliseconds _heartBeatFrequencyMs = SdamConfiguration::kDefaultHeartbeatFrequencyMs;
+    BSONObj _toBson() const;
+
+    boost::optional<std::vector<HostAndPort>> _seedList;
+    TopologyType _initialType;
+
+    Milliseconds _heartbeatFrequency;
+    Milliseconds _connectionTimeout;
+    Milliseconds _localThreshold;
+
+    boost::optional<std::string> _setName;
+    BSONObj _bsonDoc;
 };
 }  // namespace mongo::sdam

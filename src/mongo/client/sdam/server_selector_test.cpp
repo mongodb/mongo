@@ -43,8 +43,6 @@ class ServerSelectorTestFixture : public SdamTestFixture {
 public:
     static inline const auto clockSource = SystemClockSource::get();
     static inline const auto sdamConfiguration = SdamConfiguration({{HostAndPort("s0")}});
-    static inline const auto selectionConfig =
-        ServerSelectionConfiguration(Milliseconds(10), Milliseconds(10));
 
     static constexpr auto SET_NAME = "set";
     static constexpr int NUM_ITERATIONS = 1000;
@@ -138,7 +136,7 @@ public:
                               {{"dc", "north"}, {"usage", "production"}})};
     };
 
-    SdamServerSelector selector = SdamServerSelector(selectionConfig);
+    SdamServerSelector selector = SdamServerSelector(sdamConfiguration);
 };
 
 TEST_F(ServerSelectorTestFixture, ShouldFilterCorrectlyByLatencyWindow) {
@@ -206,13 +204,13 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectRandomlyWhenMultipleOptionsAreAvai
                        .instance();
     stateMachine.onServerDescription(*topologyDescription, primary);
 
-    const auto s1Latency = Milliseconds((s0Latency + selectionConfig.getLocalThresholdMs()) / 2);
+    const auto s1Latency = Milliseconds((s0Latency + sdamConfiguration.getLocalThreshold()) / 2);
     auto secondaryInLatencyWindow =
         make_with_latency(s1Latency, HostAndPort("s1"), ServerType::kRSSecondary);
     stateMachine.onServerDescription(*topologyDescription, secondaryInLatencyWindow);
 
     // s2 is on the boundary of the latency window
-    const auto s2Latency = s0Latency + selectionConfig.getLocalThresholdMs();
+    const auto s2Latency = s0Latency + sdamConfiguration.getLocalThreshold();
     auto secondaryOnBoundaryOfLatencyWindow =
         make_with_latency(s2Latency, HostAndPort("s2"), ServerType::kRSSecondary);
     stateMachine.onServerDescription(*topologyDescription, secondaryOnBoundaryOfLatencyWindow);
@@ -254,7 +252,7 @@ TEST_F(ServerSelectorTestFixture, ShouldFilterByLastWriteTime) {
     const auto s0 = ServerDescriptionBuilder()
                         .withAddress(HostAndPort("s0"))
                         .withType(ServerType::kRSPrimary)
-                        .withRtt(selectionConfig.getLocalThresholdMs())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
                         .withSetName("set")
                         .withHost(HostAndPort("s0"))
                         .withHost(HostAndPort("s1"))
@@ -270,7 +268,7 @@ TEST_F(ServerSelectorTestFixture, ShouldFilterByLastWriteTime) {
     const auto s1 = ServerDescriptionBuilder()
                         .withAddress(HostAndPort("s1"))
                         .withType(ServerType::kRSSecondary)
-                        .withRtt(selectionConfig.getLocalThresholdMs())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
                         .withSetName("set")
                         .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
@@ -284,7 +282,7 @@ TEST_F(ServerSelectorTestFixture, ShouldFilterByLastWriteTime) {
     const auto s2 = ServerDescriptionBuilder()
                         .withAddress(HostAndPort("s2"))
                         .withType(ServerType::kRSSecondary)
-                        .withRtt(selectionConfig.getLocalThresholdMs())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
                         .withSetName("set")
                         .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
@@ -322,7 +320,7 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectPreferredIfAvailable) {
     const auto s0 = ServerDescriptionBuilder()
                         .withAddress(HostAndPort("s0"))
                         .withType(ServerType::kRSPrimary)
-                        .withRtt(selectionConfig.getLocalThresholdMs())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
                         .withSetName("set")
                         .withHost(HostAndPort("s0"))
                         .withHost(HostAndPort("s1"))
@@ -336,7 +334,7 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectPreferredIfAvailable) {
     const auto s1 = ServerDescriptionBuilder()
                         .withAddress(HostAndPort("s1"))
                         .withType(ServerType::kRSSecondary)
-                        .withRtt(selectionConfig.getLocalThresholdMs())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
                         .withSetName("set")
                         .withHost(HostAndPort("s0"))
                         .withHost(HostAndPort("s1"))
@@ -376,7 +374,7 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectTaggedSecondaryIfPreferredPrimaryN
     const auto s0 = ServerDescriptionBuilder()
                         .withAddress(HostAndPort("s0"))
                         .withType(ServerType::kRSPrimary)
-                        .withRtt(selectionConfig.getLocalThresholdMs())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
                         .withSetName("set")
                         .withHost(HostAndPort("s0"))
                         .withHost(HostAndPort("s1"))
@@ -399,7 +397,7 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectTaggedSecondaryIfPreferredPrimaryN
     const auto s1 = ServerDescriptionBuilder()
                         .withAddress(HostAndPort("s1"))
                         .withType(ServerType::kRSSecondary)
-                        .withRtt(selectionConfig.getLocalThresholdMs())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
                         .withSetName("set")
                         .withHost(HostAndPort("s0"))
                         .withHost(HostAndPort("s1"))
@@ -414,7 +412,7 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectTaggedSecondaryIfPreferredPrimaryN
     const auto s2 = ServerDescriptionBuilder()
                         .withAddress(HostAndPort("s2"))
                         .withType(ServerType::kRSSecondary)
-                        .withRtt(selectionConfig.getLocalThresholdMs())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
                         .withSetName("set")
                         .withHost(HostAndPort("s0"))
                         .withHost(HostAndPort("s1"))
