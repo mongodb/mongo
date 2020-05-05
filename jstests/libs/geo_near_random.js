@@ -2,13 +2,15 @@ GeoNearRandomTest = function(name, dbToUse) {
     this.name = name;
     this.db = (dbToUse || db);
     this.t = this.db[name];
-    this.nPts = 0;
+    this.reset();
+    print("Starting getNear test: " + name);
+};
 
+GeoNearRandomTest.prototype.reset = function reset() {
     // Reset state
+    this.nPts = 0;
     this.t.drop();
     Random.srand(1234);
-
-    print("Starting getNear test: " + name);
 };
 
 GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds) {
@@ -27,7 +29,7 @@ GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds) {
 
 };
 
-GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale) {
+GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale, skipIndex) {
     assert.eq(this.nPts, 0, "insertPoints already called");
     this.nPts = nPts;
 
@@ -37,10 +39,12 @@ GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale) {
     }
     assert.writeOK(bulk.execute());
 
-    if (!indexBounds)
-        this.t.ensureIndex({loc: '2d'});
-    else
-        this.t.ensureIndex({loc: '2d'}, indexBounds);
+    if (!skipIndex) {
+        if (!indexBounds)
+            this.t.ensureIndex({loc: '2d'});
+        else
+            this.t.ensureIndex({loc: '2d'}, indexBounds);
+    }
 };
 
 GeoNearRandomTest.prototype.assertIsPrefix = function(short, long) {

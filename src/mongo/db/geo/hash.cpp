@@ -676,7 +676,8 @@ Status GeoHashConverter::parseParameters(const BSONObj& paramDoc,
                                     << " bits were specified");
     }
 
-    if (params->min >= params->max) {
+    const bool rangeValid = params->min < params->max;
+    if (!rangeValid || std::isinf(params->min) || std::isinf(params->max)) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "region for hash must be valid and have positive area, "
                                     << "but ["
@@ -687,14 +688,22 @@ Status GeoHashConverter::parseParameters(const BSONObj& paramDoc,
                                     << "was specified");
     }
 
-    double numBuckets = (1024 * 1024 * 1024 * 4.0);
+    constexpr double numBuckets = 4.0 * 1024 * 1024 * 1024;
     params->scaling = numBuckets / (params->max - params->min);
+    const bool scalingValid = params->scaling > 0;
+    if (!scalingValid || std::isinf(params->scaling)) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "range [" << params->min << ", " << params->max
+                                    << "] is too small.");
+    }
 
     return Status::OK();
 }
 
 GeoHashConverter::GeoHashConverter(const Parameters& params) : _params(params) {
     init();
+    uassert(
+        4799400, "Invalid GeoHashConverter parameters", _params.max - _params.min >= _error / 2);
 }
 
 void GeoHashConverter::init() {
