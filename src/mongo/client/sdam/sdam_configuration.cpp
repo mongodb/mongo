@@ -31,12 +31,17 @@
 namespace mongo::sdam {
 SdamConfiguration::SdamConfiguration(boost::optional<std::vector<HostAndPort>> seedList,
                                      TopologyType initialType,
-                                     mongo::Milliseconds heartBeatFrequencyMs,
+                                     Milliseconds heartBeatFrequencyMs,
+                                     Milliseconds connectTimeoutMs,
+                                     Milliseconds localThreshholdMs,
                                      boost::optional<std::string> setName)
     : _seedList(seedList),
       _initialType(initialType),
-      _heartBeatFrequencyMs(heartBeatFrequencyMs),
-      _setName(setName) {
+      _heartbeatFrequency(heartBeatFrequencyMs),
+      _connectionTimeout(connectTimeoutMs),
+      _localThreshold(localThreshholdMs),
+      _setName(setName),
+      _bsonDoc(_toBson()) {
     uassert(ErrorCodes::InvalidSeedList,
             "seed list size must be >= 1",
             !seedList || (*seedList).size() >= 1);
@@ -58,7 +63,7 @@ SdamConfiguration::SdamConfiguration(boost::optional<std::vector<HostAndPort>> s
 
     uassert(ErrorCodes::InvalidHeartBeatFrequency,
             "topology heartbeat must be >= 500ms",
-            _heartBeatFrequencyMs >= kMinHeartbeatFrequencyMS);
+            _heartbeatFrequency >= kMinHeartbeatFrequency);
 }
 
 const boost::optional<std::vector<HostAndPort>>& SdamConfiguration::getSeedList() const {
@@ -70,26 +75,44 @@ TopologyType SdamConfiguration::getInitialType() const {
 }
 
 Milliseconds SdamConfiguration::getHeartBeatFrequency() const {
-    return _heartBeatFrequencyMs;
+    return _heartbeatFrequency;
 }
 
 const boost::optional<std::string>& SdamConfiguration::getSetName() const {
     return _setName;
 }
 
-
-ServerSelectionConfiguration::ServerSelectionConfiguration(
-    const Milliseconds localThresholdMs, const Milliseconds serverSelectionTimeoutMs)
-    : _localThresholdMs(localThresholdMs), _serverSelectionTimeoutMs(serverSelectionTimeoutMs) {}
-
-Milliseconds ServerSelectionConfiguration::getLocalThresholdMs() const {
-    return _localThresholdMs;
+Milliseconds SdamConfiguration::getConnectionTimeout() const {
+    return _connectionTimeout;
 }
 
-Milliseconds ServerSelectionConfiguration::getServerSelectionTimeoutMs() const {
-    return _serverSelectionTimeoutMs;
+Milliseconds SdamConfiguration::getLocalThreshold() const {
+    return _localThreshold;
 }
-Milliseconds ServerSelectionConfiguration::getHeartBeatFrequencyMs() const {
-    return _heartBeatFrequencyMs;
+
+BSONObj SdamConfiguration::_toBson() const {
+    BSONObjBuilder builder;
+
+    if (_setName) {
+        builder.append("replicaSet", *_setName);
+    }
+
+    builder.append("topologyType", toString(getInitialType()));
+
+    if (_seedList) {
+        const auto& hostAndPorts = *_seedList;
+        std::vector<std::string> seedList;
+        std::transform(hostAndPorts.begin(),
+                       hostAndPorts.end(),
+                       back_inserter(seedList),
+                       [](const HostAndPort& h) { return h.toString(); });
+        builder.append("seedList", seedList);
+    }
+
+    builder.append("heartbeatFrequency", _heartbeatFrequency.toBSON());
+    builder.append("connectionTimeout", _connectionTimeout.toBSON());
+    builder.append("localThreshhold", _localThreshold.toBSON());
+
+    return builder.obj();
 }
 };  // namespace mongo::sdam

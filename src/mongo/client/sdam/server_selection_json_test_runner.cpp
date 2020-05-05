@@ -40,6 +40,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/client/sdam/json_test_arg_parser.h"
+#include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/sdam/server_selector.h"
 #include "mongo/client/sdam/topology_manager.h"
@@ -214,7 +215,7 @@ public:
         LOGV2(4333504, "### Running Test ###", "testFilePath"_attr = _testFilePath);
 
         SdamServerSelector serverSelector(
-            sdam::ServerSelectionConfiguration::defaultConfiguration());
+            SdamConfiguration(std::vector<HostAndPort>{HostAndPort("foo:1234")}));
         auto selectedServers = serverSelector.selectServers(_topologyDescription, _readPreference);
 
         TestCaseResult result{{}, _testFilePath};
@@ -290,8 +291,12 @@ private:
         if (serverAddresses.size() > 0)
             seedList = serverAddresses;
 
-        auto config = SdamConfiguration(
-            seedList, initType, SdamConfiguration::kDefaultHeartbeatFrequencyMs, setName);
+        auto config = SdamConfiguration(seedList,
+                                        initType,
+                                        Milliseconds{sdamHeartBeatFrequencyMs},
+                                        Milliseconds{sdamConnectTimeoutMs},
+                                        Milliseconds{sdamLocalThreshholdMs},
+                                        setName);
         _topologyDescription = std::make_shared<TopologyDescription>(config);
 
         const std::vector<BSONElement>& bsonLatencyWindow = _jsonTest["in_latency_window"].Array();

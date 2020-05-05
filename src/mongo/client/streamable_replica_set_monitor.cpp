@@ -148,8 +148,7 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
     const MongoURI& uri,
     std::shared_ptr<TaskExecutor> executor,
     std::shared_ptr<executor::EgressTagCloser> connectionManager)
-    : _serverSelector(std::make_unique<SdamServerSelector>(kServerSelectionConfig)),
-      _errorHandler(std::make_unique<SdamErrorHandler>(uri.getSetName())),
+    : _errorHandler(std::make_unique<SdamErrorHandler>(uri.getSetName())),
       _queryProcessor(std::make_shared<StreamableReplicaSetMonitorQueryProcessor>()),
       _uri(uri),
       _connectionManager(connectionManager),
@@ -168,6 +167,7 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
     }
 
     _sdamConfig = SdamConfiguration(seedsNoDups);
+    _serverSelector = std::make_unique<SdamServerSelector>(_sdamConfig);
 }
 
 ReplicaSetMonitorPtr StreamableReplicaSetMonitor::make(
@@ -185,7 +185,8 @@ void StreamableReplicaSetMonitor::init() {
                 kLowerLogLevel,
                 "Starting Replica Set Monitor {uri}",
                 "Starting Replica Set Monitor",
-                "uri"_attr = _uri);
+                "uri"_attr = _uri,
+                "config"_attr = _sdamConfig.toBson());
 
     _eventsPublisher = std::make_shared<sdam::TopologyEventsPublisher>(_executor);
     _topologyManager = std::make_unique<TopologyManager>(
@@ -193,11 +194,8 @@ void StreamableReplicaSetMonitor::init() {
 
     _eventsPublisher->registerListener(shared_from_this());
 
-    _pingMonitor =
-        std::make_unique<ServerPingMonitor>(_uri,
-                                            _eventsPublisher.get(),
-                                            sdam::SdamConfiguration::kDefaultHeartbeatFrequencyMs,
-                                            _executor);
+    _pingMonitor = std::make_unique<ServerPingMonitor>(
+        _uri, _eventsPublisher.get(), _sdamConfig.getHeartBeatFrequency(), _executor);
     _eventsPublisher->registerListener(_pingMonitor);
 
     _isMasterMonitor = std::make_unique<ServerIsMasterMonitor>(

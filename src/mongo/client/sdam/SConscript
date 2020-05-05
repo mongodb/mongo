@@ -5,6 +5,16 @@ Import('env')
 env = env.Clone()
 
 env.Library(
+    target='sdam_configuration_parameters',
+    source=[
+        env.Idlc('sdam_configuration_parameters.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ]
+)
+
+env.Library(
     target='sdam',
     source=[
 		'sdam_configuration.cpp',
@@ -24,6 +34,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/metadata',
+        'sdam_configuration_parameters',
     ],
 )
 
@@ -37,6 +48,7 @@ sdam_json_test = env.Program(
         'sdam',
         'sdam_test',
         'json_test',
+        'sdam_configuration_parameters',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/client/connection_string'],
 )[0]
@@ -50,6 +62,7 @@ server_selection_json_test = env.Program(
         'sdam',
         'sdam_test',
         'json_test',
+        'sdam_configuration_parameters',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/client/connection_string'],
 )[0]
