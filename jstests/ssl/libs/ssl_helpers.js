@@ -304,6 +304,21 @@ function isRHEL8() {
     return false;
 }
 
+function isUbuntu2004() {
+    if (_isWindows()) {
+        return false;
+    }
+
+    // Ubuntu 20.04 disables TLS 1.0 and TLS 1.1 as part their default crypto policy
+    // We skip tests on Ubuntu 20.04 that require these versions as a result.
+    const grep_result = runProgram('grep', 'focal', '/etc/os-release');
+    if (grep_result == 0) {
+        return true;
+    }
+
+    return false;
+}
+
 function isDebian10() {
     if (_isWindows()) {
         return false;
@@ -331,7 +346,7 @@ function sslProviderSupportsTLS1_0() {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
     }
-    return !isDebian10();
+    return !isDebian10() && !isUbuntu2004();
 }
 
 function sslProviderSupportsTLS1_1() {
@@ -339,7 +354,7 @@ function sslProviderSupportsTLS1_1() {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
     }
-    return !isDebian10();
+    return !isDebian10() && !isUbuntu2004();
 }
 
 function opensslVersionAsInt() {
