@@ -157,21 +157,9 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
     invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;
     _lastUpdateStale = false;
-    if (_lastAppliedOpTime < opTime.opTime) {
-        // TODO(russotto): We think this should never happen, rollback or no rollback.  Make this an
-        // invariant and see what happens.
-        LOGV2(21218,
-              "Durable progress ({durableOpTime}) is ahead of the applied progress "
-              "({lastAppliedOpTime}. This is likely due to a "
-              "rollback. memberid: {memberId}{hostAndPort} previous durable progress: "
-              "{lastDurableOpTime}",
-              "Durable progress is ahead of the applied progress. This is likely due to a rollback",
-              "durableOpTime"_attr = opTime.opTime,
-              "lastAppliedOpTime"_attr = _lastAppliedOpTime,
-              "memberId"_attr = _memberId,
-              "hostAndPort"_attr = _hostAndPort.toString(),
-              "lastDurableOpTime"_attr = _lastDurableOpTime);
-    } else {
+    // Since _lastDurableOpTime is set asynchronously from _lastAppliedOpTime, it is possible that
+    // 'opTime' is ahead of _lastAppliedOpTime.
+    if (_lastAppliedOpTime >= opTime.opTime) {
         _lastDurableOpTime = opTime.opTime;
         _lastDurableWallTime = opTime.wallTime;
     }
