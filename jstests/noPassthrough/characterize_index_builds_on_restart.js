@@ -121,15 +121,10 @@ function checkForIndexRebuild(mongod, indexName, shouldExist) {
     let rebuildIndexLogEntry = false;
     let dropIndexLogEntry = false;
 
-    /**
-     * The log should contain the following lines if it rebuilds or drops the index:
-     *     Rebuilding index. Collection: `collNss` Index: `indexName`
-     *     Dropping unfinished index. Collection: `collNss` Index: `indexName`
-     */
     let rebuildIndexRegExp =
-        new RegExp("Rebuilding index. Collection:.*" + dbName + "." + collName + ".*" + indexName);
-    let dropIndexRegExp = new RegExp("Dropping unfinished index. Collection: .*" + dbName + "." +
-                                     collName + ".*" + indexName);
+        new RegExp("Rebuilding index.*" + dbName + "." + collName + ".*" + indexName);
+    let dropIndexRegExp =
+        new RegExp("Dropping unfinished index.*" + dbName + "." + collName + ".*" + indexName);
     for (let line = 0; line < logs.log.length; line++) {
         if (logs.log[line].search(rebuildIndexRegExp) != -1)
             rebuildIndexLogEntry = true;
