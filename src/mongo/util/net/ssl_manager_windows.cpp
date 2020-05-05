@@ -1708,6 +1708,8 @@ Status validatePeerCertificate(const std::string& remoteHost,
         certChainPara.RequestedUsage.Usage.rgpszUsageIdentifier = usage;
     }
 
+    certChainPara.dwUrlRetrievalTimeout = kTLSClientOCSPTimeoutSecs * 1000;
+
     PCCERT_CHAIN_CONTEXT chainContext;
     BOOL ret = CertGetCertificateChain(certChainEngine,
                                        cert,
