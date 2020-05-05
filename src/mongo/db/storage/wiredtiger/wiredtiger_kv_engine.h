@@ -56,7 +56,7 @@ class WiredTigerRecordStore;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 class WiredTigerEngineRuntimeConfigParameter;
-class WiredTigerMaxCacheOverflowSizeGBParameter;
+class WiredTigerMaxHistoryFileSizeGBParameter;
 
 struct WiredTigerFileVersion {
     // MongoDB 4.4+ will not open on datafiles left behind by 4.2.5 and earlier. MongoDB 4.4
@@ -78,7 +78,7 @@ public:
                        ClockSource* cs,
                        const std::string& extraOpenOptions,
                        size_t cacheSizeMB,
-                       size_t maxCacheOverflowFileSizeMB,
+                       size_t maxHistoryFileSizeMB,
                        bool durable,
                        bool ephemeral,
                        bool repair,
@@ -484,7 +484,7 @@ private:
     std::list<std::string> _checkpointedIndexes;
 
     std::unique_ptr<WiredTigerEngineRuntimeConfigParameter> _runTimeConfigParam;
-    std::unique_ptr<WiredTigerMaxCacheOverflowSizeGBParameter> _maxCacheOverflowParam;
+    std::unique_ptr<WiredTigerMaxHistoryFileSizeGBParameter> _maxHistoryFileSizeGBParam;
 
     mutable Mutex _highestDurableTimestampMutex =
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_highestDurableTimestampMutex");

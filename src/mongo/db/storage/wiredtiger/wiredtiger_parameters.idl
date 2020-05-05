@@ -110,7 +110,7 @@ server_parameters:
         Defaults to 0 (unbounded)
       set_at: runtime
       cpp_class:
-        name: WiredTigerMaxCacheOverflowSizeGBParameter
+        name: WiredTigerMaxHistoryFileSizeGBParameter
         data: 'std::pair<double, WiredTigerKVEngine*>'
         override_set: true
       condition: { expr: false }

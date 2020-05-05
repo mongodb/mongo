@@ -40,8 +40,8 @@ using std::string;
 
 namespace {
 
-Status applyMaxCacheOverflowSizeGBParameter(WiredTigerMaxCacheOverflowSizeGBParameter& param,
-                                            double value) {
+Status applyMaxHistoryFileSizeGBParameter(WiredTigerMaxHistoryFileSizeGBParameter& param,
+                                          double value) {
     if (value != 0.0 && value < 0.1) {
         return {ErrorCodes::BadValue,
                 "MaxCacheOverflowFileSizeGB must be either 0 (unbounded) or greater than 0.1."};
@@ -50,7 +50,7 @@ Status applyMaxCacheOverflowSizeGBParameter(WiredTigerMaxCacheOverflowSizeGBPara
     const auto valueMB = static_cast<size_t>(1024 * value);
 
     LOGV2(22375,
-          "Reconfiguring WiredTiger max cache overflow size with value: \"{valueMB}MB\'",
+          "Reconfiguring WiredTiger max history file size with value: \"{valueMB}MB\'",
           "valueMB"_attr = valueMB);
 
     invariant(param._data.second);
@@ -104,13 +104,13 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
     return Status::OK();
 }
 
-void WiredTigerMaxCacheOverflowSizeGBParameter::append(OperationContext* opCtx,
-                                                       BSONObjBuilder& b,
-                                                       const std::string& name) {
+void WiredTigerMaxHistoryFileSizeGBParameter::append(OperationContext* opCtx,
+                                                     BSONObjBuilder& b,
+                                                     const std::string& name) {
     b << name << _data.first;
 }
 
-Status WiredTigerMaxCacheOverflowSizeGBParameter::set(const BSONElement& element) {
+Status WiredTigerMaxHistoryFileSizeGBParameter::set(const BSONElement& element) {
     if (element.type() == String) {
         return setFromString(element.valuestrsafe());
     }
@@ -120,17 +120,17 @@ Status WiredTigerMaxCacheOverflowSizeGBParameter::set(const BSONElement& element
         return {ErrorCodes::BadValue, "MaxCacheOverflowFileSizeGB must be a numeric value."};
     }
 
-    return applyMaxCacheOverflowSizeGBParameter(*this, value);
+    return applyMaxHistoryFileSizeGBParameter(*this, value);
 }
 
-Status WiredTigerMaxCacheOverflowSizeGBParameter::setFromString(const std::string& str) {
+Status WiredTigerMaxHistoryFileSizeGBParameter::setFromString(const std::string& str) {
     double value;
     const auto status = NumberParser{}(str, &value);
     if (!status.isOK()) {
         return status;
     }
 
-    return applyMaxCacheOverflowSizeGBParameter(*this, value);
+    return applyMaxHistoryFileSizeGBParameter(*this, value);
 }
 
 }  // namespace mongo
