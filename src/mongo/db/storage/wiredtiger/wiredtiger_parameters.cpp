@@ -55,7 +55,7 @@ Status applyMaxCacheOverflowSizeGBParameter(WiredTigerMaxCacheOverflowSizeGBPara
 
     invariant(param._data.second);
     int ret = param._data.second->reconfigure(
-        fmt::format("cache_overflow=(file_max={}M)", valueMB).c_str());
+        fmt::format("history_store=(file_max={}M)", valueMB).c_str());
     if (ret != 0) {
         string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
                                        << ret << "): " << wiredtiger_strerror(ret));
