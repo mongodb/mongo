@@ -51,7 +51,6 @@ namespace repl {
 MONGO_FAIL_POINT_DEFINE(stopReplProducer);
 MONGO_FAIL_POINT_DEFINE(stopReplProducerOnDocument);
 MONGO_FAIL_POINT_DEFINE(setSmallOplogGetMoreMaxTimeMS);
-MONGO_FAIL_POINT_DEFINE(logAfterOplogFetcherConnCreated);
 MONGO_FAIL_POINT_DEFINE(hangAfterOplogFetcherCallbackScheduled);
 MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogFetcherRetries);
@@ -437,12 +436,6 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
     {
         stdx::lock_guard<Latch> lock(_mutex);
         _conn = _createClientFn();
-    }
-
-    if (MONGO_unlikely(logAfterOplogFetcherConnCreated.shouldFail())) {
-        // Used in tests that wait for this failpoint to be entered to ensure the DBClientConnection
-        // was created.
-        LOGV2(21268, "logAfterOplogFetcherConnCreated failpoint enabled");
     }
 
     hangAfterOplogFetcherCallbackScheduled.pauseWhileSet();
