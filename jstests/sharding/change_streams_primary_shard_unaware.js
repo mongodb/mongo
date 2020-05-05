@@ -39,6 +39,10 @@
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
     st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 
+    // Ensure all config server nodes have replicated the movePrimary, so that all routers will see
+    // the latest primary shard regardless from which node they load the database entry.
+    st.configRS.awaitLastOpCommitted();
+
     // Create unsharded collection on primary shard.
     const mongosColl = mongosDB[testName];
     assert.commandWorked(mongosDB.createCollection(testName));
