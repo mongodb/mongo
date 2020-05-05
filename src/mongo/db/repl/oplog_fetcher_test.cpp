@@ -382,8 +382,8 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::getOplogFetcherAfterConnectionCr
         &getExecutor(), fn, numRestarts, requireFresherSyncSource, startingPoint);
 
     auto waitForConnCreatedFailPoint =
-        globalFailPointRegistry().find("logAfterOplogFetcherConnCreated");
-    auto timesEnteredFailPoint = waitForConnCreatedFailPoint->setMode(FailPoint::alwaysOn, 0);
+        globalFailPointRegistry().find("hangAfterOplogFetcherCallbackScheduled");
+    auto timesEnteredFailPoint = waitForConnCreatedFailPoint->setMode(FailPoint::alwaysOn);
 
     ASSERT_FALSE(oplogFetcher->isActive());
     ASSERT_OK(oplogFetcher->startup());
@@ -391,6 +391,7 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::getOplogFetcherAfterConnectionCr
 
     // Ensure that the MockDBClientConnection was created before proceeding.
     waitForConnCreatedFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+    waitForConnCreatedFailPoint->setMode(FailPoint::off);
 
     return oplogFetcher;
 }
