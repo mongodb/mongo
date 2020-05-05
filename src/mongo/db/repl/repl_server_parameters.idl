@@ -300,3 +300,16 @@ server_parameters:
         # and if it is not, readPreference is 'nearest'.
         default: ""
         validator: { callback: 'validateReadPreferenceMode' }
+
+    changeSyncSourceThresholdMillis:
+        description: >-
+            Threshold between ping times that are considered as coming from the same data center
+            and ping times considered as coming from a different data center. Used to determine
+            if the node should attempt to change sync sources because another node is significantly
+            closer than its current sync source.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: changeSyncSourceThresholdMillis
+        default: 5
+        validator:
+            gte: 0

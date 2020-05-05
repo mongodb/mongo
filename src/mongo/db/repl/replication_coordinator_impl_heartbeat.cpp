@@ -143,11 +143,12 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
 }
 
 void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj response,
-                                                                 int targetIndex) {
+                                                                 int targetIndex,
+                                                                 Milliseconds ping) {
     CallbackHandle handle;
     RemoteCommandRequest request;
     request.target = _rsConfig.getMemberAt(targetIndex).getHostAndPort();
-    executor::TaskExecutor::ResponseStatus status(response, Milliseconds(100));
+    executor::TaskExecutor::ResponseStatus status(response, ping);
     executor::TaskExecutor::RemoteCommandCallbackArgs cbData(
         _replExecutor.get(), handle, request, status);
 

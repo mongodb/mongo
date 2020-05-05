@@ -8010,6 +8010,163 @@ TEST_F(ReplCoordTest, NodeFailsVoteRequestIfCandidateIndexIsInvalid) {
     }
 }
 
+TEST_F(ReplCoordTest, ShouldChooseNearestNodeAsSyncSourceWhenSecondaryAndChainingAllowed) {
+    // Set up a three-node replica set with chainingAllowed set to true.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id" << 2))
+                            << "settings" << BSON("chainingAllowed" << true)),
+                       HostAndPort("node1", 12345));
+
+    auto replCoord = getReplCoord();
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setTerm(1);
+    hbResp.setConfigVersion(2);
+    hbResp.setConfigTerm(1);
+
+    const OpTime lastAppliedOpTime = OpTime(Timestamp(50, 0), 1);
+    const auto now = getNet()->now();
+    hbResp.setAppliedOpTimeAndWallTime({lastAppliedOpTime, now});
+    hbResp.setDurableOpTimeAndWallTime({lastAppliedOpTime, now});
+
+    // Set the primary's ping to be longer than the other secondary's ping.
+    const auto primaryPing = Milliseconds(10);
+    const auto nearestNodePing = Milliseconds(5);
+
+    // We must send two heartbeats per node, so that we satisfy the 2N requirement before choosing a
+    // new sync source.
+    for (auto i = 0; i < 2; i++) {
+        hbResp.setState(MemberState::RS_PRIMARY);
+        replCoord->handleHeartbeatResponse_forTest(
+            hbResp.toBSON(), 1 /* targetIndex */, primaryPing);
+        hbResp.setState(MemberState::RS_SECONDARY);
+        replCoord->handleHeartbeatResponse_forTest(
+            hbResp.toBSON(), 2 /* targetIndex */, nearestNodePing);
+    }
+
+    // We expect to sync from the closest node, since our read preference should be set to
+    // ReadPreference::Nearest.
+    ASSERT_EQ(HostAndPort("node3:12345"), replCoord->chooseNewSyncSource(OpTime()));
+}
+
+TEST_F(ReplCoordTest, ShouldChoosePrimaryAsSyncSourceWhenSecondaryAndChainingNotAllowed) {
+    // Set up a three-node replica set with chainingAllowed set to false.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id" << 2))
+                            << "settings" << BSON("chainingAllowed" << false)),
+                       HostAndPort("node1", 12345));
+
+    auto replCoord = getReplCoord();
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setTerm(1);
+    hbResp.setConfigVersion(2);
+    hbResp.setConfigTerm(1);
+
+    const OpTime lastAppliedOpTime = OpTime(Timestamp(50, 0), 1);
+    const auto now = getNet()->now();
+    hbResp.setAppliedOpTimeAndWallTime({lastAppliedOpTime, now});
+    hbResp.setDurableOpTimeAndWallTime({lastAppliedOpTime, now});
+
+    // Set the primary's ping to be longer than the other secondary's ping.
+    const auto primaryPing = Milliseconds(10);
+    const auto nearestNodePing = Milliseconds(5);
+
+    // We must send two heartbeats per node, so that we satisfy the 2N requirement before choosing a
+    // new sync source.
+    for (auto i = 0; i < 2; i++) {
+        hbResp.setState(MemberState::RS_PRIMARY);
+        replCoord->handleHeartbeatResponse_forTest(
+            hbResp.toBSON(), 1 /* targetIndex */, primaryPing);
+        hbResp.setState(MemberState::RS_SECONDARY);
+        replCoord->handleHeartbeatResponse_forTest(
+            hbResp.toBSON(), 2 /* targetIndex */, nearestNodePing);
+    }
+
+    // We expect to sync from the primary even though it is farther away, since our read preference
+    // should be set to ReadPreference::PrimaryOnly.
+    ASSERT_EQ(HostAndPort("node2:12345"), replCoord->chooseNewSyncSource(OpTime()));
+}
+
+TEST_F(ReplCoordTest, ShouldChooseNearestNodeAsSyncSourceWhenPrimaryAndChainingAllowed) {
+    // Set up a three-node replica set with chainingAllowed set to true.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id" << 2))
+                            << "settings" << BSON("chainingAllowed" << true)),
+                       HostAndPort("node1", 12345));
+
+    const auto opCtx = makeOperationContext();
+
+    // Get elected primary.
+    auto replCoord = getReplCoord();
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(
+        getReplCoord()->getElectionTimeout_forTest(), opCtx.get());
+    ASSERT(replCoord->getMemberState().primary());
+    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setTerm(1);
+    hbResp.setConfigVersion(2);
+    hbResp.setConfigTerm(1);
+
+    const OpTime lastAppliedOpTime = OpTime(Timestamp(50, 0), 1);
+    const auto now = getNet()->now();
+    hbResp.setAppliedOpTimeAndWallTime({lastAppliedOpTime, now});
+    hbResp.setDurableOpTimeAndWallTime({lastAppliedOpTime, now});
+    hbResp.setState(MemberState::RS_SECONDARY);
+
+    const auto furthestNodePing = Milliseconds(10);
+    const auto nearestNodePing = Milliseconds(5);
+
+    // We must send two heartbeats per node, so that we satisfy the 2N requirement before choosing a
+    // new sync source.
+    for (auto i = 0; i < 2; i++) {
+        replCoord->handleHeartbeatResponse_forTest(
+            hbResp.toBSON(), 1 /* targetIndex */, furthestNodePing);
+        replCoord->handleHeartbeatResponse_forTest(
+            hbResp.toBSON(), 2 /* targetIndex */, nearestNodePing);
+    }
+
+    // We expect to sync from the closest node, since our read preference should be set to
+    // ReadPreference::Nearest.
+    ASSERT_EQ(HostAndPort("node3:12345"), replCoord->chooseNewSyncSource(OpTime()));
+}
+
 // TODO(schwerin): Unit test election id updating
 }  // namespace
 }  // namespace repl

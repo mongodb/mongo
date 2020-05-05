@@ -1143,9 +1143,7 @@ void HBStepdownAndReconfigTest::sendHBResponse(int targetIndex,
         hbResp.setConfig(newConfig);
     }
 
-    BSONObjBuilder responseBuilder;
-    responseBuilder.appendElements(hbResp.toBSON());
-    replCoord->handleHeartbeatResponse_forTest(responseBuilder.obj(), targetIndex);
+    replCoord->handleHeartbeatResponse_forTest(hbResp.toBSON(), targetIndex);
 }
 
 void HBStepdownAndReconfigTest::sendHBResponseWithNewConfig() {

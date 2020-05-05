@@ -189,18 +189,12 @@ public:
      */
     void setForceSyncSourceIndex(int index);
 
-    enum class ChainingPreference { kAllowChaining, kUseConfiguration };
-
     /**
      * Chooses and sets a new sync source, based on our current knowledge of the world.
-     * If chaining is disabled in the configuration and chainingPreference is kUseConfiguration,
-     * only the primary will be selected (regardless of read preference).  Otherwise,
-     * the readPreference is respected.  Chaining disabled with SecondaryOnly read preference is
-     * not allowed.
+     * If readPreference is PrimaryOnly, only the primary will be selected.
      */
     HostAndPort chooseNewSyncSource(Date_t now,
                                     const OpTime& lastOpTimeFetched,
-                                    ChainingPreference chainingPreference,
                                     ReadPreference readPreference);
 
     /**
@@ -234,6 +228,16 @@ public:
                                 const rpc::OplogQueryMetadata& oqMetadata,
                                 const OpTime& lastOpTimeFetched,
                                 Date_t now) const;
+
+    /**
+     * Returns true if we find an eligible sync source that is considered to be within the same data
+     * center as us and our current sync source is not in the same data center as us.
+     */
+    bool shouldChangeSyncSourceDueToPingTime(const HostAndPort& currentSource,
+                                             const MemberState& memberState,
+                                             const OpTime& lastOpTimeFetched,
+                                             Date_t now,
+                                             const ReadPreference readPreference) const;
 
     /**
      * Sets the reported mode of this node to one of RS_SECONDARY, RS_STARTUP2, RS_ROLLBACK or
@@ -775,6 +779,11 @@ public:
      */
     void populateAllMembersConfigVersionAndTerm_forTest();
 
+    /**
+     * Records the ping for the given host. For use only in testing.
+     */
+    void setPing_forTest(const HostAndPort& host, const Milliseconds ping);
+
     // Returns _electionTime.  Only used in unittests.
     Timestamp getElectionTime() const;
 
@@ -835,9 +844,6 @@ private:
     // Set what type of PRIMARY this node currently is.
     void _setLeaderMode(LeaderMode mode);
 
-    // Returns the number of heartbeat pings which have occurred.
-    int _getTotalPings();
-
     // Does preliminary checks involved in choosing sync source
     // * Do we have a valid configuration?
     // * Do we have a forced sync source?
@@ -857,7 +863,18 @@ private:
                                         const OpTime& lastOpTimeFetched,
                                         ReadPreference readPreference);
 
-    // Returns the current "ping" value for the given member by their address
+    // Returns the oldest acceptable OpTime that a node must have for us to choose it as our sync
+    // source.
+    const OpTime _getOldestSyncOpTime() const;
+
+    // Returns true if the candidate node is viable as our sync source.
+    bool _isEligibleSyncSource(int candidateIndex,
+                               Date_t now,
+                               const OpTime& lastOpTimeFetched,
+                               ReadPreference readPreference,
+                               bool firstAttempt) const;
+
+    // Returns the current "ping" value for the given member by their address.
     Milliseconds _getPing(const HostAndPort& host);
 
     // Returns the index of the member with the matching id, or -1 if none match.
@@ -1081,6 +1098,11 @@ public:
      * were spent for a single network roundtrip plus remote processing time.
      */
     void hit(Milliseconds millis);
+
+    /**
+     * Sets the ping time without considering previous pings. For use only in testing.
+     */
+    void set_forTest(Milliseconds millis);
 
     /**
      * Records that a heartbeat request failed.

@@ -444,7 +444,9 @@ public:
     void cleanupStableOpTimeCandidates_forTest(std::set<OpTimeAndWallTime>* candidates,
                                                OpTimeAndWallTime stableOpTime);
     std::set<OpTimeAndWallTime> getStableOpTimeCandidates_forTest();
-    void handleHeartbeatResponse_forTest(BSONObj response, int targetIndex);
+    void handleHeartbeatResponse_forTest(BSONObj response,
+                                         int targetIndex,
+                                         Milliseconds ping = Milliseconds(100));
 
     /**
      * Non-blocking version of updateTerm.
@@ -1448,6 +1450,11 @@ private:
     void _reconfigToRemoveNewlyAddedField(const executor::TaskExecutor::CallbackArgs& cbData,
                                           MemberId memberId,
                                           ConfigVersionAndTerm versionAndTerm);
+
+    /*
+     * Calculates and returns the read preference for the node.
+     */
+    const ReadPreference _getSyncSourceReadPreference(WithLock);
 
     //
     // All member variables are labeled with one of the following codes indicating the

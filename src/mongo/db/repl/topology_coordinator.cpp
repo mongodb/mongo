@@ -55,6 +55,7 @@
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
@@ -158,6 +159,12 @@ void TopologyCoordinator::PingStats::hit(Milliseconds millis) {
         : Milliseconds((averagePingTimeMs * 4 + millis) / 5);
 }
 
+void TopologyCoordinator::PingStats::set_forTest(Milliseconds millis) {
+    _state = HeartbeatState::SUCCEEDED;
+
+    averagePingTimeMs = millis;
+}
+
 void TopologyCoordinator::PingStats::miss() {
     ++_numFailuresSinceLastStart;
     // Transition to 'FAILED' state if this was our last retry.
@@ -201,7 +208,6 @@ HostAndPort TopologyCoordinator::getSyncSourceAddress() const {
 
 HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                                                      const OpTime& lastOpTimeFetched,
-                                                     ChainingPreference chainingPreference,
                                                      ReadPreference readPreference) {
     // Check to make sure we can choose a sync source, and choose a forced one if
     // set.
@@ -212,14 +218,7 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
     }
 
     // If we are only allowed to sync from the primary, use it as the sync source if possible.
-    if (readPreference == ReadPreference::PrimaryOnly ||
-        (chainingPreference == ChainingPreference::kUseConfiguration &&
-         !_rsConfig.isChainingAllowed())) {
-        if (readPreference == ReadPreference::SecondaryOnly) {
-            LOGV2_FATAL(
-                3873103,
-                "Sync source read preference 'secondaryOnly' with chaining disabled is not valid.");
-        }
+    if (readPreference == ReadPreference::PrimaryOnly) {
         _syncSource = _choosePrimaryAsSyncSource(now, lastOpTimeFetched);
         if (_syncSource.empty()) {
             if (readPreference == ReadPreference::PrimaryOnly) {
@@ -254,24 +253,6 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
 
     // find the member with the lowest ping time that is ahead of me
 
-    // choose a time that will exclude no candidates by default, in case we don't see a primary
-    OpTime oldestSyncOpTime;
-
-    // Find primary's oplog time. Reject sync candidates that are more than
-    // _options.maxSyncSourceLagSecs seconds behind.
-    if (_currentPrimaryIndex != -1) {
-        OpTime primaryOpTime = _memberData.at(_currentPrimaryIndex).getHeartbeatAppliedOpTime();
-
-        // Check if primaryOpTime is still close to 0 because we haven't received
-        // our first heartbeat from a new primary yet.
-        unsigned int maxLag =
-            static_cast<unsigned int>(durationCount<Seconds>(_options.maxSyncSourceLagSecs));
-        if (primaryOpTime.getSecs() >= maxLag) {
-            oldestSyncOpTime =
-                OpTime(Timestamp(primaryOpTime.getSecs() - maxLag, 0), primaryOpTime.getTerm());
-        }
-    }
-
     int closestIndex = -1;
 
     // Make two attempts, with less restrictive rules the second time.
@@ -283,130 +264,35 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
     //
     // This loop attempts to set 'closestIndex', to select a viable candidate.
     for (int attempts = 0; attempts < 2; ++attempts) {
-        for (std::vector<MemberData>::const_iterator it = _memberData.begin();
-             it != _memberData.end();
-             ++it) {
-            const int itIndex = indexOfIterator(_memberData, it);
-            // Don't consider ourselves.
-            if (itIndex == _selfIndex) {
+        for (size_t candidateIndex = 0; candidateIndex < _memberData.size(); candidateIndex++) {
+            if (!_isEligibleSyncSource(candidateIndex,
+                                       now,
+                                       lastOpTimeFetched,
+                                       readPreference,
+                                       attempts == 0 /* firstAttempt */)) {
+                // Node is not a viable sync source candidate.
                 continue;
             }
 
-            const MemberConfig& itMemberConfig(_rsConfig.getMemberAt(itIndex));
-
-            // Candidate must be up to be considered.
-            if (!it->up()) {
-                LOGV2_DEBUG(3873106,
-                            2,
-                            "Cannot select sync source because it is not up.",
-                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
-                continue;
-            }
-            // Candidate must be PRIMARY or SECONDARY state to be considered.
-            if (!it->getState().readable()) {
-                LOGV2_DEBUG(3873107,
-                            2,
-                            "Cannot select sync source because it is not readable.",
-                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
+            // Set 'closestIndex' if this node is the first viable candidate we have encountered.
+            if (closestIndex == -1) {
+                closestIndex = candidateIndex;
                 continue;
             }
 
-            // Disallow the primary for first or all attempts depending on the readPreference.
-            if (readPreference == ReadPreference::SecondaryOnly ||
-                (readPreference == ReadPreference::SecondaryPreferred && attempts == 0)) {
-                if (it->getState().primary()) {
-                    LOGV2_DEBUG(3873101,
-                                2,
-                                "Cannot select sync source because it is a primary and we are "
-                                "looking for a secondary.",
-                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
-                    continue;
-                }
-            }
+            const auto syncSourceCandidate = _rsConfig.getMemberAt(candidateIndex).getHostAndPort();
+            const auto closestNode = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
 
-            // On the first attempt, we skip candidates that do not match these criteria.
-            if (attempts == 0) {
-                // Candidate must be a voter if we are a voter.
-                if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
-                    LOGV2_DEBUG(3873108,
-                                2,
-                                "Cannot select sync source because we are a voter and it is not.",
-                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
-                    continue;
-                }
-                // Candidates must not be hidden.
-                if (itMemberConfig.isHidden()) {
-                    LOGV2_DEBUG(3873109,
-                                2,
-                                "Cannot select sync source because it is hidden.",
-                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
-                    continue;
-                }
-                // Candidates cannot be excessively behind.
-                if (it->getHeartbeatAppliedOpTime() < oldestSyncOpTime) {
-                    LOGV2_DEBUG(3873110,
-                                2,
-                                "Cannot select sync source because it is too far behind.",
-                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort(),
-                                "syncSourceCandidateOpTime"_attr = it->getHeartbeatAppliedOpTime(),
-                                "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
-                    continue;
-                }
-                // Candidate must not have a configured delay larger than ours.
-                if (_selfConfig().getSlaveDelay() < itMemberConfig.getSlaveDelay()) {
-                    LOGV2_DEBUG(3873111,
-                                2,
-                                "Cannot select sync source with larger slaveDelay than ours.",
-                                "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort(),
-                                "syncSourceCandidateSlaveDelay"_attr =
-                                    itMemberConfig.getSlaveDelay(),
-                                "slaveDelay"_attr = _selfConfig().getSlaveDelay());
-                    continue;
-                }
-            }
-            // Candidate must build indexes if we build indexes, to be considered.
-            if (_selfConfig().shouldBuildIndexes()) {
-                if (!itMemberConfig.shouldBuildIndexes()) {
-                    LOGV2_DEBUG(
-                        3873112,
-                        2,
-                        "Cannot select sync source which does not build indexes when we do.",
-                        "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
-                    continue;
-                }
-            }
-            // Only select a candidate that is ahead of me.
-            if (it->getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
-                LOGV2_DEBUG(3873113,
-                            1,
-                            "Cannot select sync source which is not ahead of me.",
-                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort(),
-                            "syncSourceCandidateLastAppliedOpTime"_attr =
-                                it->getHeartbeatAppliedOpTime().toBSON(),
-                            "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
-                continue;
-            }
-            // Candidate cannot be more latent than anything we've already considered.
-            if ((closestIndex != -1) &&
-                (_getPing(itMemberConfig.getHostAndPort()) >
-                 _getPing(_rsConfig.getMemberAt(closestIndex).getHostAndPort()))) {
+            // Do not update 'closestIndex' if the candidate is not the closest node we've seen.
+            if (_getPing(syncSourceCandidate) > _getPing(closestNode)) {
                 LOGV2_DEBUG(3873114,
                             2,
                             "Cannot select sync source with higher latency than the best "
                             "candidate",
-                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
+                            "syncSourceCandidate"_attr = syncSourceCandidate);
                 continue;
             }
-            // Candidate cannot be blacklisted.
-            if (_memberIsBlacklisted(itMemberConfig, now)) {
-                LOGV2_DEBUG(3873115,
-                            1,
-                            "Cannot select sync source which is blacklisted.",
-                            "syncSourceCandidate"_attr = itMemberConfig.getHostAndPort());
-                continue;
-            }
-            // This candidate has passed all tests; set 'closestIndex'
-            closestIndex = itIndex;
+            closestIndex = candidateIndex;
         }
         if (closestIndex != -1)
             break;  // no need for second attempt
@@ -430,6 +316,144 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
     setMyHeartbeatMessage(now, msg);
     return _syncSource;
 }
+
+const OpTime TopologyCoordinator::_getOldestSyncOpTime() const {
+    OpTime oldestSyncOpTime = OpTime();
+
+    // Find primary's oplog time. We will reject sync candidates that are more than
+    // _options.maxSyncSourceLagSecs seconds behind this optime.
+    if (_currentPrimaryIndex != -1) {
+        OpTime primaryOpTime = _memberData.at(_currentPrimaryIndex).getHeartbeatAppliedOpTime();
+
+        // Check if primaryOpTime is still close to 0 because we haven't received
+        // our first heartbeat from a new primary yet.
+        auto maxLag =
+            static_cast<unsigned int>(durationCount<Seconds>(_options.maxSyncSourceLagSecs));
+        if (primaryOpTime.getSecs() >= maxLag) {
+            oldestSyncOpTime =
+                OpTime(Timestamp(primaryOpTime.getSecs() - maxLag, 0), primaryOpTime.getTerm());
+        }
+    }
+    return oldestSyncOpTime;
+}
+
+bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
+                                                Date_t now,
+                                                const OpTime& lastOpTimeFetched,
+                                                ReadPreference readPreference,
+                                                const bool firstAttempt) const {
+    // Don't consider ourselves.
+    if (candidateIndex == _selfIndex) {
+        return false;
+    }
+
+    const MemberConfig& memberConfig(_rsConfig.getMemberAt(candidateIndex));
+    const auto syncSourceCandidate = memberConfig.getHostAndPort();
+    const auto memberData = _memberData[candidateIndex];
+
+    // Candidate must be up to be considered.
+    if (!memberData.up()) {
+        LOGV2_DEBUG(3873106,
+                    2,
+                    "Cannot select sync source because it is not up",
+                    "syncSourceCandidate"_attr = syncSourceCandidate);
+        return false;
+    }
+    // Candidate must be PRIMARY or SECONDARY state to be considered.
+    if (!memberData.getState().readable()) {
+        LOGV2_DEBUG(3873107,
+                    2,
+                    "Cannot select sync source because it is not readable",
+                    "syncSourceCandidate"_attr = syncSourceCandidate);
+        return false;
+    }
+
+    // Disallow the primary for first or all attempts depending on the readPreference.
+    if (readPreference == ReadPreference::SecondaryOnly ||
+        (readPreference == ReadPreference::SecondaryPreferred && firstAttempt)) {
+        if (memberData.getState().primary()) {
+            LOGV2_DEBUG(3873101,
+                        2,
+                        "Cannot select sync source because it is a primary and we are "
+                        "looking for a secondary",
+                        "syncSourceCandidate"_attr = syncSourceCandidate);
+            return false;
+        }
+    }
+
+    // On the first attempt, we skip candidates that do not match these criteria.
+    if (firstAttempt) {
+        // Candidate must be a voter if we are a voter.
+        if (_selfConfig().isVoter() && !memberConfig.isVoter()) {
+            LOGV2_DEBUG(3873108,
+                        2,
+                        "Cannot select sync source because we are a voter and it is not",
+                        "syncSourceCandidate"_attr = syncSourceCandidate);
+            return false;
+        }
+        // Candidates must not be hidden.
+        if (memberConfig.isHidden()) {
+            LOGV2_DEBUG(3873109,
+                        2,
+                        "Cannot select sync source because it is hidden",
+                        "syncSourceCandidate"_attr = syncSourceCandidate);
+            return false;
+        }
+        // Candidates cannot be excessively behind.
+        const auto oldestSyncOpTime = _getOldestSyncOpTime();
+        if (memberData.getHeartbeatAppliedOpTime() < oldestSyncOpTime) {
+            LOGV2_DEBUG(3873110,
+                        2,
+                        "Cannot select sync source because it is too far behind",
+                        "syncSourceCandidate"_attr = syncSourceCandidate,
+                        "syncSourceCandidateOpTime"_attr = memberData.getHeartbeatAppliedOpTime(),
+                        "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
+            return false;
+        }
+        // Candidate must not have a configured delay larger than ours.
+        if (_selfConfig().getSlaveDelay() < memberConfig.getSlaveDelay()) {
+            LOGV2_DEBUG(3873111,
+                        2,
+                        "Cannot select sync source with larger slaveDelay than ours",
+                        "syncSourceCandidate"_attr = syncSourceCandidate,
+                        "syncSourceCandidateSlaveDelay"_attr = memberConfig.getSlaveDelay(),
+                        "slaveDelay"_attr = _selfConfig().getSlaveDelay());
+            return false;
+        }
+    }
+    // Candidate must build indexes if we build indexes, to be considered.
+    if (_selfConfig().shouldBuildIndexes()) {
+        if (!memberConfig.shouldBuildIndexes()) {
+            LOGV2_DEBUG(3873112,
+                        2,
+                        "Cannot select sync source which does not build indexes when we do",
+                        "syncSourceCandidate"_attr = syncSourceCandidate);
+            return false;
+        }
+    }
+    // Only select a candidate that is ahead of me.
+    if (memberData.getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
+        LOGV2_DEBUG(3873113,
+                    1,
+                    "Cannot select sync source which is not ahead of me",
+                    "syncSourceCandidate"_attr = syncSourceCandidate,
+                    "syncSourceCandidateLastAppliedOpTime"_attr =
+                        memberData.getHeartbeatAppliedOpTime().toBSON(),
+                    "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
+        return false;
+    }
+    // Candidate cannot be blacklisted.
+    if (_memberIsBlacklisted(memberConfig, now)) {
+        LOGV2_DEBUG(3873115,
+                    1,
+                    "Cannot select sync source which is blacklisted",
+                    "syncSourceCandidate"_attr = syncSourceCandidate);
+        return false;
+    }
+    // This candidate has passed all tests.
+    return true;
+}
+
 
 boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(Date_t now) {
     // If we are not a member of the current replica set configuration, no sync source is valid.
@@ -2356,19 +2380,13 @@ Milliseconds TopologyCoordinator::_getPing(const HostAndPort& host) {
     return _pings[host].getMillis();
 }
 
-void TopologyCoordinator::_setElectionTime(const Timestamp& newElectionTime) {
-    _electionTime = newElectionTime;
+void TopologyCoordinator::setPing_forTest(const HostAndPort& host, const Milliseconds ping) {
+    PingStats& pingStats = _pings[host];
+    pingStats.set_forTest(ping);
 }
 
-int TopologyCoordinator::_getTotalPings() {
-    PingMap::iterator it = _pings.begin();
-    PingMap::iterator end = _pings.end();
-    int totalPings = 0;
-    while (it != end) {
-        totalPings += it->second.getCount();
-        it++;
-    }
-    return totalPings;
+void TopologyCoordinator::_setElectionTime(const Timestamp& newElectionTime) {
+    _electionTime = newElectionTime;
 }
 
 bool TopologyCoordinator::isSteppingDownUnconditionally() const {
@@ -2963,6 +2981,79 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
         }
     }
 
+    return false;
+}
+
+bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(
+    const HostAndPort& currentSource,
+    const MemberState& memberState,
+    const OpTime& lastOpTimeFetched,
+    Date_t now,
+    const ReadPreference readPreference) const {
+    // If the ping time for currentSource is longer than 'changeSyncSourceThresholdMillis' and we
+    // find an eligible sync source that has a ping time shorter than
+    // 'changeSyncSourceThresholdMillis', return true.
+
+    // If we are in initial sync, do not re-evaluate our sync source.
+    const bool nodeInInitialSync = (memberState.startup() || memberState.startup2());
+    if (nodeInInitialSync) {
+        return false;
+    }
+
+    const bool primaryOnly = (readPreference == ReadPreference::PrimaryOnly);
+    const bool primaryPreferredAndAlreadySyncing =
+        (readPreference == ReadPreference::PrimaryPreferred &&
+         (currentSource == getCurrentPrimaryMember()->getHostAndPort()));
+
+    if (primaryOnly || primaryPreferredAndAlreadySyncing) {
+        return false;
+    }
+
+    const auto changeSyncSourceThreshold = changeSyncSourceThresholdMillis.load();
+    // If the threshold is set to zero, do not consider changing sync sources due to ping time.
+    if (changeSyncSourceThreshold == 0LL) {
+        return false;
+    }
+
+    if (_pings.count(currentSource) == 0) {
+        // Ping data for our current sync source could not be found.
+        return false;
+    }
+
+    const auto syncSourcePingTime =
+        durationCount<Milliseconds>(_pings.at(currentSource).getMillis());
+    if (syncSourcePingTime <= changeSyncSourceThreshold) {
+        return false;
+    }
+
+    // Look for another viable sync source that has ping times under the threshold.
+    for (size_t candidateIndex = 0; candidateIndex < _memberData.size(); candidateIndex++) {
+        const auto candidateNode = _memberData[candidateIndex].getHostAndPort();
+        if (_pings.count(candidateNode) == 0) {
+            // Ping data for the candidateNode could not be found. Continue to the next node.
+            continue;
+        }
+
+        const auto candidateSyncSourcePingTime =
+            durationCount<Milliseconds>(_pings.at(candidateNode).getMillis());
+        if (candidateSyncSourcePingTime > changeSyncSourceThreshold) {
+            // No need to proceed with verifying that the candidate node is eligible to be our
+            // sync source, since the node's ping time is also over the threshold.
+            continue;
+        }
+
+        if (_isEligibleSyncSource(
+                candidateIndex, now, lastOpTimeFetched, readPreference, true /* firstAttempt */)) {
+            LOGV2(4744901,
+                  "Choosing new sync source because the ping time of our sync source is longer "
+                  "than our accepted threshold and we have found another potential sync source "
+                  "with a ping time under the threshold",
+                  "syncSourcePingTime"_attr = syncSourcePingTime,
+                  "changeSyncSourceThreshold"_attr = changeSyncSourceThreshold,
+                  "candidateNode"_attr = candidateNode);
+            return true;
+        }
+    }
     return false;
 }
 
