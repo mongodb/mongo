@@ -152,14 +152,6 @@ public:
                                 const CollectionType& coll,
                                 bool expectUpsert = true);
 
-    /**
-     * Expects a setShardVersion command to be executed on the specified shard.
-     */
-    void expectSetShardVersion(const HostAndPort& expectedHost,
-                               const ShardType& expectedShard,
-                               const NamespaceString& expectedNs,
-                               const ChunkVersion& expectedChunkVersion);
-
     void shutdownExecutor();
 
     void setRemote(const HostAndPort& remote);

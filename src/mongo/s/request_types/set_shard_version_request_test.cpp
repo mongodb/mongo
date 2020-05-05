@@ -112,7 +112,8 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
                            << "db.coll"
-                           << "forceRefresh" << false << "authoritative" << false << "version"
+                           << "forceRefresh" << false << "authoritative" << false
+                           << "noConnectionVersioning" << true << "version"
                            << Timestamp(chunkVersion.toLong()) << "versionEpoch"
                            << chunkVersion.epoch()));
 }
@@ -130,7 +131,8 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
                            << "db.coll"
-                           << "forceRefresh" << false << "authoritative" << true << "version"
+                           << "forceRefresh" << false << "authoritative" << true
+                           << "noConnectionVersioning" << true << "version"
                            << Timestamp(chunkVersion.toLong()) << "versionEpoch"
                            << chunkVersion.epoch()));
 }
@@ -148,7 +150,8 @@ TEST(SetShardVersionRequest, ToSSVCommandFullForceRefresh) {
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
                            << "db.coll"
-                           << "forceRefresh" << true << "authoritative" << false << "version"
+                           << "forceRefresh" << true << "authoritative" << false
+                           << "noConnectionVersioning" << true << "version"
                            << Timestamp(chunkVersion.toLong()) << "versionEpoch"
                            << chunkVersion.epoch()));
 }

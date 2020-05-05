@@ -45,6 +45,8 @@ namespace {
 const char kCmdName[] = "setShardVersion";
 const char kForceRefresh[] = "forceRefresh";
 const char kAuthoritative[] = "authoritative";
+const char kNoConnectionVersioning[] =
+    "noConnectionVersioning";  // TODO (SERVER-47956): Remove after 4.6 is released
 
 }  // namespace
 
@@ -102,6 +104,18 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
         request._version = versionStatus.getValue();
     }
 
+    {
+        bool noConnectionVersioning;
+        Status status = bsonExtractBooleanFieldWithDefault(
+            cmdObj, kNoConnectionVersioning, true, &noConnectionVersioning);
+        if (!status.isOK())
+            return status;
+        if (!noConnectionVersioning)
+            return {ErrorCodes::Error(47841),
+                    "This is a request with noConnectionVersioning:false, which means it comes "
+                    "from an older version of the server and is not supported."};
+    }
+
     return request;
 }
 
@@ -111,6 +125,7 @@ BSONObj SetShardVersionRequest::toBSON() const {
     cmdBuilder.append(kCmdName, _nss.get().ns());
     cmdBuilder.append(kForceRefresh, _forceRefresh);
     cmdBuilder.append(kAuthoritative, _isAuthoritative);
+    cmdBuilder.append(kNoConnectionVersioning, true);
 
     _version->appendLegacyWithField(&cmdBuilder, kVersion);
 
