@@ -179,8 +179,10 @@ private:
 };
 
 TEST(R2RegionCoverer, RandomCells) {
-    GeoHashConverter converter(getConverterParams());
-    R2RegionCoverer coverer(&converter);
+    auto result = GeoHashConverter::createFromParams(getConverterParams());
+    ASSERT_OK(result.getStatus());
+
+    R2RegionCoverer coverer(std::move(result.getValue()));
     coverer.setMaxCells(1);
     // Test random cell ids at all levels.
     for (int i = 0; i < 10000; ++i) {
@@ -188,7 +190,7 @@ TEST(R2RegionCoverer, RandomCells) {
             random(std::numeric_limits<long long>::lowest(), std::numeric_limits<long long>::max()),
             random(0U, GeoHash::kMaxBits));
         vector<GeoHash> covering;
-        Box box = converter.unhashToBoxCovering(id);
+        Box box = coverer.getHashConverter().unhashToBoxCovering(id);
         // Since the unhashed box is expanded by the error 8Mu, we need to shrink it.
         box.fudge(-GeoHashConverter::kMachinePrecision * MAXBOUND * 20);
         HashBoxRegion region(box);
@@ -288,8 +290,10 @@ GeometryContainer* getRandomCircle(double radius) {
 
 // Test the covering for arbitrary random circle.
 TEST(R2RegionCoverer, RandomCircles) {
-    GeoHashConverter converter(getConverterParams());
-    R2RegionCoverer coverer(&converter);
+    auto result = GeoHashConverter::createFromParams(getConverterParams());
+    ASSERT_OK(result.getStatus());
+
+    R2RegionCoverer coverer(std::move(result.getValue()));
     coverer.setMaxCells(8);
 
     for (int i = 0; i < 1000; i++) {
@@ -305,14 +309,16 @@ TEST(R2RegionCoverer, RandomCircles) {
 
         vector<GeoHash> covering;
         coverer.getCovering(region, &covering);
-        checkCovering(converter, region, coverer, covering);
+        checkCovering(coverer.getHashConverter(), region, coverer, covering);
     }
 }
 
 // Test the covering for very small circles, since the above test doesn't cover finest cells.
 TEST(R2RegionCoverer, RandomTinyCircles) {
-    GeoHashConverter converter(getConverterParams());
-    R2RegionCoverer coverer(&converter);
+    auto result = GeoHashConverter::createFromParams(getConverterParams());
+    ASSERT_OK(result.getStatus());
+
+    R2RegionCoverer coverer(std::move(result.getValue()));
     coverer.setMaxCells(random(1, 20));  // [1, 20]
 
     for (int i = 0; i < 10000; i++) {
@@ -328,7 +334,7 @@ TEST(R2RegionCoverer, RandomTinyCircles) {
 
         vector<GeoHash> covering;
         coverer.getCovering(region, &covering);
-        checkCovering(converter, region, coverer, covering);
+        checkCovering(coverer.getHashConverter(), region, coverer, covering);
     }
 }
 

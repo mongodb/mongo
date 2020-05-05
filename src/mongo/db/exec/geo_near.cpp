@@ -245,13 +245,13 @@ static R2Annulus twoDDistanceBounds(const GeoNearParams& nearParams,
     const CRS queryCRS = nearParams.nearQuery->centroid->crs;
 
     if (FLAT == queryCRS) {
-        // Reset the full bounds based on our index bounds
-        GeoHashConverter::Parameters hashParams;
-        Status status = GeoHashConverter::parseParameters(twoDIndex->infoObj(), &hashParams);
-        invariantStatusOK(status);  // The index status should always be valid
+        // Reset the full bounds based on our index bounds.
+        // The index status should always be valid.
+        auto result = invariantStatusOK(GeoHashConverter::createFromDoc(twoDIndex->infoObj()));
 
         // The biggest distance possible in this indexed collection is the diagonal of the
         // square indexed region.
+        const GeoHashConverter::Parameters& hashParams = result->getParams();
         const double sqrt2Approx = 1.5;
         const double diagonalDist = sqrt2Approx * (hashParams.max - hashParams.min);
 
@@ -272,18 +272,16 @@ GeoNear2DStage::DensityEstimator::DensityEstimator(PlanStage::Children* children
                                                    const GeoNearParams* nearParams,
                                                    const R2Annulus& fullBounds)
     : _children(children), _nearParams(nearParams), _fullBounds(fullBounds), _currentLevel(0) {
-    GeoHashConverter::Parameters hashParams;
-    Status status = GeoHashConverter::parseParameters(std::move(infoObj), &hashParams);
     // The index status should always be valid.
-    invariantStatusOK(status);
+    auto result = invariantStatusOK(GeoHashConverter::createFromDoc(std::move(infoObj)));
 
-    _converter.reset(new GeoHashConverter(hashParams));
+    _converter = std::move(result);
     _centroidCell = _converter->hash(_nearParams->nearQuery->centroid->oldPoint);
 
     // Since appendVertexNeighbors(level, output) requires level < hash.getBits(),
     // we have to start to find documents at most GeoHash::kMaxBits - 1. Thus the finest
     // search area is 16 * finest cell area at GeoHash::kMaxBits.
-    _currentLevel = std::max(0, hashParams.bits - 1);
+    _currentLevel = std::max(0, _converter->getParams().bits - 1);
 }
 
 // Initialize the internal states
@@ -539,15 +537,13 @@ private:
 
 static double min2DBoundsIncrement(const GeoNearExpression& query,
                                    const IndexDescriptor* twoDIndex) {
-    GeoHashConverter::Parameters hashParams;
-    Status status = GeoHashConverter::parseParameters(twoDIndex->infoObj(), &hashParams);
-    invariantStatusOK(status);  // The index status should always be valid
-    GeoHashConverter hasher(hashParams);
+    // The index status should always be valid.
+    auto result = invariantStatusOK(GeoHashConverter::createFromDoc(twoDIndex->infoObj()));
 
     // The hasher error is the diagonal of a 2D hash region - it's generally not helpful
     // to change region size such that a search radius is smaller than the 2D hash region
     // max radius.  This is slightly conservative for now (box diagonal vs circle radius).
-    double minBoundsIncrement = hasher.getError() / 2;
+    const double minBoundsIncrement = result->getError() / 2;
 
     const CRS queryCRS = query.centroid->crs;
     if (FLAT == queryCRS)
@@ -697,9 +693,7 @@ GeoNear2DStage::nextInterval(OperationContext* opCtx,
                                      &scanParams.bounds.fields[twoDFieldPosition]);
 
     // These parameters are stored by the index, and so must be ok
-    GeoHashConverter::Parameters hashParams;
-    GeoHashConverter::parseParameters(indexDescriptor()->infoObj(), &hashParams)
-        .transitional_ignore();
+    invariantStatusOK(GeoHashConverter::createFromDoc(indexDescriptor()->infoObj()));
 
     // 2D indexes support covered search over additional fields they contain
     auto scan = std::make_unique<IndexScan>(expCtx(), scanParams, workingSet, _nearParams.filter);

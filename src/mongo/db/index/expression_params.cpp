@@ -48,25 +48,23 @@ void ExpressionParams::parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParam
     while (i.more()) {
         BSONElement e = i.next();
         if (e.type() == String && IndexNames::GEO_2D == e.valuestr()) {
-            uassert(16800, "can't have 2 geo fields", out->geo.size() == 0);
-            uassert(16801, "2d has to be first in index", out->other.size() == 0);
+            uassert(16800, "can't have 2 geo fields", out->geo.empty());
+            uassert(16801, "2d has to be first in index", out->other.empty());
             out->geo = e.fieldName();
         } else {
             int order = 1;
             if (e.isNumber()) {
                 order = static_cast<int>(e.Number());
             }
-            out->other.push_back(std::make_pair(e.fieldName(), order));
+            out->other.emplace_back(e.fieldName(), order);
         }
     }
 
     uassert(16802, "no geo field specified", out->geo.size());
 
-    GeoHashConverter::Parameters hashParams;
-    Status paramStatus = GeoHashConverter::parseParameters(infoObj, &hashParams);
-    uassertStatusOK(paramStatus);
-
-    out->geoHashConverter.reset(new GeoHashConverter(hashParams));
+    auto result = GeoHashConverter::createFromDoc(infoObj);
+    uassertStatusOK(result.getStatus());
+    out->geoHashConverter.reset(result.getValue().release());
 }
 
 void ExpressionParams::parseHashParams(const BSONObj& infoObj,
