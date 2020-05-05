@@ -80,8 +80,6 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     }
     if (_configVersion != -1) {
         *builder << kConfigVersionFieldName << _configVersion;
-    }
-    if (_configTerm != OpTime::kUninitializedTerm) {
         *builder << kConfigTermFieldName << _configTerm;
     }
     if (!_setName.empty()) {
