@@ -348,6 +348,8 @@ Status _collModInternal(OperationContext* opCtx,
     auto viewOn = cmrNew.viewOn;
     auto indexExpireAfterSeconds = cmrNew.indexExpireAfterSeconds;
     auto indexHidden = cmrNew.indexHidden;
+    // WriteConflictExceptions thrown in the writeConflictRetry loop below can cause cmrNew.idx to
+    // become invalid, so save a copy to use in the loop until we can refresh it.
     auto idx = cmrNew.idx;
 
     if (indexHidden) {
@@ -436,7 +438,7 @@ Status _collModInternal(OperationContext* opCtx,
                                                           : Seconds(oldExpireSecs.safeNumberLong()),
                                  !indexHidden ? boost::optional<bool>() : newHidden.booleanSafe(),
                                  !indexHidden ? boost::optional<bool>() : oldHidden.booleanSafe(),
-                                 cmrNew.idx->indexName()};
+                                 idx->indexName()};
 
             // Notify the index catalog that the definition of this index changed. This will
             // invalidate the local idx pointer. On rollback of this WUOW, the idx pointer in
