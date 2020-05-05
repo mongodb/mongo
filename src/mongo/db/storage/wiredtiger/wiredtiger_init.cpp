@@ -112,15 +112,13 @@ public:
             }
         }
         const bool ephemeral = false;
-        const auto maxCacheOverflowMB =
-            static_cast<size_t>(1024 * wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB);
         WiredTigerKVEngine* kv =
             new WiredTigerKVEngine(getCanonicalName().toString(),
                                    params.dbpath,
                                    getGlobalServiceContext()->getFastClockSource(),
                                    wiredTigerGlobalOptions.engineConfig,
                                    cacheMB,
-                                   maxCacheOverflowMB,
+                                   wiredTigerGlobalOptions.getMaxHistoryFileSizeMB(),
                                    params.dur,
                                    ephemeral,
                                    params.repair,
