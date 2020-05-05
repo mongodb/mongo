@@ -1048,19 +1048,11 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     invariant(oplog);
     invariant(opCtx->lockState()->isLocked());
 
-    // Using a YieldPolicy WRITE_CONFLICT_RETRY_ONLY that will allow query to retry on
-    // WriteConflictExceptions without releasing locks that are important to callers.
-    //
-    // This read can run concurrently with the validate cmd's WT verify operation due to the special
-    // locking rules for internal operations accessing the oplog collection. Validate holds a MODE_X
-    // collection lock for WT verify, but an internal read only needs a MODE_IS global lock. Trying
-    // to open a cursor on a collection that has a verify operation running produces an EBUSY error
-    // that we then convert to a WCE.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
         InternalPlanner::collectionScan(opCtx,
                                         NamespaceString::kRsOplogNamespace.ns(),
                                         oplog,
-                                        PlanExecutor::WRITE_CONFLICT_RETRY_ONLY,
+                                        PlanExecutor::NO_YIELD,
                                         InternalPlanner::BACKWARD);
 
     // A record id in the oplog collection is equivalent to the document's timestamp field.
@@ -1080,6 +1072,41 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     }
 
     return boost::none;
+}
+
+boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+    OperationContext* opCtx, Collection* oplogCollection, const Timestamp& timestamp) {
+    // Oplog reads are specially done under only MODE_IS global locks, without database or
+    // collection level intent locks. Therefore, reads can run concurrently with validate cmds that
+    // take collection MODE_X locks. Validate with {full:true} set calls WT::verify on the
+    // collection, which causes concurrent readers to hit WT EBUSY errors that MongoDB converts
+    // into WriteConflictException errors.
+    //
+    // Consequently, this code must be resilient to WCE errors and retry until the validate cmd
+    // finishes. The greater operation using this helper cannot simply fail because it would cause
+    // correctness errors.
+
+    int retries = 0;
+    while (true) {
+        try {
+            return findOplogEntryLessThanOrEqualToTimestamp(opCtx, oplogCollection, timestamp);
+        } catch (const WriteConflictException&) {
+            // This will log a message about the conflict initially and then every 5 seconds, with
+            // the current rather arbitrary settings.
+            if (retries % 10 == 0) {
+                LOGV2(47959000,
+                      "Reading the oplog collection conflicts with a validate cmd. Continuing to "
+                      "retry.",
+                      "retries"_attr = retries);
+            }
+
+            ++retries;
+
+            // Sleep a bit so we do not keep hammering the system with retries while the validate
+            // cmd finishes.
+            opCtx->sleepFor(Milliseconds(500));
+        }
+    }
 }
 
 Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx) {

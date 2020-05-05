@@ -320,6 +320,17 @@ public:
         OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) = 0;
 
     /**
+     * Calls findOplogEntryLessThanOrEqualToTimestamp with endless WriteConflictException retries.
+     * Other errors get thrown. Concurrent oplog reads with the validate cmd on the same collection
+     * may throw WCEs. Obeys opCtx interrupts.
+     *
+     * Call this function instead of findOplogEntryLessThanOrEqualToTimestamp if the caller cannot
+     * fail, say for correctness.
+     */
+    virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) = 0;
+
+    /**
      * Fetches the latest oplog entry's timestamp. Bypasses the oplog visibility rules.
      */
     virtual Timestamp getLatestOplogTimestamp(OperationContext* opCtx) = 0;

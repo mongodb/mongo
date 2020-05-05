@@ -267,6 +267,11 @@ public:
         return boost::none;
     }
 
+    boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) override {
+        return boost::none;
+    }
+
     Timestamp getLatestOplogTimestamp(OperationContext* opCtx) override {
         return Timestamp();
     }

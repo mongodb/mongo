@@ -506,8 +506,9 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // Fetch the oplog entry <= timestamp. all_durable may be set to a value between oplog entries.
     // We need an oplog entry in order to return term and wallclock time for an OpTimeAndWallTime
     // result.
-    auto truncateOplogEntryBSON = _storageInterface->findOplogEntryLessThanOrEqualToTimestamp(
-        opCtx, oplogRead.getCollection(), truncateTimestamp);
+    auto truncateOplogEntryBSON =
+        _storageInterface->findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+            opCtx, oplogRead.getCollection(), truncateTimestamp);
 
     // The truncate point moves the Durable timestamp forward, so it should always exist in the
     // oplog.
