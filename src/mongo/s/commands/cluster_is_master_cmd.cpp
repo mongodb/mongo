@@ -204,6 +204,7 @@ public:
 
         BSONObjBuilder topologyVersionBuilder(result.subobjStart("topologyVersion"));
         mongosTopologyVersion.serialize(&topologyVersionBuilder);
+        topologyVersionBuilder.done();
 
         if (opCtx->isExhaust()) {
             LOGV2_DEBUG(23872, 3, "Using exhaust for isMaster protocol");

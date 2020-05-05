@@ -18,7 +18,7 @@ admin.auth('admin', 'pwd');
 
 let lastStats =
     assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
-jsTest.log('Inintial stats: ' + lastStats);
+jsTest.log('Initial stats: ' + tojson(lastStats));
 
 function test(uri, incrMech) {
     jsTest.log('Connecting to: ' + uri);
@@ -26,6 +26,8 @@ function test(uri, incrMech) {
 
     const stats = assert.commandWorked(admin.runCommand({serverStatus: 1}))
                       .security.authentication.mechanisms;
+    jsTest.log('Stats: ' + tojson(stats));
+
     assert.eq(Object.keys(lastStats).length, Object.keys(stats).length);
     Object.keys(lastStats).forEach(function(mech) {
         const inc = (mech == incrMech) ? 1 : 0;
