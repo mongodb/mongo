@@ -48,7 +48,6 @@ const char kMaxChunkSizeBytes[] = "maxChunkSizeBytes";
 const char kWaitForDelete[] = "waitForDelete";
 const char kWaitForDeleteDeprecated[] = "_waitForDelete";
 const char kForceJumbo[] = "forceJumbo";
-const char kTakeDistLock[] = "takeDistLock";  // TODO: delete in 3.8
 
 }  // namespace
 
@@ -172,16 +171,6 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
         request._maxChunkSizeBytes = static_cast<int64_t>(maxChunkSizeBytes);
     }
 
-    {  // TODO: delete this block in 3.8
-        bool takeDistLock = false;
-        Status status = bsonExtractBooleanField(obj, kTakeDistLock, &takeDistLock);
-        if (status.isOK() && takeDistLock) {
-            return Status{ErrorCodes::IncompatibleShardingConfigVersion,
-                          str::stream()
-                              << "Request received from an older, incompatible mongodb version"};
-        }
-    }
-
     return request;
 }
 
@@ -211,7 +200,6 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     secondaryThrottle.append(builder);
     builder->append(kWaitForDelete, waitForDelete);
     builder->append(kForceJumbo, forceJumbo);
-    builder->append(kTakeDistLock, false);
 }
 
 bool MoveChunkRequest::operator==(const MoveChunkRequest& other) const {
