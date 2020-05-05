@@ -1000,8 +1000,8 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 // If we're interrupted at shutdown or after PeriodicRunner's client has been
                 // killed, it's fine to give up on future notifications.
                 LOGV2(22263,
-                      "{Timestamp_monitor_is_stopping_due_to_ex_reason}",
-                      "Timestamp monitor is stopping",
+                      "Timestamp monitor is stopping. {reason}",
+                      "Timestamp monitor is stopping"
                       "reason"_attr = ex.reason());
                 return;
             }
