@@ -14,9 +14,9 @@
 load("jstests/libs/global_snapshot_reads_util.js");
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
-// TODO(SERVER-47672): Use minSnapshotHistoryWindowInSeconds instead.
 const configOptions = {
-    setParameter: {maxTargetSnapshotHistoryWindowInSeconds: 600}
+    // Set a large snapshot window of 10 minutes for the test.
+    setParameter: {minSnapshotHistoryWindowInSeconds: 600}
 };
 
 const dbName = "test";

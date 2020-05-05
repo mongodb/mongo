@@ -479,7 +479,7 @@ public:
      * must maintain snapshot history through.
      *
      * oldest_timestamp will be set to stable_timestamp adjusted by
-     * 'targetSnapshotHistoryWindowInSeconds' to create a window of available snapshots on the
+     * 'minSnapshotHistoryWindowInSeconds' to create a window of available snapshots on the
      * storage engine from oldest to stable. Furthermore, oldest_timestamp will never be set ahead
      * of the oplog read timestamp, ensuring the oplog reader's 'read_timestamp' can always be
      * serviced.

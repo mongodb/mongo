@@ -1,0 +1,64 @@
+/**
+ * Test setting minSnapshotHistoryWindowInSeconds at runtime and that server keeps history for up to
+ * minSnapshotHistoryWindowInSeconds.
+ *
+ * @tags: [requires_majority_read_concern, requires_replication]
+ */
+(function() {
+"use strict";
+
+const replSet = new ReplSetTest({nodes: 1});
+
+replSet.startSet();
+replSet.initiate();
+
+const collName = "coll";
+const primary = replSet.getPrimary();
+const primaryDB = primary.getDB('test');
+
+const historyWindowSecs = 10;
+assert.commandWorked(primaryDB.adminCommand(
+    {setParameter: 1, minSnapshotHistoryWindowInSeconds: historyWindowSecs}));
+
+const startTime = Date.now();
+const insertTimestamp =
+    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: 0}]}))
+        .operationTime;
+let nextId = 1;
+
+// Test snapshot window with 1s margin.
+const testMarginMS = 1000;
+
+// Test that reading from a snapshot at insertTimestamp is valid for up to historyWindowSecs minus
+// the testMarginMS (as a buffer) to avoid races between the client's snapshot read and the update
+// of the oldest timestamp in the server.
+const testWindowMS = historyWindowSecs * 1000 - testMarginMS;
+while (Date.now() - startTime < testWindowMS) {
+    // Test that reading from a snapshot at insertTimestamp is still valid.
+    assert.commandWorked(primaryDB.runCommand(
+        {find: collName, readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}));
+
+    // Perform writes to advance stable timestamp and oldest timestamp. We use majority writeConcern
+    // so that we can make sure the stable timestamp and the oldest timestamp are updated after each
+    // insert.
+    assert.commandWorked(primaryDB.runCommand(
+        {insert: collName, documents: [{_id: nextId}], writeConcern: {w: "majority"}}));
+    nextId++;
+
+    sleep(50);
+}
+
+// Sleep enough to make sure the insertTimestamp falls off the snapshot window.
+sleep(testMarginMS * 2);
+// Perform another majority write to advance the stable timestamp and the oldest timestamp again.
+assert.commandWorked(primaryDB.runCommand(
+    {insert: collName, documents: [{_id: nextId}], writeConcern: {w: "majority"}}));
+
+// Test that reading from a snapshot at insertTimestamp returns SnapshotTooOld.
+assert.commandFailedWithCode(
+    primaryDB.runCommand(
+        {find: collName, readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}),
+    ErrorCodes.SnapshotTooOld);
+
+replSet.stopSet();
+})();

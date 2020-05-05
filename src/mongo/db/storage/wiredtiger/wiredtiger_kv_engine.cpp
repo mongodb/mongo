@@ -764,7 +764,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         // We do not maintain any snapshot history for the ephemeral storage engine in production
         // because replication and sharded transactions do not currently run on the inMemory engine.
         // It is live in testing, however.
-        snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.store(0);
+        snapshotWindowParams.minSnapshotHistoryWindowInSeconds.store(0);
     }
 
     _sizeStorerUri = _uri("sizeStorer");
@@ -1861,7 +1861,7 @@ void WiredTigerKVEngine::setOldestTimestampFromStable() {
     }
 
     // Calculate what the oldest_timestamp should be from the stable_timestamp. The oldest
-    // timestamp should lag behind stable by 'targetSnapshotHistoryWindowInSeconds' to create a
+    // timestamp should lag behind stable by 'minSnapshotHistoryWindowInSeconds' to create a
     // window of available snapshots. If the lag window is not yet large enough, we will not
     // update/forward the oldest_timestamp yet and instead return early.
     Timestamp newOldestTimestamp = _calculateHistoryLagFromStableTimestamp(stableTimestamp);
@@ -1904,23 +1904,23 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
 
 Timestamp WiredTigerKVEngine::_calculateHistoryLagFromStableTimestamp(Timestamp stableTimestamp) {
     // The oldest_timestamp should lag behind the stable_timestamp by
-    // 'targetSnapshotHistoryWindowInSeconds' seconds.
+    // 'minSnapshotHistoryWindowInSeconds' seconds.
 
     if (_ephemeral && !getTestCommandsEnabled()) {
         // No history should be maintained for the inMemory engine because it is not used yet.
-        invariant(snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load() == 0);
+        invariant(snapshotWindowParams.minSnapshotHistoryWindowInSeconds.load() == 0);
     }
 
     if (stableTimestamp.getSecs() <
-        static_cast<unsigned>(snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load())) {
+        static_cast<unsigned>(snapshotWindowParams.minSnapshotHistoryWindowInSeconds.load())) {
         // The history window is larger than the timestamp history thus far. We must wait for
-        // the history to reach the window size before moving oldest_timestamp forward.
+        // the history to reach the window size before moving oldest_timestamp forward. This should
+        // only happen in unit tests.
         return Timestamp();
     }
 
     Timestamp calculatedOldestTimestamp(
-        stableTimestamp.getSecs() -
-            snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load(),
+        stableTimestamp.getSecs() - snapshotWindowParams.minSnapshotHistoryWindowInSeconds.load(),
         stableTimestamp.getInc());
 
     if (calculatedOldestTimestamp.asULL() <= _oldestTimestamp.load()) {

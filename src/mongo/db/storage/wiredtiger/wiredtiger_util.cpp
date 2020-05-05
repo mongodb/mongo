@@ -748,11 +748,9 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
                     snapshotWindowParams.cachePressureThreshold.load());
     settings.append("current cache pressure percentage", score);
     settings.append("total number of SnapshotTooOld errors", totalNumberOfSnapshotTooOldErrors);
-    settings.append("max target available snapshots window size in seconds",
-                    snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load());
-    settings.append("target available snapshots window size in seconds",
-                    snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load());
-    settings.append("current available snapshots window size in seconds",
+    settings.append("minimum target snapshot window size in seconds",
+                    snapshotWindowParams.minSnapshotHistoryWindowInSeconds.load());
+    settings.append("current available snapshot window size in seconds",
                     static_cast<int>(currentAvailableSnapshotWindow));
     settings.append("latest majority snapshot timestamp available",
                     stableTimestamp.toStringPretty());

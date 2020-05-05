@@ -11,9 +11,9 @@
 
 load("jstests/libs/global_snapshot_reads_util.js");
 
-// TODO(SERVER-47672): Use minSnapshotHistoryWindowInSeconds instead.
 const options = {
-    setParameter: {maxTargetSnapshotHistoryWindowInSeconds: 600}
+    // Set a large snapshot window of 10 minutes for the test.
+    setParameter: {minSnapshotHistoryWindowInSeconds: 600}
 };
 const replSet = new ReplSetTest({nodes: 3, nodeOptions: options});
 replSet.startSet();
@@ -30,7 +30,7 @@ snapshotReadsTest({
     }
 });
 
-// Ensure "atClusterTime" is omitted from a regular (non-snapshot) reads.
+// Ensure "atClusterTime" is omitted from a regular (non-snapshot) read.
 primaryDB["collection"].insertOne({});
 const cursor = assert.commandWorked(primaryDB.runCommand({find: "test"})).cursor;
 assert(!cursor.hasOwnProperty("atClusterTime"));

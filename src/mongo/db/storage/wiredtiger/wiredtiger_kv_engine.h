@@ -376,7 +376,7 @@ private:
     std::string _uri(StringData ident) const;
 
     /**
-     * Uses the 'stableTimestamp', the 'targetSnapshotHistoryWindowInSeconds' setting and the
+     * Uses the 'stableTimestamp', the 'minSnapshotHistoryWindowInSeconds' setting and the
      * current _oldestTimestamp to calculate what the new oldest_timestamp should be, in order to
      * maintain a window of available snapshots on the storage engine from oldest to stable
      * timestamp.

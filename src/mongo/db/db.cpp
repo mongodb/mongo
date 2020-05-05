@@ -104,7 +104,6 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
-#include "mongo/db/periodic_runner_job_decrease_snapshot_cache_pressure.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
@@ -711,11 +710,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     if (storageEngine->supportsReadConcernSnapshot()) {
         try {
             PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
-            // The inMemory engine is not yet used for replica or sharded transactions in production
-            // so it does not currently maintain snapshot history. It is live in testing, however.
-            if (!storageEngine->isEphemeral() || getTestCommandsEnabled()) {
-                PeriodicThreadToDecreaseSnapshotHistoryCachePressure::get(serviceContext)->start();
-            }
         } catch (ExceptionFor<ErrorCodes::PeriodicJobIsStopped>&) {
             LOGV2_WARNING(4747501, "Not starting periodic jobs as shutdown is in progress");
             // Shutdown has already started before initialization is complete. Wait for the
@@ -1143,7 +1137,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (auto storageEngine = serviceContext->getStorageEngine()) {
         if (storageEngine->supportsReadConcernSnapshot()) {
             PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
-            PeriodicThreadToDecreaseSnapshotHistoryCachePressure::get(serviceContext)->stop();
         }
 
         ServiceContext::UniqueOperationContext uniqueOpCtx;

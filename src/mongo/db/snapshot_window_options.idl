@@ -35,10 +35,10 @@ imports:
   - "mongo/idl/basic_types.idl"
 
 server_parameters:
-  maxTargetSnapshotHistoryWindowInSeconds:
-    description: "Maximum target snapshot history window, in seconds"
+  minSnapshotHistoryWindowInSeconds:
+    description: "Minimum snapshot history to keep, in seconds"
     set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds"
+    cpp_varname: "snapshotWindowParams.minSnapshotHistoryWindowInSeconds"
     validator: { gte: 0 }
 
   cachePressureThreshold:
@@ -48,36 +48,3 @@ server_parameters:
     validator:
       gte: 0
       lte: 100
-
-  snapshotWindowMultiplicativeDecrease:
-    description: "Snapshot window multiplicative decrease"
-    set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.snapshotWindowMultiplicativeDecrease"
-    validator:
-      gt: 0.0
-      lt: 1.0
-
-  snapshotWindowAdditiveIncreaseSeconds:
-    description: "Snapshot window multiplicative increase, in seconds"
-    set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.snapshotWindowAdditiveIncreaseSeconds"
-    validator: { gte: 1 }
-
-  minMillisBetweenSnapshotWindowInc:
-    description: "Minimum duration between snapshot window increment, in milliseconds"
-    set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.minMillisBetweenSnapshotWindowInc"
-    validator: { gte: 1 }
-
-  minMillisBetweenSnapshotWindowDec:
-    description: "Minimum duration between snapshot window decrement, in milliseconds"
-    set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.minMillisBetweenSnapshotWindowDec"
-    validator: { gte: 1 }
-
-  checkCachePressurePeriodSeconds:
-    description: "Check cache pressure period, in seconds"
-    set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.checkCachePressurePeriodSeconds"
-    validator: { gte: 1 }
-    on_update: std::ref(SnapshotWindowParams::observeCheckCachePressurePeriodSeconds)

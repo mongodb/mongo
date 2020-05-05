@@ -815,7 +815,7 @@ env.Library(
         'introspect',
         'lasterror',
         'query_exec',
-        'snapshot_window_util',
+        'snapshot_window_options',
         'transaction',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/auth',
@@ -1464,19 +1464,6 @@ env.Library(
 )
 
 env.Library(
-    target='periodic_runner_job_decrease_snapshot_cache_pressure',
-    source=[
-        'periodic_runner_job_decrease_snapshot_cache_pressure.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        'snapshot_window_options',
-        'snapshot_window_util',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/periodic_runner',
-    ],
-)
-
-env.Library(
     target='snapshot_window_options',
     source=[
         'snapshot_window_options.cpp',
@@ -1484,18 +1471,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
-    ],
-)
-
-env.Library(
-    target='snapshot_window_util',
-    source=[
-        'snapshot_window_util.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        'snapshot_window_options',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 
@@ -1852,7 +1827,6 @@ envWithAsio.CppUnitTest(
         'server_options_test.cpp',
         'session_catalog_mongod_test.cpp',
         'session_catalog_test.cpp',
-        'snapshot_window_util_test.cpp',
         'startup_warnings_mongod_test.cpp',
         'thread_client_test.cpp',
         'time_proof_service_test.cpp',
@@ -1928,7 +1902,6 @@ envWithAsio.CppUnitTest(
         'sessions_collection_mock',
         'signed_logical_time',
         'snapshot_window_options',
-        'snapshot_window_util',
         'startup_warnings_mongod',
         'stats/fill_locker_info',
         'stats/transaction_stats',

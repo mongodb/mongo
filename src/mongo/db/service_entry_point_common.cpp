@@ -76,7 +76,7 @@
 #include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/snapshot_window_util.h"
+#include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -1235,8 +1235,7 @@ void execCommandDatabase(OperationContext* opCtx,
             // snapshot at their specified atClusterTime. Therefore, we'll try to increase the
             // snapshot history window that the storage engine maintains in order to increase
             // the likelihood of successful future PIT atClusterTime requests.
-            SnapshotWindowUtil::incrementSnapshotTooOldErrorCount();
-            SnapshotWindowUtil::increaseTargetSnapshotWindowSize(opCtx);
+            snapshotWindowParams.snapshotTooOldErrorCount.addAndFetch(1);
         } else {
             behaviors.handleException(e, opCtx);
         }
