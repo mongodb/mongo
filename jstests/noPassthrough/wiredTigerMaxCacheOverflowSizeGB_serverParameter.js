@@ -19,4 +19,14 @@ testNumericServerParameter("wiredTigerMaxCacheOverflowSizeGB",
                            0.09 /*lowerOutOfBounds*/,
                            false /*hasUpperBound*/,
                            "unused" /*upperOutOfBounds*/);
+
+testNumericServerParameter("wiredTigerMaxHistoryFileSizeGB",
+                           false /*isStartupParameter*/,
+                           true /*isRuntimeParameter*/,
+                           0 /*defaultValue*/,
+                           0.1 /*nonDefaultValidValue*/,
+                           true /*hasLowerBound*/,
+                           0.09 /*lowerOutOfBounds*/,
+                           false /*hasUpperBound*/,
+                           "unused" /*upperOutOfBounds*/);
 })();

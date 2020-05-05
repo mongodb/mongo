@@ -790,14 +790,17 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
     _runTimeConfigParam->_data.second = this;
     _maxHistoryFileSizeGBParam.reset(new WiredTigerMaxHistoryFileSizeGBParameter(
-        "wiredTigerMaxCacheOverflowSizeGB", ServerParameterType::kRuntimeOnly));
+        "wiredTigerMaxHistoryFileSizeGB", ServerParameterType::kRuntimeOnly));
     _maxHistoryFileSizeGBParam->_data = {maxHistoryFileSizeMB / 1024, this};
+    _maxCacheOverflowParam.reset(new IDLServerParameterDeprecatedAlias(
+        "wiredTigerMaxCacheOverflowSizeGB", _maxHistoryFileSizeGBParam.get()));
 }
 
 WiredTigerKVEngine::~WiredTigerKVEngine() {
     // Remove server parameters that we added in the constructor, to enable unit tests to reload the
     // storage engine again in this same process.
     ServerParameterSet::getGlobal()->remove("wiredTigerEngineRuntimeConfig");
+    ServerParameterSet::getGlobal()->remove("wiredTigerMaxHistoryFileSizeGB");
     ServerParameterSet::getGlobal()->remove("wiredTigerMaxCacheOverflowSizeGB");
 
     cleanShutdown();
