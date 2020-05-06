@@ -93,6 +93,8 @@ suites:
   concurrency_replication_multiversion:
 
   replica_sets_jscore_multiversion_passthrough:
+  - ticket: SERVER-47469
+    test_file: jstests/core/apply_ops_system_dot_views.js
 
   replica_sets_multiversion:
   - ticket: SERVER-47645
@@ -103,7 +105,11 @@ suites:
   concurrency_sharded_replication_multiversion:
 
   sharding_jscore_multiversion_passthrough:
+  - ticket: SERVER-47469
+    test_file: jstests/core/apply_ops_system_dot_views.js
 
   sharded_collections_jscore_multiversion_passthrough:
+  - ticket: SERVER-47469
+    test_file: jstests/core/apply_ops_system_dot_views.js
 
   sharding_multiversion:

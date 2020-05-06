@@ -147,6 +147,10 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
             !_view || viewMode == kViewsPermitted);
 }
 
+LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
+    return nss.isSystemDotViews() ? MODE_X : mode;
+}
+
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
                                      StringData dbName,
                                      LockMode mode,

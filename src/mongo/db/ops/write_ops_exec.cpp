@@ -308,10 +308,6 @@ bool handleError(OperationContext* opCtx,
     return !wholeOp.getOrdered();
 }
 
-LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
-    return nss.isSystemDotViews() ? MODE_X : mode;
-}
-
 void insertDocuments(OperationContext* opCtx,
                      Collection* collection,
                      std::vector<InsertStatement>::iterator begin,

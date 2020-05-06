@@ -231,7 +231,8 @@ Status _applyOps(OperationContext* opCtx,
                             return Status::OK();
                         }
 
-                        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                        AutoGetCollection autoColl(
+                            opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
                         if (!autoColl.getCollection()) {
                             // For idempotency reasons, return success on delete operations.
                             if (*opType == 'd') {
