@@ -74,7 +74,7 @@ public:
                    "handshake"_attr = prePost,
                    "operationType"_attr = applicationOperation);
         for (auto error : errors) {
-            LOGV2_INFO(4712106, "Check error ", "error"_attr = ErrorCodes::errorString(error));
+            LOGV2_INFO(4712106, "Check error", "error"_attr = ErrorCodes::errorString(error));
             for (int attempt = 0; attempt < numAttempts; attempt++) {
                 auto result = testSubject->computeErrorActions(
                     kHost, makeStatus(error), stage, isApplicationOperation, kErrorBson);
