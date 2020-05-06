@@ -8,7 +8,6 @@
 (function() {
 "use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/aggregation/extras/utils.js");
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -68,7 +67,7 @@ primary = replTest.getPrimary();
 testColl = primary.getDB(dbName)[collName];
 
 // Make sure we cannot see the writes from the prepared transaction yet.
-arrayEq(testColl.find().toArray(), [{_id: 0}, {_id: 2}]);
+assert.sameMembers(testColl.find().toArray(), [{_id: 0}, {_id: 2}]);
 assert.eq(testColl.count(), 3);
 
 // Make sure there is still one transaction in the transactions table. This is because the
@@ -108,7 +107,7 @@ assert.commandWorked(sessionDB.adminCommand({
 }));
 
 // Make sure we can see the effects of the prepared transaction.
-arrayEq(testColl.find().toArray(), [{_id: 0, a: largeArray}, {_id: 1}, {_id: 2}]);
+assert.sameMembers(testColl.find().toArray(), [{_id: 0, a: largeArray}, {_id: 1}, {_id: 2}]);
 assert.eq(testColl.count(), 3);
 
 replTest.stopSet();
