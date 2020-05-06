@@ -270,10 +270,6 @@ Status finishAndLogApply(ClockSource* clockSource,
     return finalStatus;
 }
 
-LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
-    return nss.isSystemDotViews() ? MODE_X : mode;
-}
-
 }  // namespace
 
 // static

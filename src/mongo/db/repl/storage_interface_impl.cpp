@@ -91,9 +91,6 @@ using UniqueLock = stdx::unique_lock<Latch>;
 
 const auto kIdIndexName = "_id_"_sd;
 
-LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
-    return nss.isSystemDotViews() ? MODE_X : mode;
-}
 }  // namespace
 
 StorageInterfaceImpl::StorageInterfaceImpl()
