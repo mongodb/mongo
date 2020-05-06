@@ -229,23 +229,7 @@ DB.prototype._runAggregate = function(cmdObj, aggregateOptions) {
         cmdObj.cursor = {};
     }
 
-    const pipeline = cmdObj.pipeline;
-
-    // Check whether the pipeline has a stage which performs writes like $out. If not, we may
-    // run on a Secondary and should attach a readPreference.
-    const hasWritingStage = (function() {
-        if (pipeline.length == 0) {
-            return false;
-        }
-        const lastStage = pipeline[pipeline.length - 1];
-        return lastStage.hasOwnProperty("$out") || lastStage.hasOwnProperty("$merge");
-    }());
-
-    const doAgg = function(cmdObj) {
-        return hasWritingStage ? this.runCommand(cmdObj) : this.runReadCommand(cmdObj);
-    }.bind(this);
-
-    const res = doAgg(cmdObj);
+    const res = this.runReadCommand(cmdObj);
 
     if (!res.ok && (res.code == 17020 || res.errmsg == "unrecognized field \"cursor") &&
         !("cursor" in aggregateOptions)) {

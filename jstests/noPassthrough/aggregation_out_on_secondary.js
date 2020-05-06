@@ -26,6 +26,9 @@ const readColl = primaryDB[readCollName];
 
 const secondary = rs.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
+const replSetConn = new Mongo(rs.getURL());
+replSetConn.setReadPref("secondary");
+const db = replSetConn.getDB(dbName);
 // Keeps track of values which we expect the aggregate command to return.
 let expectedResults = [];
 // Insert some documents which our pipeline will eventually read from.
@@ -44,10 +47,7 @@ assert.commandWorked(secondaryDB.setProfilingLevel(2));
 
 const pipeline = [{$group: {_id: "$groupKey", sum: {$sum: "$num"}}}, {$out: outCollName}];
 const comment = "$out issued to secondary";
-assert.eq(secondaryDB[readCollName]
-              .aggregate(pipeline, {$readPreference: {mode: "secondary"}, comment: comment})
-              .itcount(),
-          0);
+assert.eq(db[readCollName].aggregate(pipeline, {comment: comment}).itcount(), 0);
 
 // Verify that $out wrote to the primary and that query is correct.
 assert(anyEq(primaryDB[outCollName].find().toArray(), expectedResults));

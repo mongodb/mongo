@@ -16,11 +16,14 @@ replTest.awaitReplication();
 const primary = replTest.getPrimary().getDB("test");
 const secondary = replTest.getSecondary().getDB("test");
 assert.commandWorked(primary.setProfilingLevel(2));
-secondary.getMongo().setReadPref("secondary");
 
 const inputCollPrimary = primary.getCollection("inputColl");
-const inputCollSecondary = secondary.getCollection("inputColl");
 const outColl = primary.getCollection("outColl");
+
+const replSetConn = new Mongo(replTest.getURL());
+replSetConn.setReadPref("secondary");
+const db = replSetConn.getDB("test");
+const inputColl = db["inputColl"];
 
 assert.commandWorked(inputCollPrimary.insert({_id: 0, a: 1}, {writeConcern: {w: 2}}));
 assert.commandWorked(inputCollPrimary.insert({_id: 1, a: 2}, {writeConcern: {w: 2}}));
@@ -35,7 +38,7 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
 
     const commentStr = "whenMatched_" + whenMatchedMode + "_whenNotMatched_" + whenNotMatchedMode;
     assert.eq(0,
-              inputCollSecondary
+              inputColl
                   .aggregate([{
                                  $merge: {
                                      into: outColl.getName(),
