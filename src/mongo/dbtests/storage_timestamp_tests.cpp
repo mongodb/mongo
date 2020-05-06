@@ -2137,6 +2137,8 @@ public:
 
         // Create config.system.indexBuilds collection to store commit quorum value during index
         // building.
+        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(
+            _opCtx, NamespaceString::kIndexBuildEntryNamespace));
         ASSERT_OK(
             createCollection(_opCtx,
                              NamespaceString::kIndexBuildEntryNamespace.db().toString(),
@@ -2251,6 +2253,26 @@ public:
         ASSERT_TRUE(
             getIndexMetaData(getMetaDataAtTime(durableCatalog, catalogId, indexBComplete), "b_1")
                 .ready);
+
+        // Assert that the index build is removed from config.system.indexBuilds collection after
+        // completion.
+        {
+            AutoGetCollectionForRead autoColl(_opCtx, NamespaceString::kIndexBuildEntryNamespace);
+            auto collection = autoColl.getCollection();
+            ASSERT_TRUE(collection);
+
+            // At the commitIndexBuild entry time, the index build be still be present in the
+            // indexBuilds collection.
+            {
+                OneOffRead oor(_opCtx, indexBComplete);
+                // Fails if the collection is empty.
+                findOne(collection);
+            }
+
+            // After the index build has finished, we should not see the doc in the indexBuilds
+            // collection.
+            ASSERT_EQUALS(1, itCount(collection));
+        }
     }
 };
 
@@ -2364,8 +2386,24 @@ public:
 class TimestampAbortIndexBuild : public StorageTimestampTest {
 public:
     void run() {
+        // Disable index build commit quorum as we don't have support of replication subsystem for
+        // voting.
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("enableIndexBuildCommitQuorum")
+                      ->second->setFromString("false"));
+
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
+
+        // Create config.system.indexBuilds collection to store commit quorum value during index
+        // building.
+        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(
+            _opCtx, NamespaceString::kIndexBuildEntryNamespace));
+        ASSERT_OK(
+            createCollection(_opCtx,
+                             NamespaceString::kIndexBuildEntryNamespace.db().toString(),
+                             BSON("create" << NamespaceString::kIndexBuildEntryNamespace.coll())));
 
         NamespaceString nss("unittests.timestampAbortIndexBuild");
         reset(nss);
@@ -2466,6 +2504,26 @@ public:
             durableCatalog, origIdents, /*expectedNewIndexIdents*/ 0, indexAbortTs);
         assertIndexMetaDataMissing(getMetaDataAtTime(durableCatalog, catalogId, indexAbortTs),
                                    "a_1");
+
+        // Assert that the index build is removed from config.system.indexBuilds collection after
+        // completion.
+        {
+            AutoGetCollectionForRead autoColl(_opCtx, NamespaceString::kIndexBuildEntryNamespace);
+            auto collection = autoColl.getCollection();
+            ASSERT_TRUE(collection);
+
+            // At the commitIndexBuild entry time, the index build be still be present in the
+            // indexBuilds collection.
+            {
+                OneOffRead oor(_opCtx, indexAbortTs);
+                // Fails if the collection is empty.
+                findOne(collection);
+            }
+
+            // After the index build has finished, we should not see the doc in the indexBuilds
+            // collection.
+            ASSERT_EQUALS(1, itCount(collection));
+        }
     }
 };
 
