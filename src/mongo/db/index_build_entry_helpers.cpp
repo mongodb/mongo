@@ -279,10 +279,11 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
         IDLParserErrorContext ctx("IndexBuildsEntry Parser");
         IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
         return indexBuildEntry;
-    } catch (...) {
+    } catch (DBException& ex) {
         str::stream ss;
         ss << "Invalid BSON found for matching document with indexBuildUUID: " << indexBuildUUID;
-        return Status(ErrorCodes::InvalidBSON, ss);
+        ss << ": " << obj;
+        return ex.toStatus(ss);
     }
 }
 

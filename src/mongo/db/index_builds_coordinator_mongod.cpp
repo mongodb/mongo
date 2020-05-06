@@ -331,8 +331,11 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     {
         // Secondary nodes will always try to vote regardless of the commit quorum value. If the
         // commit quorum is disabled, do not record their entry into the commit ready nodes.
+        // If we fail to retrieve the persisted commit quorum, the index build might be in the
+        // middle of tearing down.
         Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
-        auto commitQuorum = invariant(indexbuildentryhelpers::getCommitQuorum(opCtx, buildUUID));
+        auto commitQuorum =
+            uassertStatusOK(indexbuildentryhelpers::getCommitQuorum(opCtx, buildUUID));
         if (commitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
             return Status::OK();
         }
@@ -408,7 +411,7 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     // Read the index builds entry from config.system.indexBuilds collection.
     auto swIndexBuildEntry =
         indexbuildentryhelpers::getIndexBuildEntry(opCtx, replState->buildUUID);
-    auto indexBuildEntry = invariantStatusOK(swIndexBuildEntry);
+    auto indexBuildEntry = uassertStatusOK(swIndexBuildEntry);
 
     auto voteMemberList = indexBuildEntry.getCommitReadyMembers();
     // This can occur when no vote got received and stepup tries to check if commit quorum is
