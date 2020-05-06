@@ -48,6 +48,7 @@ const char kHintField[] = "hint";
 const char kCollationField[] = "collation";
 const char kArrayFiltersField[] = "arrayFilters";
 const char kRuntimeConstantsField[] = "runtimeConstants";
+const char kLet[] = "let";
 const char kRemoveField[] = "remove";
 const char kUpdateField[] = "update";
 const char kNewField[] = "new";
@@ -135,6 +136,12 @@ BSONObj FindAndModifyRequest::toBSON(const BSONObj& commandPassthroughFields) co
         rtcBuilder.doneFast();
     }
 
+    if (_letParameters) {
+        if (auto letParams = _letParameters.get(); !letParams.isEmpty()) {
+            builder.append(kLet, _letParameters.get());
+        }
+    }
+
     if (_shouldReturnNew) {
         builder.append(kNewField, _shouldReturnNew);
     }
@@ -170,6 +177,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     bool arrayFiltersSet = false;
     std::vector<BSONObj> arrayFilters;
     boost::optional<RuntimeConstants> runtimeConstants;
+    BSONObj letParameters;
     bool writeConcernOptionsSet = false;
     WriteConcernOptions writeConcernOptions;
 
@@ -245,6 +253,14 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
             runtimeConstants =
                 RuntimeConstants::parse(IDLParserErrorContext(kRuntimeConstantsField),
                                         cmdObj.getObjectField(kRuntimeConstantsField));
+        } else if (field == kLet) {
+            BSONElement letElt;
+            if (Status letEltStatus =
+                    bsonExtractTypedField(cmdObj, kLet, BSONType::Object, &letElt);
+                !letEltStatus.isOK()) {
+                return letEltStatus;
+            }
+            letParameters = letElt.embeddedObject();
         } else if (field == kWriteConcernField) {
             BSONElement writeConcernElt;
             Status writeConcernEltStatus = bsonExtractTypedField(
@@ -301,6 +317,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     request.setHint(hint);
     request.setCollation(collation);
     request.setBypassDocumentValidation(bypassDocumentValidation);
+    request.setLetParameters(letParameters);
     if (arrayFiltersSet) {
         request.setArrayFilters(std::move(arrayFilters));
     }

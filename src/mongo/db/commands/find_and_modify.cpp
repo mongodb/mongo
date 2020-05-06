@@ -129,6 +129,7 @@ void makeUpdateRequest(OperationContext* opCtx,
     requestOut->setUpdateModification(*args.getUpdate());
     requestOut->setRuntimeConstants(
         args.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+    requestOut->setLetParameters(args.getLetParameters());
     requestOut->setSort(args.getSort());
     requestOut->setHint(args.getHint());
     requestOut->setCollation(args.getCollation());
@@ -151,6 +152,7 @@ void makeDeleteRequest(OperationContext* opCtx,
     requestOut->setProj(args.getFields());
     requestOut->setRuntimeConstants(
         args.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+    requestOut->setLet(args.getLetParameters());
     requestOut->setSort(args.getSort());
     requestOut->setHint(args.getHint());
     requestOut->setCollation(args.getCollation());

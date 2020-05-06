@@ -185,6 +185,21 @@ public:
     }
 
     /**
+     * Sets user-specified parameters that can be used by the findAndModify command's pipeline-style
+     * updates and inside $expr.
+     */
+    void setLetParameters(const boost::optional<BSONObj>& letParameters) {
+        _letParameters = letParameters;
+    }
+
+    /**
+     * Returns the runtime constants associated with this findAndModify request, if present.
+     */
+    const boost::optional<BSONObj>& getLetParameters() const {
+        return _letParameters;
+    }
+
+    /**
      * Sets the write concern for this request.
      */
     void setWriteConcern(WriteConcernOptions writeConcern);
@@ -210,6 +225,7 @@ private:
     boost::optional<BSONObj> _collation;
     boost::optional<std::vector<BSONObj>> _arrayFilters;
     boost::optional<RuntimeConstants> _runtimeConstants;
+    boost::optional<BSONObj> _letParameters;
     bool _shouldReturnNew{false};
     boost::optional<WriteConcernOptions> _writeConcern;
     bool _bypassDocumentValidation{false};
