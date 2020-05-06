@@ -138,15 +138,12 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
     // Only user updates should be checked. Any system or replication stuff should pass through.
     // Config db docs also do not get checked.
     const auto request = _params.request;
-    _enforceOkForStorage =
-        !(request->isFromOplogApplication() || request->getNamespaceString().isConfigDB() ||
-          request->isFromMigration());
+    _enforceOkForStorage = !(request->isFromOplogApplication() || request->isFromMigration());
 
     // We should only check for an update to the shard key if the update is coming from a user and
     // the request is versioned.
     _shouldCheckForShardKeyUpdate =
-        !(request->isFromOplogApplication() || request->getNamespaceString().isConfigDB() ||
-          request->isFromMigration()) &&
+        !(request->isFromOplogApplication() || request->isFromMigration()) &&
         OperationShardingState::isOperationVersioned(expCtx->opCtx);
 
     _specificStats.isModUpdate = params.driver->type() == UpdateDriver::UpdateType::kOperator;

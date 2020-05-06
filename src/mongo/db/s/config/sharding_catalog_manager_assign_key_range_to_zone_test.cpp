@@ -252,19 +252,24 @@ TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysSho
     updateBuilder.append(TagsType::max(), zoneWithDollarKeys.getMax());
     updateBuilder.append(TagsType::tag(), "TestZone");
 
-    ASSERT_OK(Grid::get(operationContext())
-                  ->catalogClient()
-                  ->updateConfigDocument(
-                      operationContext(),
-                      TagsType::ConfigNS,
-                      updateQuery,
-                      updateBuilder.obj(),
-                      true,
-                      WriteConcernOptions(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0))));
+    auto opCtx = operationContext();
+    {
+        // Using UnreplicatedWritesBlock to disable opCtx validation so that we can create a
+        // situation, which resembles an upgrade from an old version with a corrupted zone
+        // information
+        repl::UnreplicatedWritesBlock uwb(opCtx);
+        ASSERT_OK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+            opCtx,
+            TagsType::ConfigNS,
+            updateQuery,
+            updateBuilder.obj(),
+            true,
+            WriteConcernOptions(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0))));
+    }
     assertOnlyZone(shardedNS(), zoneWithDollarKeys, "TestZone");
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->removeKeyRangeFromZone(operationContext(), shardedNS(), zoneWithDollarKeys));
+    ASSERT_OK(ShardingCatalogManager::get(opCtx)->removeKeyRangeFromZone(
+        opCtx, shardedNS(), zoneWithDollarKeys));
     assertNoZoneDoc();
 }
 
