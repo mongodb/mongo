@@ -51,6 +51,7 @@ env.CppUnitTest(
         'biggie_recovery_unit_test.cpp',
         'biggie_sorted_impl_test.cpp',
         'store_test.cpp',
+        'radix_store_concurrent_test.cpp',
     ],
     LIBDEPS=[
         'storage_biggie_core',
