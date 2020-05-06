@@ -2271,7 +2271,7 @@ public:
 
             // After the index build has finished, we should not see the doc in the indexBuilds
             // collection.
-            ASSERT_EQUALS(1, itCount(collection));
+            ASSERT_EQUALS(0, itCount(collection));
         }
     }
 };
@@ -2522,7 +2522,7 @@ public:
 
             // After the index build has finished, we should not see the doc in the indexBuilds
             // collection.
-            ASSERT_EQUALS(1, itCount(collection));
+            ASSERT_EQUALS(0, itCount(collection));
         }
     }
 };

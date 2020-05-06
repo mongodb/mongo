@@ -76,7 +76,7 @@ IndexBuildTest.waitForIndexBuildToStop(newPrimaryDB);
 IndexBuildTest.assertIndexes(newPrimaryColl, 2, ['_id_', 'a_1']);
 
 // Index build should be removed from the config.system.indexBuilds collection.
-assert(newPrimary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
+assert.isnull(newPrimary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 
 rst.stopSet();
 })();
