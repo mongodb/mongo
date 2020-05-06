@@ -291,7 +291,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 #ifdef HAVE_DIAGNOSTIC
     WT_ORDERED_READ(my_op, async->async_queue[my_slot]);
     if (my_op != NULL)
-        return (__wt_panic(session));
+        return (__wt_panic(session, WT_PANIC, "async failure"));
 #endif
     WT_PUBLISH(async->async_queue[my_slot], op);
     op->state = WT_ASYNCOP_ENQUEUED;

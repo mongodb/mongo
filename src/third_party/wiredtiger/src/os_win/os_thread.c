@@ -56,11 +56,10 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t *tid)
     if ((windows_error = WaitForSingleObject(tid->id, INFINITE)) != WAIT_OBJECT_0) {
         if (windows_error == WAIT_FAILED)
             windows_error = __wt_getlasterror();
-        __wt_err(session, __wt_map_windows_error(windows_error),
-          "thread join: WaitForSingleObject: %s", __wt_formatmessage(session, windows_error));
 
         /* If we fail to wait, we will leak handles, do not continue. */
-        return (WT_PANIC);
+        return (__wt_panic(session, __wt_map_windows_error(windows_error),
+          "thread join: WaitForSingleObject: %s", __wt_formatmessage(session, windows_error)));
     }
 
     if (CloseHandle(tid->id) == 0) {

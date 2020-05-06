@@ -42,7 +42,8 @@ class test_hs09(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     uri = "table:test_hs09"
     key_format_values = [
-        ('column', dict(key_format='r')),
+        # The commented columnar tests needs to be enabled once columnar page instantiated is fixed in (WT-6061).
+        #('column', dict(key_format='r')),
         ('integer', dict(key_format='i')),
         ('string', dict(key_format='S')),
     ]
@@ -63,7 +64,7 @@ class test_hs09(wttest.WiredTigerTestCase):
         cursor.close()
         # Check the history store file value
         cursor = session.open_cursor("file:WiredTigerHS.wt", None, 'checkpoint=WiredTigerCheckpoint')
-        for _, _, hs_start_ts, _, hs_stop_ts, _, _, _, type, value in cursor:
+        for _, _, hs_start_ts, _, hs_stop_ts, _, type, value in cursor:
             # No WT_UPDATE_TOMBSTONE in the history store
             self.assertNotEqual(type, 5)
             # No WT_UPDATE_BIRTHMARK in the history store

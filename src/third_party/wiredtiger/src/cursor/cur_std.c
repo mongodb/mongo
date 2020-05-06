@@ -29,7 +29,7 @@ __wt_cursor_cached(WT_CURSOR *cursor)
 {
     WT_SESSION_IMPL *session;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
     WT_RET_MSG(session, ENOTSUP, "Cursor has been closed");
 }
 
@@ -42,7 +42,7 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 {
     WT_SESSION_IMPL *session;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
     WT_RET_MSG(session, ENOTSUP, "Unsupported cursor operation");
 }
 
@@ -142,7 +142,7 @@ __wt_cursor_modify_value_format_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, in
     WT_UNUSED(nentries);
 
     if (cursor->value_format != NULL && strlen(cursor->value_format) != 0) {
-        session = (WT_SESSION_IMPL *)cursor->session;
+        session = CUR2S(cursor);
         WT_RET_MSG(session, ENOTSUP,
           "WT_CURSOR.modify only supported for 'S' and 'u' value "
           "formats");
@@ -221,7 +221,7 @@ __wt_cursor_kv_not_set(WT_CURSOR *cursor, bool key) WT_GCC_FUNC_ATTRIBUTE((cold)
 {
     WT_SESSION_IMPL *session;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
 
     WT_RET_MSG(session, cursor->saved_err == 0 ? EINVAL : cursor->saved_err, "requires %s be set",
       key ? "key" : "value");
@@ -238,7 +238,7 @@ __wt_cursor_copy_release_item(WT_CURSOR *cursor, WT_ITEM *item) WT_GCC_FUNC_ATTR
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
 
     /* Bail out if the item has been cleared. */
     if (item->data == NULL)
@@ -646,7 +646,7 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     WT_SESSION_IMPL *session;
     uint64_t bucket;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
     WT_ASSERT(session, !F_ISSET(cursor, WT_CURSTD_CACHED) && dhandle != NULL);
 
     WT_TRET(cursor->reset(cursor));
@@ -687,7 +687,7 @@ __wt_cursor_reopen(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     WT_SESSION_IMPL *session;
     uint64_t bucket;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
     WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_CACHED));
 
     if (dhandle != NULL) {
@@ -892,7 +892,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 {
     WT_SESSION_IMPL *session;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
 
     if (F_ISSET(cursor, WT_CURSTD_OPEN)) {
         TAILQ_REMOVE(&session->cursors, cursor, q);
@@ -1066,7 +1066,7 @@ __wt_cursor_init(
     WT_SESSION_IMPL *session;
     bool readonly;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
 
     if (cursor->internal_uri == NULL)
         WT_RET(__wt_strdup(session, uri, &cursor->internal_uri));

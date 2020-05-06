@@ -122,11 +122,12 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
      * affect those already-running history store operations by changing the cursor state. When
      * doing history store operations, we set the no-reconciliation flag, use it as short-hand to
      * avoid that problem. This doesn't open up the window for the deadlock because setting the
-     * no-reconciliation flag limits eviction to in-memory splits. FIXME: This isn't reasonable and
-     * needs a better fix.
+     * no-reconciliation flag limits eviction to in-memory splits.
      *
      * The test for the connection's default session is because there are known problems with using
-     * cached cursors from the default session. FIXME: This isn't reasonable and needs a better fix.
+     * cached cursors from the default session.
+     *
+     * FIXME-WT-6037: This isn't reasonable and needs a better fix.
      */
     if (!WT_IS_METADATA(S2BT(session)->dhandle) && !F_ISSET(conn, WT_CONN_IN_MEMORY) &&
       session->hs_cursor == NULL && !F_ISSET(session, WT_SESSION_NO_RECONCILE) &&

@@ -325,7 +325,7 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
     if (0) {
 err:
-        WT_PANIC_RET(session, ret, "cache eviction thread error");
+        WT_RET_PANIC(session, ret, "cache eviction thread error");
     }
     return (ret);
 }
@@ -362,7 +362,7 @@ __wt_evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
     if (0) {
 err:
-        WT_PANIC_RET(session, ret, "cache eviction thread error");
+        WT_RET_PANIC(session, ret, "cache eviction thread error");
     }
     return (ret);
 }

@@ -9,6 +9,18 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_timestamp_to_string --
+ *     Convert a timestamp to the MongoDB string representation.
+ */
+char *
+__wt_timestamp_to_string(wt_timestamp_t ts, char *ts_string)
+{
+    WT_IGNORE_RET(__wt_snprintf(ts_string, WT_TS_INT_STRING_SIZE, "(%" PRIu32 ", %" PRIu32 ")",
+      (uint32_t)((ts >> 32) & 0xffffffff), (uint32_t)(ts & 0xffffffff)));
+    return (ts_string);
+}
+
+/*
  * __wt_time_pair_to_string --
  *     Converts a time pair to a standard string representation.
  */
@@ -23,15 +35,41 @@ __wt_time_pair_to_string(wt_timestamp_t timestamp, uint64_t txn_id, char *tp_str
 }
 
 /*
- * __wt_timestamp_to_string --
- *     Convert a timestamp to the MongoDB string representation.
+ * __wt_time_window_to_string --
+ *     Converts a time window to a standard string representation.
  */
 char *
-__wt_timestamp_to_string(wt_timestamp_t ts, char *ts_string)
+__wt_time_window_to_string(WT_TIME_WINDOW *tw, char *tw_string)
 {
-    WT_IGNORE_RET(__wt_snprintf(ts_string, WT_TS_INT_STRING_SIZE, "(%" PRIu32 ", %" PRIu32 ")",
-      (uint32_t)((ts >> 32) & 0xffffffff), (uint32_t)(ts & 0xffffffff)));
-    return (ts_string);
+    char ts_string[4][WT_TS_INT_STRING_SIZE];
+
+    WT_IGNORE_RET(__wt_snprintf(tw_string, WT_TIME_STRING_SIZE,
+      "start: %s/%s/%" PRIu64 " stop: %s/%s/%" PRIu64 "%s",
+      __wt_timestamp_to_string(tw->durable_start_ts, ts_string[0]),
+      __wt_timestamp_to_string(tw->start_ts, ts_string[1]), tw->start_txn,
+      __wt_timestamp_to_string(tw->durable_stop_ts, ts_string[2]),
+      __wt_timestamp_to_string(tw->stop_ts, ts_string[3]), tw->stop_txn,
+      tw->prepare ? ", prepared" : ""));
+    return (tw_string);
+}
+
+/*
+ * __wt_time_aggregate_to_string --
+ *     Converts a time aggregate to a standard string representation.
+ */
+char *
+__wt_time_aggregate_to_string(WT_TIME_AGGREGATE *ta, char *ta_string)
+{
+    char ts_string[4][WT_TS_INT_STRING_SIZE];
+
+    WT_IGNORE_RET(__wt_snprintf(ta_string, WT_TIME_STRING_SIZE,
+      "newest durable: %s/%s oldest start: %s/%" PRIu64 " newest stop %s/%" PRIu64 "%s",
+      __wt_timestamp_to_string(ta->newest_start_durable_ts, ts_string[0]),
+      __wt_timestamp_to_string(ta->newest_stop_durable_ts, ts_string[1]),
+      __wt_timestamp_to_string(ta->oldest_start_ts, ts_string[2]), ta->oldest_start_txn,
+      __wt_timestamp_to_string(ta->newest_stop_ts, ts_string[3]), ta->newest_stop_txn,
+      ta->prepare ? ", prepared" : ""));
+    return (ta_string);
 }
 
 /*
@@ -700,8 +738,7 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t commit_ts
               __wt_timestamp_to_string(txn->first_commit_timestamp, ts_string[1]));
 
         /*
-         * FIXME:
-         * WT-4779 disabled to buy time to understand a test failure.
+         * FIXME-WT-4780: Disabled to buy time to understand a test failure.
          * WT_RET(__txn_assert_after_reads(
          *   session, "commit", commit_ts, NULL));
          */

@@ -132,7 +132,7 @@ main(int argc, char *argv[])
             modify_entry.data.size = strlen(modify_entry.data.data);
             modify_entry.offset = offset;
             modify_entry.size = modify_entry.data.size;
-            /* FIXME-PM-1521: extend timeout to pass the test */
+            /* FIXME-WT-6113: extend timeout to pass the test */
             (void)alarm(7);
             testutil_check(c->modify(c, &modify_entry, 1));
             (void)alarm(0);

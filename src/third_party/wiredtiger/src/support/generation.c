@@ -136,8 +136,8 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
 
             /* If we're waiting on ourselves, we're deadlocked. */
             if (session == s) {
-                WT_ASSERT(session, session != s);
-                WT_IGNORE_RET(__wt_panic(session));
+                WT_IGNORE_RET(__wt_panic(session, WT_PANIC, "self-deadlock"));
+                return;
             }
 
             /*

@@ -58,7 +58,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
 
     ins = NULL;
     page = cbt->ref->page;
-    session = (WT_SESSION_IMPL *)cbt->iface.session;
+    session = CUR2S(cbt);
     upd = upd_arg;
     logged = false;
 
@@ -109,7 +109,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
             logged = true;
 
             /* Avoid WT_CURSOR.update data copy. */
-            cbt->modify_update = upd;
+            __wt_upd_value_assign(cbt->modify_update, upd);
         } else {
             upd_size = __wt_update_list_memsize(upd);
 
@@ -169,7 +169,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
             logged = true;
 
             /* Avoid WT_CURSOR.update data copy. */
-            cbt->modify_update = upd;
+            __wt_upd_value_assign(cbt->modify_update, upd);
         } else
             upd_size = __wt_update_list_memsize(upd);
 

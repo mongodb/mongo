@@ -712,17 +712,18 @@ struct __wt_cursor {
 #define	WT_CURSTD_DUMP_HEX		0x000080u
 #define	WT_CURSTD_DUMP_JSON		0x000100u
 #define	WT_CURSTD_DUMP_PRINT		0x000200u
-#define	WT_CURSTD_JOINED		0x000400u
-#define	WT_CURSTD_KEY_EXT		0x000800u	/* Key points out of tree. */
-#define	WT_CURSTD_KEY_INT		0x001000u	/* Key points into tree. */
-#define	WT_CURSTD_META_INUSE		0x002000u
-#define	WT_CURSTD_OPEN			0x004000u
-#define	WT_CURSTD_OVERWRITE		0x008000u
-#define	WT_CURSTD_RAW			0x010000u
-#define	WT_CURSTD_RAW_SEARCH		0x020000u
-#define	WT_CURSTD_UPDATE_LOCAL		0x040000u
-#define	WT_CURSTD_VALUE_EXT		0x080000u	/* Value points out of tree. */
-#define	WT_CURSTD_VALUE_INT		0x100000u	/* Value points into tree. */
+#define	WT_CURSTD_IGNORE_TOMBSTONE	0x000400u
+#define	WT_CURSTD_JOINED		0x000800u
+#define	WT_CURSTD_KEY_EXT		0x001000u	/* Key points out of tree. */
+#define	WT_CURSTD_KEY_INT		0x002000u	/* Key points into tree. */
+#define	WT_CURSTD_META_INUSE		0x004000u
+#define	WT_CURSTD_OPEN			0x008000u
+#define	WT_CURSTD_OVERWRITE		0x010000u
+#define	WT_CURSTD_RAW			0x020000u
+#define	WT_CURSTD_RAW_SEARCH		0x040000u
+#define	WT_CURSTD_UPDATE_LOCAL		0x080000u
+#define	WT_CURSTD_VALUE_EXT		0x100000u	/* Value points out of tree. */
+#define	WT_CURSTD_VALUE_INT		0x200000u	/* Value points into tree. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
@@ -1950,8 +1951,9 @@ struct __wt_session {
 	 * one of the following keys: \c "from=all" to drop all checkpoints\, \c "from=<checkpoint>"
 	 * to drop all checkpoints after and including the named checkpoint\, or \c
 	 * "to=<checkpoint>" to drop all checkpoints before and including the named checkpoint.
-	 * Checkpoints cannot be dropped while a hot backup is in progress or if open in a cursor.,
-	 * a list of strings; default empty.}
+	 * Checkpoints cannot be dropped if open in a cursor.  While a hot backup is in progress\,
+	 * checkpoints created prior to the start of the backup cannot be dropped., a list of
+	 * strings; default empty.}
 	 * @config{force, if false (the default)\, checkpoints may be skipped if the underlying
 	 * object has not been modified\, if true\, this option forces the checkpoint., a boolean
 	 * flag; default \c false.}
@@ -6243,10 +6245,12 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_PAGES_EVICTION			2142
 /*! reconciliation: pages deleted */
 #define	WT_STAT_DSRC_REC_PAGE_DELETE			2143
+/*! reconciliation: prepared values written */
+#define	WT_STAT_DSRC_REC_PREPARE_VALUE			2144
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2144
+#define	WT_STAT_DSRC_SESSION_COMPACT			2145
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2145
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2146
 
 /*!
  * @}

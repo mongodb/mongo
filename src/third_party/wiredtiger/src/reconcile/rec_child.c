@@ -36,7 +36,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
     if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC | WT_REC_VISIBILITY_ERR) && page_del != NULL &&
       __wt_page_del_active(session, ref, false)) {
         if (F_ISSET(r, WT_REC_VISIBILITY_ERR))
-            WT_PANIC_RET(session, EINVAL, "reconciliation illegally skipped an update");
+            WT_RET_PANIC(session, EINVAL, "reconciliation illegally skipped an update");
         return (__wt_set_return(session, EBUSY));
     }
 

@@ -35,7 +35,7 @@ __wt_curjoin_joined(WT_CURSOR *cursor) WT_GCC_FUNC_ATTRIBUTE((cold))
 {
     WT_SESSION_IMPL *session;
 
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
 
     WT_RET_MSG(session, ENOTSUP, "cursor is being used in a join");
 }
@@ -770,7 +770,7 @@ __curjoin_init_bloom(
                 goto done;
             WT_ERR(ret);
         } else
-            WT_PANIC_ERR(session, EINVAL, "fatal error in join cursor position state");
+            WT_ERR_PANIC(session, EINVAL, "fatal error in join cursor position state");
     }
     collator = (entry->index == NULL) ? NULL : entry->index->collator;
     while (ret == 0) {

@@ -89,7 +89,8 @@ static const char *const __stats_dsrc_desc[] = {
   "reconciliation: maximum blocks required for a page", "reconciliation: overflow values written",
   "reconciliation: page checksum matches", "reconciliation: page reconciliation calls",
   "reconciliation: page reconciliation calls for eviction", "reconciliation: pages deleted",
-  "session: object compaction", "transaction: update conflicts",
+  "reconciliation: prepared values written", "session: object compaction",
+  "transaction: update conflicts",
 };
 
 int
@@ -274,6 +275,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->rec_pages = 0;
     stats->rec_pages_eviction = 0;
     stats->rec_page_delete = 0;
+    stats->rec_prepare_value = 0;
     stats->session_compact = 0;
     stats->txn_update_conflict = 0;
 }
@@ -447,6 +449,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->rec_pages += from->rec_pages;
     to->rec_pages_eviction += from->rec_pages_eviction;
     to->rec_page_delete += from->rec_page_delete;
+    to->rec_prepare_value += from->rec_prepare_value;
     to->session_compact += from->session_compact;
     to->txn_update_conflict += from->txn_update_conflict;
 }
@@ -617,6 +620,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->rec_pages += WT_STAT_READ(from, rec_pages);
     to->rec_pages_eviction += WT_STAT_READ(from, rec_pages_eviction);
     to->rec_page_delete += WT_STAT_READ(from, rec_page_delete);
+    to->rec_prepare_value += WT_STAT_READ(from, rec_prepare_value);
     to->session_compact += WT_STAT_READ(from, session_compact);
     to->txn_update_conflict += WT_STAT_READ(from, txn_update_conflict);
 }

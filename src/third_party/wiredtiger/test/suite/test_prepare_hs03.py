@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import copy_wiredtiger_home
-import unittest, wiredtiger, wttest
+import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 import os, shutil
 from wtscenario import make_scenarios
@@ -183,7 +183,6 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         # and call verify
         self.corrupt_salvage_verify()
 
-    @unittest.skip("Temporarily disabled")
     def test_prepare_hs(self):
         nrows = 100
         ds = SimpleDataSet(self, self.uri, nrows, key_format="S", value_format='u')

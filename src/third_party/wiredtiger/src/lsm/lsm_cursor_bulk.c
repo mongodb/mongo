@@ -25,7 +25,7 @@ __clsm_close_bulk(WT_CURSOR *cursor)
     clsm = (WT_CURSOR_LSM *)cursor;
     lsm_tree = clsm->lsm_tree;
     chunk = lsm_tree->chunk[0];
-    session = (WT_SESSION_IMPL *)clsm->iface.session;
+    session = CUR2S(clsm);
 
     /* Close the bulk cursor to ensure the chunk is written to disk. */
     bulk_cursor = clsm->chunks[0]->cursor;
@@ -67,7 +67,7 @@ __clsm_insert_bulk(WT_CURSOR *cursor)
     clsm = (WT_CURSOR_LSM *)cursor;
     lsm_tree = clsm->lsm_tree;
     chunk = lsm_tree->chunk[0];
-    session = (WT_SESSION_IMPL *)clsm->iface.session;
+    session = CUR2S(clsm);
 
     WT_ASSERT(session, lsm_tree->nchunks == 1 && clsm->nchunks == 1);
     ++chunk->count;
@@ -95,7 +95,7 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
     bulk_cursor = NULL;
     cursor = &clsm->iface;
     lsm_tree = clsm->lsm_tree;
-    session = (WT_SESSION_IMPL *)clsm->iface.session;
+    session = CUR2S(clsm);
 
     F_SET(clsm, WT_CLSM_BULK);
 

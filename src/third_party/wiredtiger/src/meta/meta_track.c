@@ -331,7 +331,7 @@ err:
         __wt_cond_signal(session, S2C(session)->sweep_cond);
 
     if (ret != 0)
-        WT_PANIC_RET(session, ret, "failed to apply or unroll all tracked operations");
+        WT_RET_PANIC(session, ret, "failed to apply or unroll all tracked operations");
     return (saved_ret == 0 ? 0 : saved_ret);
 }
 

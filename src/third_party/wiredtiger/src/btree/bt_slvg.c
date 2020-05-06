@@ -186,12 +186,7 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
     __wt_seconds(session, &ckptbase->sec);
     WT_ERR(__wt_metadata_search(session, dhandle->name, &config));
     WT_ERR(__wt_meta_block_metadata(session, config, ckptbase));
-    ckptbase->start_durable_ts = WT_TS_NONE;
-    ckptbase->oldest_start_ts = WT_TS_NONE;
-    ckptbase->oldest_start_txn = WT_TXN_NONE;
-    ckptbase->stop_durable_ts = WT_TS_NONE;
-    ckptbase->newest_stop_ts = WT_TS_MAX;
-    ckptbase->newest_stop_txn = WT_TXN_MAX;
+    __wt_time_aggregate_init(&ckptbase->ta);
     ckptbase->write_gen = btree->write_gen;
     F_SET(ckptbase, WT_CKPT_ADD);
 
@@ -917,7 +912,7 @@ __slvg_col_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
      */
     /* Case #2/8, #10, #11 */
     if (a_trk->col_start > b_trk->col_start)
-        WT_PANIC_RET(session, EINVAL, "unexpected merge array sort order");
+        WT_RET_PANIC(session, EINVAL, "unexpected merge array sort order");
 
     if (a_trk->col_start == b_trk->col_start) { /* Case #1, #4 and #9 */
                                                 /*
@@ -1174,12 +1169,7 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * regardless of a value's timestamps or transaction IDs.
          */
         WT_ERR(__wt_calloc_one(session, &addr));
-        addr->newest_start_durable_ts = addr->newest_stop_durable_ts = addr->oldest_start_ts =
-          WT_TS_NONE;
-        addr->oldest_start_txn = WT_TXN_NONE;
-        addr->newest_stop_ts = WT_TS_MAX;
-        addr->newest_stop_txn = WT_TXN_MAX;
-        addr->prepare = false;
+        __wt_time_aggregate_init(&addr->ta);
         WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
         addr->size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
@@ -1323,7 +1313,7 @@ __slvg_col_ovfl_single(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL_UNPACK *
             return (__slvg_ovfl_ref(session, ovfl, false));
     }
 
-    WT_PANIC_RET(session, EINVAL, "overflow record at column-store page merge not found");
+    WT_RET_PANIC(session, EINVAL, "overflow record at column-store page merge not found");
 }
 
 /*
@@ -1512,7 +1502,7 @@ __slvg_row_range_overlap(WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_s
     WT_RET(__wt_compare(session, btree->collator, A_TRK_STOP, B_TRK_STOP, &stop_cmp));
 
     if (start_cmp > 0) /* Case #2/8, #10, #11 */
-        WT_PANIC_RET(session, EINVAL, "unexpected merge array sort order");
+        WT_RET_PANIC(session, EINVAL, "unexpected merge array sort order");
 
     if (start_cmp == 0) { /* Case #1, #4, #9 */
                           /*
@@ -1782,12 +1772,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * regardless of a value's timestamps or transaction IDs.
          */
         WT_ERR(__wt_calloc_one(session, &addr));
-        addr->newest_start_durable_ts = addr->newest_stop_durable_ts = addr->oldest_start_ts =
-          WT_TS_NONE;
-        addr->oldest_start_txn = WT_TXN_NONE;
-        addr->newest_stop_ts = WT_TS_MAX;
-        addr->newest_stop_txn = WT_TXN_MAX;
-        addr->prepare = false;
+        __wt_time_aggregate_init(&addr->ta);
         WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
         addr->size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
@@ -1992,7 +1977,7 @@ __slvg_row_ovfl_single(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL_UNPACK *
             return (__slvg_ovfl_ref(session, ovfl, true));
     }
 
-    WT_PANIC_RET(session, EINVAL, "overflow record at row-store page merge not found");
+    WT_RET_PANIC(session, EINVAL, "overflow record at row-store page merge not found");
 }
 
 /*
@@ -2270,7 +2255,7 @@ __slvg_ovfl_ref(WT_SESSION_IMPL *session, WT_TRACK *trk, bool multi_panic)
     if (F_ISSET(trk, WT_TRACK_OVFL_REFD)) {
         if (!multi_panic)
             return (__wt_set_return(session, EBUSY));
-        WT_PANIC_RET(session, EINVAL,
+        WT_RET_PANIC(session, EINVAL,
           "overflow record unexpectedly referenced multiple times "
           "during leaf page merge");
     }

@@ -133,20 +133,20 @@ wts_load(void)
             if (!is_bulk)
                 cursor->set_key(cursor, keyno);
             cursor->set_value(cursor, *(uint8_t *)value.data);
-            logop(session, "%-10s %" PRIu64 " {0x%02" PRIx8 "}", "bulk", keyno,
+            logop(session, "%-10s %" PRIu32 " {0x%02" PRIx8 "}", "bulk", keyno,
               ((uint8_t *)value.data)[0]);
             break;
         case VAR:
             if (!is_bulk)
                 cursor->set_key(cursor, keyno);
             cursor->set_value(cursor, &value);
-            logop(session, "%-10s %" PRIu64 " {%.*s}", "bulk", keyno, (int)value.size,
+            logop(session, "%-10s %" PRIu32 " {%.*s}", "bulk", keyno, (int)value.size,
               (char *)value.data);
             break;
         case ROW:
             cursor->set_key(cursor, &key);
             cursor->set_value(cursor, &value);
-            logop(session, "%-10s %" PRIu64 " {%.*s}, {%.*s}", "bulk", keyno, (int)key.size,
+            logop(session, "%-10s %" PRIu32 " {%.*s}, {%.*s}", "bulk", keyno, (int)key.size,
               (char *)key.data, (int)value.size, (char *)value.data);
             break;
         }
@@ -175,15 +175,8 @@ wts_load(void)
                 g.c_delete_pct += g.c_insert_pct - 5;
                 g.c_insert_pct = 5;
             }
-            if (g.c_delete_pct < 20) {
-                g.c_delete_pct += g.c_write_pct / 2;
-                g.c_write_pct = g.c_write_pct / 2;
-            }
-            if (g.c_delete_pct < 20) {
-                g.c_delete_pct += g.c_modify_pct / 2;
-                g.c_write_pct = g.c_modify_pct / 2;
-            }
-            break;
+            g.c_delete_pct += g.c_write_pct / 2;
+            g.c_write_pct = g.c_write_pct / 2;
         }
     }
 

@@ -2264,8 +2264,7 @@ err:		if (ret != 0)
 		if ((ret = $self->open_cursor($self, uri, to_dup, config, &cursor)) != 0)
 			goto err;
 
-		if ((ret = __wt_calloc_def((WT_SESSION_IMPL *)cursor->session,
-			    1, &jcb)) != 0)
+		if ((ret = __wt_calloc_def(CUR2S(cursor), 1, &jcb)) != 0)
 			goto err;
 
 		if ((cursor->flags & WT_CURSTD_RAW) != 0)
@@ -2274,7 +2273,7 @@ err:		if (ret != 0)
 			cursor->flags |= WT_CURSTD_RAW;
 
 		jcb->jnienv = jenv;
-		jcb->session = (WT_SESSION_IMPL *)cursor->session;
+		jcb->session = CUR2S(cursor);
 		cursor->lang_private = jcb;
 
 err:		if (ret != 0)

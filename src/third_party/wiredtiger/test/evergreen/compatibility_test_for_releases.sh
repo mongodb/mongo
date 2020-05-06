@@ -6,10 +6,10 @@
 set -e
 
 #############################################################
-# format_b_flag:
+# bflag:
 #       arg1: branch name
 #############################################################
-format_b_flag()
+bflag()
 {
         # Return if the branch's format command takes the -B flag for backward compatibility.
         test "$1" = "develop" && echo "-B "
@@ -63,7 +63,7 @@ run_format()
 
         cd "$1/test/format"
 
-        flags="-1q $(format_b_flag $1)"
+        flags="-1q $(bflag $1)"
 
         args=""
         args+="cache=80 "                       # Medium cache so there's eviction
@@ -115,7 +115,7 @@ verify_branches()
         for am in $3; do
             echo "$1/wt verifying $2 access method $am..."
             dir="$2/test/format/RUNDIR.$am"
-            WIREDTIGER_CONFIG="$EXT" ./wt -h "../$dir" verify table:wt
+            WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" verify table:wt
         done
 }
 
@@ -138,12 +138,12 @@ upgrade_downgrade()
             for reps in {1..2}; do
                 echo "$1 format running on $2 access method $am..."
                 cd "$top/$1/test/format"
-                flags="-1qR $(format_b_flag $1)"
+                flags="-1qR $(bflag $1)"
                 ./t $flags -h "$top/$2/test/format/RUNDIR.$am" timer=2
 
                 echo "$2 format running on $2 access method $am..."
                 cd "$top/$2/test/format"
-                flags="-1qR $(format_b_flag $2)"
+                flags="-1qR $(bflag $2)"
                 ./t $flags -h "RUNDIR.$am" timer=2
             done
         done
@@ -184,20 +184,20 @@ cd develop; wt2=$(get_prev_version 2); cd ..
 (verify_branches mongodb-3.6 mongodb-3.4 "fix row var")
 (verify_branches mongodb-4.0 mongodb-3.6 "fix row var")
 (verify_branches mongodb-4.2 mongodb-4.0 "fix row var")
-### (verify_branches mongodb-4.4 mongodb-4.2 "fix row var")
-### (verify_branches develop mongodb-4.4 "row")
+(verify_branches mongodb-4.4 mongodb-4.2 "fix row var")
+(verify_branches develop mongodb-4.4 "row")
 (verify_branches develop mongodb-4.2 "row")
 (verify_branches "$wt1" "$wt2" "row")
 (verify_branches develop "$wt1" "row")
 
 # Verify forward compatibility for supported access methods.
-### (verify_branches mongodb-4.2 mongodb-4.4 "row")
+(verify_branches mongodb-4.2 mongodb-4.4 "row")
 (verify_branches mongodb-4.2 develop "row")
-### (verify_branches mongodb-4.4 develop "row")
+(verify_branches mongodb-4.4 develop "row")
 
 # Upgrade/downgrade testing for supported access methods.
-### (upgrade_downgrade mongodb-4.2 mongodb-4.4 "row")
+(upgrade_downgrade mongodb-4.2 mongodb-4.4 "row")
 (upgrade_downgrade mongodb-4.2 develop "row")
-### (upgrade_downgrade mongodb-4.4 develop "row")
+(upgrade_downgrade mongodb-4.4 develop "row")
 
 exit 0

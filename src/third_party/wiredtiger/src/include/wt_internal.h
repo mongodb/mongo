@@ -315,8 +315,10 @@ struct __wt_thread;
 typedef struct __wt_thread WT_THREAD;
 struct __wt_thread_group;
 typedef struct __wt_thread_group WT_THREAD_GROUP;
-struct __wt_time_pair;
-typedef struct __wt_time_pair WT_TIME_PAIR;
+struct __wt_time_aggregate;
+typedef struct __wt_time_aggregate WT_TIME_AGGREGATE;
+struct __wt_time_window;
+typedef struct __wt_time_window WT_TIME_WINDOW;
 struct __wt_txn;
 typedef struct __wt_txn WT_TXN;
 struct __wt_txn_global;
@@ -329,6 +331,8 @@ struct __wt_txn_shared;
 typedef struct __wt_txn_shared WT_TXN_SHARED;
 struct __wt_update;
 typedef struct __wt_update WT_UPDATE;
+struct __wt_update_value;
+typedef struct __wt_update_value WT_UPDATE_VALUE;
 union __wt_lsn;
 typedef union __wt_lsn WT_LSN;
 union __wt_rand_state;
@@ -375,8 +379,9 @@ typedef uint64_t wt_timestamp_t;
 #include "misc.h"
 #include "mutex.h"
 
-#include "stat.h"    /* required by dhandle.h */
-#include "dhandle.h" /* required by btree.h */
+#include "stat.h"      /* required by dhandle.h */
+#include "dhandle.h"   /* required by btree.h */
+#include "timestamp.h" /* required by reconcile.h */
 
 #include "api.h"
 #include "async.h"
@@ -418,10 +423,11 @@ typedef uint64_t wt_timestamp_t;
 #include "intpack.i" /* required by cell.i, packing.i */
 #include "misc.i"    /* required by mutex.i */
 
-#include "buf.i"   /* required by cell.i */
-#include "cell.i"  /* required by btree.i */
-#include "mutex.i" /* required by btree.i */
-#include "txn.i"   /* required by btree.i */
+#include "buf.i"       /* required by cell.i */
+#include "timestamp.i" /* required by btree.i */
+#include "cell.i"      /* required by btree.i */
+#include "mutex.i"     /* required by btree.i */
+#include "txn.i"       /* required by btree.i */
 
 #include "bitstring.i"
 #include "block.i"

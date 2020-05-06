@@ -80,7 +80,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
             break;
         WT_ERR(__wt_getline(session, fs, value));
         if (value->size == 0)
-            WT_PANIC_ERR(session, EINVAL, "%s: zero-length value", WT_METADATA_BACKUP);
+            WT_ERR_PANIC(session, EINVAL, "%s: zero-length value", WT_METADATA_BACKUP);
         WT_ERR(__wt_metadata_update(session, key->data, value->data));
     }
 
@@ -381,7 +381,7 @@ err:
      */
     if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 || F_ISSET(S2C(session), WT_CONN_SALVAGE))
         return (ret);
-    WT_PANIC_RET(session, WT_TRY_SALVAGE, "%s: fatal turtle file read error", WT_METADATA_TURTLE);
+    WT_RET_PANIC(session, WT_TRY_SALVAGE, "%s: fatal turtle file read error", WT_METADATA_TURTLE);
 }
 
 /*
@@ -437,5 +437,5 @@ err:
      */
     if (ret == 0)
         return (ret);
-    WT_PANIC_RET(session, ret, "%s: fatal turtle file update error", WT_METADATA_TURTLE);
+    WT_RET_PANIC(session, ret, "%s: fatal turtle file update error", WT_METADATA_TURTLE);
 }

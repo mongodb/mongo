@@ -32,7 +32,7 @@ __wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
     WT_SESSION_IMPL *session;
 
     lsm_tree = clsm->lsm_tree;
-    session = (WT_SESSION_IMPL *)clsm->iface.session;
+    session = CUR2S(clsm);
 
     if (!lsm_tree->need_switch) {
         /*
@@ -64,7 +64,7 @@ __wt_clsm_await_switch(WT_CURSOR_LSM *clsm)
     int waited;
 
     lsm_tree = clsm->lsm_tree;
-    session = (WT_SESSION_IMPL *)clsm->iface.session;
+    session = CUR2S(clsm);
 
     /*
      * If there is no primary chunk, or a chunk has overflowed the hard limit, which either means a
@@ -96,7 +96,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
     bool hard_limit, have_primary, ovfl;
 
     lsm_tree = clsm->lsm_tree;
-    session = (WT_SESSION_IMPL *)clsm->iface.session;
+    session = CUR2S(clsm);
 
     if (clsm->nchunks == 0) {
         primary = NULL;
@@ -159,7 +159,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
     uint64_t i, pinned_id, switch_txn;
 
     lsm_tree = clsm->lsm_tree;
-    session = (WT_SESSION_IMPL *)clsm->iface.session;
+    session = CUR2S(clsm);
     txn = session->txn;
 
     /* Merge cursors never update. */
@@ -259,7 +259,7 @@ __clsm_leave(WT_CURSOR_LSM *clsm)
 {
     WT_SESSION_IMPL *session;
 
-    session = (WT_SESSION_IMPL *)clsm->iface.session;
+    session = CUR2S(clsm);
 
     if (F_ISSET(clsm, WT_CLSM_ACTIVE)) {
         --session->ncursors;
@@ -428,7 +428,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, bool update, u_int start_chunk, uint32_
 
     c = &clsm->iface;
     cursor = NULL;
-    session = (WT_SESSION_IMPL *)c->session;
+    session = CUR2S(clsm);
     txn = session->txn;
     chunk = NULL;
     locked = false;
@@ -712,7 +712,7 @@ __wt_clsm_init_merge(WT_CURSOR *cursor, u_int start_chunk, uint32_t start_id, u_
     WT_SESSION_IMPL *session;
 
     clsm = (WT_CURSOR_LSM *)cursor;
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
 
     F_SET(clsm, WT_CLSM_MERGE);
     if (start_chunk != 0)
@@ -816,7 +816,7 @@ __clsm_position_chunk(WT_CURSOR_LSM *clsm, WT_CURSOR *c, bool forward, int *cmpp
     WT_SESSION_IMPL *session;
 
     cursor = &clsm->iface;
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
 
     c->set_key(c, &cursor->key);
     WT_RET(c->search_near(c, cmpp));
@@ -1149,7 +1149,7 @@ __clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
     c = NULL;
     cursor = &clsm->iface;
     have_hash = false;
-    session = (WT_SESSION_IMPL *)cursor->session;
+    session = CUR2S(cursor);
 
     WT_FORALL_CURSORS(clsm, c, i)
     {

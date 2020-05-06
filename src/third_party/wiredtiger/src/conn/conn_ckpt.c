@@ -116,7 +116,7 @@ __ckpt_server(void *arg)
 
     if (0) {
 err:
-        WT_PANIC_MSG(session, ret, "checkpoint server error");
+        WT_IGNORE_RET(__wt_panic(session, ret, "checkpoint server error"));
     }
     return (WT_THREAD_RET_VALUE);
 }

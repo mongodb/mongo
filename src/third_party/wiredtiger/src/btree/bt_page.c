@@ -544,13 +544,23 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK unpack;
+    WT_ITEM buf;
     WT_ROW *rip;
+    WT_UPDATE **upd_array, *upd;
+    size_t size, total_size;
+    uint32_t i;
+    bool instantiate_prepared, prepare;
 
     btree = S2BT(session);
+    prepare = false;
+
+    instantiate_prepared = F_ISSET_ATOMIC(page, WT_PAGE_INSTANTIATE_PREPARE_UPDATE);
 
     /* Walk the page, building indices. */
     rip = page->pg_row;
     WT_CELL_FOREACH_BEGIN (session, btree, page->dsk, unpack) {
+        if (instantiate_prepared && !prepare && F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE))
+            prepare = true;
         switch (unpack.type) {
         case WT_CELL_KEY_OVFL:
             __wt_row_leaf_key_set_cell(page, rip, unpack.cell);
@@ -575,9 +585,9 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
              * The visibility information is not referenced on the page so we need to ensure that
              * the value is globally visible at the point in time where we read the page into cache.
              */
-            if (!btree->huffman_value && unpack.stop_txn == WT_TXN_MAX &&
-              unpack.stop_ts == WT_TS_MAX &&
-              __wt_txn_visible_all(session, unpack.start_txn, unpack.start_ts))
+            if (!btree->huffman_value && unpack.tw.stop_txn == WT_TXN_MAX &&
+              unpack.tw.stop_ts == WT_TS_MAX && !F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE) &&
+              __wt_txn_visible_all(session, unpack.tw.start_txn, unpack.tw.start_ts))
                 __wt_row_leaf_value_set(page, rip - 1, &unpack);
             break;
         case WT_CELL_VALUE_OVFL:
@@ -589,8 +599,47 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_CELL_FOREACH_END;
 
     /*
-     * We do not currently instantiate keys on leaf pages when the page is loaded, they're
-     * instantiated on demand.
+     * Instantiate prepared updates on leaf pages when the page is loaded. For in-memory databases,
+     * all non obsolete updates will retain on the page as part of __split_multi_inmem function.
      */
+    if (prepare && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+        WT_RET(__wt_page_modify_init(session, page));
+        if (!F_ISSET(btree, WT_BTREE_READONLY))
+            __wt_page_modify_set(session, page);
+
+        /* Allocate the per-page update array if one doesn't already exist. */
+        if (page->entries != 0 && page->modify->mod_row_update == NULL)
+            WT_RET(__wt_calloc_def(session, page->entries, &page->modify->mod_row_update));
+
+        /* For each entry in the page */
+        size = total_size = 0;
+        upd_array = page->modify->mod_row_update;
+        WT_ROW_FOREACH (page, rip, i) {
+            /* Unpack the on-page value cell. */
+            __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
+            if (F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE)) {
+                if (unpack.tw.stop_ts == WT_TS_MAX && unpack.tw.stop_txn == WT_TXN_MAX) {
+                    /* Take the value from the original page cell. */
+                    WT_RET(__wt_page_cell_data_ref(session, page, &unpack, &buf));
+
+                    WT_RET(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, &size));
+                    upd->durable_ts = WT_TS_NONE;
+                    upd->start_ts = unpack.tw.start_ts;
+                    upd->txnid = unpack.tw.start_txn;
+                } else {
+                    WT_RET(__wt_upd_alloc_tombstone(session, &upd, &size));
+                    upd->durable_ts = WT_TS_NONE;
+                    upd->start_ts = unpack.tw.stop_ts;
+                    upd->txnid = unpack.tw.stop_txn;
+                }
+                upd->prepare_state = WT_PREPARE_INPROGRESS;
+                upd_array[WT_ROW_SLOT(page, rip)] = upd;
+                total_size += size;
+            }
+        }
+
+        __wt_cache_page_inmem_incr(session, page, total_size);
+    }
+
     return (0);
 }

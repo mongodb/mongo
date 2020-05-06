@@ -115,7 +115,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
         goto err;
     if (addr.type != WT_ADDR_LEAF_NO)
         goto err;
-    if (!__wt_txn_visible(session, addr.oldest_start_txn, addr.oldest_start_ts))
+    if (!__wt_txn_visible(session, addr.ta.oldest_start_txn, addr.ta.oldest_start_ts))
         goto err;
 
     /*
@@ -292,7 +292,7 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_PAGE *page;
     WT_PAGE_DELETED *page_del;
     WT_ROW *rip;
-    WT_TIME_PAIR start, stop;
+    WT_TIME_WINDOW tw;
     WT_UPDATE **upd_array, *upd;
     size_t size;
     uint32_t count, i;
@@ -382,8 +382,8 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
          * Retrieve the stop time pair from the page's row. If we find an existing stop time pair we
          * don't need to append a tombstone.
          */
-        __wt_read_row_time_pairs(session, page, rip, &start, &stop);
-        if (stop.timestamp == WT_TS_MAX && stop.txnid == WT_TXN_MAX) {
+        __wt_read_row_time_window(session, page, rip, &tw);
+        if (tw.stop_ts == WT_TS_MAX && tw.stop_txn == WT_TXN_MAX) {
             WT_ERR(__tombstone_update_alloc(session, page_del, &upd, &size));
             upd->next = upd_array[WT_ROW_SLOT(page, rip)];
             upd_array[WT_ROW_SLOT(page, rip)] = upd;

@@ -224,7 +224,7 @@ __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *le
     int cmp, depth;
     bool append_check, descend_right, done;
 
-    session = (WT_SESSION_IMPL *)cbt->iface.session;
+    session = CUR2S(cbt);
     btree = S2BT(session);
     collator = btree->collator;
     item = cbt->tmp;

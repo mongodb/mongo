@@ -220,8 +220,8 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
     if (previous_state == WT_REF_DISK) {
         /* There should be an address, but simply skip any page where we don't find one. */
         if (__wt_ref_addr_copy(session, ref, &addr)) {
-            newest_stop_ts = addr.newest_stop_ts;
-            newest_stop_txn = addr.newest_stop_txn;
+            newest_stop_ts = addr.ta.newest_stop_ts;
+            newest_stop_txn = addr.ta.newest_stop_txn;
             obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_ts);
         }
 
@@ -274,21 +274,21 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
 
         /* Calculate the max stop time pair by traversing all multi addresses. */
         for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
-            newest_stop_txn = WT_MAX(newest_stop_txn, multi->addr.newest_stop_txn);
-            newest_stop_ts = WT_MAX(newest_stop_ts, multi->addr.newest_stop_ts);
+            newest_stop_txn = WT_MAX(newest_stop_txn, multi->addr.ta.newest_stop_txn);
+            newest_stop_ts = WT_MAX(newest_stop_ts, multi->addr.ta.newest_stop_ts);
         }
         obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_ts);
     } else if (mod != NULL && mod->rec_result == WT_PM_REC_REPLACE) {
         tag = "reconciled replacement block";
 
-        newest_stop_txn = mod->mod_replace.newest_stop_txn;
-        newest_stop_ts = mod->mod_replace.newest_stop_ts;
+        newest_stop_txn = mod->mod_replace.ta.newest_stop_txn;
+        newest_stop_ts = mod->mod_replace.ta.newest_stop_ts;
         obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_ts);
     } else if (__wt_ref_addr_copy(session, ref, &addr)) {
         tag = "WT_REF address";
 
-        newest_stop_txn = addr.newest_stop_txn;
-        newest_stop_ts = addr.newest_stop_ts;
+        newest_stop_txn = addr.ta.newest_stop_txn;
+        newest_stop_ts = addr.ta.newest_stop_ts;
         obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_ts);
     } else
         tag = "unexpected page state";
@@ -469,12 +469,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         btree->syncing = WT_BTREE_SYNC_RUNNING;
         is_hs = WT_IS_HS(btree);
 
-        /*
-         * Add in history store reconciliation for standard files.
-         *
-         * FIXME-PM-1521: Remove the history store check, and assert that no updates from the
-         * history store are copied to the history store recursively.
-         */
+        /* Add in history store reconciliation for standard files. */
         rec_flags = WT_REC_CHECKPOINT;
         if (!is_hs && !WT_IS_METADATA(btree->dhandle))
             rec_flags |= WT_REC_HS;
