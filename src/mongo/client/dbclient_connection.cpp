@@ -561,7 +561,7 @@ void DBClientConnection::_checkConnection() {
     LOGV2_DEBUG(20120,
                 _logLevel.toInt(),
                 "Trying to reconnect to {connString}",
-                "Trying to reconnnect",
+                "Trying to reconnect",
                 "connString"_attr = toString());
     string errmsg;
     auto connectStatus = connect(_serverAddress, _applicationName);
