@@ -170,10 +170,10 @@ void onCommitIndexBuild(OperationContext* opCtx,
     const auto& buildUUID = replState->buildUUID;
 
     auto skipCheck = shouldSkipIndexBuildStateTransitionCheck(opCtx, replState->protocol);
-    {
+    opCtx->recoveryUnit()->onCommit([replState, skipCheck](boost::optional<Timestamp> commitTime) {
         stdx::unique_lock<Latch> lk(replState->mutex);
         replState->indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
-    }
+    });
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         return;
     }
