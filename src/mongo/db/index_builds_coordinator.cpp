@@ -1177,7 +1177,11 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
 
         if (!_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
             // This reads from system.indexBuilds collection to see if commit quorum got satisfied.
-            _signalIfCommitQuorumIsSatisfied(opCtx, replState);
+            try {
+                _signalIfCommitQuorumIsSatisfied(opCtx, replState);
+            } catch (DBException& ex) {
+                fassert(31440, ex.toStatus());
+            }
         }
     };
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onStepUp - "_sd, onIndexBuild);
