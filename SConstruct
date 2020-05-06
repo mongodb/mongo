@@ -135,7 +135,7 @@ add_option('lint-scope',
 
 add_option('install-mode',
     choices=['legacy', 'hygienic'],
-    default='legacy',
+    default='hygienic',
     help='select type of installation',
     nargs=1,
     type='choice',
@@ -2210,7 +2210,7 @@ def doConfigure(myenv):
         }
         """ % compiler_minimum_string)
     elif myenv.ToolchainIs('clang'):
-        compiler_minimum_string = "clang 7.0 (or Apple XCode 10.0)"
+        compiler_minimum_string = "clang 7.0 (or Apple XCode 10.2)"
         compiler_test_body = textwrap.dedent(
         """
         #if !defined(__clang__)
