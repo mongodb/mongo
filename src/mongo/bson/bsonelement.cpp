@@ -116,12 +116,16 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
     size_t before = buffer.size();
     if (includeSeparator)
         buffer.push_back(',');
+    if (pretty)
+        fmt::format_to(buffer, "\n{:<{}}", "", (pretty - 1) * 4);
 
     if (includeFieldNames) {
         g.writePadding(buffer);
         g.writeString(buffer, fieldNameStringData());
         g.writePadding(buffer);
         buffer.push_back(':');
+        if (pretty)
+            buffer.push_back(' ');
     }
 
     g.writePadding(buffer);
@@ -155,8 +159,8 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             g.writeUndefined(buffer);
             break;
         case Object: {
-            BSONObj truncated = embeddedObject().jsonStringGenerator(
-                g, pretty ? pretty + 1 : 0, false, buffer, writeLimit);
+            BSONObj truncated =
+                embeddedObject().jsonStringGenerator(g, pretty, false, buffer, writeLimit);
             if (!truncated.isEmpty()) {
                 BSONObjBuilder builder;
                 builder.append(fieldNameStringData(), truncated);
@@ -166,8 +170,8 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             return truncated;
         }
         case mongo::Array: {
-            BSONObj truncated = embeddedObject().jsonStringGenerator(
-                g, pretty ? pretty + 1 : 0, true, buffer, writeLimit);
+            BSONObj truncated =
+                embeddedObject().jsonStringGenerator(g, pretty, true, buffer, writeLimit);
             if (!truncated.isEmpty()) {
                 BSONObjBuilder builder;
                 builder.append(fieldNameStringData(), truncated);
