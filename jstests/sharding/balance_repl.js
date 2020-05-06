@@ -5,22 +5,22 @@
 (function() {
     'use strict';
 
-    // The mongod secondaries are set to priority 0 and votes 0 to prevent the primaries
-    // from stepping down during migrations on slow evergreen builders.
+    // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down
+    // during migrations on slow evergreen builders.
     var s = new ShardingTest({
         shards: 2,
         other: {
             chunkSize: 1,
             rs0: {
                 nodes: [
-                    {rsConfig: {votes: 1}},
-                    {rsConfig: {priority: 0, votes: 0}},
+                    {rsConfig: {}},
+                    {rsConfig: {priority: 0}},
                 ],
             },
             rs1: {
                 nodes: [
-                    {rsConfig: {votes: 1}},
-                    {rsConfig: {priority: 0, votes: 0}},
+                    {rsConfig: {}},
+                    {rsConfig: {priority: 0}},
                 ],
             }
         }
@@ -30,7 +30,7 @@
     for (var i = 0; i < 2100; i++) {
         bulk.insert({_id: i, x: i});
     }
-    assert.writeOK(bulk.execute());
+    assert.writeOK(bulk.execute({w: "majority"}));
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: 'TestDB'}));
     s.ensurePrimaryShard('TestDB', s.shard0.shardName);
