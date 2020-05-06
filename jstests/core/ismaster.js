@@ -1,3 +1,4 @@
+"use strict";
 var res = db.isMaster();
 // check that the fields that should be there are there and have proper values
 assert(res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
@@ -6,7 +7,8 @@ assert(res.maxMessageSizeBytes && isNumber(res.maxMessageSizeBytes) && res.maxBs
        "maxMessageSizeBytes possibly missing:" + tojson(res));
 assert(res.maxWriteBatchSize && isNumber(res.maxWriteBatchSize) && res.maxWriteBatchSize > 0,
        "maxWriteBatchSize possibly missing:" + tojson(res));
-assert(res.ismaster, "ismaster missing or false:" + tojson(res));
+assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));
+assert(res.ismaster === true, "ismaster field is false" + tojson(res));
 assert(res.localTime, "localTime possibly missing:" + tojson(res));
 
 if (!testingReplication) {
@@ -27,6 +29,7 @@ if (!testingReplication) {
         "buildIndexes",
         "me"
     ];
+    var field;
     // check that the fields that shouldn't be there are not there
     for (field in res) {
         if (!res.hasOwnProperty(field)) {
