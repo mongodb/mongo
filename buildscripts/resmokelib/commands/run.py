@@ -22,6 +22,7 @@ except ImportError:
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import parser
 from buildscripts.resmokelib import reportfile
 from buildscripts.resmokelib import sighandler
 from buildscripts.resmokelib import suitesconfig
@@ -158,12 +159,11 @@ class TestRunner(interface.Subcommand):  # pylint: disable=too-many-instance-att
         """Run the suite and tests specified."""
         self._resmoke_logger.info("verbatim resmoke.py invocation: %s", " ".join(sys.argv))
 
-        # TODO: SERVER-47611
-        # if config.EVERGREEN_TASK_ID:
-        #     local_args = parser.to_local_args()
-        #     self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
-        #                               os.path.join("buildscripts", "resmoke.py"),
-        #                               " ".join(local_args))
+        if config.EVERGREEN_TASK_ID:
+            local_args = parser.to_local_args()
+            self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
+                                      os.path.join("buildscripts", "resmoke.py"),
+                                      " ".join(local_args))
 
         suites = None
         try:
