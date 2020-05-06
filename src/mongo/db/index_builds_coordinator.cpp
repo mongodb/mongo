@@ -166,26 +166,26 @@ bool shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx,
  */
 void onCommitIndexBuild(OperationContext* opCtx,
                         const NamespaceString& nss,
-                        ReplIndexBuildState& replState) {
-    const auto& buildUUID = replState.buildUUID;
+                        std::shared_ptr<ReplIndexBuildState> replState) {
+    const auto& buildUUID = replState->buildUUID;
 
-    auto skipCheck = shouldSkipIndexBuildStateTransitionCheck(opCtx, replState.protocol);
+    auto skipCheck = shouldSkipIndexBuildStateTransitionCheck(opCtx, replState->protocol);
     {
-        stdx::unique_lock<Latch> lk(replState.mutex);
-        replState.indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
+        stdx::unique_lock<Latch> lk(replState->mutex);
+        replState->indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
     }
-    if (IndexBuildProtocol::kSinglePhase == replState.protocol) {
+    if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         return;
     }
 
-    invariant(IndexBuildProtocol::kTwoPhase == replState.protocol,
+    invariant(IndexBuildProtocol::kTwoPhase == replState->protocol,
               str::stream() << "onCommitIndexBuild: " << buildUUID);
     invariant(opCtx->lockState()->isWriteLocked(),
               str::stream() << "onCommitIndexBuild: " << buildUUID);
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    const auto& collUUID = replState.collectionUUID;
-    const auto& indexSpecs = replState.indexSpecs;
+    const auto& collUUID = replState->collectionUUID;
+    const auto& indexSpecs = replState->indexSpecs;
     auto fromMigrate = false;
 
     // Since two phase index builds are allowed to survive replication state transitions, we should
@@ -2254,7 +2254,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     // If two phase index builds is enabled, index build will be coordinated using
     // startIndexBuild and commitIndexBuild oplog entries.
-    auto onCommitFn = [&] { onCommitIndexBuild(opCtx, collection->ns(), *replState); };
+    auto onCommitFn = [&] { onCommitIndexBuild(opCtx, collection->ns(), replState); };
 
     auto onCreateEachFn = [&](const BSONObj& spec) {
         if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
