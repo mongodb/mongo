@@ -1115,13 +1115,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
 
     /* If off-page, the pointer references a WT_ADDR structure. */
     if (__wt_off_page(page, addr)) {
-        copy->oldest_start_ts = addr->oldest_start_ts;
-        copy->oldest_start_txn = addr->oldest_start_txn;
-        copy->newest_start_durable_ts = addr->newest_start_durable_ts;
-        copy->newest_stop_ts = addr->newest_stop_ts;
-        copy->newest_stop_txn = addr->newest_stop_txn;
-        copy->newest_stop_durable_ts = addr->newest_stop_durable_ts;
-        copy->prepare = addr->prepare;
+        __wt_time_aggregate_copy(&copy->ta, &addr->ta);
         copy->type = addr->type;
         memcpy(copy->addr, addr->addr, copy->size = addr->size);
         return (true);
@@ -1129,13 +1123,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
 
     /* If on-page, the pointer references a cell. */
     __wt_cell_unpack(session, page, (WT_CELL *)addr, unpack);
-    copy->oldest_start_ts = unpack->oldest_start_ts;
-    copy->oldest_start_txn = unpack->oldest_start_txn;
-    copy->newest_start_durable_ts = unpack->newest_start_durable_ts;
-    copy->newest_stop_ts = unpack->newest_stop_ts;
-    copy->newest_stop_txn = unpack->newest_stop_txn;
-    copy->newest_stop_durable_ts = unpack->newest_stop_durable_ts;
-    copy->prepare = F_ISSET(unpack, WT_CELL_UNPACK_PREPARE);
+    __wt_time_aggregate_copy(&copy->ta, &unpack->ta);
     copy->type = 0; /* Avoid static analyzer uninitialized value complaints. */
     switch (unpack->raw) {
     case WT_CELL_ADDR_INT:
@@ -1708,25 +1696,14 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
  */
 static inline int
 __wt_bt_col_var_cursor_walk_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page,
-  WT_CELL_UNPACK *unpack, WT_COL *cip, WT_UPDATE **updp)
+  WT_CELL_UNPACK *unpack, WT_COL *cip)
 {
-    WT_UPDATE *upd;
-
-    *updp = NULL;
-
     cbt->slot = WT_COL_SLOT(page, cip);
-    WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, NULL, unpack, &upd));
-    if (upd == NULL)
+    WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, NULL, unpack));
+    if (cbt->upd_value->type == WT_UPDATE_INVALID || cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
         return (0);
 
-    if (upd->type == WT_UPDATE_TOMBSTONE) {
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK))
-            __wt_free_update_list(session, &upd);
-        return (0);
-    }
-
-    WT_RET(__wt_value_return(cbt, upd));
-    *updp = upd;
+    WT_RET(__wt_value_return(cbt, cbt->upd_value));
 
     cbt->tmp->data = cbt->iface.value.data;
     cbt->tmp->size = cbt->iface.value.size;

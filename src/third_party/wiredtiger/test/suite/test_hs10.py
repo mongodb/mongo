@@ -45,7 +45,7 @@ class test_hs10(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return val
 
-    def test_modify_insert_to_las(self):
+    def test_modify_insert_to_hs(self):
         uri = "table:test_hs10"
         uri2 = "table:test_hs10_otherdata"
         create_params = 'value_format=S,key_format=i'

@@ -8,8 +8,7 @@ all_TESTS=
 noinst_PROGRAMS=
 
 # The import test is only a shell script
-# Temporarily disabled
-# all_TESTS += import/smoke.sh
+all_TESTS += import/smoke.sh
 
 test_incr_backup_SOURCES = incr_backup/main.c
 noinst_PROGRAMS += test_incr_backup

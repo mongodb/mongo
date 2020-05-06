@@ -65,7 +65,7 @@ __wt_ovfl_read(
      */
     __wt_readlock(session, &S2BT(session)->ovfl_lock);
     if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM) {
-        WT_ASSERT(session, __wt_txn_visible_all(session, unpack->stop_txn, unpack->stop_ts));
+        WT_ASSERT(session, __wt_txn_visible_all(session, unpack->tw.stop_txn, unpack->tw.stop_ts));
         ret = __wt_buf_setstr(session, store, "WT_CELL_VALUE_OVFL_RM");
         *decoded = true;
     } else

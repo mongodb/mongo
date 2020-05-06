@@ -496,7 +496,7 @@ prepare_transaction(TINFO *tinfo)
 {
     WT_DECL_RET;
     WT_SESSION *session;
-    uint64_t ts;
+    uint64_t longwait, pause_ms, ts;
     char buf[64];
 
     session = tinfo->session;
@@ -523,6 +523,19 @@ prepare_transaction(TINFO *tinfo)
 
     lock_writeunlock(session, &g.ts_lock);
 
+    /*
+     * Sometimes add a delay after prepare to induce extra memory stress. For 80% of the threads,
+     * there is never a delay, so there is always a dedicated set of threads trying to do work. For
+     * the other 20%, we'll sometimes delay. For these threads, 99% of the time, proceed without
+     * delay. The rest of the time, pause up to 5 seconds, weighted toward the smaller delays.
+     */
+    if (tinfo->id % 5 == 0) {
+        longwait = mmrand(&tinfo->rnd, 0, 999);
+        if (longwait < 10) {
+            pause_ms = mmrand(&tinfo->rnd, 1, 10) << longwait;
+            __wt_sleep(0, pause_ms * WT_THOUSAND);
+        }
+    }
     return (ret);
 }
 
@@ -1240,11 +1253,11 @@ order_error_col:
                  * less-than, row-store inserts new rows in-between rows by appending a new suffix
                  * to the row's key.)
                  */
-                testutil_check(__wt_buf_fmt((WT_SESSION_IMPL *)cursor->session, tinfo->tbuf, "%.*s",
+                testutil_check(__wt_buf_fmt(CUR2S(cursor), tinfo->tbuf, "%.*s",
                   (int)tinfo->key->size, (char *)tinfo->key->data));
                 keyno_prev = strtoul(tinfo->tbuf->data, NULL, 10);
-                testutil_check(__wt_buf_fmt((WT_SESSION_IMPL *)cursor->session, tinfo->tbuf, "%.*s",
-                  (int)key.size, (char *)key.data));
+                testutil_check(__wt_buf_fmt(
+                  CUR2S(cursor), tinfo->tbuf, "%.*s", (int)key.size, (char *)key.data));
                 keyno = strtoul(tinfo->tbuf->data, NULL, 10);
                 if (incrementing) {
                     if (keyno_prev != keyno && keyno_prev + 1 != keyno)
@@ -1258,8 +1271,7 @@ order_error_row:
                   (char *)tinfo->key->data, (int)key.size, (char *)key.data);
             }
 
-            testutil_check(
-              __wt_buf_set((WT_SESSION_IMPL *)cursor->session, tinfo->key, key.data, key.size));
+            testutil_check(__wt_buf_set(CUR2S(cursor), tinfo->key, key.data, key.size));
             break;
         }
         break;

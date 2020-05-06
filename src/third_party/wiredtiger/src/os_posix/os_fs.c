@@ -88,7 +88,7 @@ __posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, const char *fun
         WT_SYSCALL(fcntl(fd, F_FULLFSYNC, 0) == -1 ? -1 : 0, ret);
         if (ret == 0)
             return (0);
-        WT_PANIC_RET(session, ret, "%s: %s: fcntl(F_FULLFSYNC)", name, func);
+        WT_RET_PANIC(session, ret, "%s: %s: fcntl(F_FULLFSYNC)", name, func);
     }
 #endif
 #if defined(HAVE_FDATASYNC)
@@ -96,13 +96,13 @@ __posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, const char *fun
     WT_SYSCALL(fdatasync(fd), ret);
     if (ret == 0)
         return (0);
-    WT_PANIC_RET(session, ret, "%s: %s: fdatasync", name, func);
+    WT_RET_PANIC(session, ret, "%s: %s: fdatasync", name, func);
 #else
     /* See comment in __posix_sync(): sync cannot be retried or fail. */
     WT_SYSCALL(fsync(fd), ret);
     if (ret == 0)
         return (0);
-    WT_PANIC_RET(session, ret, "%s: %s: fsync", name, func);
+    WT_RET_PANIC(session, ret, "%s: %s: fsync", name, func);
 #endif
 }
 
@@ -148,7 +148,7 @@ err:
         return (ret);
 
     /* See comment in __posix_sync(): sync cannot be retried or fail. */
-    WT_PANIC_RET(session, ret, "%s: directory-sync", path);
+    WT_RET_PANIC(session, ret, "%s: directory-sync", path);
 }
 #endif
 
@@ -541,7 +541,7 @@ __posix_file_sync_nowait(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
     if (ret == 0)
         return (0);
 
-    WT_PANIC_RET(session, ret, "%s: handle-sync-nowait: sync_file_range", file_handle->name);
+    WT_RET_PANIC(session, ret, "%s: handle-sync-nowait: sync_file_range", file_handle->name);
 }
 #endif
 

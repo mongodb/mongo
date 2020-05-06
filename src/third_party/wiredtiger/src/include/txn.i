@@ -59,8 +59,8 @@ __wt_txn_err_set(WT_SESSION_IMPL *session, int ret)
      * a prepared transaction.
      */
     if (F_ISSET(txn, WT_TXN_PREPARE))
-        WT_PANIC_MSG(session, ret,
-          "transactional error logged after transaction was prepared, failing the system");
+        WT_IGNORE_RET(__wt_panic(session, ret,
+          "transactional error logged after transaction was prepared, failing the system"));
 }
 
 /*
@@ -584,6 +584,20 @@ __wt_txn_upd_visible_all(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
+ * __wt_txn_upd_value_visible_all --
+ *     Is the given update value visible to all (possible) readers?
+ */
+static inline bool
+__wt_txn_upd_value_visible_all(WT_SESSION_IMPL *session, WT_UPDATE_VALUE *upd_value)
+{
+    if (upd_value->prepare_state == WT_PREPARE_LOCKED ||
+      upd_value->prepare_state == WT_PREPARE_INPROGRESS)
+        return (false);
+
+    return (__wt_txn_visible_all(session, upd_value->txnid, upd_value->start_ts));
+}
+
+/*
  * __txn_visible_id --
  *     Can the current transaction see the given ID?
  */
@@ -769,12 +783,12 @@ __wt_upd_alloc_tombstone(WT_SESSION_IMPL *session, WT_UPDATE **updp, size_t *siz
  *     Get the first visible update in a list (or NULL if none are visible).
  */
 static inline int
-__wt_txn_read_upd_list(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **updp)
+__wt_txn_read_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
     WT_VISIBLE_TYPE upd_visible;
     uint8_t type;
 
-    *updp = NULL;
+    __wt_upd_value_clear(cbt->upd_value);
 
     for (; upd != NULL; upd = upd->next) {
         WT_ORDERED_READ(type, upd->type);
@@ -784,19 +798,33 @@ __wt_txn_read_upd_list(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **upd
         upd_visible = __wt_txn_upd_visible_type(session, upd);
         if (upd_visible == WT_VISIBLE_TRUE) {
             /*
-             * A tombstone representing a stop time pair will have either a valid txn id or a valid
-             * timestamp. Ignore such tombstones in history store based on session settings.
+             * Ignore non-globally visible tombstones when we are doing history store scans in
+             * rollback to stable or when we are told to.
              */
-            if (type == WT_UPDATE_TOMBSTONE && WT_IS_HS(S2BT(session)) &&
-              F_ISSET(session, WT_SESSION_IGNORE_HS_TOMBSTONE) &&
-              (upd->start_ts != WT_TS_NONE || upd->txnid != WT_TXN_NONE))
+            if (type == WT_UPDATE_TOMBSTONE &&
+              (F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) ||
+                  (WT_IS_HS(S2BT(session)) && F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))) &&
+              !__wt_txn_upd_visible_all(session, upd))
                 continue;
-            *updp = upd;
-            return (0);
+            break;
         }
         if (upd_visible == WT_VISIBLE_PREPARE)
             return (WT_PREPARE_CONFLICT);
     }
+    if (upd == NULL)
+        return (0);
+    /*
+     * Now assign to the update value. If it's not a modify, we're free to simply point the value at
+     * the update's memory without owning it. If it is a modify, we need to reconstruct the full
+     * update now and make the value own the buffer.
+     *
+     * If the caller has specifically asked us to skip assigning the buffer, we shouldn't bother
+     * reconstructing the modify.
+     */
+    if (upd->type != WT_UPDATE_MODIFY || cbt->upd_value->skip_buf)
+        __wt_upd_value_assign(cbt->upd_value, upd);
+    else
+        WT_RET(__wt_modify_reconstruct_from_upd_list(session, cbt, upd, cbt->upd_value));
     return (0);
 }
 
@@ -809,101 +837,83 @@ __wt_txn_read_upd_list(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **upd
  */
 static inline int
 __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno,
-  WT_UPDATE *upd, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
+  WT_UPDATE *upd, WT_CELL_UNPACK *vpack)
 {
-    WT_DECL_RET;
-    WT_ITEM buf;
-    WT_TIME_PAIR start, stop;
+    WT_TIME_WINDOW tw;
 
-    *updp = NULL;
-    WT_RET(__wt_txn_read_upd_list(session, upd, updp));
-    if (*updp != NULL)
+    WT_RET(__wt_txn_read_upd_list(session, cbt, upd));
+    if (WT_UPDATE_DATA_VALUE(cbt->upd_value) ||
+      (cbt->upd_value->type == WT_UPDATE_MODIFY && cbt->upd_value->skip_buf))
         return (0);
+    WT_ASSERT(session, cbt->upd_value->type == WT_UPDATE_INVALID);
 
     /* If there is no ondisk value, there can't be anything in the history store either. */
-    if (cbt->ref->page->dsk == NULL || cbt->slot == UINT32_MAX)
-        return (__wt_upd_alloc_tombstone(session, updp, NULL));
-
-    buf.data = NULL;
-    buf.size = 0;
-    buf.mem = NULL;
-    buf.memsize = 0;
-    buf.flags = 0;
+    if (cbt->ref->page->dsk == NULL || cbt->slot == UINT32_MAX) {
+        cbt->upd_value->type = WT_UPDATE_TOMBSTONE;
+        return (0);
+    }
 
     /* Check the ondisk value. */
     if (vpack == NULL) {
-        ret = __wt_value_return_buf(cbt, cbt->ref, &buf, &start, &stop);
-        if (ret != 0) {
-            __wt_buf_free(session, &buf);
-            return (ret);
-        }
+        __wt_time_window_init(&tw);
+        WT_RET(__wt_value_return_buf(cbt, cbt->ref, &cbt->upd_value->buf, &tw));
     } else {
-        start.timestamp = vpack->start_ts;
-        start.txnid = vpack->start_txn;
-        stop.timestamp = vpack->stop_ts;
-        stop.txnid = vpack->start_txn;
-        buf.data = vpack->data;
-        buf.size = vpack->size;
+        __wt_time_window_copy(&tw, &vpack->tw);
+        cbt->upd_value->buf.data = vpack->data;
+        cbt->upd_value->buf.size = vpack->size;
     }
 
     /*
-     * If the stop pair is set, that means that there is a tombstone at that time. If the stop time
-     * pair is visible to our txn then that means we've just spotted a tombstone and should return
-     * "not found", except for history store scan during rollback to stable.
+     * If the stop pair is set, that means that there is a tombstone at that time. If it is not
+     * prepared and the stop time pair is visible to our txn then that means we've just spotted a
+     * tombstone and should return "not found", except for history store scan during rollback to
+     * stable and when we are told to ignore non-globally visible tombstones.
      */
-    if (stop.txnid != WT_TXN_MAX && stop.timestamp != WT_TS_MAX &&
-      (!WT_IS_HS(S2BT(session)) || !F_ISSET(session, WT_SESSION_IGNORE_HS_TOMBSTONE)) &&
-      __wt_txn_visible(session, stop.txnid, stop.timestamp)) {
-        __wt_buf_free(session, &buf);
-        WT_RET(__wt_upd_alloc_tombstone(session, updp, NULL));
-        (*updp)->txnid = stop.txnid;
-        /* FIXME: Reevaluate this as part of PM-1524. */
-        (*updp)->durable_ts = (*updp)->start_ts = stop.timestamp;
-        F_SET(*updp, WT_UPDATE_RESTORED_FROM_DISK);
+    if (tw.stop_txn != WT_TXN_MAX && tw.stop_ts != WT_TS_MAX && !tw.prepare &&
+      __wt_txn_visible(session, tw.stop_txn, tw.stop_ts) &&
+      ((!F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&
+         (!WT_IS_HS(S2BT(session)) || !F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))) ||
+          __wt_txn_visible_all(session, tw.stop_txn, tw.stop_ts))) {
+        cbt->upd_value->buf.data = NULL;
+        cbt->upd_value->buf.size = 0;
+        cbt->upd_value->start_ts = tw.stop_ts;
+        cbt->upd_value->txnid = tw.stop_txn;
+        cbt->upd_value->type = WT_UPDATE_TOMBSTONE;
+        cbt->upd_value->prepare_state = WT_PREPARE_INIT;
         return (0);
     }
 
     /*
-     * If the start time pair is visible then we need to return the ondisk value.
-     *
-     * FIXME-PM-1521: This should be probably be re-factored to return a buffer of bytes rather than
-     * an update. This allocation is expensive and doesn't serve a purpose other than to work within
-     * the current system.
+     * If the start time pair is visible and it is not a prepared value then we need to return the
+     * ondisk value.
      */
-    if (__wt_txn_visible(session, start.txnid, start.timestamp) ||
-      F_ISSET(session, WT_SESSION_RESOLVING_MODIFY)) {
+    if ((!tw.prepare || (tw.stop_txn != WT_TXN_MAX && tw.stop_ts != WT_TS_MAX)) &&
+      (__wt_txn_visible(session, tw.start_txn, tw.start_ts) ||
+          F_ISSET(session, WT_SESSION_RESOLVING_MODIFY))) {
 
         /* If we are resolving a modify then the btree must be the history store. */
         WT_ASSERT(
           session, (F_ISSET(session, WT_SESSION_RESOLVING_MODIFY) && WT_IS_HS(S2BT(session))) ||
             !F_ISSET(session, WT_SESSION_RESOLVING_MODIFY));
 
-        ret = __wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, updp, NULL);
-        __wt_buf_free(session, &buf);
-        WT_RET(ret);
-        (*updp)->txnid = start.txnid;
-        (*updp)->start_ts = start.timestamp;
-        F_SET((*updp), WT_UPDATE_RESTORED_FROM_DISK);
+        if (cbt->upd_value->skip_buf) {
+            cbt->upd_value->buf.data = NULL;
+            cbt->upd_value->buf.size = 0;
+        }
+        cbt->upd_value->start_ts = tw.start_ts;
+        cbt->upd_value->txnid = tw.start_txn;
+        cbt->upd_value->type = WT_UPDATE_STANDARD;
+        cbt->upd_value->prepare_state = WT_PREPARE_INIT;
         return (0);
     }
 
     /* If there's no visible update in the update chain or ondisk, check the history store file. */
-    if (F_ISSET(S2C(session), WT_CONN_HS_OPEN) && !F_ISSET(S2BT(session), WT_BTREE_HS)) {
-        ret = __wt_find_hs_upd(session, key, recno, updp, false, &buf);
-        __wt_buf_free(session, &buf);
-        WT_RET_NOTFOUND_OK(ret);
-    }
+    if (F_ISSET(S2C(session), WT_CONN_HS_OPEN) && !F_ISSET(S2BT(session), WT_BTREE_HS))
+        WT_RET_NOTFOUND_OK(__wt_find_hs_upd(session, key, cbt->iface.value_format, recno,
+          cbt->upd_value, false, &cbt->upd_value->buf));
 
-    __wt_buf_free(session, &buf);
-    /*
-     * Return null not tombstone if nothing is found in history store.
-     */
-    WT_ASSERT(session, (*updp) == NULL || (*updp)->type != WT_UPDATE_TOMBSTONE);
-
-    /*
-     * FIXME-PM-1521: We call transaction read in a lot of places so we can't do this yet. When we
-     * re-factor this function to return a byte array, we should tackle this at the same time.
-     */
+    /* Return invalid not tombstone if nothing is found in history store. */
+    WT_ASSERT(session, cbt->upd_value->type != WT_UPDATE_TOMBSTONE);
     return (0);
 }
 
@@ -1107,7 +1117,7 @@ static inline int
 __wt_txn_update_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
     WT_DECL_RET;
-    WT_TIME_PAIR start, stop;
+    WT_TIME_WINDOW tw;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     bool ignore_prepare_set, rollback;
@@ -1144,11 +1154,11 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE 
      */
     if (!rollback && upd == NULL && cbt != NULL && cbt->btree->type != BTREE_COL_FIX &&
       cbt->ins == NULL) {
-        __wt_read_cell_time_pairs(cbt, cbt->ref, &start, &stop);
-        if (stop.txnid != WT_TXN_MAX && stop.timestamp != WT_TS_MAX)
-            rollback = !__wt_txn_visible(session, stop.txnid, stop.timestamp);
+        __wt_read_cell_time_window(cbt, cbt->ref, &tw);
+        if (tw.stop_txn != WT_TXN_MAX && tw.stop_ts != WT_TS_MAX)
+            rollback = !__wt_txn_visible(session, tw.stop_txn, tw.stop_ts);
         else
-            rollback = !__wt_txn_visible(session, start.txnid, start.timestamp);
+            rollback = !__wt_txn_visible(session, tw.start_txn, tw.start_ts);
     }
 
     if (rollback) {
@@ -1252,4 +1262,41 @@ __wt_txn_activity_check(WT_SESSION_IMPL *session, bool *txn_active)
       txn_global->metadata_pinned != txn_global->current);
 
     return (0);
+}
+
+/*
+ * __wt_upd_value_assign --
+ *     Point an update value at a given update. We're specifically not getting the value to own the
+ *     memory since this exists in an update list somewhere.
+ */
+static inline void
+__wt_upd_value_assign(WT_UPDATE_VALUE *upd_value, WT_UPDATE *upd)
+{
+    if (!upd_value->skip_buf) {
+        upd_value->buf.data = upd->data;
+        upd_value->buf.size = upd->size;
+    }
+    upd_value->start_ts = upd->start_ts;
+    upd_value->txnid = upd->txnid;
+    upd_value->type = upd->type;
+    upd_value->prepare_state = upd->prepare_state;
+}
+
+/*
+ * __wt_upd_value_clear --
+ *     Clear an update value to its defaults.
+ */
+static inline void
+__wt_upd_value_clear(WT_UPDATE_VALUE *upd_value)
+{
+    /*
+     * Make sure we don't touch the memory pointers here. If we have some allocated memory, that
+     * could come in handy next time we need to write to the buffer.
+     */
+    upd_value->buf.data = NULL;
+    upd_value->buf.size = 0;
+    upd_value->start_ts = WT_TS_NONE;
+    upd_value->txnid = WT_TXN_NONE;
+    upd_value->type = WT_UPDATE_INVALID;
+    upd_value->prepare_state = WT_PREPARE_INIT;
 }

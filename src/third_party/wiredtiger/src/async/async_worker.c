@@ -309,7 +309,7 @@ __wt_async_worker(void *arg)
 
     if (0) {
 err:
-        WT_PANIC_MSG(session, ret, "async worker error");
+        WT_IGNORE_RET(__wt_panic(session, ret, "async worker error"));
     }
     /*
      * Worker thread cleanup, close our cached cursors and free all the WT_ASYNC_CURSOR structures.

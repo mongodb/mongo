@@ -11,6 +11,9 @@
 #define WT_TXN_MAX (UINT64_MAX - 10) /* End of time */
 #define WT_TXN_ABORTED UINT64_MAX    /* Update rolled back */
 
+#define WT_TS_NONE 0         /* Beginning of time */
+#define WT_TS_MAX UINT64_MAX /* End of time */
+
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_TXN_LOG_CKPT_CLEANUP 0x01u
 #define WT_TXN_LOG_CKPT_PREPARE 0x02u
@@ -51,25 +54,6 @@ typedef enum {
                                                   &S2C(s)->txn_global.txn_shared_list[(s)->id])
 
 #define WT_SESSION_IS_CHECKPOINT(s) ((s)->id != 0 && (s)->id == S2C(s)->txn_global.checkpoint_id)
-
-#define WT_TS_NONE 0         /* Beginning of time */
-#define WT_TS_MAX UINT64_MAX /* End of time */
-
-/*
- * We format timestamps in a couple of ways, declare appropriate sized buffers. Hexadecimal is 2x
- * the size of the value. MongoDB format (high/low pairs of 4B unsigned integers, with surrounding
- * parenthesis and separating comma and space), is 2x the maximum digits from a 4B unsigned integer
- * plus 4. Both sizes include a trailing null byte as well.
- */
-#define WT_TS_HEX_STRING_SIZE (2 * sizeof(wt_timestamp_t) + 1)
-#define WT_TS_INT_STRING_SIZE (2 * 10 + 4 + 1)
-
-/*
- * We need an appropriately sized buffer for formatted time pairs. This is for time pairs of the
- * form (time_stamp, slash and transaction_id), which gives the max digits of a timestamp plus slash
- * plus max digits of a 8 byte integer with a trailing null byte.
- */
-#define WT_TP_STRING_SIZE (WT_TS_INT_STRING_SIZE + 1 + 20 + 1)
 
 /*
  * Perform an operation at the specified isolation level.

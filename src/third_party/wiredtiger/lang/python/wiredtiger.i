@@ -1347,7 +1347,7 @@ cursorCloseHandler(WT_CURSOR *cursor)
 	cursor->lang_private = NULL;
 	if (pcb != NULL)
 		ret = pythonClose(pcb);
-	__wt_free((WT_SESSION_IMPL *)cursor->session, pcb);
+	__wt_free(CUR2S(cursor), pcb);
 
 	return (ret);
 }
@@ -1374,7 +1374,7 @@ cursorFreeHandler(WT_CURSOR *cursor)
 
 	pcb = (PY_CALLBACK *)cursor->lang_private;
 	cursor->lang_private = NULL;
-	__wt_free((WT_SESSION_IMPL *)cursor->session, pcb);
+	__wt_free(CUR2S(cursor), pcb);
 	return (0);
 }
 

@@ -160,7 +160,7 @@ thread_run(void *arg)
     /*
      * Make sure that alternative threads operate on column-store table
      *
-     * FIXME: temporarily turn off column store test.
+     * FIXME-WT-6125: temporarily turn off column store test.
      */
     if (td->id % 2 != 0)
         columnar_table = true;
@@ -180,7 +180,7 @@ thread_run(void *arg)
         if (i == 0)
             i++;
 
-        /* FIXME: temporarily turn off tests for lower isolation levels. */
+        /* FIXME-WT-6035: temporarily turn off tests for lower isolation levels. */
         testutil_check(session->begin_transaction(session, "isolation=snapshot"));
 
         /*
@@ -208,7 +208,7 @@ thread_run(void *arg)
         cursor->set_value(cursor, &data);
         testutil_check(cursor->insert(cursor));
 
-        /* FIXME: temporarily turn off tests for lower isolation levels. */
+        /* FIXME-WT-6035: temporarily turn off tests for lower isolation levels. */
         testutil_check(session->commit_transaction(session, NULL));
 
         /*
@@ -221,7 +221,7 @@ thread_run(void *arg)
          * Decide what kind of operation can be performed on the already inserted data.
          */
         if (i % MAX_NUM_OPS == OP_TYPE_DELETE) {
-            /* FIXME: temporarily turn off tests for lower isolation levels. */
+            /* FIXME-WT-6035: temporarily turn off tests for lower isolation levels. */
             testutil_check(session->begin_transaction(session, "isolation=snapshot"));
 
             if (columnar_table)
@@ -231,7 +231,7 @@ thread_run(void *arg)
 
             testutil_check(cursor->remove(cursor));
 
-            /* FIXME: temporarily turn off tests for lower isolation levels. */
+            /* FIXME-WT-6035: temporarily turn off tests for lower isolation levels. */
             testutil_check(session->commit_transaction(session, NULL));
 
             /* Save the key separately for checking later.*/
@@ -391,7 +391,7 @@ recover_and_verify(uint32_t nthreads)
             cursor = row_cursor;
         }
 #else
-        /* FIXME: temporarily turn off column store test. */
+        /* FIXME-WT-6125: temporarily turn off column store test. */
         columnar_table = false;
         cursor = row_cursor;
 #endif

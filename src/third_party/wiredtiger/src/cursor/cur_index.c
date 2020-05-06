@@ -103,7 +103,7 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
     WT_SESSION_IMPL *session;
     u_int i;
 
-    session = (WT_SESSION_IMPL *)cindex->iface.session;
+    session = CUR2S(cindex);
     first = NULL;
 
     /* Point the public cursor to the key in the child. */

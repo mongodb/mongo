@@ -109,8 +109,8 @@ op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
         /*
          * Use a checkpoint handle for 50% of reads.
          *
-         * FIXME: Checkpoint cursors are known to have issues in durable history so we've removing
-         * the use of checkpoint handles in this test. As part of WT-5927, we should either
+         * FIXME-WT-5927: Checkpoint cursors are known to have issues in durable history so we've
+         * removing the use of checkpoint handles in this test. As part of WT-5927, we should either
          * re-enable the testing of checkpoint cursors or remove this comment.
          */
         ret = session->open_cursor(session, uri_list[i], NULL, NULL, &cursor);

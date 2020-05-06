@@ -126,14 +126,7 @@ __wt_page_header_byteswap(WT_PAGE_HEADER *dsk)
  *	An in-memory structure to hold a block's location.
  */
 struct __wt_addr {
-    /* Validity window */
-    wt_timestamp_t newest_start_durable_ts;
-    wt_timestamp_t oldest_start_ts;
-    uint64_t oldest_start_txn;
-    wt_timestamp_t newest_stop_durable_ts;
-    wt_timestamp_t newest_stop_ts;
-    uint64_t newest_stop_txn;
-    bool prepare;
+    WT_TIME_AGGREGATE ta;
 
     uint8_t *addr; /* Block-manager's cookie */
     uint8_t size;  /* Block-manager's cookie length */
@@ -159,14 +152,7 @@ struct __wt_addr {
  * copy of the WT_REF address information.
  */
 struct __wt_addr_copy {
-    /* Validity window */
-    wt_timestamp_t newest_start_durable_ts;
-    wt_timestamp_t oldest_start_ts;
-    uint64_t oldest_start_txn;
-    wt_timestamp_t newest_stop_durable_ts;
-    wt_timestamp_t newest_stop_ts;
-    uint64_t newest_stop_txn;
-    bool prepare;
+    WT_TIME_AGGREGATE ta;
 
     uint8_t type;
 
@@ -640,16 +626,17 @@ struct __wt_page {
     uint8_t type;               /* Page type */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_PAGE_BUILD_KEYS 0x01u        /* Keys have been built in memory */
-#define WT_PAGE_DISK_ALLOC 0x02u        /* Disk image in allocated memory */
-#define WT_PAGE_DISK_MAPPED 0x04u       /* Disk image in mapped memory */
-#define WT_PAGE_EVICT_LRU 0x08u         /* Page is on the LRU queue */
-#define WT_PAGE_EVICT_NO_PROGRESS 0x10u /* Eviction doesn't count as progress */
-#define WT_PAGE_OVERFLOW_KEYS 0x20u     /* Page has overflow keys */
-#define WT_PAGE_SPLIT_INSERT 0x40u      /* A leaf page was split for append */
-#define WT_PAGE_UPDATE_IGNORE 0x80u     /* Ignore updates on page discard */
-                                        /* AUTOMATIC FLAG VALUE GENERATION STOP */
-    uint8_t flags_atomic;               /* Atomic flags, use F_*_ATOMIC */
+#define WT_PAGE_BUILD_KEYS 0x001u                 /* Keys have been built in memory */
+#define WT_PAGE_DISK_ALLOC 0x002u                 /* Disk image in allocated memory */
+#define WT_PAGE_DISK_MAPPED 0x004u                /* Disk image in mapped memory */
+#define WT_PAGE_EVICT_LRU 0x008u                  /* Page is on the LRU queue */
+#define WT_PAGE_EVICT_NO_PROGRESS 0x010u          /* Eviction doesn't count as progress */
+#define WT_PAGE_INSTANTIATE_PREPARE_UPDATE 0x020u /* Instantiate prepared updates */
+#define WT_PAGE_OVERFLOW_KEYS 0x040u              /* Page has overflow keys */
+#define WT_PAGE_SPLIT_INSERT 0x080u               /* A leaf page was split for append */
+#define WT_PAGE_UPDATE_IGNORE 0x100u              /* Ignore updates on page discard */
+                                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint8_t flags_atomic;                         /* Atomic flags, use F_*_ATOMIC */
 
     uint8_t unused[2]; /* Unused padding */
 
@@ -814,15 +801,6 @@ struct __wt_page_deleted {
     uint8_t previous_state; /* Previous state */
 
     WT_UPDATE **update_list; /* List of updates for abort */
-};
-
-/*
- * WT_TIME_PAIR --
- * 	A pair containing a timestamp and transaction id.
- */
-struct __wt_time_pair {
-    wt_timestamp_t timestamp;
-    uint64_t txnid;
 };
 
 /*
@@ -1098,7 +1076,6 @@ struct __wt_update {
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_UPDATE_HS 0x1u                    /* Update has been written to history store. */
 #define WT_UPDATE_RESTORED_FOR_ROLLBACK 0x2u /* Update restored for rollback to stable. */
-#define WT_UPDATE_RESTORED_FROM_DISK 0x4u    /* Update is temporary retrieved from disk. */
                                              /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 
@@ -1120,6 +1097,39 @@ struct __wt_update {
  * overhead of tiny allocations can swamp our cache overhead calculation.
  */
 #define WT_UPDATE_MEMSIZE(upd) WT_ALIGN(WT_UPDATE_SIZE + (upd)->size, 32)
+
+/*
+ * WT_UPDATE_VALUE --
+ *
+ * A generic representation of an update's value regardless of where it exists. This structure is
+ * used to represent both in-memory updates and updates that don't exist in an update list such as
+ * reconstructed modify updates, updates in the history store and onpage values.
+ *
+ * The skip buffer flag is an optimization for callers of various read functions to communicate that
+ * they just want to check that an update exists and not read its underlying value. This means that
+ * the read functions can avoid the performance penalty of reconstructing modifies.
+ */
+struct __wt_update_value {
+    WT_ITEM buf;
+    wt_timestamp_t start_ts;
+    uint64_t txnid;
+    uint8_t type;
+    uint8_t prepare_state;
+    bool skip_buf;
+};
+
+/*
+ * WT_WITH_UPDATE_VALUE_SKIP_BUF --
+ *
+ * A helper macro to use for calling read functions when we're checking for the existence of a given
+ * key. This means that read functions can avoid the performance penalty of reconstructing modifies.
+ */
+#define WT_WITH_UPDATE_VALUE_SKIP_BUF(op) \
+    do {                                  \
+        cbt->upd_value->skip_buf = true;  \
+        op;                               \
+        cbt->upd_value->skip_buf = false; \
+    } while (0)
 
 /*
  * WT_MAX_MODIFY_UPDATE, WT_MODIFY_VECTOR_STACK_SIZE

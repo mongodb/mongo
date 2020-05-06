@@ -150,7 +150,7 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable)
     int (*f)(WT_CURSOR *);
 
     cp = ctable->idx_cursors;
-    session = (WT_SESSION_IMPL *)ctable->iface.session;
+    session = CUR2S(ctable);
 
     for (i = 0; i < ctable->table->nindices; i++, cp++) {
         idx = ctable->table->indices[i];
@@ -729,7 +729,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
     int cmp;
 
     ctable = (start != NULL) ? start : stop;
-    session = (WT_SESSION_IMPL *)ctable->iface.session;
+    session = CUR2S(ctable);
     wt_start = &start->iface;
     wt_stop = &stop->iface;
 
@@ -877,7 +877,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
     const char *cfg[] = {cfg_arg[0], cfg_arg[1], "dump=\"\",readonly=0", NULL, NULL};
     u_int i;
 
-    session = (WT_SESSION_IMPL *)ctable->iface.session;
+    session = CUR2S(ctable);
     table = ctable->table;
 
     WT_RET(__curtable_complete(session, table)); /* completeness check */
@@ -904,7 +904,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
     WT_TABLE *table;
     u_int i;
 
-    session = (WT_SESSION_IMPL *)ctable->iface.session;
+    session = CUR2S(ctable);
     table = ctable->table;
 
     WT_RET(__wt_schema_open_indices(session, table));

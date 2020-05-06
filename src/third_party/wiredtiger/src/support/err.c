@@ -332,6 +332,73 @@ __wt_errx_func(WT_SESSION_IMPL *session, const char *func, int line, const char 
 }
 
 /*
+ * __wt_panic_func --
+ *     A standard error message when we panic.
+ */
+int
+__wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line, const char *fmt,
+  ...) WT_GCC_FUNC_ATTRIBUTE((cold)) WT_GCC_FUNC_ATTRIBUTE((format(printf, 5, 6)))
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    va_list ap;
+
+    /*
+     * Ignore error returns from underlying event handlers, we already have an error value to
+     * return.
+     */
+    va_start(ap, fmt);
+    WT_IGNORE_RET(__eventv(session, false, error, func, line, fmt, ap));
+    va_end(ap);
+
+    /*
+     * !!!
+     * This function MUST handle a NULL WT_SESSION_IMPL handle.
+     *
+     * If the connection has already panicked, just return the error.
+     */
+    if (session != NULL && F_ISSET(S2C(session), WT_CONN_PANIC))
+        return (WT_PANIC);
+
+    /*
+     * Call the error callback function before setting the connection's panic flag, so applications
+     * can trace the failing thread before being flooded with panic returns from API calls. Using
+     * the variable-arguments list from the current call even thought the format doesn't need it as
+     * I'm not confident of underlying support for a NULL.
+     */
+    va_start(ap, fmt);
+    WT_IGNORE_RET(
+      __eventv(session, false, WT_PANIC, func, line, "the process must exit and restart", ap));
+    va_end(ap);
+
+/*
+ * Confusing #ifdef structure because gcc/clang knows the abort call won't return, and Visual Studio
+ * doesn't.
+ */
+#if defined(HAVE_DIAGNOSTIC)
+    __wt_abort(session); /* Drop core if testing. */
+                         /* NOTREACHED */
+#endif
+#if !defined(HAVE_DIAGNOSTIC) || defined(_WIN32)
+    /*
+     * !!!
+     * This function MUST handle a NULL WT_SESSION_IMPL handle.
+     *
+     * Panic the connection;
+     */
+    if (session != NULL)
+        F_SET(S2C(session), WT_CONN_PANIC);
+
+    /*
+     * !!!
+     * Chaos reigns within.
+     * Reflect, repent, and reboot.
+     * Order shall return.
+     */
+    return (WT_PANIC);
+#endif
+}
+
+/*
  * __wt_set_return_func --
  *     Conditionally log the source of an error code and return the error.
  */
@@ -464,67 +531,6 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
                handler, wt_session, s == NULL ? session->name : s, v)) != 0)
             __handler_failure(session, ret, "progress", false);
     return (0);
-}
-
-/*
- * __wt_panic --
- *     A standard error message when we panic.
- */
-int
-__wt_panic(WT_SESSION_IMPL *session) WT_GCC_FUNC_ATTRIBUTE((cold))
-  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
-{
-    /*
-     * !!!
-     * This function MUST handle a NULL WT_SESSION_IMPL handle.
-     *
-     * If the connection has already panicked, just return the error.
-     */
-    if (session != NULL && F_ISSET(S2C(session), WT_CONN_PANIC))
-        return (WT_PANIC);
-
-    /*
-     * Call the error callback function before setting the connection's panic flag, so applications
-     * can trace the failing thread before being flooded with panic returns from API calls.
-     */
-    __wt_err(session, WT_PANIC, "the process must exit and restart");
-
-/*
- * Confusing #ifdef structure because gcc/clang knows the abort call won't return, and Visual Studio
- * doesn't.
- */
-#if defined(HAVE_DIAGNOSTIC)
-    __wt_abort(session); /* Drop core if testing. */
-                         /* NOTREACHED */
-#endif
-#if !defined(HAVE_DIAGNOSTIC) || defined(_WIN32)
-    /*
-     * !!!
-     * This function MUST handle a NULL WT_SESSION_IMPL handle.
-     *
-     * Panic the connection;
-     */
-    if (session != NULL)
-        F_SET(S2C(session), WT_CONN_PANIC);
-
-    /*
-     * Chaos reigns within. Reflect, repent, and reboot. Order shall return.
-     */
-    return (WT_PANIC);
-#endif
-}
-
-/*
- * __wt_illegal_value_func --
- *     A standard error message when we detect an illegal value.
- */
-int
-__wt_illegal_value_func(WT_SESSION_IMPL *session, uintmax_t v, const char *func, int line)
-  WT_GCC_FUNC_ATTRIBUTE((cold)) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
-{
-    __wt_err_func(session, EINVAL, func, line, "%s: 0x%" PRIxMAX,
-      "encountered an illegal file format or internal value", v);
-    return (__wt_panic(session));
 }
 
 /*

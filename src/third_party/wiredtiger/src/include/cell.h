@@ -151,23 +151,10 @@ struct __wt_cell {
 struct __wt_cell_unpack {
     WT_CELL *cell; /* Cell's disk image address */
 
+    WT_TIME_AGGREGATE ta; /* Address validity window */
+    WT_TIME_WINDOW tw;    /* Value validity window */
+
     uint64_t v; /* RLE count or recno */
-
-    /* Value validity window */
-    wt_timestamp_t start_ts;         /* default value: WT_TS_NONE */
-    uint64_t start_txn;              /* default value: WT_TXN_NONE */
-    wt_timestamp_t durable_start_ts; /* default value: WT_TS_NONE */
-    wt_timestamp_t stop_ts;          /* default value: WT_TS_MAX */
-    uint64_t stop_txn;               /* default value: WT_TXN_MAX */
-    wt_timestamp_t durable_stop_ts;  /* default value: WT_TS_NONE */
-
-    /* Address validity window */
-    wt_timestamp_t oldest_start_ts;         /* default value: WT_TS_NONE */
-    uint64_t oldest_start_txn;              /* default value: WT_TXN_NONE */
-    wt_timestamp_t newest_start_durable_ts; /* default value: WT_TS_NONE */
-    wt_timestamp_t newest_stop_ts;          /* default value: WT_TS_MAX */
-    uint64_t newest_stop_txn;               /* default value: WT_TXN_MAX */
-    wt_timestamp_t newest_stop_durable_ts;  /* default value: WT_TS_NONE */
 
     /*
      * !!!
@@ -185,9 +172,9 @@ struct __wt_cell_unpack {
     uint8_t type; /* Cell type */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_CELL_UNPACK_OVERFLOW 0x1u           /* cell is an overflow */
-#define WT_CELL_UNPACK_PREPARE 0x2u            /* cell is part of a prepared transaction */
-#define WT_CELL_UNPACK_TIME_PAIRS_CLEARED 0x4u /* time pairs are cleared because of restart */
-                                               /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_CELL_UNPACK_OVERFLOW 0x1u            /* cell is an overflow */
+#define WT_CELL_UNPACK_PREPARE 0x2u             /* cell is part of a prepared transaction */
+#define WT_CELL_UNPACK_TIME_WINDOW_CLEARED 0x4u /* time window cleared because of restart */
+                                                /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 };

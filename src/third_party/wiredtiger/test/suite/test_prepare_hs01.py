@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import copy_wiredtiger_home
-import unittest, wiredtiger, wttest
+import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
 def timestamp_str(t):
@@ -38,6 +38,19 @@ def timestamp_str(t):
 class test_prepare_hs01(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB'
+
+    def check(self, uri, ds, nrows, nsessions, nkeys, read_ts, expected_value, not_expected_value):
+        cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+        for i in range(1, nsessions * nkeys):
+            cursor.set_key(ds.key(nrows + i))
+            self.assertEquals(cursor.search(), 0)
+            # Correctness Test - commit_value should be visible
+            self.assertEquals(cursor.get_value(), expected_value)
+            # Correctness Test - prepare_value should NOT be visible
+            self.assertNotEquals(cursor.get_value(), not_expected_value)
+        cursor.close()
+        self.session.commit_transaction()
 
     def prepare_updates(self, uri, ds, nrows, nsessions, nkeys):
         # Update a large number of records in their individual transactions.
@@ -84,16 +97,9 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
                 self.assertEquals(cursors[j].insert(), 0)
             sessions[j].prepare_transaction('prepare_timestamp=' + timestamp_str(2))
 
-        # Re-read the original versions of all the data.  To do this, the pages
-        # that were just evicted need to be read back. This ensures reading
-        # prepared updates from the history store
-        cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(1))
-        for i in range(1, nsessions * nkeys):
-            cursor.set_key(ds.key(nrows + i))
-            self.assertEquals(cursor.search(), 0)
-        cursor.close()
-        self.session.commit_transaction()
+        # Re-read the original versions of all the data. This ensures reading
+        # original versions from the history store
+        self.check(uri, ds, nrows, nsessions, nkeys, 1, bigvalue1, bigvalue2)
 
         # Close all cursors and sessions, this will cause prepared updates to be
         # rollback-ed
@@ -101,7 +107,11 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
             cursors[j].close()
             sessions[j].close()
 
-    @unittest.skip("Temporarily disabled")
+        # Re-read the original versions of all the data. This ensures reading
+        # original versions from the data store as the prepared updates are
+        # aborted
+        self.check(uri, ds, nrows, nsessions, nkeys, 2, bigvalue1, bigvalue2)
+
     def test_prepare_hs(self):
         # Create a small table.
         uri = "table:test_prepare_hs01"

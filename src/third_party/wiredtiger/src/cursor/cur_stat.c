@@ -487,7 +487,7 @@ __curstat_join_desc(WT_CURSOR_STAT *cst, int slot, const char **resultp)
     const char *static_desc;
 
     sgrp = &cst->u.join_stats_group;
-    session = (WT_SESSION_IMPL *)sgrp->join_cursor->iface.session;
+    session = CUR2S(sgrp->join_cursor);
     WT_RET(__wt_stat_join_desc(cst, slot, &static_desc));
     len = strlen("join: ") + strlen(sgrp->desc_prefix) + strlen(static_desc) + 1;
     WT_RET(__wt_realloc(session, NULL, len, &cst->desc_buf));

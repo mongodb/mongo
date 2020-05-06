@@ -106,7 +106,7 @@ __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs
 #ifdef HAVE_PTHREAD_COND_MONOTONIC
         WT_SYSCALL_RETRY(clock_gettime(CLOCK_MONOTONIC, &ts), ret);
         if (ret != 0)
-            WT_PANIC_MSG(session, ret, "clock_gettime");
+            WT_IGNORE_RET(__wt_panic(session, ret, "clock_gettime"));
 #else
         __wt_epoch_raw(session, &ts);
 #endif
@@ -140,7 +140,7 @@ err:
     if (ret == 0)
         return;
 
-    WT_PANIC_MSG(session, ret, "pthread_cond_wait: %s", cond->name);
+    WT_IGNORE_RET(__wt_panic(session, ret, "pthread_cond_wait: %s", cond->name));
 }
 
 /*
@@ -175,7 +175,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
         return;
 
 err:
-    WT_PANIC_MSG(session, ret, "pthread_cond_broadcast: %s", cond->name);
+    WT_IGNORE_RET(__wt_panic(session, ret, "pthread_cond_broadcast: %s", cond->name));
 }
 
 /*
@@ -193,10 +193,10 @@ __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
         return;
 
     if ((ret = pthread_cond_destroy(&cond->cond)) != 0)
-        WT_PANIC_MSG(session, ret, "pthread_cond_destroy: %s", cond->name);
+        WT_IGNORE_RET(__wt_panic(session, ret, "pthread_cond_destroy: %s", cond->name));
 
     if ((ret = pthread_mutex_destroy(&cond->mtx)) != 0)
-        WT_PANIC_MSG(session, ret, "pthread_mutex_destroy: %s", cond->name);
+        WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_destroy: %s", cond->name));
 
     __wt_free(session, *condp);
 }

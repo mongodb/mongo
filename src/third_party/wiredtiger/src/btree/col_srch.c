@@ -74,7 +74,7 @@ __wt_col_search(
     uint32_t base, indx, limit, read_flags;
     int depth;
 
-    session = (WT_SESSION_IMPL *)cbt->iface.session;
+    session = CUR2S(cbt);
     btree = S2BT(session);
     current = NULL;
 

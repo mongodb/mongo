@@ -326,9 +326,9 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
      * In the general case, we should return a generic error and signal that we've detected data
      * corruption.
      *
-     * FIXME: MongoDB relies heavily on the error codes reported when opening cursors (which hits
-     * this logic if the relevant data handle isn't already open). However this code gets run in
-     * rollback to stable as part of recovery where we want to skip any corrupted data files
+     * FIXME-WT-5832: MongoDB relies heavily on the error codes reported when opening cursors (which
+     * hits this logic if the relevant data handle isn't already open). However this code gets run
+     * in rollback to stable as part of recovery where we want to skip any corrupted data files
      * temporarily to allow MongoDB to initiate salvage. This is why we've been forced into this
      * situation. We should address this as part of WT-5832 and clarify what error codes we expect
      * to be returning across the API boundary.

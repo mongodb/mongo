@@ -23,7 +23,7 @@ __key_return(WT_CURSOR_BTREE *cbt)
 
     page = cbt->ref->page;
     cursor = &cbt->iface;
-    session = (WT_SESSION_IMPL *)cbt->iface.session;
+    session = CUR2S(cbt);
 
     if (page->type == WT_PAGE_ROW_LEAF) {
         rip = &page->pg_row[cbt->slot];
@@ -70,84 +70,28 @@ __key_return(WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __time_pairs_init --
- *     Initialize the time pairs to globally visible.
+ * __read_col_time_window --
+ *     Retrieve the time window from a column store cell.
  */
-static inline void
-__time_pairs_init(WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
-{
-    start->txnid = WT_TXN_NONE;
-    start->timestamp = WT_TS_NONE;
-    stop->txnid = WT_TXN_MAX;
-    stop->timestamp = WT_TS_MAX;
-}
-
-/*
- * __time_pairs_set --
- *     Set the time pairs.
- */
-static inline void
-__time_pairs_set(WT_TIME_PAIR *start, WT_TIME_PAIR *stop, WT_CELL_UNPACK *unpack)
-{
-    start->timestamp = unpack->start_ts;
-    start->txnid = unpack->start_txn;
-    stop->timestamp = unpack->stop_ts;
-    stop->txnid = unpack->stop_txn;
-}
-
-/*
- * __wt_read_cell_time_pairs --
- *     Read the time pairs from the cell.
- */
-void
-__wt_read_cell_time_pairs(
-  WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
-{
-    WT_PAGE *page;
-    WT_SESSION_IMPL *session;
-
-    session = (WT_SESSION_IMPL *)cbt->iface.session;
-    page = ref->page;
-
-    WT_ASSERT(session, start != NULL && stop != NULL);
-
-    /* Take the value from the original page cell. */
-    if (page->type == WT_PAGE_ROW_LEAF) {
-        __wt_read_row_time_pairs(session, page, &page->pg_row[cbt->slot], start, stop);
-    } else if (page->type == WT_PAGE_COL_VAR) {
-        __wt_read_col_time_pairs(
-          session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), start, stop);
-    } else {
-        /* WT_PAGE_COL_FIX: return the default time pairs. */
-        __time_pairs_init(start, stop);
-    }
-}
-
-/*
- * __wt_read_col_time_pairs --
- *     Retrieve the time pairs from a column store cell.
- */
-void
-__wt_read_col_time_pairs(
-  WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
+static void
+__read_col_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, WT_TIME_WINDOW *tw)
 {
     WT_CELL_UNPACK unpack;
 
     __wt_cell_unpack(session, page, cell, &unpack);
-    __time_pairs_set(start, stop, &unpack);
+    __wt_time_window_copy(tw, &unpack.tw);
 }
 
 /*
- * __wt_read_row_time_pairs --
- *     Retrieve the time pairs from a row.
+ * __wt_read_row_time_window --
+ *     Retrieve the time window from a row.
  */
 void
-__wt_read_row_time_pairs(
-  WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
+__wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_WINDOW *tw)
 {
     WT_CELL_UNPACK unpack;
 
-    __time_pairs_init(start, stop);
+    __wt_time_window_init(tw);
     /*
      * If a value is simple and is globally visible at the time of reading a page into cache, we set
      * the time pairs as globally visible.
@@ -156,7 +100,33 @@ __wt_read_row_time_pairs(
         return;
 
     __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
-    __time_pairs_set(start, stop, &unpack);
+    __wt_time_window_copy(tw, &unpack.tw);
+}
+
+/*
+ * __wt_read_cell_time_window --
+ *     Read the time pairs from the cell.
+ */
+void
+__wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_WINDOW *tw)
+{
+    WT_PAGE *page;
+    WT_SESSION_IMPL *session;
+
+    session = CUR2S(cbt);
+    page = ref->page;
+
+    WT_ASSERT(session, tw != NULL);
+
+    /* Take the value from the original page cell. */
+    if (page->type == WT_PAGE_ROW_LEAF) {
+        __wt_read_row_time_window(session, page, &page->pg_row[cbt->slot], tw);
+    } else if (page->type == WT_PAGE_COL_VAR) {
+        __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
+    } else {
+        /* WT_PAGE_COL_FIX: return the default time pairs. */
+        __wt_time_window_init(tw);
+    }
 }
 
 /*
@@ -164,8 +134,7 @@ __wt_read_row_time_pairs(
  *     Change a buffer to reference an internal original-page return value.
  */
 int
-__wt_value_return_buf(
-  WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_PAIR *start, WT_TIME_PAIR *stop)
+__wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_WINDOW *tw)
 {
     WT_BTREE *btree;
     WT_CELL *cell;
@@ -176,17 +145,11 @@ __wt_value_return_buf(
     WT_SESSION_IMPL *session;
     uint8_t v;
 
-    session = (WT_SESSION_IMPL *)cbt->iface.session;
+    session = CUR2S(cbt);
     btree = S2BT(session);
 
     page = ref->page;
     cursor = &cbt->iface;
-
-    if (start != NULL && stop != NULL)
-        __time_pairs_init(start, stop);
-
-    /* Must provide either both start and stop as output parameters or neither. */
-    WT_ASSERT(session, (start != NULL && stop != NULL) || (start == NULL && stop == NULL));
 
     if (page->type == WT_PAGE_ROW_LEAF) {
         rip = &page->pg_row[cbt->slot];
@@ -195,14 +158,16 @@ __wt_value_return_buf(
          * If a value is simple and is globally visible at the time of reading a page into cache, we
          * encode its location into the WT_ROW.
          */
-        if (__wt_row_leaf_value(page, rip, buf))
+        if (__wt_row_leaf_value(page, rip, buf)) {
+            if (tw != NULL)
+                __wt_time_window_init(tw);
             return (0);
+        }
 
         /* Take the value from the original page cell. */
         __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
-        if (start != NULL && stop != NULL)
-            __time_pairs_set(start, stop, &unpack);
-
+        if (tw != NULL)
+            __wt_time_window_copy(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));
     }
 
@@ -210,17 +175,18 @@ __wt_value_return_buf(
         /* Take the value from the original page cell. */
         cell = WT_COL_PTR(page, &page->pg_var[cbt->slot]);
         __wt_cell_unpack(session, page, cell, &unpack);
-        if (start != NULL && stop != NULL)
-            __time_pairs_set(start, stop, &unpack);
-
+        if (tw != NULL)
+            __wt_time_window_copy(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));
     }
 
     /*
      * WT_PAGE_COL_FIX: Take the value from the original page.
      *
-     * FIXME-PM-1523: Should also check visibility here
+     * FIXME-WT-6126: Should also check visibility here
      */
+    if (tw != NULL)
+        __wt_time_window_init(tw);
     v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
     return (__wt_buf_set(session, buf, &v, 1));
 }
@@ -232,95 +198,7 @@ __wt_value_return_buf(
 static inline int
 __value_return(WT_CURSOR_BTREE *cbt)
 {
-    return (__wt_value_return_buf(cbt, cbt->ref, &cbt->iface.value, NULL, NULL));
-}
-
-/*
- * __wt_value_return_upd --
- *     Change the cursor to reference an internal update structure return value.
- */
-int
-__wt_value_return_upd(WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    WT_MODIFY_VECTOR modifies;
-    WT_SESSION_IMPL *session;
-    WT_TIME_PAIR start, stop;
-
-    cursor = &cbt->iface;
-    session = (WT_SESSION_IMPL *)cbt->iface.session;
-    __wt_modify_vector_init(session, &modifies);
-
-    /*
-     * We're passed a "standard" or "modified" update that's visible to us. Our caller should have
-     * already checked for deleted items (we're too far down the call stack to return not-found).
-     *
-     * Fast path if it's a standard item, assert our caller's behavior.
-     */
-    if (upd->type == WT_UPDATE_STANDARD) {
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DISK)) {
-            /* Copy an external update, and delete after using it */
-            WT_RET(__wt_buf_set(session, &cursor->value, upd->data, upd->size));
-            __wt_free_update_list(session, &upd);
-        } else {
-            cursor->value.data = upd->data;
-            cursor->value.size = upd->size;
-        }
-        return (0);
-    }
-    WT_ASSERT(session, upd->type == WT_UPDATE_MODIFY);
-
-    /*
-     * Find a complete update.
-     */
-    for (; upd != NULL; upd = upd->next) {
-        if (upd->txnid == WT_TXN_ABORTED)
-            continue;
-
-        if (WT_UPDATE_DATA_VALUE(upd))
-            break;
-
-        if (upd->type == WT_UPDATE_MODIFY)
-            WT_ERR(__wt_modify_vector_push(&modifies, upd));
-    }
-
-    /*
-     * If there's no full update, the base item is the on-page item. If the update is a tombstone,
-     * the base item is an empty item.
-     */
-    if (upd == NULL) {
-        /*
-         * Callers of this function set the cursor slot to an impossible value to check we don't try
-         * and return on-page values when the update list should have been sufficient (which
-         * happens, for example, if an update list was truncated, deleting some standard update
-         * required by a previous modify update). Assert the case.
-         */
-        WT_ASSERT(session, cbt->slot != UINT32_MAX);
-
-        WT_ERR(__wt_value_return_buf(cbt, cbt->ref, &cbt->iface.value, &start, &stop));
-        /*
-         * Applying modifies on top of a tombstone is invalid. So if we're using the onpage value,
-         * the stop time pair should be unset.
-         */
-        WT_ASSERT(session, stop.txnid == WT_TXN_MAX && stop.timestamp == WT_TS_MAX);
-    } else {
-        /* The base update must not be a tombstone. */
-        WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);
-        WT_ERR(__wt_buf_set(session, &cursor->value, upd->data, upd->size));
-    }
-
-    /*
-     * Once we have a base item, roll forward through any visible modify updates.
-     */
-    while (modifies.size > 0) {
-        __wt_modify_vector_pop(&modifies, &upd);
-        WT_ERR(__wt_modify_apply(cursor, upd->data));
-    }
-
-err:
-    __wt_modify_vector_free(&modifies);
-    return (ret);
+    return (__wt_value_return_buf(cbt, cbt->ref, &cbt->iface.value, NULL));
 }
 
 /*
@@ -352,20 +230,37 @@ __wt_key_return(WT_CURSOR_BTREE *cbt)
 
 /*
  * __wt_value_return --
- *     Change the cursor to reference an internal return value.
+ *     Change the cursor to reference an update return value.
  */
 int
-__wt_value_return(WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+__wt_value_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
 {
     WT_CURSOR *cursor;
+    WT_SESSION_IMPL *session;
 
     cursor = &cbt->iface;
+    session = CUR2S(cbt);
 
     F_CLR(cursor, WT_CURSTD_VALUE_EXT);
-    if (upd == NULL)
+    if (upd_value->type == WT_UPDATE_INVALID) {
+        /*
+         * FIXME-WT-6127: This is a holdover from the pre-durable history read logic where we used
+         * to fallback to the on-page value if we didn't find a visible update elsewhere. This is
+         * still required for fixed length column store as we have issues with this table type in
+         * durable history which we're planning to address in PM-1814.
+         */
+        WT_ASSERT(session, cbt->btree->type == BTREE_COL_FIX);
         WT_RET(__value_return(cbt));
-    else
-        WT_RET(__wt_value_return_upd(cbt, upd));
+    } else {
+        /*
+         * We're passed a "standard" update that's visible to us. Our caller should have already
+         * checked for deleted items (we're too far down the call stack to return not-found) and any
+         * modify updates should be have been reconstructed into a full standard update.
+         */
+        WT_ASSERT(session, upd_value->type == WT_UPDATE_STANDARD);
+        cursor->value.data = upd_value->buf.data;
+        cursor->value.size = upd_value->buf.size;
+    }
     F_SET(cursor, WT_CURSTD_VALUE_INT);
     return (0);
 }
