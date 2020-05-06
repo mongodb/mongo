@@ -38,7 +38,12 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+const indexMap =
+    IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+const indexBuildUUID = indexMap['a_1'].buildUUID;
+
+// Index build should be present in the config.system.indexBuilds collection.
+assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 
 const newPrimary = rst.getSecondary();
 const newPrimaryDB = secondaryDB;
@@ -69,6 +74,9 @@ IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 // Check that index was created on the new primary.
 IndexBuildTest.waitForIndexBuildToStop(newPrimaryDB);
 IndexBuildTest.assertIndexes(newPrimaryColl, 2, ['_id_', 'a_1']);
+
+// Index build should be removed from the config.system.indexBuilds collection.
+assert(newPrimary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 
 rst.stopSet();
 })();

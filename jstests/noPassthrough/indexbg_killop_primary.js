@@ -48,6 +48,14 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
               'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
 });
 
+// Index build should be present in the config.system.indexBuilds collection.
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    const indexMap =
+        IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+    const indexBuildUUID = indexMap['a_1'].buildUUID;
+    assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
+}
+
 // Kill the index builder thread.
 assert.commandWorked(testDB.killOp(opId));
 
@@ -72,8 +80,12 @@ if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
     ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': coll.getName()});
     assert.eq(1, ops.length, 'incorrect number of abortIndexBuild oplog entries: ' + tojson(ops));
+    const indexBuildUUID = ops[0].o.indexBuildUUID;
     ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
     assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
+
+    // Index build should be removed from the config.system.indexBuilds collection.
+    assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 } else {
     // The noop oplog entry is the only evidence of the failed single phase index build.
     let ops = rst.dumpOplog(
