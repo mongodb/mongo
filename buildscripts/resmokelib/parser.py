@@ -32,7 +32,7 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
     parser = subparsers.add_parser("run", help="Runs the specified tests.")
 
     parser.set_defaults(dry_run="off", shuffle="auto", stagger_jobs="off",
-                        suite_files="with_server", majority_read_concern="on")
+                        majority_read_concern="on")
 
     parser.add_argument("test_files", metavar="TEST_FILES", nargs="*",
                         help="Explicit test files to run")
@@ -420,6 +420,8 @@ def _add_find_suites(subparsers):
     parser = subparsers.add_parser(
         "find-suites", help="Lists the names of the suites that will execute the specified tests.")
 
+    parser.set_defaults(logger_file="console")
+
     parser.add_argument("test_files", metavar="TEST_FILES", nargs="*",
                         help="Explicit test files to run")
 
@@ -428,16 +430,6 @@ def _add_find_suites(subparsers):
         help=("A YAML file that specifies the logging configuration. If the file is"
               " located in the resmokeconfig/suites/ directory, then the basename"
               " without the .yml extension can be specified, e.g. 'console'."))
-    parser.set_defaults(logger_file="console")
-
-    parser.add_argument(
-        "--suites", dest="suite_files", metavar="SUITE1,SUITE2", required=True,
-        help=("Comma separated list of YAML files that each specify the configuration"
-              " of a suite. If the file is located in the resmokeconfig/suites/"
-              " directory, then the basename without the .yml extension can be"
-              " specified, e.g. 'core'. If a list of files is passed in as"
-              " positional arguments, they will be run using the suites'"
-              " configurations."))
 
 
 def _add_hang_analyzer(subparsers):

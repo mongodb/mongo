@@ -289,7 +289,7 @@ class TestParseCommandLine(unittest.TestCase):
     """Unit tests for the parse_command_line() function."""
 
     def test_find_suites(self):
-        subcommand_obj = _parser.parse_command_line(['find-suites', '--suites=my_suite'])
+        subcommand_obj = _parser.parse_command_line(['find-suites'])
         self.assertTrue(hasattr(subcommand_obj, 'execute'))
 
     def test_list_suites(self):

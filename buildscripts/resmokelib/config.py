@@ -90,7 +90,7 @@ DEFAULTS = {
     "majority_read_concern": None,  # Default is set on the commandline.
     "storage_engine": None,
     "storage_engine_cache_size_gb": None,
-    "suite_files": None,
+    "suite_files": "with_server",
     "tag_file": None,
     "test_files": None,
     "transport_layer": None,
