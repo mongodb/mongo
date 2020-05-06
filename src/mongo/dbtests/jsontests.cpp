@@ -97,6 +97,63 @@ TEST(JsonStringTest, BasicTest) {
     });
 }
 
+/**
+ * JavaScript's JSON.stringify(x,null,4) is the goal with our pretty==true formatting.
+ * Expected string captured from node.js interpreter.
+ * E.g.:
+ * node -e 'console.log(JSON.stringify([123,[],{},{"a":1},{"a":1,"b":2,"c":[1,2,3]}],null,4))'
+ */
+TEST(JsonStringTest, PrettyFormatTest) {
+    auto validate = [&](int line, BSONObj obj, bool arr, std::string out) {
+        ASSERT_EQUALS(obj.jsonString(ExtendedRelaxedV2_0_0, true, arr), out)
+            << format(FMT_STRING(", line {}"), line);
+    };
+    validate(__LINE__, B().obj(), 0, "{}");
+    validate(__LINE__, B{}.obj(), 1, "[]");
+    validate(__LINE__,
+             (B{} << "a"
+                  << "b")
+                 .obj(),
+             0,
+             R"({
+    "a": "b"
+})");
+    validate(__LINE__, (Arr{} << "a").arr(), 1, R"([
+    "a"
+])");
+    validate(__LINE__,
+             (Arr{} << "a"
+                    << "b")
+                 .arr(),
+             1,
+             R"([
+    "a",
+    "b"
+])");
+    validate(__LINE__,
+             (Arr{} << 123 << Arr{}.arr() << B{}.obj() << (B{} << "a" << 1).obj()
+                    << (B{} << "a" << 1 << "b" << 2 << "c" << (Arr{} << 1 << 2 << 3).arr()).obj())
+                 .arr(),
+             1,
+             R"([
+    123,
+    [],
+    {},
+    {
+        "a": 1
+    },
+    {
+        "a": 1,
+        "b": 2,
+        "c": [
+            1,
+            2,
+            3
+        ]
+    }
+])");
+}
+
 TEST(JsonStringTest, UnicodeTest) {
     // Extended Canonical/Relaxed replaces invalid UTF-8 with Unicode Replacement Character while
     // LegacyStricts treats it as Extended Ascii

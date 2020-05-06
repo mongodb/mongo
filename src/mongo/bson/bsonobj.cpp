@@ -192,20 +192,19 @@ BSONObj BSONObj::_jsonStringGenerator(const Generator& g,
     if (!e.eoo()) {
         bool writeSeparator = false;
         while (1) {
-            truncation =
-                e.jsonStringGenerator(g, writeSeparator, !isArray, pretty, buffer, writeLimit);
+            truncation = e.jsonStringGenerator(
+                g, writeSeparator, !isArray, pretty ? (pretty + 1) : 0, buffer, writeLimit);
             e = i.next();
             if (!truncation.isEmpty() || e.eoo()) {
                 g.writePadding(buffer);
                 break;
             }
             writeSeparator = true;
-            if (pretty) {
-                fmt::format_to(buffer, "{: <{}}", '\n', pretty * 2);
-            }
         }
     }
 
+    if (pretty)
+        fmt::format_to(buffer, "\n{:<{}}", "", (pretty - 1) * 4);
     buffer.push_back(isArray ? ']' : '}');
     return truncation;
 }
