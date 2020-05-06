@@ -5087,7 +5087,7 @@ tasks:
 
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
-  name: jstestfuzz_replication_multiversion_gen
+  name: jstestfuzz_replication_fcv42_multiversion_gen
   tags: ["jstestfuzz_multiversion_gen"]
   commands:
   - func: "generate multiversion tasks"
@@ -5095,10 +5095,11 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-      suite: jstestfuzz_replication
+      suite: jstestfuzz_replication_fcv42
       is_jstestfuzz: true
       use_multiversion: /data/multiversion
       npm_command: jstestfuzz
+      fallback_num_sub_suites: 4
 
 ## jstestfuzz initial sync replica set ##
 - <<: *jstestfuzz_template
@@ -5155,6 +5156,7 @@ tasks:
       is_jstestfuzz: true
       use_multiversion: /data/multiversion
       npm_command: jstestfuzz
+      fallback_num_sub_suites: 4
 
 ## jstestfuzz sharded cluster causal consistency ##
 - <<: *jstestfuzz_template
