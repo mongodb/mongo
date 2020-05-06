@@ -206,12 +206,44 @@ Admin database  | UUID() | 0             |
 * [The method that checks the equality of a shard version on a shard](https://github.com/mongodb/mongo/blob/554ec671f7acb6a4df62664f80f68ec3a85bccac/src/mongo/db/s/collection_sharding_state.h#L126-L131)
 * [The method that checks the equality of a database version on a shard](https://github.com/mongodb/mongo/blob/554ec671f7acb6a4df62664f80f68ec3a85bccac/src/mongo/db/s/database_sharding_state.h#L98-L103)
 
-## The shards list cache
+## The shard registry
+
+The shard registry is an in-memory cache mirroring the `config.shards` collection on the config
+server. The collection (and thus the cache) contains an entry for each shard in the cluster. Each
+entry contains the connection string for that shard.
+
+An independent cache exists on each node across all node types (router, shard server, config
+server).
+
+Retrieving a shard from the registry returns a `Shard` object. Using that object, one can access
+more information about a shard and run commands against that shard. A `Shard` object can be
+retrieved from the registry by using any of:
+
+* The shard's name
+* The replica set's name
+* The HostAndPort object
+* The connection string
+
+The shard registry refreshes itself in these scenarios:
+
+1. Upon the node's start-up
+1. Upon completion of a background job that runs every thirty seconds
+1. Upon an attempt to retrieve a shard that doesn’t have a matching entry in the cache
+1. Upon calling the ShardRegistry’s reload function (ShardRegistry::reload())
+
+The shard registry makes updates to the `config.shards` collection in one case. If the shard
+registry discovers an updated connection string for another shard via a replica set topology
+change, it will persist that update to `config.shards`.
+
+#### Code references
+* [The ShardRegistry class](https://github.com/mongodb/mongo/blob/master/src/mongo/s/client/shard_registry.h)
+* [The Shard class](https://github.com/mongodb/mongo/blob/master/src/mongo/s/client/shard.h)
 
 ## Targeting a specific host within a shard
 When routing a query to a replica set, a cluster node must determine which member to target for a given read preference. A cluster node either has or creates a ReplicaSetMonitor for each remote shard to which it needs to route requests. Information from the ReplicaSetMonitor interface is used to route requests to a specific node within a shard.
 
 Further details on replica set monitoring and host targeting can be found [here](../../../mongo/client/README.md).
+
 ---
 
 # Migrations
