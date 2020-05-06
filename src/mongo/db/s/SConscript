@@ -67,6 +67,7 @@ env.Library(
         'range_deletion_util.cpp',
         'read_only_catalog_cache_loader.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
+        'scoped_shard_version_critical_section.cpp',
         'session_catalog_migration_destination.cpp',
         'session_catalog_migration_source.cpp',
         'shard_filtering_metadata_refresh.cpp',

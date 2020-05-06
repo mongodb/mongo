@@ -48,6 +48,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/scoped_shard_version_critical_section.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -461,10 +462,6 @@ UUID shardCollection(OperationContext* opCtx,
         return *collectionOptional->getUUID();
     }
 
-    // Make sure that this shard initializes the collection metadata so we can perform local
-    // operations without getting stale config exception.
-    forceShardFilteringMetadataRefresh(opCtx, nss, true);
-
     std::unique_ptr<InitialSplitPolicy> splitPolicy;
     InitialSplitPolicy::ShardCollectionConfig initialChunks;
     boost::optional<ShardCollectionTargetState> targetState;
@@ -490,7 +487,7 @@ UUID shardCollection(OperationContext* opCtx,
     {
         // From this point onward the collection can only be read, not written to, so it is safe to
         // construct the prerequisites and generate the target state.
-        CollectionCriticalSection critSec(opCtx, nss);
+        ScopedShardVersionCriticalSection critSec(opCtx, nss);
 
         pauseShardCollectionReadOnlyCriticalSection.pauseWhileSet();
 
