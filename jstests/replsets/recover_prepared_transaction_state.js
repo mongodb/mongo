@@ -17,7 +17,6 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/libs/rollback_test.js");
 
@@ -102,8 +101,8 @@ assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
 
 // Make sure we can only see the first write and cannot see the writes from the prepared
 // transactions or the write that was rolled back.
-arrayEq(sessionColl1.find().toArray(), [{_id: 1}, {_id: 2}]);
-arrayEq(testColl.find().toArray(), [{_id: 1}, {_id: 2}]);
+assert.sameMembers(sessionColl1.find().toArray(), [{_id: 1}, {_id: 2}]);
+assert.sameMembers(testColl.find().toArray(), [{_id: 1}, {_id: 2}]);
 
 // This check characterizes the current behavior of fastcount after rollback. It will not be
 // correct, but reflects the count at the point where both transactions are not yet committed or
@@ -189,7 +188,7 @@ rollbackTest.awaitReplication();
 
 // Make sure we can see the result of the committed prepared transaction and cannot see the
 // write from the aborted transaction.
-arrayEq(testColl.find().toArray(), [{_id: 1, a: 1}, {_id: 2}, {_id: 3}]);
+assert.sameMembers(testColl.find().toArray(), [{_id: 1, a: 1}, {_id: 2}, {_id: 3}]);
 assert.eq(testColl.count(), 3);
 
 rollbackTest.stop();
