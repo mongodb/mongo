@@ -10,6 +10,8 @@ from . import config as _config
 from . import configure_resmoke
 from . import commands
 
+_INTERNAL_OPTIONS_TITLE = "Internal Options"
+_BENCHMARK_ARGUMENT_TITLE = "Benchmark/Benchrun test options"
 _EVERGREEN_ARGUMENT_TITLE = "Evergreen options"
 
 
@@ -59,23 +61,10 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
               " passed in from test files may cause an error."))
 
     parser.add_argument(
-        "--archiveLimitMb", type=int, dest="archive_limit_mb", metavar="ARCHIVE_LIMIT_MB",
-        help=("Sets the limit (in MB) for archived files to S3. A value of 0"
-              " indicates there is no limit."))
-
-    parser.add_argument(
-        "--archiveLimitTests", type=int, dest="archive_limit_tests", metavar="ARCHIVE_LIMIT_TESTS",
-        help=("Sets the maximum number of tests to archive to S3. A value"
-              " of 0 indicates there is no limit."))
-
-    parser.add_argument(
         "--basePort", dest="base_port", metavar="PORT",
         help=("The starting port number to use for mongod and mongos processes"
               " spawned by resmoke.py or the tests themselves. Each fixture and Job"
               " allocates a contiguous range of ports."))
-
-    parser.add_argument("--buildloggerUrl", action="store", dest="buildlogger_url", metavar="URL",
-                        help="The root url of the buildlogger server.")
 
     parser.add_argument("--continueOnFailure", action="store_true", dest="continue_on_failure",
                         help="Executes all tests in all suites, even if some of them fail.")
@@ -108,10 +97,6 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
               " only tests which have at least one of the specified tags will be"
               " run."))
 
-    # Used for testing resmoke. Do not set this.
-    parser.add_argument("--internalParam", action="append", dest="internal_params",
-                        help=argparse.SUPPRESS)
-
     parser.add_argument("-n", action="store_const", const="tests", dest="dry_run",
                         help="Outputs the tests that would be run.")
 
@@ -126,11 +111,6 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
         help=("The number of Job instances to use. Each instance will receive its"
               " own MongoDB deployment to dispatch tests to."))
 
-    parser.add_argument(
-        "--log", dest="logger_file", metavar="LOGGER",
-        help=("A YAML file that specifies the logging configuration. If the file is"
-              " located in the resmokeconfig/suites/ directory, then the basename"
-              " without the .yml extension can be specified, e.g. 'console'."))
     parser.set_defaults(logger_file="console")
 
     parser.add_argument("--mongo", dest="mongo_executable", metavar="PATH",
@@ -161,9 +141,6 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
 
     parser.add_argument("--numClientsPerFixture", type=int, dest="num_clients_per_fixture",
                         help="Number of clients running tests per fixture.")
-
-    parser.add_argument("--perfReportFile", dest="perf_report_file", metavar="PERF_REPORT",
-                        help="Writes a JSON file with performance test results.")
 
     parser.add_argument(
         "--shellConnString", dest="shell_conn_string", metavar="CONN_STRING",
@@ -207,16 +184,6 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
         " command line.")
 
     parser.add_argument(
-        "--reportFailureStatus", action="store", dest="report_failure_status",
-        choices=("fail", "silentfail"), metavar="STATUS",
-        help="Controls if the test failure status should be reported as failed"
-        " or be silently ignored (STATUS=silentfail). Dynamic test failures will"
-        " never be silently ignored. Defaults to STATUS=%%default.")
-
-    parser.add_argument("--reportFile", dest="report_file", metavar="REPORT",
-                        help="Writes a JSON file with test status and timing information.")
-
-    parser.add_argument(
         "--seed", type=int, dest="seed", metavar="SEED",
         help=("Seed for the random number generator. Useful in combination with the"
               " --shuffle option for producing a consistent test execution order."))
@@ -248,11 +215,6 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
               " all cases except when the number of jobs requested is 1."))
 
     parser.add_argument(
-        "--staggerJobs", action="store", dest="stagger_jobs", choices=("on", "off"),
-        metavar="ON|OFF", help=("Enables or disables the stagger of launching resmoke jobs."
-                                " Defaults to %%default."))
-
-    parser.add_argument(
         "--majorityReadConcern", action="store", dest="majority_read_concern", choices=("on",
                                                                                         "off"),
         metavar="ON|OFF", help=("Enable or disable majority read concern support."
@@ -282,9 +244,6 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
     parser.add_argument("--numShards", type=int, dest="num_shards", metavar="N",
                         help="The number of shards to use in a ShardedClusterFixture.")
 
-    parser.add_argument("--tagFile", dest="tag_file", metavar="OPTIONS",
-                        help="A YAML file that associates tests and tags.")
-
     parser.add_argument(
         "--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
         help="Sets the WiredTiger collection configuration setting for all mongod's.")
@@ -312,13 +271,61 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
         metavar="ON|OFF", help="Enable or disable linear chaining for tests using "
         "ReplicaSetFixture.")
 
+    internal_options = parser.add_argument_group(
+        title=_INTERNAL_OPTIONS_TITLE,
+        description=("Internal options for advanced users and resmoke developers."
+                     " These are not meant to be invoked when running resmoke locally."))
+
+    internal_options.add_argument(
+        "--log", dest="logger_file", metavar="LOGGER",
+        help=("A YAML file that specifies the logging configuration. If the file is"
+              " located in the resmokeconfig/suites/ directory, then the basename"
+              " without the .yml extension can be specified, e.g. 'console'."))
+
+    # Used for testing resmoke. Do not set this.
+    internal_options.add_argument("--internalParam", action="append", dest="internal_params",
+                                  help=argparse.SUPPRESS)
+
+    internal_options.add_argument("--perfReportFile", dest="perf_report_file",
+                                  metavar="PERF_REPORT",
+                                  help="Writes a JSON file with performance test results.")
+
+    internal_options.add_argument(
+        "--reportFailureStatus", action="store", dest="report_failure_status",
+        choices=("fail", "silentfail"), metavar="STATUS",
+        help="Controls if the test failure status should be reported as failed"
+        " or be silently ignored (STATUS=silentfail). Dynamic test failures will"
+        " never be silently ignored. Defaults to STATUS=%%default.")
+
+    internal_options.add_argument(
+        "--reportFile", dest="report_file", metavar="REPORT",
+        help="Writes a JSON file with test status and timing information.")
+
+    internal_options.add_argument(
+        "--staggerJobs", action="store", dest="stagger_jobs", choices=("on", "off"),
+        metavar="ON|OFF", help=("Enables or disables the stagger of launching resmoke jobs."
+                                " Defaults to %%default."))
+
     evergreen_options = parser.add_argument_group(
         title=_EVERGREEN_ARGUMENT_TITLE,
         description=("Options used to propagate information about the Evergreen task running this"
                      " script."))
 
+    evergreen_options.add_argument(
+        "--archiveLimitMb", type=int, dest="archive_limit_mb", metavar="ARCHIVE_LIMIT_MB",
+        help=("Sets the limit (in MB) for archived files to S3. A value of 0"
+              " indicates there is no limit."))
+
+    evergreen_options.add_argument(
+        "--archiveLimitTests", type=int, dest="archive_limit_tests", metavar="ARCHIVE_LIMIT_TESTS",
+        help=("Sets the maximum number of tests to archive to S3. A value"
+              " of 0 indicates there is no limit."))
+
     evergreen_options.add_argument("--buildId", dest="build_id", metavar="BUILD_ID",
                                    help="Sets the build ID of the task.")
+
+    evergreen_options.add_argument("--buildloggerUrl", action="store", dest="buildlogger_url",
+                                   metavar="URL", help="The root url of the buildlogger server.")
 
     evergreen_options.add_argument(
         "--distroId", dest="distro_id", metavar="DISTRO_ID",
@@ -356,6 +363,9 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
                                    metavar="REVISION_ORDER_ID",
                                    help="Sets the chronological order number of this commit.")
 
+    evergreen_options.add_argument("--tagFile", dest="tag_file", metavar="OPTIONS",
+                                   help="A YAML file that associates tests and tags.")
+
     evergreen_options.add_argument("--taskName", dest="task_name", metavar="TASK_NAME",
                                    help="Sets the name of the Evergreen task running the tests.")
 
@@ -371,8 +381,7 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
                                    help="Sets the version ID of the task.")
 
     benchmark_options = parser.add_argument_group(
-        title="Benchmark/Benchrun test options",
-        description="Options for running Benchmark/Benchrun tests")
+        title=_BENCHMARK_ARGUMENT_TITLE, description="Options for running Benchmark/Benchrun tests")
 
     benchmark_options.add_argument("--benchmarkFilter", type=str, dest="benchmark_filter",
                                    metavar="BENCHMARK_FILTER",
@@ -420,16 +429,12 @@ def _add_find_suites(subparsers):
     parser = subparsers.add_parser(
         "find-suites", help="Lists the names of the suites that will execute the specified tests.")
 
+    # find-suites shares a lot of code with 'run' (for now), and this option needs be specified,
+    # though it is not used.
     parser.set_defaults(logger_file="console")
 
     parser.add_argument("test_files", metavar="TEST_FILES", nargs="*",
                         help="Explicit test files to run")
-
-    parser.add_argument(
-        "--log", dest="logger_file", metavar="LOGGER",
-        help=("A YAML file that specifies the logging configuration. If the file is"
-              " located in the resmokeconfig/suites/ directory, then the basename"
-              " without the .yml extension can be specified, e.g. 'console'."))
 
 
 def _add_hang_analyzer(subparsers):
@@ -467,94 +472,103 @@ def _add_hang_analyzer(subparsers):
         " Python process's stdout.")
 
 
-# def to_local_args(args=None):  # pylint: disable=too-many-branches,too-many-locals
-#     """
-#     Return a command line invocation for resmoke.py suitable for being run outside of Evergreen.
-#     This function parses the 'args' list of command line arguments, removes any Evergreen-centric
-#     options, and returns a new list of command line arguments.
-#     """
+def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-many-locals
+    """
+    Return a command line invocation for resmoke.py suitable for being run outside of Evergreen.
 
-#     if args is None:
-#         args = sys.argv[1:]
+    This function parses the 'args' list of command line arguments, removes any Evergreen-centric
+    options, and returns a new list of command line arguments.
+    """
 
-#     parser = _make_parser()
+    if input_args is None:
+        input_args = sys.argv[1:]
 
-#     # We call optparse.OptionParser.parse_args() with a new instance of optparse.Values to avoid
-#     # having the default values filled in. This makes it so 'options' only contains command line
-#     # options that were explicitly specified.
-#     options, extra_args = parser.parse_args(args=args, values=optparse.Values())
+    if input_args[0] != 'run':
+        raise TypeError(
+            f"to_local_args can only be called for the 'run' subcommand. Instead was called on '{input_args[0]}'"
+        )
 
-#     # If --originSuite was specified, then we replace the value of --suites with it. This is done to
-#     # avoid needing to have engineers learn about the test suites generated by the
-#     # evergreen_generate_resmoke_tasks.py script.
-#     origin_suite = getattr(options, "origin_suite", None)
-#     if origin_suite is not None:
-#         setattr(options, "suite_files", origin_suite)
+    (parser, parsed_args) = _parse(input_args)
 
-#     # optparse.OptionParser doesn't offer a public and/or documented method for getting all of the
-#     # options. Given that the optparse module is deprecated, it is unlikely for the
-#     # _get_all_options() method to ever be removed or renamed.
-#     all_options = parser._get_all_options()  # pylint: disable=protected-access
+    # If --originSuite was specified, then we replace the value of --suites with it. This is done to
+    # avoid needing to have engineers learn about the test suites generated by the
+    # evergreen_generate_resmoke_tasks.py script.
+    origin_suite = getattr(parsed_args, "origin_suite", None)
+    if origin_suite is not None:
+        setattr(parsed_args, "suite_files", origin_suite)
 
-#     options_by_dest = {}
-#     for option in all_options:
-#         options_by_dest[option.dest] = option
+    # The top-level parser has one subparser that contains all subcommand parsers.
+    command_subparser = [
+        action for action in parser._actions  # pylint: disable=protected-access
+        if action.dest == "command"
+    ][0]
 
-#     suites_arg = None
-#     storage_engine_arg = None
-#     other_local_args = []
+    run_parser = command_subparser.choices.get("run")
 
-#     options_to_ignore = {
-#         "--archiveLimitMb",
-#         "--archiveLimitTests",
-#         "--buildloggerUrl",
-#         "--log",
-#         "--perfReportFile",
-#         "--reportFailureStatus",
-#         "--reportFile",
-#         "--staggerJobs",
-#         "--tagFile",
-#     }
+    suites_arg = None
+    storage_engine_arg = None
+    other_local_args = []
+    positional_args = []
 
-#     def format_option(option_name, option_value):
-#         """
-#         Return <option_name>=<option_value>.
-#         This function assumes that 'option_name' is always "--" prefix and isn't "-" prefixed.
-#         """
-#         return "%s=%s" % (option_name, option_value)
+    def format_option(option_name, option_value):
+        """
+        Return <option_name>=<option_value>.
 
-#     for option_dest in sorted(vars(options)):
-#         option_value = getattr(options, option_dest)
-#         option = options_by_dest[option_dest]
-#         option_name = option.get_opt_string()
+        This function assumes that 'option_name' is always "--" prefix and isn't "-" prefixed.
+        """
+        return f"{option_name}={option_value}"
 
-#         if option_name in options_to_ignore:
-#             continue
+    # Trim the argument namespace of any args we don't want to return.
+    for group in run_parser._action_groups:  # pylint: disable=protected-access
+        arg_dests_visited = set()
+        for action in group._group_actions:  # pylint: disable=protected-access
+            arg_dest = action.dest
+            arg_value = getattr(parsed_args, arg_dest, None)
 
-#         option_group = parser.get_option_group(option_name)
-#         if option_group is not None and option_group.title == _EVERGREEN_OPTIONS_TITLE:
-#             continue
+            # Some arguments, such as --shuffle and --shuffleMode, update the same dest variable.
+            # To not print out multiple arguments that will update the same dest, we will skip once
+            # one such argument has been visited.
+            if arg_dest in arg_dests_visited:
+                continue
+            else:
+                arg_dests_visited.add(arg_dest)
 
-#         if option.takes_value():
-#             if option.action == "append":
-#                 args = [format_option(option_name, elem) for elem in option_value]
-#                 other_local_args.extend(args)
-#             else:
-#                 arg = format_option(option_name, option_value)
+            # If the arg doesn't exist in the parsed namespace, skip.
+            # This is mainly for "--help".
+            if not hasattr(parsed_args, arg_dest):
+                continue
+            # Skip any evergreen centric args.
+            elif group.title in [_INTERNAL_OPTIONS_TITLE, _EVERGREEN_ARGUMENT_TITLE]:
+                continue
+            # Keep these args.
+            elif group.title == 'optional arguments':
+                arg_name = action.option_strings[-1]
 
-#                 # We track the value for the --suites and --storageEngine command line options
-#                 # separately in order to more easily sort them to the front.
-#                 if option_dest == "suite_files":
-#                     suites_arg = arg
-#                 elif option_dest == "storage_engine":
-#                     storage_engine_arg = arg
-#                 else:
-#                     other_local_args.append(arg)
-#         else:
-#             other_local_args.append(option_name)
+                # If an option has the same value as the default, we don't need to specify it.
+                if getattr(parsed_args, arg_dest, None) == action.default:
+                    continue
+                # These are arguments that take no value.
+                elif action.nargs == 0:
+                    other_local_args.append(arg_name)
+                elif isinstance(action, argparse._AppendAction):  # pylint: disable=protected-access
+                    args = [format_option(arg_name, elem) for elem in arg_value]
+                    other_local_args.extend(args)
+                else:
+                    arg = format_option(arg_name, arg_value)
 
-#     return [arg for arg in (suites_arg, storage_engine_arg) if arg is not None
-#             ] + other_local_args + extra_args
+                    # We track the value for the --suites and --storageEngine command line options
+                    # separately in order to more easily sort them to the front.
+                    if arg_dest == "suite_files":
+                        suites_arg = arg
+                    elif arg_dest == "storage_engine":
+                        storage_engine_arg = arg
+                    else:
+                        other_local_args.append(arg)
+            elif group.title == 'positional arguments':
+                positional_args.extend(arg_value)
+
+    return ["run"] + [arg for arg in (suites_arg, storage_engine_arg) if arg is not None
+                      ] + other_local_args + positional_args
 
 
 def _parse(sys_args):
