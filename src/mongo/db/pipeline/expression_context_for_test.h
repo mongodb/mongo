@@ -149,6 +149,36 @@ public:
     }
 
     /**
+     * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
+     * also resolve the ExpressionContextForTest's ServiceContext from the OperationContext and
+     * accepts letParameters.
+     */
+    ExpressionContextForTest(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             std::unique_ptr<CollatorInterface> collator,
+                             const boost::optional<BSONObj>& letParameters = boost::none)
+        : ExpressionContext(opCtx,
+                            boost::none,  // explain
+                            false,        // fromMongos,
+                            false,        // needsMerge,
+                            false,        // allowDiskUse,
+                            false,        // bypassDocumentValidation,
+                            false,        // isMapReduce
+                            nss,
+                            RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
+                            std::move(collator),
+                            std::make_shared<StubMongoProcessInterface>(),
+                            {},  // resolvedNamespaces
+                            {},  // collUUID
+                            letParameters,
+                            false  // mayDbProfile
+                            ),
+          _serviceContext(opCtx->getServiceContext()) {
+        // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
+        _setTimeZoneDatabase();
+    }
+
+    /**
      * Sets the resolved definition for an involved namespace.
      */
     void setResolvedNamespace(const NamespaceString& nss, ResolvedNamespace resolvedNamespace) {

@@ -29,7 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/visit_helper.h"
 
 #include "mongo/bson/bsonobj.h"
 
@@ -67,6 +69,10 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
 
 }  // namespace
 
+const boost::optional<RuntimeConstants> BatchedCommandRequest::kEmptyRuntimeConstants =
+    boost::optional<RuntimeConstants>{};
+const boost::optional<BSONObj> BatchedCommandRequest::kEmptyLet = boost::optional<BSONObj>{};
+
 BatchedCommandRequest BatchedCommandRequest::parseInsert(const OpMsgRequest& request) {
     return constructBatchedCommandRequest<InsertOp>(request);
 }
@@ -97,6 +103,50 @@ std::size_t BatchedCommandRequest::sizeWriteOps() const {
     };
     return _visit(Visitor{});
 }
+
+bool BatchedCommandRequest::hasRuntimeConstants() const {
+    return _visit(visit_helper::Overloaded{
+        [](write_ops::Insert&) { return false; },
+        [&](write_ops::Update& op) { return op.getRuntimeConstants().has_value(); },
+        [&](write_ops::Delete& op) { return op.getRuntimeConstants().has_value(); }});
+}
+
+void BatchedCommandRequest::setRuntimeConstants(RuntimeConstants runtimeConstants) {
+    _visit(visit_helper::Overloaded{
+        [](write_ops::Insert&) {},
+        [&](write_ops::Update& op) { op.setRuntimeConstants(std::move(runtimeConstants)); },
+        [&](write_ops::Delete& op) { op.setRuntimeConstants(std::move(runtimeConstants)); }});
+}
+
+const boost::optional<RuntimeConstants>& BatchedCommandRequest::getRuntimeConstants() const {
+    struct Visitor {
+        auto& operator()(const write_ops::Insert& op) const {
+            return kEmptyRuntimeConstants;
+        }
+        auto& operator()(const write_ops::Update& op) const {
+            return op.getRuntimeConstants();
+        }
+        auto& operator()(const write_ops::Delete& op) const {
+            return op.getRuntimeConstants();
+        }
+    };
+    return _visit(Visitor{});
+};
+
+const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
+    struct Visitor {
+        auto& operator()(const write_ops::Insert& op) const {
+            return kEmptyLet;
+        }
+        auto& operator()(const write_ops::Update& op) const {
+            return op.getLet();
+        }
+        auto& operator()(const write_ops::Delete& op) const {
+            return op.getLet();
+        }
+    };
+    return _visit(Visitor{});
+};
 
 bool BatchedCommandRequest::isVerboseWC() const {
     if (!hasWriteConcern()) {

@@ -35,6 +35,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'batch_write_types',
     ],

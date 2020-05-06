@@ -37,6 +37,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
@@ -99,15 +100,15 @@ public:
      * Returns a vector of ShardEndpoints for a potentially multi-shard update or throws
      * ShardKeyNotFound if 'updateOp' misses a shard key, but the type of update requires it.
      */
-    virtual std::vector<ShardEndpoint> targetUpdate(
-        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateOp) const = 0;
+    virtual std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                                    const BatchItemRef& itemRef) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard delete or throws
      * ShardKeyNotFound if 'deleteOp' misses a shard key, but the type of delete requires it.
      */
-    virtual std::vector<ShardEndpoint> targetDelete(
-        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteOp) const = 0;
+    virtual std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
+                                                    const BatchItemRef& itemRef) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for all shards.

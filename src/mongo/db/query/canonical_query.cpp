@@ -98,10 +98,16 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make MatchExpression.
     boost::intrusive_ptr<ExpressionContext> newExpCtx;
     if (!expCtx.get()) {
-        newExpCtx = make_intrusive<ExpressionContext>(
-            opCtx, std::move(collator), qr->nss(), qr->getRuntimeConstants());
+        newExpCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                      std::move(collator),
+                                                      qr->nss(),
+                                                      qr->getRuntimeConstants(),
+                                                      qr->getLetParameters());
     } else {
         newExpCtx = expCtx;
+        // A collator can enter through both the QueryRequest and ExpressionContext arguments.
+        // This invariant ensures that both collators are the same because downstream we
+        // pull the collator from only one of the ExpressionContext carrier.
         invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
 

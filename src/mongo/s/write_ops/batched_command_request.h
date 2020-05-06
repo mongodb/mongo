@@ -36,6 +36,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_helpers.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 
@@ -133,32 +134,12 @@ public:
         return *_dbVersion;
     }
 
-    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
-        invariant(_updateReq);
-        _updateReq->setRuntimeConstants(std::move(runtimeConstants));
-    }
+    void setRuntimeConstants(RuntimeConstants runtimeConstants);
 
-    bool hasRuntimeConstants() const {
-        invariant(_updateReq);
-        return _updateReq->getRuntimeConstants().has_value();
-    }
+    bool hasRuntimeConstants() const;
 
-    const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
-        invariant(_updateReq);
-        return _updateReq->getRuntimeConstants();
-    }
-
-    void setLet(BSONObj let) {
-        _updateReq->setLet(std::move(let));
-    }
-
-    bool hasLet() const {
-        return _updateReq->getLet().is_initialized();
-    }
-
-    const boost::optional<BSONObj>& getLet() const {
-        return _updateReq->getLet();
-    }
+    const boost::optional<RuntimeConstants>& getRuntimeConstants() const;
+    const boost::optional<BSONObj>& getLet() const;
 
     const write_ops::WriteCommandBase& getWriteCommandBase() const;
     void setWriteCommandBase(write_ops::WriteCommandBase writeCommandBase);
@@ -179,6 +160,12 @@ public:
      * Generates a new request, the same as the old, but with insert _ids if required.
      */
     static BatchedCommandRequest cloneInsertWithIds(BatchedCommandRequest origCmdRequest);
+
+    /** These are used to return empty refs from Insert ops that don't carry runtimeConstants
+     * or let parameters in getLet and getRuntimeConstants.
+     */
+    const static boost::optional<RuntimeConstants> kEmptyRuntimeConstants;
+    const static boost::optional<BSONObj> kEmptyLet;
 
 private:
     template <typename Req, typename F, typename... As>
@@ -234,13 +221,20 @@ public:
     const auto& getDocument() const {
         return _request.getInsertRequest().getDocuments()[_index];
     }
-
     const auto& getUpdate() const {
         return _request.getUpdateRequest().getUpdates()[_index];
     }
 
     const auto& getDelete() const {
         return _request.getDeleteRequest().getDeletes()[_index];
+    }
+
+    auto& getLet() const {
+        return _request.getLet();
+    }
+
+    auto& getRuntimeConstants() const {
+        return _request.getRuntimeConstants();
     }
 
 private:

@@ -303,22 +303,26 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
     return chunkInfo->getShardIdAt(_clusterTime) == shardId;
 }
 
-void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
+void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds) const {
     auto qr = std::make_unique<QueryRequest>(_rt->getns());
     qr->setFilter(query);
 
+    if (auto uuid = getUUID())
+        expCtx->uuid = uuid;
+
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
     } else if (_rt->getDefaultCollator()) {
-        qr->setCollation(_rt->getDefaultCollator()->getSpec().toBSON());
+        auto defaultCollator = _rt->getDefaultCollator();
+        qr->setCollation(defaultCollator->getSpec().toBSON());
+        expCtx->setCollator(defaultCollator->clone());
     }
 
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto cq = uassertStatusOK(
-        CanonicalQuery::canonicalize(opCtx,
+        CanonicalQuery::canonicalize(expCtx->opCtx,
                                      std::move(qr),
                                      expCtx,
                                      ExtensionsCallbackNoop(),

@@ -412,7 +412,7 @@ public:
      * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
      * collection default collation for targeting.
      */
-    void getShardIdsForQuery(OperationContext* opCtx,
+    void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const BSONObj& query,
                              const BSONObj& collation,
                              std::set<ShardId>* shardIds) const;

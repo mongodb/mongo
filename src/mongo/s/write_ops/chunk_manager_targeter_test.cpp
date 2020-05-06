@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/hasher.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/session_catalog_router.h"
@@ -45,19 +46,23 @@ using unittest::assertGet;
 
 const NamespaceString kNss("TestDB", "TestColl");
 
-write_ops::UpdateOpEntry buildUpdate(BSONObj query, BSONObj update, bool upsert) {
+auto buildUpdate(const NamespaceString& nss, BSONObj query, BSONObj update, bool upsert) {
+    write_ops::Update updateOp(nss);
     write_ops::UpdateOpEntry entry;
     entry.setQ(query);
     entry.setU(update);
     entry.setUpsert(upsert);
-    return entry;
+    updateOp.setUpdates(std::vector{entry});
+    return BatchedCommandRequest{std::move(updateOp)};
 }
 
-write_ops::DeleteOpEntry buildDelete(BSONObj query) {
+auto buildDelete(const NamespaceString& nss, BSONObj query) {
+    write_ops::Delete deleteOp(nss);
     write_ops::DeleteOpEntry entry;
     entry.setQ(query);
     entry.setMulti(false);
-    return entry;
+    deleteOp.setDeletes(std::vector{entry});
+    return BatchedCommandRequest{std::move(deleteOp)};
 }
 
 class ChunkManagerTargeterTest : public CatalogCacheTestFixture {
@@ -191,54 +196,56 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithRangePrefixHashedShardKey) {
                               splitPoints);
 
     // When update targets using replacement object.
-    auto res = cmTargeter.targetUpdate(
-        operationContext(),
-        buildUpdate(fromjson("{'a.b': {$gt : 2}}"), fromjson("{a: {b: -1}}"), false));
+    auto request =
+        buildUpdate(kNss, fromjson("{'a.b': {$gt : 2}}"), fromjson("{a: {b: -1}}"), false);
+    auto res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&request, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "2");
 
     // When update targets using query.
-    res = cmTargeter.targetUpdate(
-        operationContext(),
-        buildUpdate(fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}}"),
-                    fromjson("{$set: {p : 1}}"),
-                    false));
+    auto requestAndSet = buildUpdate(kNss,
+                                     fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}}"),
+                                     fromjson("{$set: {p : 1}}"),
+                                     false);
+    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestAndSet, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "3");
 
-    res = cmTargeter.targetUpdate(
-        operationContext(),
-        buildUpdate(fromjson("{'a.b': {$lt : -101}}"), fromjson("{a: {b: 111}}"), false));
+    auto requestLT =
+        buildUpdate(kNss, fromjson("{'a.b': {$lt : -101}}"), fromjson("{a: {b: 111}}"), false);
+    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestLT, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
 
     // For op-style updates, query on _id gets targeted to all shards.
-    res = cmTargeter.targetUpdate(
-        operationContext(), buildUpdate(fromjson("{_id: 1}"), fromjson("{$set: {p: 111}}"), false));
+    auto requestOpUpdate =
+        buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{$set: {p: 111}}"), false);
+    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestOpUpdate, 0));
     ASSERT_EQUALS(res.size(), 5);
 
     // For replacement style updates, query on _id uses replacement doc to target. If the
     // replacement doc doesn't have shard key fields, then update should be routed to the shard
     // holding 'null' shard key documents.
-    res = cmTargeter.targetUpdate(operationContext(),
-                                  buildUpdate(fromjson("{_id: 1}"), fromjson("{p: 111}}"), false));
+    auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}}"), false);
+    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestReplUpdate, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
 
 
     // Upsert requires full shard key in query, even if the query can target a single shard.
+    auto requestFullKey = buildUpdate(kNss,
+                                      fromjson("{'a.b':  100, 'c.d' : {$exists: false}}}"),
+                                      fromjson("{a: {b: -111}}"),
+                                      true);
     ASSERT_THROWS_CODE(
-        cmTargeter.targetUpdate(operationContext(),
-                                buildUpdate(fromjson("{'a.b':  100, 'c.d' : {$exists: false}}}"),
-                                            fromjson("{a: {b: -111}}"),
-                                            true)),
+        cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestFullKey, 0)),
         DBException,
         ErrorCodes::ShardKeyNotFound);
 
     // Upsert success case.
-    res = cmTargeter.targetUpdate(
-        operationContext(),
-        buildUpdate(fromjson("{'a.b': 100, 'c.d': 'val'}"), fromjson("{a: {b: -111}}"), true));
+    auto requestSuccess =
+        buildUpdate(kNss, fromjson("{'a.b': 100, 'c.d': 'val'}"), fromjson("{a: {b: -111}}"), true);
+    res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestSuccess, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "4");
 }
@@ -263,8 +270,8 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
 
         // Verify that the given document is being routed based on hashed value of 'i' in
         // 'updateQueryObj'.
-        const auto res = cmTargeter.targetUpdate(
-            operationContext(), buildUpdate(updateQueryObj, fromjson("{$set: {p: 1}}"), false));
+        auto request = buildUpdate(kNss, updateQueryObj, fromjson("{$set: {p: 1}}"), false);
+        const auto res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&request, 0));
         ASSERT_EQUALS(res.size(), 1);
         ASSERT_EQUALS(res[0].shardName, findChunk(updateQueryObj["a"]["b"]).getShardId());
     }
@@ -272,16 +279,15 @@ TEST_F(ChunkManagerTargeterTest, TargetUpdateWithHashedPrefixHashedShardKey) {
     // Range queries on hashed field cannot be used for targeting. In this case, update will be
     // targeted based on update document.
     const auto updateObj = fromjson("{a: {b: -1}}");
-    auto res = cmTargeter.targetUpdate(
-        operationContext(), buildUpdate(fromjson("{'a.b': {$gt : 101}}"), updateObj, false));
+    auto requestUpdate = buildUpdate(kNss, fromjson("{'a.b': {$gt : 101}}"), updateObj, false);
+    auto res = cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestUpdate, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, findChunk(updateObj["a"]["b"]).getShardId());
-    ASSERT_THROWS_CODE(
-        cmTargeter.targetUpdate(
-            operationContext(),
-            buildUpdate(fromjson("{'a.b': {$gt : 101}}"), fromjson("{$set: {p: 1}}"), false)),
-        DBException,
-        ErrorCodes::InvalidOptions);
+    auto requestErr =
+        buildUpdate(kNss, fromjson("{'a.b': {$gt : 101}}"), fromjson("{$set: {p: 1}}"), false);
+    ASSERT_THROWS_CODE(cmTargeter.targetUpdate(operationContext(), BatchItemRef(&requestErr, 0)),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
 }
 
 TEST_F(ChunkManagerTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
@@ -295,30 +301,33 @@ TEST_F(ChunkManagerTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
                               splitPoints);
 
     // Cannot delete without full shardkey in the query.
+    auto requestPartialKey = buildDelete(kNss, fromjson("{'a.b': {$gt : 2}}"));
     ASSERT_THROWS_CODE(
-        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b': {$gt : 2}}"))),
+        cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestPartialKey, 0)),
         DBException,
         ErrorCodes::ShardKeyNotFound);
+
+    auto requestPartialKey2 = buildDelete(kNss, fromjson("{'a.b': -101}"));
     ASSERT_THROWS_CODE(
-        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b':  -101}"))),
+        cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestPartialKey2, 0)),
         DBException,
         ErrorCodes::ShardKeyNotFound);
 
     // Delete targeted correctly with full shard key in query.
-    auto res = cmTargeter.targetDelete(operationContext(),
-                                       buildDelete(fromjson("{'a.b':  -101, 'c.d': 5}")));
+    auto requestFullKey = buildDelete(kNss, fromjson("{'a.b': -101, 'c.d': 5}"));
+    auto res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestFullKey, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
 
     // Query with MinKey value should go to chunk '0' because MinKey is smaller than BSONNULL.
-    res = cmTargeter.targetDelete(
-        operationContext(),
-        buildDelete(BSONObjBuilder().appendMinKey("a.b").append("c.d", 4).obj()));
+    auto requestMinKey =
+        buildDelete(kNss, BSONObjBuilder().appendMinKey("a.b").append("c.d", 4).obj());
+    res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestMinKey, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "0");
 
-    res =
-        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b':  0, 'c.d': 5}")));
+    auto requestMinKey2 = buildDelete(kNss, fromjson("{'a.b':  0, 'c.d': 5}"));
+    res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestMinKey2, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "3");
 }
@@ -342,16 +351,17 @@ TEST_F(ChunkManagerTargeterTest, TargetDeleteWithHashedPrefixHashedShardKey) {
         auto queryObj = BSON("a" << BSON("b" << i) << "c" << BSON("d" << 10));
         // Verify that the given document is being routed based on hashed value of 'i' in
         // 'queryObj'.
-        const auto res = cmTargeter.targetDelete(operationContext(), buildDelete(queryObj));
+        auto request = buildDelete(kNss, queryObj);
+        const auto res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&request, 0));
         ASSERT_EQUALS(res.size(), 1);
         ASSERT_EQUALS(res[0].shardName, findChunk(queryObj["a"]["b"]).getShardId());
     }
 
     // Range queries on hashed field cannot be used for targeting.
-    ASSERT_THROWS_CODE(
-        cmTargeter.targetDelete(operationContext(), buildDelete(fromjson("{'a.b': {$gt : 101}}"))),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+    auto request = buildDelete(kNss, fromjson("{'a.b': {$gt : 101}}"));
+    ASSERT_THROWS_CODE(cmTargeter.targetDelete(operationContext(), BatchItemRef(&request, 0)),
+                       DBException,
+                       ErrorCodes::ShardKeyNotFound);
 }
 
 }  // namespace
