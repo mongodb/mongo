@@ -65,8 +65,6 @@
 
 namespace mongo {
 
-using namespace indexbuildentryhelpers;
-
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
@@ -1169,7 +1167,7 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
 
     // This would create an empty table even for FCV 4.2 to handle case where a primary node started
     // with FCV 4.2, and then upgraded FCV 4.4.
-    ensureIndexBuildEntriesNamespaceExists(opCtx);
+    indexbuildentryhelpers::ensureIndexBuildEntriesNamespaceExists(opCtx);
 
     auto indexBuilds = _getIndexBuilds();
     auto onIndexBuild = [this, opCtx](std::shared_ptr<ReplIndexBuildState> replState) {
@@ -1680,7 +1678,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                                             replState->collectionUUID,
                                             indexBuildOptions.commitQuorum.get(),
                                             replState->indexNames);
-            uassertStatusOK(addIndexBuildEntry(opCtx, indexBuildEntry));
+            uassertStatusOK(indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexBuildEntry));
 
             opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
                 opCtx,
