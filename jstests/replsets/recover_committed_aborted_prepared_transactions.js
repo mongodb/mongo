@@ -9,7 +9,6 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/libs/rollback_test.js");
 
@@ -36,13 +35,13 @@ let sessionColl1 = sessionDB1.getCollection(collName);
 const sessionDB2 = session2.getDatabase(dbName);
 const sessionColl2 = sessionDB2.getCollection(collName);
 
-assert.commandWorked(sessionColl1.insert({id: 1}));
+assert.commandWorked(sessionColl1.insert({_id: 1}));
 
 rollbackTest.awaitLastOpCommitted();
 
 // Prepare a transaction on the first session which will be committed eventually.
 session1.startTransaction();
-assert.commandWorked(sessionColl1.insert({id: 2}));
+assert.commandWorked(sessionColl1.insert({_id: 2}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
 
 // Prevent the stable timestamp from moving beyond the following prepared transactions so
@@ -55,7 +54,7 @@ assert.commandWorked(
 
 // Prepare another transaction on the second session which will be aborted.
 session2.startTransaction();
-assert.commandWorked(sessionColl2.insert({id: 3}));
+assert.commandWorked(sessionColl2.insert({_id: 3}));
 const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2, {w: 1});
 
 // Commit the first transaction.
@@ -69,7 +68,7 @@ assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
 
 // The following write will be rolled back.
 rollbackTest.transitionToRollbackOperations();
-assert.commandWorked(testColl.insert({id: 4}));
+assert.commandWorked(testColl.insert({_id: 4}));
 
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
@@ -87,8 +86,8 @@ assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
 // Make sure we can see the first two writes and the insert from the first prepared transaction.
 // Make sure we cannot see the insert from the second prepared transaction or the writes after
 // transitionToRollbackOperations.
-arrayEq(testColl.find().toArray(), [{_id: 1}, {_id: 2}]);
-arrayEq(sessionColl1.find().toArray(), [{_id: 1}, {_id: 2}]);
+assert.sameMembers(testColl.find().toArray(), [{_id: 1}, {_id: 2}]);
+assert.sameMembers(sessionColl1.find().toArray(), [{_id: 1}, {_id: 2}]);
 
 assert.eq(testColl.count(), 2);
 assert.eq(sessionColl1.count(), 2);
@@ -128,7 +127,7 @@ assert.commandFailedWithCode(sessionDB1.adminCommand({
                              ErrorCodes.NoSuchTransaction);
 
 // Make sure we can see the insert after committing the prepared transaction.
-arrayEq(testColl.find().toArray(), [{_id: 1}, {_id: 2}, {_id: 5}]);
+assert.sameMembers(testColl.find().toArray(), [{_id: 1}, {_id: 2}, {_id: 5}]);
 assert.eq(testColl.count(), 3);
 
 rollbackTest.stop();

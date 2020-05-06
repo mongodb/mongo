@@ -50,7 +50,7 @@ jsTestLog("Committing the transaction before the stable timestamp");
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
 // Make sure we can see the insert from the prepared transaction.
-arrayEq(sessionColl.find().toArray(), [{_id: 1}, {_id: 2}]);
+assert.sameMembers(sessionColl.find().toArray(), [{_id: 1}, {_id: 2}]);
 
 assert.commandWorked(
     primary.adminCommand({configureFailPoint: 'WTSetOldestTSToStableTS', mode: 'off'}));

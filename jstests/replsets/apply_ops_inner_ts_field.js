@@ -8,7 +8,6 @@
 
 (function() {
 "use strict";
-load("jstests/aggregation/extras/utils.js");
 
 const dbName = "test";
 const collName = "coll";
@@ -52,8 +51,8 @@ rst.awaitReplication();
 
 // Make sure that the secondary succesfully applies the applyOps oplog entry despite the command
 // specifying an invalid inner "ts" field.
-arrayEq(primaryColl.find({_id: 3}).toArray(), [{_id: 3}]);
-arrayEq(secondary.getDB(dbName)[collName].find({_id: 3}).toArray(), [{_id: 3}]);
+assert.sameMembers(primaryColl.find({_id: 3}).toArray(), [{_id: 3}]);
+assert.sameMembers(secondary.getDB(dbName)[collName].find({_id: 3}).toArray(), [{_id: 3}]);
 
 rst.stopSet();
 })();
