@@ -88,7 +88,8 @@ if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
 
     // Index build should be removed from the config.system.indexBuilds collection.
-    assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
+    assert.isnull(
+        primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 } else {
     // The noop oplog entry is the only evidence of the failed single phase index build.
     let ops = rst.dumpOplog(

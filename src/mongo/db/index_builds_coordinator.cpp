@@ -161,6 +161,37 @@ bool shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx,
 }
 
 /**
+ * Removes the index build from the config.system.indexBuilds collection after the primary has
+ * written the commitIndexBuild or abortIndexBuild oplog entry.
+ */
+void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
+                                             const NamespaceStringOrUUID& dbAndUUID,
+                                             const ReplIndexBuildState& replState) {
+    if (IndexBuildProtocol::kSinglePhase == replState.protocol) {
+        return;
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
+        return;
+    }
+
+    auto status = indexbuildentryhelpers::removeIndexBuildEntry(opCtx, replState.buildUUID);
+
+    // If we fail to remove the document from config.system.indexBuilds, it is because the document
+    // or collection is missing. In any case, we do not need to fail the commit or abort operation.
+    // TODO(SERVER-47323): Do not ignore removeIndexBuildEntry() errors. Convert to fatal assertion.
+    if (!status.isOK()) {
+        LOGV2(4763501,
+              "Unable to remove index build from system collection. Ignoring error",
+              "buildUUID"_attr = replState.buildUUID,
+              "collectionUUID"_attr = replState.collectionUUID,
+              "status"_attr = status);
+    }
+}
+
+
+/**
  * Replicates a commitIndexBuild oplog entry for two-phase builds, which signals downstream
  * secondary nodes to commit the index build.
  */
@@ -1029,6 +1060,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
                                             Status reason) {
     auto coll =
         CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     auto nss = coll->ns();
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     switch (signalAction) {
@@ -1045,6 +1077,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
                                     << (IndexBuildProtocol::kSinglePhase == replState->protocol));
             auto onCleanUpFn = [&] { onAbortIndexBuild(opCtx, coll->ns(), *replState, reason); };
             _indexBuildsManager.abortIndexBuild(opCtx, coll, replState->buildUUID, onCleanUpFn);
+            removeIndexBuildEntryAfterCommitOrAbort(opCtx, dbAndUUID, *replState);
             break;
         }
         // Deletes the index from the durable catalog.
@@ -2290,6 +2323,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     TimestampBlock tsBlock(opCtx, commitIndexBuildTimestamp);
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
         opCtx, collection, collection->ns(), replState->buildUUID, onCreateEachFn, onCommitFn));
+    removeIndexBuildEntryAfterCommitOrAbort(opCtx, dbAndUUID, *replState);
     replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection);
     LOGV2(20663,
           "Index build completed successfully",
