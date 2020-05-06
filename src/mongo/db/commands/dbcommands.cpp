@@ -458,7 +458,8 @@ public:
         AutoGetCollectionForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
 
-        const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+        const auto collDesc =
+            CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
 
         if (collDesc.isSharded()) {
             const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());

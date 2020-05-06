@@ -181,8 +181,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     const bool isInsert = false;
     FieldRefSet immutablePaths;
     if (isUserInitiatedWrite) {
-        const auto collDesc =
-            CollectionShardingState::get(opCtx(), collection()->ns())->getCollectionDescription();
+        const auto collDesc = CollectionShardingState::get(opCtx(), collection()->ns())
+                                  ->getCollectionDescription(opCtx());
         if (collDesc.isSharded() && !OperationShardingState::isOperationVersioned(opCtx())) {
             immutablePaths.fillFrom(collDesc.getKeyPatternFields());
         }
@@ -255,7 +255,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
             args.update = logObj;
             if (isUserInitiatedWrite) {
                 args.criteria = CollectionShardingState::get(opCtx(), collection()->ns())
-                                    ->getCollectionDescription()
+                                    ->getCollectionDescription(opCtx())
                                     .extractDocumentKey(newObj);
             } else {
                 const auto docId = newObj[idFieldName];
@@ -705,7 +705,7 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
 
 bool UpdateStage::checkUpdateChangesShardKeyFields(const Snapshotted<BSONObj>& oldObj) {
     auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-    const auto collDesc = css->getCollectionDescription();
+    const auto collDesc = css->getCollectionDescription(opCtx());
     if (!collDesc.isSharded()) {
         return false;
     }

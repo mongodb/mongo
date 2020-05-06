@@ -175,7 +175,7 @@ BSONObj UpsertStage::_produceNewDocumentForInsert() {
     if (!isInternalRequest) {
         optCollDesc.emplace(
             CollectionShardingState::get(opCtx(), _params.request->getNamespaceString())
-                ->getCollectionDescription());
+                ->getCollectionDescription(opCtx()));
 
         // If the collection is sharded, add all fields from the shard key to the 'shardKeyPaths'
         // set.

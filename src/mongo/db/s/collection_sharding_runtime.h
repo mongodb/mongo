@@ -87,7 +87,7 @@ public:
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
                                               OrphanCleanupPolicy orphanCleanupPolicy) override;
 
-    ScopedCollectionDescription getCollectionDescription() override;
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override;
     ScopedCollectionDescription getCollectionDescription_DEPRECATED() override;
 
     void checkShardVersionOrThrow(OperationContext* opCtx) override;

@@ -195,13 +195,14 @@ public:
 
         // Distinct doesn't filter orphan documents so it is not allowed to run on sharded
         // collections in multi-document transactions.
-        uassert(
-            ErrorCodes::OperationNotSupportedInTransaction,
-            "Cannot run 'distinct' on a sharded collection in a multi-document transaction. "
-            "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
-            "alternative.",
-            !opCtx->inMultiDocumentTransaction() ||
-                !CollectionShardingState::get(opCtx, nss)->getCollectionDescription().isSharded());
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                "Cannot run 'distinct' on a sharded collection in a multi-document transaction. "
+                "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
+                "alternative.",
+                !opCtx->inMultiDocumentTransaction() ||
+                    !CollectionShardingState::get(opCtx, nss)
+                         ->getCollectionDescription(opCtx)
+                         .isSharded());
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         auto defaultCollation =

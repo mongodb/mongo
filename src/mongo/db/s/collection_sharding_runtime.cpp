@@ -123,10 +123,14 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
                                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
 }
 
-ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription() {
+ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
+    OperationContext* opCtx) {
+    auto& oss = OperationShardingState::get(opCtx);
     // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
-    // consider all collections as unsharded.
-    if (!ShardingState::get(_serviceContext)->enabled()) {
+    // consider all collections as unsharded. Also, return unsharded if no shard version or db
+    // version is present on the context.
+    if (!ShardingState::get(_serviceContext)->enabled() ||
+        (!oss.hasShardVersion() && !oss.hasDbVersion())) {
         return {kUnshardedCollection};
     }
 

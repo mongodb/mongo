@@ -52,7 +52,7 @@ const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
 
 class CollectionShardingStateStandalone final : public CollectionShardingState {
 public:
-    ScopedCollectionDescription getCollectionDescription() override {
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override {
         return {kUnshardedCollection};
     }
     ScopedCollectionDescription getCollectionDescription_DEPRECATED() override {

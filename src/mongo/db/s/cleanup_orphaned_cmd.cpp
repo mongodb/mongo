@@ -85,9 +85,9 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         }
         collectionUuid.emplace(autoColl.getCollection()->uuid());
 
-        auto* const css = CollectionShardingRuntime::get(opCtx, ns);
-        const auto collDesc = css->getCollectionDescription();
-        if (!collDesc.isSharded()) {
+        auto* const csr = CollectionShardingRuntime::get(opCtx, ns);
+        const auto optCollDescr = csr->getCurrentMetadataIfKnown();
+        if (!optCollDescr || !optCollDescr->isSharded()) {
             LOGV2(4416001,
                   "cleanupOrphaned skipping waiting for orphaned data cleanup because "
                   "{namespace} is not sharded",
@@ -96,13 +96,13 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                   "namespace"_attr = ns.ns());
             return CleanupResult::kDone;
         }
-        range.emplace(collDesc.getMinKey(), collDesc.getMaxKey());
+        range.emplace(optCollDescr->getMinKey(), optCollDescr->getMaxKey());
 
         // Though the 'startingFromKey' parameter is not used as the min key of the range to
         // wait for, we still validate that 'startingFromKey' in the same way as the original
         // cleanupOrphaned logic did if 'startingFromKey' is present.
-        BSONObj keyPattern = collDesc.getKeyPattern();
-        if (!startingFromKeyConst.isEmpty() && !collDesc.isValidKey(startingFromKeyConst)) {
+        BSONObj keyPattern = optCollDescr->getKeyPattern();
+        if (!startingFromKeyConst.isEmpty() && !optCollDescr->isValidKey(startingFromKeyConst)) {
             LOGV2_ERROR_OPTIONS(
                 4416002,
                 {logv2::UserAssertAfterLog(ErrorCodes::OrphanedRangeCleanUpFailed)},

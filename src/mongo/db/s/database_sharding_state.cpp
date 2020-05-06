@@ -147,10 +147,10 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) co
     }
 
     uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none),
-            "don't know dbVersion",
+            str::stream() << "don't know dbVersion for database " << _dbName,
             _dbVersion);
     uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, *_dbVersion),
-            "dbVersion mismatch",
+            str::stream() << "dbVersion mismatch for database " << _dbName,
             databaseVersion::equal(*clientDbVersion, *_dbVersion));
 }
 

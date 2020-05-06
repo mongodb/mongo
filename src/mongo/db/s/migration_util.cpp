@@ -280,11 +280,12 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
     return ExecutorFuture<void>(getMigrationUtilExecutor())
         .then([=] {
             auto deletionTaskUuidMatchesFilteringMetadataUuid =
-                [](CollectionShardingRuntime* csr, const RangeDeletionTask& deletionTask) {
-                    return csr->getCurrentMetadataIfKnown() &&
-                        csr->getCollectionDescription().isSharded() &&
-                        csr->getCollectionDescription().uuidMatches(
-                            deletionTask.getCollectionUuid());
+                [](OperationContext* opCtx,
+                   CollectionShardingRuntime* csr,
+                   const RangeDeletionTask& deletionTask) {
+                    auto optCollDescr = csr->getCurrentMetadataIfKnown();
+                    return optCollDescr && optCollDescr->isSharded() &&
+                        optCollDescr->uuidMatches(deletionTask.getCollectionUuid());
                 };
 
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
@@ -307,22 +308,22 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 boost::optional<AutoGetCollection> autoColl;
                 autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
                 auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-                if (!deletionTaskUuidMatchesFilteringMetadataUuid(csr, deletionTask)) {
+                if (!deletionTaskUuidMatchesFilteringMetadataUuid(opCtx, csr, deletionTask)) {
                     // If the collection's filtering metadata is not known, is unsharded, or its
                     // UUID does not match the UUID of the deletion task, force a filtering metadata
                     // refresh once, because this node may have just stepped up and therefore may
                     // have a stale cache.
+                    auto optCollDescr = csr->getCurrentMetadataIfKnown();
                     LOGV2(22024,
                           "Filtering metadata for this range deletion task may be outdated; "
                           "forcing refresh",
                           "deletionTask"_attr = redact(deletionTask.toBSON()),
                           "error"_attr =
-                              (csr->getCurrentMetadataIfKnown()
-                                   ? (csr->getCollectionDescription().isSharded()
-                                          ? "Collection has UUID that does not match UUID "
-                                            "of the deletion task"
-                                          : "Collection is unsharded")
-                                   : "Collection's sharding state is not known"),
+                              (optCollDescr ? (optCollDescr->isSharded()
+                                                   ? "Collection has UUID that does not match "
+                                                     "UUID of the deletion task"
+                                                   : "Collection is unsharded")
+                                            : "Collection's sharding state is not known"),
                           "namespace"_attr = deletionTask.getNss(),
                           "migrationId"_attr = deletionTask.getId());
 
@@ -335,16 +336,17 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
             auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
             // Keep the collection metadata from changing for the rest of this scope.
             auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+            auto optCollDescr = csr->getCurrentMetadataIfKnown();
             uassert(ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
                     str::stream()
                         << "Even after forced refresh, filtering metadata for namespace in "
                            "deletion task "
-                        << (csr->getCurrentMetadataIfKnown()
-                                ? (csr->getCollectionDescription().isSharded()
+                        << (optCollDescr
+                                ? (optCollDescr->isSharded()
                                        ? " has UUID that does not match UUID of the deletion task"
                                        : " is unsharded")
                                 : " is not known"),
-                    deletionTaskUuidMatchesFilteringMetadataUuid(csr, deletionTask));
+                    deletionTaskUuidMatchesFilteringMetadataUuid(opCtx, csr, deletionTask));
 
             LOGV2(22026,
                   "Submitting range deletion task",
