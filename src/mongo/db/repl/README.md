@@ -283,9 +283,6 @@ It includes:
 4. The replica set ID.
 5. Whether the upstream node is primary.
 
-If the metadata has a different config version than the downstream node's config version, then the
-metadata is ignored until a reconfig command is received that synchronizes the config versions.
-
 The node sets its term to the upstream node's term, and if it's a primary (which can only happen on
 heartbeats), it steps down.
 
