@@ -111,9 +111,11 @@ replset.startSet();
 replset.initiate();
 replset.awaitSecondaryNodes();
 runTest('ReplSet', {primary: replset.getPrimary(), replset: replset, wc: replsetWC}, function() {
+    const kAppliedOpTimeTimeoutMS = 10 * 1000;
     // Need to be authed for restart.
     // Only __system is guaranteed to be available, especially during 2nd restart.
     replset.nodes.forEach((node) => assert(node.getDB('admin').auth('__system', keyfileContents)));
+    replset.awaitNodesAgreeOnAppliedOpTime(kAppliedOpTimeTimeoutMS, replset.nodes);
     replset.restart(replset.nodes);
     replset.awaitSecondaryNodes();
     return {primary: replset.getPrimary(), replset: replset, wc: replsetWC};
