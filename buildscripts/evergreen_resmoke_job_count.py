@@ -46,6 +46,9 @@ GLOBAL_TASK_FACTOR_OVERRIDES = {
     r"causally_consistent_hedged_reads_jscore_passthrough.*": 0.25,
     r"logical_session_cache.*_refresh_jscore_passthrough.*": 0.25,
     r"multi_shard_.*multi_stmt_txn_.*jscore_passthrough.*": 0.125,
+    r"replica_sets_reconfig_jscore_passthrough.*": 0.25,
+    r"replica_sets_reconfig_jscore_stepdown_passthrough.*": 0.25,
+    r"replica_sets_reconfig_kill_primary_jscore_passthrough.*": 0.25,
     r"sharded_causally_consistent_jscore_passthrough.*": 0.75,
     r"sharded_collections_jscore_passthrough.*": 0.75,
 }
