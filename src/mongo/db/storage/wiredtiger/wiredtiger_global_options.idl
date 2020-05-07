@@ -71,23 +71,15 @@ configs:
         arg_vartype: Switch
         cpp_varname: 'wiredTigerGlobalOptions.directoryForIndexes'
         short_name: wiredTigerDirectoryForIndexes
-    "storage.wiredTiger.engineConfig.maxCacheOverflowFileSizeGB":
-        description: >-
-            Maximum amount of disk space to use for cache overflow;
-            Defaults to 0 (unbounded)
-            Deprecated. Has no effect on storage engine operation.
-        arg_vartype: Double
-        cpp_varname: 'wiredTigerGlobalOptions.maxCacheOverflowFileSizeGBDeprecated'
-        short_name: wiredTigerMaxCacheOverflowFileSizeGB
-        default: 0.0
-        hidden: true
     "storage.wiredTiger.engineConfig.maxHistoryFileSizeGB":
+        deprecated_name: 'storage.wiredTiger.engineConfig.maxCacheOverflowFileSizeGB'
         description: >-
             Maximum amount of disk space to use for history file;
             Defaults to 0 (unbounded)
         arg_vartype: Double
         cpp_varname: 'wiredTigerGlobalOptions.maxHistoryFileSizeGB'
         short_name: wiredTigerMaxHistoryFileSizeGB
+        deprecated_short_name: wiredTigerMaxCacheOverflowFileSizeGB
         validator:
             callback: 'WiredTigerGlobalOptions::validateMaxHistoryFileSizeGB'
         default: 0.0

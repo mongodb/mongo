@@ -466,6 +466,7 @@ private:
 
     std::unique_ptr<WiredTigerEngineRuntimeConfigParameter> _runTimeConfigParam;
     std::unique_ptr<WiredTigerMaxHistoryFileSizeGBParameter> _maxHistoryFileSizeGBParam;
+    std::unique_ptr<ServerParameter> _maxCacheOverflowParam;
 
     mutable Mutex _highestDurableTimestampMutex =
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_highestDurableTimestampMutex");

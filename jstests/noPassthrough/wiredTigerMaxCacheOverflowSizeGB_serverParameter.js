@@ -15,8 +15,8 @@ testNumericServerParameter("wiredTigerMaxCacheOverflowSizeGB",
                            true /*isRuntimeParameter*/,
                            0 /*defaultValue*/,
                            0.1 /*nonDefaultValidValue*/,
-                           false /*hasLowerBound*/,
-                           "unused" /*lowerOutOfBounds*/,
+                           true /*hasLowerBound*/,
+                           0.09 /*lowerOutOfBounds*/,
                            false /*hasUpperBound*/,
                            "unused" /*upperOutOfBounds*/);
 

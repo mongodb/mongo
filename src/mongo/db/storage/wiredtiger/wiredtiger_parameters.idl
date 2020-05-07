@@ -104,17 +104,8 @@ server_parameters:
         cpp_varname: gWiredTigerCursorCacheSize
         default: -100
 
-    wiredTigerMaxCacheOverflowSizeGB:
-      description: >-
-        Maximum amount of disk space to use for cache overflow;
-        Defaults to 0 (unbounded)
-        Deprecated.
-      set_at: runtime
-      cpp_vartype: 'AtomicWord<double>'
-      cpp_varname: gWiredTigerMaxCacheOverflowSizeGBDeprecated
-      default: 0
-
     wiredTigerMaxHistorySizeGB:
+      deprecated_name: wiredTigerMaxCacheOverflowSizeGB
       description: >-
         Maximum amount of disk space to use for history file;
         Defaults to 0 (unbounded)
@@ -123,8 +114,8 @@ server_parameters:
         name: WiredTigerMaxHistoryFileSizeGBParameter
         data: 'std::pair<double, WiredTigerKVEngine*>'
         override_set: true
-      # This parameter has to be initialized in the WiredTigerKVEngine constructor due to the
-      # WiredTigerKVEngine dependency.
+      # This parameter, along with the deprecation alias, has to be initialized in
+      # the WiredTigerKVEngine constructor due to the WiredTigerKVEngine dependency.
       condition: { expr: false }
 
     wiredTigerEvictionDebugMode:
