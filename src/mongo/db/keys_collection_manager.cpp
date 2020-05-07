@@ -223,6 +223,8 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                                                                Milliseconds refreshInterval) {
     ThreadClient tc(threadName, service);
 
+    ON_BLOCK_EXIT([this]() mutable { _hasSeenKeys.store(false); });
+
     while (true) {
         unsigned errorCount = 0;
 
@@ -251,10 +253,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                 const auto& latestKey = latestKeyStatusWith.getValue();
                 auto currentTime = LogicalClock::get(service)->getClusterTime();
 
-                {
-                    stdx::unique_lock<Latch> lock(_mutex);
-                    _hasSeenKeys = true;
-                }
+                _hasSeenKeys.store(true);
 
                 nextWakeup =
                     howMuchSleepNeedFor(currentTime, latestKey.getExpiresAt(), refreshInterval);
@@ -345,16 +344,14 @@ void KeysCollectionManager::PeriodicRunner::stop() {
         }
 
         _inShutdown = true;
-        _hasSeenKeys = false;
         _refreshNeededCV.notify_all();
     }
 
     _backgroundThread.join();
 }
 
-bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() {
-    stdx::lock_guard<Latch> lock(_mutex);
-    return _hasSeenKeys;
+bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() const noexcept {
+    return _hasSeenKeys.load();
 }
 
 }  // namespace mongo

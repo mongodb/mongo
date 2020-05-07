@@ -134,42 +134,59 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
 }
 
 /**
+ * Invoking `shouldGossipLogicalTime()` is expected to always return "true" during normal execution.
+ * SERVER-48013 uses this property to avoid the cost of calling this function during normal
+ * execution. However, it might be desired to do the validation for test purposes (e.g.,
+ * unit-tests). This fail-point allows going through a code path that does the check and quick
+ * returns from `appendRequiredFieldsToResponse()` if `shouldGossipLogicalTime()` returns "false".
+ * TODO SERVER-48142 should remove the following fail-point.
+ */
+MONGO_FAIL_POINT_DEFINE(allowSkippingAppendRequiredFieldsToResponse);
+
+/**
  * Append required fields to command response.
  */
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
     VectorClock::get(opCtx)->gossipOut(responseBuilder, opCtx->getClient()->getSessionTags());
-    auto validator = LogicalTimeValidator::get(opCtx);
-    if (validator->shouldGossipLogicalTime()) {
-        auto now = LogicalClock::get(opCtx)->getClusterTime();
 
-        // Add operationTime.
-        auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
-        if (operationTime != LogicalTime::kUninitialized) {
-            LOGV2_DEBUG(22764,
-                        5,
-                        "Appending operationTime: {operationTime}",
-                        "Appending operationTime",
-                        "operationTime"_attr = operationTime.asTimestamp());
-            responseBuilder->append(kOperationTime, operationTime.asTimestamp());
-        } else if (now != LogicalTime::kUninitialized) {
-            // If we don't know the actual operation time, use the cluster time instead. This is
-            // safe but not optimal because we can always return a later operation time than actual.
-            LOGV2_DEBUG(22765,
-                        5,
-                        "Appending clusterTime as operationTime {clusterTime}",
-                        "Appending clusterTime as operationTime",
-                        "clusterTime"_attr = now.asTimestamp());
-            responseBuilder->append(kOperationTime, now.asTimestamp());
+    // TODO SERVER-48142 should remove the following block.
+    if (MONGO_unlikely(allowSkippingAppendRequiredFieldsToResponse.shouldFail())) {
+        auto validator = LogicalTimeValidator::get(opCtx);
+        if (!validator->shouldGossipLogicalTime()) {
+            LOGV2_DEBUG(4801301, 3, "Skipped gossiping logical time");
+            return;
         }
+    }
 
-        // Add $clusterTime.
-        if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-            SignedLogicalTime dummySignedTime(now, TimeProofService::TimeProof(), 0);
-            rpc::LogicalTimeMetadata(dummySignedTime).writeToMetadata(responseBuilder);
-        } else {
-            auto currentTime = validator->signLogicalTime(opCtx, now);
-            rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
-        }
+    auto now = LogicalClock::get(opCtx)->getClusterTime();
+
+    // Add operationTime.
+    auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
+    if (operationTime != LogicalTime::kUninitialized) {
+        LOGV2_DEBUG(22764,
+                    5,
+                    "Appending operationTime: {operationTime}",
+                    "Appending operationTime",
+                    "operationTime"_attr = operationTime.asTimestamp());
+        responseBuilder->append(kOperationTime, operationTime.asTimestamp());
+    } else if (now != LogicalTime::kUninitialized) {
+        // If we don't know the actual operation time, use the cluster time instead. This is
+        // safe but not optimal because we can always return a later operation time than actual.
+        LOGV2_DEBUG(22765,
+                    5,
+                    "Appending clusterTime as operationTime {clusterTime}",
+                    "Appending clusterTime as operationTime",
+                    "clusterTime"_attr = now.asTimestamp());
+        responseBuilder->append(kOperationTime, now.asTimestamp());
+    }
+
+    // Add $clusterTime.
+    if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+        SignedLogicalTime dummySignedTime(now, TimeProofService::TimeProof(), 0);
+        rpc::LogicalTimeMetadata(dummySignedTime).writeToMetadata(responseBuilder);
+    } else {
+        auto currentTime = LogicalTimeValidator::get(opCtx)->signLogicalTime(opCtx, now);
+        rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
     }
 }
 
