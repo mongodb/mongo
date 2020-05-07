@@ -1404,13 +1404,14 @@ private:
                 if (node->isLeaf() && baseNode->isLeaf() && otherNode->isLeaf())
                     throw merge_conflict_exception();
 
-                // If the keys are all the exact same, then we can keep recursing.
+                // If the keys and data are all the exact same, then we can keep recursing.
                 // Otherwise, we manually resolve the differences element by element. The
                 // structure of compressed radix tries makes it difficult to compare the
                 // trees node by node, hence the reason for resolving these differences
                 // element by element.
                 if (node->_trieKey == baseNode->_trieKey &&
-                    baseNode->_trieKey == otherNode->_trieKey) {
+                    baseNode->_trieKey == otherNode->_trieKey && node->_data == baseNode->_data &&
+                    baseNode->_data == otherNode->_data) {
                     _merge3Helper(node, baseNode, otherNode, context, trieKeyIndex);
                 } else {
                     _mergeResolveConflict(node, baseNode, otherNode);
