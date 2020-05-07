@@ -57,7 +57,7 @@ public:
     /**
      * Appends the four histograms with latency totals and operation counts.
      */
-    void append(bool includeHistograms, BSONObjBuilder* builder) const;
+    void append(bool includeHistograms, bool slowMSBucketsOnly, BSONObjBuilder* builder) const;
 
 private:
     struct HistogramData {
@@ -73,6 +73,7 @@ private:
     void _append(const HistogramData& data,
                  const char* key,
                  bool includeHistograms,
+                 bool slowMSBucketsOnly,
                  BSONObjBuilder* builder) const;
 
     void _incrementData(uint64_t latency, int bucket, HistogramData* data);

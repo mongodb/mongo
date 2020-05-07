@@ -132,7 +132,9 @@ public:
     /**
      * Appends the global latency statistics.
      */
-    void appendGlobalLatencyStats(bool includeHistograms, BSONObjBuilder* builder);
+    void appendGlobalLatencyStats(bool includeHistograms,
+                                  bool slowMSBucketsOnly,
+                                  BSONObjBuilder* builder);
 
 private:
     void _appendToUsageMap(BSONObjBuilder& b, const UsageMap& map) const;
