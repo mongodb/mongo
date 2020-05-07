@@ -36,6 +36,7 @@ selector:
   - jstests/core/find_and_modify2.js
   - jstests/core/find_and_modify_pipeline_update.js
   - jstests/core/find_and_modify_server6865.js
+  - jstests/core/fts_find_and_modify.js
 
   # This test makes the assumption that a command is run a certain number of times, but
   # the retryable writes suite overrides the runCommand to repeat commands.

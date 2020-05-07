@@ -686,19 +686,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorLega
 namespace {
 
 /**
- * Wrap the specified 'root' plan stage in a ProjectionStage. Does not take ownership of any
- * arguments other than root.
+ * Attempts to construct and return the projection AST corresponding to 'projObj'. Illegal to call
+ * if 'projObj' is empty.
  *
- * If the projection was valid, then return Status::OK() with a pointer to the newly created
- * ProjectionStage. Otherwise, return a status indicating the error reason.
+ * If 'allowPositional' is false, and the projection AST involves positional projection, returns a
+ * non-OK status.
+ *
+ * Marks any metadata dependencies required by the projection on the given CanonicalQuery.
  */
-StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
-                                                  const NamespaceString& nsString,
-                                                  CanonicalQuery* cq,
-                                                  const BSONObj& projObj,
-                                                  bool allowPositional,
-                                                  WorkingSet* ws,
-                                                  unique_ptr<PlanStage> root) {
+StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSONObj& projObj,
+                                                                       bool allowPositional,
+                                                                       CanonicalQuery* cq) {
     invariant(!projObj.isEmpty());
 
     projection_ast::Projection proj =
@@ -724,8 +722,7 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
                 "Cannot use a $meta sortKey projection in findAndModify commands."};
     }
 
-    return {std::make_unique<ProjectionStageDefault>(
-        cq->getExpCtx(), projObj, &proj, ws, std::unique_ptr<PlanStage>(root.release()))};
+    return std::make_unique<projection_ast::Projection>(proj);
 }
 
 }  // namespace
@@ -844,6 +841,18 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
 
+    std::unique_ptr<projection_ast::Projection> projection;
+    if (!request->getProj().isEmpty()) {
+        invariant(request->getReturnDeleted());
+
+        const bool allowPositional = true;
+        auto projectionWithStatus = makeProjection(request->getProj(), allowPositional, cq.get());
+        if (!projectionWithStatus.isOK()) {
+            return projectionWithStatus.getStatus();
+        }
+        projection = std::move(projectionWithStatus.getValue());
+    }
+
     // The underlying query plan must preserve the record id, since it will be needed in order to
     // identify the record to update.
     const size_t defaultPlannerOptions = QueryPlannerParams::PRESERVE_RECORD_ID;
@@ -863,16 +872,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     root = std::make_unique<DeleteStage>(
         cq->getExpCtx().get(), std::move(deleteStageParams), ws.get(), collection, root.release());
 
-    if (!request->getProj().isEmpty()) {
-        invariant(request->getReturnDeleted());
-
-        const bool allowPositional = true;
-        StatusWith<unique_ptr<PlanStage>> projStatus = applyProjection(
-            opCtx, nss, cq.get(), request->getProj(), allowPositional, ws.get(), std::move(root));
-        if (!projStatus.isOK()) {
-            return projStatus.getStatus();
-        }
-        root = std::move(projStatus.getValue());
+    if (projection) {
+        root = std::make_unique<ProjectionStageDefault>(
+            cq->getExpCtx(), request->getProj(), projection.get(), ws.get(), std::move(root));
     }
 
     // We must have a tree of stages in order to have a valid plan executor, but the query
@@ -1003,6 +1005,21 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
 
+    std::unique_ptr<projection_ast::Projection> projection;
+    if (!request->getProj().isEmpty()) {
+        invariant(request->shouldReturnAnyDocs());
+
+        // If the plan stage is to return the newly-updated version of the documents, then it
+        // is invalid to use a positional projection because the query expression need not
+        // match the array element after the update has been applied.
+        const bool allowPositional = request->shouldReturnOldDocs();
+        auto projectionWithStatus = makeProjection(request->getProj(), allowPositional, cq.get());
+        if (!projectionWithStatus.isOK()) {
+            return projectionWithStatus.getStatus();
+        }
+        projection = std::move(projectionWithStatus.getValue());
+    }
+
     // The underlying query plan must preserve the record id, since it will be needed in order to
     // identify the record to update.
     const size_t defaultPlannerOptions = QueryPlannerParams::PRESERVE_RECORD_ID;
@@ -1027,19 +1044,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
              : std::make_unique<UpdateStage>(
                    cq->getExpCtx().get(), updateStageParams, ws.get(), collection, root.release()));
 
-    if (!request->getProj().isEmpty()) {
-        invariant(request->shouldReturnAnyDocs());
-
-        // If the plan stage is to return the newly-updated version of the documents, then it
-        // is invalid to use a positional projection because the query expression need not
-        // match the array element after the update has been applied.
-        const bool allowPositional = request->shouldReturnOldDocs();
-        StatusWith<unique_ptr<PlanStage>> projStatus = applyProjection(
-            opCtx, nss, cq.get(), request->getProj(), allowPositional, ws.get(), std::move(root));
-        if (!projStatus.isOK()) {
-            return projStatus.getStatus();
-        }
-        root = std::move(projStatus.getValue());
+    if (projection) {
+        root = std::make_unique<ProjectionStageDefault>(
+            cq->getExpCtx(), request->getProj(), projection.get(), ws.get(), std::move(root));
     }
 
     // We must have a tree of stages in order to have a valid plan executor, but the query
