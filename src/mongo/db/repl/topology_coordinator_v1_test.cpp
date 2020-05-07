@@ -4265,6 +4265,98 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceFromStalePrimary) {
         now()));
 }
 
+TEST_F(HeartbeatResponseTestV1,
+       ShouldntChangeSyncSourceWhenNotSyncingFromPrimaryAndChainingDisabledButNoNewPrimary) {
+    // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+    // "host2" since we are not aware of who the new primary is.
+
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1 << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+        now()));
+}
+
+TEST_F(HeartbeatResponseTestV1,
+       ShouldChangeSyncSourceWhenNotSyncingFromPrimaryChainingDisabledAndFoundNewPrimary) {
+    // In this test, the TopologyCoordinator should tell us to change sync sources away from
+    // "host2" since "host3" is the new primary and chaining is disabled.
+
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1 << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime election = OpTime(Timestamp(1, 0), 0);
+    OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+
+    // Set that host3 is the new primary.
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, election, freshOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+
+    startCapturingLogMessages();
+    ASSERT(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+        now()));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
+}
+
+TEST_F(HeartbeatResponseTestV1, ShouldntChangeSyncSourceWhenChainingDisabledAndWeArePrimary) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1 << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5 << "chainingAllowed" << false)),
+                 0);
+
+    OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+
+    // Set that we are primary.
+    getTopoCoord().setPrimaryIndex(0);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+        now()));
+}
+
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceFromStale42Primary) {
     // In this test, the TopologyCoordinator should still sync to the primary, "host2", although
     // "host3" is fresher. Simulate a 4.2 primary which sends primaryIndex but not isPrimary with

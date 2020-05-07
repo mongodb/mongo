@@ -93,6 +93,8 @@ all:
     test_file: jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
   - ticket: SERVER-49991
     test_file: jstests/replsets/get_replication_info_helper.js
+  - ticket: SERVER-39621
+    test_file: jstests/replsets/step_down_chaining_disabled.js
 
 suites:
 
