@@ -38,10 +38,10 @@ namespace {
 class ClusterShutdownCmd : public CmdShutdown<ClusterShutdownCmd> {
 public:
     std::string help() const override {
-        return "shutdown the database.  must be ran against admin db and "
-               "either (1) ran from localhost or (2) authenticated. You can "
-               "also specify timeoutSecs : N to wait N seconds to allow in "
-               "progress operations to complete.";
+        return "Shuts down the mongos. Must be run against the admin database and either (1) run "
+               "from localhost or (2) run while authenticated with the shutdown privilege. Spends "
+               "'timeoutSecs' in quiesce mode, where the mongos continues to allow operations to "
+               "run, but directs clients to route new operations to other mongos nodes.";
     }
 
     static void beginShutdown(OperationContext* opCtx, bool force, long long timeoutSecs) {}

@@ -53,7 +53,9 @@ Status stepDownForShutdown(OperationContext* opCtx,
     // for any secondaries. Ignore stepdown.
     if (replCoord->getConfig().getNumMembers() != 1) {
         try {
-            replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
+            // Specify a high freeze time, so that if there is a stall during shut down, the node
+            // does not run for election.
+            replCoord->stepDown(opCtx, false /* force */, waitTime, Days(1));
 
             if (MONGO_unlikely(hangInShutdownAfterStepdown.shouldFail())) {
                 LOGV2(4695100, "hangInShutdownAfterStepdown failpoint enabled");
@@ -81,12 +83,14 @@ namespace {
 class CmdShutdownMongoD : public CmdShutdown<CmdShutdownMongoD> {
 public:
     std::string help() const override {
-        return "shutdown the database.  must be ran against admin db and "
-               "either (1) ran from localhost or (2) authenticated. If "
-               "this is a primary in a replica set and there is no member "
-               "within 10 seconds of its optime, it will not shutdown "
-               "without force : true.  You can also specify timeoutSecs : "
-               "N to wait N seconds for other members to catch up.";
+        return "Shuts down the database. Must be run against the admin database and either (1) run "
+               "from localhost or (2) run while authenticated with the shutdown privilege. If the "
+               "node is the primary of a replica set, waits up to 'timeoutSecs' for an electable "
+               "node to be caught up before stepping down. If 'force' is false and no electable "
+               "node was able to catch up, does not shut down. If the node is in state SECONDARY "
+               "after the attempted stepdown, any remaining time in 'timeoutSecs' is used for "
+               "quiesce mode, where the database continues to allow operations to run, but directs "
+               "clients to route new operations to other replica set members.";
     }
 
     static void beginShutdown(OperationContext* opCtx, bool force, long long timeoutSecs) {
