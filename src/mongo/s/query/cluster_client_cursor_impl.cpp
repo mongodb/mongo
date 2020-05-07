@@ -209,6 +209,10 @@ boost::optional<ReadPreferenceSetting> ClusterClientCursorImpl::getReadPreferenc
     return _params.readPreference;
 }
 
+boost::optional<ReadConcernArgs> ClusterClientCursorImpl::getReadConcern() const {
+    return _params.readConcern;
+}
+
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,

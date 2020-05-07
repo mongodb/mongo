@@ -252,10 +252,21 @@ void execCommandClient(OperationContext* opCtx,
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "read concern snapshot is only supported in a multi-statement transaction",
-                    TransactionRouter::get(opCtx));
+        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
+            !TransactionRouter::get(opCtx) && !readConcernArgs.getArgsAtClusterTime()) {
+            // Select the latest known clusterTime as the atClusterTime for snapshot reads outside
+            // of transactions.
+            auto atClusterTime = [&] {
+                auto latestKnownClusterTime = LogicalClock::get(opCtx)->getClusterTime();
+                // If the user passed afterClusterTime, the chosen time must be greater than or
+                // equal to it.
+                auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
+                if (afterClusterTime && *afterClusterTime > latestKnownClusterTime) {
+                    return afterClusterTime->asTimestamp();
+                }
+                return latestKnownClusterTime.asTimestamp();
+            }();
+            readConcernArgs.setArgsAtClusterTimeForSnapshot(atClusterTime);
         }
 
         // attach tracking
@@ -399,12 +410,6 @@ void runCommand(OperationContext* opCtx,
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
         return;
-    }
-
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        uassert(ErrorCodes::InvalidOptions,
-                "read concern snapshot is not supported with atClusterTime on mongos",
-                !readConcernArgs.getArgsAtClusterTime());
     }
 
     boost::optional<RouterOperationContextSession> routerSession;

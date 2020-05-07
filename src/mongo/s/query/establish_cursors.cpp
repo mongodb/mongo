@@ -179,8 +179,9 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                 }
                 // This exception is eligible to be swallowed. Add an entry with a cursorID of 0, an
                 // empty HostAndPort, and which has the 'partialResultsReturned' flag set to true.
-                remoteCursors.push_back(
-                    {response.shardId.toString(), {}, {nss, CursorId{0}, {}, {}, {}, {}, true}});
+                remoteCursors.push_back({response.shardId.toString(),
+                                         {},
+                                         {nss, CursorId{0}, {}, {}, {}, {}, {}, true}});
             }
         }
         return remoteCursors;

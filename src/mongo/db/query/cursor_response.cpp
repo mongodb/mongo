@@ -129,6 +129,7 @@ void appendGetMoreResponseObject(long long cursorId,
 CursorResponse::CursorResponse(NamespaceString nss,
                                CursorId cursorId,
                                std::vector<BSONObj> batch,
+                               boost::optional<Timestamp> atClusterTime,
                                boost::optional<long long> numReturnedSoFar,
                                boost::optional<BSONObj> postBatchResumeToken,
                                boost::optional<BSONObj> writeConcernError,
@@ -136,6 +137,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
     : _nss(std::move(nss)),
       _cursorId(cursorId),
       _batch(std::move(batch)),
+      _atClusterTime(std::move(atClusterTime)),
       _numReturnedSoFar(numReturnedSoFar),
       _postBatchResumeToken(std::move(postBatchResumeToken)),
       _writeConcernError(std::move(writeConcernError)),
@@ -235,6 +237,14 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
                               << postBatchResumeTokenElem.type()};
     }
 
+    auto atClusterTimeElem = cursorObj[kAtClusterTimeField];
+    if (atClusterTimeElem && atClusterTimeElem.type() != BSONType::bsonTimestamp) {
+        return {ErrorCodes::BadValue,
+                str::stream() << kAtClusterTimeField
+                              << " format is invalid; expected Timestamp, but found: "
+                              << atClusterTimeElem.type()};
+    }
+
     auto partialResultsReturned = cursorObj[kPartialResultsReturnedField];
 
     if (partialResultsReturned) {
@@ -257,6 +267,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
     return {{NamespaceString(fullns),
              cursorId,
              std::move(batch),
+             atClusterTimeElem ? atClusterTimeElem.timestamp() : boost::optional<Timestamp>{},
              boost::none,
              postBatchResumeTokenElem ? postBatchResumeTokenElem.Obj().getOwned()
                                       : boost::optional<BSONObj>{},
@@ -281,6 +292,10 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
 
     if (_postBatchResumeToken && !_postBatchResumeToken->isEmpty()) {
         cursorBuilder.append(kPostBatchResumeTokenField, *_postBatchResumeToken);
+    }
+
+    if (_atClusterTime) {
+        cursorBuilder.append(kAtClusterTimeField, *_atClusterTime);
     }
 
     if (_partialResultsReturned) {

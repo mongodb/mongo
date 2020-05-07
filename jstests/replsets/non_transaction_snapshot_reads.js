@@ -1,4 +1,5 @@
-/**Tests readConcern level snapshot outside of transactions.
+/**
+ * Tests readConcern level snapshot outside of transactions.
  *
  * @tags: [
  *   requires_fcv_46,
@@ -12,15 +13,22 @@ load("jstests/libs/global_snapshot_reads_util.js");
 
 // TODO(SERVER-47672): Use minSnapshotHistoryWindowInSeconds instead.
 const options = {
-    setParameter: "maxTargetSnapshotHistoryWindowInSeconds=600",
+    setParameter: {maxTargetSnapshotHistoryWindowInSeconds: 600}
 };
 const replSet = new ReplSetTest({nodes: 3, nodeOptions: options});
 replSet.startSet();
 replSet.initiateWithHighElectionTimeout();
 const primaryDB = replSet.getPrimary().getDB('test');
 const secondaryDB = replSet.getSecondary().getDB('test');
-snapshotReadsCursorTest(jsTestName(), primaryDB, secondaryDB, "test");
-snapshotReadsDistinctTest(jsTestName(), primaryDB, secondaryDB, "test");
+snapshotReadsTest({
+    testScenarioName: jsTestName(),
+    primaryDB: primaryDB,
+    secondaryDB: secondaryDB,
+    collName: "test",
+    awaitCommittedFn: () => {
+        replSet.awaitLastOpCommitted();
+    }
+});
 
 // Ensure "atClusterTime" is omitted from a regular (non-snapshot) reads.
 primaryDB["collection"].insertOne({});

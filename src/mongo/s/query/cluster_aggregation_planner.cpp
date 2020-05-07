@@ -243,7 +243,8 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
                                      const PrivilegeVector& privileges) {
 
-    ClusterClientCursorParams params(requestedNss, ReadPreferenceSetting::get(opCtx));
+    ClusterClientCursorParams params(
+        requestedNss, ReadPreferenceSetting::get(opCtx), ReadConcernArgs::get(opCtx));
 
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = pipelineForMerging->getContext()->tailableMode;
@@ -267,7 +268,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     rpc::OpMsgReplyBuilder replyBuilder;
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
-
+    options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     CursorResponseBuilder responseBuilder(&replyBuilder, options);
     bool stashedResult = false;
 

@@ -104,6 +104,8 @@ public:
 
     boost::optional<ReadPreferenceSetting> getReadPreference() const final;
 
+    boost::optional<ReadConcernArgs> getReadConcern() const final;
+
     Date_t getCreatedDate() const final;
 
     Date_t getLastUseDate() const final;

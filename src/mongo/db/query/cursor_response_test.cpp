@@ -300,6 +300,7 @@ TEST(CursorResponseTest, toBSONPartialResultsReturned) {
                             boost::none,
                             boost::none,
                             boost::none,
+                            boost::none,
                             true);
     BSONObj responseObj = response.toBSON(CursorResponse::ResponseType::InitialResponse);
     BSONObj expectedResponse = BSON(
@@ -347,8 +348,12 @@ TEST(CursorResponseTest, serializePostBatchResumeToken) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
     auto postBatchResumeToken =
         ResumeToken::makeHighWaterMarkToken(Timestamp(1, 2)).toDocument().toBson();
-    CursorResponse response(
-        NamespaceString("db.coll"), CursorId(123), batch, boost::none, postBatchResumeToken);
+    CursorResponse response(NamespaceString("db.coll"),
+                            CursorId(123),
+                            batch,
+                            boost::none,
+                            boost::none,
+                            postBatchResumeToken);
     auto serialized = response.toBSON(CursorResponse::ResponseType::SubsequentResponse);
     ASSERT_BSONOBJ_EQ(serialized,
                       BSON("cursor" << BSON("id" << CursorId(123) << "ns"

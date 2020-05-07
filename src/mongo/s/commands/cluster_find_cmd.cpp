@@ -230,6 +230,7 @@ public:
                 // Build the response document.
                 CursorResponseBuilder::Options options;
                 options.isInitialResponse = true;
+                options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
                 CursorResponseBuilder firstBatch(result, options);
                 for (const auto& obj : batch) {
                     firstBatch.append(obj);

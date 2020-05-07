@@ -32,7 +32,7 @@ function verifyInvalidGetMoreAttempts(mainDb, collName, cursorId, lsid, txnNumbe
                                  ErrorCodes.NoSuchTransaction);
 }
 
-var snapshotReadsCursorTest, snapshotReadsDistinctTest;
+var snapshotReadsTest;
 
 (function() {
 function makeSnapshotReadConcern(atClusterTime) {
@@ -43,16 +43,8 @@ function makeSnapshotReadConcern(atClusterTime) {
     return {level: "snapshot", atClusterTime: atClusterTime};
 }
 
-function awaitCommitted(db, ts) {
-    jsTestLog(`Wait for ${ts} to be committed on ${db.getMongo()}`);
-    assert.soonNoExcept(function() {
-        const replSetStatus =
-            assert.commandWorked(db.getSiblingDB("admin").runCommand({replSetGetStatus: 1}));
-        return timestampCmp(replSetStatus.optimes.readConcernMajorityOpTime.ts, ts) >= 0;
-    }, `${ts} was never committed on ${db.getMongo()}`);
-}
-
-snapshotReadsCursorTest = function(testScenarioName, primaryDB, secondaryDB, collName) {
+function snapshotReadsCursorTest(
+    {testScenarioName, primaryDB, secondaryDB, collName, awaitCommittedFn}) {
     const docs = [...Array(10).keys()].map((i) => ({"_id": i}));
 
     const commands = {
@@ -93,7 +85,7 @@ snapshotReadsCursorTest = function(testScenarioName, primaryDB, secondaryDB, col
                 assert(insertTimestamp);
 
                 jsTestLog(`Inserted 10 documents at timestamp ${insertTimestamp}`);
-                awaitCommitted(db, insertTimestamp);
+                awaitCommittedFn(db, insertTimestamp);
 
                 // Create a session if useCausalConsistency is true.
                 let causalDb, sessionTimestamp;
@@ -128,7 +120,7 @@ snapshotReadsCursorTest = function(testScenarioName, primaryDB, secondaryDB, col
                     {update: collName, updates: [{q: {}, u: {$set: {x: true}}, multi: true}]}));
 
                 jsTestLog(`Updated collection "${collName}" at timestamp ${res.operationTime}`);
-                awaitCommitted(db, res.operationTime);
+                awaitCommittedFn(db, res.operationTime);
 
                 // Retrieve the rest of the read command's result set.
                 res = assert.commandWorked(
@@ -167,9 +159,10 @@ snapshotReadsCursorTest = function(testScenarioName, primaryDB, secondaryDB, col
             }
         }
     }
-};
+}
 
-snapshotReadsDistinctTest = function(testScenarioName, primaryDB, secondaryDB, collName) {
+function snapshotReadsDistinctTest(
+    {testScenarioName, primaryDB, secondaryDB, collName, awaitCommittedFn}) {
     // Note: this test sets documents' "x" field, the test above uses "_id".
     const docs = [...Array(10).keys()].map((i) => ({"x": i}));
 
@@ -184,9 +177,10 @@ snapshotReadsDistinctTest = function(testScenarioName, primaryDB, secondaryDB, c
 
     for (let useCausalConsistency of [false, true]) {
         for (let [db, readPreferenceMode] of [[primaryDB, "primary"], [secondaryDB, "secondary"]]) {
-            jsTestLog(`Testing "distinct" on collection ` +
-                      `${collName} with read preference ${readPreferenceMode} and causal` +
-                      ` consistency ${useCausalConsistency}`);
+            jsTestLog(
+                `Testing "distinct" with the ${testScenarioName} scenario on` +
+                ` collection ${collName} with read preference ${readPreferenceMode} and causal` +
+                ` consistency ${useCausalConsistency}`);
 
             let res =
                 assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs}));
@@ -194,7 +188,7 @@ snapshotReadsDistinctTest = function(testScenarioName, primaryDB, secondaryDB, c
             assert(insertTimestamp);
 
             jsTestLog(`Inserted 10 documents at timestamp ${insertTimestamp}`);
-            awaitCommitted(db, insertTimestamp);
+            awaitCommittedFn(db, insertTimestamp);
 
             // Create a session if useCausalConsistency is true.
             let causalDb, sessionTimestamp;
@@ -227,7 +221,7 @@ snapshotReadsDistinctTest = function(testScenarioName, primaryDB, secondaryDB, c
                 {update: collName, updates: [{q: {}, u: {$set: {x: 42}}, multi: true}]}));
 
             jsTestLog(`Updated collection "${collName}" at timestamp ${res.operationTime}`);
-            awaitCommitted(db, res.operationTime);
+            awaitCommittedFn(db, res.operationTime);
 
             // This read shows the updated docs.
             res = assert.commandWorked(causalDb.runCommand(distinctCommand(readPreferenceMode)));
@@ -249,5 +243,40 @@ snapshotReadsDistinctTest = function(testScenarioName, primaryDB, secondaryDB, c
             assert.commandWorked(primaryDB[collName].remove({}, {writeConcern: {w: "majority"}}));
         }
     }
+}
+
+/**
+ * Test non-transaction snapshot reads on primary and secondary.
+ *
+ * Pass two handles to the same database; either both connected to a mongos, or one connected to
+ * a replica set primary and the other connected to a replica set secondary. (The test will also
+ * pass $readPreference, so if the handles are connected to a mongos, then the reads will target
+ * primary/secondary shard servers.)
+ *
+ * For awaitCommittedFn, pass a function that waits for the last write to be committed on all
+ * secondaries.
+ *
+ * @param {testScenarioName} String used when logging progress
+ * @param {primaryDB} Database handle connected to a primary or mongos
+ * @param {secondaryDB} Database handle connected to a secondary or mongos
+ * @param {collName} String
+ * @param {awaitCommittedFn} A function with no arguments or return value
+ */
+snapshotReadsTest = function(
+    {testScenarioName, primaryDB, secondaryDB, collName, awaitCommittedFn}) {
+    snapshotReadsCursorTest({
+        testScenarioName: testScenarioName,
+        primaryDB: primaryDB,
+        secondaryDB: secondaryDB,
+        collName: collName,
+        awaitCommittedFn: awaitCommittedFn
+    });
+    snapshotReadsDistinctTest({
+        testScenarioName: testScenarioName,
+        primaryDB: primaryDB,
+        secondaryDB: secondaryDB,
+        collName: collName,
+        awaitCommittedFn: awaitCommittedFn
+    });
 };
 })();

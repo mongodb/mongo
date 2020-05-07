@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/tailable_mode.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/util/net/hostandport.h"
@@ -55,6 +56,8 @@ class TaskExecutor;
 class OperationContext;
 class RouterExecStage;
 
+using repl::ReadConcernArgs;
+
 /**
  * The resulting ClusterClientCursor will take ownership of the existing remote cursor, generating
  * results based on the cursor's current state.
@@ -65,10 +68,14 @@ class RouterExecStage;
  */
 struct ClusterClientCursorParams {
     ClusterClientCursorParams(NamespaceString nss,
-                              boost::optional<ReadPreferenceSetting> readPref = boost::none)
+                              boost::optional<ReadPreferenceSetting> readPref = boost::none,
+                              boost::optional<ReadConcernArgs> readConcernArgs = boost::none)
         : nsString(std::move(nss)) {
         if (readPref) {
             readPreference = std::move(readPref.get());
+        }
+        if (readConcernArgs) {
+            readConcern = std::move(readConcernArgs.get());
         }
     }
 
@@ -142,6 +149,9 @@ struct ClusterClientCursorParams {
 
     // Set if a readPreference must be respected throughout the lifetime of the cursor.
     boost::optional<ReadPreferenceSetting> readPreference;
+
+    // Set if a readConcern must be respected throughout the lifetime of the cursor.
+    boost::optional<ReadConcernArgs> readConcern;
 
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.

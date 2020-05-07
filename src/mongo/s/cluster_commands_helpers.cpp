@@ -267,6 +267,7 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
     BSONObjBuilder output;
     bool seenReadConcern = false;
     bool seenWriteConcern = false;
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     for (const auto& elem : cmdObj) {
         const auto name = elem.fieldNameStringData();
         if (appendRC && name == repl::ReadConcernArgs::kReadConcernFieldName) {
@@ -276,13 +277,18 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
             seenWriteConcern = true;
         }
         if (!output.hasField(name)) {
-            output.append(elem);
+            // If mongos selected atClusterTime, forward it to the shard.
+            if (name == repl::ReadConcernArgs::kReadConcernFieldName &&
+                readConcernArgs.wasAtClusterTimeSelected()) {
+                output.appendElements(readConcernArgs.toBSON());
+            } else {
+                output.append(elem);
+            }
         }
     }
 
     // Finally, add the new read/write concern.
     if (appendRC && !seenReadConcern) {
-        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         output.appendElements(readConcernArgs.toBSON());
     }
     if (appendWC && !seenWriteConcern) {
@@ -720,6 +726,12 @@ StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     invariant(catalogCache);
+
+    auto argsAtClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    if (argsAtClusterTime) {
+        return catalogCache->getCollectionRoutingInfoAt(
+            opCtx, nss, argsAtClusterTime->asTimestamp());
+    }
 
     // Return the latest routing table if not running in a transaction with snapshot level read
     // concern.

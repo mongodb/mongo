@@ -181,6 +181,11 @@ public:
     virtual boost::optional<ReadPreferenceSetting> getReadPreference() const = 0;
 
     /**
+     * Returns the readConcern for this cursor.
+     */
+    virtual boost::optional<ReadConcernArgs> getReadConcern() const = 0;
+
+    /**
      * Returns the creation date of the cursor.
      */
     virtual Date_t getCreatedDate() const = 0;

@@ -153,4 +153,8 @@ boost::optional<ReadPreferenceSetting> ClusterClientCursorMock::getReadPreferenc
     return boost::none;
 }
 
+boost::optional<ReadConcernArgs> ClusterClientCursorMock::getReadConcern() const {
+    return boost::none;
+}
+
 }  // namespace mongo

@@ -187,6 +187,12 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         qrToForward = std::make_unique<QueryRequest>(query.getQueryRequest());
     }
 
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    if (readConcernArgs.wasAtClusterTimeSelected()) {
+        // If mongos selected atClusterTime or received it from client, transmit it to shard.
+        qrToForward->setReadConcern(readConcernArgs.toBSONInner());
+    }
+
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     std::vector<std::pair<ShardId, BSONObj>> requests;
     for (const auto& shardId : shardIds) {
@@ -242,7 +248,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
-    ClusterClientCursorParams params(query.nss(), readPref);
+    ClusterClientCursorParams params(query.nss(), readPref, ReadConcernArgs::get(opCtx));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.batchSize = query.getQueryRequest().getEffectiveBatchSize();
     params.tailableMode = query.getQueryRequest().getTailableMode();
@@ -427,6 +433,11 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
                                             const ClusterCursorManager::PinnedCursor& cursor) {
     if (auto readPref = cursor->getReadPreference()) {
         ReadPreferenceSetting::get(opCtx) = *readPref;
+    }
+
+    if (auto readConcern = cursor->getReadConcern()) {
+        // Used to return "atClusterTime" in cursor replies to clients for snapshot reads.
+        ReadConcernArgs::get(opCtx) = *readConcern;
     }
 
     // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
@@ -835,9 +846,12 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
     }
 
+    auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     return CursorResponse(request.nss,
                           idToReturn,
                           std::move(batch),
+                          atClusterTime ? atClusterTime->asTimestamp()
+                                        : boost::optional<Timestamp>{},
                           startingFrom,
                           postBatchResumeToken,
                           boost::none,
