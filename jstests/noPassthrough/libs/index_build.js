@@ -200,16 +200,6 @@ var IndexBuildTest = class {
     }
 
     /**
-     * Returns true if two phase index builds are supported.
-     */
-    static supportsTwoPhaseIndexBuild(conn) {
-        const adminDB = conn.getDB('admin');
-        const serverStatus = assert.commandWorked(adminDB.serverStatus());
-        const storageEngineSection = serverStatus.storageEngine;
-        return storageEngineSection.supportsTwoPhaseIndexBuild;
-    }
-
-    /**
      * Returns true if majority commit quorum is supported by two phase index builds.
      */
     static indexBuildCommitQuorumEnabled(conn) {
