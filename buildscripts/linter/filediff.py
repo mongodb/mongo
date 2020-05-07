@@ -38,6 +38,17 @@ def _get_repos_and_revisions() -> Tuple[List[Repo], Dict[str, str]]:
     return repos, revision_map
 
 
+def _filter_file(filename: str, is_interesting_file: Callable) -> bool:
+    """
+    Determine if file should be included based on existence and passed in method.
+
+    :param filename: Filename to check.
+    :param is_interesting_file: Function to determine if file is interesting.
+    :return: True if file exists and is interesting.
+    """
+    return os.path.exists(filename) and is_interesting_file(filename)
+
+
 def gather_changed_files_for_lint(is_interesting_file: Callable):
     """
     Get the files that have changes since the last git commit.
@@ -49,7 +60,9 @@ def gather_changed_files_for_lint(is_interesting_file: Callable):
     LOGGER.info("revisions", revision=revision_map)
 
     candidate_files = find_changed_files_in_repos(repos, revision_map)
-    files = [filename for filename in candidate_files if is_interesting_file(filename)]
+    files = [
+        filename for filename in candidate_files if _filter_file(filename, is_interesting_file)
+    ]
 
     LOGGER.info("Found files to lint", files=files)
 
