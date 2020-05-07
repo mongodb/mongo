@@ -172,7 +172,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         const dbName = "EnsureAnyNodeCanSyncFromAnyOther";
         assert.commandWorked(curPrimary.getDB(dbName).ensureSyncSource.insert(
             {thisDocument: 'is inserted to ensure any node can sync from any other'},
-            {writeConcern: {w: 3, j: true}}));
+            {writeConcern: {w: 3}}));
     }
 
     /**
