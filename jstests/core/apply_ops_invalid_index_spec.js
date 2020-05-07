@@ -17,8 +17,6 @@
 (function() {
 'use strict';
 
-load('jstests/noPassthrough/libs/index_build.js');
-
 const t = db.apply_ops_invalid_index_spec;
 t.drop();
 
@@ -35,60 +33,4 @@ assert.commandFailedWithCode(t.createIndex({a: 1}, {v: 2, name: 'a_1_base_v2', u
                              ErrorCodes.InvalidIndexSpecificationOption);
 assert.commandFailedWithCode(t.createIndex({a: 1}, {v: 1, name: 'a_1_base_v1', unknown: 1}),
                              ErrorCodes.InvalidIndexSpecificationOption);
-
-// It is not possible to test createIndexes in applyOps with two-phase-index-builds support because
-// that command is not accepted by applyOps in that mode.
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(db.getMongo())) {
-    jsTestLog('Skipping applyOps test cases. Cannot start two phase index builds using applyOps');
-    return;
-}
-
-// A createIndexes command for a v:2 index with an unknown field in the index spec should fail.
-assert.commandFailedWithCode(db.adminCommand({
-    applyOps: [{
-        op: 'c',
-        ns: cmdNs,
-        o: {
-            createIndexes: t.getName(),
-            v: 2,
-            key: {a: 1},
-            name: 'a_1_create_v2',
-            unknown: 1,
-        },
-    }],
-}),
-                             ErrorCodes.InvalidIndexSpecificationOption);
-
-// A createIndexes command for a background index with unknown field in the index spec should
-// fail.
-assert.commandFailedWithCode(db.adminCommand({
-    applyOps: [{
-        op: 'c',
-        ns: cmdNs,
-        o: {
-            createIndexes: t.getName(),
-            v: 2,
-            key: {a: 1},
-            background: true,
-            name: 'a_1_background',
-            unknown: 1,
-        },
-    }],
-}),
-                             ErrorCodes.InvalidIndexSpecificationOption);
-
-// A createIndexes command for a v:1 index with an unknown field in the index spec should work.
-const res1 = assert.commandWorked(db.adminCommand({
-    applyOps: [{
-        op: 'c',
-        ns: cmdNs,
-        o: {
-            createIndexes: t.getName(),
-            v: 1,
-            key: {a: 1},
-            name: 'a_1_create_v1',
-            unknown: 1,
-        },
-    }],
-}));
 })();

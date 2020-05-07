@@ -20,12 +20,6 @@ replSet.initiate();
 const primary = replSet.getPrimary();
 const primaryDB = primary.getDB(dbName);
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    jsTestLog('Two phase index builds not supported, skipping test.');
-    rst.stopSet();
-    return;
-}
-
 const secondary = replSet.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 const secondaryPort = secondary.port;
