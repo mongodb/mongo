@@ -44,7 +44,6 @@ public:
           statisticsLogDelaySecs(0),
           directoryForIndexes(false),
           maxCacheOverflowFileSizeGBDeprecated(0),
-          maxHistoryFileSizeGB(0),
           useCollectionPrefixCompression(false),
           useIndexPrefixCompression(false){};
 
@@ -56,7 +55,6 @@ public:
     std::string journalCompressor;
     bool directoryForIndexes;
     double maxCacheOverflowFileSizeGBDeprecated;
-    double maxHistoryFileSizeGB;
     std::string engineConfig;
 
     std::string collectionBlockCompressor;
@@ -67,13 +65,13 @@ public:
     std::string indexConfig;
 
     static Status validateWiredTigerCompressor(const std::string&);
-    static Status validateMaxHistoryFileSizeGB(double);
 
     /**
-     * Returns current history file size in MB.
+     * Returns current history file size limit in MB.
+     * Always returns 0 for unbounded.
      */
     std::size_t getMaxHistoryFileSizeMB() const {
-        return 1024 * maxHistoryFileSizeGB;
+        return 0;
     }
 };
 
