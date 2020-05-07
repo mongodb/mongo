@@ -2206,12 +2206,6 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                             << replState->buildUUID
                             << ", collection UUID: " << replState->collectionUUID);
 
-    {
-        auto dss = DatabaseShardingState::get(opCtx, replState->dbName);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-        dss->checkDbVersion(opCtx, dssLock);
-    }
-
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.
     uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
@@ -2223,6 +2217,12 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     try {
         failIndexBuildOnCommit.execute(
             [](const BSONObj&) { uasserted(4698903, "index build aborted due to failpoint"); });
+
+        {
+            auto dss = DatabaseShardingState::get(opCtx, replState->dbName);
+            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+            dss->checkDbVersion(opCtx, dssLock);
+        }
 
         // If we are no longer primary and a single phase index build started as primary attempts to
         // commit, trigger a self-abort.
