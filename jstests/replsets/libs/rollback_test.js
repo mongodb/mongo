@@ -170,9 +170,13 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // any other. If we do not do this, then due to initial sync timing and sync source
         // selection all nodes may not be guaranteed to have overlapping oplogs.
         const dbName = "EnsureAnyNodeCanSyncFromAnyOther";
+        // To prevent losing this document due to unclean shutdowns, we need to
+        // ensure the insert was replicated and written to the on-disk journal of all 3
+        // nodes, with the exception of ephemeral and in-memory storage engines where
+        // journaling isn't supported.
         assert.commandWorked(curPrimary.getDB(dbName).ensureSyncSource.insert(
             {thisDocument: 'is inserted to ensure any node can sync from any other'},
-            {writeConcern: {w: 3}}));
+            {writeConcern: {w: 3, j: config.writeConcernMajorityJournalDefault}}));
     }
 
     /**
