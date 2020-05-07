@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/s/async_requests_sender.h"
 
 namespace mongo {
@@ -53,6 +55,8 @@ public:
         const ReadPreferenceSetting& readPreference,
         Shard::RetryPolicy retryPolicy);
 
+    ~MultiStatementTransactionRequestsSender();
+
     bool done();
 
     AsyncRequestsSender::Response next();
@@ -61,7 +65,7 @@ public:
 
 private:
     OperationContext* _opCtx;
-    AsyncRequestsSender _ars;
+    std::unique_ptr<AsyncRequestsSender> _ars;
 };
 
 }  // namespace mongo
