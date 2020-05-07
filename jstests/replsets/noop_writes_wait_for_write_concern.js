@@ -211,10 +211,8 @@ function testCommandWithWriteConcern(cmd) {
     jsTest.log("Testing " + tojson(cmd.req));
 
     if (cmd.req["createIndexes"] !== undefined &&
-        !(IndexBuildTest.supportsTwoPhaseIndexBuild(primary) &&
-          IndexBuildTest.indexBuildCommitQuorumEnabled(primary))) {
-        jsTest.log(
-            "Skipping test because two phase index build and index build commit quorum are not supported.");
+        !IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
+        jsTest.log("Skipping test because index build commit quorum is not supported.");
         return;
     }
 

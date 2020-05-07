@@ -198,9 +198,9 @@ var tests = {
  *  additional databases, it should return an array with all databases to check.
  */
 function testIdempotency(primary, testFun, testName) {
-    // It is not possible to test createIndexes in applyOps with two-phase-index-builds support
-    // because that command is not accepted by applyOps in that mode.
-    if ('createIndex' === testName && IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    // It is not possible to test createIndexes in applyOps because that command is not accepted
+    // by applyOps in that mode.
+    if ('createIndex' === testName) {
         return;
     }
 

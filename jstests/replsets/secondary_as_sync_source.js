@@ -54,27 +54,15 @@ addTestDocuments(primaryDB);
 // Used to wait for two-phase builds to complete.
 let awaitIndex;
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    jsTest.log("Hanging index build on the secondary node");
-    IndexBuildTest.pauseIndexBuilds(secondary);
+jsTest.log("Hanging index build on the primary node");
+IndexBuildTest.pauseIndexBuilds(primary);
 
-    jsTest.log("Beginning index build");
-    assert.commandWorked(primaryDB.runCommand({
-        createIndexes: collName,
-        indexes: [{key: {i: 1}, name: "i_1"}],
-        writeConcern: {w: 2},
-    }));
-} else {
-    jsTest.log("Hanging index build on the primary node");
-    IndexBuildTest.pauseIndexBuilds(primary);
+jsTest.log("Beginning index build");
+const coll = primaryDB.getCollection(collName);
+awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
 
-    jsTest.log("Beginning index build");
-    const coll = primaryDB.getCollection(collName);
-    awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
-
-    jsTest.log("Waiting for index build to start on secondary");
-    IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-}
+jsTest.log("Waiting for index build to start on secondary");
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
 jsTest.log("Adding a new node to the replica set");
 let newNode = replSet.add({
@@ -95,13 +83,8 @@ replSet.reInitiate();
 waitForState(newNode, ReplSetTest.State.SECONDARY);
 
 jsTest.log("Removing index build hang to allow it to finish");
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    // Let the 'secondary' finish its index build.
-    IndexBuildTest.resumeIndexBuilds(secondary);
-} else {
-    IndexBuildTest.resumeIndexBuilds(primary);
-    awaitIndex();
-}
+IndexBuildTest.resumeIndexBuilds(primary);
+awaitIndex();
 
 // Wait for the index builds to finish.
 replSet.awaitReplication();

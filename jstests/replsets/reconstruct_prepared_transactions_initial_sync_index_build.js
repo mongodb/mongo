@@ -70,24 +70,14 @@ jsTestLog("Running operations while collection cloning is paused");
 // the oplog application stage of initial sync.
 assert.commandWorked(testColl.insert({_id: 1, a: 1}));
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    // Make the index build hang on the secondary so that initial sync gets to the prepared-txn
-    // reconstruct stage with the index build still running.
-    jsTest.log("Hanging index build on the secondary node");
-    IndexBuildTest.pauseIndexBuilds(secondary);
+// Make the index build hang on the primary so that only a startIndexBuild oplog entry is
+// replicated and initial sync gets to the prepared-txn reconstruct stage with the index build
+// still running.
+jsTest.log("Hanging index build on the primary node");
+IndexBuildTest.pauseIndexBuilds(primary);
 
-    jsTest.log("Beginning index build");
-    assert.commandWorked(testColl.createIndex({a: 1}));
-} else {
-    // Make the index build hang on the primary so that only a startIndexBuild oplog entry is
-    // replicated and initial sync gets to the prepared-txn reconstruct stage with the index build
-    // still running.
-    jsTest.log("Hanging index build on the primary node");
-    IndexBuildTest.pauseIndexBuilds(primary);
-
-    jsTest.log("Beginning index build");
-    IndexBuildTest.startIndexBuild(primary, testColl.getFullName(), {a: 1});
-}
+jsTest.log("Beginning index build");
+IndexBuildTest.startIndexBuild(primary, testColl.getFullName(), {a: 1});
 
 let session = primary.startSession();
 let sessionDB = session.getDatabase(dbName);
@@ -108,16 +98,8 @@ assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 // Unblock index build.
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    // Wait for log message.
-    checkLog.containsJson(secondary, 21849, {namespace: testColl.getFullName()});
-
-    // Let the secondary finish its index build.
-    IndexBuildTest.resumeIndexBuilds(secondary);
-} else {
-    // Let the primary finish its index build and replicate a commit to the secondary.
-    IndexBuildTest.resumeIndexBuilds(primary);
-}
+// Let the primary finish its index build and replicate a commit to the secondary.
+IndexBuildTest.resumeIndexBuilds(primary);
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();

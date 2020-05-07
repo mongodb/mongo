@@ -21,10 +21,8 @@ const collNss = primaryColl.getFullName();
 const secondary = rollbackTest.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 
-if (!(IndexBuildTest.supportsTwoPhaseIndexBuild(primary) &&
-      IndexBuildTest.indexBuildCommitQuorumEnabled(primary))) {
-    jsTestLog(
-        'Skipping test because two phase index build and index build commit quorum are not supported.');
+if (!IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
+    jsTestLog('Skipping test because index build commit quorum is not supported.');
     rollbackTest.stop();
     return;
 }

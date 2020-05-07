@@ -29,12 +29,6 @@ const primary = replTest.getPrimary();
 const testDB = primary.getDB(dbName);
 const coll = testDB.getCollection(collName);
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    jsTestLog('Two phase index builds not enabled. Skipping test.');
-    twoPhaseDropTest.stop();
-    return;
-}
-
 // Create the collection that will be dropped.
 twoPhaseDropTest.createCollection(collName);
 

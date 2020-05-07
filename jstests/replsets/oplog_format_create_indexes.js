@@ -6,7 +6,6 @@
 "use strict";
 
 load("jstests/libs/get_index_helpers.js");
-load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -27,11 +26,11 @@ function testOplogEntryContainsIndexInfoObj(coll, keyPattern, indexOptions) {
         indexSpec,
         "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes));
 
-    // If two phase index builds are enabled, index creation will show up in the oplog as a pair of
-    // startIndexBuild and commitIndexBuild oplog entries rather than a single createIndexes entry.
-    const indexCreationOplogQuery = IndexBuildTest.supportsTwoPhaseIndexBuild(primary)
-        ? {op: "c", ns: testDB.getName() + ".$cmd", "o.startIndexBuild": coll.getName()}
-        : {op: "c", ns: testDB.getName() + ".$cmd", "o.createIndexes": coll.getName()};
+    const indexCreationOplogQuery = {
+        op: "c",
+        ns: testDB.getName() + ".$cmd",
+        "o.startIndexBuild": coll.getName(),
+    };
 
     const allOplogEntries = oplogColl.find(indexCreationOplogQuery).toArray();
 
