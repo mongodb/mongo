@@ -28,11 +28,6 @@ replSet.startSet();
 replSet.initiate();
 
 const primary = replSet.getPrimary();
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    jsTestLog('Skipping test because two phase index builds are not supported.');
-    replSet.stopSet();
-    return;
-}
 
 const dbName = 'test';
 const primaryDB = primary.getDB(dbName);

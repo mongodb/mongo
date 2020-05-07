@@ -44,8 +44,7 @@ const primary = rst.getPrimary();
 const db = primary.getDB(dbName);
 const coll = db.getCollection(collName);
 
-if (!(IndexBuildTest.supportsTwoPhaseIndexBuild(primary) &&
-      IndexBuildTest.indexBuildCommitQuorumEnabled(primary))) {
+if (!IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
     jsTestLog(
         'Skipping test because two phase index build and index build commit quorum are not supported.');
     rst.stopSet();

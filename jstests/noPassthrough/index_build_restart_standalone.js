@@ -36,12 +36,6 @@ const primaryColl = primaryDB.getCollection(collName);
 const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    jsTestLog('skipping test because two-phase index builds are not enabled');
-    rst.stopSet();
-    return;
-}
-
 assert.commandWorked(primaryColl.insert({a: 1}));
 
 jsTest.log("Starting an index build on the primary and waiting for the secondary.");

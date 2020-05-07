@@ -78,13 +78,8 @@ const secondaryColl = rst.getSecondary().getDB(dbName).getCollection(collName);
 res = assert.commandWorked(secondaryColl.validate());
 assert(res.valid, 'expected validation to succeed: ' + tojson(res));
 
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(rst.getPrimary())) {
-    IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'a_1']);
-    IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
-} else {
-    IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
-    IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
-}
+IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
 
 rst.stopSet();
 })();

@@ -62,21 +62,6 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    // Wait for the index build to be unregistred.
-    if (isJsonLog(primary)) {
-        checkLog.containsJson(primary, 4656004);
-    } else {
-        checkLog.contains(primary, '[IndexBuildsCoordinatorMongod-0] Index build failed: ');
-    }
-
-    // Check that no new index has been created.  This verifies that the index build was aborted
-    // rather than successfully completed.
-    IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
-    rst.stopSet();
-    return;
-}
-
 // With two phase index builds, a stepdown will not abort the index build, which should complete
 // after the node becomes primary again.
 rst.awaitReplication();

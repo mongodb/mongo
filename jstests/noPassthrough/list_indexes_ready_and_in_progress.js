@@ -32,11 +32,7 @@ const createIdx =
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'b_1');
 
 // The listIndexes command supports returning all indexes, including ones that are not ready.
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(conn)) {
-    IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeBuildUUIDs: true});
-} else {
-    IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeBuildUUIDs: false});
-}
+IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeBuildUUIDs: true});
 
 IndexBuildTest.resumeIndexBuilds(conn);
 

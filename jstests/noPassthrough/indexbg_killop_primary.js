@@ -49,12 +49,10 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
 });
 
 // Index build should be present in the config.system.indexBuilds collection.
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    const indexMap =
-        IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
-    const indexBuildUUID = indexMap['a_1'].buildUUID;
-    assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
-}
+const indexMap =
+    IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+const indexBuildUUID = indexMap['a_1'].buildUUID;
+assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 
 // Kill the index builder thread.
 assert.commandWorked(testDB.killOp(opId));
@@ -73,25 +71,16 @@ assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build be
 // rather than successfully completed.
 IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
-// Two-phase index builds replicate different oplog entries.
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    const cmdNs = testDB.getCollection('$cmd').getFullName();
-    let ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': coll.getName()});
-    assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
-    ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': coll.getName()});
-    assert.eq(1, ops.length, 'incorrect number of abortIndexBuild oplog entries: ' + tojson(ops));
-    const indexBuildUUID = ops[0].o.indexBuildUUID;
-    ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
-    assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
+const cmdNs = testDB.getCollection('$cmd').getFullName();
+let ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': coll.getName()});
+assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
+ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': coll.getName()});
+assert.eq(1, ops.length, 'incorrect number of abortIndexBuild oplog entries: ' + tojson(ops));
+ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
+assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
 
-    // Index build should be removed from the config.system.indexBuilds collection.
-    assert.isnull(
-        primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
-} else {
-    // The noop oplog entry is the only evidence of the failed single phase index build.
-    let ops = rst.dumpOplog(
-        primary, {op: 'n', ns: '', 'o.msg': 'Creating indexes. Coll: ' + coll.getFullName()});
-    assert.eq(1, ops.length, 'incorrect number of noop oplog entries: ' + tojson(ops));
-}
+// Index build should be removed from the config.system.indexBuilds collection.
+assert.isnull(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
+
 rst.stopSet();
 })();

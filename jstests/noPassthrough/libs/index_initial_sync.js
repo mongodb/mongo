@@ -53,12 +53,8 @@ var IndexInitialSyncTest = function(options) {
         const secondaryDB = secondary.getDB(testDB.getName());
         const secondaryColl = secondaryDB.getCollection(coll.getName());
         try {
-            if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-                IndexBuildTest.assertIndexes(
-                    secondaryColl, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true});
-            } else {
-                IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
-            }
+            IndexBuildTest.assertIndexes(
+                secondaryColl, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true});
         } finally {
             IndexBuildTest.resumeIndexBuilds(primary);
         }

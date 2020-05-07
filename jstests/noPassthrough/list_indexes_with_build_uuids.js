@@ -62,9 +62,7 @@ IndexBuildTest.pauseIndexBuilds(secondary);
 // PBWM while waiting for the index build to complete in the backgroud. Therefore, we get the
 // primary to hold off on writing the commitIndexBuild oplog entry until we are ready to resume
 // index builds on the secondary.
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    IndexBuildTest.pauseIndexBuilds(primary);
-}
+IndexBuildTest.pauseIndexBuilds(primary);
 
 // Build and hang on the second index. This should be run in the background if we pause index
 // builds on the primary because the createIndexes command will block.
@@ -88,12 +86,8 @@ jsTest.log(indexes);
 assert.eq(indexes[0].name, "_id_");
 assert.eq(indexes[1].name, "first");
 
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(secondary)) {
-    assert.eq(indexes[2].spec.name, "second");
-    assert(indexes[2].hasOwnProperty("buildUUID"));
-} else {
-    assert.eq(indexes[2].name, "second");
-}
+assert.eq(indexes[2].spec.name, "second");
+assert(indexes[2].hasOwnProperty("buildUUID"));
 
 // Allow the replica set to finish the index build.
 IndexBuildTest.resumeIndexBuilds(secondary);

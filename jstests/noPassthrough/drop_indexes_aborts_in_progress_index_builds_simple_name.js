@@ -24,12 +24,6 @@ const secondaryReadsTest = new SecondaryReadsTest(dbName);
 let primaryDB = secondaryReadsTest.getPrimaryDB();
 const conn = primaryDB.getMongo();
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(conn)) {
-    jsTestLog('Two phase index builds not enabled, skipping test.');
-    secondaryReadsTest.stop();
-    return;
-}
-
 const collName = "test";
 
 TestData.dbName = dbName;

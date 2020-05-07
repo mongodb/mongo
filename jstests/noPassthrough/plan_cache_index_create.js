@@ -6,8 +6,6 @@
 (function() {
 "use strict";
 
-load('jstests/noPassthrough/libs/index_build.js');
-
 const dbName = "test";
 const collName = "coll";
 
@@ -82,8 +80,7 @@ function runTest({rst, readDB, writeDB}) {
     // application because it will hold the PBWM while waiting for the index build to complete in
     // the backgroud. Therefore, we get the primary to hold off on writing the commitIndexBuild
     // oplog entry until we are ready to resume index builds on the secondary.
-    if (writeDB.getMongo().host != readDB.getMongo().host &&
-        IndexBuildTest.supportsTwoPhaseIndexBuild(writeDB.getMongo())) {
+    if (writeDB.getMongo().host != readDB.getMongo().host) {
         assert.commandWorked(writeDB.adminCommand(
             {configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'}));
     }

@@ -17,11 +17,6 @@ replSet.startSet();
 replSet.initiate();
 
 const primary = replSet.getPrimary();
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    jsTestLog('Two phase index builds not enabled, skipping test.');
-    replSet.stopSet();
-    return;
-}
 
 let testDB = primary.getDB(dbName);
 const testColl = testDB.getCollection(collName);

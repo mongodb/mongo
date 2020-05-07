@@ -28,12 +28,6 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB('test');
 const coll = testDB.getCollection('test');
 
-if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    jsTestLog('Two phase index builds not enabled, skipping test.');
-    rst.stopSet();
-    return;
-}
-
 assert.commandWorked(coll.insert({a: 1}));
 
 const secondary = rst.getSecondary();

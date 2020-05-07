@@ -98,15 +98,8 @@ assert.commandWorked(newSession.abortTransaction_forTesting());
 IndexBuildTest.waitForIndexBuildToStop(newPrimary.getDB(dbName), collName, "x_1");
 IndexBuildTest.waitForIndexBuildToStop(primary.getDB(dbName), collName, "x_1");
 
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    IndexBuildTest.assertIndexes(
-        newPrimary.getDB(dbName).getCollection(collName), 2, ["_id_", "x_1"]);
-    IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "x_1"]);
-} else {
-    // A single-phase index build will get aborted from the state transition.
-    IndexBuildTest.assertIndexes(newPrimary.getDB(dbName).getCollection(collName), 1, ["_id_"]);
-    IndexBuildTest.assertIndexes(primaryColl, 1, ["_id_"]);
-}
+IndexBuildTest.assertIndexes(newPrimary.getDB(dbName).getCollection(collName), 2, ["_id_", "x_1"]);
+IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "x_1"]);
 
 rst.stopSet();
 })();

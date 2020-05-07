@@ -104,12 +104,7 @@ assert.commandWorked(session.abortTransaction_forTesting());
 jsTestLog("Waiting for index build to complete");
 IndexBuildTest.waitForIndexBuildToStop(primaryDB, primaryColl.getName(), indexName);
 
-if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
-    IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", indexName]);
-} else {
-    // Single-phase index builds are aborted on step-down.
-    IndexBuildTest.assertIndexes(primaryColl, 1, ["_id_"]);
-}
+IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", indexName]);
 
 rst.stopSet();
 })();
