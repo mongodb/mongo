@@ -56,7 +56,7 @@ TEST(OperationLatencyHistogram, EnsureIncrementsStored) {
         hist.increment(i, Command::ReadWriteType::kTransaction);
     }
     BSONObjBuilder outBuilder;
-    hist.append(false, &outBuilder);
+    hist.append(false, false, &outBuilder);
     BSONObj out = outBuilder.done();
     ASSERT_EQUALS(out["reads"]["ops"].Long(), kMaxBuckets);
     ASSERT_EQUALS(out["writes"]["ops"].Long(), kMaxBuckets);
@@ -78,7 +78,7 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatency) {
     // The additional +1 because of the first boundary.
     uint64_t expectedSum = 3 * std::accumulate(kLowerBounds.begin(), kLowerBounds.end(), 0ULL) + 1;
     BSONObjBuilder outBuilder;
-    hist.append(true, &outBuilder);
+    hist.append(true, false, &outBuilder);
     BSONObj out = outBuilder.done();
     ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
@@ -90,6 +90,48 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatency) {
         BSONObj bucket = readBuckets[i].Obj();
         ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[i]);
         ASSERT_EQUALS(bucket["count"].Long(), (i < kMaxBuckets - 1) ? 3 : 2);
+    }
+}
+
+TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBuckets) {
+    OperationLatencyHistogram hist;
+    // Increment at the boundary, boundary+1, and boundary-1.
+    for (int i = 0; i < kMaxBuckets; i++) {
+        hist.increment(kLowerBounds[i], Command::ReadWriteType::kRead);
+        hist.increment(kLowerBounds[i] + 1, Command::ReadWriteType::kRead);
+        if (i > 0) {
+            hist.increment(kLowerBounds[i] - 1, Command::ReadWriteType::kRead);
+        }
+    }
+
+    auto orig = serverGlobalParams.slowMS;
+    serverGlobalParams.slowMS = 100;
+    auto g1 = makeGuard([orig] { serverGlobalParams.slowMS = orig; });
+
+    // The additional +1 because of the first boundary.
+    uint64_t expectedSum = 3 * std::accumulate(kLowerBounds.begin(), kLowerBounds.end(), 0ULL) + 1;
+    BSONObjBuilder outBuilder;
+    hist.append(true, true, &outBuilder);
+    BSONObj out = outBuilder.done();
+    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+
+    const size_t kMaxUnFilteredBuckets = 23;
+    // Each bucket has three counts with the exception of the last bucket, which has two.
+    ASSERT_EQUALS(out["reads"]["ops"].Long(), 3 * kMaxBuckets - 1);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), kMaxUnFilteredBuckets + 1);
+    for (size_t i = 0; i < kMaxUnFilteredBuckets; i++) {
+        BSONObj bucket = readBuckets[i].Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()), kLowerBounds[i]);
+        ASSERT_EQUALS(bucket["count"].Long(), (i < kMaxBuckets - 1) ? 3 : 2);
+    }
+
+    // Handle the last bucket which is an aggregate
+    {
+        BSONObj bucket = readBuckets[kMaxUnFilteredBuckets].Obj();
+        ASSERT_EQUALS(static_cast<uint64_t>(bucket["micros"].Long()),
+                      kLowerBounds[kMaxUnFilteredBuckets] + 1);
+        ASSERT_EQUALS(bucket["count"].Long(), 83);
     }
 }
 }  // namespace mongo

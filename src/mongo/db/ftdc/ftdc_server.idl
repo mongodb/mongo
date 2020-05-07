@@ -87,3 +87,8 @@ server_parameters:
     set_at: [startup, runtime]
     cpp_class: DiagnosticDataCollectionDirectoryPathServerParameter
 
+  diagnosticDataCollectionEnableLatencyHistograms:
+    description: "Enable the capture of opLatencies: { histograms: true } } in FTDC."
+    set_at: [startup, runtime]
+    cpp_vartype: 'AtomicWord<bool>'
+    cpp_varname: gDiagnosticDataCollectionEnableLatencyHistograms

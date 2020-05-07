@@ -95,31 +95,62 @@ const std::array<uint64_t, OperationLatencyHistogram::kMaxBuckets>
 void OperationLatencyHistogram::_append(const HistogramData& data,
                                         const char* key,
                                         bool includeHistograms,
+                                        bool slowMSBucketsOnly,
                                         BSONObjBuilder* builder) const {
+
+    uint64_t filteredCount = 0;
+    bool filterBuckets = slowMSBucketsOnly && serverGlobalParams.slowMS >= 0;
+    size_t lowestFilteredBound = 0;
 
     BSONObjBuilder histogramBuilder(builder->subobjStart(key));
     if (includeHistograms) {
         BSONArrayBuilder arrayBuilder(histogramBuilder.subarrayStart("histogram"));
-        for (int i = 0; i < kMaxBuckets; i++) {
-            if (data.buckets[i] == 0)
+        for (size_t i = 0; i < kMaxBuckets; i++) {
+            if (data.buckets[i] == 0) {
                 continue;
+            }
+
+            if (filterBuckets &&
+                (kLowerBounds[i] / 1000) >= static_cast<unsigned int>(serverGlobalParams.slowMS)) {
+                if (lowestFilteredBound == 0) {
+                    lowestFilteredBound = kLowerBounds[i];
+                }
+
+                filteredCount += data.buckets[i];
+                continue;
+            }
+
             BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
             entryBuilder.append("micros", static_cast<long long>(kLowerBounds[i]));
             entryBuilder.append("count", static_cast<long long>(data.buckets[i]));
             entryBuilder.doneFast();
         }
+
+        // Append final bucket only if it contains values to minimize data in FTDC
+        // Final bucket is aggregate of all buckets >= slowMS with bucket labeled as minimum latency
+        // of bucket
+        if (filterBuckets && filteredCount > 0) {
+            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
+            entryBuilder.append("micros", static_cast<long long>(lowestFilteredBound + 1));
+            entryBuilder.append("count", static_cast<long long>(filteredCount));
+            entryBuilder.doneFast();
+        }
+
         arrayBuilder.doneFast();
     }
+
     histogramBuilder.append("latency", static_cast<long long>(data.sum));
     histogramBuilder.append("ops", static_cast<long long>(data.entryCount));
     histogramBuilder.doneFast();
 }
 
-void OperationLatencyHistogram::append(bool includeHistograms, BSONObjBuilder* builder) const {
-    _append(_reads, "reads", includeHistograms, builder);
-    _append(_writes, "writes", includeHistograms, builder);
-    _append(_commands, "commands", includeHistograms, builder);
-    _append(_transactions, "transactions", includeHistograms, builder);
+void OperationLatencyHistogram::append(bool includeHistograms,
+                                       bool slowMSBucketsOnly,
+                                       BSONObjBuilder* builder) const {
+    _append(_reads, "reads", includeHistograms, slowMSBucketsOnly, builder);
+    _append(_writes, "writes", includeHistograms, slowMSBucketsOnly, builder);
+    _append(_commands, "commands", includeHistograms, slowMSBucketsOnly, builder);
+    _append(_transactions, "transactions", includeHistograms, slowMSBucketsOnly, builder);
 }
 
 // Computes the log base 2 of value, and checks for cases of split buckets.
