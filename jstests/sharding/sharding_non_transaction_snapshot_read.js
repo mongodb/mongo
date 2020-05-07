@@ -136,13 +136,20 @@ for (let [scenarioName, scenario] of Object.entries(shardingScenarios)) {
         // Pass the same DB handle as "primaryDB" and "secondaryDB" params; the test functions will
         // send readPreference to mongos to target primary/secondary shard servers.
         let db = st.s.getDB(dbName);
-        snapshotReadsTest({
-            testScenarioName: scenarioName,
-            primaryDB: db,
-            secondaryDB: db,
-            collName: collName,
-            awaitCommittedFn: awaitCommittedFn
-        });
+        let snapshotReadsTest = new SnapshotReadsTest(
+            {primaryDB: db, secondaryDB: db, awaitCommittedFn: awaitCommittedFn});
+
+        snapshotReadsTest.cursorTest({testScenarioName: scenarioName, collName: collName});
+
+        if (collName === shardedCollName) {
+            // "distinct" prohibited on sharded collections.
+            assert.commandFailedWithCode(
+                db.runCommand({distinct: collName, key: "_id", readConcern: {level: "snapshot"}}),
+                ErrorCodes.InvalidOptions);
+        } else {
+            snapshotReadsTest.distinctTest({testScenarioName: scenarioName, collName: collName});
+        }
+
         st.stop();
     });
 }

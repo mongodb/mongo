@@ -26,15 +26,16 @@ assert.eq(assert
           600);
 const primaryDB = replSet.getPrimary().getDB('test');
 const secondaryDB = replSet.getSecondary().getDB('test');
-snapshotReadsTest({
-    testScenarioName: jsTestName(),
+const snapshotReadsTest = new SnapshotReadsTest({
     primaryDB: primaryDB,
     secondaryDB: secondaryDB,
-    collName: "test",
     awaitCommittedFn: () => {
         replSet.awaitLastOpCommitted();
     }
 });
+
+snapshotReadsTest.cursorTest({testScenarioName: jsTestName(), collName: "test"});
+snapshotReadsTest.distinctTest({testScenarioName: jsTestName(), collName: "test"});
 
 // Ensure "atClusterTime" is omitted from a regular (non-snapshot) read.
 primaryDB["collection"].insertOne({});

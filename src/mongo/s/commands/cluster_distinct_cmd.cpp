@@ -36,6 +36,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -176,6 +177,13 @@ public:
         }
 
         const auto routingInfo = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+                repl::ReadConcernLevel::kSnapshotReadConcern &&
+            !opCtx->inMultiDocumentTransaction() && routingInfo.cm()) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      "readConcern level \"snapshot\" prohibited for \"distinct\" command on"
+                      " sharded collection");
+        }
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
