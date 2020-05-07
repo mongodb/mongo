@@ -87,13 +87,4 @@ Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& 
     return Status::OK();
 }
 
-Status WiredTigerGlobalOptions::validateMaxCacheOverflowFileSizeGB(double value) {
-    if (value != 0.0 && value < 0.1) {
-        return {ErrorCodes::BadValue,
-                "MaxCacheOverflowFileSizeGB must be either 0 (unbounded) or greater than 0.1."};
-    }
-
-    return Status::OK();
-}
-
 }  // namespace mongo

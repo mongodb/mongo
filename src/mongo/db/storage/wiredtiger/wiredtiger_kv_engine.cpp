@@ -764,7 +764,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        ClockSource* cs,
                                        const std::string& extraOpenOptions,
                                        size_t cacheSizeMB,
-                                       size_t maxCacheOverflowFileSizeMB,
+                                       size_t maxHistoryFileSizeMB,
                                        bool durable,
                                        bool ephemeral,
                                        bool repair,
@@ -800,7 +800,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     std::stringstream ss;
     ss << "create,";
     ss << "cache_size=" << cacheSizeMB << "M,";
-    ss << "cache_overflow=(file_max=" << maxCacheOverflowFileSizeMB << "M),";
     ss << "session_max=33000,";
     ss << "eviction=(threads_min=4,threads_max=4),";
     ss << "config_base=false,";
@@ -953,16 +952,12 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     _runTimeConfigParam.reset(new WiredTigerEngineRuntimeConfigParameter(
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly));
     _runTimeConfigParam->_data.second = this;
-    _maxCacheOverflowParam.reset(new WiredTigerMaxCacheOverflowSizeGBParameter(
-        "wiredTigerMaxCacheOverflowSizeGB", ServerParameterType::kRuntimeOnly));
-    _maxCacheOverflowParam->_data = {maxCacheOverflowFileSizeMB / 1024, this};
 }
 
 WiredTigerKVEngine::~WiredTigerKVEngine() {
     // Remove server parameters that we added in the constructor, to enable unit tests to reload the
     // storage engine again in this same process.
     ServerParameterSet::getGlobal()->remove("wiredTigerEngineRuntimeConfig");
-    ServerParameterSet::getGlobal()->remove("wiredTigerMaxCacheOverflowSizeGB");
 
     cleanShutdown();
 

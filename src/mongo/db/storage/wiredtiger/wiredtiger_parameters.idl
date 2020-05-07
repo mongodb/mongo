@@ -108,12 +108,11 @@ server_parameters:
       description: >-
         Maximum amount of disk space to use for cache overflow;
         Defaults to 0 (unbounded)
+        Deprecated.
       set_at: runtime
-      cpp_class:
-        name: WiredTigerMaxCacheOverflowSizeGBParameter
-        data: 'std::pair<double, WiredTigerKVEngine*>'
-        override_set: true
-      condition: { expr: false }
+      cpp_vartype: 'AtomicWord<double>'
+      cpp_varname: gWiredTigerMaxCacheOverflowSizeGBDeprecated
+      default: 0
 
     wiredTigerEvictionDebugMode:
       description: >-

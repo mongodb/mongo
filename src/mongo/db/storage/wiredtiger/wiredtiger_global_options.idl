@@ -75,12 +75,12 @@ configs:
         description: >-
             Maximum amount of disk space to use for cache overflow;
             Defaults to 0 (unbounded)
+            Deprecated. Has no effect on storage engine operation.
         arg_vartype: Double
-        cpp_varname: 'wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB'
+        cpp_varname: 'wiredTigerGlobalOptions.maxCacheOverflowFileSizeGBDeprecated'
         short_name: wiredTigerMaxCacheOverflowFileSizeGB
-        validator:
-            callback: 'WiredTigerGlobalOptions::validateMaxCacheOverflowFileSizeGB'
         default: 0.0
+        hidden: true
     "storage.wiredTiger.engineConfig.configString":
         description: 'WiredTiger storage engine custom configuration setting'
         arg_vartype: String
