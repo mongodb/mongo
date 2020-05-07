@@ -43,6 +43,7 @@ Barack
 BerkeleyDB
 Bitfield
 Bitwise
+BlqRr
 Brueckner
 Bsearch
 Btree
@@ -174,6 +175,7 @@ HHHHLL
 HHHLL
 HILQr
 HOTBACKUP
+HSdump
 Hendrik
 HyperLevelDB
 ID's
@@ -267,6 +269,7 @@ Mutex
 MySecret
 NEEDKEY
 NEEDVALUE
+NNN
 NOLINT
 NOLINTNEXTLINE
 NOLL
@@ -318,6 +321,7 @@ RCS
 RDNOLOCK
 RDONLY
 READONLY
+REBALANCE
 RECNO
 REF's
 REFs
@@ -826,6 +830,7 @@ hhh
 highjack
 hilq
 hotbackup
+hs
 hselasky
 html
 huffman
@@ -905,6 +910,7 @@ kb
 kbits
 keycmp
 keyid
+keylen
 keyv
 kv
 kvraw
@@ -950,6 +956,7 @@ lookaside
 lookup
 lookups
 lossy
+lqRrt
 lqr
 lqrt
 lr
@@ -1150,6 +1157,7 @@ rduppo
 readlock
 readonly
 readunlock
+readv
 realloc
 rebalance
 rebalanced

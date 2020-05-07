@@ -33,15 +33,13 @@ from suite_subprocess import suite_subprocess
 from wtdataset import simple_key
 from wtscenario import make_scenarios
 
-# test_backup12.py
-# Test cursor backup with a block-based incremental cursor.
-class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
+# test_backup13.py
+# Test cursor backup with a block-based incremental cursor and force_stop.
+class test_backup13(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config='cache_size=1G,log=(enabled,file_max=100K)'
     dir='backup.dir'                    # Backup directory name
     logmax="100K"
     uri="table:test"
-    uri2="table:test2"
-    uri_rem="table:test_rem"
     nops=1000
     mult=0
 
@@ -63,22 +61,15 @@ class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
         # Increase the multiplier so that later calls insert unique items.
         self.mult += 1
 
-    def test_backup12(self):
+    def test_backup13(self):
 
         self.session.create(self.uri, "key_format=S,value_format=S")
-        self.session.create(self.uri2, "key_format=S,value_format=S")
-        self.session.create(self.uri_rem, "key_format=S,value_format=S")
         self.add_data(self.uri)
-        self.add_data(self.uri2)
-        self.add_data(self.uri_rem)
 
         # Open up the backup cursor. This causes a new log file to be created.
         # That log file is not part of the list returned. This is a full backup
         # primary cursor with incremental configured.
         os.mkdir(self.dir)
-        #
-        # Note, this first backup is actually done before a checkpoint is taken.
-        #
         config = 'incremental=(enabled,granularity=1M,this_id="ID1")'
         bkup_c = self.session.open_cursor('backup:', None, config)
 
@@ -87,6 +78,10 @@ class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Now copy the files returned by the backup cursor.
         all_files = []
+
+        # We cannot use 'for newfile in bkup_c:' usage because backup cursors don't have
+        # values and adding in get_values returns ENOTSUP and causes the usage to fail.
+        # If that changes then this, and the use of the duplicate below can change.
         while True:
             ret = bkup_c.next()
             if ret != 0:
@@ -97,37 +92,10 @@ class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
             shutil.copy(newfile, self.dir)
             all_files.append(newfile)
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-
-        # Now open a duplicate backup cursor.
-        # We *can* use a log target duplicate on an incremental primary backup so that
-        # a backup process can get all the log files that occur while that primary cursor
-        # is open.
-        config = 'target=("log:")'
-        dupc = self.session.open_cursor(None, bkup_c, config)
-        dup_logs = []
-        while True:
-            ret = dupc.next()
-            if ret != 0:
-                break
-            newfile = dupc.get_key()
-            self.assertTrue("WiredTigerLog" in newfile)
-            sz = os.path.getsize(newfile)
-            if (newfile not in all_files):
-                self.pr('DUP: Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
-                shutil.copy(newfile, self.dir)
-            # Record all log files returned for later verification.
-            dup_logs.append(newfile)
-            all_files.append(newfile)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        dupc.close()
         bkup_c.close()
 
         # Add more data.
         self.add_data(self.uri)
-        self.add_data(self.uri2)
-
-        # Drop a table.
-        self.session.drop(self.uri_rem)
 
         # Now do an incremental backup.
         config = 'incremental=(src_id="ID1",this_id="ID2")'
@@ -153,10 +121,8 @@ class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
                 offset = incrlist[0]
                 size = incrlist[1]
                 curtype = incrlist[2]
-                # 1 is WT_BACKUP_FILE
-                # 2 is WT_BACKUP_RANGE
-                self.assertTrue(curtype == 1 or curtype == 2)
-                if curtype == 1:
+                self.assertTrue(curtype == wiredtiger.WT_BACKUP_FILE or curtype == wiredtiger.WT_BACKUP_RANGE)
+                if curtype == wiredtiger.WT_BACKUP_FILE:
                     self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
                     shutil.copy(newfile, self.dir)
                 else:
@@ -174,7 +140,6 @@ class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         bkup_c.close()
 
-        # We need to remove files in the backup directory that are not in the current backup.
         all_set = set(all_files)
         bkup_set = set(bkup_files)
         rem_files = list(all_set - bkup_set)
@@ -184,6 +149,20 @@ class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
         # After the full backup, open and recover the backup database.
         backup_conn = self.wiredtiger_open(self.dir)
         backup_conn.close()
+
+        # Do a force stop to release resources and reset the system.
+        config = 'incremental=(force_stop=true)'
+        bkup_c = self.session.open_cursor('backup:', None, config)
+        bkup_c.close()
+
+        # Make sure after a force stop we cannot access old backup info.
+        config = 'incremental=(src_id="ID1",this_id="ID3")'
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config))
+        self.reopen_conn()
+        # Make sure after a restart we cannot access old backup info.
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config))
 
 if __name__ == '__main__':
     wttest.run()

@@ -1102,6 +1102,7 @@ backup(WT_SESSION *session)
 {
     char buf[1024];
 
+    WT_CURSOR *dup_cursor;
     /*! [backup]*/
     WT_CURSOR *cursor;
     const char *filename;
@@ -1125,10 +1126,24 @@ backup(WT_SESSION *session)
     error_check(cursor->close(cursor));
     /*! [backup]*/
 
+    /*! [backup log duplicate]*/
+    /* Open the backup data source. */
+    error_check(session->open_cursor(session, "backup:", NULL, NULL, &cursor));
+    /* Open a duplicate cursor for additional log files. */
+    error_check(session->open_cursor(session, NULL, cursor, "target=(\"log:\")", &dup_cursor));
+    /*! [backup log duplicate]*/
+
     /*! [incremental backup]*/
-    /* Open the backup data source for incremental backup. */
+    /* Open the backup data source for log-based incremental backup. */
     error_check(session->open_cursor(session, "backup:", NULL, "target=(\"log:\")", &cursor));
     /*! [incremental backup]*/
+    error_check(cursor->close(cursor));
+
+    /*! [incremental block backup]*/
+    /* Open the backup data source for block-based incremental backup. */
+    error_check(session->open_cursor(
+      session, "backup:", NULL, "incremental=(enabled,src_id=ID0,this_id=ID1)", &cursor));
+    /*! [incremental block backup]*/
     error_check(cursor->close(cursor));
 
     /*! [backup of a checkpoint]*/

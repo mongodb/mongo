@@ -488,22 +488,6 @@ t = env.Program("t_fops",
     LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
-t = env.Program("t_format",
-    ["test/format/backup.c",
-    "test/format/bulk.c",
-    "test/format/compact.c",
-    "test/format/config.c",
-    "test/format/ops.c",
-    "test/format/rebalance.c",
-    "test/format/random.c",
-    "test/format/salvage.c",
-    "test/format/snap.c",
-    "test/format/t.c",
-    "test/format/util.c",
-    "test/format/wts.c"],
-    LIBS=[wtlib, shim, testutil] + wtlibs)
-Default(t)
-
 t = env.Program("t_huge",
     "test/huge/huge.c",
     LIBS=[wtlib, shim, testutil] + wtlibs)

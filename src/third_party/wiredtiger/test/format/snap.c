@@ -231,18 +231,20 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
      * We have a mismatch. Try to print out as much information as we can. In doing so, we are
      * calling into the debug code directly and that does not take locks, so it's possible we will
      * simply drop core. The most important information is the key/value mismatch information. Then
-     * try to dump out the other information. Right now we dump the entire lookaside table including
-     * what is on disk. That can potentially be very large. If it becomes a problem, this can be
-     * modified to just dump out the page this key is on. Write a failure message into the log file
-     * first so format.sh knows we failed, and turn off core dumps.
+     * try to dump out the other information. Right now we dump the entire history store table
+     * including what is on disk. That can potentially be very large. If it becomes a problem, this
+     * can be modified to just dump out the page this key is on. Write a failure message into the
+     * log file first so format.sh knows we failed, and turn off core dumps.
      */
     fprintf(stderr, "\n%s: run FAILED\n", progname);
     set_core_off();
 
     fprintf(stderr, "snapshot-isolation error: Dumping page to %s\n", g.home_pagedump);
     testutil_check(__wt_debug_cursor_page(cursor, g.home_pagedump));
-    fprintf(stderr, "snapshot-isolation error: Dumping LAS to %s\n", g.home_lasdump);
-    testutil_check(__wt_debug_cursor_las(cursor, g.home_lasdump));
+    fprintf(stderr, "snapshot-isolation error: Dumping HS to %s\n", g.home_hsdump);
+#if WIREDTIGER_VERSION_MAJOR >= 10
+    testutil_check(__wt_debug_cursor_tree_hs(cursor, g.home_hsdump));
+#endif
     if (g.logging)
         testutil_check(cursor->session->log_flush(cursor->session, "sync=off"));
 #endif

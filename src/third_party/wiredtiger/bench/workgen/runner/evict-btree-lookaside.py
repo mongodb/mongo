@@ -79,11 +79,10 @@ from wiredtiger import *
 from workgen import *
 
 context = Context()
-homedir = "WT_TEST"
 conn_config =   "cache_size=1G,checkpoint=(wait=60,log_size=2GB),\
                 eviction=(threads_min=12,threads_max=12),log=(enabled=true),session_max=800,\
                 eviction_target=60,statistics=(fast),statistics_log=(wait=1,json)"# explicitly added
-conn = wiredtiger_open(homedir, "create," + conn_config)
+conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")
 
 wtperf_table_config = "key_format=S,value_format=S," +\

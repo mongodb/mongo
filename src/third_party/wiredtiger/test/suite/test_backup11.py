@@ -36,48 +36,28 @@ from wtscenario import make_scenarios
 # test_backup11.py
 # Test cursor backup with a duplicate backup cursor.
 class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
+    conn_config= 'cache_size=1G,log=(enabled,file_max=100K)'
     dir='backup.dir'                    # Backup directory name
-    logmax="100K"
-    uri="table:test"
+    mult=0
     nops=100
-
     pfx = 'test_backup'
-
-   #     ('archiving', dict(archive='true')),
-   #     ('not-archiving', dict(archive='false')),
-    scenarios = make_scenarios([
-        ('archiving', dict(archive='true')),
-    ])
-
-    # Create a large cache, otherwise this test runs quite slowly.
-    def conn_config(self):
-        return 'cache_size=1G,log=(archive=%s,' % self.archive + \
-            'enabled,file_max=%s)' % self.logmax
+    uri="table:test"
 
     def add_data(self):
-        log2 = "WiredTigerLog.0000000002"
-        log3 = "WiredTigerLog.0000000003"
 
-        self.session.create(self.uri, "key_format=S,value_format=S")
-
-        # Insert small amounts of data at a time stopping after we
-        # cross into log file 2.
-        loop = 0
         c = self.session.open_cursor(self.uri)
-        while not os.path.exists(log2):
-            for i in range(0, self.nops):
-                num = i + (loop * self.nops)
-                key = 'key' + str(num)
-                val = 'value' + str(num)
-                c[key] = val
-            loop += 1
+        for i in range(0, self.nops):
+            num = i + (self.mult * self.nops)
+            key = 'key' + str(num)
+            val = 'value' + str(num)
+            c[key] = val
+        self.mult += 1
         self.session.checkpoint()
         c.close()
-        return loop
 
     def test_backup11(self):
-
-        loop = self.add_data()
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        self.add_data()
 
         # Open up the backup cursor. This causes a new log file to be created.
         # That log file is not part of the list returned. This is a full backup
@@ -86,17 +66,8 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
         config = 'incremental=(enabled,this_id="ID1")'
         bkup_c = self.session.open_cursor('backup:', None, config)
 
-        # Add some data that will appear in log file 3.
-        c = self.session.open_cursor(self.uri)
-        for i in range(0, self.nops):
-            num = i + (loop * self.nops)
-            key = 'key' + str(num)
-            val = 'value' + str(num)
-            c[key] = val
-        loop += 1
-        c.close()
-        self.session.log_flush('sync=on')
-        self.session.checkpoint()
+        # Add data while the backup cursor is open.
+        self.add_data()
 
         # Now copy the files returned by the backup cursor.
         orig_logs = []
@@ -136,37 +107,22 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
         bkup_c.close()
 
         # Add more data
-        c = self.session.open_cursor(self.uri)
-        for i in range(0, self.nops):
-            num = i + (loop * self.nops)
-            key = 'key' + str(num)
-            val = 'value' + str(num)
-            c[key] = val
-        loop += 1
-        c.close()
-        self.session.log_flush('sync=on')
-        self.session.checkpoint()
+        self.add_data()
 
-        # Test a few error cases now.
-        # - Incremental filename must be on duplicate, not primary.
-        # - An incremental duplicate must have an incremental primary.
-        # - We cannot make multiple incremental duplcate backup cursors.
-        # - We cannot duplicate the duplicate backup cursor.
-        # - We cannot mix block incremental with a log target on the same duplicate.
-        # - Incremental ids must be on primary, not duplicate.
-        # - Incremental must be opened on a primary with a source identifier.
-        # - Force stop must be on primary, not duplicate.
+        # Test error cases now.
 
         # - Incremental filename must be on duplicate, not primary.
         # Test this first because we currently do not have a primary open.
         config = 'incremental=(file=test.wt)'
         msg = "/file name can only be specified on a duplicate/"
+        self.pr("Specify file on primary")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.assertEquals(self.session.open_cursor('backup:',
             None, config), 0), msg)
 
         # Open a non-incremental full backup cursor.
         # - An incremental duplicate must have an incremental primary.
+        self.pr("Try to open an incremental on a non-incremental primary")
         bkup_c = self.session.open_cursor('backup:', None, None)
         msg = "/must have an incremental primary/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -229,13 +185,12 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
             bkup_c, config), 0), msg)
 
         # - Force stop must be on primary, not duplicate.
-        #self.pr("Test force stop")
-        #self.pr("=========")
-        #config = 'incremental=(force_stop=true)'
-        #print "config is " + config
-        #self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-        #    lambda:self.assertEquals(self.session.open_cursor(None,
-        #    bkup_c, config), 0), msg)
+        self.pr("Test force stop")
+        self.pr("=========")
+        config = 'incremental=(force_stop=true)'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:self.assertEquals(self.session.open_cursor(None,
+            bkup_c, config), 0), msg)
 
         bkup_c.close()
 
@@ -255,9 +210,61 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: self.session.open_cursor(None, bkup_c, config), msg)
         bkup_c.close()
 
+        # - Test opening a primary backup with an unknown source id.
+        self.pr("Test incremental with unknown source identifier on primary")
+        self.pr("=========")
+        config = 'incremental=(enabled,src_id="ID_BAD",this_id="ID4")'
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config))
+
+        # - Test opening a primary backup with an id in WiredTiger namespace.
+        self.pr("Test incremental with illegal src identifier using WiredTiger namespace")
+        self.pr("=========")
+        msg = '/name space may not/'
+        config = 'incremental=(enabled,src_id="WiredTiger.0")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
+        # - Test opening a primary backup with an id in WiredTiger namespace.
+        self.pr("Test incremental with illegal this identifier using WiredTiger namespace")
+        self.pr("=========")
+        config = 'incremental=(enabled,this_id="WiredTiger.ID")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
+        # - Test opening a primary backup with an id using illegal characters.
+        self.pr("Test incremental with illegal source identifier using illegal colon character")
+        self.pr("=========")
+        msg = '/grouping characters/'
+        config = 'incremental=(enabled,src_id="ID4:4.0")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
+        # - Test opening a primary backup with an id using illegal characters.
+        self.pr("Test incremental with illegal this identifier using illegal colon character")
+        self.pr("=========")
+        config = 'incremental=(enabled,this_id="ID4:4.0")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
+        # - Test opening a primary backup with the same source id and this id (new id).
+        self.pr("Test incremental with the same new source and this identifiers")
+        self.pr("=========")
+        config = 'incremental=(enabled,src_id="IDSAME",this_id="IDSAME")'
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config))
+
+        # - Test opening a primary backup with the same source id and this id (reusing id).
+        self.pr("Test incremental with the same re-used source and this identifiers")
+        self.pr("=========")
+        msg = '/already in use/'
+        config = 'incremental=(enabled,src_id="ID2",this_id="ID2")'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config), msg)
+
         # After the full backup, open and recover the backup database.
-        #backup_conn = self.wiredtiger_open(self.dir)
-        #backup_conn.close()
+        backup_conn = self.wiredtiger_open(self.dir)
+        backup_conn.close()
 
 if __name__ == '__main__':
     wttest.run()

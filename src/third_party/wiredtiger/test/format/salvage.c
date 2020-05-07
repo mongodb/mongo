@@ -69,24 +69,14 @@ corrupt(void)
      */
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", g.home, WT_NAME));
     if ((fd = open(buf, O_RDWR)) != -1) {
-#ifdef _WIN32
         testutil_check(__wt_snprintf(copycmd, sizeof(copycmd),
-          "copy %s\\%s %s\\slvg.copy\\%s.corrupted", g.home, WT_NAME, g.home, WT_NAME));
-#else
-        testutil_check(__wt_snprintf(copycmd, sizeof(copycmd), "cp %s/%s %s/slvg.copy/%s.corrupted",
-          g.home, WT_NAME, g.home, WT_NAME));
-#endif
+          "cp %s/%s %s/SALVAGE.copy/%s.corrupted", g.home, WT_NAME, g.home, WT_NAME));
         goto found;
     }
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s.wt", g.home, WT_NAME));
     if ((fd = open(buf, O_RDWR)) != -1) {
-#ifdef _WIN32
         testutil_check(__wt_snprintf(copycmd, sizeof(copycmd),
-          "copy %s\\%s.wt %s\\slvg.copy\\%s.wt.corrupted", g.home, WT_NAME, g.home, WT_NAME));
-#else
-        testutil_check(__wt_snprintf(copycmd, sizeof(copycmd),
-          "cp %s/%s.wt %s/slvg.copy/%s.wt.corrupted", g.home, WT_NAME, g.home, WT_NAME));
-#endif
+          "cp %s/%s.wt %s/SALVAGE.copy/%s.wt.corrupted", g.home, WT_NAME, g.home, WT_NAME));
         goto found;
     }
     return (0);
@@ -97,7 +87,7 @@ found:
 
     offset = mmrand(NULL, 0, (u_int)sb.st_size);
     len = (size_t)(20 + (sb.st_size / 100) * 2);
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/slvg.corrupt", g.home));
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/SALVAGE.corrupt", g.home));
     if ((fp = fopen(buf, "w")) == NULL)
         testutil_die(errno, "salvage-corrupt: open: %s", buf);
     (void)fprintf(fp, "salvage-corrupt: offset %" PRIuMAX ", length %" WT_SIZET_FMT "\n",
@@ -127,6 +117,17 @@ found:
 }
 
 /*
+ * Salvage command, save the interesting files so we can replay the salvage command as necessary.
+ *
+ * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
+ * directory to our output.
+ */
+#define SALVAGE_COPY_CMD                            \
+    "cd %s > /dev/null && "                         \
+    "rm -rf SALVAGE.copy && mkdir SALVAGE.copy && " \
+    "cp WiredTiger* wt* SALVAGE.copy/"
+
+/*
  * wts_salvage --
  *     Salvage testing.
  */
@@ -134,15 +135,19 @@ void
 wts_salvage(void)
 {
     WT_DECL_RET;
+    size_t len;
+    char *cmd;
 
     if (g.c_salvage == 0)
         return;
 
-    /*
-     * Save a copy of the interesting files so we can replay the salvage step as necessary.
-     */
-    if ((ret = system(g.home_salvage_copy)) != 0)
-        testutil_die(ret, "salvage copy step failed");
+    /* Save a copy of the interesting files so we can replay the salvage step as necessary. */
+    len = strlen(g.home) + strlen(SALVAGE_COPY_CMD) + 1;
+    cmd = dmalloc(len);
+    testutil_check(__wt_snprintf(cmd, len, SALVAGE_COPY_CMD, g.home));
+    if ((ret = system(cmd)) != 0)
+        testutil_die(ret, "salvage copy (\"%s\"), failed", cmd);
+    free(cmd);
 
     /* Salvage, then verify. */
     wts_open(g.home, true, &g.wts_conn);

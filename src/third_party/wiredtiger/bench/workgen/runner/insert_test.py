@@ -55,7 +55,7 @@ def expectException(expr):
         raise Exception("missing expected exception")
 
 context = Context()
-conn = wiredtiger_open("WT_TEST", "create,cache_size=1G")
+conn = context.wiredtiger_open("create,cache_size=1G")
 s = conn.open_session()
 tname0 = tablename(0)
 tname1 = tablename(1)

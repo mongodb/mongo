@@ -97,7 +97,7 @@ compression_opts = {
 #
 #conn_config += extensions_config(['compressors/snappy'])
 
-conn = wiredtiger_open("WT_TEST", conn_config)
+conn = context.wiredtiger_open(conn_config)
 s = conn.open_session()
 
 tables = []

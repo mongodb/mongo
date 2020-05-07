@@ -60,23 +60,43 @@
 
 #define MAX_MODIFY_ENTRIES 5 /* maximum change vectors */
 
+/*
+ * Abstract lock that lets us use either pthread reader-writer locks or WiredTiger's own (likely
+ * faster) implementation.
+ */
 typedef struct {
-    char *home;              /* Home directory */
-    char *home_backup;       /* Hot-backup directory */
-    char *home_backup_init;  /* Initialize backup command */
-    char *home_config;       /* Run CONFIG file path */
-    char *home_init;         /* Initialize home command */
-    char *home_lasdump;      /* LAS dump filename */
-    char *home_log;          /* Operation log file path */
-    char *home_pagedump;     /* Page dump filename */
-    char *home_rand;         /* RNG log file path */
-    char *home_salvage_copy; /* Salvage copy command */
-    char *home_stats;        /* Statistics file path */
+    union {
+        WT_RWLOCK wt;
+        pthread_rwlock_t pthread;
+    } l;
+    enum { LOCK_NONE = 0, LOCK_WT, LOCK_PTHREAD } lock_type;
+} RWLOCK;
 
-    char wiredtiger_open_config[8 * 1024]; /* Database open config */
+#define LOCK_INITIALIZED(lock) ((lock)->lock_type != LOCK_NONE)
 
+typedef struct {
     WT_CONNECTION *wts_conn;
     WT_EXTENSION_API *wt_api;
+
+    char *uri; /* Object name */
+
+    bool backward_compatible; /* Backward compatibility testing */
+    bool reopen;              /* Reopen an existing database */
+    bool replay;              /* Replaying a run. */
+    bool workers_finished;    /* Operations completed */
+
+    char *home;          /* Home directory */
+    char *home_config;   /* Run CONFIG file path */
+    char *home_hsdump;   /* HS dump filename */
+    char *home_init;     /* Initialize home command */
+    char *home_key;      /* Key file filename */
+    char *home_log;      /* Operation log file path */
+    char *home_pagedump; /* Page dump filename */
+    char *home_rand;     /* RNG log file path */
+    char *home_stats;    /* Statistics file path */
+
+    char *config_open;                     /* Command-line configuration */
+    char wiredtiger_open_config[8 * 1024]; /* Database open config */
 
     bool rand_log_stop; /* Logging turned off */
     FILE *randfp;       /* Random number log */
@@ -86,10 +106,8 @@ typedef struct {
     bool logging; /* log operations  */
     FILE *logfp;  /* log file */
 
-    bool replay;           /* Replaying a run. */
-    bool workers_finished; /* Operations completed */
-
-    pthread_rwlock_t backup_lock; /* Backup running */
+    RWLOCK backup_lock; /* Backup running */
+    uint64_t backup_id; /* Block incremental id */
 
     WT_RAND_STATE rnd; /* Global RNG state */
 
@@ -100,17 +118,17 @@ typedef struct {
      * We get the last committed timestamp periodically in order to update the oldest timestamp,
      * that requires locking out transactional ops that set a timestamp.
      */
-    pthread_rwlock_t ts_lock;
+    RWLOCK ts_lock;
 
     uint64_t timestamp; /* Counter for timestamps */
 
     uint64_t truncate_cnt; /* Counter for truncation */
 
-    pthread_rwlock_t death_lock; /* Single-thread failure */
-
-    char *uri; /* Object name */
-
-    char *config_open; /* Command-line configuration */
+    /*
+     * Single-thread failure. Always use pthread lock rather than WT lock in case WT library is
+     * misbehaving.
+     */
+    pthread_rwlock_t death_lock;
 
     uint32_t c_abort; /* Config values */
     uint32_t c_alter;
@@ -118,6 +136,7 @@ typedef struct {
     uint32_t c_assert_read_timestamp;
     uint32_t c_auto_throttle;
     uint32_t c_backups;
+    char *c_backup_incremental;
     uint32_t c_bitcnt;
     uint32_t c_bloom;
     uint32_t c_bloom_bit_count;
@@ -165,6 +184,7 @@ typedef struct {
     uint32_t c_memory_page_max;
     uint32_t c_merge_max;
     uint32_t c_mmap;
+    uint32_t c_mmap_all;
     uint32_t c_modify_pct;
     uint32_t c_ops;
     uint32_t c_prefix_compression;
@@ -186,7 +206,7 @@ typedef struct {
     uint32_t c_timer;
     uint32_t c_timing_stress_aggressive_sweep;
     uint32_t c_timing_stress_checkpoint;
-    uint32_t c_timing_stress_lookaside_sweep;
+    uint32_t c_timing_stress_hs_sweep;
     uint32_t c_timing_stress_split_1;
     uint32_t c_timing_stress_split_2;
     uint32_t c_timing_stress_split_3;
@@ -202,11 +222,17 @@ typedef struct {
     uint32_t c_value_min;
     uint32_t c_verify;
     uint32_t c_write_pct;
+    uint32_t c_wt_mutex;
 
 #define FIX 1
 #define ROW 2
 #define VAR 3
     u_int type; /* File type's flag value */
+
+#define INCREMENTAL_BLOCK 1
+#define INCREMENTAL_LOG 2
+#define INCREMENTAL_OFF 3
+    u_int c_backup_incr_flag; /* Incremental backup flag value */
 
 #define CHECKPOINT_OFF 1
 #define CHECKPOINT_ON 2
@@ -230,6 +256,7 @@ typedef struct {
 #define ENCRYPT_ROTN_7 2
     u_int c_encryption_flag; /* Encryption flag value */
 
+#define ISOLATION_NOT_SET 0
 #define ISOLATION_RANDOM 1
 #define ISOLATION_READ_UNCOMMITTED 2
 #define ISOLATION_READ_COMMITTED 3
@@ -239,15 +266,14 @@ typedef struct {
     uint32_t intl_page_max; /* Maximum page sizes */
     uint32_t leaf_page_max;
 
-    uint64_t key_cnt; /* Keys loaded so far */
-    uint64_t rows;    /* Total rows */
+    uint64_t rows; /* Total rows */
 
     uint32_t key_rand_len[1031]; /* Key lengths */
 } GLOBAL;
 extern GLOBAL g;
 
 /* Worker thread operations. */
-typedef enum { INSERT, MODIFY, READ, REMOVE, TRUNCATE, UPDATE } thread_op;
+typedef enum { INSERT = 1, MODIFY, READ, REMOVE, TRUNCATE, UPDATE } thread_op;
 
 /* Worker read operations. */
 typedef enum { NEXT, PREV, SEARCH, SEARCH_NEAR } read_operation;
@@ -330,17 +356,23 @@ WT_THREAD_RET backup(void *);
 WT_THREAD_RET checkpoint(void *);
 WT_THREAD_RET compact(void *);
 void config_clear(void);
+void config_compat(const char **);
 void config_error(void);
 void config_file(const char *);
+void config_final(void);
 void config_print(bool);
-void config_setup(void);
 void config_single(const char *, bool);
 void fclose_and_clear(FILE **);
-void key_gen(WT_ITEM *, uint64_t);
+bool fp_readv(FILE *, char *, bool, uint32_t *);
+void handle_init(void);
+void handle_teardown(void);
+void key_gen_common(WT_ITEM *, uint64_t, const char *);
 void key_gen_init(WT_ITEM *);
-void key_gen_insert(WT_RAND_STATE *, WT_ITEM *, uint64_t);
 void key_gen_teardown(WT_ITEM *);
 void key_init(void);
+void lock_destroy(WT_SESSION *, RWLOCK *);
+void lock_init(WT_SESSION *, RWLOCK *);
+void operations(u_int, bool);
 WT_THREAD_RET random_kv(void *);
 void path_setup(const char *);
 int read_row_worker(WT_CURSOR *, uint64_t, WT_ITEM *, WT_ITEM *, bool);
@@ -353,7 +385,7 @@ int snap_repeat_txn(WT_CURSOR *, TINFO *);
 void snap_repeat_update(TINFO *, bool);
 void snap_track(TINFO *, thread_op);
 WT_THREAD_RET timestamp(void *);
-void timestamp_once(void);
+void timestamp_once(WT_SESSION *);
 void track(const char *, uint64_t, TINFO *);
 void val_gen(WT_RAND_STATE *, WT_ITEM *, uint64_t);
 void val_gen_init(WT_ITEM *);
@@ -361,11 +393,11 @@ void val_gen_teardown(WT_ITEM *);
 void val_init(void);
 void wts_checkpoints(void);
 void wts_close(void);
+void wts_create(void);
 void wts_dump(const char *, bool);
 void wts_init(void);
 void wts_load(void);
 void wts_open(const char *, bool, WT_CONNECTION **);
-void wts_ops(u_int, bool);
 void wts_read_scan(void);
 void wts_rebalance(void);
 void wts_reopen(void);

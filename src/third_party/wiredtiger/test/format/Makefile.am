@@ -4,8 +4,8 @@ AM_CPPFLAGS +=-I$(top_srcdir)/test/utility
 
 noinst_PROGRAMS = t
 t_SOURCES =\
-	backup.c bulk.c compact.c config.c ops.c random.c rebalance.c \
-	salvage.c snap.c t.c util.c wts.c
+	backup.c bulk.c checkpoint.c compact.c config.c config_compat.c kv.c ops.c random.c \
+	rebalance.c salvage.c snap.c t.c util.c wts.c
 
 t_LDADD = $(top_builddir)/test/utility/libtest_util.la
 t_LDADD +=$(top_builddir)/libwiredtiger.la
@@ -25,7 +25,8 @@ backup:
 refresh:
 	rm -rf RUNDIR && cp -p -r BACKUP RUNDIR
 
-TESTS = smoke.sh
+# Temporarily disabled
+# TESTS = smoke.sh
 
 clean-local:
 	rm -rf RUNDIR s_dumpcmp core.* *.core

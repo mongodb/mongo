@@ -29,6 +29,36 @@
 #include "format.h"
 
 /*
+ * Home directory initialize command: create the directory if it doesn't exist, else remove
+ * everything except the RNG log file.
+ *
+ * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
+ * directory to our output.
+ */
+#define FORMAT_HOME_INIT_CMD   \
+    "test -e %s || mkdir %s; " \
+    "cd %s > /dev/null && rm -rf `ls | sed /CONFIG.rand/d`"
+
+/*
+ * wts_create --
+ *     Create the database home.
+ */
+void
+wts_create(void)
+{
+    WT_DECL_RET;
+    size_t len;
+    char *cmd;
+
+    len = strlen(g.home) * 3 + strlen(FORMAT_HOME_INIT_CMD) + 1;
+    cmd = dmalloc(len);
+    testutil_check(__wt_snprintf(cmd, len, FORMAT_HOME_INIT_CMD, g.home, g.home, g.home));
+    if ((ret = system(cmd)) != 0)
+        testutil_die(ret, "home initialization (\"%s\") failed", cmd);
+    free(cmd);
+}
+
+/*
  * compressor --
  *     Configure compression.
  */
@@ -198,7 +228,10 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     CONFIG_APPEND(p, ",buffer_alignment=512");
 #endif
 
-    CONFIG_APPEND(p, ",mmap=%d", g.c_mmap ? 1 : 0);
+    if (g.c_mmap)
+        CONFIG_APPEND(p, ",mmap=1");
+    if (g.c_mmap_all)
+        CONFIG_APPEND(p, ",mmap_all=1");
 
     if (g.c_direct_io)
         CONFIG_APPEND(p, ",direct_io=(data)");
@@ -228,8 +261,8 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",aggressive_sweep");
     if (g.c_timing_stress_checkpoint)
         CONFIG_APPEND(p, ",checkpoint_slow");
-    if (g.c_timing_stress_lookaside_sweep)
-        CONFIG_APPEND(p, ",lookaside_sweep_race");
+    if (g.c_timing_stress_hs_sweep)
+        CONFIG_APPEND(p, ",history_store_sweep_race");
     if (g.c_timing_stress_split_1)
         CONFIG_APPEND(p, ",split_1");
     if (g.c_timing_stress_split_2)
@@ -247,6 +280,11 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     if (g.c_timing_stress_split_8)
         CONFIG_APPEND(p, ",split_8");
     CONFIG_APPEND(p, "]");
+
+#if WIREDTIGER_VERSION_MAJOR >= 10
+    if (g.c_verify)
+        CONFIG_APPEND(p, ",verify_metadata=true");
+#endif
 
     /* Extensions. */
     CONFIG_APPEND(p,
@@ -294,34 +332,8 @@ wts_reopen(void)
 }
 
 /*
- * wts_checkpoints --
- *     Configure WiredTiger library checkpoints.
- */
-void
-wts_checkpoints(void)
-{
-    char config[1024];
-
-    /*
-     * Configuring WiredTiger library checkpoints is done separately, rather than as part of the
-     * original database open because format tests small caches and you can get into cache stuck
-     * trouble during the initial load (where bulk load isn't configured). There's a single thread
-     * doing lots of inserts and creating huge leaf pages. Those pages can't be evicted if there's a
-     * checkpoint running in the tree, and the cache can get stuck. That workload is unlikely enough
-     * we're not going to fix it in the library, so configure it away here.
-     */
-    if (g.c_checkpoint_flag != CHECKPOINT_WIREDTIGER)
-        return;
-
-    testutil_check(
-      __wt_snprintf(config, sizeof(config), ",checkpoint=(wait=%" PRIu32 ",log_size=%" PRIu32 ")",
-        g.c_checkpoint_wait, MEGABYTE(g.c_checkpoint_log_size)));
-    testutil_check(g.wts_conn->reconfigure(g.wts_conn, config));
-}
-
-/*
- * wts_create --
- *     Create the underlying store.
+ * wts_init --
+ *     Create the database object.
  */
 void
 wts_init(void)
@@ -448,13 +460,14 @@ void
 wts_close(void)
 {
     WT_CONNECTION *conn;
-    const char *config;
 
     conn = g.wts_conn;
 
-    config = g.c_leak_memory ? "leak_memory" : NULL;
+    if (g.backward_compatible)
+        testutil_check(conn->reconfigure(conn, "compatibility=(release=3.3)"));
 
-    testutil_check(conn->close(conn, config));
+    testutil_check(conn->close(conn, g.c_leak_memory ? "leak_memory" : NULL));
+
     g.wts_conn = NULL;
     g.wt_api = NULL;
 }

@@ -38,7 +38,7 @@ from workgen import *
 context = Context()
 # Connection configuration.
 conn_config = "cache_size=100MB,log=(enabled=false),statistics=[fast],statistics_log=(wait=1,json=false)"
-conn = wiredtiger_open("WT_TEST", "create," + conn_config)
+conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")
 
 # Table configuration.
@@ -78,6 +78,6 @@ workload.options.run_time=300
 print('Split stress workload running...')
 workload.run(conn)
 
-latency_filename = "WT_TEST/latency.out"
+latency_filename = context.args.home + "/latency.out"
 latency.workload_latency(workload, latency_filename)
 conn.close()
