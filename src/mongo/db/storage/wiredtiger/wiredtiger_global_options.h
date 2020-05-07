@@ -43,6 +43,7 @@ public:
           checkpointDelaySecs(0),
           statisticsLogDelaySecs(0),
           directoryForIndexes(false),
+          maxCacheOverflowFileSizeGBDeprecated(0),
           maxHistoryFileSizeGB(0),
           useCollectionPrefixCompression(false),
           useIndexPrefixCompression(false){};
@@ -54,6 +55,7 @@ public:
     size_t statisticsLogDelaySecs;
     std::string journalCompressor;
     bool directoryForIndexes;
+    double maxCacheOverflowFileSizeGBDeprecated;
     double maxHistoryFileSizeGB;
     std::string engineConfig;
 
