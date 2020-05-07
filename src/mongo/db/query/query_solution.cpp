@@ -166,7 +166,6 @@ QuerySolutionNode* TextNode::clone() const {
     TextNode* copy = new TextNode(this->index);
     cloneBaseData(copy);
 
-    copy->_sort = this->_sort;
     copy->ftsQuery = this->ftsQuery->clone();
     copy->indexPrefix = this->indexPrefix;
 
@@ -195,7 +194,6 @@ QuerySolutionNode* CollectionScanNode::clone() const {
     CollectionScanNode* copy = new CollectionScanNode();
     cloneBaseData(copy);
 
-    copy->_sort = this->_sort;
     copy->name = this->name;
     copy->tailable = this->tailable;
     copy->direction = this->direction;
@@ -251,9 +249,6 @@ FieldAvailability AndHashNode::getFieldAvailability(const string& field) const {
 QuerySolutionNode* AndHashNode::clone() const {
     AndHashNode* copy = new AndHashNode();
     cloneBaseData(copy);
-
-    copy->_sort = this->_sort;
-
     return copy;
 }
 
@@ -299,9 +294,6 @@ FieldAvailability AndSortedNode::getFieldAvailability(const string& field) const
 QuerySolutionNode* AndSortedNode::clone() const {
     AndSortedNode* copy = new AndSortedNode();
     cloneBaseData(copy);
-
-    copy->_sort = this->_sort;
-
     return copy;
 }
 
@@ -358,7 +350,6 @@ QuerySolutionNode* OrNode::clone() const {
     OrNode* copy = new OrNode();
     cloneBaseData(copy);
 
-    copy->_sort = this->_sort;
     copy->dedup = this->dedup;
 
     return copy;
@@ -417,7 +408,6 @@ QuerySolutionNode* MergeSortNode::clone() const {
     MergeSortNode* copy = new MergeSortNode();
     cloneBaseData(copy);
 
-    copy->_sorts = this->_sorts;
     copy->dedup = this->dedup;
     copy->sort = this->sort;
 
@@ -449,9 +439,6 @@ void FetchNode::appendToString(str::stream* ss, int indent) const {
 QuerySolutionNode* FetchNode::clone() const {
     FetchNode* copy = new FetchNode();
     cloneBaseData(copy);
-
-    copy->_sorts = this->_sorts;
-
     return copy;
 }
 
@@ -886,7 +873,7 @@ std::pair<ProvidedSortSet, std::set<StringData>> computeSortsAndMultikeyPathsFor
 }  // namespace
 
 void IndexScanNode::computeProperties() {
-    std::tie(_sorts, multikeyFields) =
+    std::tie(sortSet, multikeyFields) =
         computeSortsAndMultikeyPathsForScan(index, direction, bounds, queryCollator);
 }
 
@@ -894,7 +881,6 @@ QuerySolutionNode* IndexScanNode::clone() const {
     IndexScanNode* copy = new IndexScanNode(this->index);
     cloneBaseData(copy);
 
-    copy->_sorts = this->_sorts;
     copy->direction = this->direction;
     copy->addKeyMetadata = this->addKeyMetadata;
     copy->bounds = this->bounds;
@@ -981,7 +967,7 @@ void ProjectionNode::computeProperties() {
         }
         prefixBob.append(key);
     }
-    _sorts = ProvidedSortSet(prefixBob.obj(), inputSorts.getIgnoredFields());
+    sortSet = ProvidedSortSet(prefixBob.obj(), inputSorts.getIgnoredFields());
 }
 
 void ProjectionNode::cloneProjectionData(ProjectionNode* copy) const {
@@ -989,7 +975,7 @@ void ProjectionNode::cloneProjectionData(ProjectionNode* copy) const {
     if (this->filter)
         copy->filter = this->filter->shallowClone();
 
-    copy->_sorts = this->_sorts;
+    copy->sortSet = this->sortSet;
 }
 
 ProjectionNode* ProjectionNodeDefault::clone() const {
@@ -1060,7 +1046,6 @@ void SortNode::appendToString(str::stream* ss, int indent) const {
 
 void SortNode::cloneSortData(SortNode* copy) const {
     cloneBaseData(copy);
-    copy->_sorts = this->_sorts;
     copy->pattern = this->pattern;
     copy->limit = this->limit;
     copy->addSortKeyMetadata = this->addSortKeyMetadata;
@@ -1151,7 +1136,6 @@ QuerySolutionNode* GeoNear2DNode::clone() const {
     GeoNear2DNode* copy = new GeoNear2DNode(this->index);
     cloneBaseData(copy);
 
-    copy->_sorts = this->_sorts;
     copy->nq = this->nq;
     copy->baseBounds = this->baseBounds;
     copy->addPointMeta = this->addPointMeta;
@@ -1185,7 +1169,6 @@ QuerySolutionNode* GeoNear2DSphereNode::clone() const {
     GeoNear2DSphereNode* copy = new GeoNear2DSphereNode(this->index);
     cloneBaseData(copy);
 
-    copy->_sorts = this->_sorts;
     copy->nq = this->nq;
     copy->baseBounds = this->baseBounds;
     copy->addPointMeta = this->addPointMeta;
@@ -1241,7 +1224,6 @@ QuerySolutionNode* DistinctNode::clone() const {
     DistinctNode* copy = new DistinctNode(this->index);
     cloneBaseData(copy);
 
-    copy->sorts = this->sorts;
     copy->direction = this->direction;
     copy->bounds = this->bounds;
     copy->queryCollator = this->queryCollator;
@@ -1253,7 +1235,7 @@ QuerySolutionNode* DistinctNode::clone() const {
 void DistinctNode::computeProperties() {
     // Note that we don't need to save the returned multikey fields for a DISTINCT_SCAN. They are
     // only needed for explodeForSort(), which works on IXSCAN but not DISTINCT_SCAN.
-    sorts = computeSortsAndMultikeyPathsForScan(index, direction, bounds, queryCollator).first;
+    sortSet = computeSortsAndMultikeyPathsForScan(index, direction, bounds, queryCollator).first;
 }
 
 //
@@ -1277,7 +1259,6 @@ QuerySolutionNode* CountScanNode::clone() const {
     CountScanNode* copy = new CountScanNode(this->index);
     cloneBaseData(copy);
 
-    copy->sorts = this->sorts;
     copy->startKey = this->startKey;
     copy->startKeyInclusive = this->startKeyInclusive;
     copy->endKey = this->endKey;

@@ -259,6 +259,27 @@ private:
     QuerySolutionNode& operator=(const QuerySolutionNode&) = delete;
 };
 
+struct QuerySolutionNodeWithSortSet : public QuerySolutionNode {
+    QuerySolutionNodeWithSortSet() = default;
+
+    /**
+     * This constructor is only useful for QuerySolutionNodes with a single child.
+     */
+    explicit QuerySolutionNodeWithSortSet(std::unique_ptr<QuerySolutionNode> child)
+        : QuerySolutionNode(std::move(child)) {}
+
+    const ProvidedSortSet& providedSorts() const final {
+        return sortSet;
+    }
+
+    void cloneBaseData(QuerySolutionNodeWithSortSet* other) const {
+        QuerySolutionNode::cloneBaseData(other);
+        other->sortSet = sortSet;
+    }
+
+    ProvidedSortSet sortSet;
+};
+
 /**
  * A QuerySolution must be entirely self-contained and own everything inside of it.
  *
@@ -310,7 +331,7 @@ private:
     QuerySolution& operator=(const QuerySolution&) = delete;
 };
 
-struct TextNode : public QuerySolutionNode {
+struct TextNode : public QuerySolutionNodeWithSortSet {
     TextNode(IndexEntry index) : index(std::move(index)) {}
 
     virtual ~TextNode() {}
@@ -331,13 +352,8 @@ struct TextNode : public QuerySolutionNode {
     bool sortedByDiskLoc() const {
         return false;
     }
-    const ProvidedSortSet& providedSorts() const {
-        return _sort;
-    }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet _sort;
 
     IndexEntry index;
     std::unique_ptr<fts::FTSQuery> ftsQuery;
@@ -355,7 +371,7 @@ struct TextNode : public QuerySolutionNode {
     BSONObj indexPrefix;
 };
 
-struct CollectionScanNode : public QuerySolutionNode {
+struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     CollectionScanNode();
     virtual ~CollectionScanNode() {}
 
@@ -374,13 +390,8 @@ struct CollectionScanNode : public QuerySolutionNode {
     bool sortedByDiskLoc() const {
         return false;
     }
-    const ProvidedSortSet& providedSorts() const {
-        return _sort;
-    }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet _sort;
 
     // Name of the namespace.
     std::string name;
@@ -441,11 +452,9 @@ struct AndHashNode : public QuerySolutionNode {
     }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet _sort;
 };
 
-struct AndSortedNode : public QuerySolutionNode {
+struct AndSortedNode : public QuerySolutionNodeWithSortSet {
     AndSortedNode();
     virtual ~AndSortedNode();
 
@@ -460,16 +469,11 @@ struct AndSortedNode : public QuerySolutionNode {
     bool sortedByDiskLoc() const {
         return true;
     }
-    const ProvidedSortSet& providedSorts() const {
-        return _sort;
-    }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet _sort;
 };
 
-struct OrNode : public QuerySolutionNode {
+struct OrNode : public QuerySolutionNodeWithSortSet {
     OrNode();
     virtual ~OrNode();
 
@@ -486,18 +490,13 @@ struct OrNode : public QuerySolutionNode {
         // any order on the output.
         return false;
     }
-    const ProvidedSortSet& providedSorts() const {
-        return _sort;
-    }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet _sort;
 
     bool dedup;
 };
 
-struct MergeSortNode : public QuerySolutionNode {
+struct MergeSortNode : public QuerySolutionNodeWithSortSet {
     MergeSortNode();
     virtual ~MergeSortNode();
 
@@ -513,20 +512,14 @@ struct MergeSortNode : public QuerySolutionNode {
         return false;
     }
 
-    const ProvidedSortSet& providedSorts() const {
-        return _sorts;
-    }
-
     QuerySolutionNode* clone() const;
 
     virtual void computeProperties() {
         for (size_t i = 0; i < children.size(); ++i) {
             children[i]->computeProperties();
         }
-        _sorts = ProvidedSortSet(sort, std::set<std::string>());
+        sortSet = ProvidedSortSet(sort, std::set<std::string>());
     }
-
-    ProvidedSortSet _sorts;
 
     BSONObj sort;
     bool dedup;
@@ -556,11 +549,9 @@ struct FetchNode : public QuerySolutionNode {
     }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet _sorts;
 };
 
-struct IndexScanNode : public QuerySolutionNode {
+struct IndexScanNode : public QuerySolutionNodeWithSortSet {
     IndexScanNode(IndexEntry index);
     virtual ~IndexScanNode() {}
 
@@ -577,9 +568,6 @@ struct IndexScanNode : public QuerySolutionNode {
     }
     FieldAvailability getFieldAvailability(const std::string& field) const;
     bool sortedByDiskLoc() const;
-    const ProvidedSortSet& providedSorts() const {
-        return _sorts;
-    }
 
     QuerySolutionNode* clone() const;
 
@@ -592,8 +580,6 @@ struct IndexScanNode : public QuerySolutionNode {
      */
     static std::set<StringData> getFieldsWithStringBounds(const IndexBounds& bounds,
                                                           const BSONObj& indexKeyPattern);
-
-    ProvidedSortSet _sorts;
 
     IndexEntry index;
 
@@ -650,11 +636,11 @@ struct ReturnKeyNode : public QuerySolutionNode {
  * is much slower than the fast-path implementations. We only really have all the information
  * available to choose a projection implementation at planning time.
  */
-struct ProjectionNode : QuerySolutionNode {
+struct ProjectionNode : public QuerySolutionNodeWithSortSet {
     ProjectionNode(std::unique_ptr<QuerySolutionNode> child,
                    const MatchExpression& fullExpression,
                    projection_ast::Projection proj)
-        : QuerySolutionNode(std::move(child)),
+        : QuerySolutionNodeWithSortSet(std::move(child)),
           fullExpression(fullExpression),
           proj(std::move(proj)) {}
 
@@ -688,10 +674,6 @@ struct ProjectionNode : QuerySolutionNode {
         return children[0]->sortedByDiskLoc();
     }
 
-    const ProvidedSortSet& providedSorts() const {
-        return _sorts;
-    }
-
 protected:
     void cloneProjectionData(ProjectionNode* copy) const;
 
@@ -700,8 +682,6 @@ public:
      * Identify projectionImplementation type as a string.
      */
     virtual StringData projectionImplementationTypeToString() const = 0;
-
-    ProvidedSortSet _sorts;
 
     // The full query tree.  Needed when we have positional operators.
     // Owned in the CanonicalQuery, not here.
@@ -799,7 +779,7 @@ struct SortKeyGeneratorNode : public QuerySolutionNode {
     BSONObj sortSpec;
 };
 
-struct SortNode : public QuerySolutionNode {
+struct SortNode : public QuerySolutionNodeWithSortSet {
     SortNode() : limit(0) {}
 
     virtual ~SortNode() {}
@@ -816,18 +796,12 @@ struct SortNode : public QuerySolutionNode {
         return false;
     }
 
-    const ProvidedSortSet& providedSorts() const {
-        return _sorts;
-    }
-
     virtual void computeProperties() {
         for (size_t i = 0; i < children.size(); ++i) {
             children[i]->computeProperties();
         }
-        _sorts = ProvidedSortSet(pattern, std::set<std::string>());
+        sortSet = ProvidedSortSet(pattern, std::set<std::string>());
     }
-
-    ProvidedSortSet _sorts;
 
     BSONObj pattern;
 
@@ -931,8 +905,7 @@ struct SkipNode : public QuerySolutionNode {
     long long skip;
 };
 
-// This is a standalone stage.
-struct GeoNear2DNode : public QuerySolutionNode {
+struct GeoNear2DNode : public QuerySolutionNodeWithSortSet {
     GeoNear2DNode(IndexEntry index)
         : index(std::move(index)), addPointMeta(false), addDistMeta(false) {}
 
@@ -952,13 +925,8 @@ struct GeoNear2DNode : public QuerySolutionNode {
     bool sortedByDiskLoc() const {
         return false;
     }
-    const ProvidedSortSet& providedSorts() const {
-        return _sorts;
-    }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet _sorts;
 
     // Not owned here
     const GeoNearExpression* nq;
@@ -969,8 +937,7 @@ struct GeoNear2DNode : public QuerySolutionNode {
     bool addDistMeta;
 };
 
-// This is actually its own standalone stage.
-struct GeoNear2DSphereNode : public QuerySolutionNode {
+struct GeoNear2DSphereNode : public QuerySolutionNodeWithSortSet {
     GeoNear2DSphereNode(IndexEntry index)
         : index(std::move(index)), addPointMeta(false), addDistMeta(false) {}
 
@@ -990,13 +957,8 @@ struct GeoNear2DSphereNode : public QuerySolutionNode {
     bool sortedByDiskLoc() const {
         return false;
     }
-    const ProvidedSortSet& providedSorts() const {
-        return _sorts;
-    }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet _sorts;
 
     // Not owned here
     const GeoNearExpression* nq;
@@ -1046,7 +1008,7 @@ struct ShardingFilterNode : public QuerySolutionNode {
  * Distinct queries only want one value for a given field.  We run an index scan but
  * *always* skip over the current key to the next key.
  */
-struct DistinctNode : public QuerySolutionNode {
+struct DistinctNode : public QuerySolutionNodeWithSortSet {
     DistinctNode(IndexEntry index) : index(std::move(index)) {}
 
     virtual ~DistinctNode() {}
@@ -1072,15 +1034,10 @@ struct DistinctNode : public QuerySolutionNode {
     bool sortedByDiskLoc() const {
         return false;
     }
-    const ProvidedSortSet& providedSorts() const {
-        return sorts;
-    }
 
     QuerySolutionNode* clone() const;
 
     virtual void computeProperties();
-
-    ProvidedSortSet sorts;
 
     IndexEntry index;
     IndexBounds bounds;
@@ -1096,7 +1053,7 @@ struct DistinctNode : public QuerySolutionNode {
  * Some count queries reduce to counting how many keys are between two entries in a
  * Btree.
  */
-struct CountScanNode : public QuerySolutionNode {
+struct CountScanNode : public QuerySolutionNodeWithSortSet {
     CountScanNode(IndexEntry index) : index(std::move(index)) {}
 
     virtual ~CountScanNode() {}
@@ -1115,13 +1072,8 @@ struct CountScanNode : public QuerySolutionNode {
     bool sortedByDiskLoc() const {
         return false;
     }
-    const ProvidedSortSet& providedSorts() const {
-        return sorts;
-    }
 
     QuerySolutionNode* clone() const;
-
-    ProvidedSortSet sorts;
 
     IndexEntry index;
 
