@@ -36,9 +36,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace repl {
+
+MONGO_FAIL_POINT_DEFINE(topologyVersionObserverExpectsInterruption);
+MONGO_FAIL_POINT_DEFINE(topologyVersionObserverExpectsShutdown);
 
 void TopologyVersionObserver::init(ServiceContext* serviceContext,
                                    ReplicationCoordinator* replCoordinator) noexcept {
@@ -116,8 +120,10 @@ std::string TopologyVersionObserver::toString() const {
 }
 
 void TopologyVersionObserver::_cacheIsMasterResponse(
-    OperationContext* opCtx, boost::optional<TopologyVersion> topologyVersion) noexcept try {
+    OperationContext* opCtx, boost::optional<TopologyVersion> topologyVersion) try {
     invariant(opCtx);
+
+    LOGV2_DEBUG(4794600, 3, "Waiting for a topology change");
 
     {
         auto cacheGuard = makeGuard([&] {
@@ -143,23 +149,22 @@ void TopologyVersionObserver::_cacheIsMasterResponse(
         return;
     }
 
+    LOGV2_DEBUG(4794601, 3, "Observed a topology change");
+
     // We could be a PeriodicRunner::Job someday. For now, OperationContext::sleepFor() will serve
     // the same purpose.
     opCtx->sleepFor(kDelayMS);
-} catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-    LOGV2_DEBUG(40443,
-                1,
-                "Observer was interrupted by {error}",
-                "Observer was interrupted by an exception",
-                "error"_attr = e.toString());
-} catch (DBException& e) {
-    LOGV2_WARNING(40444,
-                  "Observer could not retrieve isMasterResponse: {error}",
-                  "Observer could not retrieve isMasterResponse",
-                  "error"_attr = e.toString());
+} catch (const DBException& e) {
+    if (ErrorCodes::isShutdownError(e)) {
+        // Rethrow if we've experienced shutdown.
+        throw;
+    }
+
+    LOGV2_WARNING(
+        40444, "Observer could not retrieve isMasterResponse", "error"_attr = e.toString());
 }
 
-void TopologyVersionObserver::_workerThreadBody() noexcept {
+void TopologyVersionObserver::_workerThreadBody() noexcept try {
     invariant(_serviceContext);
     ThreadClient tc(kTopologyVersionObserverName, _serviceContext);
 
@@ -203,22 +208,34 @@ void TopologyVersionObserver::_workerThreadBody() noexcept {
         }
 
         LOGV2_INFO(40447, "Stopped TopologyVersionObserver");
+
+        // Pause here to confirm that we do not depend upon shutdown() being invoked for
+        // isShutdown() to be true.
+        topologyVersionObserverExpectsShutdown.pauseWhileSet();
     });
 
-    stdx::unique_lock lk(_mutex);
     while (!_shouldShutdown.load()) {
         auto opCtxHandle = tc->makeOperationContext();
 
-        // Set the _workerOpCtx to our newly formed opCtxHandle before we unlock.
-        _workerOpCtx = opCtxHandle.get();
+        {
+            // Set the _workerOpCtx to our newly formed opCtxHandle before we unlock.
+            stdx::lock_guard lk(_mutex);
+            _workerOpCtx = opCtxHandle.get();
+        }
 
-        lk.unlock();
+        ON_BLOCK_EXIT([&] {
+            // We're done with our opCtxHandle, unset _workerOpCtx.
+            stdx::lock_guard lk(_mutex);
+            _workerOpCtx = nullptr;
+        });
+
+        // Pause here so that we can force there to be an opCtx to be interrupted.
+        topologyVersionObserverExpectsInterruption.pauseWhileSet();
+
         _cacheIsMasterResponse(opCtxHandle.get(), getTopologyVersion());
-        lk.lock();
-
-        // We're done with our opCtxHandle, unset _workerOpCtx.
-        _workerOpCtx = nullptr;
     }
+} catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+    LOGV2_DEBUG(40443, 3, "Observer thread stopped due to shutdown", "error"_attr = e.toString());
 }
 
 }  // namespace repl

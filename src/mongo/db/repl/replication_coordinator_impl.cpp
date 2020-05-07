@@ -929,6 +929,8 @@ void ReplicationCoordinatorImpl::enterTerminalShutdown() {
 }
 
 bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary() {
+    LOGV2_INFO(4794602, "Attempting to enter quiesce mode");
+
     stdx::lock_guard lk(_mutex);
 
     if (!_memberState.secondary()) {
