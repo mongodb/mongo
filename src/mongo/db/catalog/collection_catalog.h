@@ -235,6 +235,17 @@ public:
      */
     void onOpenCatalog(OperationContext* opCtx);
 
+    /**
+     * The epoch is incremented whenever the catalog is closed and re-opened.
+     *
+     * Callers of this method must hold the global lock in at least MODE_IS.
+     *
+     * This allows callers to detect an intervening catalog close. For example, closing the catalog
+     * must kill all active queries. This is implemented by checking that the epoch has not changed
+     * during query yield recovery.
+     */
+    uint64_t getEpoch() const;
+
     iterator begin(StringData db) const;
     iterator end() const;
 
@@ -284,6 +295,18 @@ private:
      * Generation number to track changes to the catalog that could invalidate iterators.
      */
     uint64_t _generationNumber;
+
+    // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
+    // onOpenCatalog).
+    //
+    // Catalog objects are destroyed and recreated when the catalog is closed and re-opened. We
+    // increment this counter to track when the catalog is reopened. This permits callers to detect
+    // after yielding whether their catalog pointers are still valid. Collection UUIDs are not
+    // sufficient, since they remain stable across catalog re-opening.
+    //
+    // A thread must hold the global exclusive lock to write to this variable, and must hold the
+    // global lock in at least MODE_IS to read it.
+    uint64_t _epoch = 0;
 
     // Protects _resourceInformation.
     mutable Mutex _resourceLock = MONGO_MAKE_LATCH("CollectionCatalog::_resourceLock");

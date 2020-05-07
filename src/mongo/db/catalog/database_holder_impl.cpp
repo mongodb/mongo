@@ -147,7 +147,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
             *justCreated = true;
     }
 
-    auto newDb = std::make_unique<DatabaseImpl>(dbname, ++_epoch);
+    auto newDb = std::make_unique<DatabaseImpl>(dbname);
     newDb->init(opCtx);
 
     // Finally replace our nullptr entry with the new Database pointer.

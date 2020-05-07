@@ -576,6 +576,15 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), newNss);
 }
 
+// Re-opening the catalog should increment the CollectionCatalog's epoch.
+TEST_F(CollectionCatalogTest, CollectionCatalogEpoch) {
+    auto originalEpoch = catalog.getEpoch();
+    catalog.onCloseCatalog(&opCtx);
+    catalog.onOpenCatalog(&opCtx);
+    auto incrementedEpoch = catalog.getEpoch();
+    ASSERT_EQ(originalEpoch + 1, incrementedEpoch);
+}
+
 DEATH_TEST_F(CollectionCatalogResourceTest, AddInvalidResourceType, "invariant") {
     auto rid = ResourceId(RESOURCE_GLOBAL, 0);
     catalog.addResource(rid, "");

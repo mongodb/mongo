@@ -172,19 +172,6 @@ public:
      * DropPendingCollectionReaper to clean up eventually.
      */
     virtual void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const = 0;
-
-    /**
-     * A database is assigned a new epoch whenever it is closed and re-opened. This involves
-     * deleting and reallocating a new Database object, so the epoch for a particular Database
-     * instance is immutable.
-     *
-     * Callers of this method must hold the global lock in at least MODE_IS.
-     *
-     * This allows callers which drop and reacquire locks to detect an intervening database close.
-     * For example, closing a database must kill all active queries against the database. This is
-     * implemented by checking that the epoch has not changed during query yield recovery.
-     */
-    virtual uint64_t epoch() const = 0;
 };
 
 }  // namespace mongo

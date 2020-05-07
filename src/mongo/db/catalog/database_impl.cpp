@@ -129,9 +129,8 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
     return Status::OK();
 }
 
-DatabaseImpl::DatabaseImpl(const StringData name, uint64_t epoch)
+DatabaseImpl::DatabaseImpl(const StringData name)
     : _name(name.toString()),
-      _epoch(epoch),
       _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()) {
     auto durableViewCatalog = std::make_unique<DurableViewCatalogImpl>(this);
     auto viewCatalog = std::make_unique<ViewCatalog>(std::move(durableViewCatalog));

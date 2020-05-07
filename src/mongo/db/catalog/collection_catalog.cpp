@@ -249,6 +249,11 @@ void CollectionCatalog::onOpenCatalog(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lock(_catalogLock);
     invariant(_shadowCatalog);
     _shadowCatalog.reset();
+    ++_epoch;
+}
+
+uint64_t CollectionCatalog::getEpoch() const {
+    return _epoch;
 }
 
 Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,

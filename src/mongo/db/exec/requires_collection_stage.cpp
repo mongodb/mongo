@@ -31,8 +31,6 @@
 
 #include "mongo/db/exec/requires_collection_stage.h"
 
-#include "mongo/db/catalog/collection_catalog.h"
-
 namespace mongo {
 
 template <typename CollectionT>
@@ -72,8 +70,8 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     invariant(_collection);
 
     uassert(ErrorCodes::QueryPlanKilled,
-            str::stream() << "Database epoch changed due to a database-level event.",
-            getDatabaseEpoch(_collection) == _databaseEpoch);
+            str::stream() << "The catalog was closed and reopened",
+            getCatalogEpoch() == _catalogEpoch);
 
     doRestoreStateRequiresCollection();
 }

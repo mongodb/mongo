@@ -35,7 +35,7 @@ namespace mongo {
 
 class DatabaseImpl final : public Database {
 public:
-    explicit DatabaseImpl(StringData name, uint64_t epoch);
+    explicit DatabaseImpl(StringData name);
 
     void init(OperationContext*) const final;
 
@@ -132,10 +132,6 @@ public:
         return CollectionCatalog::get(opCtx).end();
     }
 
-    uint64_t epoch() const {
-        return _epoch;
-    }
-
 private:
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection.
@@ -162,8 +158,6 @@ private:
                                 Collection* collection) const;
 
     const std::string _name;  // "dbname"
-
-    const uint64_t _epoch;
 
     const NamespaceString _viewsName;  // "dbname.system.views"
 
