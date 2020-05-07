@@ -20,7 +20,7 @@
     </Property>
 
     <Condition Message="MongoDB application is only supported on Windows 10/Windows 2016 or later">
-        <![CDATA[Installed OR (WINDOWSBUILDNUM >= 10)]]>
+        <![CDATA[Installed OR WINDOWSBUILDNUM]]>
     </Condition>
 
     <WixVariable Id="InstallFolder" Value="$(var.MongoDBMajorVersion)"/>
