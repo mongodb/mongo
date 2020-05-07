@@ -2925,6 +2925,21 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
 
     int syncSourceIndex = oqMetadata.getSyncSourceIndex();
 
+    // Change sync source if chaining is disabled, we are not syncing from the primary, and we know
+    // who the new primary is. We do not consider chaining disabled if we are the primary, since
+    // we are in catchup mode.
+    auto chainingDisabled = !_rsConfig.isChainingAllowed() && _currentPrimaryIndex != _selfIndex;
+    auto foundNewPrimary = _currentPrimaryIndex != -1 && _currentPrimaryIndex != currentSourceIndex;
+    if (!replMetadata.getIsPrimary() && chainingDisabled && foundNewPrimary) {
+        auto newPrimary = _rsConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort();
+        LOGV2(3962100,
+              "Choosing new sync source because chaining is disabled and we are aware of a new "
+              "primary",
+              "syncSource"_attr = currentSource,
+              "newPrimary"_attr = newPrimary);
+        return true;
+    }
+
     // Change sync source if they are not ahead of us, and don't have a sync source,
     // unless they are primary.
     if (syncSourceIndex == -1 && currentSourceOpTime <= lastOpTimeFetched &&
