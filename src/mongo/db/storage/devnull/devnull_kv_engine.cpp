@@ -33,7 +33,6 @@
 
 #include <memory>
 
-#include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -242,15 +241,6 @@ std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(Operation
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
     OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
     return std::make_unique<DevNullSortedDataInterface>();
-}
-
-bool DevNullKVEngine::isCacheUnderPressure(OperationContext* opCtx) const {
-    return (_cachePressureForTest >= snapshotWindowParams.cachePressureThreshold.load());
-}
-
-void DevNullKVEngine::setCachePressureForTest(int pressure) {
-    invariant(pressure >= 0 && pressure <= 100);
-    _cachePressureForTest = pressure;
 }
 
 namespace {

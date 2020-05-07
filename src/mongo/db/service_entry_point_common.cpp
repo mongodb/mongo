@@ -76,7 +76,6 @@
 #include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -1228,20 +1227,7 @@ void execCommandDatabase(OperationContext* opCtx,
             throw;
         }
     } catch (const DBException& e) {
-        if (e.code() == ErrorCodes::SnapshotTooOld) {
-            // SnapshotTooOld errors should never be thrown unless we are using a storage engine
-            // that supports snapshot read concern.
-            auto engine = opCtx->getServiceContext()->getStorageEngine();
-            invariant(engine && engine->supportsReadConcernSnapshot());
-
-            // SnapshotTooOld errors indicate that PIT ops are failing to find an available
-            // snapshot at their specified atClusterTime. Therefore, we'll try to increase the
-            // snapshot history window that the storage engine maintains in order to increase
-            // the likelihood of successful future PIT atClusterTime requests.
-            snapshotWindowParams.snapshotTooOldErrorCount.addAndFetch(1);
-        } else {
-            behaviors.handleException(e, opCtx);
-        }
+        behaviors.handleException(e, opCtx);
 
         // Append the error labels for transient transaction errors.
         auto response = extraFieldsBuilder.asTempObj();

@@ -138,10 +138,7 @@ public:
     void setOldestTimestamp(Timestamp timestamp) final {}
     void setOldestActiveTransactionTimestampCallback(
         OldestActiveTransactionTimestampCallback callback) final {}
-    bool isCacheUnderPressure(OperationContext* opCtx) const final {
-        return false;
-    }
-    void setCachePressureForTest(int pressure) final {}
+
     StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx) final {
         return ReconcileResult{};

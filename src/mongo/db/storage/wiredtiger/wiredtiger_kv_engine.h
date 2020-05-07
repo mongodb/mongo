@@ -273,8 +273,6 @@ public:
 
     bool supportsOplogStones() const final override;
 
-    bool isCacheUnderPressure(OperationContext* opCtx) const override;
-
     bool supportsReadConcernMajority() const final;
 
     // wiredtiger specific

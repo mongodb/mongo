@@ -356,18 +356,6 @@ public:
     virtual void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {}
 
     /**
-     * See `StorageEngine::isCacheUnderPressure()`
-     */
-    virtual bool isCacheUnderPressure(OperationContext* opCtx) const {
-        return false;
-    }
-
-    /**
-     * See 'StorageEngine::setCachePressureForTest()'
-     */
-    virtual void setCachePressureForTest(int pressure) {}
-
-    /**
      * See `StorageEngine::supportsRecoverToStableTimestamp`
      */
     virtual bool supportsRecoverToStableTimestamp() const {

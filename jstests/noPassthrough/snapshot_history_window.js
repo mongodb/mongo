@@ -60,5 +60,11 @@ assert.commandFailedWithCode(
         {find: collName, readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}),
     ErrorCodes.SnapshotTooOld);
 
+// Test that the SnapshotTooOld is recorded in serverStatus.
+const serverStatusWT = assert.commandWorked(primaryDB.adminCommand({serverStatus: 1})).wiredTiger;
+assert.eq(1,
+          serverStatusWT["snapshot-window-settings"]["total number of SnapshotTooOld errors"],
+          tojson(serverStatusWT));
+
 replSet.stopSet();
 })();

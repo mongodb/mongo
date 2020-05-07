@@ -28,8 +28,6 @@
 
 global:
   cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/snapshot_window_options.h"
 
 imports:
   - "mongo/idl/basic_types.idl"
@@ -38,13 +36,7 @@ server_parameters:
   minSnapshotHistoryWindowInSeconds:
     description: "Minimum snapshot history to keep, in seconds"
     set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.minSnapshotHistoryWindowInSeconds"
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: minSnapshotHistoryWindowInSeconds
+    default: 5
     validator: { gte: 0 }
-
-  cachePressureThreshold:
-    description: "Cache pressure threshold"
-    set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.cachePressureThreshold"
-    validator:
-      gte: 0
-      lte: 100

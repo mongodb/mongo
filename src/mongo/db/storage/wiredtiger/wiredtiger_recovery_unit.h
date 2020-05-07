@@ -51,6 +51,8 @@ namespace mongo {
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
 using RoundUpReadTimestamp = WiredTigerBeginTxnBlock::RoundUpReadTimestamp;
 
+extern AtomicWord<std::int64_t> snapshotTooOldErrorCount;
+
 class BSONObjBuilder;
 
 class WiredTigerOperationStats final : public StorageStats {

@@ -517,21 +517,6 @@ public:
     virtual void setOldestActiveTransactionTimestampCallback(
         OldestActiveTransactionTimestampCallback callback) = 0;
 
-    /**
-     * Indicates whether the storage engine cache is under pressure.
-     *
-     * Retrieves a cache pressure value in the range [0, 100] from the storage engine, and compares
-     * it against storageGlobalParams.cachePressureThreshold, a dynamic server parameter, to
-     * determine whether cache pressure is too high.
-     */
-    virtual bool isCacheUnderPressure(OperationContext* opCtx) const = 0;
-
-    /**
-     * For unit tests only. Sets the cache pressure value with which isCacheUnderPressure()
-     * evalutates to 'pressure'.
-     */
-    virtual void setCachePressureForTest(int pressure) = 0;
-
     struct IndexIdentifier {
         const RecordId catalogId;
         const NamespaceString nss;

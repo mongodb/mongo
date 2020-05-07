@@ -133,10 +133,6 @@ public:
     virtual void setOldestActiveTransactionTimestampCallback(
         StorageEngine::OldestActiveTransactionTimestampCallback) override;
 
-    virtual bool isCacheUnderPressure(OperationContext* opCtx) const override;
-
-    virtual void setCachePressureForTest(int pressure) override;
-
     virtual bool supportsRecoverToStableTimestamp() const override;
 
     virtual bool supportsRecoveryTimestamp() const override;

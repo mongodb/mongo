@@ -97,10 +97,6 @@ public:
         return true;
     }
 
-    virtual bool isCacheUnderPressure(OperationContext* opCtx) const override;
-
-    virtual void setCachePressureForTest(int pressure) override;
-
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) {
         return 1;
     }

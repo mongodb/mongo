@@ -36,7 +36,6 @@
 #include <memory>
 
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
@@ -47,10 +46,6 @@ namespace biggie {
 
 mongo::RecoveryUnit* KVEngine::newRecoveryUnit() {
     return new RecoveryUnit(this, nullptr);
-}
-
-void KVEngine::setCachePressureForTest(int pressure) {
-    // TODO : implement.
 }
 
 Status KVEngine::createRecordStore(OperationContext* opCtx,

@@ -783,14 +783,6 @@ void StorageEngineImpl::setOldestActiveTransactionTimestampCallback(
     _engine->setOldestActiveTransactionTimestampCallback(callback);
 }
 
-bool StorageEngineImpl::isCacheUnderPressure(OperationContext* opCtx) const {
-    return _engine->isCacheUnderPressure(opCtx);
-}
-
-void StorageEngineImpl::setCachePressureForTest(int pressure) {
-    return _engine->setCachePressureForTest(pressure);
-}
-
 bool StorageEngineImpl::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }

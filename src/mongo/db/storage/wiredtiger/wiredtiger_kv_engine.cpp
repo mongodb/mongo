@@ -69,7 +69,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/snapshot_window_options.h"
+#include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
@@ -681,7 +681,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         // We do not maintain any snapshot history for the ephemeral storage engine in production
         // because replication and sharded transactions do not currently run on the inMemory engine.
         // It is live in testing, however.
-        snapshotWindowParams.minSnapshotHistoryWindowInSeconds.store(0);
+        minSnapshotHistoryWindowInSeconds.store(0);
     }
 
     _sizeStorerUri = _uri("sizeStorer");
@@ -2017,20 +2017,20 @@ Timestamp WiredTigerKVEngine::_calculateHistoryLagFromStableTimestamp(Timestamp 
 
     if (_ephemeral && !getTestCommandsEnabled()) {
         // No history should be maintained for the inMemory engine because it is not used yet.
-        invariant(snapshotWindowParams.minSnapshotHistoryWindowInSeconds.load() == 0);
+        invariant(minSnapshotHistoryWindowInSeconds.load() == 0);
     }
 
     if (stableTimestamp.getSecs() <
-        static_cast<unsigned>(snapshotWindowParams.minSnapshotHistoryWindowInSeconds.load())) {
+        static_cast<unsigned>(minSnapshotHistoryWindowInSeconds.load())) {
         // The history window is larger than the timestamp history thus far. We must wait for
         // the history to reach the window size before moving oldest_timestamp forward. This should
         // only happen in unit tests.
         return Timestamp();
     }
 
-    Timestamp calculatedOldestTimestamp(
-        stableTimestamp.getSecs() - snapshotWindowParams.minSnapshotHistoryWindowInSeconds.load(),
-        stableTimestamp.getInc());
+    Timestamp calculatedOldestTimestamp(stableTimestamp.getSecs() -
+                                            minSnapshotHistoryWindowInSeconds.load(),
+                                        stableTimestamp.getInc());
 
     if (calculatedOldestTimestamp.asULL() <= _oldestTimestamp.load()) {
         // The stable_timestamp is not far enough ahead of the oldest_timestamp for the
@@ -2283,16 +2283,6 @@ void WiredTigerKVEngine::haltOplogManager() {
     if (_oplogManagerCount == 0) {
         _oplogManager->haltVisibilityThread();
     }
-}
-
-bool WiredTigerKVEngine::isCacheUnderPressure(OperationContext* opCtx) const {
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
-    invariant(session);
-
-    int64_t score = uassertStatusOK(WiredTigerUtil::getStatisticsValue(
-        session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_SCORE));
-
-    return (score >= snapshotWindowParams.cachePressureThreshold.load());
 }
 
 Timestamp WiredTigerKVEngine::getStableTimestamp() const {

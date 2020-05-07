@@ -263,48 +263,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
     ASSERT_TRUE(rs->findRecord(opCtx1, rid3, &unused));
 }
 
-TEST_F(WiredTigerRecoveryUnitTestFixture, CreateAndCheckForCachePressure) {
-    int time = 1;
-
-    // Reconfigure the size of the cache to be very small so that building cache pressure is fast.
-    WiredTigerKVEngine* engine = harnessHelper->getEngine();
-    std::string cacheSizeReconfig = "cache_size=1MB";
-    ASSERT_EQ(engine->reconfigure(cacheSizeReconfig.c_str()), 0);
-
-    OperationContext* opCtx = clientAndCtx1.second.get();
-    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "a.b"));
-
-    // Insert one document so that we can then update it in a loop to create cache pressure.
-    // Note: inserts will not create cache pressure.
-    WriteUnitOfWork wu(opCtx);
-    ASSERT_OK(ru1->setTimestamp(Timestamp(time++)));
-    std::string str = str::stream() << "foobarbaz";
-    StatusWith<RecordId> ress = rs->insertRecord(opCtx, str.c_str(), str.size() + 1, Timestamp());
-    ASSERT_OK(ress.getStatus());
-    auto recordId = ress.getValue();
-    wu.commit();
-
-    for (int j = 0; j < 1000; ++j) {
-        // Once we hit the cache pressure threshold, i.e. have successfully created cache pressure
-        // that is detectable, we are done.
-        if (engine->isCacheUnderPressure(opCtx)) {
-            invariant(j != 0);
-            break;
-        }
-
-        try {
-            WriteUnitOfWork wuow(opCtx);
-            ASSERT_OK(ru1->setTimestamp(Timestamp(time++)));
-            std::string s = str::stream()
-                << "abcbcdcdedefefgfghghihijijkjklklmlmnmnomopopqpqrqrsrststutuv" << j;
-            ASSERT_OK(rs->updateRecord(opCtx, recordId, s.c_str(), s.size() + 1));
-            wuow.commit();
-        } catch (const DBException& ex) {
-            invariant(ex.toStatus().code() == ErrorCodes::WriteConflict);
-        }
-    }
-}
-
 TEST_F(WiredTigerRecoveryUnitTestFixture,
        LocalReadOnADocumentBeingPreparedWithoutIgnoringPreparedTriggersPrepareConflict) {
     // Prepare but don't commit a transaction

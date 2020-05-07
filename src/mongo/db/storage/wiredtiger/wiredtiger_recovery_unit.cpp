@@ -58,6 +58,8 @@ MONGO_FAIL_POINT_DEFINE(doUntimestampedWritesForIdempotencyTests);
 
 }  // namespace
 
+AtomicWord<std::int64_t> snapshotTooOldErrorCount{0};
+
 using Section = WiredTigerOperationStats::Section;
 
 std::map<int, std::pair<StringData, Section>> WiredTigerOperationStats::_statNameMap = {
@@ -531,6 +533,9 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
 
             if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
+                // SnapshotTooOld errors indicate that PIT ops are failing to find an available
+                // snapshot at their specified atClusterTime.
+                snapshotTooOldErrorCount.addAndFetch(1);
                 uasserted(ErrorCodes::SnapshotTooOld,
                           str::stream() << "Read timestamp " << _readAtTimestamp.toString()
                                         << " is older than the oldest available timestamp.");
