@@ -119,6 +119,8 @@ MONGO_FAIL_POINT_DEFINE(forceSyncSourceRetryWaitForInitialSync);
 MONGO_FAIL_POINT_DEFINE(waitForIsMasterResponse);
 // Will cause an isMaster request to hang as it starts waiting.
 MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
+// Will cause an isMaster request to hang after it times out waiting for a topology change.
+MONGO_FAIL_POINT_DEFINE(hangAfterWaitingForTopologyChangeTimesOut);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 // Skip sending heartbeats to pre-check that a quorum is available before a reconfig.
 MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
@@ -212,6 +214,9 @@ StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
         return e.toStatus();
     }
 }
+
+const Status kQuiesceModeShutdownStatus =
+    Status(ErrorCodes::ShutdownInProgress, "The server is in quiesce mode and will shut down");
 
 }  // namespace
 
@@ -2129,6 +2134,9 @@ void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
 
 std::shared_ptr<IsMasterResponse> ReplicationCoordinatorImpl::_makeIsMasterResponse(
     boost::optional<StringData> horizonString, WithLock lock, const bool hasValidConfig) const {
+    uassert(
+        kQuiesceModeShutdownStatus.code(), kQuiesceModeShutdownStatus.reason(), !_inQuiesceMode);
+
     if (!hasValidConfig) {
         auto response = std::make_shared<IsMasterResponse>();
         response->setTopologyVersion(_topCoord->getTopologyVersion());
@@ -2170,9 +2178,8 @@ ReplicationCoordinatorImpl::_getIsMasterResponseFuture(
     boost::optional<StringData> horizonString,
     boost::optional<TopologyVersion> clientTopologyVersion) {
 
-    uassert(ErrorCodes::ShutdownInProgress,
-            "The server is in quiesce mode and will shut down",
-            !_inQuiesceMode);
+    uassert(
+        kQuiesceModeShutdownStatus.code(), kQuiesceModeShutdownStatus.reason(), !_inQuiesceMode);
 
     const bool hasValidConfig = horizonString != boost::none;
 
@@ -2286,6 +2293,11 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     auto statusWithIsMaster =
         futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
     auto status = statusWithIsMaster.getStatus();
+
+    if (MONGO_unlikely(hangAfterWaitingForTopologyChangeTimesOut.shouldFail())) {
+        LOGV2(4783200, "Hanging due to hangAfterWaitingForTopologyChangeTimesOut failpoint");
+        hangAfterWaitingForTopologyChangeTimesOut.pauseWhileSet(opCtx);
+    }
 
     if (status == ErrorCodes::ExceededTimeLimit) {
         // Return an IsMasterResponse with the current topology version on timeout when waiting for
@@ -3909,8 +3921,7 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
          iter != _horizonToTopologyChangePromiseMap.end();
          iter++) {
         if (_inQuiesceMode) {
-            iter->second->setError({ErrorCodes::ShutdownInProgress,
-                                    "The server is in quiesce mode and will shut down"});
+            iter->second->setError(kQuiesceModeShutdownStatus);
         } else {
             StringData horizonString = iter->first;
             auto response = _makeIsMasterResponse(horizonString, lock, hasValidConfig);
