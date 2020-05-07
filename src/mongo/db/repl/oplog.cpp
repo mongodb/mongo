@@ -727,8 +727,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"createIndexes",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           const auto& cmd = entry.getObject();
-          if (OplogApplication::Mode::kApplyOpsCmd == mode &&
-              IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
+          if (OplogApplication::Mode::kApplyOpsCmd == mode) {
               return {ErrorCodes::CommandNotSupported,
                       "The createIndexes operation is not supported in applyOps mode"};
           }
@@ -754,10 +753,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           if (OplogApplication::Mode::kApplyOpsCmd == mode) {
               return {ErrorCodes::CommandNotSupported,
                       "The startIndexBuild operation is not supported in applyOps mode"};
-          }
-
-          if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
-              return Status::OK();
           }
 
           auto swOplogEntry = IndexBuildOplogEntry::parse(entry);

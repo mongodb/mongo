@@ -312,7 +312,6 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx;
     repl::ReplicationCoordinatorMock* _replCoord = nullptr;
     OpObserverMock* _opObserver = nullptr;
-    bool _supportsTwoPhaseIndexBuild = false;
     NamespaceString _sourceNss;
     NamespaceString _targetNss;
     NamespaceString _targetNssDifferentDb;
@@ -351,9 +350,6 @@ void RenameCollectionTest::setUp() {
     _opObserver = mockObserver.get();
     opObserver->addObserver(std::move(mockObserver));
     service->setOpObserver(std::move(opObserver));
-
-    // Cache two phase index build support setting.
-    _supportsTwoPhaseIndexBuild = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild();
 
     _sourceNss = NamespaceString("test.foo");
     _targetNss = NamespaceString("test.bar");

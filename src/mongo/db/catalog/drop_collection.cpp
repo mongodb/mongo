@@ -307,14 +307,6 @@ Status dropCollection(OperationContext* opCtx,
                 if (!coll) {
                     return _dropView(opCtx, db, collectionName, result);
                 }
-
-                // Only abort in-progress index builds if two phase index builds are supported.
-                bool supportsTwoPhaseIndexBuild =
-                    IndexBuildsCoordinator::get(opCtx)->supportsTwoPhaseIndexBuild();
-                if (!supportsTwoPhaseIndexBuild) {
-                    return _dropCollection(
-                        opCtx, db, collectionName, {}, systemCollectionMode, result);
-                }
             }
 
             return _abortIndexBuildsAndDropCollection(

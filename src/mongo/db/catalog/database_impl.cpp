@@ -537,25 +537,6 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
 
-    // Renaming a collection under the same database name is permitted for two-phase index builds.
-    if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
-        invariant(
-            !collToRename->getIndexCatalog()->haveAnyIndexesInProgress(),
-            str::stream() << "cannot perform operation: an index build is currently running for "
-                             "collection "
-                          << fromNss);
-
-        Collection* toColl =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
-        if (toColl) {
-            invariant(!toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
-                      str::stream()
-                          << "cannot perform operation: an index build is currently running for "
-                             "collection "
-                          << toNss);
-        }
-    }
-
     LOGV2(20319,
           "renameCollection: renaming collection {collToRename_uuid} from {fromNss} to {toNss}",
           "renameCollection: renaming collection",

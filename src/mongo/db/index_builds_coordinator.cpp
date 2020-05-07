@@ -357,10 +357,6 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
     invariant(_allIndexBuilds.empty());
 }
 
-bool IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() {
-    return true;
-}
-
 std::vector<std::string> IndexBuildsCoordinator::extractIndexNames(
     const std::vector<BSONObj>& specs) {
     std::vector<std::string> indexNames;

@@ -121,12 +121,6 @@ public:
                                          const std::vector<BSONObj>& indexSpecs);
 
     /**
-     * Returns true if two phase index builds are supported.
-     * This is determined by the current FCV.
-     */
-    static bool supportsTwoPhaseIndexBuild();
-
-    /**
      * Returns index names listed from the index specs list "specs".
      */
     static std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs);

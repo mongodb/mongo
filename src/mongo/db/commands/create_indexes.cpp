@@ -487,10 +487,9 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    auto protocol = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() &&
-            !replCoord->isOplogDisabledFor(opCtx, ns)
-        ? IndexBuildProtocol::kTwoPhase
-        : IndexBuildProtocol::kSinglePhase;
+    // Two phase index builds are designed to improve the availability of indexes in a replica set.
+    auto protocol = !replCoord->isOplogDisabledFor(opCtx, ns) ? IndexBuildProtocol::kTwoPhase
+                                                              : IndexBuildProtocol::kSinglePhase;
     auto commitQuorum = parseAndGetCommitQuorum(opCtx, protocol, cmdObj);
 
     Status validateTTL = validateTTLOptions(opCtx, cmdObj);

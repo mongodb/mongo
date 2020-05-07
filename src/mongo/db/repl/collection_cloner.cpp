@@ -168,7 +168,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
-    const bool includeBuildUUIDs = IndexBuildsCoordinator::supportsTwoPhaseIndexBuild();
+    const bool includeBuildUUIDs = true;
     auto indexSpecs =
         getClient()->getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, QueryOption_SlaveOk);
     if (indexSpecs.empty()) {
@@ -207,13 +207,6 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::createCollectionStage() {
-    if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
-        // Single phase index builds should have an empty '_unfinishedIndexSpecs' vector because in
-        // the 'listIndexesStage', we only populate '_unfinishedIndexSpecs' if a buildUUID is
-        // present. A buildUUID is only present for two phase index builds.
-        invariant(_unfinishedIndexSpecs.empty());
-    }
-
     auto collectionBulkLoader = getStorageInterface()->createCollectionForBulkLoading(
         _sourceNss, _collectionOptions, _idIndexSpec, _readyIndexSpecs);
     uassertStatusOK(collectionBulkLoader.getStatus());
@@ -231,7 +224,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::queryStage() {
 }
 
 BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinishedIndexesStage() {
-    if (!IndexBuildsCoordinator::supportsTwoPhaseIndexBuild() || _unfinishedIndexSpecs.empty()) {
+    if (_unfinishedIndexSpecs.empty()) {
         return kContinueNormally;
     }
 

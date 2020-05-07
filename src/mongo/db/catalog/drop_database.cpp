@@ -425,18 +425,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
 }  // namespace
 
 Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
-    // Only allow aborting index builds if two-phase index builds are enabled.
-    bool abortIndexBuilds = true;
-    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    if (!indexBuildsCoord->supportsTwoPhaseIndexBuild()) {
-        LOGV2_DEBUG(4612301,
-                    2,
-                    "dropDatabase - not aborting in-progress index builds because two phase index "
-                    "builds are disabled",
-                    "dbName"_attr = dbName);
-        abortIndexBuilds = false;
-    }
-
+    const bool abortIndexBuilds = true;
     return _dropDatabase(opCtx, dbName, abortIndexBuilds);
 }
 
