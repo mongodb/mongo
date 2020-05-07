@@ -558,6 +558,10 @@ bool ReplicationCoordinatorMock::setContainsArbiter() const {
     return false;
 }
 
+bool ReplicationCoordinatorMock::replSetContainsNewlyAddedMembers() const {
+    return false;
+}
+
 void ReplicationCoordinatorMock::attemptToAdvanceStableTimestamp() {
     return;
 }

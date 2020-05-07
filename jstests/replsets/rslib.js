@@ -21,6 +21,7 @@ var isConfigCommitted;
 var waitForConfigReplication;
 var assertSameConfigContent;
 var isMemberNewlyAdded;
+var replConfigHasNewlyAddedMembers;
 var waitForNewlyAddedRemovalForNodeToBeCommitted;
 var assertVoteCount;
 
@@ -720,6 +721,10 @@ assertSameConfigContent = function(configA, configB) {
     configB.term = termB;
 };
 
+/**
+ * @param memberIndex is optional. If not provided, then it will return true even if
+ * a single member in the replSet config has "newlyAdded" field.
+ */
 isMemberNewlyAdded = function(node, memberIndex, force = false) {
     // The in-memory config will not include the 'newlyAdded' field, so we must consult the on-disk
     // version. However, the in-memory config is updated after the config is persisted to disk, so
@@ -751,12 +756,34 @@ isMemberNewlyAdded = function(node, memberIndex, force = false) {
             ", on-disk: " + tojsononeline(configOnDisk));
     }
 
-    const memberConfigOnDisk = configOnDisk.members[memberIndex];
-    if (memberConfigOnDisk.hasOwnProperty("newlyAdded")) {
-        assert(memberConfigOnDisk["newlyAdded"] === true, () => tojson(configOnDisk));
-        return true;
+    const allMembers = (memberIndex === undefined);
+    assert(allMembers || (memberIndex >= 0 && memberIndex < configOnDisk.members.length),
+           "memberIndex should be between 0 and " + (configOnDisk.members.length - 1) +
+               ", but memberIndex is " + memberIndex);
+
+    var hasNewlyAdded = (index) => {
+        const memberConfigOnDisk = configOnDisk.members[index];
+        if (memberConfigOnDisk.hasOwnProperty("newlyAdded")) {
+            assert(memberConfigOnDisk["newlyAdded"] === true, () => tojson(configOnDisk));
+            return true;
+        }
+        return false;
+    };
+
+    if (allMembers) {
+        for (let i = 0; i < configOnDisk.members.length; i++) {
+            if (hasNewlyAdded(i))
+                return true;
+        }
+        return false;
     }
-    return false;
+
+    return hasNewlyAdded(memberIndex);
+};
+
+// Returns true if at least one member in the repl set config contains "newlyAdded" field.
+replConfigHasNewlyAddedMembers = function(conn) {
+    return isMemberNewlyAdded(conn);
 };
 
 waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex, force = false) {

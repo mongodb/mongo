@@ -486,6 +486,12 @@ public:
     bool containsArbiter() const;
 
     /**
+     * Returns true if this replica set has at least one member with 'newlyAdded'
+     * field set to true.
+     */
+    bool containsNewlyAddedMembers() const;
+
+    /**
      * Returns a mutable (but not directly usable) copy of the config.
      */
     MutableReplSetConfig getMutable() const;

@@ -265,6 +265,8 @@ public:
 
     bool setContainsArbiter() const override;
 
+    bool replSetContainsNewlyAddedMembers() const override;
+
     void attemptToAdvanceStableTimestamp() override;
 
     void finishRecoveryIfEligible(OperationContext* opCtx) override;

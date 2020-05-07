@@ -52,6 +52,7 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
@@ -129,6 +130,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterReconfigOnDrainComplete);
 MONGO_FAIL_POINT_DEFINE(doNotRemoveNewlyAddedOnHeartbeats);
 // Will hang right after setting the currentOp info associated with an automatic reconfig.
 MONGO_FAIL_POINT_DEFINE(hangDuringAutomaticReconfig);
+// Make reconfig command hang before validating new config.
+MONGO_FAIL_POINT_DEFINE(ReconfigHangBeforeConfigValidationCheck);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -3169,6 +3172,19 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
     return Status::OK();
 }
 
+bool ReplicationCoordinatorImpl::_supportsAutomaticReconfig() const {
+    if (!enableAutomaticReconfig) {
+        return false;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
+        return false;
+    }
+
+    return true;
+}
+
 Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCtx,
                                                           const ReplSetReconfigArgs& args,
                                                           BSONObjBuilder* resultObj) {
@@ -3221,58 +3237,56 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
             newConfig = ReplSetConfig(std::move(newMutableConfig));
         }
 
-        if (enableAutomaticReconfig) {
-            boost::optional<MutableReplSetConfig> newMutableConfig;
+        boost::optional<MutableReplSetConfig> newMutableConfig;
 
-            // Set the 'newlyAdded' field to true for all new voting nodes.
-            for (int i = 0; i < newConfig.getNumMembers(); i++) {
-                const auto newMem = newConfig.getMemberAt(i);
+        // Set the 'newlyAdded' field to true for all new voting nodes.
+        for (int i = 0; i < newConfig.getNumMembers(); i++) {
+            const auto newMem = newConfig.getMemberAt(i);
 
-                // In a reconfig, the 'newlyAdded' flag should never already be set for
-                // this member. If it is set, throw an error.
-                if (newMem.isNewlyAdded()) {
-                    str::stream errmsg;
-                    errmsg << "Cannot provide " << MemberConfig::kNewlyAddedFieldName
-                           << " field to member config during reconfig.";
-                    LOGV2_ERROR(
-                        4634900,
-                        "Initializing 'newlyAdded' field to member has failed with bad status.",
-                        "errmsg"_attr = std::string(errmsg));
-                    return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
-                }
-
-                // We should never set the 'newlyAdded' field for arbiters, or during force
-                // reconfigs.
-                if (newMem.isArbiter() || args.force) {
-                    continue;
-                }
-                const auto newMemId = newMem.getId();
-                const auto oldMem = oldConfig.findMemberByID(newMemId.getData());
-
-                const bool isNewVotingMember = (oldMem == nullptr && newMem.isVoter());
-                const bool isCurrentlyNewlyAdded = (oldMem != nullptr && oldMem->isNewlyAdded());
-
-                // Append the 'newlyAdded' field if the node:
-                // 1) Is a new, voting node
-                // 2) Already has a 'newlyAdded' field in the old config
-                if (isNewVotingMember || isCurrentlyNewlyAdded) {
-                    if (!newMutableConfig) {
-                        newMutableConfig = newConfig.getMutable();
-                    }
-                    newMutableConfig->addNewlyAddedFieldForMember(newMemId);
-                }
+            // In a reconfig, the 'newlyAdded' flag should never already be set for
+            // this member. If it is set, throw an error.
+            if (newMem.isNewlyAdded()) {
+                str::stream errmsg;
+                errmsg << "Cannot provide " << MemberConfig::kNewlyAddedFieldName
+                       << " field to member config during reconfig.";
+                LOGV2_ERROR(4634900,
+                            "Initializing 'newlyAdded' field to member has failed with bad status.",
+                            "errmsg"_attr = std::string(errmsg));
+                return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
             }
 
-            if (newMutableConfig) {
-                newConfig = ReplSetConfig(*std::move(newMutableConfig));
-                LOGV2(4634400,
-                      "Appended the 'newlyAdded' field to a node in the new config. Nodes with "
-                      "the 'newlyAdded' field will be considered to have 'votes:0'. Upon "
-                      "transition to SECONDARY, this field will be automatically removed.",
-                      "newConfigObj"_attr = newConfig.toBSON(),
-                      "userProvidedConfig"_attr = args.newConfigObj,
-                      "oldConfig"_attr = oldConfig.toBSON());
+            // We should never set the 'newlyAdded' field for arbiters, or when automatic reconfig
+            // is disabled, or during force reconfigs.
+            if (newMem.isArbiter() || !_supportsAutomaticReconfig() || args.force) {
+                continue;
             }
+
+            const auto newMemId = newMem.getId();
+            const auto oldMem = oldConfig.findMemberByID(newMemId.getData());
+
+            const bool isNewVotingMember = (oldMem == nullptr && newMem.isVoter());
+            const bool isCurrentlyNewlyAdded = (oldMem != nullptr && oldMem->isNewlyAdded());
+
+            // Append the 'newlyAdded' field if the node:
+            // 1) Is a new, voting node
+            // 2) Already has a 'newlyAdded' field in the old config
+            if (isNewVotingMember || isCurrentlyNewlyAdded) {
+                if (!newMutableConfig) {
+                    newMutableConfig = newConfig.getMutable();
+                }
+                newMutableConfig->addNewlyAddedFieldForMember(newMemId);
+            }
+        }
+
+        if (newMutableConfig) {
+            newConfig = ReplSetConfig(*std::move(newMutableConfig));
+            LOGV2(4634400,
+                  "Appended the 'newlyAdded' field to a node in the new config. Nodes with "
+                  "the 'newlyAdded' field will be considered to have 'votes:0'. Upon "
+                  "transition to SECONDARY, this field will be automatically removed.",
+                  "newConfigObj"_attr = newConfig.toBSON(),
+                  "userProvidedConfig"_attr = args.newConfigObj,
+                  "oldConfig"_attr = oldConfig.toBSON());
         }
 
         return newConfig;
@@ -3378,6 +3392,12 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     int myIndex = _selfIndex;
     lk.unlock();
 
+    // Automatic reconfig ("newlyAdded" field in repl config) is supported only from FCV4.6+.
+    // So, acquire FCV mutex lock in shared mode to block writers from modifying the fcv document
+    // to make sure fcv is not changed between getNewConfig() and storing the new config
+    // document locally.
+    FixedFCVRegion fixedFcvRegion(opCtx);
+
     // Call the callback to get the new config given the old one.
     auto newConfigStatus = getNewConfig(oldConfig, topCoordTerm);
     Status status = newConfigStatus.getStatus();
@@ -3397,6 +3417,47 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
                     "error"_attr = validateStatus,
                     "newConfig"_attr = newConfigObj);
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, validateStatus.reason());
+    }
+
+    // Since at this point, we have validated the new config, we are assuming the new config follows
+    // the safe reconfig rules.
+    auto needsFcvLock = [&]() -> bool {
+        int oldVoters = 0, newVoters = 0;
+        bool oldHasNewlyAdded = false, newHasNewlyAdded = false;
+
+        std::for_each(oldConfig.membersBegin(), oldConfig.membersEnd(), [&](const MemberConfig& m) {
+            if (m.isVoter())
+                oldVoters++;
+            oldHasNewlyAdded = oldHasNewlyAdded || m.isNewlyAdded();
+        });
+        std::for_each(newConfig.membersBegin(), newConfig.membersEnd(), [&](const MemberConfig& m) {
+            if (m.isVoter())
+                newVoters++;
+            newHasNewlyAdded = newHasNewlyAdded || m.isNewlyAdded();
+        });
+
+        // It's illegal for the new config to contain "newlyAdded" field when automatic reconfig is
+        // disabled. If the primary receives a new config with 'newlyAdded' field via
+        // replSetReconfig command, then the primary should have already uasserted earlier in
+        // getNewConfig().
+        invariant(_supportsAutomaticReconfig() || !newHasNewlyAdded);
+
+        return (!oldHasNewlyAdded && newHasNewlyAdded) || (newVoters > oldVoters);
+    };
+
+    // We need to take fcv lock only for 2 cases:
+    // 1) For fcv 4.4, addition of new voter nodes.
+    // 2) For fcv 4.6+, only if the current config doesn't contain the 'newlyAdded' field but the
+    // new config got mutated to append 'newlyAdded' field.
+    if (force || !needsFcvLock()) {
+        fixedFcvRegion.release();
+    }
+
+    if (MONGO_unlikely(ReconfigHangBeforeConfigValidationCheck.shouldFail())) {
+        LOGV2(4637900,
+              "ReconfigHangBeforeConfigValidationCheck fail point "
+              "enabled. Blocking until fail point is disabled.");
+        ReconfigHangBeforeConfigValidationCheck.pauseWhileSet(opCtx);
     }
 
     // Make sure we can find ourselves in the config. If the config contents have not changed, then
@@ -5504,6 +5565,11 @@ int64_t ReplicationCoordinatorImpl::_nextRandomInt64_inlock(int64_t limit) {
 bool ReplicationCoordinatorImpl::setContainsArbiter() const {
     stdx::lock_guard<Latch> lock(_mutex);
     return _rsConfig.containsArbiter();
+}
+
+bool ReplicationCoordinatorImpl::replSetContainsNewlyAddedMembers() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.containsNewlyAddedMembers();
 }
 
 void ReplicationCoordinatorImpl::ReadWriteAbility::setCanAcceptNonLocalWrites(

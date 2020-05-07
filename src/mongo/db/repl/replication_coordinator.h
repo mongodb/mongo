@@ -941,6 +941,12 @@ public:
     virtual bool setContainsArbiter() const = 0;
 
     /**
+     * Returns true if the current replica set config has at least one member with 'newlyAdded'
+     * field set to true.
+     */
+    virtual bool replSetContainsNewlyAddedMembers() const = 0;
+
+    /**
      * Instructs the ReplicationCoordinator to recalculate the stable timestamp and advance it for
      * storage if needed.
      */

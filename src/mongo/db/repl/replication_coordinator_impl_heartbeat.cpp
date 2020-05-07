@@ -285,38 +285,45 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         _wakeReadyWaiters(lk);
     }
 
-    if (enableAutomaticReconfig) {
-        // When receiving a heartbeat response indicating that the remote is in a state past
-        // STARTUP_2, the primary will initiate a reconfig to remove the 'newlyAdded' field for that
-        // node (if present). This field is normally set when we add new members with votes:1 to the
-        // set.
-        if (_getMemberState_inlock().primary() && hbStatusResponse.isOK() &&
-            hbStatusResponse.getValue().hasState()) {
-            auto remoteState = hbStatusResponse.getValue().getState();
-            if (remoteState == MemberState::RS_SECONDARY ||
-                remoteState == MemberState::RS_RECOVERING ||
-                remoteState == MemberState::RS_ROLLBACK) {
-                const auto mem = _rsConfig.getMemberAt(targetIndex);
-                const auto memId = mem.getId();
-                if (mem.isNewlyAdded()) {
-                    auto status = _replExecutor->scheduleWork(
-                        [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                            _reconfigToRemoveNewlyAddedField(
-                                cbData, memId, _rsConfig.getConfigVersionAndTerm());
-                        });
+    // When receiving a heartbeat response indicating that the remote is in a state past
+    // STARTUP_2, the primary will initiate a reconfig to remove the 'newlyAdded' field for that
+    // node (if present). This field is normally set when we add new members with votes:1 to the
+    // set.
+    if (_getMemberState_inlock().primary() && hbStatusResponse.isOK() &&
+        hbStatusResponse.getValue().hasState()) {
+        auto remoteState = hbStatusResponse.getValue().getState();
+        if (remoteState == MemberState::RS_SECONDARY || remoteState == MemberState::RS_RECOVERING ||
+            remoteState == MemberState::RS_ROLLBACK) {
+            const auto mem = _rsConfig.findMemberByHostAndPort(target);
+            if (mem && mem->isNewlyAdded()) {
+                // 'NewlyAdded' field can only exist if automatic reconfig is supported, with the
+                // exception of upgrading/downgrading fcv document. And, it's safe to have that
+                // exception because a node can't downgrade the binary version until its FCV
+                // document is fully downgraded. So, its impossible for a node with downgraded
+                // binaries to have on-disk repl config with 'newlyAdded' fields.
+                invariant(
+                    _supportsAutomaticReconfig() ||
+                    serverGlobalParams.featureCompatibility.getVersion() >
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44);
 
-                    if (!status.isOK()) {
-                        LOGV2_DEBUG(4634500,
-                                    1,
-                                    "Failed to schedule work for removing 'newlyAdded' field.",
-                                    "memberId"_attr = memId.getData(),
-                                    "error"_attr = status.getStatus());
-                    } else {
-                        LOGV2_DEBUG(4634501,
-                                    1,
-                                    "Scheduled automatic reconfig to remove 'newlyAdded' field.",
-                                    "memberId"_attr = memId.getData());
-                    }
+                const auto memId = mem->getId();
+                auto status = _replExecutor->scheduleWork(
+                    [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                        _reconfigToRemoveNewlyAddedField(
+                            cbData, memId, _rsConfig.getConfigVersionAndTerm());
+                    });
+
+                if (!status.isOK()) {
+                    LOGV2_DEBUG(4634500,
+                                1,
+                                "Failed to schedule work for removing 'newlyAdded' field.",
+                                "memberId"_attr = memId.getData(),
+                                "error"_attr = status.getStatus());
+                } else {
+                    LOGV2_DEBUG(4634501,
+                                1,
+                                "Scheduled automatic reconfig to remove 'newlyAdded' field.",
+                                "memberId"_attr = memId.getData());
                 }
             }
         }
