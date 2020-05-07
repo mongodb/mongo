@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load('jstests/libs/fail_point_util.js');
+
 const testName = "change_sync_source_in_initial_sync";
 const dbName = testName;
 

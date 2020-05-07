@@ -8,6 +8,7 @@
 
 load("jstests/sharding/libs/shard_versioning_util.js");
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load("jstests/libs/fail_point_util.js");
 
 const st = new ShardingTest({mongos: 2, shards: 2});
 const dbName = jsTestName();

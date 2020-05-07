@@ -19,6 +19,7 @@ load("jstests/libs/parallel_shell_helpers.js");
 load('jstests/libs/test_background_ops.js');
 load("jstests/replsets/rslib.js");
 load('jstests/aggregation/extras/utils.js');
+load("jstests/libs/fail_point_util.js");
 
 let rst = new ReplSetTest({nodes: 4, useBridge: true});
 rst.startSet();

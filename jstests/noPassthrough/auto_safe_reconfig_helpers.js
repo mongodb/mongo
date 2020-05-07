@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/replsets/rslib.js");
+
 // Make secondaries unelectable.
 const replTest =
     new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}]});

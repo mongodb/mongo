@@ -7,6 +7,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
 const dbName = "test";

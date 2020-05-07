@@ -11,6 +11,7 @@
 "use strict";
 
 load('jstests/replsets/rslib.js');
+load("jstests/libs/fail_point_util.js");
 
 const testName = jsTestName();
 const dbName = "testdb";

@@ -10,6 +10,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 'use strict';
 
 load('jstests/sharding/migration_coordinator_failover_include.js');
+load('jstests/replsets/rslib.js');
 
 const dbName = "test";
 

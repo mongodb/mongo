@@ -10,6 +10,8 @@
 
 (function() {
 
+load("jstests/libs/fail_point_util.js");
+
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;

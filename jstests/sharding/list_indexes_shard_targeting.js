@@ -7,6 +7,7 @@
 "use strict";
 
 load("jstests/sharding/libs/shard_versioning_util.js");
+load("jstests/libs/fail_point_util.js");
 
 // This test makes shards have inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;

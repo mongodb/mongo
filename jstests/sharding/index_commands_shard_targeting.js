@@ -11,6 +11,7 @@ load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/libs/sharded_index_util.js");
 load("jstests/sharding/libs/shard_versioning_util.js");
+load("jstests/libs/parallelTester.js");  // For Thread.
 
 // Test deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;

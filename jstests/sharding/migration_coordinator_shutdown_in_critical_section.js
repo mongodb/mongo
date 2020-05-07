@@ -13,6 +13,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 
 load('jstests/libs/parallel_shell_helpers.js');
+load('jstests/libs/fail_point_util.js');
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == 'undefined') {

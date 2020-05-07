@@ -3,6 +3,8 @@
 (function() {
 'use strict';
 
+load('jstests/replsets/rslib.js');
+
 // Checking index consistency involves talking to the primary config server which is blackholed from
 // the mongos in this test.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;

@@ -20,6 +20,7 @@
 load('jstests/noPassthrough/libs/index_build.js');
 load("jstests/replsets/rslib.js");
 load("jstests/core/txns/libs/prepare_helpers.js");
+load("jstests/libs/fail_point_util.js");
 
 (function() {
 

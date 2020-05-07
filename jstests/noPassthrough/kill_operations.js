@@ -4,6 +4,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/parallelTester.js");  // For Thread.
+
 const kDbName = "kill_operations";
 const kCollName = "test";
 const kNumDocs = 10;

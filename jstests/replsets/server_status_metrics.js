@@ -14,6 +14,7 @@
 "use strict";
 
 load("jstests/libs/write_concern_util.js");
+load("jstests/libs/fail_point_util.js");
 
 /**
  * Test replication metrics

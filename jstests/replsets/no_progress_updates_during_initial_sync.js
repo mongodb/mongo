@@ -10,6 +10,7 @@
 "use strict";
 
 load("jstests/libs/write_concern_util.js");
+load("jstests/libs/fail_point_util.js");
 
 const testName = jsTestName();
 const rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}]});

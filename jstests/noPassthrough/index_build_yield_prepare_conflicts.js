@@ -10,6 +10,7 @@
  */
 load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.
 load("jstests/noPassthrough/libs/index_build.js");  // For IndexBuildTest
+load("jstests/libs/fail_point_util.js");
 
 (function() {
 

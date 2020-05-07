@@ -16,6 +16,7 @@
 (function() {
 "use strict";
 load("jstests/replsets/rslib.js");
+load('jstests/libs/fail_point_util.js');
 
 const rst = new ReplSetTest({
     name: jsTestName(),

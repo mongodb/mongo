@@ -6,6 +6,7 @@
 "use strict";
 
 load("jstests/libs/uuid_util.js");
+load("jstests/libs/fail_point_util.js");
 
 const dbName = "test";
 const collName = "foo";

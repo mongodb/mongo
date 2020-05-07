@@ -7,6 +7,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
+load('jstests/replsets/rslib.js');
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 

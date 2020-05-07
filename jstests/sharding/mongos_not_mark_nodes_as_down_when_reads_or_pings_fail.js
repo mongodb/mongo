@@ -5,6 +5,7 @@
 'use strict';
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/replsets/rslib.js");
 
 /*
  * Configures failCommand to force the given command to fail with the given error code when run
