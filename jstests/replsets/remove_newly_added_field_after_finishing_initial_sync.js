@@ -102,11 +102,14 @@ assert.commandWorked(primaryColl.insert({a: 3}, {writeConcern: {w: "majority"}})
 
 // Only two nodes are needed for an election (0 and 1).
 assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
+assert.eq(rst.getPrimary(), rst.nodes[1]);
+waitForConfigReplication(rst.nodes[1], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);
 
 // Reset node 0 to be primary.
 rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
 assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
 assert.eq(rst.getPrimary(), rst.nodes[0]);
+waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);
 
 // Initial syncing nodes do not acknowledge replication.
 rst.nodes[1].disconnect(rst.nodes);
@@ -154,11 +157,14 @@ assert.commandWorked(primaryColl.insert({a: 6}, {writeConcern: {w: "majority"}})
 
 // Only two nodes are needed for an election (0 and 1).
 assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
+assert.eq(rst.getPrimary(), rst.nodes[1]);
+waitForConfigReplication(rst.nodes[1], [rst.nodes[0], rst.nodes[1]]);
 
 // Reset node 0 to be primary.
 rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
 assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
 assert.eq(rst.getPrimary(), rst.nodes[0]);
+waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1]]);
 
 // 'newlyAdded' nodes cannot be one of the two nodes to satisfy w:majority.
 rst.nodes[3].reconnect(rst.nodes);
@@ -215,11 +221,14 @@ rst.nodes[2].disconnect(rst.nodes);
 
 // Only three nodes are needed for an election (0, 1, and 3).
 assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
+assert.eq(rst.getPrimary(), rst.nodes[1]);
+waitForConfigReplication(rst.nodes[1], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);
 
 // Reset node 0 to be primary.
 rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
 assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
 assert.eq(rst.getPrimary(), rst.nodes[0]);
+waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);
 
 // 3 nodes are needed for a w:majority write.
 rst.nodes[3].disconnect(rst.nodes);
