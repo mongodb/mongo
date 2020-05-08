@@ -76,14 +76,12 @@ bool TopologyManager::onServerDescription(const IsMasterOutcome& isMasterOutcome
 
     boost::optional<IsMasterRTT> lastRTT;
     boost::optional<TopologyVersion> lastTopologyVersion;
-    boost::optional<int> lastPoolResetCounter;
 
     const auto& lastServerDescription =
         _topologyDescription->findServerByAddress(isMasterOutcome.getServer());
     if (lastServerDescription) {
         lastRTT = (*lastServerDescription)->getRtt();
         lastTopologyVersion = (*lastServerDescription)->getTopologyVersion();
-        lastPoolResetCounter = (*lastServerDescription)->getPoolResetCounter();
     }
 
     boost::optional<TopologyVersion> newTopologyVersion = isMasterOutcome.getTopologyVersion();
@@ -99,14 +97,8 @@ bool TopologyManager::onServerDescription(const IsMasterOutcome& isMasterOutcome
         return false;
     }
 
-    boost::optional<int> poolResetCounter = lastPoolResetCounter;
-    if (!isMasterOutcome.isSuccess() && lastPoolResetCounter) {
-        // Bump the poolResetCounter on error if we have one established already.
-        poolResetCounter = ++lastPoolResetCounter.get();
-    }
-
     auto newServerDescription = std::make_shared<ServerDescription>(
-        _clockSource, isMasterOutcome, lastRTT, newTopologyVersion, poolResetCounter);
+        _clockSource, isMasterOutcome, lastRTT, newTopologyVersion);
 
     auto oldTopologyDescription = _topologyDescription;
     _topologyDescription = std::make_shared<TopologyDescription>(*oldTopologyDescription);

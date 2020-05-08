@@ -206,21 +206,6 @@ TEST(ServerDescriptionEqualityTest, ShouldCompareTopologyVersion) {
     ASSERT_EQUALS(a, a);
 }
 
-TEST(ServerDescriptionEqualityTest, ShouldCompareStreamable) {
-    auto a = *ServerDescriptionBuilder().withStreamable(true).instance();
-    // Default for _streamble is false.
-    auto b = *ServerDescriptionBuilder().instance();
-    ASSERT_NOT_EQUALS(a, b);
-    ASSERT_EQUALS(a, a);
-}
-
-TEST(ServerDescriptionEqualityTest, ShouldComparePoolResetCounter) {
-    auto a = *ServerDescriptionBuilder().withPoolResetCounter(1).instance();
-    auto b = *ServerDescriptionBuilder().withPoolResetCounter(2).instance();
-    ASSERT_NOT_EQUALS(a, b);
-    ASSERT_EQUALS(a, a);
-}
-
 class ServerDescriptionTestFixture : public SdamTestFixture {
 protected:
     // returns a set containing the elements in the given bson array with lowercase values.
@@ -298,7 +283,6 @@ protected:
         okBuilder().append("logicalSessionTimeoutMinutes", 1).obj();
     static inline const auto kTopologyVersion =
         okBuilder().append("topologyVersion", TopologyVersion(OID::max(), 0).toBSON()).obj();
-    static inline const auto kStreamable = okBuilder().append("streamable", true).obj();
 };
 
 TEST_F(ServerDescriptionTestFixture, ShouldParseTypeAsUnknownForIsMasterError) {
@@ -505,30 +489,11 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreTopologyVersion) {
         TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
                                kTopologyVersion.getObjectField("topologyVersion"));
 
-    auto description = ServerDescription(clockSource,
-                                         response,
-                                         boost::none /*lastRtt*/,
-                                         topologyVersion,
-                                         boost::none /*poolResetCounter*/);
+    auto description =
+        ServerDescription(clockSource, response, boost::none /*lastRtt*/, topologyVersion);
     ASSERT_EQUALS(topologyVersion.getProcessId(), description.getTopologyVersion()->getProcessId());
     ASSERT_EQUALS(topologyVersion.getCounter(), description.getTopologyVersion()->getCounter());
 }
-
-TEST_F(ServerDescriptionTestFixture, ShouldStoreStreamable) {
-    auto response = IsMasterOutcome(
-        HostAndPort("foo:1234"), kStreamable, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
-    auto description = ServerDescription(clockSource, response);
-    ASSERT_EQUALS(true, description.isStreamable());
-}
-
-TEST_F(ServerDescriptionTestFixture, ShouldStorePoolResetCounter) {
-    auto response = IsMasterOutcome(
-        HostAndPort("foo:1234"), kStreamable, duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
-    auto description = ServerDescription(
-        clockSource, response, boost::none /*lastRtt*/, boost::none /*topologyVersion*/, 1);
-    ASSERT_EQUALS(1, description.getPoolResetCounter());
-}
-
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreServerAddressOnError) {
     auto response = IsMasterOutcome(HostAndPort("foo:1234"), kTopologyVersion, "an error occurred");
@@ -554,8 +519,6 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreCorrectDefaultValuesOnSuccess) {
     ASSERT_EQUALS(boost::none, description.getPrimary());
     ASSERT_EQUALS(boost::none, description.getLogicalSessionTimeoutMinutes());
     ASSERT(boost::none == description.getTopologyVersion());
-    ASSERT_EQUALS(false, description.isStreamable());
-    ASSERT_EQUALS(0, description.getPoolResetCounter());
 }
 
 
@@ -576,7 +539,5 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreCorrectDefaultValuesOnFailure) {
     ASSERT_EQUALS(boost::none, description.getPrimary());
     ASSERT_EQUALS(boost::none, description.getLogicalSessionTimeoutMinutes());
     ASSERT(boost::none == description.getTopologyVersion());
-    ASSERT_EQUALS(false, description.isStreamable());
-    ASSERT_EQUALS(0, description.getPoolResetCounter());
 }
 };  // namespace mongo::sdam

@@ -54,8 +54,7 @@ std::set<ServerType> kDataServerTypes{
 ServerDescription::ServerDescription(ClockSource* clockSource,
                                      const IsMasterOutcome& isMasterOutcome,
                                      boost::optional<IsMasterRTT> lastRtt,
-                                     boost::optional<TopologyVersion> topologyVersion,
-                                     boost::optional<int> poolResetCounter)
+                                     boost::optional<TopologyVersion> topologyVersion)
     : ServerDescription(isMasterOutcome.getServer()) {
     if (isMasterOutcome.isSuccess()) {
         const auto response = *isMasterOutcome.getResponse();
@@ -73,7 +72,6 @@ ServerDescription::ServerDescription(ClockSource* clockSource,
         saveHosts(response);
         saveTags(response.getObjectField("tags"));
         saveElectionId(response.getField("electionId"));
-        saveStreamable(response.getField("streamable"));
 
         auto lsTimeoutField = response.getField("logicalSessionTimeoutMinutes");
         if (lsTimeoutField.type() == BSONType::NumberInt) {
@@ -94,16 +92,9 @@ ServerDescription::ServerDescription(ClockSource* clockSource,
         if (primaryField.type() == BSONType::String) {
             _primary = HostAndPort(response.getStringField("primary"));
         }
-
-        if (poolResetCounter) {
-            _poolResetCounter = poolResetCounter.get();
-        }
     } else {
         _error = isMasterOutcome.getErrorMsg();
         _topologyVersion = topologyVersion;
-        if (poolResetCounter) {
-            _poolResetCounter = poolResetCounter.get();
-        }
     }
 }
 
@@ -149,15 +140,6 @@ void ServerDescription::saveElectionId(BSONElement electionId) {
     if (electionId.type() == jstOID) {
         _electionId = electionId.OID();
     }
-}
-
-void ServerDescription::saveStreamable(BSONElement streamableField) {
-    if (_type == ServerType::kUnknown) {
-        _streamable = false;
-        return;
-    }
-
-    _streamable = streamableField && streamableField.Bool();
 }
 
 void ServerDescription::calculateRtt(const boost::optional<IsMasterRTT> currentRtt,
@@ -311,14 +293,6 @@ const boost::optional<TopologyVersion>& ServerDescription::getTopologyVersion() 
     return _topologyVersion;
 }
 
-int ServerDescription::getPoolResetCounter() {
-    return _poolResetCounter;
-}
-
-bool ServerDescription::isStreamable() const {
-    return _streamable;
-}
-
 bool ServerDescription::isEquivalent(const ServerDescription& other) const {
     if (_topologyVersion && other._topologyVersion &&
         ((_topologyVersion->getProcessId() != other._topologyVersion->getProcessId()) ||
@@ -341,9 +315,7 @@ bool ServerDescription::isEquivalent(const ServerDescription& other) const {
                                 other._setVersion,
                                 other._electionId,
                                 other._primary,
-                                other._logicalSessionTimeoutMinutes,
-                                other._streamable,
-                                other._poolResetCounter);
+                                other._logicalSessionTimeoutMinutes);
     auto thisValues = std::tie(_type,
                                _minWireVersion,
                                _maxWireVersion,
@@ -356,9 +328,7 @@ bool ServerDescription::isEquivalent(const ServerDescription& other) const {
                                _setVersion,
                                _electionId,
                                _primary,
-                               _logicalSessionTimeoutMinutes,
-                               _streamable,
-                               _poolResetCounter);
+                               _logicalSessionTimeoutMinutes);
     return thisValues == otherValues;
 }
 
@@ -394,9 +364,6 @@ BSONObj ServerDescription::toBson() const {
 
     bson.append("minWireVersion", _minWireVersion);
     bson.append("maxWireVersion", _maxWireVersion);
-    bson.append("streamable", _streamable);
-    bson.append("poolResetCounter", _poolResetCounter);
-
 
     if (_me) {
         bson.append("me", (*_me).toString());

@@ -149,40 +149,5 @@ TEST_F(TopologyManagerTestFixture, ShouldNotUpdateServerDescriptionIfNewTopology
     ASSERT_BSONOBJ_EQ(newServerDescription->getTopologyVersion()->toBSON(),
                       kBsonTopologyVersionHigh.getObjectField("topologyVersion"));
 }
-
-TEST_F(TopologyManagerTestFixture, ShouldNowIncrementPoolResetCounterOnSuccess) {
-    auto config = SdamConfiguration(kOneServer);
-    TopologyManager topologyManager(config, clockSource);
-
-    auto topologyDescription = topologyManager.getTopologyDescription();
-    ASSERT_EQUALS(topologyDescription->getServers().size(), 1);
-    auto serverDescription = topologyDescription->getServers()[0];
-    ASSERT_EQUALS(serverDescription->getPoolResetCounter(), 0);
-
-    // If isMasterOutcome is successful, poolResetCounter should remain the same
-    IsMasterOutcome isMasterOutcome(serverDescription->getAddress(), kBsonOk);
-    topologyManager.onServerDescription(isMasterOutcome);
-    topologyDescription = topologyManager.getTopologyDescription();
-    auto newServerDescription = topologyDescription->getServers()[0];
-    ASSERT_EQUALS(newServerDescription->getPoolResetCounter(), 0);
-}
-
-TEST_F(TopologyManagerTestFixture, ShouldIncrementPoolResetCounterOnError) {
-    auto config = SdamConfiguration(kOneServer);
-    TopologyManager topologyManager(config, clockSource);
-
-    auto topologyDescription = topologyManager.getTopologyDescription();
-    ASSERT_EQUALS(topologyDescription->getServers().size(), 1);
-    auto serverDescription = topologyDescription->getServers()[0];
-    ASSERT_EQUALS(serverDescription->getPoolResetCounter(), 0);
-
-    // If isMasterOutcome is successful, poolResetCounter should remain the same
-    IsMasterOutcome isMasterOutcome(
-        serverDescription->getAddress(), kBsonTopologyVersionLow, "an error occurred");
-    topologyManager.onServerDescription(isMasterOutcome);
-    topologyDescription = topologyManager.getTopologyDescription();
-    auto newServerDescription = topologyDescription->getServers()[0];
-    ASSERT_EQUALS(newServerDescription->getPoolResetCounter(), 1);
-}
 };  // namespace sdam
 };  // namespace mongo
