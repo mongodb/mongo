@@ -227,7 +227,14 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
                                           const boost::optional<ChunkType>& controlChunk,
                                           StringData fromShard,
                                           StringData toShard) {
-    invariant(!isUpgradingOrDowngradingFCV());
+    // The _id format for chunk documents changed in 4.4, so during an upgrade or downgrade it is
+    // not known which format the chunks are currently in. Moving a chunk requires updating the
+    // associated chunk document by its _id, so migrations are disabled until the upgrade or
+    // downgrade completes.
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Chunks cannot be migrated while a feature compatibility version upgrade or downgrade "
+            "is in progress",
+            !isUpgradingOrDowngradingFCV());
 
     // Update migratedChunk's version and shard.
     BSONArrayBuilder updates;
