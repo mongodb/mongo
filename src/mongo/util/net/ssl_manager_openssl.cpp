@@ -693,7 +693,8 @@ StatusWith<std::vector<std::string>> addOCSPUrlToMap(
 }
 
 Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
-                                                OCSPRequestAndIDs& ocspRequestAndIDs) {
+                                                OCSPRequestAndIDs& ocspRequestAndIDs,
+                                                OCSPPurpose purpose) {
     auto& [ocspReq, certIDs] = ocspRequestAndIDs;
 
     // Decompose the OCSP request into a DER encoded OCSP request
@@ -711,7 +712,7 @@ Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
 
     // Query the OCSP responder
     return OCSPManager::get()
-        ->requestStatus(buffer, host)
+        ->requestStatus(buffer, host, purpose)
         .then([](std::vector<uint8_t> responseData) mutable -> StatusWith<UniqueOCSPResponse> {
             const uint8_t* respDataPtr = responseData.data();
 
@@ -824,7 +825,8 @@ StatusWith<std::pair<OCSPCertIDSet, Date_t>> parseAndValidateOCSPResponse(
 
 Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
                                            std::shared_ptr<STACK_OF(X509)> intermediateCerts,
-                                           OCSPValidationContext& ocspContext) {
+                                           OCSPValidationContext& ocspContext,
+                                           OCSPPurpose purpose) {
     auto& [ocspRequestMap, _, leafResponders] = ocspContext;
 
     struct OCSPCompletionState {
@@ -844,7 +846,8 @@ Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
 
     for (auto host : leafResponders) {
         auto& ocspRequestAndIDs = ocspRequestMap[host];
-        Future<UniqueOCSPResponse> futureResponse = retrieveOCSPResponse(host, ocspRequestAndIDs);
+        Future<UniqueOCSPResponse> futureResponse =
+            retrieveOCSPResponse(host, ocspRequestAndIDs, purpose);
         futureResponses.push_back(std::move(futureResponse));
     };
 
@@ -965,7 +968,9 @@ private:
         auto ocspContext = std::move(swOCSPContext.getValue());
 
         auto swResponse =
-            dispatchRequests(key.context, key.intermediateCerts, ocspContext).getNoThrow();
+            dispatchRequests(
+                key.context, key.intermediateCerts, ocspContext, OCSPPurpose::kClientVerify)
+                .getNoThrow();
         if (!swResponse.isOK()) {
             return boost::none;
         }
@@ -1753,7 +1758,8 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
 
         auto ocspContext = std::move(swOCSPContext.getValue());
 
-        return dispatchRequests(context, std::move(intermediateCerts), ocspContext)
+        return dispatchRequests(
+                   context, std::move(intermediateCerts), ocspContext, OCSPPurpose::kStaple)
             .onCompletion([](StatusWith<OCSPFetchResponse> swResponse) -> Milliseconds {
                 if (!swResponse.isOK()) {
                     LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");

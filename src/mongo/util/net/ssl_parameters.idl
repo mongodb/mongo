@@ -80,6 +80,27 @@ server_parameters:
     cpp_varname: "kOCSPValidationRefreshPeriodSecs"
     validator:
       gte: 1
+  tlsOCSPVerifyTimeoutSecs:
+    description: >-
+        How long the http client should wait before timing out
+        when fetching OCSP Responses for peer certificate
+    set_at: startup
+    cpp_vartype: int
+    default: 5
+    cpp_varname: "gTLSOCSPVerifyTimeoutSecs"
+    validator:
+      gte: 1
+  tlsOCSPStaplingTimeoutSecs:
+    description: >-
+        How long the http client should wait before timing out
+        when fetching OCSP Responses for stapling. If not set,
+        value is taken  from tlsClientOCSPTimeoutSecs
+    set_at: startup
+    cpp_vartype: int
+    default: -1
+    cpp_varname: "gTLSOCSPStaplingTimeoutSecs"
+    validator:
+      gte: 1
 
   opensslCipherConfig:
     description: "Cipher configuration string for OpenSSL based TLS connections"
