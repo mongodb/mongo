@@ -1,10 +1,16 @@
-// Confirms that blocking sorts are covered when the index contains the sort key.
-// For example, if we have an index on {a:1, b:1} and a sort on {b:1}, and a projection of only
-// field 'b', we can sort using only the existing index keys, without needing to do a fetch.
-
-// Queries on a sharded collection can't be covered when they aren't on the shard key. The document
-// must be fetched to support the SHARDING_FILTER stage.
-// @tags: [assumes_unsharded_collection]
+/**
+ * Confirms that blocking sorts are covered when the index contains the sort key. For example, if we
+ * have an index on {a:1, b:1} and a sort on {b:1}, and a projection of only field 'b', we can sort
+ * using only the existing index keys, without needing to do a fetch.
+ *
+ * Queries on a sharded collection can't be covered when they aren't on the shard key. The document
+ * must be fetched to support the SHARDING_FILTER stage.
+ * @tags: [
+ *  assumes_unsharded_collection,
+ *  # Sort optimizations added for hashed indexes in 4.6 can generate a different plan.
+ *  requires_fcv_46
+ * ]
+ */
 (function() {
 "use strict";
 
