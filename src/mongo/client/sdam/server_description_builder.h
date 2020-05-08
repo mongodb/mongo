@@ -56,12 +56,10 @@ public:
     ServerDescriptionBuilder& withError(const std::string& error);
     ServerDescriptionBuilder& withLogicalSessionTimeoutMinutes(
         const boost::optional<int> logicalSessionTimeoutMinutes);
-    ServerDescriptionBuilder& withPoolResetCounter(int poolResetCounter);
 
     // server capabilities
     ServerDescriptionBuilder& withMinWireVersion(int minVersion);
     ServerDescriptionBuilder& withMaxWireVersion(int maxVersion);
-    ServerDescriptionBuilder& withStreamable(bool isStreamable);
 
     // server 'time'
     ServerDescriptionBuilder& withLastWriteDate(const Date_t& lastWriteDate);

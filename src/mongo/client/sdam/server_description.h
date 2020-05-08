@@ -60,8 +60,7 @@ public:
     ServerDescription(ClockSource* clockSource,
                       const IsMasterOutcome& isMasterOutcome,
                       boost::optional<IsMasterRTT> lastRtt = boost::none,
-                      boost::optional<TopologyVersion> topologyVersion = boost::none,
-                      boost::optional<int> poolResetCounter = boost::none);
+                      boost::optional<TopologyVersion> topologyVersion = boost::none);
 
     /**
      * This determines if a server description is equivalent according to the Server Discovery and
@@ -82,13 +81,11 @@ public:
     const boost::optional<std::string>& getError() const;
     const boost::optional<IsMasterRTT>& getRtt() const;
     const boost::optional<int>& getLogicalSessionTimeoutMinutes() const;
-    int getPoolResetCounter();
 
     // server capabilities
     int getMinWireVersion() const;
     int getMaxWireVersion() const;
     bool isDataBearingServer() const;
-    bool isStreamable() const;
 
     // server 'time'
     const Date_t getLastUpdateTime() const;
@@ -128,7 +125,6 @@ private:
     void saveTags(BSONObj tagsObj);
     void saveElectionId(BSONElement electionId);
     void saveTopologyVersion(BSONElement topologyVersionField);
-    void saveStreamable(BSONElement streamableField);
 
     static inline const std::string kIsDbGrid = "isdbgrid";
     static inline const double kRttAlpha = 0.2;
@@ -196,13 +192,6 @@ private:
 
     // (=) logicalSessionTimeoutMinutes: integer or null. Default null.
     boost::optional<int> _logicalSessionTimeoutMinutes;
-
-    // (=) streamable: whether this server can stream isMaster responses. Default false.
-    bool _streamable = false;
-
-    // (=) poolResetCounter: integer, default 0. Initialized when client first creates connection
-    // pool for server. Incremented on network error or timeout.
-    int _poolResetCounter = 0;
 
     // The topology description of that we are a part of. Since this is a weak_ptr, code that
     // accesses this variable should ensure that the TopologyDescription cannot be destroyed by

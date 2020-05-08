@@ -135,14 +135,4 @@ ServerDescriptionBuilder& ServerDescriptionBuilder::withTopologyVersion(
     _instance->_topologyVersion = topologyVersion;
     return *this;
 }
-
-ServerDescriptionBuilder& ServerDescriptionBuilder::withPoolResetCounter(int poolResetCounter) {
-    _instance->_poolResetCounter = poolResetCounter;
-    return *this;
-}
-
-ServerDescriptionBuilder& ServerDescriptionBuilder::withStreamable(bool isStreamable) {
-    _instance->_streamable = isStreamable;
-    return *this;
-}
 };  // namespace mongo::sdam
