@@ -13,6 +13,8 @@
 (function() {
 'use strict';
 
+db.foo.drop();
+
 assert.commandWorked(db.foo.createIndex({a: 1}));
 let validation = assert.commandWorked(db.foo.validate({background: true}));
 jsTestLog({validation: validation});
