@@ -22,9 +22,18 @@ class WaitForReplication(interface.Hook):
         """Run mongo shell to call replSetTest.awaitReplication()."""
         start_time = time.time()
         client_conn = self.fixture.get_driver_connection_url()
-        js_cmds = "conn = '{}'; rst = new ReplSetTest(conn); rst.awaitReplication();".format(
-            client_conn)
-        shell_options = {"nodb": "", "eval": js_cmds}
+        js_cmds = """
+            conn = '{}';
+            try {{
+                rst = new ReplSetTest(conn);
+                rst.awaitReplication();
+            }} catch (e) {{
+                if (e.code === ErrorCodes.InterruptedAtShutdown || e.code === ErrorCodes.ShutdownInProgress) {{
+                    jsTestLog("Ignoring shutdown error: " + tojson(e));
+                }}
+                throw e;
+            }}"""
+        shell_options = {"nodb": "", "eval": js_cmds.format(client_conn)}
         shell_proc = core.programs.mongo_shell_program(self.hook_logger, **shell_options)
         shell_proc.start()
         return_code = shell_proc.wait()
