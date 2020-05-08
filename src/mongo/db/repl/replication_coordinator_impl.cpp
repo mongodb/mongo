@@ -3337,6 +3337,14 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     }
     auto topCoordTerm = _topCoord->getTerm();
 
+    if (!force) {
+        // For safety of reconfig, since we must commit a config in our own term before executing a
+        // reconfig, so we should never have a config in an older term. If the current config was
+        // installed via a force reconfig, we aren't concerned about this safety guarantee.
+        invariant(_rsConfig.getConfigTerm() == OpTime::kUninitializedTerm ||
+                  _rsConfig.getConfigTerm() == topCoordTerm);
+    }
+
     auto configWriteConcern = _getConfigReplicationWriteConcern();
     // Construct a fake OpTime that can be accepted but isn't used.
     OpTime fakeOpTime(Timestamp(1, 1), topCoordTerm);
@@ -5157,18 +5165,27 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
         }
     } else if (result.isOK() &&
                response->getConfigVersionAndTerm() < args.getConfigVersionAndTerm()) {
+        logv2::DynamicAttributes attr;
+        attr.add("configTerm", args.getConfigTerm());
+        attr.add("configVersion", args.getConfigVersion());
+        attr.add("senderHost", senderHost);
+
+        // If we are currently in drain mode, we won't allow installing newer configs, so we don't
+        // schedule a heartbeat to fetch one. We do allow force reconfigs to proceed even if we are
+        // in drain mode.
+        if (_memberState.primary() && !_readWriteAbility->canAcceptNonLocalWrites(lk) &&
+            args.getConfigTerm() != OpTime::kUninitializedTerm) {
+            LOGV2(4794901,
+                  "Not scheduling a heartbeat to fetch a newer config since we are in PRIMARY "
+                  "state but cannot accept writes yet.",
+                  attr);
+        }
         // Schedule a heartbeat to the sender to fetch the new config.
         // Only send this if the sender's config is newer.
         // We cannot cancel the enqueued heartbeat, but either this one or the enqueued heartbeat
         // will trigger reconfig, which cancels and reschedules all heartbeats.
-        if (args.hasSender()) {
-            LOGV2(21401,
-                  "Scheduling heartbeat to fetch a newer config with term {configTerm} and "
-                  "version {configVersion} from member: {senderHost}",
-                  "Scheduling heartbeat to fetch a newer config",
-                  "configTerm"_attr = args.getConfigTerm(),
-                  "configVersion"_attr = args.getConfigVersion(),
-                  "senderHost"_attr = senderHost);
+        else if (args.hasSender()) {
+            LOGV2(21401, "Scheduling heartbeat to fetch a newer config", attr);
             int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
             _scheduleHeartbeatToTarget_inlock(senderHost, senderIndex, now);
         }

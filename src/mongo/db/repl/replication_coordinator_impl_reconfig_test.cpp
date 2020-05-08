@@ -2037,6 +2037,204 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigShouldThrowIfArbiterNodesHaveNewlyAdd
                   getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
 }
 
+TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kReplication,
+                                                              logv2::LogSeverity::Debug(2)};
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_EQUALS(getReplCoord()->getTerm(), 0);
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+
+    // Win election but don't exit drain mode.
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    const auto opCtx = makeOperationContext();
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
+
+    // Receive a heartbeat that should NOT schedule a new heartbeat to fetch a newer config.
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto rsConfig = getReplCoord()->getConfig();
+    hbArgs.setConfigVersion(3);  // simulate a newer config version.
+    hbArgs.setConfigTerm(rsConfig.getConfigTerm());
+    hbArgs.setSetName(rsConfig.getReplSetName());
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setSenderId(2);
+    hbArgs.setTerm(0);
+    ASSERT(hbArgs.isInitialized());
+
+    ReplSetHeartbeatResponse response;
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+
+    // No requests should have been scheduled.
+    getNet()->enterNetwork();
+    ASSERT_FALSE(getNet()->hasReadyRequests());
+    getNet()->exitNetwork();
+
+    // Receive a heartbeat that schedules a new heartbeat to fetch a newer config. We simulate a
+    // newer config version and an uninitialized term, so that a heartbeat will be scheduled to
+    // fetch a new config. When we mock the heartbeat response below, we will respond with a
+    // non-force config, which is to test the case where the sending node installed a non force
+    // config after we scheduled a heartbeat to it to fetch a force config. For safety, the
+    // important aspect is that we don't accept/install configs during drain mode, even if we try to
+    // fetch them.
+    hbArgs.setConfigVersion(3);
+    hbArgs.setConfigTerm(OpTime::kUninitializedTerm);
+    hbArgs.setSetName(rsConfig.getReplSetName());
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setSenderId(2);
+    hbArgs.setTerm(0);
+    ASSERT(hbArgs.isInitialized());
+
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+
+    // Schedule a response with a newer config.
+    auto newerConfigVersion = 3;
+    auto newerConfig = BSON("_id"
+                            << "mySet"
+                            << "version" << newerConfigVersion << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345")));
+    auto net = getNet();
+    net->enterNetwork();
+    auto noi = net->getNextReadyRequest();
+    auto& request = noi->getRequest();
+
+    ReplSetHeartbeatArgsV1 args;
+    ASSERT_OK(args.initialize(request.cmdObj));
+
+    startCapturingLogMessages();
+    OpTime lastApplied(Timestamp(100, 1), 0);
+    ReplSetHeartbeatResponse hbResp;
+    ASSERT_OK(rsConfig.initialize(newerConfig));
+    hbResp.setConfig(rsConfig);
+    hbResp.setSetName(rsConfig.getReplSetName());
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    hbResp.setAppliedOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+    hbResp.setDurableOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+    stopCapturingLogMessages();
+
+    // Make sure the heartbeat reconfig has not been scheduled.
+    ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Not scheduling a heartbeat reconfig"));
+
+    // Let drain mode complete.
+    signalDrainComplete(opCtx.get());
+
+    // We should have moved to a new term in the election, and our config should have the same term.
+    ASSERT_EQUALS(getReplCoord()->getTerm(), 1);
+    ASSERT_EQUALS(getReplCoord()->getConfig().getConfigTerm(), 1);
+}
+
+TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithForceHeartbeatReconfig) {
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kReplication,
+                                                              logv2::LogSeverity::Debug(2)};
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "term" << 0 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_EQUALS(getReplCoord()->getTerm(), 0);
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+
+    // Win election but don't exit drain mode.
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    const auto opCtx = makeOperationContext();
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
+
+    // Receive a heartbeat that schedules a new heartbeat to fetch a newer config.
+    ReplSetHeartbeatArgsV1 hbArgs;
+    auto rsConfig = getReplCoord()->getConfig();
+    hbArgs.setConfigVersion(3);                        // simulate a newer config version.
+    hbArgs.setConfigTerm(OpTime::kUninitializedTerm);  // force config.
+    hbArgs.setSetName(rsConfig.getReplSetName());
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setSenderId(2);
+    hbArgs.setTerm(0);
+    ASSERT(hbArgs.isInitialized());
+
+    ReplSetHeartbeatResponse response;
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+
+    // Schedule a response with a newer config.
+    auto newerConfigVersion = 3;
+    auto newerConfig =
+        BSON("_id"
+             << "mySet"
+             << "version" << newerConfigVersion << "term" << OpTime::kUninitializedTerm << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "node1:12345")
+                           << BSON("_id" << 2 << "host"
+                                         << "node2:12345")));
+    auto net = getNet();
+    net->enterNetwork();
+    auto noi = net->getNextReadyRequest();
+    auto& request = noi->getRequest();
+
+    ReplSetHeartbeatArgsV1 args;
+    ASSERT_OK(args.initialize(request.cmdObj));
+
+    OpTime lastApplied(Timestamp(100, 1), 0);
+    ReplSetHeartbeatResponse hbResp;
+    ASSERT_OK(rsConfig.initialize(newerConfig));
+    hbResp.setConfig(rsConfig);
+    hbResp.setSetName(rsConfig.getReplSetName());
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    hbResp.setAppliedOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+    hbResp.setDurableOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
+    net->exitNetwork();
+
+    {
+        // Prevent the heartbeat reconfig from completing.
+        FailPointEnableBlock fpb("blockHeartbeatReconfigFinish");
+
+        // Let the heartbeat reconfig begin.
+        net->enterNetwork();
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        // For force reconfigs, we do allow them to proceed even if we are in drain mode, so make
+        // sure it is in progress, stuck at the failpoint before completion.
+        fpb->waitForTimesEntered(1);
+
+        // At this point the heartbeat reconfig should be in progress but blocked from completion by
+        // the failpoint. We now let drain mode complete. The step up reconfig should be interrupted
+        // by the in progress heartbeat reconfig.
+        signalDrainComplete(opCtx.get());
+    }
+
+    // The failpoint should be released now, allowing the heartbeat reconfig to complete. We run the
+    // clock forward so the re-scheduled heartbeat reconfig will complete.
+    net->enterNetwork();
+    net->runUntil(net->now() + Milliseconds(100));
+    net->exitNetwork();
+
+    // We should have moved to a new term in the election, but our config should have the term from
+    // the force config.
+    ASSERT_EQUALS(getReplCoord()->getTerm(), 1);
+    ASSERT_EQUALS(getReplCoord()->getConfig().getConfigTerm(), OpTime::kUninitializedTerm);
+}
+
 }  // anonymous namespace
 }  // namespace repl
 }  // namespace mongo

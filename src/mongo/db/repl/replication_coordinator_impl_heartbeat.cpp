@@ -356,7 +356,7 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
             break;
         case HeartbeatResponseAction::Reconfig:
             invariant(responseStatus.isOK());
-            _scheduleHeartbeatReconfig_inlock(responseStatus.getValue().getConfig());
+            _scheduleHeartbeatReconfig(lock, responseStatus.getValue().getConfig());
             break;
         case HeartbeatResponseAction::StepDownSelf:
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
@@ -530,7 +530,8 @@ bool ReplicationCoordinatorImpl::_shouldStepDownOnReconfig(WithLock,
         !(myIndex.isOK() && newConfig.getMemberAt(myIndex.getValue()).isElectable());
 }
 
-void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSetConfig& newConfig) {
+void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
+                                                            const ReplSetConfig& newConfig) {
     if (_inShutdown) {
         return;
     }
@@ -565,6 +566,17 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
                         "{_rsConfigState}; aborting.",
                         "Aborting reconfiguration request",
                         "_rsConfigState"_attr = int(_rsConfigState));
+    }
+
+    // Allow force reconfigs to proceed even if we are not a writable primary yet.
+    if (_memberState.primary() && !_readWriteAbility->canAcceptNonLocalWrites(lk) &&
+        newConfig.getConfigTerm() != OpTime::kUninitializedTerm) {
+        LOGV2_FOR_HEARTBEATS(
+            4794900,
+            1,
+            "Not scheduling a heartbeat reconfig since we are in PRIMARY state but "
+            "cannot accept writes yet.");
+        return;
     }
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||

@@ -1162,7 +1162,7 @@ private:
     /**
      * Schedules a replica set config change.
      */
-    void _scheduleHeartbeatReconfig_inlock(const ReplSetConfig& newConfig);
+    void _scheduleHeartbeatReconfig(WithLock lk, const ReplSetConfig& newConfig);
 
     /**
      * Method to write a configuration transmitted via heartbeat message to stable storage.
