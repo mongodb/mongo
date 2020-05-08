@@ -24,17 +24,17 @@ const pipeline = [mergeStage];
     let error = assert.throws(() => source.aggregate(pipeline));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     // Since there is no way to guarantee the ordering of the writes performed by $merge, it
-    // follows that the contents of the target collection will depend on when the document which
+    // follows that the contents of the target collection will depend on when the write which
     // triggers the MergeStageNoMatchingDocument error executes. As such, we test that the
     // target collection contains some combination of its original documents and expected
     // updates. In particular, it should be the case that each document has exactly one of field
     // 'a' or field 'b' and its value should equal that of '_id'.
-    let checkOutputDocument = function(elem) {
-        const hasA = elem.hasOwnProperty('a');
-        const hasB = elem.hasOwnProperty('b');
-        assert(hasA ^ hasB);
-        const value = hasA ? elem['a'] : elem['b'];
-        assert.eq(value, elem['_id'], elem);
+    let checkOutputDocument = function(document) {
+        const hasA = document.hasOwnProperty('a');
+        const hasB = document.hasOwnProperty('b');
+        assert(hasA ^ hasB, document);
+        const value = hasA ? document['a'] : document['b'];
+        assert.eq(value, document['_id'], document);
     };
 
     let result = target.find().toArray();

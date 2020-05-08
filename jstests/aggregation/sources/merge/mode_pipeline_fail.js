@@ -25,15 +25,37 @@ const pipeline = [mergeStage];
     assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 3, b: 3}]));
     let error = assert.throws(() => source.aggregate(pipeline));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, b: 1, x: 2}, {_id: 3, b: 3, x: 2}]});
+    // Since there is no way to guarantee the ordering of the writes performed by $merge, it
+    // follows that the contents of the target collection will depend on when the write which
+    // triggers the MergeStageNoMatchingDocument error executes. As such, we test that the
+    // target collection contains some combination of its original documents and expected
+    // updates. In particular, it should be the case that each document has fields '_id' and
+    // 'b', but may or not have field 'x'. Additionally, 'b' should have the same value as
+    // '_id' and if 'x' is present, it should be equal to 2.
+    let checkOutputDocument = function(document) {
+        const hasB = document.hasOwnProperty("b");
+        const hasX = document.hasOwnProperty("x");
+        assert(hasB, document);
+        const value = document["b"];
+        assert.eq(value, document['_id'], document);
+        if (hasX)
+            assert.eq(2, document['x'], document);
+    };
+
+    let result = target.find().toArray();
+    assert.eq(result.length, 2, result);
+    for (let elem of result) {
+        checkOutputDocument(elem);
+    }
 
     // Multiple documents without a match.
     assert(target.drop());
     assert.commandWorked(target.insert([{_id: 1, b: 1}]));
     error = assert.throws(() => source.aggregate(pipeline));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1, x: 2}]});
+    result = target.find().toArray();
+    assert.eq(result.length, 1, result);
+    checkOutputDocument(result[0]);
 })();
 
 // Test $merge when all documents in the source collection have a matching document in the
