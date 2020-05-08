@@ -752,7 +752,6 @@ StatusWith<std::pair<OCSPCertIDSet, Date_t>> iterateResponse(OCSP_BASICRESP* bas
             OCSP_CERTID_dup(const_cast<OCSP_CERTID*>(OCSP_SINGLERESP_get0_id(singleResp))));
 
         int reason;
-        // TODO SERVER-45798 the updated time will be implemented in the cache
         ASN1_GENERALIZEDTIME *revtime, *thisupd, *nextupd;
 
         auto status = OCSP_single_get0_status(singleResp, &reason, &revtime, &thisupd, &nextupd);
