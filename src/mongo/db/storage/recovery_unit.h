@@ -292,6 +292,14 @@ public:
     }
 
     /**
+     * Returns true if a commit timestamp has been assigned to writes in this transaction.
+     * Otherwise, returns false.
+     */
+    virtual bool isTimestamped() const {
+        return false;
+    }
+
+    /**
      * Sets a timestamp that will be assigned to all future writes on this RecoveryUnit until
      * clearCommitTimestamp() is called. This must be called either outside of a WUOW or on a
      * prepared transaction after setPrepareTimestamp() is called. setTimestamp() must not be called

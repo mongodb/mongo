@@ -353,6 +353,12 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
         // If the ticket wait is interrupted, restore the state of the client.
         auto restoreStateOnErrorGuard = makeGuard([&] { _clientState.store(kInactive); });
 
+        // Acquiring a ticket is a potentially blocking operation. This must not be called after a
+        // transaction timestamp has been set, indicating this transaction has created an oplog
+        // hole.
+        if (opCtx)
+            invariant(!opCtx->recoveryUnit()->isTimestamped());
+
         OperationContext* interruptible = _uninterruptibleLocksRequested ? nullptr : opCtx;
         if (deadline == Date_t::max()) {
             holder->waitForTicket(interruptible);
@@ -1002,6 +1008,10 @@ void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode
         // tracking whether other resources need to be released.
         _clientState.store(kQueuedWriter);
         auto restoreState = makeGuard([&] { _clientState.store(kInactive); });
+        // Acquiring a ticket is a potentially blocking operation. This must not be called after a
+        // transaction timestamp has been set, indicating this transaction has created an oplog
+        // hole.
+        invariant(!opCtx->recoveryUnit()->isTimestamped());
         ticketholder->getTicket(opCtx, &_flowControlStats);
     }
 }
