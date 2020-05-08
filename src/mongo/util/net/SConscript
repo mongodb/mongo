@@ -113,21 +113,6 @@ if not get_option('ssl') == 'off':
                 'ssl_options',
             ],
         );
-    env.Library(
-        target='ocsp',
-        source=[
-            "ocsp/ocsp_manager.cpp",
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/service_context',
-            '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        ],
-        LIBDEPS_PRIVATE=[
-            'http_client',
-            'network',
-        ]
-    )
 
     env.Library(
         target='ssl_manager',
@@ -138,18 +123,19 @@ if not get_option('ssl') == 'off':
             "ssl_manager_%s.cpp" % (ssl_provider),
             "ssl_stream.cpp",
             env.Idlc('ssl_parameters.idl')[0],
+            "ocsp/ocsp_manager.cpp",
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/mongo/util/caching',
+            '$BUILD_DIR/mongo/util/concurrency/thread_pool',
             '$BUILD_DIR/third_party/shim_asio',
             'network',
             'openssl_init' if ssl_provider == 'openssl' else '',
             'socket',
             'ssl_options',
             'ssl_types',
-            'ocsp',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base/secure_allocator',
@@ -160,6 +146,7 @@ if not get_option('ssl') == 'off':
             '$BUILD_DIR/mongo/util/background_job',
             '$BUILD_DIR/mongo/util/icu',
             '$BUILD_DIR/mongo/util/winutil',
+            'http_client',
         ],
     )
 
