@@ -10,6 +10,8 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For 'arrayEq'.
+load("jstests/libs/analyze_plan.js");         // For planHasStage().
+load("jstests/libs/fixture_helpers.js");      // For isMongos().
 
 // Make sure that the test collection is empty before starting the test.
 const testColl = db.update_pipeline_shell_helpers_test;
@@ -81,6 +83,46 @@ assert.docEq(findAndModifyPostImage, expectedFindAndModifyPostImage);
 const findOneAndUpdatePostImage = testColl.findOneAndUpdate(
     {_id: 1}, [{$set: {findOneAndUpdate: true}}], {returnNewDocument: true});
 assert.docEq(findOneAndUpdatePostImage, expectedFindOneAndUpdatePostImage);
+
+//
+// Explain for updates that use an _id lookup query.
+//
+{
+    let explain = testColl.explain("queryPlanner").update({_id: 2}, [{$set: {y: 999}}]);
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "IDHACK"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));
+
+    // Run explain with execution-level verbosity.
+    explain = testColl.explain("executionStats").update({_id: 2}, [{$set: {y: 999}}]);
+    assert.eq(explain.executionStats.totalDocsExamined, 1, explain);
+    // UPDATE stage would modify one document.
+    const updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
+    assert.eq(updateStage.nWouldModify, 1);
+
+    // Check that no write was performed.
+    assert.eq(testColl.find({y: 999}).count(), 0);
+}
+
+//
+// Explain for updates that use a query which requires a COLLSCAN.
+//
+
+// We skip these tests under sharded fixtures, since sharded passthroughs require that FAM queries
+// contain the shard key.
+if (!FixtureHelpers.isMongos(db)) {
+    let explain = testColl.explain("queryPlanner").update({a: 2}, [{$set: {y: 999}}]);
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));
+
+    // Run explain with execution-level verbosity.
+    explain = testColl.explain("executionStats").update({a: 2}, [{$set: {y: 999}}]);
+    // UPDATE stage would modify one document.
+    const updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
+    assert.eq(updateStage.nWouldModify, 1);
+
+    // Check that no write was performed.
+    assert.eq(testColl.find({y: 999}).count(), 0);
+}
 
 // Shell helpers for replacement updates should reject pipeline-style updates.
 assert.throws(() => testColl.replaceOne({_id: 1}, [{$replaceWith: {}}]));

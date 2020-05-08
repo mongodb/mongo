@@ -91,7 +91,7 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
     _specificStats.objInserted = _produceNewDocumentForInsert();
 
     // If this is an explain, skip performing the actual insert.
-    if (!_params.request->isExplain()) {
+    if (!_params.request->explain()) {
         _performInsert(_specificStats.objInserted);
     }
 

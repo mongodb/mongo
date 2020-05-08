@@ -134,8 +134,10 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      const boost::optional<RuntimeConstants>& runtimeConstants,
                                      const boost::optional<BSONObj>& letParameters,
-                                     bool mayDbProfile)
-    : ns(nss),
+                                     bool mayDbProfile,
+                                     boost::optional<ExplainOptions::Verbosity> explain)
+    : explain(explain),
+      ns(nss),
       opCtx(opCtx),
       mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
       timeZoneDatabase(opCtx && opCtx->getServiceContext()

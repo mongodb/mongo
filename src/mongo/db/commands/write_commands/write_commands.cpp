@@ -419,7 +419,7 @@ private:
                 _batch.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
             updateRequest.setLetParameters(_batch.getLet());
             updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
-            updateRequest.setExplain();
+            updateRequest.setExplain(verbosity);
 
             const ExtensionsCallbackReal extensionsCallback(opCtx,
                                                             &updateRequest.getNamespaceString());

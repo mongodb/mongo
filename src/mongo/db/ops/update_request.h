@@ -196,12 +196,12 @@ public:
         return _fromOplogApplication;
     }
 
-    void setExplain(bool value = true) {
-        _isExplain = value;
+    void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
+        _explain = verbosity;
     }
 
-    bool isExplain() const {
-        return _isExplain;
+    boost::optional<ExplainOptions::Verbosity> explain() const {
+        return _explain;
     }
 
     void setReturnDocs(ReturnDocOption value) {
@@ -277,7 +277,7 @@ public:
         builder << " multi: " << isMulti();
         builder << " fromMigration: " << _fromMigration;
         builder << " fromOplogApplication: " << _fromOplogApplication;
-        builder << " isExplain: " << _isExplain;
+        builder << " isExplain: " << static_cast<bool>(_explain);
         return builder.str();
     }
 
@@ -314,8 +314,9 @@ private:
     // True if this update was triggered by the application of an oplog entry.
     bool _fromOplogApplication = false;
 
-    // Whether or not we are requesting an explained update. Explained updates are read-only.
-    bool _isExplain = false;
+    // Whether or not we are requesting an explained update, and if so, which type. Explained
+    // updates may involve executing stages, but they will not perform writes.
+    boost::optional<ExplainOptions::Verbosity> _explain;
 
     // Specifies which version of the documents to return, if any.
     //

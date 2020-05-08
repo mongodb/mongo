@@ -121,7 +121,7 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
 
 void makeUpdateRequest(OperationContext* opCtx,
                        const FindAndModifyRequest& args,
-                       bool explain,
+                       boost::optional<ExplainOptions::Verbosity> explain,
                        UpdateRequest* requestOut) {
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
@@ -291,8 +291,7 @@ public:
         } else {
             auto request = UpdateRequest();
             request.setNamespaceString(nsString);
-            const bool isExplain = true;
-            makeUpdateRequest(opCtx, args, isExplain, &request);
+            makeUpdateRequest(opCtx, args, verbosity, &request);
 
             const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
             ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
@@ -385,8 +384,8 @@ public:
                 for (;;) {
                     auto request = UpdateRequest();
                     request.setNamespaceString(nsString);
-                    const bool isExplain = false;
-                    makeUpdateRequest(opCtx, args, isExplain, &request);
+                    const auto verbosity = boost::none;
+                    makeUpdateRequest(opCtx, args, verbosity, &request);
 
                     if (opCtx->getTxnNumber()) {
                         request.setStmtId(stmtId);

@@ -45,11 +45,15 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const ExtensionsCallback& extensionsCallback)
     : _opCtx(opCtx),
       _request(request),
-      _expCtx(make_intrusive<ExpressionContext>(opCtx,
-                                                nullptr,
-                                                _request->getNamespaceString(),
-                                                _request->getRuntimeConstants(),
-                                                _request->getLetParameters())),
+      _expCtx(make_intrusive<ExpressionContext>(
+          opCtx,
+          nullptr,
+          _request->getNamespaceString(),
+          _request->getRuntimeConstants(),
+          _request->getLetParameters(),
+          true,  // mayDbProfile. We pass 'true' here conservatively. In the future we may
+          // change this.
+          request->explain())),
       _driver(_expCtx),
       _canonicalQuery(),
       _extensionsCallback(extensionsCallback) {}
@@ -124,7 +128,7 @@ Status ParsedUpdate::parseQueryToCQ() {
     auto qr = std::make_unique<QueryRequest>(_request->getNamespaceString());
     qr->setFilter(_request->getQuery());
     qr->setSort(_request->getSort());
-    qr->setExplain(_request->isExplain());
+    qr->setExplain(static_cast<bool>(_request->explain()));
     qr->setHint(_request->getHint());
 
     // We get the collation off the ExpressionContext because it may contain a collection-default

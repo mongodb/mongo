@@ -57,7 +57,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     invariant(db);
 
     // Explain should never use this helper.
-    invariant(!request.isExplain());
+    invariant(!request.explain());
 
     const NamespaceString& nsString = request.getNamespaceString();
     invariant(opCtx->lockState()->isCollectionLockedForMode(nsString, MODE_IX));

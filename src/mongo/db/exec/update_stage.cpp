@@ -250,7 +250,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         RecordId newRecordId;
         CollectionUpdateArgs args;
 
-        if (!request->isExplain()) {
+        if (!request->explain()) {
             args.stmtId = request->getStmtId();
             args.update = logObj;
             if (isUserInitiatedWrite) {
@@ -272,7 +272,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         }
 
         if (inPlace) {
-            if (!request->isExplain()) {
+            if (!request->explain()) {
                 newObj = oldObj.value();
                 const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
 
@@ -302,7 +302,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                                   << BSONObjMaxUserSize,
                     newObj.objsize() <= BSONObjMaxUserSize);
 
-            if (!request->isExplain()) {
+            if (!request->explain()) {
                 if (_shouldCheckForShardKeyUpdate && checkUpdateChangesShardKeyFields(oldObj) &&
                     !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
@@ -336,7 +336,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
     // Only record doc modifications if they wrote (exclude no-ops). Explains get
     // recorded as if they wrote.
-    if (docWasModified || request->isExplain()) {
+    if (docWasModified || request->explain()) {
         _specificStats.nModified++;
     }
 

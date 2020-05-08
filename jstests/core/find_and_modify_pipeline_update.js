@@ -6,6 +6,7 @@
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For isMongos.
+load("jstests/libs/analyze_plan.js");     // For planHasStage().
 
 const coll = db.find_and_modify_pipeline_update;
 coll.drop();
@@ -35,10 +36,52 @@ assert.eq(found, {_id: 2, y: 2});
 found = coll.findAndModify({query: {_id: 3}, update: [{$set: {y: 3}}], fields: {x: 1}, new: true});
 assert.eq(found, {_id: 3, x: 3});
 
-// We skip the following test for sharded fixtures as it will fail as the query for
-// findAndModify must contain the shard key.
+//
+// Tests for explain using findAndModify with an _id equality query.
+//
+{
+    let explain =
+        coll.explain("queryPlanner").findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "IDHACK"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));
+
+    // Run explain with execution-level verbosity.
+    explain =
+        coll.explain("executionStats").findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
+    assert.eq(explain.executionStats.nReturned, 1);
+    // UPDATE stage would modify one document.
+    const updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
+    assert.eq(updateStage.nWouldModify, 1);
+
+    // Check that no write was performed.
+    assert.eq(coll.find({y: 999}).count(), 0);
+}
+
+// We skip the following tests for sharded fixtures as it will fail as the query when
+// findAndModify doesn't contain the shard key.
 if (!FixtureHelpers.isMongos(db)) {
+    //
+    // Tests for explain with a query that requires a COLLSCAN.
+    //
+    let explain =
+        coll.explain("queryPlanner").findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));
+
+    // Run explain with execution-level verbosity.
+    explain =
+        coll.explain("executionStats").findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
+    assert.eq(explain.executionStats.nReturned, 1);
+    // UPDATE stage would modify one document.
+    const updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
+    assert.eq(updateStage.nWouldModify, 1);
+
+    // Check that no write was performed.
+    assert.eq(coll.find({y: 999}).count(), 0);
+
+    //
     // Test that 'sort' works with pipeline-style update.
+    //
     assert(coll.drop());
     assert.commandWorked(
         coll.insert([{_id: 0, x: 'b'}, {_id: 1, x: 'd'}, {_id: 2, x: 'a'}, {_id: 3, x: 'c'}]));
