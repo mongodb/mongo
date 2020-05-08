@@ -31,5 +31,6 @@ elif ! WORKERS=$(sysctl -n hw.logicalcpu); then
 fi
 
 cd "$1"
+# Requires Java 11.
 # Defer liveness checks to the end with -lncheck, for speed.
-java -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -lncheck final -workers "$WORKERS" "$TLA_FILE"
+/opt/java/jdk11/bin/java -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -lncheck final -workers "$WORKERS" "$TLA_FILE"
