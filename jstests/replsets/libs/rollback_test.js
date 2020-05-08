@@ -597,8 +597,19 @@ function RollbackTest(name = "RollbackTest", replSet) {
             // because we have configured the replica set with high electionTimeoutMillis.
             assert.eq(newPrimary, curPrimary, "Did not elect the same node as primary");
 
-            // Unfreeze the current secondary so that it can step up again.
-            assert.commandWorked(curSecondary.adminCommand({replSetFreeze: 0}));
+            // Unfreeze the current secondary so that it can step up again. Retry on network errors
+            // in case the current secondary is in ROLLBACK state.
+            assert.soon(() => {
+                try {
+                    assert.commandWorked(curSecondary.adminCommand({replSetFreeze: 0}));
+                    return true;
+                } catch (e) {
+                    if (isNetworkError(e)) {
+                        return false;
+                    }
+                    throw e;
+                }
+            }, `Failed to unfreeze current secondary ${curSecondary.host}`);
         }
 
         curSecondary = rst.getSecondary();
