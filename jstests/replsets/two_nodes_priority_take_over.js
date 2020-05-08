@@ -34,7 +34,7 @@ var conf = rst.getReplSetConfigFromNode();
 conf.members[0].priority = 1;
 conf.members[1].priority = 2;
 conf.version = conf.version + 1;
-reconfig(rst, conf);
+assert.commandWorked(rst.getPrimary().adminCommand({replSetReconfig: conf}));
 
 // The second node will take over the primary.
 rst.waitForState(rst.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);
