@@ -38,8 +38,7 @@
 
 namespace mongo {
 
-enum class OCSPPurpose { kClientVerify, kStaple };
-
+constexpr Seconds kOCSPRequestTimeoutSeconds(5);
 class OCSPManager {
 
 public:
@@ -51,16 +50,12 @@ public:
         return &manager;
     };
 
-    Future<std::vector<uint8_t>> requestStatus(std::vector<uint8_t> data,
-                                               StringData responderURI,
-                                               OCSPPurpose direction);
+    Future<std::vector<uint8_t>> requestStatus(std::vector<uint8_t> data, StringData responderURI);
 
     void startThreadPool();
 
 private:
-    std::unique_ptr<HttpClient> _tlsClientHttp;
-    std::unique_ptr<HttpClient> _tlsServerHttp;
-
+    std::unique_ptr<HttpClient> _client;
     std::unique_ptr<ThreadPool> _pool;
 };
 

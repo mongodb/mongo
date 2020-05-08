@@ -32,7 +32,6 @@
 #include "mongo/db/client.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
-#include "mongo/util/net/ssl_parameters_gen.h"
 
 namespace mongo {
 
@@ -53,24 +52,14 @@ auto makeTaskExecutor() {
 OCSPManager::OCSPManager() {
     _pool = makeTaskExecutor();
 
-    this->_tlsServerHttp = HttpClient::create();
-    this->_tlsClientHttp = HttpClient::create();
-
-    if (!this->_tlsServerHttp) {
+    _client = HttpClient::create();
+    if (!_client) {
         return;
     }
 
-    this->_tlsClientHttp->allowInsecureHTTP(true);
-    this->_tlsClientHttp->setTimeout(Seconds(gTLSOCSPVerifyTimeoutSecs));
-    this->_tlsClientHttp->setHeaders({"Content-Type: application/ocsp-request"});
-
-    this->_tlsServerHttp->allowInsecureHTTP(true);
-    if (gTLSOCSPStaplingTimeoutSecs < 0) {
-        this->_tlsServerHttp->setTimeout(Seconds(gTLSOCSPVerifyTimeoutSecs));
-    } else {
-        this->_tlsServerHttp->setTimeout(Seconds(gTLSOCSPStaplingTimeoutSecs));
-    }
-    this->_tlsServerHttp->setHeaders({"Content-Type: application/ocsp-request"});
+    _client->allowInsecureHTTP(true);
+    _client->setTimeout(kOCSPRequestTimeoutSeconds);
+    _client->setHeaders({"Content-Type: application/ocsp-request"});
 }
 
 void OCSPManager::startThreadPool() {
@@ -84,9 +73,8 @@ void OCSPManager::startThreadPool() {
  * Returns a vector of bytes to be constructed into a OCSP response.
  */
 Future<std::vector<uint8_t>> OCSPManager::requestStatus(std::vector<uint8_t> data,
-                                                        StringData responderURI,
-                                                        OCSPPurpose purpose) {
-    if (!this->_tlsClientHttp || !this->_tlsServerHttp) {
+                                                        StringData responderURI) {
+    if (!this->_client) {
         return Future<std::vector<uint8_t>>::makeReady(
             Status(ErrorCodes::InternalErrorNotSupported, "HTTP Client not supported"));
     }
@@ -94,23 +82,19 @@ Future<std::vector<uint8_t>> OCSPManager::requestStatus(std::vector<uint8_t> dat
     auto pf = makePromiseFuture<DataBuilder>();
     std::string uri("http://" + responderURI);
 
-    _pool->schedule([this,
-                     purpose,
-                     promise = std::move(pf.promise),
-                     uri = std::move(uri),
-                     data = std::move(data)](auto status) mutable {
-        if (!status.isOK()) {
-            return;
-        }
-        try {
-            const auto& client =
-                purpose == OCSPPurpose::kClientVerify ? this->_tlsClientHttp : this->_tlsServerHttp;
-            auto result = client->post(uri, data);
-            promise.emplaceValue(std::move(result));
-        } catch (...) {
-            promise.setError(exceptionToStatus());
-        }
-    });
+    _pool->schedule(
+        [this, promise = std::move(pf.promise), uri = std::move(uri), data = std::move(data)](
+            auto status) mutable {
+            if (!status.isOK()) {
+                return;
+            }
+            try {
+                auto result = this->_client->post(uri, data);
+                promise.emplaceValue(std::move(result));
+            } catch (...) {
+                promise.setError(exceptionToStatus());
+            }
+        });
 
     return std::move(pf.future).then(
         [](DataBuilder dataBuilder) mutable -> Future<std::vector<uint8_t>> {

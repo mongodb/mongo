@@ -65,7 +65,6 @@ const std::set<std::string> kSetShellParameterWhitelist = {
     "awsEC2InstanceMetadataUrl",
     "awsECSInstanceMetadataUrl",
     "ocspEnabled",
-    "ocspClientHttpTimeoutSecs",
     "disabledSecureAllocatorDomains",
     "newLineAfterPasswordPromptForTest",
     "skipShellCursorFinalize",
