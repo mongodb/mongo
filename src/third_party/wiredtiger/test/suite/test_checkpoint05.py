@@ -76,7 +76,10 @@ class test_checkpoint05(wttest.WiredTigerTestCase):
         # is generous.  But if WT isn't deleting checkpoints there would
         # be about 30x more checkpoints here.
         final_count = self.count_checkpoints()
-        self.assertTrue (final_count < initial_count * 3)
+
+        # N.B. This test is temporarily disabled because deleting checkpoints during backup
+        # can corrupt the backup.
+        # self.assertTrue (final_count < initial_count * 3)
 
         self.session.close()
 

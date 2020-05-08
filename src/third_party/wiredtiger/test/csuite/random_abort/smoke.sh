@@ -9,10 +9,6 @@ set -e
 top_builddir=${top_builddir:-../../build_posix}
 top_srcdir=${top_srcdir:-../..}
 
-#FIXME-WT-6093: reenable calls to test_random_abort
-echo "Warning: test_random_abort temporarily disabled"
-exit 0
-
 $TEST_WRAPPER $top_builddir/test/csuite/test_random_abort -t 10 -T 5
 $TEST_WRAPPER $top_builddir/test/csuite/test_random_abort -m -t 10 -T 5
 $TEST_WRAPPER $top_builddir/test/csuite/test_random_abort -C -t 10 -T 5
