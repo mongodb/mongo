@@ -38,6 +38,11 @@ assert.commandWorked(
         primaryColl.insert({_id: 0}, {"writeConcern": {"w": "majority"}}));
 rst.awaitReplication();
 
+// It's possible for notMasterUnacknowledgedWrites to be non-zero because of mirrored reads during
+// initial sync.
+let replMetrics = assert.commandWorked(secondaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
+const startingNumNotMasterErrors = replMetrics.network.notMasterUnacknowledgedWrites;
+
 // Open a cursor on secondary.
 const cursorIdToBeReadAfterStepUp =
     assert.commandWorked(secondaryDB.runCommand({"find": collName, batchSize: 0})).cursor.id;
@@ -119,13 +124,12 @@ assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 
 // Validate that no operations got killed on step up and no network disconnection happened due
 // to failed unacknowledged operations.
-const replMetrics =
-    assert.commandWorked(secondaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
+replMetrics = assert.commandWorked(secondaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepUp");
 assert.eq(replMetrics.stateTransition.userOperationsKilled, 0);
 // Should account for find and getmore commands issued before step up.
 assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
-assert.eq(replMetrics.network.notMasterUnacknowledgedWrites, 0);
+assert.eq(replMetrics.network.notMasterUnacknowledgedWrites, startingNumNotMasterErrors);
 
 rst.stopSet();
 })();
