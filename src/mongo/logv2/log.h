@@ -65,7 +65,7 @@ const mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
 #else
 #error \
     "mongo/logv2/log.h requires MONGO_LOGV2_DEFAULT_COMPONENT to be defined. " \
-       "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
+       "Please see https://github.com/mongodb/mongo/blob/master/src/mongo/logv2/README.md "
 #endif  // MONGO_LOGV2_DEFAULT_COMPONENT
 }  // namespace
 
