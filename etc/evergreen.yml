@@ -1988,6 +1988,14 @@ functions:
           set -o errexit
           ${activate_virtualenv}
           $python -c 'import socket; num_nodes = 5; print("\n".join(["%s:%d" % (socket.gethostname(), port) for port in range(20000, 20000 + num_nodes)]))' > nodes.txt
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+
+          # Move binaries to CWD as Jepsen expects that.
+          mv dist-test/bin/* .
 
   "run jepsen test":
     - command: shell.exec
