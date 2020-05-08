@@ -718,8 +718,7 @@ __txn_fixup_prepared_update(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_CURSOR *
             upd->next = cbt->ins->upd;
         else if (cbt->ref->page->modify != NULL && cbt->ref->page->modify->mod_row_update != NULL)
             upd->next = cbt->ref->page->modify->mod_row_update[cbt->slot];
-        WT_ASSERT(session,
-          upd->next != NULL && upd->next->next == NULL && upd->next->txnid == WT_TXN_ABORTED);
+        WT_ASSERT(session, upd->next != NULL && upd->next->txnid == WT_TXN_ABORTED);
 
         /* Append a tombstone if the stop timestamp exists. */
         if (hs_stop_ts != WT_TS_MAX) {

@@ -66,8 +66,8 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
         return val
 
     def test_checkpoint_stats(self):
-        nrows = 1000
-        ntables = 50
+        nrows = 100
+        ntables = 5
 
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
             ',stable_timestamp=' + timestamp_str(10))

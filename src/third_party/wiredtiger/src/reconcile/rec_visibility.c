@@ -378,7 +378,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             tombstone = upd;
 
             /* Find the update this tombstone applies to. */
-            if (!__wt_txn_visible_all(session, upd->txnid, upd->start_ts)) {
+            if (!__wt_txn_upd_visible_all(session, upd)) {
                 while (upd->next != NULL && upd->next->txnid == WT_TXN_ABORTED)
                     upd = upd->next;
                 WT_ASSERT(session, upd->next == NULL || upd->next->txnid != WT_TXN_ABORTED);
@@ -387,12 +387,12 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
                 upd_select->upd = upd = upd->next;
             }
         }
-        if (upd != NULL) {
+        if (upd != NULL)
             /* The beginning of the validity window is the selected update's time pair. */
             __wt_time_window_set_start(select_tw, upd);
-        } else if (select_tw->stop_ts != WT_TS_NONE || select_tw->stop_txn != WT_TXN_NONE) {
+        else if (select_tw->stop_ts != WT_TS_NONE || select_tw->stop_txn != WT_TXN_NONE) {
             /* If we only have a tombstone in the update list, we must have an ondisk value. */
-            WT_ASSERT(session, vpack != NULL && tombstone != NULL);
+            WT_ASSERT(session, vpack != NULL && tombstone != NULL && last_upd->next == NULL);
             /*
              * It's possible to have a tombstone as the only update in the update list. If we
              * reconciled before with only a single update and then read the page back into cache,
@@ -404,12 +404,22 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
              * window ends when this tombstone started.
              */
             WT_ERR(__rec_append_orig_value(session, page, tombstone, vpack));
-            WT_ASSERT(session, last_upd->next != NULL &&
-                last_upd->next->txnid == vpack->tw.start_txn &&
-                last_upd->next->start_ts == vpack->tw.start_ts &&
-                last_upd->next->type == WT_UPDATE_STANDARD && last_upd->next->next == NULL);
-            upd_select->upd = last_upd->next;
-            __wt_time_window_set_start(select_tw, last_upd->next);
+
+            /*
+             * We may have updated the global transaction concurrently and the tombstone is now
+             * globally visible. In this case, the on page value is not appended. Check that.
+             */
+            if (last_upd->next != NULL) {
+                WT_ASSERT(session, last_upd->next->txnid == vpack->tw.start_txn &&
+                    last_upd->next->start_ts == vpack->tw.start_ts &&
+                    last_upd->next->type == WT_UPDATE_STANDARD && last_upd->next->next == NULL);
+                upd_select->upd = last_upd->next;
+                __wt_time_window_set_start(select_tw, last_upd->next);
+            } else {
+                WT_ASSERT(
+                  session, __wt_txn_upd_visible_all(session, tombstone) && upd_select->upd == NULL);
+                upd_select->upd = tombstone;
+            }
         }
     }
 

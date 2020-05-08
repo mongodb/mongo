@@ -85,7 +85,7 @@ struct __wt_blkincr {
 /*
  * At the default granularity, this is enough for blocks in a 2G file.
  */
-#define WT_BLOCK_MODS_LIST_MIN 16 /* Initial bytes for bitmap. */
+#define WT_BLOCK_MODS_LIST_MIN 128 /* Initial bits for bitmap. */
 struct __wt_block_mods {
     const char *id_str;
 

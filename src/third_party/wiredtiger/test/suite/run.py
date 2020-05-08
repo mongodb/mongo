@@ -105,6 +105,8 @@ def usage():
 \n\
 Options:\n\
             --asan               run with an ASAN enabled shared library\n\
+  -b K/N  | --batch K/N          run batch K of N, 0 <= K < N. The tests\n\
+                                 are split into N batches and the Kth is run.\n\
   -C file | --configcreate file  create a config file for controlling tests\n\
   -c file | --config file        use a config file for controlling tests\n\
   -D dir  | --dir dir            use dir rather than WT_TEST.\n\
@@ -301,6 +303,7 @@ if __name__ == '__main__':
     asan = False
     parallel = 0
     random_sample = 0
+    batchtotal = batchnum = 0
     configfile = None
     configwrite = False
     dirarg = None
@@ -317,6 +320,24 @@ if __name__ == '__main__':
             option = arg[1:]
             if option == '-asan':
                 asan = True
+                continue
+            if option == '-batch' or option == 'b':
+                if batchtotal != 0 or len(args) == 0:
+                    usage()
+                    sys.exit(2)
+                # Batch expects an argument that has int slash int.
+                # For example "-b 4/12"
+                try:
+                    left, right = args.pop(0).split('/')
+                    batchnum = int(left)
+                    batchtotal = int(right)
+                except:
+                    print('batch argument should be nnn/nnn')
+                    usage()
+                    sys.exit(2)
+                if batchtotal <= 0 or batchnum < 0 or batchnum >= batchtotal:
+                    usage()
+                    sys.exit(2)
                 continue
             if option == '-dir' or option == 'D':
                 if dirarg != None or len(args) == 0:
@@ -511,12 +532,34 @@ if __name__ == '__main__':
     if debug:
         import pdb
         pdb.set_trace()
+    if batchtotal != 0:
+        # For test batching, we want to split up all the tests evenly, and
+        # spread out the tests, so each batch contains tests of all kinds. We'd
+        # like to prioritize the lowest scenario numbers first, so if there's a
+        # failure, we won't have to do all X thousand of some test's scenarios
+        # before we see a failure in the next test.  To that end, we define a
+        # sort function that sorts by scenario first, and test name second.
+        hugetests = set()
+        def get_sort_keys(test):
+            s = 0
+            name = test.simpleName()
+            if hasattr(test, 'scenario_number'):
+                s = test.scenario_number
+                if s > 1000:
+                    hugetests.add(name)    # warn for too many scenarios
+            return (s, test.simpleName())  # sort by scenerio number first
+        all_tests = sorted(tests, key = get_sort_keys)
+        if not longtest:
+            for name in hugetests:
+                print("WARNING: huge test " + name + " has > 1000 scenarios.\n" +
+                      "That is only appropriate when using the --long option.\n" +
+                      "The number of scenerios for the test should be pruned")
+
+        # At this point we have an ordered list of all the tests.
+        # Break it into just our batch.
+        tests = unittest.TestSuite(all_tests[batchnum::batchtotal])
     if dryRun:
-        # We have to de-dupe here as some scenarios overlap in the same suite
-        dryOutput = set()
-        for test in tests:
-            dryOutput.add(test.shortDesc())
-        for line in dryOutput:
+        for line in tests:
             print(line)
     else:
         result = wttest.runsuite(tests, parallel)

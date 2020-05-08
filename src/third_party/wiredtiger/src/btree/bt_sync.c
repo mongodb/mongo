@@ -373,9 +373,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     /*
      * Skip all deleted pages. For a page to be marked deleted, it must have been evicted from cache
      * and marked clean. Checkpoint should never instantiate deleted pages: if a truncate is not
-     * visible to the checkpoint, the on-disk version is correct. If the truncate is visible, we
-     * skip over the child page when writing its parent. We check whether a truncate is visible in
-     * the checkpoint as part of reconciling internal pages (specifically in __rec_child_modify).
+     * visible to the checkpoint, the on-disk version is correct. If the truncate is visible to
+     * checkpoint, we write a proxy cell to its parent. We check whether a truncate is visible in
+     * the checkpoint as part of reconciling internal pages (specifically in __rec_child_deleted).
      */
     LF_SET(WT_READ_DELETED_SKIP);
 
