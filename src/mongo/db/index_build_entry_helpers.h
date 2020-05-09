@@ -104,9 +104,6 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
  * for the given 'indexBuildUUID'.
  *
  * Returns 'NoMatchingDocument' error code if no document with 'indexBuildUUID' is found.
- *
- * TODO(SERVER-47635): use this to remove index build entries for the finished index builds from
- * system.indexBuilds collection.
  */
 Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID);
 
