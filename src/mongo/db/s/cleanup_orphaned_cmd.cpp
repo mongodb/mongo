@@ -118,7 +118,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                     {logv2::UserAssertAfterLog(ErrorCodes::OrphanedRangeCleanUpFailed)},
                     "Could not cleanup orphaned data because start key does not match shard key "
                     "pattern",
-                    "startKey"_attr = startingFromKeyConst,
+                    "startKey"_attr = redact(startingFromKeyConst),
                     "shardKeyPattern"_attr = keyPattern);
             }
         }
@@ -178,7 +178,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                         "shard key pattern {shardKeyPattern}",
                         "Could not cleanup orphaned data because start key does not match shard "
                         "key pattern",
-                        "startKey"_attr = startingFromKey,
+                        "startKey"_attr = redact(startingFromKey),
                         "shardKeyPattern"_attr = keyPattern);
                 }
             } else {
