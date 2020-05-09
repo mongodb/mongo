@@ -240,6 +240,19 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
             return txn::persistDecision(*_scheduler, _lsid, _txnNumber, *_participants, *_decision);
         })
         .then([this](repl::OpTime opTime) {
+            switch (_decision->getDecision()) {
+                case CommitDecision::kCommit: {
+                    _decisionPromise.emplaceValue(CommitDecision::kCommit);
+                    break;
+                }
+                case CommitDecision::kAbort: {
+                    _decisionPromise.setError(*_decision->getAbortStatus());
+                    break;
+                }
+                default:
+                    MONGO_UNREACHABLE;
+            };
+
             return waitForMajorityWithHangFailpoint(_serviceContext,
                                                     hangBeforeWaitingForDecisionWriteConcern,
                                                     "hangBeforeWaitingForDecisionWriteConcern",
@@ -268,8 +281,6 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
 
             switch (_decision->getDecision()) {
                 case CommitDecision::kCommit: {
-                    _decisionPromise.emplaceValue(CommitDecision::kCommit);
-
                     return txn::sendCommit(_serviceContext,
                                            *_scheduler,
                                            _lsid,
@@ -278,8 +289,6 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                                            *_decision->getCommitTimestamp());
                 }
                 case CommitDecision::kAbort: {
-                    _decisionPromise.setError(*_decision->getAbortStatus());
-
                     return txn::sendAbort(
                         _serviceContext, *_scheduler, _lsid, _txnNumber, *_participants);
                 }
@@ -410,10 +419,17 @@ void TransactionCoordinator::_done(Status status) {
     }
 
     ul.unlock();
-    if (!_decisionDurable) {
+
+    if (!_decisionPromise.getFuture().isReady()) {
         _decisionPromise.setError(status);
     }
-    _completionPromise.setFrom(_decisionPromise.getFuture().getNoThrow());
+
+    if (!status.isOK()) {
+        _completionPromise.setError(status);
+    } else {
+        // If the status is OK, the decisionPromise must be set.
+        _completionPromise.setFrom(_decisionPromise.getFuture().getNoThrow());
+    }
 }
 
 void TransactionCoordinator::_logSlowTwoPhaseCommit(
