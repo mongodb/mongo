@@ -586,7 +586,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               StmtId stmtId,
                               bool fromMigrate,
                               const boost::optional<BSONObj>& deletedDoc) {
-    auto& documentKey = documentKeyDecoration(opCtx).get();
+    auto optDocKey = documentKeyDecoration(opCtx);
+    invariant(optDocKey, nss.ns());
+    auto& documentKey = optDocKey.get();
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
