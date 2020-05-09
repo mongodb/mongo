@@ -121,6 +121,26 @@ function waitForFailpoint(hitFailpointStr, numTimes, timeout) {
         {runHangAnalyzer: false});
 }
 
+/*
+ * If all shards in the cluster have binVersion "lastest", sets the server parameter for
+ * making the transaction coordinator return decision early to true.
+ * TODO (SERVER-48114): Remove this function.
+ */
+function enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st) {
+    if (jsTest.options().shardMixedBinVersions ||
+        jsTest.options().useRandomBinVersionsWithinReplicaSet)
+        return;
+
+    st._rs.forEach(rs => {
+        rs.nodes.forEach(node => {
+            assert.commandWorked(node.getDB('admin').runCommand({
+                setParameter: 1,
+                "coordinateCommitReturnImmediatelyAfterPersistingDecision": true
+            }));
+        });
+    });
+}
+
 // Enables the transaction router to retry on stale version (db or shard version) and snapshot
 // errors within a transaction.
 //

@@ -13,13 +13,11 @@
 // ]
 (function() {
 
-const s = new ShardingTest({
-    name: "auto1",
-    shards: 2,
-    mongos: 1,
-    shardOptions: {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}}
-});
+load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
+const s = new ShardingTest({name: "auto1", shards: 2, mongos: 1});
+
+enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(s);
 s.adminCommand({enablesharding: "test"});
 s.ensurePrimaryShard('test', s.shard1.shardName);
 

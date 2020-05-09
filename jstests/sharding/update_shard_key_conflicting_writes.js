@@ -20,16 +20,13 @@
 load('jstests/libs/parallelTester.js');  // for Thread.
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-let st = new ShardingTest({
-    mongos: 1,
-    shards: 2,
-    shardOptions: {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}}
-});
+let st = new ShardingTest({mongos: 1, shards: 2});
 let kDbName = 'db';
 let mongos = st.s0;
 let ns = kDbName + '.foo';
 let db = mongos.getDB(kDbName);
 
+enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 

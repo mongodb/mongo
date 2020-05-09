@@ -60,14 +60,13 @@ let st = new ShardingTest({
     config: 1,
     other: {
         mongosOptions: {verbose: 3},
-        shardOptions:
-            {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}},
         rs0: {nodes: [{}, {rsConfig: {priority: 0}}]},
         rs1: {nodes: [{}, {rsConfig: {priority: 0}}]},
         rs2: {nodes: [{}, {rsConfig: {priority: 0}}]},
     },
 });
 
+enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 

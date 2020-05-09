@@ -175,16 +175,8 @@ const sendCommitViaRecoveryMongos = function(lsid, txnNumber, recoveryToken, wri
                                                         writeConcern));
 };
 
-let st = new ShardingTest({
-    shards: 2,
-    rs: {nodes: 2},
-    mongos: 2,
-    other: {
-        mongosOptions: {verbose: 3},
-        shardOptions:
-            {setParameter: {"coordinateCommitReturnImmediatelyAfterPersistingDecision": true}}
-    }
-});
+let st =
+    new ShardingTest({shards: 2, rs: {nodes: 2}, mongos: 2, other: {mongosOptions: {verbose: 3}}});
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
 st.ensurePrimaryShard('test', st.shard0.name);
