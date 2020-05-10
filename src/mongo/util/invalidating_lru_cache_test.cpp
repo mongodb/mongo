@@ -47,14 +47,18 @@ namespace {
 struct TestValue {
     TestValue(std::string in_value) : value(std::move(in_value)) {}
     TestValue(TestValue&&) = default;
-    TestValue(const TestValue&) = delete;
-    TestValue& operator=(const TestValue&) = delete;
 
     std::string value;
 };
 
 using TestValueCache = InvalidatingLRUCache<int, TestValue>;
 using TestValueHandle = TestValueCache::ValueHandle;
+
+TEST(InvalidatingLRUCacheTest, StandaloneValueHandle) {
+    TestValueHandle standaloneHandle({"Standalone value"});
+    ASSERT(standaloneHandle.isValid());
+    ASSERT_EQ("Standalone value", standaloneHandle->value);
+}
 
 TEST(InvalidatingLRUCacheTest, ValueHandleOperators) {
     TestValueCache cache(1);

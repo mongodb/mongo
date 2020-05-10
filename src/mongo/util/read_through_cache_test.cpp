@@ -41,10 +41,14 @@
 namespace mongo {
 namespace {
 
+using unittest::assertGet;
+
+// The structure for testing is intentionally made movable, but non-copyable
 struct CachedValue {
     CachedValue(int counter) : counter(counter) {}
     CachedValue(CachedValue&&) = default;
     CachedValue& operator=(CachedValue&&) = default;
+
     int counter;
 };
 
@@ -86,14 +90,19 @@ protected:
     OperationContext* const _opCtx{_opCtxHolder.get()};
 };
 
+TEST(ReadThroughCacheTest, StandaloneValueHandle) {
+    Cache::ValueHandle standaloneHandle(CachedValue(100));
+    ASSERT(standaloneHandle.isValid());
+    ASSERT_EQ(100, standaloneHandle->counter);
+}
+
 TEST_F(ReadThroughCacheTest, FetchInvalidateAndRefetch) {
     int countLookups = 0;
     CacheWithThreadPool cache(
         getServiceContext(), 1, [&](OperationContext*, const std::string& key) {
             ASSERT_EQ("TestKey", key);
             countLookups++;
-
-            return CachedValue{100 * countLookups};
+            return Cache::LookupResult(CachedValue(100 * countLookups));
         });
 
     for (int i = 1; i <= 3; i++) {
@@ -109,14 +118,24 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateAndRefetch) {
     }
 }
 
+TEST_F(ReadThroughCacheTest, FailedLookup) {
+    CacheWithThreadPool cache(
+        getServiceContext(),
+        1,
+        [&](OperationContext*, const std::string& key) -> Cache::LookupResult {
+            uasserted(ErrorCodes::InternalError, "Test error");
+        });
+
+    ASSERT_THROWS_CODE(cache.acquire(_opCtx, "TestKey"), DBException, ErrorCodes::InternalError);
+}
+
 TEST_F(ReadThroughCacheTest, CacheSizeZero) {
     int countLookups = 0;
     CacheWithThreadPool cache(
         getServiceContext(), 0, [&](OperationContext*, const std::string& key) {
             ASSERT_EQ("TestKey", key);
             countLookups++;
-
-            return CachedValue{100 * countLookups};
+            return Cache::LookupResult(CachedValue(100 * countLookups));
         });
 
     for (int i = 1; i <= 3; i++) {
@@ -133,8 +152,7 @@ TEST_F(ReadThroughCacheTest, InvalidateCacheSizeZeroReissuesLookup) {
         getServiceContext(), 0, [&](OperationContext*, const std::string& key) {
             ASSERT_EQ("TestKey", key);
             countLookups++;
-
-            return CachedValue{1000 * countLookups};
+            return Cache::LookupResult(CachedValue(1000 * countLookups));
         });
 
     auto value = cache.acquire(_opCtx, "TestKey");
@@ -158,7 +176,7 @@ TEST_F(ReadThroughCacheTest, KeyDoesNotExist) {
     CacheWithThreadPool cache(
         getServiceContext(), 1, [&](OperationContext*, const std::string& key) {
             ASSERT_EQ("TestKey", key);
-            return boost::none;
+            return Cache::LookupResult(boost::none);
         });
 
     ASSERT(!cache.acquire(_opCtx, "TestKey"));
@@ -167,12 +185,58 @@ TEST_F(ReadThroughCacheTest, KeyDoesNotExist) {
 /**
  * Fixture for tests, which need to control the creation/destruction of their operation contexts.
  */
-class ReadThroughCacheTestAsync : public unittest::Test,
+class ReadThroughCacheAsyncTest : public unittest::Test,
                                   public ScopedGlobalServiceContextForTest {};
 
 using Barrier = unittest::Barrier;
 
-TEST_F(ReadThroughCacheTestAsync, AcquireObservesOperationContextDeadline) {
+TEST_F(ReadThroughCacheAsyncTest, SuccessfulInProgressLookup) {
+    ThreadPool threadPool{ThreadPool::Options()};
+    threadPool.startup();
+
+    Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string& key) {
+        return Cache::LookupResult(CachedValue(500));
+    });
+
+    Cache::InProgressLookup inProgress(cache, "TestKey");
+    auto future = inProgress.addWaiter(WithLock::withoutLock());
+    ASSERT(!future.isReady());
+
+    auto optVal = inProgress.asyncLookupRound().get();
+    ASSERT(inProgress.valid(WithLock::withoutLock()));
+    ASSERT(optVal.v);
+    ASSERT_EQ(500, optVal.v->counter);
+    inProgress.signalWaiters(Cache::ValueHandle(std::move(*optVal.v)));
+
+    ASSERT(future.isReady());
+    ASSERT_EQ(500, future.get()->counter);
+}
+
+TEST_F(ReadThroughCacheAsyncTest, FailedInProgressLookup) {
+    ThreadPool threadPool{ThreadPool::Options()};
+    threadPool.startup();
+
+    Cache cache(getServiceContext(),
+                threadPool,
+                1,
+                [&](OperationContext*, const std::string& key) -> Cache::LookupResult {
+                    uasserted(ErrorCodes::InternalError, "Test error");
+                });
+
+    Cache::InProgressLookup inProgress(cache, "TestKey");
+    auto future = inProgress.addWaiter(WithLock::withoutLock());
+    ASSERT(!future.isReady());
+
+    auto asyncLookupResult = inProgress.asyncLookupRound().getNoThrow();
+    ASSERT_THROWS_CODE(inProgress.asyncLookupRound().get(), DBException, ErrorCodes::InternalError);
+    ASSERT(inProgress.valid(WithLock::withoutLock()));
+    inProgress.signalWaiters(asyncLookupResult.getStatus());
+
+    ASSERT(future.isReady());
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
+}
+
+TEST_F(ReadThroughCacheAsyncTest, AcquireObservesOperationContextDeadline) {
     ThreadPool threadPool{ThreadPool::Options()};
     threadPool.startup();
 
@@ -181,7 +245,7 @@ TEST_F(ReadThroughCacheTestAsync, AcquireObservesOperationContextDeadline) {
     Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string& key) {
         lookupStartedBarrier.countDownAndWait();
         completeLookupBarrier.countDownAndWait();
-        return CachedValue(5);
+        return Cache::LookupResult(CachedValue(5));
     });
 
     {
@@ -220,7 +284,7 @@ TEST_F(ReadThroughCacheTestAsync, AcquireObservesOperationContextDeadline) {
     }
 }
 
-TEST_F(ReadThroughCacheTestAsync, InvalidateReissuesLookup) {
+TEST_F(ReadThroughCacheAsyncTest, InvalidateReissuesLookup) {
     ThreadPool threadPool{ThreadPool::Options()};
     threadPool.startup();
 
@@ -232,41 +296,40 @@ TEST_F(ReadThroughCacheTestAsync, InvalidateReissuesLookup) {
         int idx = countLookups.fetchAndAdd(1);
         lookupStartedBarriers[idx].countDownAndWait();
         completeLookupBarriers[idx].countDownAndWait();
-        return CachedValue(idx);
+        return Cache::LookupResult(CachedValue(idx));
     });
 
     // Kick off the first lookup, which will block
     auto future = cache.acquireAsync("TestKey");
     ASSERT(!future.isReady());
 
-    // Invalidate the first lookup attempt while it is still blocked
+    // Wait for the first lookup attempt to start and invalidate it before letting it proceed
     lookupStartedBarriers[0].countDownAndWait();
     ASSERT_EQ(1, countLookups.load());
     cache.invalidate("TestKey");
     ASSERT(!future.isReady());
-
-    completeLookupBarriers[0].countDownAndWait();
+    completeLookupBarriers[0].countDownAndWait();  // Lets lookup attempt 1 proceed
     ASSERT(!future.isReady());
 
-    // Invalidate the second lookup attempt while it is still blocked
+    // Wait for the second lookup attempt to start and invalidate it before letting it proceed
     lookupStartedBarriers[1].countDownAndWait();
     ASSERT_EQ(2, countLookups.load());
     cache.invalidate("TestKey");
     ASSERT(!future.isReady());
-
-    completeLookupBarriers[1].countDownAndWait();
+    completeLookupBarriers[1].countDownAndWait();  // Lets lookup attempt 2 proceed
     ASSERT(!future.isReady());
 
-    // Do not invalidate the third lookup and make sure it returns the correct value
+    // Wait for the third lookup attempt to start, but not do not invalidate it before letting it
+    // proceed
     lookupStartedBarriers[2].countDownAndWait();
     ASSERT_EQ(3, countLookups.load());
     ASSERT(!future.isReady());
+    completeLookupBarriers[2].countDownAndWait();  // Lets lookup attempt 3 proceed
 
-    completeLookupBarriers[2].countDownAndWait();
     ASSERT_EQ(2, future.get()->counter);
 }
 
-TEST_F(ReadThroughCacheTestAsync, AcquireWithAShutdownThreadPool) {
+TEST_F(ReadThroughCacheAsyncTest, AcquireWithAShutdownThreadPool) {
     ThreadPool threadPool{ThreadPool::Options()};
     threadPool.startup();
     threadPool.shutdown();
@@ -274,14 +337,14 @@ TEST_F(ReadThroughCacheTestAsync, AcquireWithAShutdownThreadPool) {
 
     Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
         FAIL("Should not be called");
-        return CachedValue(0);  // Will never be reached
+        return Cache::LookupResult(CachedValue(0));  // Will never be reached
     });
 
     auto future = cache.acquireAsync("TestKey");
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 }
 
-TEST_F(ReadThroughCacheTestAsync, InvalidateCalledBeforeLookupTaskExecutes) {
+TEST_F(ReadThroughCacheAsyncTest, InvalidateCalledBeforeLookupTaskExecutes) {
     struct MockThreadPool : public ThreadPoolInterface {
         void startup() override {}
         void shutdown() override {}
@@ -300,7 +363,7 @@ TEST_F(ReadThroughCacheTestAsync, InvalidateCalledBeforeLookupTaskExecutes) {
     } threadPool;
 
     Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
-        return CachedValue(123);
+        return Cache::LookupResult(CachedValue(123));
     });
 
     auto future = cache.acquireAsync("TestKey");

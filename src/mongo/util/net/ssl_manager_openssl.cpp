@@ -950,18 +950,17 @@ public:
     }
 
 private:
-    static boost::optional<OCSPFetchResponse> _lookup(OperationContext* opCtx,
-                                                      const OCSPCacheKey& key) {
+    static LookupResult _lookup(OperationContext* opCtx, const OCSPCacheKey& key) {
         // If there is a CRL file, we expect the CRL file to cover the certificate status
         // information, and therefore we don't need to make a roundtrip.
         if (!getSSLGlobalParams().sslCRLFile.empty()) {
-            return boost::none;
+            return LookupResult(boost::none);
         }
 
         auto swOCSPContext =
             extractOcspUris(key.context, key.peerCert.get(), key.intermediateCerts.get());
         if (!swOCSPContext.isOK()) {
-            return boost::none;
+            return LookupResult(boost::none);
         }
 
         auto ocspContext = std::move(swOCSPContext.getValue());
@@ -971,10 +970,10 @@ private:
                 key.context, key.intermediateCerts, ocspContext, OCSPPurpose::kClientVerify)
                 .getNoThrow();
         if (!swResponse.isOK()) {
-            return boost::none;
+            return LookupResult(boost::none);
         }
 
-        return std::move(swResponse.getValue());
+        return LookupResult(std::move(swResponse.getValue()));
     }
 
     static const ServiceContext::Decoration<boost::optional<OCSPCache>> getOCSPCache;

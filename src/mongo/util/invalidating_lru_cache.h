@@ -119,9 +119,6 @@ class InvalidatingLRUCache {
     using Cache = LRUCache<Key, std::shared_ptr<StoredValue>>;
 
 public:
-    using key_type = typename Cache::key_type;
-    using mapped_type = typename Cache::mapped_type;
-
     /**
      * The 'cacheSize' parameter specifies the maximum size of the cache before the least recently
      * used entries start getting evicted. It is allowed to be zero, in which case no entries will
