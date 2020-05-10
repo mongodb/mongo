@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -271,33 +272,42 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
         return {ErrorCodes::SnapshotUnavailable, "index not visible in side transaction"};
     }
 
-    writeConflictRetry(opCtx, "set index multikey", ns().ns(), [&] {
-        WriteUnitOfWork wuow(opCtx);
+    writeConflictRetry(
+        opCtx, "set index multikey", ns().ns(), [&] {
+            WriteUnitOfWork wuow(opCtx);
 
-        // If we have a prepare optime for recovery, then we always use that. During recovery of
-        // prepared transactions, the logical clock may not yet be initialized, so we use the
-        // prepare timestamp of the transaction for this write. This is safe since the prepare
-        // timestamp is always <= the commit timestamp of a transaction, which satisfies the
-        // correctness requirement for multikey writes i.e. they must occur at or before the
-        // first write that set the multikey flag.
-        auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
-        Timestamp writeTs = recoveryPrepareOpTime.isNull()
-            ? LogicalClock::get(opCtx)->getClusterTime().asTimestamp()
-            : recoveryPrepareOpTime.getTimestamp();
+            // If we have a prepare optime for recovery, then we always use that. This is safe since
+            // the prepare timestamp is always <= the commit timestamp of a transaction, which
+            // satisfies the correctness requirement for multikey writes i.e. they must occur at or
+            // before the first write that set the multikey flag. This only occurs when
+            // reconstructing prepared transactions, and not during replication recovery oplog
+            // application.
+            auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
+            if (!recoveryPrepareOpTime.isNull()) {
+                auto status =
+                    opCtx->recoveryUnit()->setTimestamp(recoveryPrepareOpTime.getTimestamp());
+                if (status.code() == ErrorCodes::BadValue) {
+                    LOGV2(20352,
+                          "Temporarily could not timestamp the multikey catalog write, retrying.",
+                          "reason"_attr = status.reason());
+                    throw WriteConflictException();
+                }
+                fassert(31164, status);
+            } else {
+                // If there is no recovery prepare OpTime, then this node must be a primary. We
+                // write a noop oplog entry to get a properly ordered timestamp.
+                invariant(opCtx->writesAreReplicated());
 
-        auto status = opCtx->recoveryUnit()->setTimestamp(writeTs);
-        if (status.code() == ErrorCodes::BadValue) {
-            LOGV2(20352,
-                  "Temporarily could not timestamp the multikey catalog write, retrying.",
-                  "reason"_attr = status.reason());
-            throw WriteConflictException();
-        }
-        fassert(31164, status);
+                auto msg = BSON("msg"
+                                << "Setting index to multikey"
+                                << "coll" << ns().ns() << "index" << _descriptor->indexName());
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msg);
+            }
 
-        _catalogSetMultikey(opCtx, multikeyPaths);
+            _catalogSetMultikey(opCtx, multikeyPaths);
 
-        wuow.commit();
-    });
+            wuow.commit();
+        });
 
     return Status::OK();
 }

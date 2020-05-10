@@ -686,7 +686,8 @@ public:
 
         const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
         if (!match) {
-            FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
+            FAIL(str::stream() << "TS: " << ts.toString()
+                               << ", Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
                                << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths));
         }
         ASSERT_TRUE(match);
@@ -1528,11 +1529,14 @@ public:
 
         const auto beforeTxnTime = _clock->reserveTicks(1);
         auto beforeTxnTs = beforeTxnTime.asTimestamp();
-        auto commitEntryTs = beforeTxnTime.addTicks(1).asTimestamp();
+        const auto multikeyNoopTime = beforeTxnTime.addTicks(1);
+        auto multikeyNoopTs = multikeyNoopTime.asTimestamp();
+        auto commitEntryTs = multikeyNoopTime.addTicks(1).asTimestamp();
 
-        LOGV2(22502, "Present TS: {presentTs}", "presentTs"_attr = presentTs);
-        LOGV2(22503, "Before transaction TS: {beforeTxnTs}", "beforeTxnTs"_attr = beforeTxnTs);
-        LOGV2(22504, "Commit entry TS: {commitEntryTs}", "commitEntryTs"_attr = commitEntryTs);
+        LOGV2(22502, "Present time", "timestamp"_attr = presentTs);
+        LOGV2(22503, "Before transaction time", "timestamp"_attr = beforeTxnTs);
+        LOGV2(4801000, "Multikey noop time", "timestamp"_attr = multikeyNoopTs);
+        LOGV2(22504, "Commit entry time", "timestamp"_attr = commitEntryTs);
 
         const auto sessionId = makeLogicalSessionIdForTest();
         _opCtx->setLogicalSessionId(sessionId);
@@ -1561,8 +1565,9 @@ public:
         auto coll = autoColl.getCollection();
 
         // Make sure the transaction committed and its writes were timestamped correctly.
-        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
         assertDocumentAtTimestamp(coll, presentTs, BSONObj());
+        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(coll, multikeyNoopTs, BSONObj());
         assertDocumentAtTimestamp(coll, commitEntryTs, doc);
         assertDocumentAtTimestamp(coll, nullTs, doc);
 
@@ -1575,9 +1580,12 @@ public:
         // commit time.
         assertMultikeyPaths(_opCtx, coll, indexName, presentTs, false /* shouldBeMultikey */, {{}});
         assertMultikeyPaths(
-            _opCtx, coll, indexName, beforeTxnTs, true /* shouldBeMultikey */, {{0}});
+            _opCtx, coll, indexName, beforeTxnTs, false /* shouldBeMultikey */, {{}});
+        assertMultikeyPaths(
+            _opCtx, coll, indexName, multikeyNoopTs, true /* shouldBeMultikey */, {{0}});
         assertMultikeyPaths(
             _opCtx, coll, indexName, commitEntryTs, true /* shouldBeMultikey */, {{0}});
+        assertMultikeyPaths(_opCtx, coll, indexName, nullTs, true /* shouldBeMultikey */, {{0}});
     }
 };
 
