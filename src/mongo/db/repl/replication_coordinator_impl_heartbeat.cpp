@@ -153,8 +153,13 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
         _replExecutor.get(), handle, request, status);
 
     {
-        // Pretend we sent a request so that _untrackHeartbeatHandle_inlock succeeds.
         stdx::unique_lock<Latch> lk(_mutex);
+
+        // Simulate preparing a heartbeat request so that the target's ping stats are initialized.
+        _topCoord->prepareHeartbeatRequestV1(
+            _replExecutor->now(), _rsConfig.getReplSetName(), request.target);
+
+        // Pretend we sent a request so that _untrackHeartbeatHandle_inlock succeeds.
         _trackHeartbeatHandle_inlock(handle);
     }
 
