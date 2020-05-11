@@ -55,6 +55,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -127,6 +128,8 @@ MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
 // Will cause signal drain complete to hang after reconfig
 MONGO_FAIL_POINT_DEFINE(hangAfterReconfigOnDrainComplete);
 MONGO_FAIL_POINT_DEFINE(doNotRemoveNewlyAddedOnHeartbeats);
+// Will hang right after setting the currentOp info associated with an automatic reconfig.
+MONGO_FAIL_POINT_DEFINE(hangDuringAutomaticReconfig);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -3716,6 +3719,30 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
     };
 
     auto opCtx = cc().makeOperationContext();
+
+    // Set info for currentOp to display if called while this is still running.
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        auto curOp = CurOp::get(opCtx.get());
+        curOp->setLogicalOp_inlock(LogicalOp::opCommand);
+        BSONObjBuilder bob;
+        bob.append("replSetReconfig", "automatic");
+        bob.append("memberId", memberId.getData());
+        bob.append("configVersionAndTerm", versionAndTerm.toString());
+        bob.append("info",
+                   "An automatic reconfig. Used to remove a 'newlyAdded' config field for a "
+                   "replica set member.");
+        curOp->setOpDescription_inlock(bob.obj());
+        curOp->setNS_inlock("local.system.replset");
+        curOp->ensureStarted();
+    }
+
+    if (MONGO_unlikely(hangDuringAutomaticReconfig.shouldFail())) {
+        LOGV2(4635700,
+              "Failpoint 'hangDuringAutomaticReconfig' enabled. Blocking until it is disabled.");
+        hangDuringAutomaticReconfig.pauseWhileSet();
+    }
+
     auto status = doReplSetReconfig(opCtx.get(), getNewConfig, false /* force */);
 
     if (!status.isOK()) {
