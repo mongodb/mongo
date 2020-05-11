@@ -1,11 +1,13 @@
-// Tests that validators with encryption-related keywords and action "warn" correctly logs a startup
-// warning after upgrade and is not usable. Also verify that we can collMod the validator such that
-// the collection is then usable.
-// @tags: [requires_majority_read_concern]
+/**
+ * Tests that validators with encryption-related keywords and action "warn" correctly logs a startup
+ * warning after upgrade and is not usable. Also verify that we can collMod the validator such that
+ * the collection is then usable.
+ *
+ * We restart mongod during the test and expect it to have the same data after restarting.
+ * @tags: [requires_persistence]
+ */
 (function() {
 "use strict";
-
-load("jstests/multiVersion/libs/multi_rs.js");  // For upgradeSet.
 
 const preBackport42Version = "4.2.1";
 const latestVersion = "latest";
@@ -14,26 +16,11 @@ const encryptSchema = {
     $jsonSchema: {properties: {_id: {encrypt: {}}}}
 };
 
-const rst = new ReplSetTest({
-    nodes: 3,
-    nodeOptions: {binVersion: preBackport42Version},
-});
-rst.startSet();
-rst.initiate();
+const dbpath = MongoRunner.dataPath + jsTestName();
+let conn = MongoRunner.runMongod({binVersion: preBackport42Version, dbpath: dbpath});
+assert.neq(null, conn, "mongod was unable to start up");
 
-// Up- or downgrades the replset and then refreshes our references to the test collection.
-function refreshReplSet(version) {
-    // Upgrade the set and wait for it to become available again.
-    rst.upgradeSet({binVersion: version});
-    rst.awaitSecondaryNodes();
-
-    // Having upgraded the set, reacquire references to the db and collection.
-    testDB = rst.getPrimary().getDB(jsTestName());
-    coll = testDB[collName];
-}
-
-// Obtain references to the test database and create the test collection.
-let testDB = rst.getPrimary().getDB(jsTestName());
+let testDB = conn.getDB("test");
 let collName = "doc_validation_encrypt_keywords";
 let coll = testDB[collName];
 coll.drop();
@@ -44,8 +31,13 @@ assert.commandWorked(
 // Check that an insert which violates the validator passes.
 assert.commandWorked(coll.insert({_id: 0}));
 
-// Upgrade the replica set to 'latest'.
-refreshReplSet("latest");
+// Restart the mongod with binVersion "latest".
+MongoRunner.stopMongod(conn);
+conn = MongoRunner.runMongod({noCleanData: true, binVersion: "latest", dbpath: dbpath});
+assert.neq(null, conn, "mongod was unable to start up");
+
+testDB = conn.getDB("test");
+coll = testDB[collName];
 
 // Check that we logged a startup warning.
 const cmdRes = assert.commandWorked(testDB.adminCommand({getLog: "startupWarnings"}));
@@ -62,5 +54,11 @@ assert.commandWorked(testDB.runCommand({collMod: collName, validationAction: "er
 // Retry the insert and verify that it now passes.
 assert.commandWorked(coll.insert({_id: BinData(6, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}));
 
-rst.stopSet();
+// Creating a new collection with a disallowed validator should fail.
+assert.commandFailedWithCode(
+    testDB.createCollection(collName + "_new",
+                            {validator: encryptSchema, validationAction: "warn"}),
+    ErrorCodes.QueryFeatureNotAllowed);
+
+MongoRunner.stopMongod(conn);
 })();
