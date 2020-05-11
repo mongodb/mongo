@@ -59,23 +59,11 @@ AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    Top::LockType lockType,
                                    LogMode logMode,
-                                   boost::optional<int> dbProfilingLevel,
+                                   int dbProfilingLevel,
                                    Date_t deadline)
     : _opCtx(opCtx), _lockType(lockType), _nss(nss), _logMode(logMode) {
     if (_logMode == LogMode::kUpdateTop) {
         return;
-    }
-
-    if (!dbProfilingLevel) {
-        // No profiling level was determined, attempt to read the profiling level from the Database
-        // object. Since we are only reading the in-memory profiling level out of the database
-        // object (which is configured on a per-node basis and not replicated or persisted), we
-        // never need to conflict with secondary batch application.
-        ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
-        AutoGetDb autoDb(_opCtx, _nss.db(), MODE_IS, deadline);
-        if (autoDb.getDb()) {
-            dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
-        }
     }
 
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
@@ -256,13 +244,13 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     Date_t deadline,
     AutoStatsTracker::LogMode logMode)
     : _autoCollForRead(opCtx, nsOrUUID, viewMode, deadline),
-      _statsTracker(opCtx,
-                    _autoCollForRead.getNss(),
-                    Top::LockType::ReadLocked,
-                    logMode,
-                    _autoCollForRead.getDb() ? _autoCollForRead.getDb()->getProfilingLevel()
-                                             : kDoNotChangeProfilingLevel,
-                    deadline) {
+      _statsTracker(
+          opCtx,
+          _autoCollForRead.getNss(),
+          Top::LockType::ReadLocked,
+          logMode,
+          CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_autoCollForRead.getNss().db()),
+          deadline) {
 
     if (!_autoCollForRead.getView()) {
         auto* const css = CollectionShardingState::get(opCtx, _autoCollForRead.getNss());
@@ -294,7 +282,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
     }
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    currentOp->enter_inlock(ns.c_str(), _db->getProfilingLevel());
+    currentOp->enter_inlock(ns.c_str(),
+                            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_db->name()));
 }
 
 OldClientContext::~OldClientContext() {

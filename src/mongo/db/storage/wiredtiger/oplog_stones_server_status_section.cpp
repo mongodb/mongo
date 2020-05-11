@@ -57,13 +57,15 @@ public:
         AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
         auto oplog = oplogRead.getCollection();
         if (oplog) {
-            const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, "local");
+            const auto localDb =
+                DatabaseHolder::get(opCtx)->getDb(opCtx, NamespaceString::kLocalDb);
             invariant(localDb);
-            AutoStatsTracker statsTracker(opCtx,
-                                          NamespaceString::kRsOplogNamespace,
-                                          Top::LockType::ReadLocked,
-                                          AutoStatsTracker::LogMode::kUpdateTop,
-                                          localDb->getProfilingLevel());
+            AutoStatsTracker statsTracker(
+                opCtx,
+                NamespaceString::kRsOplogNamespace,
+                Top::LockType::ReadLocked,
+                AutoStatsTracker::LogMode::kUpdateTop,
+                CollectionCatalog::get(opCtx).getDatabaseProfileLevel(NamespaceString::kLocalDb));
             oplog->getRecordStore()->getOplogTruncateStats(builder);
         }
         return builder.obj();

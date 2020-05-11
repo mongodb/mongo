@@ -47,6 +47,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -105,6 +106,41 @@ MONGO_FAIL_POINT_DEFINE(waitInFilemd5DuringManualYield);
 
 namespace {
 
+Status _setProfilingLevel(OperationContext* opCtx, Database* db, StringData dbName, int newLevel) {
+    invariant(db);
+
+    auto currLevel = CollectionCatalog::get(opCtx).getDatabaseProfileLevel(dbName);
+
+    if (currLevel == newLevel) {
+        return Status::OK();
+    }
+
+    if (newLevel == 0) {
+        CollectionCatalog::get(opCtx).setDatabaseProfileLevel(dbName, newLevel);
+        return Status::OK();
+    }
+
+    if (newLevel < 0 || newLevel > 2) {
+        return Status(ErrorCodes::BadValue, "profiling level has to be >=0 and <= 2");
+    }
+
+    // Can't support profiling without supporting capped collections.
+    if (!opCtx->getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "the storage engine doesn't support profiling.");
+    }
+
+    Status status = createProfileCollection(opCtx, db);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    CollectionCatalog::get(opCtx).setDatabaseProfileLevel(dbName, newLevel);
+
+    return Status::OK();
+}
+
+
 /**
  * Sets the profiling level, logging/profiling threshold, and logging/profiling sample rate for the
  * given database.
@@ -131,7 +167,8 @@ protected:
         AutoGetDb ctx(opCtx, dbName, dbMode);
         Database* db = ctx.getDb();
 
-        auto oldLevel = (db ? db->getProfilingLevel() : serverGlobalParams.defaultProfile);
+        // Fetches the database profiling level or the server default if the db does not exist.
+        auto oldLevel = CollectionCatalog::get(opCtx).getDatabaseProfileLevel(dbName);
 
         if (!readOnly) {
             if (!db) {
@@ -140,7 +177,8 @@ protected:
                 auto databaseHolder = DatabaseHolder::get(opCtx);
                 db = databaseHolder->openDb(opCtx, dbName);
             }
-            uassertStatusOK(db->setProfilingLevel(opCtx, profilingLevel));
+
+            uassertStatusOK(_setProfilingLevel(opCtx, db, dbName, profilingLevel));
         }
 
         return oldLevel;

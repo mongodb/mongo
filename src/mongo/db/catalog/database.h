@@ -87,16 +87,6 @@ public:
     virtual void clearTmpCollections(OperationContext* const opCtx) const = 0;
 
     /**
-     * Sets a new profiling level for the database and returns the outcome.
-     *
-     * @param opCtx Operation context which to use for creating the profiling collection.
-     * @param newLevel New profiling level to use.
-     */
-    virtual Status setProfilingLevel(OperationContext* const opCtx, const int newLevel) = 0;
-
-    virtual int getProfilingLevel() const = 0;
-
-    /**
      * Sets the 'drop-pending' state of this Database.
      * This is done at the beginning of a dropDatabase operation and is used to reject subsequent
      * collection creation requests on this database.

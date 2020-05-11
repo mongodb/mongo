@@ -68,7 +68,7 @@ public:
                      const NamespaceString& nss,
                      Top::LockType lockType,
                      LogMode logMode,
-                     boost::optional<int> dbProfilingLevel,
+                     int dbProfilingLevel,
                      Date_t deadline = Date_t::max());
 
     /**
