@@ -350,7 +350,10 @@ private:
             exec = InternalPlanner::collectionScan(
                 opCtx, nss.ns(), collection, PlanExecutor::NO_YIELD);
         } else {
-            LOGV2(20455, "can't find _id index for: {nss}", "nss"_attr = nss);
+            LOGV2(20455,
+                  "Can't find _id index for namespace: {namespace}",
+                  "Can't find _id index for namespace",
+                  "namespace"_attr = nss);
             return "no _id _index";
         }
 
@@ -366,7 +369,8 @@ private:
             n++;
         }
         if (PlanExecutor::IS_EOF != state) {
-            LOGV2_WARNING(20456, "error while hashing, db dropped? ns={nss}", "nss"_attr = nss);
+            LOGV2_WARNING(
+                20456, "Error while hashing, db possibly dropped", "namespace"_attr = nss);
             uasserted(34371,
                       "Plan executor error while running dbHash command: " +
                           WorkingSetCommon::toStatusString(c));

@@ -656,16 +656,16 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         // considered an error and the command should return success.
         if (ErrorCodes::NamespaceNotFound == ex.code()) {
             LOGV2(20448,
-                  "Index build failed: collection dropped: ",
+                  "Index build failed: collection dropped",
                   "buildUUID"_attr = buildUUID,
                   "ns"_attr = ns,
                   "collectionUUID"_attr = *collectionUUID,
-                  "ex"_attr = ex);
+                  "exception"_attr = ex);
             return true;
         }
 
         // All other errors should be forwarded to the caller with index build information included.
-        LOGV2(20449, "Index build failed", "buildUUID"_attr = buildUUID, "ex"_attr = ex.toStatus());
+        LOGV2(20449, "Index build failed", "buildUUID"_attr = buildUUID, "error"_attr = ex);
         ex.addContext(str::stream() << "Index build failed: " << buildUUID << ": Collection " << ns
                                     << " ( " << *collectionUUID << " )");
 
@@ -740,12 +740,16 @@ public:
                 if (shouldLogMessageOnAlreadyBuildingError) {
                     auto bsonElem = cmdObj.getField(kIndexesFieldName);
                     LOGV2(20450,
-                          "Received a request to create indexes: '{bsonElem}', but found that at "
-                          "least one of the indexes is already being built, '{ex_toStatus}'. This "
-                          "request will wait for the pre-existing index build to finish "
-                          "before proceeding.",
-                          "bsonElem"_attr = bsonElem,
-                          "ex_toStatus"_attr = ex.toStatus());
+                          "Received a request to create indexes: '{indexesFieldName}', but found "
+                          "that at least one of the indexes is already being built, '{error}'. "
+                          "This request will wait for the pre-existing index build to finish "
+                          "before proceeding",
+                          "Received a request to create indexes, "
+                          "but found that at least one of the indexes is already being built."
+                          "This request will wait for the pre-existing index build to finish "
+                          "before proceeding",
+                          "indexesFieldName"_attr = bsonElem,
+                          "error"_attr = ex);
                     shouldLogMessageOnAlreadyBuildingError = false;
                 }
                 // Unset the response fields so we do not write duplicate fields.

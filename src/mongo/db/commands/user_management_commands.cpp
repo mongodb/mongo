@@ -570,7 +570,7 @@ public:
         }
 
         if (_authzManager->getCacheGeneration() == _cacheGeneration) {
-            LOGV2_DEBUG(20509, 1, "User management command did not invalidate the user cache.");
+            LOGV2_DEBUG(20509, 1, "User management command did not invalidate the user cache");
             _authzManager->invalidateUserCache(_opCtx);
         }
     }
@@ -2493,9 +2493,10 @@ public:
                 // Match the behavior of mongorestore to continue on failure
                 LOGV2_WARNING(
                     20510,
-                    "Could not update user {userName} in _mergeAuthzCollections command: {status}",
-                    "userName"_attr = userName,
-                    "status"_attr = redact(status));
+                    "Could not update user {user} in _mergeAuthzCollections command: {error}",
+                    "Could not update user during _mergeAuthzCollections command",
+                    "user"_attr = userName,
+                    "error"_attr = redact(status));
             }
         } else {
             auditCreateOrUpdateUser(userObj, true);
@@ -2504,9 +2505,10 @@ public:
                 // Match the behavior of mongorestore to continue on failure
                 LOGV2_WARNING(
                     20511,
-                    "Could not insert user {userName} in _mergeAuthzCollections command: {status}",
-                    "userName"_attr = userName,
-                    "status"_attr = redact(status));
+                    "Could not insert user {user} in _mergeAuthzCollections command: {error}",
+                    "Could not insert user during _mergeAuthzCollections command",
+                    "user"_attr = userName,
+                    "error"_attr = redact(status));
             }
         }
         usersToDrop->erase(userName);
@@ -2537,9 +2539,10 @@ public:
                 // Match the behavior of mongorestore to continue on failure
                 LOGV2_WARNING(
                     20512,
-                    "Could not update role {roleName} in _mergeAuthzCollections command: {status}",
-                    "roleName"_attr = roleName,
-                    "status"_attr = redact(status));
+                    "Could not update role {role} in _mergeAuthzCollections command: {error}",
+                    "Could not update role during _mergeAuthzCollections command",
+                    "role"_attr = roleName,
+                    "error"_attr = redact(status));
             }
         } else {
             auditCreateOrUpdateRole(roleObj, true);
@@ -2548,9 +2551,10 @@ public:
                 // Match the behavior of mongorestore to continue on failure
                 LOGV2_WARNING(
                     20513,
-                    "Could not insert role {roleName} in _mergeAuthzCollections command: {status}",
-                    "roleName"_attr = roleName,
-                    "status"_attr = redact(status));
+                    "Could not insert role {role} in _mergeAuthzCollections command: {error}",
+                    "Could not insert role during _mergeAuthzCollections command",
+                    "role"_attr = roleName,
+                    "error"_attr = redact(status));
             }
         }
         rolesToDrop->erase(roleName);

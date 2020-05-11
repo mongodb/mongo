@@ -103,13 +103,13 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
         // We should always have a valid status member object at this point.
         auto status = WorkingSetCommon::getMemberObjectStatus(value);
         invariant(!status.isOK());
-        LOGV2_WARNING(23802,
-                      "Plan executor error during findAndModify: {PlanExecutor_statestr_state}, "
-                      "status: {status}, stats: {Explain_getWinningPlanStats_exec}",
-                      "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
-                      "status"_attr = status,
-                      "Explain_getWinningPlanStats_exec"_attr =
-                          redact(Explain::getWinningPlanStats(exec)));
+        LOGV2_WARNING(
+            23802,
+            "Plan executor error during findAndModify: {state}, status: {error}, stats: {stats}",
+            "Plan executor error during findAndModify",
+            "state"_attr = PlanExecutor::statestr(state),
+            "error"_attr = status,
+            "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
 
         uassertStatusOKWithContext(status, "Plan executor error during findAndModify");
         MONGO_UNREACHABLE;

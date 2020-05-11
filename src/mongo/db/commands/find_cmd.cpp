@@ -531,14 +531,13 @@ public:
                 // We should always have a valid status member object at this point.
                 auto status = WorkingSetCommon::getMemberObjectStatus(doc);
                 invariant(!status.isOK());
-                LOGV2_WARNING(
-                    23798,
-                    "Plan executor error during find command: {PlanExecutor_statestr_state}, "
-                    "status: {status}, stats: {Explain_getWinningPlanStats_exec_get}",
-                    "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
-                    "status"_attr = status,
-                    "Explain_getWinningPlanStats_exec_get"_attr =
-                        redact(Explain::getWinningPlanStats(exec.get())));
+                LOGV2_WARNING(23798,
+                              "Plan executor error during find command: {state}, status: {error}, "
+                              "stats: {stats}",
+                              "Plan executor error during find command",
+                              "state"_attr = PlanExecutor::statestr(state),
+                              "error"_attr = status,
+                              "stats"_attr = redact(Explain::getWinningPlanStats(exec.get())));
 
                 uassertStatusOK(status.withContext("Executor error during find command"));
             }

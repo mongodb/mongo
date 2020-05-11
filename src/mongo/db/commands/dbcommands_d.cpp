@@ -280,8 +280,11 @@ public:
                     if (partialOk) {
                         break;  // skipped chunk is probably on another shard
                     }
-                    LOGV2(
-                        20452, "should have chunk: {n} have:{myn}", "n"_attr = n, "myn"_attr = myn);
+                    LOGV2(20452,
+                          "Should have chunk: {expected} have: {observed}",
+                          "Unexpected chunk",
+                          "expected"_attr = n,
+                          "observed"_attr = myn);
                     dumpChunks(opCtx, nss.ns(), query, sort);
                     uassert(10040, "chunks out of order", n == myn);
                 }
@@ -319,7 +322,7 @@ public:
                     LOGV2_DEBUG(
                         20453,
                         1,
-                        "chunk metadata changed during filemd5, will retarget and continue");
+                        "Chunk metadata changed during filemd5, will retarget and continue");
                     break;
                 }
 
@@ -354,7 +357,7 @@ public:
         q.sort(sort);
         unique_ptr<DBClientCursor> c = client.query(NamespaceString(ns), q);
         while (c->more()) {
-            LOGV2(20454, "{c_nextSafe}", "c_nextSafe"_attr = c->nextSafe());
+            LOGV2(20454, "Chunk: {chunk}", "Dumping chunks", "chunk"_attr = c->nextSafe());
         }
     }
 

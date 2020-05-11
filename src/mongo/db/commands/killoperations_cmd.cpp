@@ -43,9 +43,8 @@ public:
             auto status = cursorManager->killCursor(opCtx, cursorId, true /* shouldAudit */);
 
             if (!status.isOK()) {
-                LOGV2(4664803,
-                      "Failed to kill the cursor ",
-                      "status"_attr = redact(status.toString()));
+                LOGV2(
+                    4664803, "Failed to kill the cursor", "error"_attr = redact(status.toString()));
             } else {
                 LOGV2(4664804, "Killed cursor", "cursorId"_attr = cursorId);
             }

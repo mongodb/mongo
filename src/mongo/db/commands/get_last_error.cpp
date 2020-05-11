@@ -265,10 +265,10 @@ public:
                 if (electionId != repl::ReplicationCoordinator::get(opCtx)->getElectionId()) {
                     LOGV2_DEBUG(20476,
                                 3,
-                                "oid passed in is {electionId}, but our id is "
-                                "{repl_ReplicationCoordinator_get_opCtx_getElectionId}",
-                                "electionId"_attr = electionId,
-                                "repl_ReplicationCoordinator_get_opCtx_getElectionId"_attr =
+                                "OID passed in is {passedOID}, but our id is {ourOID}",
+                                "OID mismatch during election",
+                                "passedOID"_attr = electionId,
+                                "ourOID"_attr =
                                     repl::ReplicationCoordinator::get(opCtx)->getElectionId());
                     errmsg = "election occurred after write";
                     result.append("code", ErrorCodes::WriteConcernFailed);

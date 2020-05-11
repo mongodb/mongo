@@ -80,8 +80,8 @@ function authAndTest(mongo) {
         function checkAuthSuccess(element, index, array) {
             const logJson = JSON.parse(element);
 
-            return logJson.id === 20429 && logJson.attr.principalName === CLIENT_USER &&
-                logJson.attr.DB === "$external" &&
+            return logJson.id === 20429 && logJson.attr.user === CLIENT_USER &&
+                logJson.attr.db === "$external" &&
                 /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(logJson.attr.client);
         }
         assert(log.some(checkAuthSuccess));

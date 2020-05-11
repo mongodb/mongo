@@ -258,9 +258,10 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     if (!serverGlobalParams.quiet.load()) {
         mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
         LOGV2(20427,
-              " authenticate db: {dbname} {cmdToLog}",
-              "dbname"_attr = dbname,
-              "cmdToLog"_attr = cmdToLog);
+              "Authenticate db: {db} {command}",
+              "Authenticate",
+              "db"_attr = dbname,
+              "command"_attr = cmdToLog);
     }
     std::string mechanism = cmdObj.getStringField("mechanism");
     if (mechanism.empty()) {
@@ -295,11 +296,12 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
             auto const client = opCtx->getClient();
             LOGV2(20428,
                   "Failed to authenticate {user} from client {client} with mechanism "
-                  "{mechanism}: {status}",
+                  "{mechanism}: {error}",
+                  "Failed to authenticate",
                   "user"_attr = user,
                   "client"_attr = client->getRemote(),
                   "mechanism"_attr = mechanism,
-                  "status"_attr = status);
+                  "error"_attr = status);
         }
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         if (status.code() == ErrorCodes::AuthenticationFailed) {
@@ -314,10 +316,10 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
 
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(20429,
-              "Successfully authenticated as principal {principalName} on {DB} from client "
-              "{client}",
-              "principalName"_attr = user.getUser(),
-              "DB"_attr = user.getDB(),
+              "Successfully authenticated as principal {user} on {db} from client {client}",
+              "Successfully authenticated",
+              "user"_attr = user.getUser(),
+              "db"_attr = user.getDB(),
               "client"_attr = opCtx->getClient()->session()->remote());
     }
 

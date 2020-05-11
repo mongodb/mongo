@@ -118,7 +118,7 @@ public:
              const std::string& ns,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        LOGV2(20504, "test only command sleep invoked");
+        LOGV2(20504, "Test-only command 'sleep' invoked");
         long long msToSleep = 0;
 
         if (cmdObj["secs"] || cmdObj["seconds"] || cmdObj["millis"]) {

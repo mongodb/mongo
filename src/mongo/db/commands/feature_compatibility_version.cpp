@@ -154,15 +154,17 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
 
     // To avoid extra log messages when the targetVersion is set/unset, only log when the version
     // changes.
-    bool isDifferent = serverGlobalParams.featureCompatibility.isVersionInitialized()
-        ? serverGlobalParams.featureCompatibility.getVersion() != newVersion
-        : true;
+    logv2::DynamicAttributes attrs;
+    bool isDifferent = true;
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
+        attrs.add("currentVersion", FeatureCompatibilityVersionParser::toString(currentVersion));
+        isDifferent = currentVersion != newVersion;
+    }
+
     if (isDifferent) {
-        LOGV2(
-            20459,
-            "setting featureCompatibilityVersion to {FeatureCompatibilityVersionParser_newVersion}",
-            "FeatureCompatibilityVersionParser_newVersion"_attr =
-                FeatureCompatibilityVersionParser::toString(newVersion));
+        attrs.add("newVersion", FeatureCompatibilityVersionParser::toString(newVersion));
+        LOGV2(20459, "Setting featureCompatibilityVersion", attrs);
     }
 
     opCtx->recoveryUnit()->onCommit(
@@ -208,9 +210,9 @@ void FeatureCompatibilityVersion::_setVersion(
     if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
         if (MONGO_unlikely(hangBeforeAbortingRunningTransactionsOnFCVDowngrade.shouldFail())) {
             LOGV2(20460,
-                  "featureCompatibilityVersion - "
-                  "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled. "
-                  "Blocking until fail point is disabled.");
+                  "FeatureCompatibilityVersion - "
+                  "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled, "
+                  "blocking until fail point is disabled");
             hangBeforeAbortingRunningTransactionsOnFCVDowngrade.pauseWhileSet();
         }
         // Abort all open transactions when downgrading the featureCompatibilityVersion.

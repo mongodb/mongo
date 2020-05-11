@@ -318,11 +318,10 @@ public:
         const NamespaceString ns = cmd.getNamespace();
 
         if (cmd.getAutoIndexId()) {
-            const char* deprecationWarning =
-                "the autoIndexId option is deprecated and will be removed in a future release";
-            LOGV2_WARNING(
-                23800, "{deprecationWarning}", "deprecationWarning"_attr = deprecationWarning);
-            result.append("note", deprecationWarning);
+#define DEPR_23800 "The autoIndexId option is deprecated and will be removed in a future release"
+            LOGV2_WARNING(23800, DEPR_23800);
+            result.append("note", DEPR_23800);
+#undef DEPR_23800
         }
 
         // Ensure that the 'size' field is present if 'capped' is set to true.
@@ -561,7 +560,10 @@ public:
         }
 
         if (PlanExecutor::FAILURE == state) {
-            LOGV2_WARNING(23801, "Internal error while reading {ns}", "ns"_attr = ns);
+            LOGV2_WARNING(23801,
+                          "Internal error while reading {namespace}",
+                          "Internal error while reading",
+                          "namespace"_attr = ns);
             uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
                 "Executor error while reading during dataSize command"));
         }

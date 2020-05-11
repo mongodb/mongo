@@ -202,13 +202,13 @@ bool handleCursorCommand(OperationContext* opCtx,
             // We should always have a valid status member object at this point.
             auto status = WorkingSetCommon::getMemberObjectStatus(nextDoc);
             invariant(!status.isOK());
-            LOGV2_WARNING(23799,
-                          "Aggregate command executor error: {PlanExecutor_statestr_state}, "
-                          "status: {status}, stats: {Explain_getWinningPlanStats_exec}",
-                          "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
-                          "status"_attr = status,
-                          "Explain_getWinningPlanStats_exec"_attr =
-                              redact(Explain::getWinningPlanStats(exec)));
+            LOGV2_WARNING(
+                23799,
+                "Aggregate command executor error: {state}, status: {error}, stats: {stats}",
+                "Aggregate command executor error",
+                "state"_attr = PlanExecutor::statestr(state),
+                "error"_attr = status,
+                "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
 
             uassertStatusOK(status.withContext("PlanExecutor error during aggregation"));
         }

@@ -337,14 +337,13 @@ public:
                     auto status = WorkingSetCommon::getMemberObjectStatus(doc);
                     invariant(!status.isOK());
                     // Log an error message and then perform the cleanup.
-                    LOGV2_WARNING(20478,
-                                  "GetMore command executor error: {PlanExecutor_statestr_state}, "
-                                  "status: {status}, stats: {Explain_getWinningPlanStats_exec}",
-                                  "PlanExecutor_statestr_state"_attr =
-                                      PlanExecutor::statestr(*state),
-                                  "status"_attr = status,
-                                  "Explain_getWinningPlanStats_exec"_attr =
-                                      redact(Explain::getWinningPlanStats(exec)));
+                    LOGV2_WARNING(
+                        20478,
+                        "getMore command executor error: {state}, status: {error}, stats: {stats}",
+                        "getMore command executor error",
+                        "state"_attr = PlanExecutor::statestr(*state),
+                        "error"_attr = status,
+                        "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
 
                     nextBatch->abandon();
                     return status;
@@ -429,7 +428,7 @@ public:
                 if (MONGO_unlikely(GetMoreHangBeforeReadLock.shouldFail())) {
                     LOGV2(20477,
                           "GetMoreHangBeforeReadLock fail point enabled. Blocking until fail "
-                          "point is disabled.");
+                          "point is disabled");
                     GetMoreHangBeforeReadLock.pauseWhileSet(opCtx);
                 }
 

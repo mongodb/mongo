@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 #include "mongo/db/commands/mr_common.h"
 
 #include <string>
@@ -55,7 +53,6 @@
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/expression_js_emit.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 

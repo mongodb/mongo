@@ -280,14 +280,14 @@ public:
             // We should always have a valid status member object at this point.
             auto status = WorkingSetCommon::getMemberObjectStatus(obj);
             invariant(!status.isOK());
-            LOGV2_WARNING(
-                23797,
-                "Plan executor error during distinct command: {PlanExecutor_statestr_state}, "
-                "status: {status}, stats: {Explain_getWinningPlanStats_executor_getValue_get}",
-                "PlanExecutor_statestr_state"_attr = redact(PlanExecutor::statestr(state)),
-                "status"_attr = status,
-                "Explain_getWinningPlanStats_executor_getValue_get"_attr =
-                    redact(Explain::getWinningPlanStats(executor.getValue().get())));
+            LOGV2_WARNING(23797,
+                          "Plan executor error during distinct command: {state}, status: {error}, "
+                          "stats: {stats}",
+                          "Plan executor error during distinct command",
+                          "state"_attr = redact(PlanExecutor::statestr(state)),
+                          "error"_attr = status,
+                          "stats"_attr =
+                              redact(Explain::getWinningPlanStats(executor.getValue().get())));
 
             uassertStatusOK(status.withContext("Executor error during distinct command"));
         }

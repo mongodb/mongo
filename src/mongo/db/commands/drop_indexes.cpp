@@ -130,7 +130,7 @@ public:
         const NamespaceString toReIndexNss =
             CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
 
-        LOGV2(20457, "CMD: reIndex {toReIndexNss}", "toReIndexNss"_attr = toReIndexNss);
+        LOGV2(20457, "CMD: reIndex {namespace}", "CMD reIndex", "namespace"_attr = toReIndexNss);
 
         if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
             repl::ReplicationCoordinator::modeNone) {
@@ -230,7 +230,7 @@ public:
         });
 
         if (MONGO_unlikely(reIndexCrashAfterDrop.shouldFail())) {
-            LOGV2(20458, "exiting because 'reIndexCrashAfterDrop' fail point was set");
+            LOGV2(20458, "Exiting because 'reIndexCrashAfterDrop' fail point was set");
             quickExit(EXIT_ABRUPT);
         }
 
