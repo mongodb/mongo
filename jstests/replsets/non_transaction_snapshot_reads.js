@@ -18,6 +18,12 @@ const options = {
 const replSet = new ReplSetTest({nodes: 3, nodeOptions: options});
 replSet.startSet();
 replSet.initiateWithHighElectionTimeout();
+let primaryAdmin = replSet.getPrimary().getDB("admin");
+assert.eq(assert
+              .commandWorked(
+                  primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
+              .minSnapshotHistoryWindowInSeconds,
+          600);
 const primaryDB = replSet.getPrimary().getDB('test');
 const secondaryDB = replSet.getSecondary().getDB('test');
 snapshotReadsTest({
