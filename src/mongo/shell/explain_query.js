@@ -151,6 +151,11 @@ var DBExplainQuery = (function() {
 
                 var explainCmd = {explain: innerCmd};
                 explainCmd["verbosity"] = this._verbosity;
+                // If "maxTimeMS" is set on innerCmd, it needs to be propagated to the top-level
+                // of explainCmd so that it has the intended effect.
+                if (innerCmd.hasOwnProperty("maxTimeMS")) {
+                    explainCmd.maxTimeMS = innerCmd.maxTimeMS;
+                }
 
                 var explainDb = this._query._db;
 
