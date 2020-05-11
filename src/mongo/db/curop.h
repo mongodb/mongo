@@ -531,8 +531,8 @@ public:
         if (_debug.remoteOpWaitTime) {
             Microseconds end = elapsedTimeTotal();
             invariant(_remoteOpStartTime);
-            invariant(*_remoteOpStartTime <= end);
-            Microseconds delta = end - *_remoteOpStartTime;
+            // A backward shift of the realtime system clock could lead to a negative delta.
+            Microseconds delta = std::max((end - *_remoteOpStartTime), Microseconds{0});
             *_debug.remoteOpWaitTime += delta;
             _remoteOpStartTime = boost::none;
         }
