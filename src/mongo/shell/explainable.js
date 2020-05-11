@@ -28,6 +28,16 @@ var Explainable = (function() {
         return explainResult;
     };
 
+    var buildExplainCmd = function(innerCmd, verbosity) {
+        var explainCmd = {"explain": innerCmd, "verbosity": verbosity};
+        // If "maxTimeMS" is set on innerCmd, it needs to be propagated to the top-level
+        // of explainCmd so that it has the intended effect.
+        if (innerCmd.hasOwnProperty("maxTimeMS")) {
+            explainCmd.maxTimeMS = innerCmd.maxTimeMS;
+        }
+        return explainCmd;
+    };
+
     function constructor(collection, verbosity) {
         //
         // Private vars.
@@ -110,7 +120,7 @@ var Explainable = (function() {
 
                 let aggCmd = Object.extend(
                     {"aggregate": this._collection.getName(), "pipeline": pipeline}, extraOpts);
-                let explainCmd = {"explain": aggCmd, "verbosity": this._verbosity};
+                let explainCmd = buildExplainCmd(aggCmd, this._verbosity);
                 let explainResult = this._collection.runReadCommand(explainCmd);
                 return throwOrReturn(explainResult);
             }
@@ -133,7 +143,7 @@ var Explainable = (function() {
 
         this.findAndModify = function(params) {
             var famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
-            var explainCmd = {"explain": famCmd, "verbosity": this._verbosity};
+            var explainCmd = buildExplainCmd(famCmd, this._verbosity);
             var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
@@ -156,8 +166,11 @@ var Explainable = (function() {
             if (options && options.hasOwnProperty("collation")) {
                 distinctCmd.collation = options.collation;
             }
+            if (options && options.hasOwnProperty("maxTimeMS")) {
+                distinctCmd.maxTimeMS = options.maxTimeMS;
+            }
 
-            var explainCmd = {explain: distinctCmd, verbosity: this._verbosity};
+            var explainCmd = buildExplainCmd(distinctCmd, this._verbosity);
             var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
