@@ -218,6 +218,10 @@ public:
      */
     virtual void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) {}
 
+    virtual void alterIdentMetadata(OperationContext* opCtx,
+                                    StringData ident,
+                                    const IndexDescriptor* desc){};
+
     /**
      * See StorageEngine::beginBackup for details
      */

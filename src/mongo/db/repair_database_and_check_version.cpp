@@ -55,6 +55,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/downgraded_unique_indexes.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
@@ -341,6 +342,47 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     // index, and wait for a replicated commit or abort oplog entry.
     IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
         opCtx, reconcileResult.indexBuildsToRestart);
+}
+
+/**
+ * Upgrades the metadata for every unique index.
+ */
+void upgradeAllUniqueIndexes(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
+    invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
+
+    auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto dbNames = storageEngine->listDatabases();
+    for (auto dbName : dbNames) {
+        auto colls = CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
+        for (auto nss : colls) {
+            auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+
+            // Updates the format version for all non-_id unique indexes.
+            std::vector<std::string> indexNames;
+            DurableCatalog::get(opCtx)->getAllUniqueIndexes(
+                opCtx, collection->getCatalogId(), &indexNames);
+            for (auto indexName : indexNames) {
+                const IndexDescriptor* desc =
+                    collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+                invariant(desc);
+
+                WriteUnitOfWork wuow(opCtx);
+                LOGV2(4805400,
+                      "Upgrading unique index metadata",
+                      "indexName"_attr = indexName,
+                      "collection"_attr = nss);
+
+                // Update index metadata in storage engine.
+                DurableCatalog::get(opCtx)->updateIndexMetadata(
+                    opCtx, collection->getCatalogId(), desc);
+
+                // Refresh the in-memory instance of the index.
+                collection->getIndexCatalog()->refreshEntry(opCtx, desc);
+                wuow.commit();
+            }
+        }
+    }
 }
 
 /**
@@ -655,6 +697,15 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                             "recordPreImages collection option is only supported when the feature "
                             "compatibility version is set to 4.4 or above");
     }
+
+    // If we have not upgraded all unique indexes, they must be upgraded before startup. To be
+    // conservative, we run this operation on all unique indexes, regardless of their state.
+    // See SERVER-48054.
+    if (hasDowngradedUniqueIndexes()) {
+        LOGV2(4805401, "Detected unique indexes that are not fully-upgraded");
+        upgradeAllUniqueIndexes(opCtx);
+    }
+
 
     LOGV2_DEBUG(21017, 1, "done repairDatabases");
     return nonLocalDatabases;

@@ -44,6 +44,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/downgraded_unique_indexes.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -515,20 +516,13 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
     _dataFormatVersion = version.getValue();
 
     if (!desc->isIdIndex() && desc->unique()) {
-        Status versionStatus = _dataFormatVersion == kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
-                _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2
-            ? Status::OK()
-            : Status(ErrorCodes::UnsupportedFormat,
-                     str::stream()
-                         << "Index: {name: " << desc->indexName() << ", ns: " << desc->parentNS()
-                         << "} has incompatible format version: " << _dataFormatVersion
-                         << ". In MongoDB 4.2 onwards, WT secondary unique indexes use "
-                            "either format version 11 or 12. See "
-                            "https://dochub.mongodb.org/core/upgrade-4.2-procedures for "
-                            "detailed instructions on upgrading the index format. If this node is "
-                            "already upgraded to FCV 4.2, try restarting with a 4.2.4 binary to "
-                            "correct the unique index format version.");
-        fassertNoTrace(31179, versionStatus);
+        if (_dataFormatVersion != kDataFormatV3KeyStringV0UniqueIndexVersionV1 &&
+            _dataFormatVersion != kDataFormatV4KeyStringV1UniqueIndexVersionV2) {
+            invariant(_dataFormatVersion == kDataFormatV1KeyStringV0IndexVersionV1 ||
+                          _dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2,
+                      str::stream() << _dataFormatVersion);
+            setHasDowngradedUniqueIndexes();
+        }
     }
 
     if (!isReadOnly) {

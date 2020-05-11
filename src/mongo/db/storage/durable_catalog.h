@@ -188,6 +188,10 @@ public:
                                  StringData validationLevel,
                                  StringData validationAction) = 0;
 
+    virtual void updateIndexMetadata(OperationContext* opCtx,
+                                     RecordId catalogId,
+                                     const IndexDescriptor* desc) = 0;
+
     virtual Status removeIndex(OperationContext* opCtx,
                                RecordId catalogId,
                                StringData indexName) = 0;
@@ -266,6 +270,12 @@ public:
     virtual void getReadyIndexes(OperationContext* opCtx,
                                  RecordId catalogId,
                                  std::vector<std::string>* names) const = 0;
+    /**
+     * Returns names of all non-_id unique indexes on a collection, by catalogId.
+     */
+    virtual void getAllUniqueIndexes(OperationContext* opCtx,
+                                     RecordId catalogId,
+                                     std::vector<std::string>* names) const = 0;
 
     virtual bool isIndexPresent(OperationContext* opCtx,
                                 RecordId catalogId,

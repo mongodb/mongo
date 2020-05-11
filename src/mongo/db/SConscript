@@ -1176,6 +1176,7 @@ env.Library(
         'dbhelpers',
         'repair_database',
         'repl/repl_settings',
+        'storage/downgraded_unique_indexes',
         'storage/storage_repair_observer',
     ],
 )

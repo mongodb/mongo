@@ -143,6 +143,10 @@ public:
                          StringData validationLevel,
                          StringData validationAction);
 
+    void updateIndexMetadata(OperationContext* opCtx,
+                             RecordId catalogId,
+                             const IndexDescriptor* desc);
+
     Status removeIndex(OperationContext* opCtx, RecordId catalogId, StringData indexName);
 
     Status prepareForIndexBuild(OperationContext* opCtx,
@@ -182,6 +186,9 @@ public:
     void getReadyIndexes(OperationContext* opCtx,
                          RecordId catalogId,
                          std::vector<std::string>* names) const;
+    void getAllUniqueIndexes(OperationContext* opCtx,
+                             RecordId catalogId,
+                             std::vector<std::string>* names) const;
 
     bool isIndexPresent(OperationContext* opCtx, RecordId catalogId, StringData indexName) const;
 
