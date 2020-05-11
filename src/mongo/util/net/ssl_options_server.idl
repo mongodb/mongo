@@ -175,7 +175,7 @@ configs:
   "net.tls.clusterCertificateSelector":
     description: "SSL/TLS Certificate in system store for internal TLS authentication"
     short_name: tlsClusterCertificateSelector
-    deprecated_name: "tls.ssl.clusterCertificateSelector"
+    deprecated_name: "net.ssl.clusterCertificateSelector"
     deprecated_short_name: sslClusterCertificateSelector
     arg_vartype: String
     conflicts: [ "net.tls.clusterFile", "net.tls.clusterFilePassword" ]
