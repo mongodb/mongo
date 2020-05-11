@@ -975,13 +975,14 @@ private:
     MemberData* _findMemberDataByMemberId(const int memberId);
 
     /**
-     * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse(), and determines if an
-     * election or stepdown should commence.
+     * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse().
      */
-    HeartbeatResponseAction _updatePrimaryFromHBDataV1(int updatedConfigIndex,
-                                                       const MemberState& originalState,
-                                                       Date_t now);
+    void _updatePrimaryFromHBDataV1(Date_t now);
 
+    /**
+     * Determine if the node should run PriorityTakeover or CatchupTakeover.
+     */
+    HeartbeatResponseAction _shouldTakeOverPrimary(int updatedConfigIndex);
     /**
      * Updates _memberData based on the newConfig, ensuring that every member in the newConfig
      * has an entry in _memberData.  If any nodes in the newConfig are also present in

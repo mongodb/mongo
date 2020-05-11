@@ -4356,6 +4356,46 @@ TEST_F(HeartbeatResponseReconfigTestV1, NodeAcceptsConfigIfVersionInHeartbeatRes
     ASSERT_EQ(action.getAction(), HeartbeatResponseAction::Reconfig);
 }
 
+TEST_F(HeartbeatResponseReconfigTestV1, PrimaryAcceptsConfigAfterUpdatingHeartbeatData) {
+    // Become primary but don't completeTransitionToPrimary.
+    Timestamp electionTimestamp(2, 0);
+    getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
+    getTopoCoord().setCurrentPrimary_forTest(getSelfIndex(), electionTimestamp);
+    OpTime dummyOpTime(electionTimestamp, getTopoCoord().getTerm());
+    setMyOpTime(dummyOpTime);
+
+    long long version = initConfigVersion + 1;
+    long long term = initConfigTerm;
+    auto config = ReplSetConfig::parse(makeRSConfigWithVersionAndTerm(version, term));
+
+    auto remote = HostAndPort("host2");
+    auto remoteId = getCurrentConfig().findMemberByHostAndPort(remote)->getId();
+    auto oldOpTime = getTopoCoord().latestKnownOpTimeSinceHeartbeatRestartPerMember().at(remoteId);
+    ASSERT_FALSE(oldOpTime);
+
+    // Construct a higher OpTime.
+    OpTime newOpTime{{20, 1}, term};
+    ReplSetHeartbeatResponse hb;
+    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1).ignore();
+    hb.setConfig(config);
+    hb.setConfigVersion(version);
+    hb.setConfigTerm(term);
+    hb.setAppliedOpTimeAndWallTime({newOpTime, now()});
+    StatusWith<ReplSetHeartbeatResponse> hbResponse(hb);
+
+    getTopoCoord().prepareHeartbeatRequestV1(now(), "rs0", remote);
+    now() += Milliseconds(1);
+    auto action =
+        getTopoCoord().processHeartbeatResponse(now(), Milliseconds(1), remote, hbResponse);
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::Reconfig);
+
+    // Check that heartbeat response updated the heartbeat data even on reconfig.
+    auto actualOpTime =
+        getTopoCoord().latestKnownOpTimeSinceHeartbeatRestartPerMember().at(remoteId);
+    ASSERT(actualOpTime);
+    ASSERT_EQUALS(*actualOpTime, newOpTime);
+}
+
 TEST_F(HeartbeatResponseReconfigTestV1, NodeAcceptsConfigIfTermInHeartbeatResponseIsNewer) {
     long long version = initConfigVersion;
     long long term = initConfigTerm + 1;
