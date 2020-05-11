@@ -149,7 +149,7 @@ class TwoPhaseDropCollectionTest {
      * 'collectionName' is the original collection name.
      */
     static pendingDropRegex(collName) {
-        return new RegExp("system\.drop\..*\." + collName + "$");
+        return new RegExp("system\\.drop\\..*\\." + collName + "$");
     }
 
     /**
