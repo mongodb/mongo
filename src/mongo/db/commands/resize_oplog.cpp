@@ -109,7 +109,7 @@ public:
             wunit.commit();
 
             LOGV2(20497,
-                  "replSetResizeOplog success.",
+                  "replSetResizeOplog success",
                   "size"_attr = DurableCatalog::get(opCtx)
                                     ->getCollectionOptions(opCtx, coll->getCatalogId())
                                     .cappedSize,

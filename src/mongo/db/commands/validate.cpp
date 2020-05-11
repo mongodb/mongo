@@ -129,7 +129,7 @@ public:
         if (background && storageGlobalParams.engine == "ephemeralForTest") {
             LOGV2(4775400,
                   "ephemeralForTest does not support background validation, switching to "
-                  "foreground validation.");
+                  "foreground validation");
             background = false;
         }
 

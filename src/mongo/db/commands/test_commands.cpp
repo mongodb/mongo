@@ -81,8 +81,9 @@ public:
                            BSONObjBuilder& result) {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         LOGV2(20505,
-              "test only command godinsert invoked coll:{nss_coll}",
-              "nss_coll"_attr = nss.coll());
+              "Test-only command 'godinsert' invoked coll:{collection}",
+              "Test-only command 'godinsert' invoked",
+              "collection"_attr = nss.coll());
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
         Lock::DBLock lk(opCtx, dbname, MODE_X);

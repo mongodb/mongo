@@ -98,9 +98,10 @@ public:
         LOGV2_DEBUG(20507,
                     3,
                     "Received commitTransaction for transaction with txnNumber "
-                    "{opCtx_getTxnNumber} on session {opCtx_getLogicalSessionId}",
-                    "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
-                    "opCtx_getLogicalSessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
+                    "{txnNumber} on session {sessionId}",
+                    "Received commitTransaction",
+                    "txnNumber"_attr = opCtx->getTxnNumber(),
+                    "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
 
         // commitTransaction is retryable.
         if (txnParticipant.transactionIsCommitted()) {
@@ -205,10 +206,11 @@ public:
 
         LOGV2_DEBUG(20508,
                     3,
-                    "Received abortTransaction for transaction with txnNumber {opCtx_getTxnNumber} "
-                    "on session {opCtx_getLogicalSessionId}",
-                    "opCtx_getTxnNumber"_attr = opCtx->getTxnNumber(),
-                    "opCtx_getLogicalSessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
+                    "Received abortTransaction for transaction with txnNumber {txnNumber} "
+                    "on session {sessionId}",
+                    "Received abortTransaction",
+                    "txnNumber"_attr = opCtx->getTxnNumber(),
+                    "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
 
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
