@@ -86,11 +86,12 @@ Status _createView(OperationContext* opCtx,
 
         WriteUnitOfWork wunit(opCtx);
 
-        AutoStatsTracker statsTracker(opCtx,
-                                      nss,
-                                      Top::LockType::NotLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      db->getProfilingLevel());
+        AutoStatsTracker statsTracker(
+            opCtx,
+            nss,
+            Top::LockType::NotLocked,
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nss.db()));
 
         // If the view creation rolls back, ensure that the Top entry created for the view is
         // deleted.
@@ -135,11 +136,12 @@ Status _createCollection(OperationContext* opCtx,
 
         WriteUnitOfWork wunit(opCtx);
 
-        AutoStatsTracker statsTracker(opCtx,
-                                      nss,
-                                      Top::LockType::NotLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      autoDb.getDb()->getProfilingLevel());
+        AutoStatsTracker statsTracker(
+            opCtx,
+            nss,
+            Top::LockType::NotLocked,
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nss.db()));
 
         // If the collection creation rolls back, ensure that the Top entry created for the
         // collection is deleted.

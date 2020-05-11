@@ -94,11 +94,12 @@ Status _dropView(OperationContext* opCtx,
         hangDuringDropCollection.pauseWhileSet();
     }
 
-    AutoStatsTracker statsTracker(opCtx,
-                                  collectionName,
-                                  Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateCurOp,
-                                  db->getProfilingLevel());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        collectionName,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(collectionName.db()));
 
     if (opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName)) {
@@ -150,11 +151,12 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
         hangDuringDropCollection.pauseWhileSet();
     }
 
-    AutoStatsTracker statsTracker(opCtx,
-                                  startingNss,
-                                  Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateCurOp,
-                                  autoDb->getDb()->getProfilingLevel());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        startingNss,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(startingNss.db()));
 
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     const UUID collectionUUID = coll->uuid();
@@ -247,11 +249,12 @@ Status _dropCollection(OperationContext* opCtx,
         hangDuringDropCollection.pauseWhileSet();
     }
 
-    AutoStatsTracker statsTracker(opCtx,
-                                  collectionName,
-                                  Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateCurOp,
-                                  db->getProfilingLevel());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        collectionName,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(collectionName.db()));
 
     WriteUnitOfWork wunit(opCtx);
 

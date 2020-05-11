@@ -219,6 +219,23 @@ public:
     std::vector<std::string> getAllDbNames() const;
 
     /**
+     * Sets 'newProfileLevel' as the profiling level for the database 'dbName'.
+     */
+    void setDatabaseProfileLevel(StringData dbName, int newProfileLevel);
+
+    /**
+     * Fetches the profiling level for database 'dbName'.
+     *
+     * Returns the server's default database profile level if the database does not exist.
+     */
+    int getDatabaseProfileLevel(StringData dbName) const;
+
+    /**
+     * Clears the database profile level entry for 'dbName'.
+     */
+    void clearDatabaseProfileLevel(StringData dbName);
+
+    /**
      * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
      * to the pre-close state to resolve queries for currently unknown UUIDs. This allows processes,
      * like authorization and replication, which need to do lookups outside of database locks, to
@@ -272,10 +289,12 @@ private:
         mongo::stdx::unordered_map<CollectionUUID, NamespaceString, CollectionUUID::Hash>>
         _shadowCatalog;
 
-    using CollectionCatalogMap = mongo::stdx::
-        unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>;
+    using CollectionCatalogMap =
+        stdx::unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>;
     using OrderedCollectionMap = std::map<std::pair<std::string, CollectionUUID>, Collection*>;
-    using NamespaceCollectionMap = mongo::stdx::unordered_map<NamespaceString, Collection*>;
+    using NamespaceCollectionMap = stdx::unordered_map<NamespaceString, Collection*>;
+    using DatabaseProfileLevelMap = StringMap<int>;
+
     CollectionCatalogMap _catalog;
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
     NamespaceCollectionMap _collections;
@@ -290,5 +309,15 @@ private:
 
     // Mapping from ResourceId to a set of strings that contains collection and database namespaces.
     std::map<ResourceId, std::set<std::string>> _resourceInformation;
+
+    // Protects _databaseProfileLevels.
+    mutable Mutex _profileLevelsLock = MONGO_MAKE_LATCH("CollectionCatalog::_profileLevelsLock");
+
+    /**
+     * Contains non-default database profile levels. New collections, current collections and views
+     * must all be able to access the correct profile level for the database in which they reside.
+     * Simple database name to integer profile level map. Access protected by the _catalogLock.
+     */
+    DatabaseProfileLevelMap _databaseProfileLevels;
 };
 }  // namespace mongo

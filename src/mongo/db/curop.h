@@ -365,7 +365,7 @@ public:
         return _originatingCommand;
     }
 
-    void enter_inlock(const char* ns, boost::optional<int> dbProfileLevel);
+    void enter_inlock(const char* ns, int dbProfileLevel);
 
     /**
      * Sets the type of the current network operation.

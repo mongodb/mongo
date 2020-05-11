@@ -158,7 +158,6 @@ DatabaseImpl::DatabaseImpl(const StringData name, uint64_t epoch)
     auto viewCatalog = std::make_unique<ViewCatalog>(std::move(durableViewCatalog));
 
     ViewCatalog::set(this, std::move(viewCatalog));
-    _profile.store(serverGlobalParams.defaultProfile);
 }
 
 void DatabaseImpl::init(OperationContext* const opCtx) const {
@@ -231,39 +230,6 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     };
 
     catalog::forEachCollectionFromDb(opCtx, name(), MODE_X, callback, predicate);
-}
-
-Status DatabaseImpl::setProfilingLevel(OperationContext* opCtx, int newLevel) {
-    auto currLevel = _profile.load();
-
-    if (currLevel == newLevel) {
-        return Status::OK();
-    }
-
-    if (newLevel == 0) {
-        _profile.store(0);
-        return Status::OK();
-    }
-
-    if (newLevel < 0 || newLevel > 2) {
-        return Status(ErrorCodes::BadValue, "profiling level has to be >=0 and <= 2");
-    }
-
-    // Can't support profiling without supporting capped collections.
-    if (!opCtx->getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "the storage engine doesn't support profiling.");
-    }
-
-    Status status = createProfileCollection(opCtx, this);
-
-    if (!status.isOK()) {
-        return status;
-    }
-
-    _profile.store(newLevel);
-
-    return Status::OK();
 }
 
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
@@ -363,7 +329,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     if (nss.isSystem()) {
         if (nss.isSystemDotProfile()) {
-            if (_profile.load() != 0)
+            if (CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_name) != 0)
                 return Status(ErrorCodes::IllegalOperation,
                               "turn off profiling before dropping system.profile collection");
         } else if (!(nss.isSystemDotViews() || nss.isHealthlog() ||

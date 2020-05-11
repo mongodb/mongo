@@ -427,7 +427,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             makeCollection(opCtx, wholeOp.getNamespace());
         }
 
-        curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
+        curOp.raiseDbProfileLevel(
+            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(wholeOp.getNamespace().db()));
         assertCanWrite_inlock(opCtx, wholeOp.getNamespace());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -693,7 +694,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     auto& curOp = *CurOp::get(opCtx);
 
     if (collection->getDb()) {
-        curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
+        curOp.raiseDbProfileLevel(CollectionCatalog::get(opCtx).getDatabaseProfileLevel(ns.db()));
     }
 
     assertCanWrite_inlock(opCtx, ns);
@@ -922,7 +923,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     AutoGetCollection collection(opCtx, ns, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
     if (collection.getDb()) {
-        curOp.raiseDbProfileLevel(collection.getDb()->getProfilingLevel());
+        curOp.raiseDbProfileLevel(CollectionCatalog::get(opCtx).getDatabaseProfileLevel(ns.db()));
     }
 
     assertCanWrite_inlock(opCtx, ns);

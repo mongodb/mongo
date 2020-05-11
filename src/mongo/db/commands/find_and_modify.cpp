@@ -382,14 +382,11 @@ public:
                 uassertStatusOK(parsedDelete.parseRequest());
 
                 AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
-
                 {
-                    boost::optional<int> dbProfilingLevel;
-                    if (autoColl.getDb())
-                        dbProfilingLevel = autoColl.getDb()->getProfilingLevel();
-
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
+                    CurOp::get(opCtx)->enter_inlock(
+                        nsString.ns().c_str(),
+                        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nsString.db()));
                 }
 
                 assertCanWrite(opCtx, nsString);
@@ -446,11 +443,10 @@ public:
                 Database* db = autoColl.ensureDbExists();
 
                 {
-                    boost::optional<int> dbProfilingLevel;
-                    dbProfilingLevel = db->getProfilingLevel();
-
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
+                    CurOp::get(opCtx)->enter_inlock(
+                        nsString.ns().c_str(),
+                        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nsString.db()));
                 }
 
                 assertCanWrite(opCtx, nsString);

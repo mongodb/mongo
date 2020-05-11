@@ -331,11 +331,12 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     Collection* const targetColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
 
-    AutoStatsTracker statsTracker(opCtx,
-                                  source,
-                                  Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateCurOp,
-                                  db->getProfilingLevel());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        source,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
 
     if (!targetColl) {
         return renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
@@ -371,11 +372,12 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     Collection* const sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
 
-    AutoStatsTracker statsTracker(opCtx,
-                                  source,
-                                  Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateCurOp,
-                                  db->getProfilingLevel());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        source,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
 
     return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
         Collection* targetColl =
@@ -488,12 +490,13 @@ Status renameBetweenDBs(OperationContext* opCtx,
     if (!sourceDB)
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
 
-    boost::optional<AutoStatsTracker> statsTracker(boost::in_place_init,
-                                                   opCtx,
-                                                   source,
-                                                   Top::LockType::NotLocked,
-                                                   AutoStatsTracker::LogMode::kUpdateCurOp,
-                                                   sourceDB->getProfilingLevel());
+    boost::optional<AutoStatsTracker> statsTracker(
+        boost::in_place_init,
+        opCtx,
+        source,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
 
     Collection* const sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);

@@ -78,14 +78,15 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
 
     ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
     Lock::GlobalLock globalLock(opCtx, MODE_IS);
-    const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, "local");
+    const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, NamespaceString::kLocalDb);
     invariant(localDb);
-    AutoStatsTracker statsTracker(opCtx,
-                                  NamespaceString::kRsOplogNamespace,
-                                  Top::LockType::ReadLocked,
-                                  AutoStatsTracker::LogMode::kUpdateTop,
-                                  localDb->getProfilingLevel(),
-                                  Date_t::max());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        NamespaceString::kRsOplogNamespace,
+        Top::LockType::ReadLocked,
+        AutoStatsTracker::LogMode::kUpdateTop,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(NamespaceString::kLocalDb),
+        Date_t::max());
     auto oplog = repl::LocalOplogInfo::get(opCtx)->getCollection();
     invariant(oplog);
 

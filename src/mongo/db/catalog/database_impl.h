@@ -45,18 +45,6 @@ public:
 
     void clearTmpCollections(OperationContext* opCtx) const final;
 
-    /**
-     * Sets a new profiling level for the database and returns the outcome.
-     *
-     * @param opCtx Operation context which to use for creating the profiling collection.
-     * @param newLevel New profiling level to use.
-     */
-    Status setProfilingLevel(OperationContext* opCtx, int newLevel) final;
-
-    int getProfilingLevel() const final {
-        return _profile.load();
-    }
-
     void setDropPending(OperationContext* opCtx, bool dropPending) final;
 
     bool isDropPending(OperationContext* opCtx) const final;
@@ -166,8 +154,6 @@ private:
     const uint64_t _epoch;
 
     const NamespaceString _viewsName;  // "dbname.system.views"
-
-    AtomicWord<int> _profile{0};  // 0=off
 
     // If '_dropPending' is true, this Database is in the midst of a two-phase drop. No new
     // collections may be created in this Database.

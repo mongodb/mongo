@@ -407,12 +407,12 @@ public:
             }
             if (cursorPin->lockPolicy() == ClientCursorParams::LockPolicy::kLocksInternally) {
                 if (!_request.nss.isCollectionlessCursorNamespace()) {
-                    const boost::optional<int> dbProfilingLevel = boost::none;
-                    statsTracker.emplace(opCtx,
-                                         _request.nss,
-                                         Top::LockType::NotLocked,
-                                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                         dbProfilingLevel);
+                    statsTracker.emplace(
+                        opCtx,
+                        _request.nss,
+                        Top::LockType::NotLocked,
+                        AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_request.nss.db()));
                 }
             } else {
                 invariant(cursorPin->lockPolicy() ==
@@ -437,13 +437,12 @@ public:
                 // Otherwise, these two namespaces will match.
                 readLock.emplace(opCtx, cursorPin->getExecutor()->nss());
 
-                const int doNotChangeProfilingLevel = 0;
-                statsTracker.emplace(opCtx,
-                                     _request.nss,
-                                     Top::LockType::ReadLocked,
-                                     AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                     readLock->getDb() ? readLock->getDb()->getProfilingLevel()
-                                                       : doNotChangeProfilingLevel);
+                statsTracker.emplace(
+                    opCtx,
+                    _request.nss,
+                    Top::LockType::ReadLocked,
+                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                    CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_request.nss.db()));
 
                 // Check whether we are allowed to read from this node after acquiring our locks.
                 uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
