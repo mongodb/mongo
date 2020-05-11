@@ -19,7 +19,15 @@ var replTest = new ReplSetTest({
     ]
 });
 var nodes = replTest.startSet();
-replTest.initiate();
+
+// Stopping replication on secondaries can be very slow with a high election timeout. Set a small
+// oplog getMore timeout so the test runs faster.
+nodes.forEach(node => {
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: 'setSmallOplogGetMoreMaxTimeMS', mode: 'alwaysOn'}));
+});
+
+replTest.initiateWithHighElectionTimeout();
 var primary = replTest.getPrimary();
 
 // Do a write that should not be able to replicate to node1 since we stopped replication.
