@@ -4,6 +4,7 @@
 import datetime
 import logging
 import os
+import re
 import sys
 import tempfile
 from typing import Optional, List, Set
@@ -92,11 +93,18 @@ def get_backports_required_last_stable_hash(task_path_suffix: str):
     last_stable_commit_hash = ""
     for line in shell_version.splitlines():
         if "gitVersion" in line:
-            last_stable_commit_hash = line.split(':')[1].strip('"')
-            break
-    if not last_stable_commit_hash:
-        raise ValueError("Could not find a valid commit hash from the last-stable mongo binary.")
-    return last_stable_commit_hash
+            version_line = line.split(':')[1]
+            # We identify the commit hash as the string enclosed by double quotation marks.
+            result = re.search(r'"(.*?)"', version_line)
+            if result:
+                commit_hash = result.group().strip('"')
+                if not commit_hash.isalnum():
+                    raise ValueError(f"Error parsing last-stable commit hash. Expected an "
+                                     f"alpha-numeric string but got: {commit_hash}")
+                return commit_hash
+            else:
+                break
+    raise ValueError("Could not find a valid commit hash from the last-stable mongo binary.")
 
 
 def get_last_stable_yaml(last_stable_commit_hash, suite_name):
