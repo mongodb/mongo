@@ -64,6 +64,7 @@ jsTestLog('Applying updates on secondary ' + secondary.host);
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 rst.awaitReplication();
+rst.awaitSecondaryNodes();
 
 rst.stopSet();
 })();
