@@ -226,21 +226,20 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
     }
 
     if (!hbResp.getReplicaSetName().empty()) {
-        if (hbResp.getConfigVersion() >= _rsConfig->getConfigVersion()) {
+        if (hbResp.getConfigVersionAndTerm() >= _rsConfig->getConfigVersionAndTerm()) {
             static constexpr char message[] =
-                "Our config version is no larger than the version of the request target";
-            _vetoStatus = Status(
-                ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                str::stream() << message << ", rsConfigVersion: " << _rsConfig->getConfigVersion()
-                              << ", requestTarget: " << request.target.toString()
-                              << ", requestTargetConfigVersion: " << hbResp.getConfigVersion());
+                "Our config (term, version) is no larger than that of the request target";
+            _vetoStatus = {ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                           str::stream() << message << ", rsConfig: "
+                                         << _rsConfig->getConfigVersionAndTerm().toString()
+                                         << ", requestTarget: " << request.target.toString()
+                                         << ", requestTargetConfig: "
+                                         << hbResp.getConfigVersionAndTerm().toString()};
             LOGV2_WARNING(23725,
-                          "Our config version of {rsConfigVersion} is no larger than the version "
-                          "on {requestTarget}, which is {requestTargetConfigVersion}",
                           message,
-                          "rsConfigVersion"_attr = _rsConfig->getConfigVersion(),
+                          "rsConfig"_attr = _rsConfig->getConfigVersionAndTerm(),
                           "requestTarget"_attr = request.target.toString(),
-                          "requestTargetConfigVersion"_attr = hbResp.getConfigVersion());
+                          "requestTargetConfig"_attr = hbResp.getConfigVersionAndTerm());
             return;
         }
     }
