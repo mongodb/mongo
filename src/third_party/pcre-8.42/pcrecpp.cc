@@ -77,9 +77,6 @@ extern Arg no_arg
 // If a regular expression has no error, its error_ field points here
 static const string empty_string;
 
-// If the user doesn't ask for any options, we just use this one
-static RE_Options default_options;
-
 // Specials for the start of patterns. See comments where start_options is used
 // below. (PH June 2018)
 static const char *start_options[] = {
@@ -102,6 +99,7 @@ static const char *start_options[] = {
 void RE::Init(const string& pat, const RE_Options* options) {
   pattern_ = pat;
   if (options == NULL) {
+    static const RE_Options& default_options = *new RE_Options();
     options_ = default_options;
   } else {
     options_ = *options;
