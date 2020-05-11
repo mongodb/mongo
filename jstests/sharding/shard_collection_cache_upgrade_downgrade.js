@@ -41,66 +41,45 @@
 
     const db1Name = "db1";
     const db2Name = "db2";
-    const db3Name = "db3";
     const collName = "foo";
     const ns1 = db1Name + "." + collName;
     const ns2 = db2Name + "." + collName;
-    const ns3 = db3Name + "." + collName;
 
     // Create both collections in the sharding catalog and ensure they are on different shards.
     assert.commandWorked(st.s.adminCommand({enableSharding: db1Name}));
     assert.commandWorked(st.s.adminCommand({enableSharding: db2Name}));
-    assert.commandWorked(st.s.adminCommand({enableSharding: db3Name}));
     st.ensurePrimaryShard(db1Name, st.shard0.shardName);
     st.ensurePrimaryShard(db2Name, st.shard1.shardName);
-    st.ensurePrimaryShard(db3Name, st.shard0.shardName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns1, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {_id: 1}}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns3, key: {_id: 1}}));
-
-    // Ensure ns3 has chunks in both shards
-    assert.commandWorked(st.s.adminCommand({split: ns3, middle: {_id: 0}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns3, find: {_id: 0}, to: st.shard1.shardName}));
 
     // Ensure the collection entries have UUIDs.
     const ns1EntryOriginal = st.s.getDB("config").getCollection("collections").findOne({_id: ns1});
     const ns2EntryOriginal = st.s.getDB("config").getCollection("collections").findOne({_id: ns2});
-    const ns3EntryOriginal = st.s.getDB("config").getCollection("collections").findOne({_id: ns3});
     assert.neq(null, ns1EntryOriginal.uuid);
     assert.neq(null, ns2EntryOriginal.uuid);
-    assert.neq(null, ns3EntryOriginal.uuid);
 
     const ns1ChunkEntryOriginal = st.s.getDB("config").getCollection("chunks").findOne({ns: ns1});
     const ns2ChunkEntryOriginal = st.s.getDB("config").getCollection("chunks").findOne({ns: ns2});
-    const ns3ChunkEntryOriginal = st.s.getDB("config").getCollection("chunks").findOne({ns: ns3});
     assert.neq(null, ns1ChunkEntryOriginal);
     assert(!ns1ChunkEntryOriginal.hasOwnProperty("history"));
     assert.neq(null, ns2ChunkEntryOriginal);
     assert(!ns2ChunkEntryOriginal.hasOwnProperty("history"));
-    assert.neq(null, ns3ChunkEntryOriginal);
-    assert(!ns3ChunkEntryOriginal.hasOwnProperty("history"));
 
     // Force each shard to refresh for the collection it owns to ensure it writes a cache entry.
 
     assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns1}));
     assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns2}));
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns3}));
-    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns3}));
 
     checkCachedCollectionEntry(st.shard0, ns1, ns1EntryOriginal);
     checkCachedCollectionEntry(st.shard0, ns2, undefined);
     checkCachedCollectionEntry(st.shard1, ns1, undefined);
     checkCachedCollectionEntry(st.shard1, ns2, ns2EntryOriginal);
-    checkCachedCollectionEntry(st.shard0, ns3, ns3EntryOriginal);
-    checkCachedCollectionEntry(st.shard1, ns3, ns3EntryOriginal);
 
     checkCachedChunksEntry(st.shard0, ns1, ns1ChunkEntryOriginal);
     checkCachedChunksEntry(st.shard0, ns2, undefined);
     checkCachedChunksEntry(st.shard1, ns1, undefined);
     checkCachedChunksEntry(st.shard1, ns2, ns2ChunkEntryOriginal);
-    checkCachedChunksEntry(st.shard0, ns3, ns3ChunkEntryOriginal);
-    checkCachedChunksEntry(st.shard1, ns3, ns3ChunkEntryOriginal);
 
     // Simulate that the cache entry was written without a UUID (SERVER-33356).
     assert.writeOK(st.shard0.getDB("config")
@@ -119,24 +98,18 @@
     // The UUID in the authoritative collection entries should not have changed.
     const ns1EntryFCV40 = st.s.getDB("config").getCollection("collections").findOne({_id: ns1});
     const ns2EntryFCV40 = st.s.getDB("config").getCollection("collections").findOne({_id: ns2});
-    const ns3EntryFCV40 = st.s.getDB("config").getCollection("collections").findOne({_id: ns3});
     assert.docEq(ns1EntryFCV40, ns1EntryOriginal);
     assert.docEq(ns2EntryFCV40, ns2EntryOriginal);
-    assert.docEq(ns3EntryFCV40, ns3EntryOriginal);
 
     const ns1ChunkEntryFCV40 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns1});
     const ns2ChunkEntryFCV40 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns2});
-    const ns3ChunkEntryFCV40 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns3});
     assert.neq(null, ns1ChunkEntryFCV40);
     assert(ns1ChunkEntryFCV40.hasOwnProperty("history"));
     assert.neq(null, ns2ChunkEntryFCV40);
     assert(ns2ChunkEntryFCV40.hasOwnProperty("history"));
-    assert.neq(null, ns3ChunkEntryFCV40);
-    assert(ns3ChunkEntryFCV40.hasOwnProperty("history"));
 
     st.s.getDB(db1Name).getCollection(collName).findOne();
     st.s.getDB(db2Name).getCollection(collName).findOne();
-    st.s.getDB(db3Name).getCollection(collName).findOne();
 
     // We wait for the refresh triggered by the finds to persist the new cache entry to disk,
     // because it's done asynchronously.
@@ -144,26 +117,18 @@
         st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns1, syncFromConfig: false}));
     assert.commandWorked(
         st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns2, syncFromConfig: false}));
-    assert.commandWorked(
-        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns3, syncFromConfig: false}));
-    assert.commandWorked(
-        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns3, syncFromConfig: false}));
 
     // The shards' collection caches should have been updated with UUIDs.
     checkCachedCollectionEntry(st.shard0, ns1, ns1EntryOriginal);
     checkCachedCollectionEntry(st.shard0, ns2, undefined);
     checkCachedCollectionEntry(st.shard1, ns1, undefined);
     checkCachedCollectionEntry(st.shard1, ns2, ns2EntryOriginal);
-    checkCachedCollectionEntry(st.shard0, ns3, ns3EntryOriginal);
-    checkCachedCollectionEntry(st.shard1, ns3, ns3EntryOriginal);
 
     // The shards' chunk caches should have been updated with histories.
     checkCachedChunksEntry(st.shard0, ns1, ns1ChunkEntryFCV40);
     checkCachedChunksEntry(st.shard0, ns2, undefined);
     checkCachedChunksEntry(st.shard1, ns1, undefined);
     checkCachedChunksEntry(st.shard1, ns2, ns2ChunkEntryFCV40);
-    checkCachedChunksEntry(st.shard0, ns3, ns3ChunkEntryFCV40);
-    checkCachedChunksEntry(st.shard1, ns3, ns3ChunkEntryFCV40);
 
     //
     // setFCV 3.6 (downgrade)
@@ -174,33 +139,23 @@
     // The UUID in the authoritative collection entries should still not have changed.
     const ns1EntryFCV36 = st.s.getDB("config").getCollection("collections").findOne({_id: ns1});
     const ns2EntryFCV36 = st.s.getDB("config").getCollection("collections").findOne({_id: ns2});
-    const ns3EntryFCV36 = st.s.getDB("config").getCollection("collections").findOne({_id: ns3});
     assert.docEq(ns1EntryFCV36, ns1EntryOriginal);
     assert.docEq(ns2EntryFCV36, ns2EntryOriginal);
-    assert.docEq(ns3EntryFCV36, ns3EntryOriginal);
 
     const ns1ChunkEntryFCV36 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns1});
     const ns2ChunkEntryFCV36 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns2});
-    const ns3ChunkEntryFCV36 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns3});
     assert.neq(null, ns1ChunkEntryFCV36);
     assert(!ns1ChunkEntryFCV36.hasOwnProperty("history"));
     assert.neq(null, ns2ChunkEntryFCV36);
     assert(!ns2ChunkEntryFCV36.hasOwnProperty("history"));
-    assert.neq(null, ns3ChunkEntryFCV36);
-    assert(!ns3ChunkEntryFCV36.hasOwnProperty("history"));
 
     st.s.getDB(db1Name).getCollection(collName).findOne();
     st.s.getDB(db2Name).getCollection(collName).findOne();
-    st.s.getDB(db3Name).getCollection(collName).findOne();
 
     assert.commandWorked(
         st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns1, syncFromConfig: false}));
     assert.commandWorked(
         st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns2, syncFromConfig: false}));
-    assert.commandWorked(
-        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns3, syncFromConfig: false}));
-    assert.commandWorked(
-        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns3, syncFromConfig: false}));
 
     // Also refresh the sessions collection so that the UUID consistency check at the end of
     // ShardingTest, which will check for its UUID on the shards, passes.
@@ -214,16 +169,12 @@
     checkCachedCollectionEntry(st.shard0, ns2, undefined);
     checkCachedCollectionEntry(st.shard1, ns1, undefined);
     checkCachedCollectionEntry(st.shard1, ns2, ns2EntryOriginal);
-    checkCachedCollectionEntry(st.shard0, ns3, ns3EntryOriginal);
-    checkCachedCollectionEntry(st.shard1, ns3, ns3EntryOriginal);
 
     // The shards' chunk caches should have been updated with histories removed.
     checkCachedChunksEntry(st.shard0, ns1, ns1ChunkEntryFCV40);
     checkCachedChunksEntry(st.shard0, ns2, undefined);
     checkCachedChunksEntry(st.shard1, ns1, undefined);
     checkCachedChunksEntry(st.shard1, ns2, ns2ChunkEntryFCV40);
-    checkCachedChunksEntry(st.shard0, ns3, ns3ChunkEntryFCV40);
-    checkCachedChunksEntry(st.shard1, ns3, ns3ChunkEntryFCV40);
 
     st.stop();
 })();

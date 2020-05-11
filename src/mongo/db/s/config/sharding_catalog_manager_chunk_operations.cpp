@@ -51,7 +51,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -941,7 +940,6 @@ Status ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
                                              0,
                                              currentCollectionVersion.getValue().epoch());
 
-    stdx::unordered_set<ShardId, ShardId::Hasher> bumpedShards;
     for (const auto& chunk : chunksVector) {
         auto swChunk = ChunkType::fromConfigBSON(chunk);
         if (!swChunk.isOK()) {
@@ -950,14 +948,10 @@ Status ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
         auto& upgradeChunk = swChunk.getValue();
 
         if (upgradeChunk.getHistory().empty()) {
-            // Bump the version for only one chunk per shard to satisfy the requirement imposed by
-            // SERVER-33356
-            const auto& shardId = upgradeChunk.getShard();
-            if (!bumpedShards.count(shardId)) {
-                upgradeChunk.setVersion(newCollectionVersion);
-                newCollectionVersion.incMajor();
-                bumpedShards.emplace(shardId);
-            }
+
+            // Bump the version.
+            upgradeChunk.setVersion(newCollectionVersion);
+            newCollectionVersion.incMajor();
 
             // Construct the fresh history.
             upgradeChunk.setHistory({ChunkHistory{validAfter, upgradeChunk.getShard()}});
@@ -1010,12 +1004,26 @@ Status ShardingCatalogManager::downgradeChunksHistory(OperationContext* opCtx,
                               << ", but found no chunks"};
     }
 
+    const auto currentCollectionVersion = _findCollectionVersion(opCtx, nss, collectionEpoch);
+    if (!currentCollectionVersion.isOK()) {
+        return currentCollectionVersion.getStatus();
+    }
+
+    // Bump the version.
+    auto newCollectionVersion = ChunkVersion(currentCollectionVersion.getValue().majorVersion() + 1,
+                                             0,
+                                             currentCollectionVersion.getValue().epoch());
+
     for (const auto& chunk : chunksVector) {
         auto swChunk = ChunkType::fromConfigBSON(chunk);
         if (!swChunk.isOK()) {
             return swChunk.getStatus();
         }
         auto& downgradeChunk = swChunk.getValue();
+
+        // Bump the version.
+        downgradeChunk.setVersion(newCollectionVersion);
+        newCollectionVersion.incMajor();
 
         // Clear the history.
         downgradeChunk.setHistory({});
