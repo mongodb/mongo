@@ -1597,6 +1597,22 @@ TEST_F(RadixStoreTest, MergeOnlyDataDifferenceInBranch) {
     ASSERT_TRUE(thisStore == expected);
 }
 
+TEST_F(RadixStoreTest, MergeSharedSubKey) {
+    otherStore = baseStore;
+
+    otherStore.insert({"aaa", "a"});
+    otherStore.insert({"aaab", "b"});
+
+    thisStore = baseStore;
+    thisStore.insert({"aaaa", "a"});
+    thisStore.merge3(baseStore, otherStore);
+
+    expected.insert({"aaa", "a"});
+    expected.insert({"aaaa", "a"});
+    expected.insert({"aaab", "b"});
+    ASSERT_TRUE(thisStore == expected);
+}
+
 TEST_F(RadixStoreTest, MergeConflictingModifications) {
     value_type value1 = std::make_pair("foo", "1");
     value_type value2 = std::make_pair("foo", "2");
