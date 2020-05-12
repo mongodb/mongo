@@ -188,27 +188,29 @@ for (let level of ["none", "local", "available", "snapshot", "majority", "linear
     verifyServerStatusChange(serverStatus, newStatus, level, 1);
     serverStatus = newStatus;
 
-    assert.commandWorked(testDB.runCommand({count: collName, readConcern: readConcern}));
-    newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1);
-    serverStatus = newStatus;
-
     assert.commandWorked(
         testDB.runCommand({distinct: collName, key: "_id", readConcern: readConcern}));
     newStatus = getServerStatus(testDB);
     verifyServerStatusChange(serverStatus, newStatus, level, 1);
     serverStatus = newStatus;
 
-    assert.commandWorked(testDB.runCommand({
-        geoSearch: collName,
-        near: [0, 0],
-        maxDistance: 1,
-        search: {a: 1},
-        readConcern: readConcern
-    }));
-    newStatus = getServerStatus(testDB);
-    verifyServerStatusChange(serverStatus, newStatus, level, 1);
-    serverStatus = newStatus;
+    if (level !== "snapshot") {
+        assert.commandWorked(testDB.runCommand({count: collName, readConcern: readConcern}));
+        newStatus = getServerStatus(testDB);
+        verifyServerStatusChange(serverStatus, newStatus, level, 1);
+        serverStatus = newStatus;
+
+        assert.commandWorked(testDB.runCommand({
+            geoSearch: collName,
+            near: [0, 0],
+            maxDistance: 1,
+            search: {a: 1},
+            readConcern: readConcern
+        }));
+        newStatus = getServerStatus(testDB);
+        verifyServerStatusChange(serverStatus, newStatus, level, 1);
+        serverStatus = newStatus;
+    }
 
     if (level in ["none", "local", "available"]) {
         // mapReduce only support local and available.

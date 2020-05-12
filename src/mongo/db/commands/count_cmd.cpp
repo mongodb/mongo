@@ -91,7 +91,10 @@ public:
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level) const override {
-        return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
+        static const Status kSnapshotNotSupported{ErrorCodes::InvalidOptions,
+                                                  "read concern snapshot not supported"};
+        return {{level == repl::ReadConcernLevel::kSnapshotReadConcern, kSnapshotNotSupported},
+                Status::OK()};
     }
 
     bool shouldAffectReadConcernCounter() const override {

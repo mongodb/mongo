@@ -82,6 +82,7 @@ public:
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level) const final {
+        // geoSearch must support read concerns in order to be run in transactions.
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
@@ -124,6 +125,13 @@ public:
                           "and use $geoNear or $geoWithin. See "
                           "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
         }
+
+        uassert(ErrorCodes::InvalidOptions,
+                "read concern snapshot is not supported for geoSearch outside of transactions",
+                repl::ReadConcernArgs::get(opCtx).getLevel() !=
+                        repl::ReadConcernLevel::kSnapshotReadConcern ||
+                    opCtx->inMultiDocumentTransaction());
+
         const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
 
         AutoGetCollectionForReadCommand ctx(opCtx, nss);

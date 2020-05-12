@@ -24,6 +24,7 @@ assert.commandWorked(testDB[collName].insert({x: 1}));
 
 flushRoutersAndRefreshShardMetadata(st, {ns: dbName + "." + collName, dbNames: [dbName]});
 
+// Test snapshot in a transaction.
 let session = testDB.getMongo().startSession({causalConsistency: false});
 let sessionDb = session.getDatabase(dbName);
 
@@ -56,6 +57,7 @@ expectSuccessInTxnThenAbort(session, sessionDb, {
     readConcern: {level: "snapshot"},
 });
 
+// readConcern 'snapshot' is supported by aggregate on mongos in a transaction.
 expectSuccessInTxnThenAbort(session, sessionDb, {
     aggregate: collName,
     pipeline: [],
@@ -63,13 +65,13 @@ expectSuccessInTxnThenAbort(session, sessionDb, {
     readConcern: {level: "snapshot"},
 });
 
-// readConcern 'snapshot' is supported by find on mongos.
+// readConcern 'snapshot' is supported by find on mongos in a transaction.
 expectSuccessInTxnThenAbort(session, sessionDb, {
     find: collName,
     readConcern: {level: "snapshot"},
 });
 
-// readConcern 'snapshot' is supported by distinct on mongos.
+// readConcern 'snapshot' is supported by distinct on mongos in a transaction.
 expectSuccessInTxnThenAbort(session, sessionDb, {
     distinct: collName,
     key: "x",
@@ -93,6 +95,34 @@ expectSuccessInTxnThenAbort(session, sessionDb, {
     cursor: {},
     readConcern: {level: "snapshot", afterClusterTime: clusterTime},
 });
+
+// Test snapshot outside of transactions on mongos.
+const snapshotReadConcern = {
+    level: "snapshot"
+};
+// readConcern 'snapshot' is supported by find outside of transactions on mongos.
+assert.commandWorked(testDB.runCommand({find: collName, readConcern: snapshotReadConcern}));
+
+// readConcern 'snapshot' is supported by aggregate outside of transactions on mongos.
+assert.commandWorked(testDB.runCommand(
+    {aggregate: collName, pipeline: [], cursor: {}, readConcern: snapshotReadConcern}));
+
+// readConcern 'snapshot' is supported by distinct outside of transactions on mongos.
+assert.commandWorked(
+    testDB.runCommand({distinct: collName, key: "x", readConcern: snapshotReadConcern}));
+
+// readConcern 'snapshot' is not supported by count on mongos.
+assert.commandFailedWithCode(testDB.runCommand({count: collName, readConcern: snapshotReadConcern}),
+                             ErrorCodes.InvalidOptions);
+
+// readConcern 'snapshot' is not supported by findAndModify outside of transactions on mongos.
+assert.commandFailedWithCode(testDB.runCommand({
+    findAndModify: collName,
+    query: {},
+    update: {$set: {a: 1}},
+    readConcern: snapshotReadConcern,
+}),
+                             ErrorCodes.InvalidOptions);
 
 st.stop();
 }());

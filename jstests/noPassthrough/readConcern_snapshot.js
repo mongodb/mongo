@@ -1,5 +1,5 @@
 // Test parsing of readConcern level 'snapshot'.
-// @tags: [requires_replication, uses_transactions]
+// @tags: [requires_majority_read_concern, requires_replication, uses_transactions]
 (function() {
 "use strict";
 
@@ -107,27 +107,84 @@ assert.commandWorked(testDB.runCommand({
     writeConcern: {w: "majority"}
 }));
 
+// Test snapshot in a transaction.
 session = testDB.getMongo().startSession({causalConsistency: false});
 sessionDb = session.getDatabase(dbName);
 
-// readConcern 'snapshot' is supported by find.
+// readConcern 'snapshot' is supported by find in a transaction.
 session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 assert.commandWorked(sessionDb.runCommand({find: collName}));
 
-// readConcern 'snapshot' is supported by aggregate.
+// readConcern 'snapshot' is supported by aggregate in a transaction.
 assert.commandWorked(sessionDb.runCommand({aggregate: collName, pipeline: [], cursor: {}}));
 
-// readConcern 'snapshot' is supported by distinct.
+// readConcern 'snapshot' is supported by distinct in a transaction.
 assert.commandWorked(sessionDb.runCommand({distinct: collName, key: "x"}));
 
-// readConcern 'snapshot' is supported by geoSearch.
+// readConcern 'snapshot' is supported by geoSearch in a transaction.
 assert.commandWorked(
     sessionDb.runCommand({geoSearch: collName, near: [0, 0], maxDistance: 1, search: {a: 1}}));
 
-// readConcern 'snapshot' is not supported by non-CRUD commands.
+// readConcern 'snapshot' is not supported by non-CRUD commands in a transaction.
 assert.commandFailedWithCode(sessionDb.runCommand({dropIndexes: collName, index: "a_1"}),
                              ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandWorked(session.abortTransaction_forTesting());
 session.endSession();
+
+// Test snapshot outside of transactions.
+const snapshotReadConcern = {
+    level: "snapshot"
+};
+// readConcern 'snapshot' is supported by find outside of transactions.
+assert.commandWorked(testDB.runCommand({find: collName, readConcern: snapshotReadConcern}));
+
+// readConcern 'snapshot' is supported by aggregate outside of transactions.
+assert.commandWorked(testDB.runCommand(
+    {aggregate: collName, pipeline: [], cursor: {}, readConcern: snapshotReadConcern}));
+
+// readConcern 'snapshot' is supported by distinct outside of transactions.
+assert.commandWorked(
+    testDB.runCommand({distinct: collName, key: "x", readConcern: snapshotReadConcern}));
+
+// readConcern 'snapshot' is not supported by geoSearch outside of transactions.
+assert.commandFailedWithCode(testDB.runCommand({
+    geoSearch: collName,
+    near: [0, 0],
+    maxDistance: 1,
+    search: {a: 1},
+    readConcern: snapshotReadConcern
+}),
+                             ErrorCodes.InvalidOptions);
+
+// readConcern 'snapshot' is not supported by count.
+assert.commandFailedWithCode(testDB.runCommand({count: collName, readConcern: snapshotReadConcern}),
+                             ErrorCodes.InvalidOptions);
+
+// readConcern 'snapshot' is not supported by findAndModify.
+assert.commandFailedWithCode(testDB.runCommand({
+    findAndModify: collName,
+    query: {},
+    update: {$set: {a: 1}},
+    readConcern: snapshotReadConcern,
+}),
+                             ErrorCodes.InvalidOptions);
+
+// readConcern 'snapshot' is not supported by non-CRUD commands.
+assert.commandFailedWithCode(
+    testDB.adminCommand({listDatabases: 1, readConcern: snapshotReadConcern}),
+    ErrorCodes.InvalidOptions);
+
+assert.commandFailedWithCode(
+    testDB.runCommand({listCollections: 1, readConcern: snapshotReadConcern}),
+    ErrorCodes.InvalidOptions);
+
+assert.commandFailedWithCode(
+    testDB.runCommand({listIndexes: collName, readConcern: snapshotReadConcern}),
+    ErrorCodes.InvalidOptions);
+
+assert.commandFailedWithCode(
+    testDB.runCommand({dropIndexes: collName, index: "a_1", readConcern: snapshotReadConcern}),
+    ErrorCodes.InvalidOptions);
+
 rst.stopSet();
 }());
