@@ -2217,10 +2217,10 @@ buildvariants:
     - name: syscall-linux
     - name: make-check-asan-test
     - name: configure-combinations
-    # - name: checkpoint-filetypes-test
+    - name: checkpoint-filetypes-test
     # - name: coverage-report
     - name: unit-test-long
-    # - name: spinlock-gcc-test
+    - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
     - name: wtperf-test
@@ -2321,9 +2321,9 @@ buildvariants:
     - name: syscall-linux
     - name: compile-asan
     - name: make-check-asan-test
-    # - name: checkpoint-filetypes-test
+    - name: checkpoint-filetypes-test
     - name: unit-test-long
-    # - name: spinlock-gcc-test
+    - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
     - name: wtperf-test

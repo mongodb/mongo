@@ -144,7 +144,7 @@ static int
 __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip,
   wt_timestamp_t rollback_timestamp, bool replace)
 {
-    WT_CELL_UNPACK *unpack, _unpack;
+    WT_CELL_UNPACK_KV *unpack, _unpack;
     WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(hs_key);
@@ -351,7 +351,7 @@ static int
 __rollback_abort_row_ondisk_kv(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, wt_timestamp_t rollback_timestamp)
 {
-    WT_CELL_UNPACK *vpack, _vpack;
+    WT_CELL_UNPACK_KV *vpack, _vpack;
     WT_DECL_RET;
     WT_ITEM buf;
     WT_UPDATE *upd;
@@ -635,7 +635,7 @@ __rollback_page_needs_abort(
   WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
 {
     WT_ADDR *addr;
-    WT_CELL_UNPACK vpack;
+    WT_CELL_UNPACK_ADDR vpack;
     WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
     wt_timestamp_t durable_ts;
@@ -677,7 +677,7 @@ __rollback_page_needs_abort(
     } else if (!__wt_off_page(ref->home, addr)) {
         tag = "on page cell";
         /* Check if the page is obsolete using the page disk address. */
-        __wt_cell_unpack(session, ref->home, (WT_CELL *)addr, &vpack);
+        __wt_cell_unpack_addr(session, ref->home->dsk, (WT_CELL *)addr, &vpack);
         durable_ts = WT_MAX(vpack.ta.newest_start_durable_ts, vpack.ta.newest_stop_durable_ts);
         prepared = F_ISSET(&vpack, WT_CELL_UNPACK_PREPARE);
         result = (durable_ts > rollback_timestamp) || prepared;
@@ -704,7 +704,7 @@ static void
 __rollback_verify_ondisk_page(
   WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t rollback_timestamp)
 {
-    WT_CELL_UNPACK *vpack, _vpack;
+    WT_CELL_UNPACK_KV *vpack, _vpack;
     WT_ROW *rip;
     uint32_t i;
 

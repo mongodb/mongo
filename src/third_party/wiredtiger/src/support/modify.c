@@ -535,7 +535,7 @@ __wt_modify_reconstruct_from_upd_list(
     cursor = &cbt->iface;
 
     /* While we have a pointer to our original modify, grab this information. */
-    upd_value->start_ts = upd->start_ts;
+    upd_value->durable_ts = upd->durable_ts;
     upd_value->txnid = upd->txnid;
     upd_value->prepare_state = upd->prepare_state;
 

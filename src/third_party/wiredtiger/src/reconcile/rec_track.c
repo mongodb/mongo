@@ -31,13 +31,13 @@ __wt_ovfl_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __ovfl_discard_verbose(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, const char *tag)
 {
-    WT_CELL_UNPACK *unpack, _unpack;
+    WT_CELL_UNPACK_KV *unpack, _unpack;
     WT_DECL_ITEM(tmp);
 
     WT_RET(__wt_scr_alloc(session, 512, &tmp));
 
     unpack = &_unpack;
-    __wt_cell_unpack(session, page, cell, unpack);
+    __wt_cell_unpack_kv(session, page->dsk, cell, unpack);
 
     __wt_verbose(session, WT_VERB_OVERFLOW, "discard: %s%s%p %s", tag == NULL ? "" : tag,
       tag == NULL ? "" : ": ", (void *)page,

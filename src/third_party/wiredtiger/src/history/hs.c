@@ -1070,7 +1070,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
      */
     WT_ERR(__wt_buf_set(session, &upd_value->buf, hs_value->data, hs_value->size));
 skip_buf:
-    upd_value->start_ts = hs_start_ts;
+    upd_value->durable_ts = durable_timestamp;
     upd_value->txnid = WT_TXN_NONE;
     upd_value->type = upd_type;
     upd_value->prepare_state =

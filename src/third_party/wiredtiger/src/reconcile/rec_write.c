@@ -519,7 +519,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
 
     /* Track the page's min/maximum transaction */
     r->max_txn = WT_TXN_NONE;
-    r->max_ondisk_ts = r->max_ts = WT_TS_NONE;
+    r->max_ts = WT_TS_NONE;
     r->min_skipped_ts = WT_TS_MAX;
 
     /* Track if updates were used and/or uncommitted. */

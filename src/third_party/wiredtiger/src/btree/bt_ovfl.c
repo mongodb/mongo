@@ -43,8 +43,8 @@ __ovfl_read(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size, WT_
  *     Bring an overflow item into memory.
  */
 int
-__wt_ovfl_read(
-  WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store, bool *decoded)
+__wt_ovfl_read(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_COMMON *unpack,
+  WT_ITEM *store, bool *decoded)
 {
     WT_DECL_RET;
 
@@ -65,7 +65,6 @@ __wt_ovfl_read(
      */
     __wt_readlock(session, &S2BT(session)->ovfl_lock);
     if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM) {
-        WT_ASSERT(session, __wt_txn_visible_all(session, unpack->tw.stop_txn, unpack->tw.stop_ts));
         ret = __wt_buf_setstr(session, store, "WT_CELL_VALUE_OVFL_RM");
         *decoded = true;
     } else
@@ -80,7 +79,7 @@ __wt_ovfl_read(
  *     Remove an overflow value.
  */
 int
-__wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
+__wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *unpack)
 {
     /*
      * This function solves two problems in reconciliation.
@@ -121,13 +120,13 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
 {
     WT_BM *bm;
     WT_BTREE *btree;
-    WT_CELL_UNPACK *unpack, _unpack;
+    WT_CELL_UNPACK_KV *unpack, _unpack;
 
     btree = S2BT(session);
     bm = btree->bm;
     unpack = &_unpack;
 
-    __wt_cell_unpack(session, page, cell, unpack);
+    __wt_cell_unpack_kv(session, page->dsk, cell, unpack);
 
     /*
      * Remove overflow key/value objects, called when reconciliation finishes after successfully

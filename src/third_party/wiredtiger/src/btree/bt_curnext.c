@@ -179,7 +179,7 @@ static inline int
 __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 {
     WT_CELL *cell;
-    WT_CELL_UNPACK unpack;
+    WT_CELL_UNPACK_KV unpack;
     WT_COL *cip;
     WT_INSERT *ins;
     WT_PAGE *page;
@@ -245,7 +245,7 @@ restart_read:
          */
         if (cbt->cip_saved != cip) {
             cell = WT_COL_PTR(page, cip);
-            __wt_cell_unpack(session, page, cell, &unpack);
+            __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
             if (unpack.type == WT_CELL_DEL) {
                 if ((rle = __wt_cell_rle(&unpack)) == 1)
                     continue;
@@ -295,7 +295,7 @@ restart_read:
 static inline int
 __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 {
-    WT_CELL_UNPACK kpack;
+    WT_CELL_UNPACK_KV kpack;
     WT_INSERT *ins;
     WT_ITEM *key;
     WT_PAGE *page;

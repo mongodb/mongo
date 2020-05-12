@@ -122,7 +122,7 @@ __wt_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv)
  */
 static inline void
 __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *addr,
-  WT_CELL_UNPACK *vpack, bool proxy_cell, uint64_t recno)
+  WT_CELL_UNPACK_ADDR *vpack, bool proxy_cell, uint64_t recno)
 {
     WT_REC_KV *val;
     u_int cell_type;

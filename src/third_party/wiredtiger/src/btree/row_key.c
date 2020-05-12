@@ -120,7 +120,7 @@ __wt_row_leaf_key_copy(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_
 
 /*
  * __wt_row_leaf_key_work --
- *     Return a reference to, a row-store leaf-page key, optionally instantiate the key into the
+ *     Return a reference to a row-store leaf-page key, optionally instantiate the key into the
  *     in-memory page.
  */
 int
@@ -130,7 +130,7 @@ __wt_row_leaf_key_work(
     enum { FORWARD, BACKWARD } direction;
     WT_BTREE *btree;
     WT_CELL *cell;
-    WT_CELL_UNPACK *unpack, _unpack;
+    WT_CELL_UNPACK_KV *unpack, _unpack;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_IKEY *ikey;
@@ -253,7 +253,7 @@ switch_and_jump:
         /*
          * It must be an on-page cell, unpack it.
          */
-        __wt_cell_unpack(session, page, cell, unpack);
+        __wt_cell_unpack_kv(session, page->dsk, cell, unpack);
 
         /* 3: the test for an on-page reference to an overflow key. */
         if (unpack->type == WT_CELL_KEY_OVFL) {
@@ -272,7 +272,7 @@ switch_and_jump:
                 __wt_readlock(session, &btree->ovfl_lock);
                 copy = WT_ROW_KEY_COPY(rip);
                 if (!__wt_row_leaf_key_info(page, copy, NULL, &cell, &keyb->data, &keyb->size)) {
-                    __wt_cell_unpack(session, page, cell, unpack);
+                    __wt_cell_unpack_kv(session, page->dsk, cell, unpack);
                     ret = __wt_dsk_cell_data_ref(session, WT_PAGE_ROW_LEAF, unpack, keyb);
                 }
                 __wt_readunlock(session, &btree->ovfl_lock);

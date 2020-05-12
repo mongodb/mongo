@@ -159,7 +159,7 @@ static int
 __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 {
     WT_CELL *cell;
-    WT_CELL_UNPACK kpack;
+    WT_CELL_UNPACK_KV kpack;
     WT_IKEY *ikey;
     uint32_t cell_offset;
 
@@ -181,7 +181,7 @@ __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
     ikey->cell_offset = 0;
 
     cell = WT_PAGE_REF_OFFSET(page, cell_offset);
-    __wt_cell_unpack(session, page, cell, &kpack);
+    __wt_cell_unpack_kv(session, page->dsk, cell, &kpack);
     if (FLD_ISSET(kpack.flags, WT_CELL_UNPACK_OVERFLOW) && kpack.raw != WT_CELL_KEY_OVFL_RM)
         WT_RET(__wt_ovfl_discard(session, page, cell));
 
@@ -197,7 +197,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home, WT_REF **from_ref
   WT_REF **to_refp, size_t *incrp)
 {
     WT_ADDR *addr, *ref_addr;
-    WT_CELL_UNPACK unpack;
+    WT_CELL_UNPACK_ADDR unpack;
     WT_DECL_RET;
     WT_IKEY *ikey;
     WT_REF *ref;
@@ -247,7 +247,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home, WT_REF **from_ref
      */
     WT_ORDERED_READ(ref_addr, ref->addr);
     if (ref_addr != NULL && !__wt_off_page(from_home, ref_addr)) {
-        __wt_cell_unpack(session, from_home, (WT_CELL *)ref_addr, &unpack);
+        __wt_cell_unpack_addr(session, from_home->dsk, (WT_CELL *)ref_addr, &unpack);
         WT_RET(__wt_calloc_one(session, &addr));
         __wt_time_aggregate_copy(&addr->ta, &unpack.ta);
         WT_ERR(__wt_memdup(session, unpack.data, unpack.size, &addr->addr));

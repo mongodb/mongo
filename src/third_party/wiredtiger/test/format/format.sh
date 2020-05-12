@@ -214,14 +214,11 @@ skip_known_errors()
 
 	log=$1
 
-	# Define each array with multi-signature matching for a single known error
-	# and append it to the skip_error_list
-	err_1=("heap-buffer-overflow" "__split_parent") # Delete this error line post WT-5518 fix
-	err_2=("heap-use-after-free" "__wt_btcur_next_random") # Delete this error line post WT-5552 fix
-
-	# skip_error_list is the list of errors to skip, and each error could
-	# have multiple signatures to be able to reach a finer match
-	skip_error_list=( err_1[@] err_2[@] )
+	# skip_error_list is a list of errors to skip. Each array entry can have multiple signatures
+	# for finger-grained matching. For example:
+	#
+	#	err_1=("heap-buffer-overflow" "__split_parent")
+	skip_error_list=( err_1[@] )
 
 	# Loop through the skip list and search in the log file.
 	err_count=${#skip_error_list[@]}
@@ -249,12 +246,11 @@ report_failure()
 	log="$dir.log"
 
 	# DO NOT CURRENTLY SKIP ANY ERRORS.
-	skip_ret=0
 	#skip_known_errors $log
 	#skip_ret=$?
 
 	echo "$name: failure status reported" > $dir/$status
-	[[ $skip_ret -ne 0 ]] && failure=$(($failure + 1))
+	failure=$(($failure + 1))
 
 	# Forcibly quit if first-failure configured.
 	[[ $first_failure -ne 0 ]] && force_quit=1

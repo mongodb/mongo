@@ -409,7 +409,7 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
  */
 static inline int
 __cursor_row_slot_key_return(
-  WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_CELL_UNPACK *kpack, bool *kpack_used)
+  WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_CELL_UNPACK_KV *kpack, bool *kpack_used)
 {
     WT_BTREE *btree;
     WT_CELL *cell;
@@ -454,7 +454,7 @@ __cursor_row_slot_key_return(
      * compiler complaining about uninitialized field use.
      */
     memset(kpack, 0, sizeof(*kpack));
-    __wt_cell_unpack(session, page, cell, kpack);
+    __wt_cell_unpack_kv(session, page->dsk, cell, kpack);
     *kpack_used = true;
     if (kpack->type == WT_CELL_KEY && cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
         WT_ASSERT(session, cbt->row_key->size >= kpack->prefix);

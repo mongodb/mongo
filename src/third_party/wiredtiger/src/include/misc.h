@@ -235,9 +235,6 @@
         }                                                              \
     } while (0)
 
-/* Verbose messages. */
-#define WT_VERBOSE_ISSET(session, f) (FLD_ISSET(S2C(session)->verbose, f))
-
 #define WT_CLEAR(s) memset(&(s), 0, sizeof(s))
 
 /* Check if a string matches a prefix. */

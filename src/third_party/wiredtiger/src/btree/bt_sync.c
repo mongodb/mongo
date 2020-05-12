@@ -179,7 +179,7 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
     WT_DECL_RET;
     WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
-    wt_timestamp_t newest_stop_ts;
+    wt_timestamp_t newest_stop_durable_ts;
     uint64_t newest_stop_txn;
     uint32_t i;
     uint8_t previous_state;
@@ -214,15 +214,20 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
      * dirty. This is to ensure the parent is written during the checkpoint and the child page
      * discarded.
      */
-    newest_stop_ts = WT_TS_NONE;
+    newest_stop_durable_ts = WT_TS_NONE;
     newest_stop_txn = WT_TXN_NONE;
     obsolete = false;
     if (previous_state == WT_REF_DISK) {
         /* There should be an address, but simply skip any page where we don't find one. */
         if (__wt_ref_addr_copy(session, ref, &addr)) {
-            newest_stop_ts = addr.ta.newest_stop_ts;
+            /*
+             * Max stop timestamp is possible only when the prepared update is written to the data
+             * store.
+             */
+            newest_stop_durable_ts =
+              addr.ta.newest_stop_ts == WT_TS_MAX ? WT_TS_MAX : addr.ta.newest_stop_durable_ts;
             newest_stop_txn = addr.ta.newest_stop_txn;
-            obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_ts);
+            obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
         }
 
         if (obsolete) {
@@ -237,7 +242,7 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
           "%p on-disk page obsolete check: %s"
           "obsolete, stop ts/txn %s",
           (void *)ref, obsolete ? "" : "not ",
-          __wt_time_pair_to_string(newest_stop_ts, newest_stop_txn, tp_string));
+          __wt_time_pair_to_string(newest_stop_durable_ts, newest_stop_txn, tp_string));
         return (0);
     }
     WT_REF_UNLOCK(ref, previous_state);
@@ -275,21 +280,26 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
         /* Calculate the max stop time pair by traversing all multi addresses. */
         for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
             newest_stop_txn = WT_MAX(newest_stop_txn, multi->addr.ta.newest_stop_txn);
-            newest_stop_ts = WT_MAX(newest_stop_ts, multi->addr.ta.newest_stop_ts);
+            newest_stop_durable_ts = WT_MAX(newest_stop_durable_ts,
+              multi->addr.ta.newest_stop_ts == WT_TS_MAX ? WT_TS_MAX :
+                                                           multi->addr.ta.newest_stop_durable_ts);
         }
-        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_ts);
+        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
     } else if (mod != NULL && mod->rec_result == WT_PM_REC_REPLACE) {
         tag = "reconciled replacement block";
 
         newest_stop_txn = mod->mod_replace.ta.newest_stop_txn;
-        newest_stop_ts = mod->mod_replace.ta.newest_stop_ts;
-        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_ts);
+        newest_stop_durable_ts = mod->mod_replace.ta.newest_stop_ts == WT_TS_MAX ?
+          WT_TS_MAX :
+          mod->mod_replace.ta.newest_stop_durable_ts;
+        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
     } else if (__wt_ref_addr_copy(session, ref, &addr)) {
         tag = "WT_REF address";
 
         newest_stop_txn = addr.ta.newest_stop_txn;
-        newest_stop_ts = addr.ta.newest_stop_ts;
-        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_ts);
+        newest_stop_durable_ts =
+          addr.ta.newest_stop_ts == WT_TS_MAX ? WT_TS_MAX : addr.ta.newest_stop_durable_ts;
+        obsolete = __wt_txn_visible_all(session, newest_stop_txn, newest_stop_durable_ts);
     } else
         tag = "unexpected page state";
 
@@ -303,7 +313,7 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
       "%p in-memory page obsolete check: %s %s"
       "obsolete, stop ts/txn %s",
       (void *)ref, tag, obsolete ? "" : "not ",
-      __wt_time_pair_to_string(newest_stop_ts, newest_stop_txn, tp_string));
+      __wt_time_pair_to_string(newest_stop_durable_ts, newest_stop_txn, tp_string));
 
 err:
     if (hazard)
