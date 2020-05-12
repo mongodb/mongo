@@ -177,6 +177,19 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                   "existing expireAfterSeconds field is not a number");
                 }
             }
+
+            // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
+            if (!cmr.indexHidden.eoo() && cmr.idx->hidden() == cmr.indexHidden.booleanSafe()) {
+                // If the collMod includes "expireAfterSeconds", remove the no-op "hidden" parameter
+                // and write the remaining "index" object to the oplog entry builder.
+                if (!cmr.indexExpireAfterSeconds.eoo()) {
+                    oplogEntryBuilder->append(fieldName, indexObj.removeField("hidden"));
+                }
+                // Un-set "indexHidden" in CollModRequest, and skip the automatic write to the
+                // oplogEntryBuilder that occurs at the end of the parsing loop.
+                cmr.indexHidden = {};
+                continue;
+            }
         } else if (fieldName == "validator" && !isView) {
             // Save this to a variable to avoid reading the atomic variable multiple times.
             const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
