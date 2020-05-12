@@ -5,4 +5,5 @@ selector:
   - src/mongo/db/repl/tla_plus/**/*.cfg
 
 executor:
-  config: {}
+  config:
+    java_binary: /opt/java/jdk11/bin/java
