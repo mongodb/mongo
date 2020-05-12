@@ -6,8 +6,8 @@
  * restarting
  *
  * @tags: [
+ *   requires_fcv_46,
  *   requires_persistence,
- *   need_fixing_for_46
  * ]
  */
 (function() {
