@@ -497,8 +497,10 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
         return true;
     }
     ReplSetConfig localConfig;
-    status = localConfig.initialize(cfg.getValue());
-    if (!status.isOK()) {
+    try {
+        localConfig = ReplSetConfig::parse(cfg.getValue());
+    } catch (const DBException& e) {
+        auto status = e.toStatus();
         if (status.code() == ErrorCodes::RepairedReplicaSetNode) {
             LOGV2_FATAL_NOTRACE(
                 50923,
@@ -1183,9 +1185,9 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
                     return {ErrorCodes::ConfigurationInProgress,
                             "reconfig on step up was preempted by another reconfig"};
                 }
-                auto config = oldConfig;
+                auto config = oldConfig.getMutable();
                 config.setConfigTerm(primaryTerm);
-                return config;
+                return ReplSetConfig(std::move(config));
             };
             LOGV2(4508103, "Increment the config term via reconfig");
             auto reconfigStatus = doReplSetReconfig(opCtx, getNewConfig, true /* force */);
@@ -3218,10 +3220,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 
         // When initializing a new config through the replSetReconfig command, ignore the term
         // field passed in through its args. Instead, use this node's term.
-        const Status status =
-            newConfig.initialize(args.newConfigObj, term, oldConfig.getReplicaSetId());
-
-        if (!status.isOK()) {
+        try {
+            newConfig = ReplSetConfig::parse(args.newConfigObj, term, oldConfig.getReplicaSetId());
+        } catch (const DBException& e) {
+            auto status = e.toStatus();
             LOGV2_ERROR(21418,
                         "replSetReconfig got {error} while parsing {newConfig}",
                         "replSetReconfig error parsing new config",
@@ -3247,11 +3249,13 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
             // Increase the config version for force reconfig.
             auto version = std::max(oldConfig.getConfigVersion(), newConfig.getConfigVersion());
             version += 10'000 + SecureRandom().nextInt32(100'000);
-            newConfig.setConfigVersion(version);
+            auto newMutableConfig = newConfig.getMutable();
+            newMutableConfig.setConfigVersion(version);
+            newConfig = ReplSetConfig(std::move(newMutableConfig));
         } else {
             // Only append 'newlyAdded' to nodes during safe reconfig.
             if (enableAutomaticReconfig) {
-                bool addedNewlyAddedField = false;
+                boost::optional<MutableReplSetConfig> newMutableConfig;
 
                 // Set the 'newlyAdded' field to true for all new voting nodes.
                 for (int i = 0; i < newConfig.getNumMembers(); i++) {
@@ -3285,12 +3289,15 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                     // 1) Is a new, voting node
                     // 2) Already has a 'newlyAdded' field in the old config
                     if (isNewVotingMember || isCurrentlyNewlyAdded) {
-                        newConfig.addNewlyAddedFieldForMember(newMemId);
-                        addedNewlyAddedField = true;
+                        if (!newMutableConfig) {
+                            newMutableConfig = newConfig.getMutable();
+                        }
+                        newMutableConfig->addNewlyAddedFieldForMember(newMemId);
                     }
                 }
 
-                if (addedNewlyAddedField) {
+                if (newMutableConfig) {
+                    newConfig = ReplSetConfig(*std::move(newMutableConfig));
                     LOGV2(4634400,
                           "Appended the 'newlyAdded' field to a node in the new config. Nodes with "
                           "the 'newlyAdded' field will be considered to have 'votes:0'. Upon "
@@ -3572,7 +3579,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         newConfig.getWriteConcernMajorityShouldJournal();
     // If the new config has the same content but different version and term, like on stepup, we
     // don't need to drop snapshots either, since the quorum condition is still the same.
-    auto newConfigCopy = newConfig;
+    auto newConfigCopy = newConfig.getMutable();
     newConfigCopy.setConfigTerm(oldConfig.getConfigTerm());
     newConfigCopy.setConfigVersion(oldConfig.getConfigVersion());
     auto contentChanged =
@@ -3692,7 +3699,7 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
                               << ", heartbeat data config version: " << versionAndTerm.toString());
         }
 
-        auto newConfig = oldConfig;
+        auto newConfig = oldConfig.getMutable();
         newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
 
         const auto hasNewlyAddedField =
@@ -3702,7 +3709,7 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
         }
 
         newConfig.removeNewlyAddedFieldForMember(memberId);
-        return newConfig;
+        return ReplSetConfig(std::move(newConfig));
     };
 
     auto opCtx = cc().makeOperationContext();
@@ -3760,8 +3767,10 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     lk.unlock();
 
     ReplSetConfig newConfig;
-    Status status = newConfig.initializeForInitiate(configObj, OID::gen());
-    if (!status.isOK()) {
+    try {
+        newConfig = ReplSetConfig::parseForInitiate(configObj, OID::gen());
+    } catch (const DBException& e) {
+        Status status = e.toStatus();
         LOGV2_ERROR(21423,
                     "replSet initiate got {error} while parsing {config}",
                     "replSetInitiate error while parsing config",
@@ -3800,7 +3809,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
 
     // In pv1, the TopologyCoordinator has not set the term yet. It will be set to kInitialTerm if
     // the initiate succeeds so we pass that here.
-    status = checkQuorumForInitiate(
+    auto status = checkQuorumForInitiate(
         _replExecutor.get(), newConfig, myIndex.getValue(), OpTime::kInitialTerm);
 
     if (!status.isOK()) {

@@ -201,8 +201,7 @@ protected:
     // Update config and set selfIndex
     // If "now" is passed in, set _now to now+1
     void updateConfig(BSONObj cfg, int selfIndex, Date_t now = Date_t::fromMillisSinceEpoch(-1)) {
-        ReplSetConfig config;
-        ASSERT_OK(config.initialize(addProtocolVersion(cfg)));
+        auto config = ReplSetConfig::parse(addProtocolVersion(cfg));
         ASSERT_OK(config.validate());
 
         _selfIndex = selfIndex;
@@ -2701,13 +2700,12 @@ TEST_F(TopoCoordTest,
        DoNotBecomeCandidateWhenReconfigToBeElectableInSingleNodeSetIfInMaintenanceMode) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    ReplSetConfig cfg;
-    ASSERT_OK(cfg.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 1 << "protocolVersion" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "hself"
-                                                           << "priority" << 0)))));
+    auto cfg = ReplSetConfig::parse(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                  << "hself"
+                                                                  << "priority" << 0))));
     getTopoCoord().updateConfig(cfg, 0, now()++);
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
@@ -2731,14 +2729,12 @@ TEST_F(TopoCoordTest,
 TEST_F(TopoCoordTest, NodeDoesNotBecomeCandidateWhenBecomingSecondaryInSingleNodeSetIfUnelectable) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    ReplSetConfig cfg;
-    cfg.initialize(BSON("_id"
-                        << "rs0"
-                        << "version" << 1 << "members"
-                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                 << "hself"
-                                                 << "priority" << 0))))
-        .transitional_ignore();
+    auto cfg = ReplSetConfig::parse(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                  << "hself"
+                                                                  << "priority" << 0))));
 
     getTopoCoord().updateConfig(cfg, 0, now()++);
     ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
@@ -4341,10 +4337,9 @@ public:
 };
 
 TEST_F(HeartbeatResponseReconfigTestV1, NodeAcceptsConfigIfVersionInHeartbeatResponseIsNewer) {
-    ReplSetConfig config;
     long long version = initConfigVersion + 1;
     long long term = initConfigTerm;
-    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+    auto config = ReplSetConfig::parse(makeRSConfigWithVersionAndTerm(version, term));
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1)
@@ -4362,10 +4357,9 @@ TEST_F(HeartbeatResponseReconfigTestV1, NodeAcceptsConfigIfVersionInHeartbeatRes
 }
 
 TEST_F(HeartbeatResponseReconfigTestV1, NodeAcceptsConfigIfTermInHeartbeatResponseIsNewer) {
-    ReplSetConfig config;
     long long version = initConfigVersion;
     long long term = initConfigTerm + 1;
-    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+    auto config = ReplSetConfig::parse(makeRSConfigWithVersionAndTerm(version, term));
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1)
@@ -4384,10 +4378,9 @@ TEST_F(HeartbeatResponseReconfigTestV1, NodeAcceptsConfigIfTermInHeartbeatRespon
 
 TEST_F(HeartbeatResponseReconfigTestV1,
        NodeAcceptsConfigIfVersionInHeartbeatResponseIfNewerAndTermUninitialized) {
-    ReplSetConfig config;
     long long version = initConfigVersion + 1;
     long long term = OpTime::kUninitializedTerm;
-    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+    auto config = ReplSetConfig::parse(makeRSConfigWithVersionAndTerm(version, term));
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1)
@@ -4406,10 +4399,9 @@ TEST_F(HeartbeatResponseReconfigTestV1,
 
 TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfVersionIsOlder) {
     // Older config version, same term.
-    ReplSetConfig config;
     long long version = (initConfigVersion - 1);
     long long term = initConfigTerm;
-    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+    auto config = ReplSetConfig::parse(makeRSConfigWithVersionAndTerm(version, term));
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 1)
@@ -4428,10 +4420,9 @@ TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfVe
 }
 
 TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfConfigIsTheSame) {
-    ReplSetConfig config;
     long long version = initConfigVersion;
     long long term = initConfigTerm;
-    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+    auto config = ReplSetConfig::parse(makeRSConfigWithVersionAndTerm(version, term));
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 0)
@@ -4451,10 +4442,9 @@ TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfCo
 
 TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfTermIsOlder) {
     // Older config term, same version
-    ReplSetConfig config;
     long long version = initConfigVersion;
     long long term = initConfigTerm - 1;
-    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+    auto config = ReplSetConfig::parse(makeRSConfigWithVersionAndTerm(version, term));
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 0)
@@ -4475,10 +4465,9 @@ TEST_F(HeartbeatResponseReconfigTestV1, NodeRejectsConfigInHeartbeatResponseIfTe
 TEST_F(HeartbeatResponseReconfigTestV1,
        NodeRejectsConfigInHeartbeatResponseIfNewerVersionButOlderTerm) {
     // Newer version but older term.
-    ReplSetConfig config;
     long long version = (initConfigVersion + 1);
     long long term = (initConfigTerm - 1);
-    config.initialize(makeRSConfigWithVersionAndTerm(version, term)).transitional_ignore();
+    auto config = ReplSetConfig::parse(makeRSConfigWithVersionAndTerm(version, term));
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_SECONDARY), 0)
@@ -6004,8 +5993,7 @@ TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
 }
 
 TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
-    ReplSetConfig configA;
-    ASSERT_OK(configA.initialize(BSON(
+    auto configA = ReplSetConfig::parse(BSON(
         "_id"
         << "rs0"
         << "version" << 1 << "protocolVersion" << 1 << "members"
@@ -6050,7 +6038,7 @@ TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
         << "settings"
         << BSON("getLastErrorModes" << BSON(
                     "valid" << BSON("dc" << 2 << "rack" << 3) << "invalidNotEnoughValues"
-                            << BSON("dc" << 3) << "invalidNotEnoughNodes" << BSON("rack" << 6))))));
+                            << BSON("dc" << 3) << "invalidNotEnoughNodes" << BSON("rack" << 6)))));
     getTopoCoord().updateConfig(configA, -1, Date_t());
 
     CommitQuorumOptions validNumberCQ;
@@ -7094,20 +7082,17 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataSameConfig) {
 
     // construct a copy of the original config for log message checking later
     // see HeartbeatResponseTest for the origin of the original config
-    ReplSetConfig originalConfig;
-    originalConfig
-        .initialize(BSON("_id"
-                         << "rs0"
-                         << "version" << 5 << "members"
-                         << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                  << "host1:27017")
-                                       << BSON("_id" << 1 << "host"
-                                                     << "host2:27017")
-                                       << BSON("_id" << 2 << "host"
-                                                     << "host3:27017"))
-                         << "protocolVersion" << 1 << "settings"
-                         << BSON("heartbeatTimeoutSecs" << 5)))
-        .transitional_ignore();
+    auto originalConfig = ReplSetConfig::parse(BSON("_id"
+                                                    << "rs0"
+                                                    << "version" << 5 << "members"
+                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                             << "host1:27017")
+                                                                  << BSON("_id" << 1 << "host"
+                                                                                << "host2:27017")
+                                                                  << BSON("_id" << 2 << "host"
+                                                                                << "host3:27017"))
+                                                    << "protocolVersion" << 1 << "settings"
+                                                    << BSON("heartbeatTimeoutSecs" << 5)));
 
     ReplSetHeartbeatResponse sameConfigResponse;
     sameConfigResponse.setSetName("rs0");

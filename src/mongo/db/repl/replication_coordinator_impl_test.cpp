@@ -4045,14 +4045,14 @@ TEST_F(ReplCoordTest, IsMasterOnRemovedNode) {
 
     // Receive a config that excludes node1 and with node2 having a configured horizon.
     ReplSetHeartbeatResponse hbResp;
-    ReplSetConfig removedFromConfig;
-    ASSERT_OK(removedFromConfig.initialize(
-        BSON("_id"
-             << "mySet"
-             << "protocolVersion" << 1 << "version" << 2 << "members"
-             << BSON_ARRAY(BSON("host" << nodeTwoHostName << "_id" << 2 << "horizons"
-                                       << BSON("horizon1"
-                                               << "testhorizon.com:100"))))));
+    auto removedFromConfig =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "mySet"
+                                  << "protocolVersion" << 1 << "version" << 2 << "members"
+                                  << BSON_ARRAY(BSON("host" << nodeTwoHostName << "_id" << 2
+                                                            << "horizons"
+                                                            << BSON("horizon1"
+                                                                    << "testhorizon.com:100")))));
     hbResp.setConfig(removedFromConfig);
     hbResp.setConfigVersion(2);
     hbResp.setSetName("mySet");
@@ -4211,14 +4211,14 @@ TEST_F(ReplCoordTest, AwaitIsMasterRespondsCorrectlyWhenNodeRemovedAndReadded) {
 
     // Receive a config that excludes node1 and with node2 having a configured horizon.
     ReplSetHeartbeatResponse hbResp;
-    ReplSetConfig removedFromConfig;
-    ASSERT_OK(removedFromConfig.initialize(
-        BSON("_id"
-             << "mySet"
-             << "protocolVersion" << 1 << "version" << 2 << "members"
-             << BSON_ARRAY(BSON("host" << nodeTwoHostName << "_id" << 2 << "horizons"
-                                       << BSON("horizon1"
-                                               << "testhorizon.com:100"))))));
+    auto removedFromConfig =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "mySet"
+                                  << "protocolVersion" << 1 << "version" << 2 << "members"
+                                  << BSON_ARRAY(BSON("host" << nodeTwoHostName << "_id" << 2
+                                                            << "horizons"
+                                                            << BSON("horizon1"
+                                                                    << "testhorizon.com:100")))));
     hbResp.setConfig(removedFromConfig);
     hbResp.setConfigVersion(2);
     hbResp.setSetName("mySet");
@@ -6664,15 +6664,12 @@ TEST_F(ReplCoordTest,
 
     // Respond to node1's heartbeat command with a config that excludes node1.
     ReplSetHeartbeatResponse hbResp;
-    ReplSetConfig config;
-    config
-        .initialize(BSON("_id"
-                         << "mySet"
-                         << "protocolVersion" << 1 << "version" << 3 << "members"
-                         << BSON_ARRAY(BSON("host"
-                                            << "node2:12345"
-                                            << "_id" << 1))))
-        .transitional_ignore();
+    auto config = ReplSetConfig::parse(BSON("_id"
+                                            << "mySet"
+                                            << "protocolVersion" << 1 << "version" << 3 << "members"
+                                            << BSON_ARRAY(BSON("host"
+                                                               << "node2:12345"
+                                                               << "_id" << 1))));
     hbResp.setConfig(config);
     hbResp.setConfigVersion(3);
     hbResp.setSetName("mySet");

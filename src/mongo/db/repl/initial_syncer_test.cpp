@@ -400,14 +400,14 @@ protected:
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
         {
-            ReplSetConfig config;
-            ASSERT_OK(
-                config.initialize(BSON("_id"
-                                       << "myset"
-                                       << "version" << 1 << "protocolVersion" << 1 << "members"
-                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                << "localhost:12345"))
-                                       << "settings" << BSON("electionTimeoutMillis" << 10000))));
+            ReplSetConfig config(
+                ReplSetConfig::parse(BSON("_id"
+                                          << "myset"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "localhost:12345"))
+                                          << "settings"
+                                          << BSON("electionTimeoutMillis" << 10000))));
             dataReplicatorExternalState->replSetConfigResult = config;
         }
         _externalState = dataReplicatorExternalState.get();

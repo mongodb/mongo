@@ -54,7 +54,6 @@ class MemberConfig : private MemberConfigBase {
 public:
     // Expose certain member functions used externally.
     using MemberConfigBase::getId;
-    using MemberConfigBase::setNewlyAdded;
 
     using MemberConfigBase::kArbiterOnlyFieldName;
     using MemberConfigBase::kBuildIndexesFieldName;
@@ -191,6 +190,10 @@ public:
      * Gets the number of replica set tags, including internal '$' tags, for this member.
      */
     size_t getNumTags() const {
+        // All valid MemberConfig objects should have at least one tag, kInternalAllTagName if
+        // nothing else.  So if we're accessing an empty _tags array we're using a MemberConfig
+        // from a MutableReplSetConfig, which is invalid.
+        invariant(!_tags.empty());
         return _tags.size();
     }
 
@@ -203,6 +206,7 @@ public:
      * Gets a begin iterator over the tags for this member.
      */
     TagIterator tagsBegin() const {
+        invariant(!_tags.empty());
         return _tags.begin();
     }
 
@@ -210,6 +214,7 @@ public:
      * Gets an end iterator over the tags for this member.
      */
     TagIterator tagsEnd() const {
+        invariant(!_tags.empty());
         return _tags.end();
     }
 
@@ -231,6 +236,11 @@ public:
     void addTagInfo(ReplSetTagConfig* tagConfig);
 
 private:
+    // Allow MutableReplSetConfig to modify the newlyAdded field.
+    friend class MutableReplSetConfig;
+
+    friend void setNewlyAdded_ForTest(MemberConfig*, boost::optional<bool>);
+
     /**
      * Constructor used by IDL; does not set up tags because we cannot pass TagConfig through IDL.
      */
@@ -239,6 +249,16 @@ private:
     const HostAndPort& _host() const {
         return getHostAndPort(SplitHorizon::kDefaultHorizon);
     }
+
+    /**
+     * Modifiers which potentially affect tags.  Calling them clears the tags array, which
+     * will be rebuilt when addTagInfo is called.  Accessing a cleared tags array is not allowed
+     * and is enforced by invariant.
+     */
+    void setNewlyAdded(boost::optional<bool> newlyAdded);
+    void setArbiterOnly(bool arbiterOnly);
+    void setVotes(int64_t votes);
+    void setPriority(double priority);
 
     std::vector<ReplSetTag> _tags;  // tagging for data center, rack, etc.
     SplitHorizon _splitHorizon;

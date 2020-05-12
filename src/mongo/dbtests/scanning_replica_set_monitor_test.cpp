@@ -128,8 +128,7 @@ repl::ReplSetConfig _getConfigWithMemberRemoved(const repl::ReplSetConfig& oldCo
     }
 
     membersBuilder.done();
-    repl::ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(newConfigBuilder.obj()));
+    auto newConfig = repl::ReplSetConfig::parse(newConfigBuilder.obj());
     ASSERT_OK(newConfig.validate());
     return newConfig;
 }

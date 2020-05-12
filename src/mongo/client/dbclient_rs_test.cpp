@@ -653,8 +653,7 @@ protected:
             }
 
             membersBuilder.done();
-            mongo::repl::ReplSetConfig newConfig;
-            fassert(28569, newConfig.initialize(newConfigBuilder.done()));
+            auto newConfig = mongo::repl::ReplSetConfig::parse(newConfigBuilder.done());
             fassert(28568, newConfig.validate());
             _replSet->setConfig(newConfig);
         }

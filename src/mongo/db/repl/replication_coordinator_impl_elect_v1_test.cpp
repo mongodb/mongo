@@ -558,17 +558,14 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
     ReplSetHeartbeatResponse hbResp2;
-    ReplSetConfig config;
-    config
-        .initialize(BSON("_id"
-                         << "mySet"
-                         << "version" << 3 << "members"
-                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                  << "node1:12345")
-                                       << BSON("_id" << 2 << "host"
-                                                     << "node2:12345"))
-                         << "protocolVersion" << 1))
-        .transitional_ignore();
+    auto config = ReplSetConfig::parse(BSON("_id"
+                                            << "mySet"
+                                            << "version" << 3 << "members"
+                                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                     << "node1:12345")
+                                                          << BSON("_id" << 2 << "host"
+                                                                        << "node2:12345"))
+                                            << "protocolVersion" << 1));
     hbResp2.setConfig(config);
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");

@@ -252,7 +252,12 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     }
     _configSet = true;
 
-    return _config.initialize(rsConfigElement.Obj());
+    try {
+        _config = ReplSetConfig::parse(rsConfigElement.Obj());
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+    return Status::OK();
 }
 
 MemberState ReplSetHeartbeatResponse::getState() const {

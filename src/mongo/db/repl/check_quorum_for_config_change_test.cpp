@@ -134,8 +134,7 @@ protected:
 };
 
 ReplSetConfig assertMakeRSConfig(const BSONObj& configBson) {
-    ReplSetConfig config;
-    ASSERT_OK(config.initialize(configBson));
+    ReplSetConfig config(ReplSetConfig::parse(configBson));
     ASSERT_OK(config.validate());
     return config;
 }

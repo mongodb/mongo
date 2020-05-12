@@ -109,9 +109,41 @@ private:
 };
 
 /**
+ * This class is used for mutating the ReplicaSetConfig.  Call ReplSetConfig::getMutable()
+ * to get a mutable copy, mutate it, and use the ReplSetConfig(MutableReplSetConfig&&) constructor
+ * to get a usable immutable config from it.
+ */
+class MutableReplSetConfig : public ReplSetConfigBase {
+public:
+    ReplSetConfigSettings& getMutableSettings() {
+        invariant(ReplSetConfigBase::getSettings());
+        // TODO(SERVER-47937): Get rid of the const_cast when the IDL supports that.
+        return const_cast<ReplSetConfigSettings&>(*ReplSetConfigBase::getSettings());
+    }
+
+    /**
+     * Adds 'newlyAdded=true' to the MemberConfig of the specified member.
+     */
+    void addNewlyAddedFieldForMember(MemberId memberId);
+
+    /**
+     * Removes the 'newlyAdded' field from the MemberConfig of the specified member.
+     */
+    void removeNewlyAddedFieldForMember(MemberId memberId);
+
+protected:
+    MutableReplSetConfig() = default;
+
+    /**
+     * Returns a pointer to a mutable MemberConfig.
+     */
+    MemberConfig* _findMemberByID(MemberId id);
+};
+
+/**
  * Representation of the configuration information about a particular replica set.
  */
-class ReplSetConfig : private ReplSetConfigBase {
+class ReplSetConfig : private MutableReplSetConfig {
 public:
     typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 
@@ -143,44 +175,46 @@ public:
     static const bool kDefaultChainingAllowed;
     static const Milliseconds kDefaultCatchUpTakeoverDelay;
 
-    // Methods inherited from the base IDL class.
-    using ReplSetConfigBase::getConfigVersion;
-    using ReplSetConfigBase::setConfigVersion;
-
-    using ReplSetConfigBase::getConfigTerm;
-    using ReplSetConfigBase::setConfigTerm;
-
-    using ReplSetConfigBase::getProtocolVersion;
-
-    using ReplSetConfigBase::getWriteConcernMajorityShouldJournal;
-
+    // Methods inherited from the base IDL class.  Do not include any setters here.
     using ReplSetConfigBase::getConfigServer;
+    using ReplSetConfigBase::getConfigTerm;
+    using ReplSetConfigBase::getConfigVersion;
+    using ReplSetConfigBase::getProtocolVersion;
     using ReplSetConfigBase::getReplSetName;
-
+    using ReplSetConfigBase::getWriteConcernMajorityShouldJournal;
     using ReplSetConfigBase::toBSON;
+
+    /**
+     * Constructor used for converting a mutable config to an immutable one.
+     */
+    explicit ReplSetConfig(MutableReplSetConfig&& base);
 
     ReplSetConfig() {
         // This is not defaultable in the IDL.
+        // SERVER-47938 would make it possible to be defaulted.
+
         setSettings(ReplSetConfigSettings());
         _setRequiredFields();
     }
     /**
-     * Initializes this ReplSetConfig from the contents of "cfg".
+     * Initializes a new ReplSetConfig from the contents of "cfg".
      * Sets replicaSetId to "defaultReplicaSetId" if a replica set ID is not specified in "cfg";
      * If forceTerm is not boost::none, sets _term to the given term. Otherwise, uses term from
      * config BSON.
+     *
+     * Parse errors are reported via exceptions.
      */
-    Status initialize(const BSONObj& cfg,
-                      boost::optional<long long> forceTerm = boost::none,
-                      OID defaultReplicaSetId = OID());
+    static ReplSetConfig parse(const BSONObj& cfg,
+                               boost::optional<long long> forceTerm = boost::none,
+                               OID defaultReplicaSetId = OID());
 
     /**
-     * Same as the generic initialize() above except will default "configsvr" setting to the value
+     * Same as the generic parse() above except will default "configsvr" setting to the value
      * of serverGlobalParams.configsvr.
      * Sets term to kInitialTerm.
      * Sets replicaSetId to "newReplicaSetId", which must be set.
      */
-    Status initializeForInitiate(const BSONObj& cfg, OID newReplicaSetId);
+    static ReplSetConfig parseForInitiate(const BSONObj& cfg, OID newReplicaSetId);
 
     /**
      * Returns true if this object has been successfully initialized or copied from
@@ -452,16 +486,21 @@ public:
     bool containsArbiter() const;
 
     /**
-     * Adds 'newlyAdded=true' to the MemberConfig of the specified member.
+     * Returns a mutable (but not directly usable) copy of the config.
      */
-    void addNewlyAddedFieldForMember(MemberId memberId);
-
-    /**
-     * Removes the 'newlyAdded' field from the MemberConfig of the specified member.
-     */
-    void removeNewlyAddedFieldForMember(MemberId memberId);
+    MutableReplSetConfig getMutable() const;
 
 private:
+    /**
+     * Sets replica set ID to 'defaultReplicaSetId' if 'cfg' does not contain an ID.
+     * Sets term to kInitialTerm for initiate.
+     * Sets term to forceTerm if it is not boost::none. Otherwise, parses term from 'cfg'.
+     */
+    ReplSetConfig(const BSONObj& cfg,
+                  bool forInitiate,
+                  boost::optional<long long> forceTerm,
+                  OID defaultReplicaSetId);
+
     /**
      * Calculates and stores the majority for electing a primary (_majorityVoteCount).
      */
@@ -483,17 +522,9 @@ private:
     void _setRequiredFields();
 
     /**
-     * Returns a pointer to a mutable MemberConfig.
+     * Common code used by constructors
      */
-    MemberConfig* _findMemberByID(MemberId id);
-
-    /**
-     * Sets replica set ID to 'defaultReplicaSetId' if 'cfg' does not contain an ID.
-     * Sets term to kInitialTerm for initiate.
-     * Sets term to forceTerm if it is not boost::none. Otherwise, parses term from 'cfg'.
-     */
-    Status _initialize(const BSONObj& cfg,
-                       bool forInitiate,
+    Status _initialize(bool forInitiate,
                        boost::optional<long long> forceTerm,
                        OID defaultReplicaSetId);
 
@@ -506,7 +537,6 @@ private:
     StringMap<ReplSetTagPattern> _customWriteConcernModes;
     ConnectionString _connectionString;
 };
-
 
 }  // namespace repl
 }  // namespace mongo

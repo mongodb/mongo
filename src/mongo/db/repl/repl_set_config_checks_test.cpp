@@ -55,13 +55,13 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
 
     ReplSetConfig config;
     OID newReplSetId = OID::gen();
-    ASSERT_OK(
-        config.initializeForInitiate(BSON("_id"
-                                          << "rs0"
-                                          << "version" << 2 << "protocolVersion" << 1 << "members"
-                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                   << "h1"))),
-                                     newReplSetId));
+    config = ReplSetConfig::parseForInitiate(BSON("_id"
+                                                  << "rs0"
+                                                  << "version" << 2 << "protocolVersion" << 1
+                                                  << "members"
+                                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                           << "h1"))),
+                                             newReplSetId);
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                   validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
 }
@@ -70,16 +70,15 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
 
-    ReplSetConfig config;
     OID newReplSetId = OID::gen();
-    ASSERT_OK(
-        config.initializeForInitiate(BSON("_id"
-                                          << "rs0"
-                                          << "version" << 1 << "term" << (OpTime::kInitialTerm + 1)
-                                          << "protocolVersion" << 1 << "members"
-                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                   << "h1"))),
-                                     newReplSetId));
+    auto config = ReplSetConfig::parseForInitiate(BSON("_id"
+                                                       << "rs0"
+                                                       << "version" << 1 << "term"
+                                                       << (OpTime::kInitialTerm + 1)
+                                                       << "protocolVersion" << 1 << "members"
+                                                       << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                                << "h1"))),
+                                                  newReplSetId);
     ASSERT_OK(validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
     ASSERT_EQUALS(config.getConfigTerm(), OpTime::kInitialTerm);
 }
@@ -87,17 +86,17 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
     ReplSetConfig config;
     OID newReplSetId = OID::gen();
-    ASSERT_OK(
-        config.initializeForInitiate(BSON("_id"
-                                          << "rs0"
-                                          << "version" << 1 << "protocolVersion" << 1 << "members"
-                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                   << "h1")
-                                                        << BSON("_id" << 2 << "host"
-                                                                      << "h2")
-                                                        << BSON("_id" << 3 << "host"
-                                                                      << "h3"))),
-                                     newReplSetId));
+    config = ReplSetConfig::parseForInitiate(BSON("_id"
+                                                  << "rs0"
+                                                  << "version" << 1 << "protocolVersion" << 1
+                                                  << "members"
+                                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                           << "h1")
+                                                                << BSON("_id" << 2 << "host"
+                                                                              << "h2")
+                                                                << BSON("_id" << 3 << "host"
+                                                                              << "h3"))),
+                                             newReplSetId);
     ReplicationCoordinatorExternalStateMock notPresentExternalState;
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -121,18 +120,18 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
     ReplSetConfig config;
     OID newReplSetId = OID::gen();
-    ASSERT_OK(
-        config.initializeForInitiate(BSON("_id"
-                                          << "rs0"
-                                          << "version" << 1 << "protocolVersion" << 1 << "members"
-                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                   << "h1")
-                                                        << BSON("_id" << 2 << "host"
-                                                                      << "h2"
-                                                                      << "priority" << 0)
-                                                        << BSON("_id" << 3 << "host"
-                                                                      << "h3"))),
-                                     newReplSetId));
+    config = ReplSetConfig::parseForInitiate(BSON("_id"
+                                                  << "rs0"
+                                                  << "version" << 1 << "protocolVersion" << 1
+                                                  << "members"
+                                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                           << "h1")
+                                                                << BSON("_id" << 2 << "host"
+                                                                              << "h2"
+                                                                              << "priority" << 0)
+                                                                << BSON("_id" << 3 << "host"
+                                                                              << "h3"))),
+                                             newReplSetId);
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
@@ -145,15 +144,16 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiable) {
     ReplSetConfig config;
     OID newReplSetId = OID::gen();
-    ASSERT_OK(
-        config.initializeForInitiate(BSON("_id"
-                                          << "rs0"
-                                          << "version" << 1 << "protocolVersion" << 1 << "members"
-                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                   << "h1"))
-                                          << "settings"
-                                          << BSON("getLastErrorDefaults" << BSON("w" << 2))),
-                                     newReplSetId));
+    config =
+        ReplSetConfig::parseForInitiate(BSON("_id"
+                                             << "rs0"
+                                             << "version" << 1 << "protocolVersion" << 1
+                                             << "members"
+                                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                      << "h1"))
+                                             << "settings"
+                                             << BSON("getLastErrorDefaults" << BSON("w" << 2))),
+                                        newReplSetId);
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
@@ -168,7 +168,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
     ReplSetConfig oneConfig;
     ReplSetConfig twoConfig;
     OID newReplSetId = OID::gen();
-    ASSERT_OK(zeroConfig.initializeForInitiate(
+    zeroConfig = ReplSetConfig::parseForInitiate(
         BSON("_id"
              << "rs0"
              << "version" << 1 << "protocolVersion" << 1 << "members"
@@ -179,9 +179,9 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
                                          << "priority" << 0 << "arbiterOnly" << true)
                            << BSON("_id" << 3 << "host"
                                          << "h3"))),
-        newReplSetId));
+        newReplSetId);
 
-    ASSERT_OK(oneConfig.initializeForInitiate(
+    oneConfig = ReplSetConfig::parseForInitiate(
         BSON("_id"
              << "rs0"
              << "version" << 1 << "protocolVersion" << 1 << "members"
@@ -192,9 +192,9 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
                                          << "priority" << 1 << "arbiterOnly" << true)
                            << BSON("_id" << 3 << "host"
                                          << "h3"))),
-        newReplSetId));
+        newReplSetId);
 
-    ASSERT_OK(twoConfig.initializeForInitiate(
+    twoConfig = ReplSetConfig::parseForInitiate(
         BSON("_id"
              << "rs0"
              << "version" << 1 << "protocolVersion" << 1 << "members"
@@ -205,7 +205,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
                                          << "priority" << 2 << "arbiterOnly" << true)
                            << BSON("_id" << 3 << "host"
                                          << "h3"))),
-        newReplSetId));
+        newReplSetId);
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
 
@@ -229,32 +229,33 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewlyAddedFieldNotAllowed) 
     ReplSetConfig firstNewlyAdded;
     ReplSetConfig lastNewlyAdded;
     OID newReplSetId = OID::gen();
-    ASSERT_OK(
-        firstNewlyAdded.initializeForInitiate(BSON("_id"
-                                                   << "rs0"
-                                                   << "version" << 1 << "protocolVersion" << 1
-                                                   << "members"
-                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                            << "newly_added_h1"
-                                                                            << "newlyAdded" << true)
-                                                                 << BSON("_id" << 2 << "host"
-                                                                               << "h2")
-                                                                 << BSON("_id" << 3 << "host"
-                                                                               << "h3"))),
-                                              newReplSetId));
+    firstNewlyAdded =
+        ReplSetConfig::parseForInitiate(BSON("_id"
+                                             << "rs0"
+                                             << "version" << 1 << "protocolVersion" << 1
+                                             << "members"
+                                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                      << "newly_added_h1"
+                                                                      << "newlyAdded" << true)
+                                                           << BSON("_id" << 2 << "host"
+                                                                         << "h2")
+                                                           << BSON("_id" << 3 << "host"
+                                                                         << "h3"))),
+                                        newReplSetId);
 
-    ASSERT_OK(lastNewlyAdded.initializeForInitiate(
-        BSON("_id"
-             << "rs0"
-             << "version" << 1 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "h1")
-                           << BSON("_id" << 2 << "host"
-                                         << "h2")
-                           << BSON("_id" << 3 << "host"
-                                         << "newly_added_h3"
-                                         << "newlyAdded" << true))),
-        newReplSetId));
+    lastNewlyAdded =
+        ReplSetConfig::parseForInitiate(BSON("_id"
+                                             << "rs0"
+                                             << "version" << 1 << "protocolVersion" << 1
+                                             << "members"
+                                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                      << "h1")
+                                                           << BSON("_id" << 2 << "host"
+                                                                         << "h2")
+                                                           << BSON("_id" << 3 << "host"
+                                                                         << "newly_added_h3"
+                                                                         << "newlyAdded" << true))),
+                                        newReplSetId);
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
@@ -279,25 +280,25 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigVersionNumberMustB
     ReplSetConfig newConfig;
 
     // Two configurations, identical except for version.
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 3 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 3 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -323,25 +324,25 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetNa
     ReplSetConfig newConfig;
 
     // Two configurations, compatible except for set name.
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs1"
-                                        << "version" << 3 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs1"
+                                          << "version" << 3 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -360,27 +361,27 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetId
     ReplSetConfig newConfig;
 
     // Two configurations, compatible except for set ID.
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3"))
-                                        << "settings" << BSON("replicaSetId" << OID::gen()))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))
+                                          << "settings" << BSON("replicaSetId" << OID::gen())));
 
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 3 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3"))
-                                        << "settings" << BSON("replicaSetId" << OID::gen()))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 3 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))
+                                          << "settings" << BSON("replicaSetId" << OID::gen())));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -403,42 +404,43 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipBuildIn
 
     // Three configurations, two compatible except that h2 flips the buildIndex flag.
     // The third, compatible with the first.
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "buildIndexes" << false
-                                                                    << "priority" << 0)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "buildIndexes" << false
+                                                                      << "priority" << 0)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 3 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "buildIndexes" << true
-                                                                    << "priority" << 0)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 3 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "buildIndexes" << true
+                                                                      << "priority" << 0)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
-    ASSERT_OK(
-        oldConfigRefresh.initialize(BSON("_id"
-                                         << "rs0"
-                                         << "version" << 2 << "protocolVersion" << 1 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                  << "h1")
-                                                       << BSON("_id" << 2 << "host"
-                                                                     << "h2"
-                                                                     << "buildIndexes" << false
-                                                                     << "priority" << 0)
-                                                       << BSON("_id" << 3 << "host"
-                                                                     << "h3")))));
+
+    oldConfigRefresh =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 2 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                           << "h1")
+                                                << BSON("_id" << 2 << "host"
+                                                              << "h2"
+                                                              << "buildIndexes" << false
+                                                              << "priority" << 0)
+                                                << BSON("_id" << 3 << "host"
+                                                              << "h3"))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -462,39 +464,40 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipArbiter
 
     // Three configurations, two compatible except that h2 flips the arbiterOnly flag.
     // The third, compatible with the first.
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "arbiterOnly" << false)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "arbiterOnly" << false)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 3 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "arbiterOnly" << true)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 3 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "arbiterOnly" << true)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
-    ASSERT_OK(
-        oldConfigRefresh.initialize(BSON("_id"
-                                         << "rs0"
-                                         << "version" << 2 << "protocolVersion" << 1 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                  << "h1")
-                                                       << BSON("_id" << 2 << "host"
-                                                                     << "h2"
-                                                                     << "arbiterOnly" << false)
-                                                       << BSON("_id" << 3 << "host"
-                                                                     << "h3")))));
+
+    oldConfigRefresh =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 2 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                           << "h1")
+                                                << BSON("_id" << 2 << "host"
+                                                              << "h2"
+                                                              << "arbiterOnly" << false)
+                                                << BSON("_id" << 3 << "host"
+                                                              << "h3"))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -520,32 +523,32 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
     ReplSetConfig illegalNewConfigReusingHost;
     ReplSetConfig illegalNewConfigReusingId;
 
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
     ASSERT_OK(oldConfig.validate());
 
     //
     // Here, the new config is valid because we've replaced (2, "h2") with
     // (4, "h4"), so neither the member _id or host name were reused.
     //
-    ASSERT_OK(
-        legalNewConfigWithNewHostAndId.initialize(BSON("_id"
-                                                       << "rs0"
-                                                       << "version" << 2 << "protocolVersion" << 1
-                                                       << "members"
-                                                       << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                                << "h1")
-                                                                     << BSON("_id" << 4 << "host"
-                                                                                   << "h4")
-                                                                     << BSON("_id" << 3 << "host"
-                                                                                   << "h3")))));
+
+    legalNewConfigWithNewHostAndId =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 2 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                           << "h1")
+                                                << BSON("_id" << 4 << "host"
+                                                              << "h4")
+                                                << BSON("_id" << 3 << "host"
+                                                              << "h3"))));
     ASSERT_OK(legalNewConfigWithNewHostAndId.validate());
     ASSERT_OK(
         validateConfigForReconfig(oldConfig,
@@ -557,16 +560,16 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
     // Here, the new config is invalid because we've reused host name "h2" with
     // new _id 4.
     //
-    ASSERT_OK(illegalNewConfigReusingHost.initialize(BSON("_id"
-                                                          << "rs0"
-                                                          << "version" << 2 << "protocolVersion"
-                                                          << 1 << "members"
-                                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                                   << "h1")
-                                                                        << BSON("_id" << 4 << "host"
-                                                                                      << "h2")
-                                                                        << BSON("_id" << 3 << "host"
-                                                                                      << "h3")))));
+    illegalNewConfigReusingHost =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 2 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                           << "h1")
+                                                << BSON("_id" << 4 << "host"
+                                                              << "h2")
+                                                << BSON("_id" << 3 << "host"
+                                                              << "h3"))));
     ASSERT_OK(illegalNewConfigReusingHost.validate());
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                   validateConfigForReconfig(oldConfig, illegalNewConfigReusingHost, false));
@@ -577,16 +580,16 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
     // Here, the new config is valid, because all we've changed is the name of
     // the host representing _id 2.
     //
-    ASSERT_OK(illegalNewConfigReusingId.initialize(BSON("_id"
-                                                        << "rs0"
-                                                        << "version" << 2 << "protocolVersion" << 1
-                                                        << "members"
-                                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                                 << "h1")
-                                                                      << BSON("_id" << 2 << "host"
-                                                                                    << "h4")
-                                                                      << BSON("_id" << 3 << "host"
-                                                                                    << "h3")))));
+    illegalNewConfigReusingId =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 2 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                           << "h1")
+                                                << BSON("_id" << 2 << "host"
+                                                              << "h4")
+                                                << BSON("_id" << 3 << "host"
+                                                              << "h3"))));
     ASSERT_OK(illegalNewConfigReusingId.validate());
     ASSERT_OK(validateConfigForReconfig(oldConfig, illegalNewConfigReusingId, false));
 }
@@ -600,50 +603,50 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_ArbiterPriorityValueMustBeZ
     ReplSetConfig oneConfig;
     ReplSetConfig twoConfig;
 
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "arbiterOnly" << true)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "arbiterOnly" << true)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
-    ASSERT_OK(zeroConfig.initialize(BSON("_id"
-                                         << "rs0"
-                                         << "version" << 2 << "protocolVersion" << 1 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                  << "h1")
-                                                       << BSON("_id" << 2 << "host"
-                                                                     << "h2"
-                                                                     << "priority" << 0
-                                                                     << "arbiterOnly" << true)
-                                                       << BSON("_id" << 3 << "host"
-                                                                     << "h3")))));
-    ASSERT_OK(oneConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "priority" << 1
-                                                                    << "arbiterOnly" << true)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
-    ASSERT_OK(twoConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "priority" << 2
-                                                                    << "arbiterOnly" << true)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    zeroConfig = ReplSetConfig::parse(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 2 << "protocolVersion" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                    << "h1")
+                                                         << BSON("_id" << 2 << "host"
+                                                                       << "h2"
+                                                                       << "priority" << 0
+                                                                       << "arbiterOnly" << true)
+                                                         << BSON("_id" << 3 << "host"
+                                                                       << "h3"))));
+    oneConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "priority" << 1
+                                                                      << "arbiterOnly" << true)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
+    twoConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "priority" << 2
+                                                                      << "arbiterOnly" << true)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(zeroConfig.validate());
@@ -664,15 +667,15 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
     // wrong with the new config.
     ReplSetConfig newConfig;
     OID newReplSetId = OID::gen();
-    ASSERT_OK(newConfig.initializeForInitiate(BSON("_id"
-                                                   << "rs0"
-                                                   << "version" << 2 << "protocolVersion" << 1
-                                                   << "members"
-                                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                            << "h2")
-                                                                 << BSON("_id" << 0 << "host"
-                                                                               << "h3"))),
-                                              newReplSetId));
+    newConfig = ReplSetConfig::parseForInitiate(BSON("_id"
+                                                     << "rs0"
+                                                     << "version" << 2 << "protocolVersion" << 1
+                                                     << "members"
+                                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                              << "h2")
+                                                                   << BSON("_id" << 0 << "host"
+                                                                                 << "h3"))),
+                                                newReplSetId);
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -687,20 +690,20 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigInvalid) {
     // config is invalid, validateConfigForReconfig will return a status indicating what is
     // wrong with the new config.
     ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2"))));
 
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 0 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2")
+                                                        << BSON("_id" << 0 << "host"
+                                                                      << "h3"))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -714,20 +717,20 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigWriteConcernNotSat
     // new config is invalid, validateConfigForReconfig will return a status indicating what is
     // wrong with the new config.
     ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2"))));
 
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2"))
-                                        << "settings"
-                                        << BSON("getLastErrorDefaults" << BSON("w" << 2)))));
+    newConfig =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 1 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                           << "h2"))
+                                  << "settings" << BSON("getLastErrorDefaults" << BSON("w" << 2))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -743,13 +746,13 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigInvalid) {
     // config is invalid, validateConfigForStartUp will return a status indicating what is wrong
     // with the new config.
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 0 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2")
+                                                        << BSON("_id" << 0 << "host"
+                                                                      << "h3"))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -763,14 +766,14 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigValid) {
     // The new config is valid. This tests that validateConfigForStartUp will return a
     // Status::OK() indicating the validity of this configuration.
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2"
-                                                                 << "priority" << 3)
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2"
+                                                                   << "priority" << 3)
+                                                        << BSON("_id" << 1 << "host"
+                                                                      << "h3"))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -784,13 +787,13 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigWriteConcernNotSati
     // created anymore, but we allow any which exist to pass and the database to start up to
     // maintain backwards compatibility.
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2"))
-                                        << "settings"
-                                        << BSON("getLastErrorDefaults" << BSON("w" << 2)))));
+    newConfig =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 2 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                           << "h2"))
+                                  << "settings" << BSON("getLastErrorDefaults" << BSON("w" << 2))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -804,13 +807,13 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigInvalid) 
     // config is invalid, validateConfigForHeartbeatReconfig will return a status indicating
     // what is wrong with the new config.
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 0 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2")
+                                                        << BSON("_id" << 0 << "host"
+                                                                      << "h3"))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -824,13 +827,13 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigValid) {
     // The new config is valid. This tests that validateConfigForHeartbeatReconfig will return
     // a Status::OK() indicating the validity of this config change.
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2")
+                                                        << BSON("_id" << 1 << "host"
+                                                                      << "h3"))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -843,15 +846,15 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigWriteConc
     // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
     // created anymore, but we allow any which exist to be received in a heartbeat.
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h3"))
-                                        << "settings"
-                                        << BSON("getLastErrorDefaults" << BSON("w" << 2)))));
+    newConfig =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 2 << "protocolVersion" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                           << "h2")
+                                                << BSON("_id" << 1 << "host"
+                                                              << "h3"))
+                                  << "settings" << BSON("getLastErrorDefaults" << BSON("w" << 2))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -864,23 +867,23 @@ TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsValidConfig) {
     // The new config is invalid due to two nodes with the same _id value. This tests that
     // ValidateForReconfig fails with an invalid config, even if force is true.
     ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h3")))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2")
+                                                        << BSON("_id" << 1 << "host"
+                                                                      << "h3"))));
 
 
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 0 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "h2")
+                                                        << BSON("_id" << 0 << "host"
+                                                                      << "h3"))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -918,17 +921,16 @@ BSONObj m4_NonVoting = BSON("_id" << 4 << "host"
                                   << "votes" << 0 << "priority" << 0);
 
 // Test helper to initialize config more concisely.
-Status initializeConfig(ReplSetConfig& cfg, std::string id, int version, BSONArray members) {
-    return cfg.initialize(BSON("_id" << id << "version" << version << "protocolVersion" << 1
-                                     << "members" << members));
+ReplSetConfig initializeConfig(std::string id, int version, BSONArray members) {
+    return ReplSetConfig::parse(BSON("_id" << id << "version" << version << "protocolVersion" << 1
+                                           << "members" << members));
 }
 
 // Validate reconfig between the two given member arrays and return the Status.
 Status validateMemberReconfig(BSONArray oldMembers, BSONArray newMembers, BSONObj selfMember) {
     // Initialize configs.
-    ReplSetConfig oldConfig, newConfig;
-    ASSERT_OK(initializeConfig(oldConfig, "rs0", 1, oldMembers));
-    ASSERT_OK(initializeConfig(newConfig, "rs0", 2, newMembers));
+    auto oldConfig = initializeConfig("rs0", 1, oldMembers);
+    auto newConfig = initializeConfig("rs0", 2, newMembers);
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort(selfMember.getStringField("host")));
 
@@ -1020,77 +1022,77 @@ TEST_F(ServiceContextTest, SameConfigContents) {
                                              << "2"));
 
     // Same contents with different version.
-    ASSERT_OK(configA.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
-                                      << "members" << members1)));
-    ASSERT_OK(configB.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 2 << "term" << 1 << "protocolVersion" << 1
-                                      << "members" << members1)));
+    configA = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                        << "members" << members1));
+    configB = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 2 << "term" << 1 << "protocolVersion" << 1
+                                        << "members" << members1));
     ASSERT(sameConfigContents(configA, configB));
 
     // Same contents with different term.
-    ASSERT_OK(configA.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
-                                      << "members" << members1)));
-    ASSERT_OK(configB.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "term" << 2 << "protocolVersion" << 1
-                                      << "members" << members1)));
+    configA = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                        << "members" << members1));
+    configB = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "term" << 2 << "protocolVersion" << 1
+                                        << "members" << members1));
     ASSERT(sameConfigContents(configA, configB));
 
     // Same contents with different term and version.
-    ASSERT_OK(configA.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
-                                      << "members" << members1)));
-    ASSERT_OK(configB.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 2 << "term" << 2 << "protocolVersion" << 1
-                                      << "members" << members1)));
+    configA = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                        << "members" << members1));
+    configB = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 2 << "term" << 2 << "protocolVersion" << 1
+                                        << "members" << members1));
     ASSERT(sameConfigContents(configA, configB));
 
     // Different config settings.
-    ASSERT_OK(configA.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
-                                      << "members" << members1 << "settings"
-                                      << BSON("electionTimeoutMillis" << 1000))));
-    ASSERT_OK(configB.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
-                                      << "members" << members1 << "settings"
-                                      << BSON("electionTimeoutMillis" << 2000))));
+    configA = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                        << "members" << members1 << "settings"
+                                        << BSON("electionTimeoutMillis" << 1000)));
+    configB = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                        << "members" << members1 << "settings"
+                                        << BSON("electionTimeoutMillis" << 2000)));
     ASSERT_FALSE(sameConfigContents(configA, configB));
 
     // Different members.
-    ASSERT_OK(configA.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
-                                      << "members" << members1 << "settings"
-                                      << BSON("electionTimeoutMillis" << 1000))));
-    ASSERT_OK(configB.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "term" << 1 << "protocolVersion" << 1
-                                      << "members" << members2 << "settings"
-                                      << BSON("electionTimeoutMillis" << 2000))));
+    configA = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                        << "members" << members1 << "settings"
+                                        << BSON("electionTimeoutMillis" << 1000)));
+    configB = ReplSetConfig::parse(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "term" << 1 << "protocolVersion" << 1
+                                        << "members" << members2 << "settings"
+                                        << BSON("electionTimeoutMillis" << 2000)));
     ASSERT_FALSE(sameConfigContents(configA, configB));
 }
 
 TEST_F(ServiceContextTest, FindSelfInConfig) {
     // We must be able to find ourself in the new config.
     ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
     ReplicationCoordinatorExternalStateMock notPresentExternalState;
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -1125,16 +1127,16 @@ TEST_F(ServiceContextTest, FindSelfInConfig) {
                       &presentOnceExternalState, newConfig, getGlobalServiceContext())));
 
     // We must be electable in the new config.
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "protocolVersion" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h2"
-                                                                    << "priority" << 0)
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h3")))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "priority" << 0)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
 
     ASSERT_EQUALS(
         ErrorCodes::NodeNotElectable,

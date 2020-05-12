@@ -284,8 +284,7 @@ ReplSetConfig _getConfigWithMemberRemoved(const ReplSetConfig& oldConfig,
     }
 
     membersBuilder.done();
-    ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(newConfigBuilder.obj()));
+    ReplSetConfig newConfig(ReplSetConfig::parse(newConfigBuilder.obj()));
     ASSERT_OK(newConfig.validate());
     return newConfig;
 }

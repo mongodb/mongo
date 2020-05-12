@@ -72,8 +72,7 @@ ReplSetConfig _createConfig() {
     }
     auto configObj = bob.obj();
 
-    ReplSetConfig config;
-    ASSERT_OK(config.initialize(configObj));
+    ReplSetConfig config(ReplSetConfig::parse(configObj));
     return config;
 }
 

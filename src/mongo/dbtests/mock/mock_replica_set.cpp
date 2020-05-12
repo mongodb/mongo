@@ -80,7 +80,11 @@ MockReplicaSet::MockReplicaSet(const string& setName,
     membersBuilder.done();
 
     ReplSetConfig replConfig;
-    fassert(28566, replConfig.initialize(configBuilder.obj()));
+    try {
+        replConfig = ReplSetConfig::parse(configBuilder.obj());
+    } catch (const DBException&) {
+        fassertFailed(28566);
+    }
     fassert(28573, replConfig.validate());
     setConfig(replConfig);
 }

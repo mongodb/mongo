@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_set_config.h"
@@ -39,6 +41,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -64,28 +67,27 @@ namespace {
 const std::string kStepDownCheckWriteConcernModeName = "$stepDownCheck";
 }  // namespace
 
-Status ReplSetConfig::initialize(const BSONObj& cfg,
-                                 boost::optional<long long> forceTerm,
-                                 OID defaultReplicaSetId) {
-    return _initialize(cfg, false, forceTerm, defaultReplicaSetId);
+/* static */
+ReplSetConfig ReplSetConfig::parse(const BSONObj& cfg,
+                                   boost::optional<long long> forceTerm,
+                                   OID defaultReplicaSetId) {
+    return ReplSetConfig(cfg, false /* forInitiate */, forceTerm, defaultReplicaSetId);
 }
 
-Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg, OID newReplicaSetId) {
-    if (!newReplicaSetId.isSet()) {
-        return Status(ErrorCodes::Error(4709000),
-                      "A replica set ID must be provided to initializeForInitiate");
-    }
-
-    auto status = _initialize(cfg, true, OpTime::kInitialTerm, newReplicaSetId);
-    if (status.isOK() && newReplicaSetId != getReplicaSetId()) {
-        return Status(ErrorCodes::InvalidReplicaSetConfig,
-                      str::stream() << "replica set configuration cannot contain '"
-                                    << ReplSetConfigSettings::kReplicaSetIdFieldName
-                                    << "' "
-                                       "field when called from replSetInitiate: "
-                                    << cfg);
-    }
-    return status;
+/* static */
+ReplSetConfig ReplSetConfig::parseForInitiate(const BSONObj& cfg, OID newReplicaSetId) {
+    uassert(
+        4709000, "A replica set ID must be provided to parseForInitiate", newReplicaSetId.isSet());
+    auto result = ReplSetConfig(
+        cfg, true /* forInitiate */, OpTime::kInitialTerm /* forceTerm*/, newReplicaSetId);
+    uassert(ErrorCodes::InvalidReplicaSetConfig,
+            str::stream() << "replica set configuration cannot contain '"
+                          << ReplSetConfigSettings::kReplicaSetIdFieldName
+                          << "' "
+                             "field when called from replSetInitiate: "
+                          << cfg,
+            newReplicaSetId == result.getReplicaSetId());
+    return result;
 }
 
 void ReplSetConfig::_setRequiredFields() {
@@ -99,23 +101,26 @@ void ReplSetConfig::_setRequiredFields() {
         setMembers({});
 }
 
-Status ReplSetConfig::_initialize(const BSONObj& cfg,
-                                  bool forInitiate,
-                                  boost::optional<long long> forceTerm,
-                                  OID defaultReplicaSetId) {
-    _isInitialized = false;
-    // This line clears the base IDL class, and is necessary because an object may be re-used.
-    *static_cast<ReplSetConfigBase*>(this) = ReplSetConfigBase();
+ReplSetConfig::ReplSetConfig(MutableReplSetConfig&& base)
+    : MutableReplSetConfig(std::move(base)), _isInitialized(true) {
+    uassertStatusOK(_initialize(false, boost::none, OID()));
+}
+
+ReplSetConfig::ReplSetConfig(const BSONObj& cfg,
+                             bool forInitiate,
+                             boost::optional<long long> forceTerm,
+                             OID defaultReplicaSetId)
+    : _isInitialized(true) {
     // The settings field is optional, but we always serialize it.  Because we can't default it in
     // the IDL, we default it here.
     setSettings(ReplSetConfigSettings());
-    try {
-        ReplSetConfigBase::parseProtected(IDLParserErrorContext("ReplSetConfig"), cfg);
-    } catch (const DBException& e) {
-        _setRequiredFields();
-        return e.toStatus();
-    }
+    ReplSetConfigBase::parseProtected(IDLParserErrorContext("ReplSetConfig"), cfg);
+    uassertStatusOK(_initialize(forInitiate, forceTerm, defaultReplicaSetId));
+}
 
+Status ReplSetConfig::_initialize(bool forInitiate,
+                                  boost::optional<long long> forceTerm,
+                                  OID defaultReplicaSetId) {
     if (getRepaired()) {
         return {ErrorCodes::RepairedReplicaSetNode, "Replicated data has been repaired"};
     }
@@ -160,7 +165,6 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
     _calculateMajorities();
     _addInternalWriteConcernModes();
     _initializeConnectionString();
-    _isInitialized = true;
     return Status::OK();
 }
 
@@ -437,15 +441,6 @@ const MemberConfig* ReplSetConfig::findMemberByID(int id) const {
     return nullptr;
 }
 
-MemberConfig* ReplSetConfig::_findMemberByID(MemberId id) {
-    for (auto it = getMembers().begin(); it != getMembers().end(); ++it) {
-        if (it->getId() == id) {
-            return const_cast<MemberConfig*>(&(*it));
-        }
-    }
-    return nullptr;
-}
-
 int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     int x = 0;
     for (std::vector<MemberConfig>::const_iterator it = getMembers().begin();
@@ -656,22 +651,25 @@ bool ReplSetConfig::containsArbiter() const {
     return false;
 }
 
-void ReplSetConfig::addNewlyAddedFieldForMember(MemberId memberId) {
-    _findMemberByID(memberId)->setNewlyAdded(true);
-
-    // We must recalculate the majority, since nodes with the 'newlyAdded' field set
-    // should be treated as non-voting nodes.
-    _calculateMajorities();
-    _addInternalWriteConcernModes();
+MutableReplSetConfig ReplSetConfig::getMutable() const {
+    return *static_cast<const MutableReplSetConfig*>(this);
 }
 
-void ReplSetConfig::removeNewlyAddedFieldForMember(MemberId memberId) {
-    _findMemberByID(memberId)->setNewlyAdded(boost::none);
+MemberConfig* MutableReplSetConfig::_findMemberByID(MemberId id) {
+    for (auto it = getMembers().begin(); it != getMembers().end(); ++it) {
+        if (it->getId() == id) {
+            return const_cast<MemberConfig*>(&(*it));
+        }
+    }
+    LOGV2_FATAL(4709100, "Unable to find member", "id"_attr = id);
+}
 
-    // We must recalculate the majority, since nodes with the 'newlyAdded' field removed
-    // should be treated as voting nodes.
-    _calculateMajorities();
-    _addInternalWriteConcernModes();
+void MutableReplSetConfig::addNewlyAddedFieldForMember(MemberId memberId) {
+    _findMemberByID(memberId)->setNewlyAdded(true);
+}
+
+void MutableReplSetConfig::removeNewlyAddedFieldForMember(MemberId memberId) {
+    _findMemberByID(memberId)->setNewlyAdded(boost::none);
 }
 
 }  // namespace repl

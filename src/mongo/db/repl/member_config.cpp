@@ -116,6 +116,10 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) : M
 }
 
 void MemberConfig::addTagInfo(ReplSetTagConfig* tagConfig) {
+    // When a ReplSetConfig is created from a MutableReplSetConfig, the MemberConfig objects
+    // may have tags from the original configuration, so we need to clear them before adding
+    // the tags from the modified configuration.
+    _tags.clear();
     //
     // Parse "tags" field.
     //
@@ -170,6 +174,28 @@ void MemberConfig::addTagInfo(ReplSetTagConfig* tagConfig) {
 
 bool MemberConfig::hasTags() const {
     return getTags() && !getTags()->isEmpty();
+}
+
+// Changing these members may change the tags, so invalidate them.  The tags will be rebuilt
+// when addTagInfo is called.
+void MemberConfig::setNewlyAdded(boost::optional<bool> newlyAdded) {
+    _tags.clear();
+    MemberConfigBase::setNewlyAdded(newlyAdded);
+}
+
+void MemberConfig::setArbiterOnly(bool arbiterOnly) {
+    _tags.clear();
+    MemberConfigBase::setArbiterOnly(arbiterOnly);
+}
+
+void MemberConfig::setVotes(int64_t votes) {
+    _tags.clear();
+    MemberConfigBase::setVotes(votes);
+}
+
+void MemberConfig::setPriority(double priority) {
+    _tags.clear();
+    MemberConfigBase::setPriority(priority);
 }
 
 BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {

@@ -216,8 +216,7 @@ assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 
 // is) can be one of them (0, 1, and 3).
 rst.nodes[2].disconnect(rst.nodes);
 
-// TODO (SERVER-47499): Uncomment this line.
-// assert.commandWorked(primaryColl.insert({a: 8}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(primaryColl.insert({a: 8}, {writeConcern: {w: "majority"}}));
 
 // Only three nodes are needed for an election (0, 1, and 3).
 assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));

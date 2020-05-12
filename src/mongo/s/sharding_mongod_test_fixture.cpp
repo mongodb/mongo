@@ -115,9 +115,9 @@ void ShardingMongodTestFixture::setUp() {
     for (size_t i = 0; i < _servers.size(); ++i) {
         serversBob.append(BSON("host" << _servers[i].toString() << "_id" << static_cast<int>(i)));
     }
-    repl::ReplSetConfig replSetConfig;
-    ASSERT_OK(replSetConfig.initialize(BSON("_id" << _setName << "protocolVersion" << 1 << "version"
-                                                  << 3 << "members" << serversBob.arr())));
+    auto replSetConfig =
+        repl::ReplSetConfig::parse(BSON("_id" << _setName << "protocolVersion" << 1 << "version"
+                                              << 3 << "members" << serversBob.arr()));
     replCoordPtr->setGetConfigReturnValue(replSetConfig);
 
     repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));

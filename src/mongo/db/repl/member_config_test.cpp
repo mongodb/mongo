@@ -213,7 +213,13 @@ TEST(MemberConfig, ParseArbiterOnly) {
         ASSERT_EQUALS(1.0, mc.getPriority());
     }
 }
+}  // namespace
 
+void setNewlyAdded_ForTest(MemberConfig* mc, boost::optional<bool> newlyAdded) {
+    mc->setNewlyAdded(newlyAdded);
+}
+
+namespace {
 TEST(MemberConfig, ParseAndSetNewlyAddedField) {
     // Set the flag to add the 'newlyAdded' field to MemberConfigs.
     enableAutomaticReconfig = true;
@@ -228,7 +234,7 @@ TEST(MemberConfig, ParseAndSetNewlyAddedField) {
         // Verify that the 'newlyAdded' field is not added by default.
         ASSERT_FALSE(mc.isNewlyAdded());
 
-        mc.setNewlyAdded(true);
+        setNewlyAdded_ForTest(&mc, true);
         ASSERT_TRUE(mc.isNewlyAdded());
     }
     {

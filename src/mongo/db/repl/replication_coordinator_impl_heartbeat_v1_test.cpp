@@ -167,9 +167,8 @@ TEST_F(ReplCoordHBV1Test,
 
     assertMemberState(MemberState::RS_STARTUP2);
     OperationContextNoop opCtx;
-    ReplSetConfig storedConfig;
-    ASSERT_OK(storedConfig.initialize(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx))));
+    auto storedConfig = ReplSetConfig::parse(
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
     ASSERT_OK(storedConfig.validate());
     ASSERT_EQUALS(3, storedConfig.getConfigVersion());
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
@@ -635,9 +634,8 @@ TEST_F(ReplCoordHBV1Test,
 
     assertMemberState(MemberState::RS_ARBITER);
     OperationContextNoop opCtx;
-    ReplSetConfig storedConfig;
-    ASSERT_OK(storedConfig.initialize(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx))));
+    auto storedConfig = ReplSetConfig::parse(
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
     ASSERT_OK(storedConfig.validate());
     ASSERT_EQUALS(3, storedConfig.getConfigVersion());
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
@@ -1138,8 +1136,7 @@ void HBStepdownAndReconfigTest::sendHBResponse(int targetIndex,
     if (includeConfig) {
         auto configDoc = MutableDocument(Document(_initialConfig));
         configDoc["version"] = Value(configVersion);
-        ReplSetConfig newConfig;
-        ASSERT_OK(newConfig.initialize(configDoc.freeze().toBson()));
+        auto newConfig = ReplSetConfig::parse(configDoc.freeze().toBson());
         hbResp.setConfig(newConfig);
     }
 
