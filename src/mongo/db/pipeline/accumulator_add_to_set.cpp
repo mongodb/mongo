@@ -79,7 +79,7 @@ Value AccumulatorAddToSet::getValue(bool toBeMerged) {
     return Value(vector<Value>(_set.begin(), _set.end()));
 }
 
-AccumulatorAddToSet::AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+AccumulatorAddToSet::AccumulatorAddToSet(ExpressionContext* const expCtx,
                                          boost::optional<int> maxMemoryUsageBytes)
     : AccumulatorState(expCtx),
       _set(expCtx->getValueComparator().makeUnorderedValueSet()),
@@ -92,8 +92,7 @@ void AccumulatorAddToSet::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorAddToSet::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<AccumulatorState> AccumulatorAddToSet::create(ExpressionContext* const expCtx) {
     return new AccumulatorAddToSet(expCtx, boost::none);
 }
 

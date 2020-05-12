@@ -45,19 +45,19 @@ namespace {
 
 class MapReduceFixture : public ServiceContextMongoDTest {
 protected:
-    MapReduceFixture() : _expCtx((new ExpressionContextForTest())) {
-        _expCtx->mongoProcessInterface = std::make_shared<StandaloneProcessInterface>(nullptr);
+    MapReduceFixture() {
+        _expCtx.mongoProcessInterface = std::make_shared<StandaloneProcessInterface>(nullptr);
     }
 
-    boost::intrusive_ptr<ExpressionContextForTest>& getExpCtx() {
-        return _expCtx;
+    auto getExpCtx() {
+        return &_expCtx;
     }
 
 private:
     void setUp() override;
     void tearDown() override;
 
-    boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
+    ExpressionContextForTest _expCtx;
 };
 
 
@@ -75,7 +75,7 @@ void MapReduceFixture::tearDown() {
 namespace InternalJsReduce {
 
 template <typename AccName>
-static void assertProcessFailsWithCode(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+static void assertProcessFailsWithCode(ExpressionContext* const expCtx,
                                        const std::string& eval,
                                        Value processArgument,
                                        int code) {
@@ -83,7 +83,7 @@ static void assertProcessFailsWithCode(const boost::intrusive_ptr<ExpressionCont
     ASSERT_THROWS_CODE(accum->process(processArgument, false), AssertionException, code);
 }
 
-static void assertParsingFailsWithCode(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+static void assertParsingFailsWithCode(ExpressionContext* const expCtx,
                                        BSONElement elem,
                                        int code) {
     ASSERT_THROWS_CODE(AccumulatorInternalJsReduce::parseInternalJsReduce(
@@ -93,7 +93,7 @@ static void assertParsingFailsWithCode(const boost::intrusive_ptr<ExpressionCont
 }
 
 template <typename AccName>
-static void assertExpectedResults(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+static void assertExpectedResults(ExpressionContext* const expCtx,
                                   const std::string& eval,
                                   std::vector<Value> data,
                                   Value expectedResult) {

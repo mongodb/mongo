@@ -88,7 +88,7 @@ public:
          * This constructor is private, all CollatorStashes should be created by calling
          * ExpressionContext::temporarilyChangeCollator().
          */
-        CollatorStash(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        CollatorStash(ExpressionContext* const expCtx,
                       std::unique_ptr<CollatorInterface> newCollator);
 
         friend class ExpressionContext;

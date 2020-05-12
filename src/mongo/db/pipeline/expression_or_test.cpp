@@ -96,19 +96,18 @@ class ExpectedResultBase {
 public:
     virtual ~ExpectedResultBase() {}
     void run() {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expCtx = ExpressionContextForTest{};
         BSONObj specObject = BSON("" << spec());
         BSONElement specElement = specObject.firstElement();
-        VariablesParseState vps = expCtx->variablesParseState;
-        intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
+        VariablesParseState vps = expCtx.variablesParseState;
+        intrusive_ptr<Expression> expression = Expression::parseOperand(&expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
         ASSERT_BSONOBJ_EQ(
             BSON("" << expectedResult()),
-            toBson(expression->evaluate(fromBson(BSON("a" << 1)), &expCtx->variables)));
+            toBson(expression->evaluate(fromBson(BSON("a" << 1)), &expCtx.variables)));
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_BSONOBJ_EQ(
-            BSON("" << expectedResult()),
-            toBson(optimized->evaluate(fromBson(BSON("a" << 1)), &expCtx->variables)));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(optimized->evaluate(fromBson(BSON("a" << 1)), &expCtx.variables)));
     }
 
 protected:
@@ -120,11 +119,11 @@ class OptimizeBase {
 public:
     virtual ~OptimizeBase() {}
     void run() {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expCtx = ExpressionContextForTest{};
         BSONObj specObject = BSON("" << spec());
         BSONElement specElement = specObject.firstElement();
-        VariablesParseState vps = expCtx->variablesParseState;
-        intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
+        VariablesParseState vps = expCtx.variablesParseState;
+        intrusive_ptr<Expression> expression = Expression::parseOperand(&expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
         intrusive_ptr<Expression> optimized = expression->optimize();
         ASSERT_BSONOBJ_EQ(expectedOptimized(), expressionToBson(optimized));

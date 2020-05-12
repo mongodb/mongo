@@ -69,8 +69,7 @@ Value AccumulatorMinMax::getValue(bool toBeMerged) {
     return _val;
 }
 
-AccumulatorMinMax::AccumulatorMinMax(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     Sense sense)
+AccumulatorMinMax::AccumulatorMinMax(ExpressionContext* const expCtx, Sense sense)
     : AccumulatorState(expCtx), _sense(sense) {
     _memUsageBytes = sizeof(*this);
 }
@@ -80,13 +79,11 @@ void AccumulatorMinMax::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorMin::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<AccumulatorState> AccumulatorMin::create(ExpressionContext* const expCtx) {
     return new AccumulatorMin(expCtx);
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorMax::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<AccumulatorState> AccumulatorMax::create(ExpressionContext* const expCtx) {
     return new AccumulatorMax(expCtx);
 }
 }  // namespace mongo

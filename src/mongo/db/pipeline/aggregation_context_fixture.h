@@ -53,11 +53,15 @@ public:
         _expCtx->tempDir = tempDir.path();
     }
 
-    boost::intrusive_ptr<ExpressionContextForTest> getExpCtx() {
+    auto getExpCtx() {
         return _expCtx;
     }
 
-    OperationContext* getOpCtx() {
+    auto getExpCtxRaw() {
+        return _expCtx.get();
+    }
+
+    auto getOpCtx() {
         return _opCtx.get();
     }
 

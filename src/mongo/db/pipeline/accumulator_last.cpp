@@ -54,8 +54,7 @@ Value AccumulatorLast::getValue(bool toBeMerged) {
     return _last;
 }
 
-AccumulatorLast::AccumulatorLast(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : AccumulatorState(expCtx) {
+AccumulatorLast::AccumulatorLast(ExpressionContext* const expCtx) : AccumulatorState(expCtx) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -64,8 +63,7 @@ void AccumulatorLast::reset() {
     _last = Value();
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorLast::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<AccumulatorState> AccumulatorLast::create(ExpressionContext* const expCtx) {
     return new AccumulatorLast(expCtx);
 }
 }  // namespace mongo

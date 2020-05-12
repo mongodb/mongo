@@ -247,7 +247,7 @@ void AddFieldsProjectionExecutor::parse(const BSONObj& spec) {
             // This is a literal or regular value.
             _root->addExpressionForPath(
                 FieldPath(elem.fieldName()),
-                Expression::parseOperand(_expCtx, elem, _expCtx->variablesParseState));
+                Expression::parseOperand(_expCtx.get(), elem, _expCtx->variablesParseState));
         }
     }
 }
@@ -270,7 +270,7 @@ bool AddFieldsProjectionExecutor::parseObjectAsExpression(
         // This is an expression like {$add: [...]}. We already verified that it has only one field.
         invariant(objSpec.nFields() == 1);
         _root->addExpressionForPath(
-            pathToObject, Expression::parseExpression(_expCtx, objSpec, variablesParseState));
+            pathToObject, Expression::parseExpression(_expCtx.get(), objSpec, variablesParseState));
         return true;
     }
     return false;
@@ -300,7 +300,7 @@ void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
             // This is a literal or regular value.
             node->addExpressionForPath(
                 FieldPath(elem.fieldName()),
-                Expression::parseOperand(_expCtx, elem, variablesParseState));
+                Expression::parseOperand(_expCtx.get(), elem, variablesParseState));
         }
     }
 }

@@ -44,7 +44,7 @@ namespace mongo {
  */
 class ExpressionInternalFindPositional final : public Expression {
 public:
-    ExpressionInternalFindPositional(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    ExpressionInternalFindPositional(ExpressionContext* const expCtx,
                                      boost::intrusive_ptr<Expression> preImageExpr,
                                      boost::intrusive_ptr<Expression> postImageExpr,
                                      FieldPath path,
@@ -122,7 +122,7 @@ private:
  */
 class ExpressionInternalFindSlice final : public Expression {
 public:
-    ExpressionInternalFindSlice(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    ExpressionInternalFindSlice(ExpressionContext* const expCtx,
                                 boost::intrusive_ptr<Expression> postImageExpr,
                                 FieldPath path,
                                 boost::optional<int> skip,
@@ -183,7 +183,7 @@ private:
  */
 class ExpressionInternalFindElemMatch final : public Expression {
 public:
-    ExpressionInternalFindElemMatch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    ExpressionInternalFindElemMatch(ExpressionContext* const expCtx,
                                     boost::intrusive_ptr<Expression> child,
                                     FieldPath path,
                                     CopyableMatchExpression matchExpr)

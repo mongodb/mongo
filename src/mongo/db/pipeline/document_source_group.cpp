@@ -372,23 +372,23 @@ intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContex
     if (groupField.type() == Object) {
         // {_id: {}} is treated as grouping on a constant, not an expression
         if (groupField.Obj().isEmpty()) {
-            return ExpressionConstant::create(expCtx, Value(groupField));
+            return ExpressionConstant::create(expCtx.get(), Value(groupField));
         }
 
         const BSONObj idKeyObj = groupField.Obj();
         if (idKeyObj.firstElementFieldName()[0] == '$') {
             // grouping on a $op expression
-            return Expression::parseObject(expCtx, idKeyObj, vps);
+            return Expression::parseObject(expCtx.get(), idKeyObj, vps);
         } else {
             for (auto&& field : idKeyObj) {
                 uassert(17390,
                         "$group does not support inclusion-style expressions",
                         !field.isNumber() && field.type() != Bool);
             }
-            return ExpressionObject::parse(expCtx, idKeyObj, vps);
+            return ExpressionObject::parse(expCtx.get(), idKeyObj, vps);
         }
     } else {
-        return Expression::parseOperand(expCtx, groupField, vps);
+        return Expression::parseOperand(expCtx.get(), groupField, vps);
     }
 }
 
@@ -437,7 +437,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
         } else {
             // Any other field will be treated as an accumulator specification.
             pGroup->addAccumulator(
-                AccumulationStatement::parseAccumulationStatement(pExpCtx, groupField, vps));
+                AccumulationStatement::parseAccumulationStatement(pExpCtx.get(), groupField, vps));
         }
     }
 
@@ -707,7 +707,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceGroup::distr
 
     VariablesParseState vps = pExpCtx->variablesParseState;
     /* the merger will use the same grouping key */
-    mergingGroup->setIdExpression(ExpressionFieldPath::parse(pExpCtx, "$$ROOT._id", vps));
+    mergingGroup->setIdExpression(ExpressionFieldPath::parse(pExpCtx.get(), "$$ROOT._id", vps));
 
     for (auto&& accumulatedField : _accumulatedFields) {
         // The merger's output field names will be the same, as will the accumulator factories.
@@ -715,8 +715,8 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceGroup::distr
         // original accumulator may be collecting an expression based on a field expression or
         // constant.  Here, we accumulate the output of the same name from the prior group.
         auto copiedAccumulatedField = accumulatedField;
-        copiedAccumulatedField.expr.argument =
-            ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + copiedAccumulatedField.fieldName, vps);
+        copiedAccumulatedField.expr.argument = ExpressionFieldPath::parse(
+            pExpCtx.get(), "$$ROOT." + copiedAccumulatedField.fieldName, vps);
         mergingGroup->addAccumulator(copiedAccumulatedField);
     }
 
@@ -794,7 +794,7 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
     }
 
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fields;
-    fields.push_back(std::make_pair("_id", ExpressionFieldPath::create(pExpCtx, groupId)));
+    fields.push_back(std::make_pair("_id", ExpressionFieldPath::create(pExpCtx.get(), groupId)));
 
     for (auto&& accumulator : _accumulatedFields) {
         fields.push_back(std::make_pair(accumulator.fieldName, accumulator.expr.argument));

@@ -36,7 +36,6 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -126,16 +125,8 @@ ExpressionContext::ExpressionContext(
     if (!isMapReduce) {
         jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
     }
-    if (letParameters) {
-        // TODO SERVER-47713: One possible fix is to change the interface of everything that needs
-        // an expression context intrusive_ptr to take a raw ptr.
-        auto intrusiveThis = boost::intrusive_ptr{this};
-        ON_BLOCK_EXIT([&] {
-            intrusiveThis.detach();
-            unsafeRefDecRefCountTo(0u);
-        });
-        variables.seedVariablesWithLetParameters(intrusiveThis, *letParameters);
-    }
+    if (letParameters)
+        variables.seedVariablesWithLetParameters(this, *letParameters);
 }
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
@@ -160,16 +151,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     }
 
     jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();
-    if (letParameters) {
-        // TODO SERVER-47713: One possible fix is to change the interface of everything that needs
-        // an expression context intrusive_ptr to take a raw ptr.
-        auto intrusiveThis = boost::intrusive_ptr{this};
-        ON_BLOCK_EXIT([&] {
-            intrusiveThis.detach();
-            unsafeRefDecRefCountTo(0u);
-        });
-        variables.seedVariablesWithLetParameters(intrusiveThis, *letParameters);
-    }
+    if (letParameters)
+        variables.seedVariablesWithLetParameters(this, *letParameters);
 }
 
 void ExpressionContext::checkForInterrupt() {
@@ -181,9 +164,8 @@ void ExpressionContext::checkForInterrupt() {
     }
 }
 
-ExpressionContext::CollatorStash::CollatorStash(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::unique_ptr<CollatorInterface> newCollator)
+ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,
+                                                std::unique_ptr<CollatorInterface> newCollator)
     : _expCtx(expCtx), _originalCollator(std::move(_expCtx->_collator)) {
     _expCtx->setCollator(std::move(newCollator));
 }

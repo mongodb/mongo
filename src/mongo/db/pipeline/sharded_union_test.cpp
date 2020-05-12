@@ -202,13 +202,14 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     auto&& parser = AccumulationStatement::getParser("$sum", boost::none);
     auto accumulatorArg = BSON("" << 1);
     auto sumStatement =
-        parser(expCtx(), accumulatorArg.firstElement(), expCtx()->variablesParseState);
+        parser(expCtx().get(), accumulatorArg.firstElement(), expCtx()->variablesParseState);
     AccumulationStatement countStatement{"count", sumStatement};
     auto pipeline = Pipeline::create(
         {DocumentSourceMatch::create(fromjson("{_id: {$gte: 0}}"), expCtx()),
-         DocumentSourceGroup::create(
-             expCtx(), ExpressionConstant::create(expCtx(), Value(BSONNULL)), {countStatement})},
-        expCtx());
+         DocumentSourceGroup::create(expCtx(),
+                                     ExpressionConstant::create(expCtx().get(), Value(BSONNULL)),
+                                     {countStatement})},
+        expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
     expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
     auto queue = DocumentSourceQueue::create(expCtx());
@@ -290,12 +291,13 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     auto&& parser = AccumulationStatement::getParser("$sum", boost::none);
     auto accumulatorArg = BSON("" << 1);
     auto sumStatement =
-        parser(expCtx(), accumulatorArg.firstElement(), expCtx()->variablesParseState);
+        parser(expCtx().get(), accumulatorArg.firstElement(), expCtx()->variablesParseState);
     AccumulationStatement countStatement{"count", sumStatement};
     auto pipeline = Pipeline::create(
-        {DocumentSourceGroup::create(
-            expCtx(), ExpressionConstant::create(expCtx(), Value(BSONNULL)), {countStatement})},
-        expCtx());
+        {DocumentSourceGroup::create(expCtx(),
+                                     ExpressionConstant::create(expCtx().get(), Value(BSONNULL)),
+                                     {countStatement})},
+        expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
     expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
     auto queue = DocumentSourceQueue::create(expCtx());
@@ -423,12 +425,13 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
     auto&& parser = AccumulationStatement::getParser("$sum", boost::none);
     auto accumulatorArg = BSON("" << 1);
     auto sumExpression =
-        parser(expCtx(), accumulatorArg.firstElement(), expCtx()->variablesParseState);
+        parser(expCtx().get(), accumulatorArg.firstElement(), expCtx()->variablesParseState);
     AccumulationStatement countStatement{"count", sumExpression};
     auto pipeline = Pipeline::create(
-        {DocumentSourceGroup::create(
-            expCtx(), ExpressionConstant::create(expCtx(), Value(BSONNULL)), {countStatement})},
-        expCtx());
+        {DocumentSourceGroup::create(expCtx(),
+                                     ExpressionConstant::create(expCtx().get(), Value(BSONNULL)),
+                                     {countStatement})},
+        expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
     expCtx()->mongoProcessInterface = std::make_shared<ShardServerProcessInterface>(executor());
     auto queue = DocumentSourceQueue::create(expCtx());

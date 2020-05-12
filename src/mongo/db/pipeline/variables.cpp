@@ -239,7 +239,7 @@ BSONObj Variables::serializeLetParameters(const VariablesParseState& vps) const 
         bob << kIdToBuiltinVarName.at(id) << value;
     return bob.appendElements(vps.serialize(*this)).obj();
 }
-void Variables::seedVariablesWithLetParameters(boost::intrusive_ptr<ExpressionContext> expCtx,
+void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
                                                const BSONObj letParams) {
     for (auto&& elem : letParams) {
         Variables::validateNameForUserWrite(elem.fieldName());

@@ -53,10 +53,10 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
     const VariablesParseState& vps) {
     if (groupByField.type() == BSONType::Object &&
         groupByField.embeddedObject().firstElementFieldName()[0] == '$') {
-        return Expression::parseObject(expCtx, groupByField.embeddedObject(), vps);
+        return Expression::parseObject(expCtx.get(), groupByField.embeddedObject(), vps);
     } else if (groupByField.type() == BSONType::String &&
                groupByField.valueStringData()[0] == '$') {
-        return ExpressionFieldPath::parse(expCtx, groupByField.str(), vps);
+        return ExpressionFieldPath::parse(expCtx.get(), groupByField.str(), vps);
     } else {
         uasserted(
             40239,
@@ -431,9 +431,9 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     if (accumulationStatements.empty()) {
         accumulationStatements.emplace_back(
             "count",
-            AccumulationExpression(ExpressionConstant::create(pExpCtx, Value(BSONNULL)),
-                                   ExpressionConstant::create(pExpCtx, Value(1)),
-                                   [pExpCtx] { return AccumulatorSum::create(pExpCtx); }));
+            AccumulationExpression(ExpressionConstant::create(pExpCtx.get(), Value(BSONNULL)),
+                                   ExpressionConstant::create(pExpCtx.get(), Value(1)),
+                                   [pExpCtx] { return AccumulatorSum::create(pExpCtx.get()); }));
     }
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,
@@ -512,8 +512,8 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
                     argument.type() == BSONType::Object);
 
             for (auto&& outputField : argument.embeddedObject()) {
-                auto stmt =
-                    AccumulationStatement::parseAccumulationStatement(pExpCtx, outputField, vps);
+                auto stmt = AccumulationStatement::parseAccumulationStatement(
+                    pExpCtx.get(), outputField, vps);
                 stmt.expr.initializer = stmt.expr.initializer->optimize();
                 uassert(4544714,
                         "Can't refer to the group key in $bucketAuto",

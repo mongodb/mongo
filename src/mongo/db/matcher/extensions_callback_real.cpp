@@ -73,11 +73,11 @@ StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(
         // Desugar $where to $expr. The $where function is invoked through a $function expression by
         // passing the document as $$CURRENT.
         auto fnExpression = ExpressionFunction::createForWhere(
-            expCtx,
+            expCtx.get(),
             ExpressionArray::create(
-                expCtx,
-                make_vector<boost::intrusive_ptr<Expression>>(
-                    ExpressionFieldPath::parse(expCtx, "$$CURRENT", expCtx->variablesParseState))),
+                expCtx.get(),
+                make_vector<boost::intrusive_ptr<Expression>>(ExpressionFieldPath::parse(
+                    expCtx.get(), "$$CURRENT", expCtx->variablesParseState))),
             code,
             ExpressionFunction::kJavaScript);
 

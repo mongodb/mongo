@@ -56,16 +56,17 @@ protected:
                          const BSONObj& matchSpec,
                          const std::string& path,
                          const Document& input) {
-        auto executor = createProjectionExecutor(getExpCtx(), projSpec, {});
+        auto executor = createProjectionExecutor(getExpCtxRaw(), projSpec, {});
         auto matchExpr = CopyableMatchExpression{matchSpec,
-                                                 getExpCtx(),
+                                                 getExpCtxRaw(),
                                                  std::make_unique<ExtensionsCallbackNoop>(),
                                                  MatchExpressionParser::kBanAllSpecialFeatures};
         auto expr = make_intrusive<ExpressionInternalFindPositional>(
-            getExpCtx(),
-            ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
-            ExpressionFieldPath::parse(
-                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(),
+            ExpressionFieldPath::parse(getExpCtxRaw(), "$$ROOT", getExpCtx()->variablesParseState),
+            ExpressionFieldPath::parse(getExpCtxRaw(),
+                                       "$$" + kProjectionPostImageVarName,
+                                       getExpCtx()->variablesParseState),
             path,
             std::move(matchExpr));
         executor->setRootReplacementExpression(expr);
@@ -80,11 +81,12 @@ protected:
                     boost::optional<int> skip,
                     int limit,
                     const Document& input) {
-        auto executor = createProjectionExecutor(getExpCtx(), projSpec, {});
+        auto executor = createProjectionExecutor(getExpCtxRaw(), projSpec, {});
         auto expr = make_intrusive<ExpressionInternalFindSlice>(
-            getExpCtx(),
-            ExpressionFieldPath::parse(
-                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(),
+            ExpressionFieldPath::parse(getExpCtxRaw(),
+                                       "$$" + kProjectionPostImageVarName,
+                                       getExpCtx()->variablesParseState),
             path,
             skip,
             limit);
@@ -116,17 +118,17 @@ TEST_F(PositionalProjectionExecutionTest, AppliesProjectionToPreImage) {
 }
 
 TEST_F(PositionalProjectionExecutionTest, ShouldAddInclusionFieldsAndWholeDocumentToDependencies) {
-    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
+    auto executor = createProjectionExecutor(getExpCtxRaw(), fromjson("{bar: 1, _id: 0}"), {});
     auto matchSpec = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
     auto matchExpr = CopyableMatchExpression{matchSpec,
-                                             getExpCtx(),
+                                             getExpCtxRaw(),
                                              std::make_unique<ExtensionsCallbackNoop>(),
                                              MatchExpressionParser::kBanAllSpecialFeatures};
     auto expr = make_intrusive<ExpressionInternalFindPositional>(
-        getExpCtx(),
-        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        getExpCtxRaw(),
+        ExpressionFieldPath::parse(getExpCtxRaw(), "$$ROOT", getExpCtx()->variablesParseState),
         ExpressionFieldPath::parse(
-            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         std::move(matchExpr));
     executor->setRootReplacementExpression(expr);
@@ -141,17 +143,17 @@ TEST_F(PositionalProjectionExecutionTest, ShouldAddInclusionFieldsAndWholeDocume
 }
 
 TEST_F(PositionalProjectionExecutionTest, ShouldConsiderAllPathsAsModified) {
-    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
+    auto executor = createProjectionExecutor(getExpCtxRaw(), fromjson("{bar: 1, _id: 0}"), {});
     auto matchSpec = fromjson("{bar: 1, 'foo.bar': {$gte: 5}}");
     auto matchExpr = CopyableMatchExpression{matchSpec,
-                                             getExpCtx(),
+                                             getExpCtxRaw(),
                                              std::make_unique<ExtensionsCallbackNoop>(),
                                              MatchExpressionParser::kBanAllSpecialFeatures};
     auto expr = make_intrusive<ExpressionInternalFindPositional>(
-        getExpCtx(),
-        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        getExpCtxRaw(),
+        ExpressionFieldPath::parse(getExpCtxRaw(), "$$ROOT", getExpCtx()->variablesParseState),
         ExpressionFieldPath::parse(
-            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         std::move(matchExpr));
     executor->setRootReplacementExpression(expr);
@@ -184,21 +186,21 @@ TEST_F(SliceProjectionExecutionTest, AppliesProjectionToPostImage) {
 }
 
 TEST_F(SliceProjectionExecutionTest, CanApplySliceAndPositionalProjectionsTogether) {
-    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{foo: 1, bar: 1}"), {});
+    auto executor = createProjectionExecutor(getExpCtxRaw(), fromjson("{foo: 1, bar: 1}"), {});
     auto matchSpec = fromjson("{foo: {$gte: 3}}");
     auto matchExpr = CopyableMatchExpression{matchSpec,
-                                             getExpCtx(),
+                                             getExpCtxRaw(),
                                              std::make_unique<ExtensionsCallbackNoop>(),
                                              MatchExpressionParser::kBanAllSpecialFeatures};
     auto positionalExpr = make_intrusive<ExpressionInternalFindPositional>(
-        getExpCtx(),
-        ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+        getExpCtxRaw(),
+        ExpressionFieldPath::parse(getExpCtxRaw(), "$$ROOT", getExpCtx()->variablesParseState),
         ExpressionFieldPath::parse(
-            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo",
         std::move(matchExpr));
     auto sliceExpr =
-        make_intrusive<ExpressionInternalFindSlice>(getExpCtx(), positionalExpr, "bar", 1, 1);
+        make_intrusive<ExpressionInternalFindSlice>(getExpCtxRaw(), positionalExpr, "bar", 1, 1);
     executor->setRootReplacementExpression(sliceExpr);
 
     ASSERT_DOCUMENT_EQ(
@@ -215,11 +217,11 @@ TEST_F(SliceProjectionExecutionTest, CanApplySliceWithExclusionProjection) {
 
 TEST_F(SliceProjectionExecutionTest,
        ShouldAddFieldsAndWholeDocumentToDependenciesWithInclusionProjection) {
-    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 1, _id: 0}"), {});
+    auto executor = createProjectionExecutor(getExpCtxRaw(), fromjson("{bar: 1, _id: 0}"), {});
     auto expr = make_intrusive<ExpressionInternalFindSlice>(
-        getExpCtx(),
+        getExpCtxRaw(),
         ExpressionFieldPath::parse(
-            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         1,
         1);
@@ -234,11 +236,11 @@ TEST_F(SliceProjectionExecutionTest,
 }
 
 TEST_F(SliceProjectionExecutionTest, ShouldConsiderAllPathsAsModifiedWithInclusionProjection) {
-    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 1}"), {});
+    auto executor = createProjectionExecutor(getExpCtxRaw(), fromjson("{bar: 1}"), {});
     auto expr = make_intrusive<ExpressionInternalFindSlice>(
-        getExpCtx(),
+        getExpCtxRaw(),
         ExpressionFieldPath::parse(
-            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         1,
         1);
@@ -249,11 +251,11 @@ TEST_F(SliceProjectionExecutionTest, ShouldConsiderAllPathsAsModifiedWithInclusi
 }
 
 TEST_F(SliceProjectionExecutionTest, ShouldConsiderAllPathsAsModifiedWithExclusionProjection) {
-    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 0}"), {});
+    auto executor = createProjectionExecutor(getExpCtxRaw(), fromjson("{bar: 0}"), {});
     auto expr = make_intrusive<ExpressionInternalFindSlice>(
-        getExpCtx(),
+        getExpCtxRaw(),
         ExpressionFieldPath::parse(
-            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         1,
         1);
@@ -264,11 +266,11 @@ TEST_F(SliceProjectionExecutionTest, ShouldConsiderAllPathsAsModifiedWithExclusi
 }
 
 TEST_F(SliceProjectionExecutionTest, ShouldAddWholeDocumentToDependenciesWithExclusionProjection) {
-    auto executor = createProjectionExecutor(getExpCtx(), fromjson("{bar: 0}"), {});
+    auto executor = createProjectionExecutor(getExpCtxRaw(), fromjson("{bar: 0}"), {});
     auto expr = make_intrusive<ExpressionInternalFindSlice>(
-        getExpCtx(),
+        getExpCtxRaw(),
         ExpressionFieldPath::parse(
-            getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
         "foo.bar",
         1,
         1);

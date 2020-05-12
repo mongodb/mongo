@@ -37,7 +37,6 @@ namespace mongo {
 /**
  * Parses and returns an executable Javascript function.
  */
-ScriptingFunction makeJsFunc(boost::intrusive_ptr<ExpressionContext> expCtx,
-                             const std::string& func);
+ScriptingFunction makeJsFunc(ExpressionContext* const expCtx, const std::string& func);
 
 }  // namespace mongo

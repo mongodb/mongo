@@ -116,7 +116,7 @@ public:
 
         // Make the stage.
         unique_ptr<PlanStage> root(
-            new CollectionScan(cq->getExpCtx().get(), coll, csparams, ws.get(), cq.get()->root()));
+            new CollectionScan(cq->getExpCtxRaw(), coll, csparams, ws.get(), cq.get()->root()));
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor =

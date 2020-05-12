@@ -74,7 +74,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
                                        const QuerySolution& qsol,
                                        const QuerySolutionNode* root,
                                        WorkingSet* ws) {
-    auto* const expCtx = cq.getExpCtx().get();
+    auto* const expCtx = cq.getExpCtxRaw();
     switch (root->getType()) {
         case STAGE_COLLSCAN: {
             const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
@@ -171,7 +171,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
         case STAGE_PROJECTION_COVERED: {
             auto pn = static_cast<const ProjectionNodeCovered*>(root);
             auto childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
-            return std::make_unique<ProjectionStageCovered>(cq.getExpCtx().get(),
+            return std::make_unique<ProjectionStageCovered>(cq.getExpCtxRaw(),
                                                             cq.getQueryRequest().getProj(),
                                                             cq.getProj(),
                                                             ws,
@@ -181,7 +181,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
         case STAGE_PROJECTION_SIMPLE: {
             auto pn = static_cast<const ProjectionNodeSimple*>(root);
             auto childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
-            return std::make_unique<ProjectionStageSimple>(cq.getExpCtx().get(),
+            return std::make_unique<ProjectionStageSimple>(cq.getExpCtxRaw(),
                                                            cq.getQueryRequest().getProj(),
                                                            cq.getProj(),
                                                            ws,

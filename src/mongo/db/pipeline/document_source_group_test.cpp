@@ -75,10 +75,10 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
                               // This is the only way to do this in a debug build.
     auto&& parser = AccumulationStatement::getParser("$sum", boost::none);
     auto accumulatorArg = BSON("" << 1);
-    auto accExpr = parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement countStatement{"count", accExpr};
     auto group = DocumentSourceGroup::create(
-        expCtx, ExpressionConstant::create(expCtx, Value(BSONNULL)), {countStatement});
+        expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement});
     auto mock =
         DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
                                            Document(),
@@ -113,10 +113,10 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
     auto&& parser = AccumulationStatement::getParser("$push", boost::none);
     auto accumulatorArg = BSON(""
                                << "$largeStr");
-    auto accExpr = parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement pushStatement{"spaceHog", accExpr};
     auto groupByExpression =
-        ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
+        ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
         expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
@@ -156,10 +156,10 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
     auto&& parser = AccumulationStatement::getParser("$push", boost::none);
     auto accumulatorArg = BSON(""
                                << "$largeStr");
-    auto accExpr = parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement pushStatement{"spaceHog", accExpr};
     auto groupByExpression =
-        ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
+        ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
         expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
@@ -182,10 +182,10 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto&& parser = AccumulationStatement::getParser("$push", boost::none);
     auto accumulatorArg = BSON(""
                                << "$largeStr");
-    auto accExpr = parser(expCtx, accumulatorArg.firstElement(), expCtx->variablesParseState);
+    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement pushStatement{"spaceHog", accExpr};
     auto groupByExpression =
-        ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState);
+        ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
         expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
@@ -209,7 +209,7 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
 TEST_F(DocumentSourceGroupTest, ShouldReportSingleFieldGroupKeyAsARename) {
     auto expCtx = getExpCtx();
     VariablesParseState vps = expCtx->variablesParseState;
-    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$x", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$x", vps);
     auto group = DocumentSourceGroup::create(expCtx, groupByExpression, {});
     auto modifiedPathsRet = group->getModifiedPaths();
     ASSERT(modifiedPathsRet.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
@@ -221,9 +221,9 @@ TEST_F(DocumentSourceGroupTest, ShouldReportSingleFieldGroupKeyAsARename) {
 TEST_F(DocumentSourceGroupTest, ShouldReportMultipleFieldGroupKeysAsARename) {
     auto expCtx = getExpCtx();
     VariablesParseState vps = expCtx->variablesParseState;
-    auto x = ExpressionFieldPath::parse(expCtx, "$x", vps);
-    auto y = ExpressionFieldPath::parse(expCtx, "$y", vps);
-    auto groupByExpression = ExpressionObject::create(expCtx, {{"x", x}, {"y", y}});
+    auto x = ExpressionFieldPath::parse(expCtx.get(), "$x", vps);
+    auto y = ExpressionFieldPath::parse(expCtx.get(), "$y", vps);
+    auto groupByExpression = ExpressionObject::create(expCtx.get(), {{"x", x}, {"y", y}});
     auto group = DocumentSourceGroup::create(expCtx, groupByExpression, {});
     auto modifiedPathsRet = group->getModifiedPaths();
     ASSERT(modifiedPathsRet.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
@@ -236,7 +236,7 @@ TEST_F(DocumentSourceGroupTest, ShouldReportMultipleFieldGroupKeysAsARename) {
 TEST_F(DocumentSourceGroupTest, ShouldNotReportDottedGroupKeyAsARename) {
     auto expCtx = getExpCtx();
     VariablesParseState vps = expCtx->variablesParseState;
-    auto xDotY = ExpressionFieldPath::parse(expCtx, "$x.y", vps);
+    auto xDotY = ExpressionFieldPath::parse(expCtx.get(), "$x.y", vps);
     auto group = DocumentSourceGroup::create(expCtx, xDotY, {});
     auto modifiedPathsRet = group->getModifiedPaths();
     ASSERT(modifiedPathsRet.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);

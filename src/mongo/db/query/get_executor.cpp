@@ -385,7 +385,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     "Collection {ns} does not exist. Using EOF plan: {canonicalQuery_Short}",
                     "ns"_attr = ns,
                     "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
-        root = std::make_unique<EOFStage>(canonicalQuery->getExpCtx().get());
+        root = std::make_unique<EOFStage>(canonicalQuery->getExpCtxRaw());
         return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
 
@@ -411,12 +411,12 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
 
         root = std::make_unique<IDHackStage>(
-            canonicalQuery->getExpCtx().get(), canonicalQuery.get(), ws, descriptor);
+            canonicalQuery->getExpCtxRaw(), canonicalQuery.get(), ws, descriptor);
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             root = std::make_unique<ShardFilterStage>(
-                canonicalQuery->getExpCtx().get(),
+                canonicalQuery->getExpCtxRaw(),
                 CollectionShardingState::get(opCtx, canonicalQuery->nss())
                     ->getOwnershipFilter(
                         opCtx,
@@ -430,7 +430,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         // Add a SortKeyGeneratorStage if the query requested sortKey metadata.
         if (canonicalQuery->metadataDeps()[DocumentMetadataFields::kSortKey]) {
             root = std::make_unique<SortKeyGeneratorStage>(
-                canonicalQuery->getExpCtx().get(),
+                canonicalQuery->getExpCtxRaw(),
                 std::move(root),
                 ws,
                 canonicalQuery->getQueryRequest().getSort());
@@ -442,7 +442,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             // the exception the $meta sortKey projection, which can be used along with the
             // returnKey.
             root = std::make_unique<ReturnKeyStage>(
-                canonicalQuery->getExpCtx().get(),
+                canonicalQuery->getExpCtxRaw(),
                 cqProjection
                     ? QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(*cqProjection)
                     : std::vector<FieldPath>{},
@@ -462,7 +462,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     std::move(root));
             } else {
                 root = std::make_unique<ProjectionStageSimple>(
-                    canonicalQuery->getExpCtx().get(),
+                    canonicalQuery->getExpCtxRaw(),
                     canonicalQuery->getQueryRequest().getProj(),
                     canonicalQuery->getProj(),
                     ws,
@@ -518,7 +518,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                 // 'decisionWorks' is used to determine whether the existing cache entry should
                 // be evicted, and the query replanned.
                 auto cachedPlanStage =
-                    std::make_unique<CachedPlanStage>(canonicalQuery->getExpCtx().get(),
+                    std::make_unique<CachedPlanStage>(canonicalQuery->getExpCtxRaw(),
                                                       collection,
                                                       ws,
                                                       canonicalQuery.get(),
@@ -540,7 +540,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
 
         root = std::make_unique<SubplanStage>(
-            canonicalQuery->getExpCtx().get(), collection, ws, plannerParams, canonicalQuery.get());
+            canonicalQuery->getExpCtxRaw(), collection, ws, plannerParams, canonicalQuery.get());
         return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
 
@@ -593,7 +593,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
         // and so on. The working set will be shared by all candidate plans.
         auto multiPlanStage = std::make_unique<MultiPlanStage>(
-            canonicalQuery->getExpCtx().get(), collection, canonicalQuery.get());
+            canonicalQuery->getExpCtxRaw(), collection, canonicalQuery.get());
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             if (solutions[ix]->cacheData.get()) {
@@ -870,7 +870,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
 
     invariant(root);
     root = std::make_unique<DeleteStage>(
-        cq->getExpCtx().get(), std::move(deleteStageParams), ws.get(), collection, root.release());
+        cq->getExpCtxRaw(), std::move(deleteStageParams), ws.get(), collection, root.release());
 
     if (projection) {
         root = std::make_unique<ProjectionStageDefault>(
@@ -1037,12 +1037,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     updateStageParams.canonicalQuery = cq.get();
 
     const bool isUpsert = updateStageParams.request->isUpsert();
-    root =
-        (isUpsert
-             ? std::make_unique<UpsertStage>(
-                   cq->getExpCtx().get(), updateStageParams, ws.get(), collection, root.release())
-             : std::make_unique<UpdateStage>(
-                   cq->getExpCtx().get(), updateStageParams, ws.get(), collection, root.release()));
+    root = (isUpsert
+                ? std::make_unique<UpsertStage>(
+                      cq->getExpCtxRaw(), updateStageParams, ws.get(), collection, root.release())
+                : std::make_unique<UpdateStage>(
+                      cq->getExpCtxRaw(), updateStageParams, ws.get(), collection, root.release()));
 
     if (projection) {
         root = std::make_unique<ProjectionStageDefault>(

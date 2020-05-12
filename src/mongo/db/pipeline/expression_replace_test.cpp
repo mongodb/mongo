@@ -41,11 +41,11 @@ using std::string;
 using namespace mongo;
 
 intrusive_ptr<Expression> parse(const string& expressionName, ImplicitValue operand) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
-    VariablesParseState vps = expCtx->variablesParseState;
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
     Value operandValue = operand;
     const BSONObj obj = BSON(expressionName << operandValue);
-    return Expression::parseExpression(expCtx, obj, vps);
+    return Expression::parseExpression(&expCtx, obj, vps);
 }
 
 Value eval(const string& expressionName,

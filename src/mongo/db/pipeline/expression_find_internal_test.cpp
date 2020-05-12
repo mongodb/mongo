@@ -39,8 +39,7 @@ namespace mongo::expression_internal_tests {
 constexpr auto kProjectionPostImageVarName =
     projection_executor::ProjectionExecutor::kProjectionPostImageVarName;
 
-auto defineAndSetProjectionPostImageVariable(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                             Value postImage) {
+auto defineAndSetProjectionPostImageVariable(ExpressionContext* const expCtx, Value postImage) {
     auto& vps = expCtx->variablesParseState;
     auto varId = vps.defineVariable(kProjectionPostImageVarName);
     expCtx->variables.setValue(varId, postImage);
@@ -51,14 +50,15 @@ class ExpressionInternalFindPositionalTest : public AggregationContextFixture {
 protected:
     auto createExpression(BSONObj matchSpec, const std::string& path) {
         auto matchExpr = CopyableMatchExpression{matchSpec,
-                                                 getExpCtx(),
+                                                 getExpCtxRaw(),
                                                  std::make_unique<ExtensionsCallbackNoop>(),
                                                  MatchExpressionParser::kBanAllSpecialFeatures};
         auto expr = make_intrusive<ExpressionInternalFindPositional>(
-            getExpCtx(),
-            ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
-            ExpressionFieldPath::parse(
-                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(),
+            ExpressionFieldPath::parse(getExpCtxRaw(), "$$ROOT", getExpCtx()->variablesParseState),
+            ExpressionFieldPath::parse(getExpCtxRaw(),
+                                       "$$" + kProjectionPostImageVarName,
+                                       getExpCtx()->variablesParseState),
             path,
             std::move(matchExpr));
         return expr;
@@ -69,9 +69,10 @@ class ExpressionInternalFindSliceTest : public AggregationContextFixture {
 protected:
     auto createExpression(const std::string& path, boost::optional<int> skip, int limit) {
         auto expr = make_intrusive<ExpressionInternalFindSlice>(
-            getExpCtx(),
-            ExpressionFieldPath::parse(
-                getExpCtx(), "$$" + kProjectionPostImageVarName, getExpCtx()->variablesParseState),
+            getExpCtxRaw(),
+            ExpressionFieldPath::parse(getExpCtxRaw(),
+                                       "$$" + kProjectionPostImageVarName,
+                                       getExpCtx()->variablesParseState),
             path,
             skip,
             limit);
@@ -83,20 +84,20 @@ class ExpressionInternalFindElemMatchTest : public AggregationContextFixture {
 protected:
     auto createExpression(BSONObj matchSpec, const std::string& path) {
         auto matchExpr = CopyableMatchExpression{matchSpec,
-                                                 getExpCtx(),
+                                                 getExpCtxRaw(),
                                                  std::make_unique<ExtensionsCallbackNoop>(),
                                                  MatchExpressionParser::kBanAllSpecialFeatures};
 
         return make_intrusive<ExpressionInternalFindElemMatch>(
-            getExpCtx(),
-            ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState),
+            getExpCtxRaw(),
+            ExpressionFieldPath::parse(getExpCtxRaw(), "$$ROOT", getExpCtx()->variablesParseState),
             path,
             std::move(matchExpr));
     }
 };
 
 TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
-    defineAndSetProjectionPostImageVariable(getExpCtx(),
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
     auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
@@ -109,7 +110,7 @@ TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
 
 TEST_F(ExpressionInternalFindPositionalTest, RecordsProjectionDependencies) {
     auto varId = defineAndSetProjectionPostImageVariable(
-        getExpCtx(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+        getExpCtxRaw(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
     auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
 
     DepsTracker deps;
@@ -124,7 +125,7 @@ TEST_F(ExpressionInternalFindPositionalTest, RecordsProjectionDependencies) {
 }
 
 TEST_F(ExpressionInternalFindPositionalTest, AddsArrayUndottedPathToComputedPaths) {
-    defineAndSetProjectionPostImageVariable(getExpCtx(),
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
     auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
@@ -139,7 +140,7 @@ TEST_F(ExpressionInternalFindPositionalTest, AddsArrayUndottedPathToComputedPath
 
 TEST_F(ExpressionInternalFindPositionalTest,
        AddsOnlyTopLevelFieldOfArrayDottedPathToComputedPaths) {
-    defineAndSetProjectionPostImageVariable(getExpCtx(),
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
     auto expr = createExpression(fromjson("{bar: 1, 'foo.bar': {$gte: 5}}"), "foo.bar");
@@ -153,7 +154,7 @@ TEST_F(ExpressionInternalFindPositionalTest,
 }
 
 TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToPostImage) {
-    defineAndSetProjectionPostImageVariable(getExpCtx(),
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
     auto expr = createExpression("foo", 1, 2);
@@ -166,7 +167,7 @@ TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToPostImage) {
 
 TEST_F(ExpressionInternalFindSliceTest, RecordsProjectionDependencies) {
     auto varId = defineAndSetProjectionPostImageVariable(
-        getExpCtx(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+        getExpCtxRaw(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
     auto expr = createExpression("foo", 1, 2);
 
     DepsTracker deps;
@@ -179,7 +180,7 @@ TEST_F(ExpressionInternalFindSliceTest, RecordsProjectionDependencies) {
 }
 
 TEST_F(ExpressionInternalFindSliceTest, AddsArrayUndottedPathToComputedPaths) {
-    defineAndSetProjectionPostImageVariable(getExpCtx(),
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
     auto expr = createExpression("foo", 1, 2);
@@ -193,7 +194,7 @@ TEST_F(ExpressionInternalFindSliceTest, AddsArrayUndottedPathToComputedPaths) {
 }
 
 TEST_F(ExpressionInternalFindSliceTest, AddsTopLevelFieldOfArrayDottedPathToComputedPaths) {
-    defineAndSetProjectionPostImageVariable(getExpCtx(),
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
                                             Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
 
     auto expr = createExpression("foo.bar", 1, 2);

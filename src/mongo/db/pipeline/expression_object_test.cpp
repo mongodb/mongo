@@ -56,27 +56,21 @@ Document literal(T&& value) {
     return Document{{"$const", Value(std::forward<T>(value))}};
 }
 
-template <typename T>
-intrusive_ptr<ExpressionConstant> makeConstant(T&& val) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    return ExpressionConstant::create(expCtx, Value(std::forward<T>(val)));
-}
-
 //
 // Parsing.
 //
 
 TEST(ExpressionObjectParse, ShouldAcceptEmptyObject) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    auto object = ExpressionObject::parse(expCtx, BSONObj(), vps);
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto object = ExpressionObject::parse(&expCtx, BSONObj(), vps);
     ASSERT_VALUE_EQ(Value(Document{}), object->serialize(false));
 }
 
 TEST(ExpressionObjectParse, ShouldAcceptLiteralsAsValues) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    auto object = ExpressionObject::parse(expCtx,
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto object = ExpressionObject::parse(&expCtx,
                                           BSON("a" << 5 << "b"
                                                    << "string"
                                                    << "c" << BSONNULL),
@@ -87,26 +81,26 @@ TEST(ExpressionObjectParse, ShouldAcceptLiteralsAsValues) {
 }
 
 TEST(ExpressionObjectParse, ShouldAccept_idAsFieldName) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    auto object = ExpressionObject::parse(expCtx, BSON("_id" << 5), vps);
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto object = ExpressionObject::parse(&expCtx, BSON("_id" << 5), vps);
     auto expectedResult = Value(Document{{"_id", literal(5)}});
     ASSERT_VALUE_EQ(expectedResult, object->serialize(false));
 }
 
 TEST(ExpressionObjectParse, ShouldAcceptFieldNameContainingDollar) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    auto object = ExpressionObject::parse(expCtx, BSON("a$b" << 5), vps);
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto object = ExpressionObject::parse(&expCtx, BSON("a$b" << 5), vps);
     auto expectedResult = Value(Document{{"a$b", literal(5)}});
     ASSERT_VALUE_EQ(expectedResult, object->serialize(false));
 }
 
 TEST(ExpressionObjectParse, ShouldAcceptNestedObjects) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
     auto object =
-        ExpressionObject::parse(expCtx, fromjson("{a: {b: 1}, c: {d: {e: 1, f: 1}}}"), vps);
+        ExpressionObject::parse(&expCtx, fromjson("{a: {b: 1}, c: {d: {e: 1, f: 1}}}"), vps);
     auto expectedResult =
         Value(Document{{"a", Document{{"b", literal(1)}}},
                        {"c", Document{{"d", Document{{"e", literal(1)}, {"f", literal(1)}}}}}});
@@ -114,18 +108,18 @@ TEST(ExpressionObjectParse, ShouldAcceptNestedObjects) {
 }
 
 TEST(ExpressionObjectParse, ShouldAcceptArrays) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    auto object = ExpressionObject::parse(expCtx, fromjson("{a: [1, 2]}"), vps);
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto object = ExpressionObject::parse(&expCtx, fromjson("{a: [1, 2]}"), vps);
     auto expectedResult =
         Value(Document{{"a", vector<Value>{Value(literal(1)), Value(literal(2))}}});
     ASSERT_VALUE_EQ(expectedResult, object->serialize(false));
 }
 
 TEST(ObjectParsing, ShouldAcceptExpressionAsValue) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    auto object = ExpressionObject::parse(expCtx, BSON("a" << BSON("$and" << BSONArray())), vps);
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto object = ExpressionObject::parse(&expCtx, BSON("a" << BSON("$and" << BSONArray())), vps);
     ASSERT_VALUE_EQ(object->serialize(false),
                     Value(Document{{"a", Document{{"$and", BSONArray()}}}}));
 }
@@ -135,43 +129,43 @@ TEST(ObjectParsing, ShouldAcceptExpressionAsValue) {
 //
 
 TEST(ExpressionObjectParse, ShouldRejectDottedFieldNames) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    ASSERT_THROWS(ExpressionObject::parse(expCtx, BSON("a.b" << 1), vps), AssertionException);
-    ASSERT_THROWS(ExpressionObject::parse(expCtx, BSON("c" << 3 << "a.b" << 1), vps),
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON("a.b" << 1), vps), AssertionException);
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON("c" << 3 << "a.b" << 1), vps),
                   AssertionException);
-    ASSERT_THROWS(ExpressionObject::parse(expCtx, BSON("a.b" << 1 << "c" << 3), vps),
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON("a.b" << 1 << "c" << 3), vps),
                   AssertionException);
 }
 
 TEST(ExpressionObjectParse, ShouldRejectDuplicateFieldNames) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    ASSERT_THROWS(ExpressionObject::parse(expCtx, BSON("a" << 1 << "a" << 1), vps),
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON("a" << 1 << "a" << 1), vps),
                   AssertionException);
-    ASSERT_THROWS(ExpressionObject::parse(expCtx, BSON("a" << 1 << "b" << 2 << "a" << 1), vps),
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON("a" << 1 << "b" << 2 << "a" << 1), vps),
                   AssertionException);
     ASSERT_THROWS(
-        ExpressionObject::parse(expCtx, BSON("a" << BSON("c" << 1) << "b" << 2 << "a" << 1), vps),
+        ExpressionObject::parse(&expCtx, BSON("a" << BSON("c" << 1) << "b" << 2 << "a" << 1), vps),
         AssertionException);
     ASSERT_THROWS(
-        ExpressionObject::parse(expCtx, BSON("a" << 1 << "b" << 2 << "a" << BSON("c" << 1)), vps),
+        ExpressionObject::parse(&expCtx, BSON("a" << 1 << "b" << 2 << "a" << BSON("c" << 1)), vps),
         AssertionException);
 }
 
 TEST(ExpressionObjectParse, ShouldRejectInvalidFieldName) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    ASSERT_THROWS(ExpressionObject::parse(expCtx, BSON("$a" << 1), vps), AssertionException);
-    ASSERT_THROWS(ExpressionObject::parse(expCtx, BSON("" << 1), vps), AssertionException);
-    ASSERT_THROWS(ExpressionObject::parse(expCtx, BSON(std::string("a\0b", 3) << 1), vps),
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON("$a" << 1), vps), AssertionException);
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON("" << 1), vps), AssertionException);
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx, BSON(std::string("a\0b", 3) << 1), vps),
                   AssertionException);
 }
 
 TEST(ExpressionObjectParse, ShouldRejectInvalidFieldPathAsValue) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
-    ASSERT_THROWS(ExpressionObject::parse(expCtx,
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    ASSERT_THROWS(ExpressionObject::parse(&expCtx,
                                           BSON("a"
                                                << "$field."),
                                           vps),
@@ -179,11 +173,11 @@ TEST(ExpressionObjectParse, ShouldRejectInvalidFieldPathAsValue) {
 }
 
 TEST(ParseObject, ShouldRejectExpressionAsTheSecondField) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
     ASSERT_THROWS(
         ExpressionObject::parse(
-            expCtx, BSON("a" << BSON("$and" << BSONArray()) << "$or" << BSONArray()), vps),
+            &expCtx, BSON("a" << BSON("$and" << BSONArray()) << "$or" << BSONArray()), vps),
         AssertionException);
 }
 
@@ -192,70 +186,74 @@ TEST(ParseObject, ShouldRejectExpressionAsTheSecondField) {
 //
 
 TEST(ExpressionObjectEvaluate, EmptyObjectShouldEvaluateToEmptyDocument) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto object = ExpressionObject::create(expCtx, {});
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document(), &(expCtx->variables)));
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"a", 1}}, &(expCtx->variables)));
+    auto expCtx = ExpressionContextForTest{};
+    auto object = ExpressionObject::create(&expCtx, {});
+    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document(), &(expCtx.variables)));
+    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
     ASSERT_VALUE_EQ(Value(Document()),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx->variables)));
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto object =
-        ExpressionObject::create(expCtx, {{"a", makeConstant(1)}, {"b", makeConstant(5)}});
+    auto expCtx = ExpressionContextForTest{};
+    auto object = ExpressionObject::create(&expCtx,
+                                           {{"a", ExpressionConstant::create(&expCtx, Value{1})},
+                                            {"b", ExpressionConstant::create(&expCtx, Value{5})}});
+
+
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document(), &(expCtx->variables)));
+                    object->evaluate(Document(), &(expCtx.variables)));
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document{{"a", 1}}, &(expCtx->variables)));
+                    object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx->variables)));
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
 }
 
 TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecification) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto object = ExpressionObject::create(expCtx,
-                                           {{"a", ExpressionFieldPath::create(expCtx, "a")},
-                                            {"b", ExpressionFieldPath::create(expCtx, "b")},
-                                            {"c", ExpressionFieldPath::create(expCtx, "c")}});
+    auto expCtx = ExpressionContextForTest{};
+    auto object = ExpressionObject::create(&expCtx,
+                                           {{"a", ExpressionFieldPath::create(&expCtx, "a")},
+                                            {"b", ExpressionFieldPath::create(&expCtx, "b")},
+                                            {"c", ExpressionFieldPath::create(&expCtx, "c")}});
     ASSERT_VALUE_EQ(
         Value(Document{{"a", "A"_sd}, {"b", "B"_sd}, {"c", "C"_sd}}),
         object->evaluate(Document{{"c", "C"_sd}, {"a", "A"_sd}, {"b", "B"_sd}, {"_id", "ID"_sd}},
-                         &(expCtx->variables)));
+                         &(expCtx.variables)));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto object = ExpressionObject::create(expCtx,
-                                           {{"a", ExpressionFieldPath::create(expCtx, "a.b")},
-                                            {"b", ExpressionFieldPath::create(expCtx, "missing")}});
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx->variables)));
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document{{"a", 1}}, &(expCtx->variables)));
+    auto expCtx = ExpressionContextForTest{};
+    auto object =
+        ExpressionObject::create(&expCtx,
+                                 {{"a", ExpressionFieldPath::create(&expCtx, "a.b")},
+                                  {"b", ExpressionFieldPath::create(&expCtx, "missing")}});
+    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables)));
+    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto object = ExpressionObject::create(
-        expCtx,
+        &expCtx,
         {{"a",
-          ExpressionObject::create(
-              expCtx,
-              {{"b", makeConstant(1)}, {"c", ExpressionFieldPath::create(expCtx, "_id")}})}});
+          ExpressionObject::create(&expCtx,
+                                   {{"b", ExpressionConstant::create(&expCtx, Value{1})},
+                                    {"c", ExpressionFieldPath::create(&expCtx, "_id")}})}});
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}}}}),
-                    object->evaluate(Document(), &(expCtx->variables)));
+                    object->evaluate(Document(), &(expCtx.variables)));
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"_sd}}}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx->variables)));
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissing) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto object =
-        ExpressionObject::create(expCtx, {{"a", ExpressionFieldPath::create(expCtx, "missing")}});
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx->variables)));
+        ExpressionObject::create(&expCtx, {{"a", ExpressionFieldPath::create(&expCtx, "missing")}});
+    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables)));
 
-    auto objectWithNestedObject = ExpressionObject::create(expCtx, {{"nested", object}});
+    auto objectWithNestedObject = ExpressionObject::create(&expCtx, {{"nested", object}});
     ASSERT_VALUE_EQ(Value(Document{{"nested", Document{}}}),
-                    objectWithNestedObject->evaluate(Document(), &(expCtx->variables)));
+                    objectWithNestedObject->evaluate(Document(), &(expCtx.variables)));
 }
 
 //
@@ -263,17 +261,18 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissin
 //
 
 TEST(ExpressionObjectDependencies, ConstantValuesShouldNotBeAddedToDependencies) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto object = ExpressionObject::create(expCtx, {{"a", makeConstant(5)}});
+    auto expCtx = ExpressionContextForTest{};
+    auto object =
+        ExpressionObject::create(&expCtx, {{"a", ExpressionConstant::create(&expCtx, Value{5})}});
     DepsTracker deps;
     object->addDependencies(&deps);
     ASSERT_EQ(deps.fields.size(), 0UL);
 }
 
 TEST(ExpressionObjectDependencies, FieldPathsShouldBeAddedToDependencies) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto object =
-        ExpressionObject::create(expCtx, {{"x", ExpressionFieldPath::create(expCtx, "c.d")}});
+        ExpressionObject::create(&expCtx, {{"x", ExpressionFieldPath::create(&expCtx, "c.d")}});
     DepsTracker deps;
     object->addDependencies(&deps);
     ASSERT_EQ(deps.fields.size(), 1UL);
@@ -281,9 +280,9 @@ TEST(ExpressionObjectDependencies, FieldPathsShouldBeAddedToDependencies) {
 };
 
 TEST(ExpressionObjectDependencies, VariablesShouldBeAddedToDependencies) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto varID = expCtx->variablesParseState.defineVariable("var1");
-    auto fieldPath = ExpressionFieldPath::parse(expCtx, "$$var1", expCtx->variablesParseState);
+    auto expCtx = ExpressionContextForTest{};
+    auto varID = expCtx.variablesParseState.defineVariable("var1");
+    auto fieldPath = ExpressionFieldPath::parse(&expCtx, "$$var1", expCtx.variablesParseState);
     DepsTracker deps;
     fieldPath->addDependencies(&deps);
     ASSERT_EQ(deps.vars.size(), 1UL);
@@ -291,24 +290,24 @@ TEST(ExpressionObjectDependencies, VariablesShouldBeAddedToDependencies) {
 }
 
 TEST(ExpressionObjectDependencies, LocalLetVariablesShouldBeFilteredOutOfDependencies) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->variablesParseState.defineVariable("var1");
+    auto expCtx = ExpressionContextForTest{};
+    expCtx.variablesParseState.defineVariable("var1");
     auto letSpec = BSON("$let" << BSON("vars" << BSON("var2"
                                                       << "abc")
                                               << "in"
                                               << BSON("$multiply" << BSON_ARRAY("$$var1"
                                                                                 << "$$var2"))));
     auto expressionLet =
-        ExpressionLet::parse(expCtx, letSpec.firstElement(), expCtx->variablesParseState);
+        ExpressionLet::parse(&expCtx, letSpec.firstElement(), expCtx.variablesParseState);
     DepsTracker deps;
     expressionLet->addDependencies(&deps);
     ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(expCtx->variablesParseState.getVariable("var1"), *deps.vars.begin());
+    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *deps.vars.begin());
 }
 
 TEST(ExpressionObjectDependencies, LocalMapVariablesShouldBeFilteredOutOfDependencies) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->variablesParseState.defineVariable("var1");
+    auto expCtx = ExpressionContextForTest{};
+    expCtx.variablesParseState.defineVariable("var1");
     auto mapSpec = BSON("$map" << BSON("input"
                                        << "$field1"
                                        << "as"
@@ -318,16 +317,16 @@ TEST(ExpressionObjectDependencies, LocalMapVariablesShouldBeFilteredOutOfDepende
                                                                          << "$$var2"))));
 
     auto expressionMap =
-        ExpressionMap::parse(expCtx, mapSpec.firstElement(), expCtx->variablesParseState);
+        ExpressionMap::parse(&expCtx, mapSpec.firstElement(), expCtx.variablesParseState);
     DepsTracker deps;
     expressionMap->addDependencies(&deps);
     ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(expCtx->variablesParseState.getVariable("var1"), *deps.vars.begin());
+    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *deps.vars.begin());
 }
 
 TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDependencies) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    expCtx->variablesParseState.defineVariable("var1");
+    auto expCtx = ExpressionContextForTest{};
+    expCtx.variablesParseState.defineVariable("var1");
     auto filterSpec = BSON("$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3) << "as"
                                                      << "var2"
                                                      << "cond"
@@ -335,11 +334,11 @@ TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDepe
                                                                                  << "$$var2"))));
 
     auto expressionFilter =
-        ExpressionFilter::parse(expCtx, filterSpec.firstElement(), expCtx->variablesParseState);
+        ExpressionFilter::parse(&expCtx, filterSpec.firstElement(), expCtx.variablesParseState);
     DepsTracker deps;
     expressionFilter->addDependencies(&deps);
     ASSERT_EQ(deps.vars.size(), 1UL);
-    ASSERT_EQ(expCtx->variablesParseState.getVariable("var1"), *deps.vars.begin());
+    ASSERT_EQ(expCtx.variablesParseState.getVariable("var1"), *deps.vars.begin());
 }
 
 //
@@ -348,34 +347,34 @@ TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDepe
 
 TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressions) {
     // Build up the object {a: {$add: [1, 2]}}.
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
     auto addExpression =
-        ExpressionAdd::parse(expCtx, BSON("$add" << BSON_ARRAY(1 << 2)).firstElement(), vps);
-    auto object = ExpressionObject::create(expCtx, {{"a", addExpression}});
+        ExpressionAdd::parse(&expCtx, BSON("$add" << BSON_ARRAY(1 << 2)).firstElement(), vps);
+    auto object = ExpressionObject::create(&expCtx, {{"a", addExpression}});
     ASSERT_EQ(object->getChildExpressions().size(), 1UL);
 
     auto optimized = object->optimize();
     auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(optimizedObject);
-    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document(), &(expCtx->variables)),
+    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document(), &(expCtx.variables)),
                     Value(BSON("a" << 3)));
 };
 
 TEST(ExpressionObjectOptimizations,
      OptimizingAnObjectWithAllConstantsShouldOptimizeToExpressionConstant) {
 
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
 
     // All constants should optimize to ExpressionConstant.
-    auto objectWithAllConstants = ExpressionObject::parse(expCtx, BSON("b" << 1 << "c" << 1), vps);
+    auto objectWithAllConstants = ExpressionObject::parse(&expCtx, BSON("b" << 1 << "c" << 1), vps);
     auto optimizedToAllConstants = objectWithAllConstants->optimize();
     auto constants = dynamic_cast<ExpressionConstant*>(optimizedToAllConstants.get());
     ASSERT_TRUE(constants);
 
     // Not all constants should not optimize to ExpressionConstant.
-    auto objectNotAllConstants = ExpressionObject::parse(expCtx,
+    auto objectNotAllConstants = ExpressionObject::parse(&expCtx,
                                                          BSON("b" << 1 << "input"
                                                                   << "$inputField"),
                                                          vps);
@@ -385,14 +384,14 @@ TEST(ExpressionObjectOptimizations,
 
     // Sub expression should optimize to constant expression.
     auto expressionWithConstantObject = ExpressionObject::parse(
-        expCtx,
+        &expCtx,
         BSON("willBeConstant" << BSON("$add" << BSON_ARRAY(1 << 2)) << "alreadyConstant"
                               << "string"),
         vps);
     auto optimizedWithConstant = expressionWithConstantObject->optimize();
     auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimizedWithConstant.get());
     ASSERT_TRUE(optimizedObject);
-    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document(), &expCtx->variables),
+    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document(), &expCtx.variables),
                     Value(BSON("willBeConstant" << 3 << "alreadyConstant"
                                                 << "string")));
 };

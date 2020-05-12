@@ -55,7 +55,7 @@ using std::string;
  */
 template <typename AccName>
 static void assertExpectedResults(
-    const intrusive_ptr<ExpressionContext>& expCtx,
+    ExpressionContext* const expCtx,
     std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
     for (auto&& op : operations) {
         try {
@@ -103,9 +103,9 @@ static void assertExpectedResults(
 }
 
 TEST(Accumulators, Avg) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     assertExpectedResults<AccumulatorAvg>(
-        expCtx,
+        &expCtx,
         {
             // No documents evaluated.
             {{}, Value(BSONNULL)},
@@ -158,9 +158,9 @@ TEST(Accumulators, Avg) {
 }
 
 TEST(Accumulators, First) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     assertExpectedResults<AccumulatorFirst>(
-        expCtx,
+        &expCtx,
         {// No documents evaluated.
          {{}, Value()},
 
@@ -176,9 +176,9 @@ TEST(Accumulators, First) {
 }
 
 TEST(Accumulators, Last) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     assertExpectedResults<AccumulatorLast>(
-        expCtx,
+        &expCtx,
         {// No documents evaluated.
          {{}, Value()},
 
@@ -194,9 +194,9 @@ TEST(Accumulators, Last) {
 }
 
 TEST(Accumulators, Min) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     assertExpectedResults<AccumulatorMin>(
-        expCtx,
+        &expCtx,
         {// No documents evaluated.
          {{}, Value(BSONNULL)},
 
@@ -212,18 +212,18 @@ TEST(Accumulators, Min) {
 }
 
 TEST(Accumulators, MinRespectsCollation) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
-    expCtx->setCollator(std::move(collator));
-    assertExpectedResults<AccumulatorMin>(expCtx,
+    expCtx.setCollator(std::move(collator));
+    assertExpectedResults<AccumulatorMin>(&expCtx,
                                           {{{Value("abc"_sd), Value("cba"_sd)}, Value("cba"_sd)}});
 }
 
 TEST(Accumulators, Max) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     assertExpectedResults<AccumulatorMax>(
-        expCtx,
+        &expCtx,
         {// No documents evaluated.
          {{}, Value(BSONNULL)},
 
@@ -239,18 +239,18 @@ TEST(Accumulators, Max) {
 }
 
 TEST(Accumulators, MaxRespectsCollation) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
-    expCtx->setCollator(std::move(collator));
-    assertExpectedResults<AccumulatorMax>(expCtx,
+    expCtx.setCollator(std::move(collator));
+    assertExpectedResults<AccumulatorMax>(&expCtx,
                                           {{{Value("abc"_sd), Value("cba"_sd)}, Value("abc"_sd)}});
 }
 
 TEST(Accumulators, Sum) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     assertExpectedResults<AccumulatorSum>(
-        expCtx,
+        &expCtx,
         {// No documents evaluated.
          {{}, Value(0)},
 
@@ -337,19 +337,19 @@ TEST(Accumulators, Sum) {
 }
 
 TEST(Accumulators, AddToSetRespectsCollation) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    expCtx->setCollator(std::move(collator));
-    assertExpectedResults<AccumulatorAddToSet>(expCtx,
+    expCtx.setCollator(std::move(collator));
+    assertExpectedResults<AccumulatorAddToSet>(&expCtx,
                                                {{{Value("a"_sd), Value("b"_sd), Value("c"_sd)},
                                                  Value(std::vector<Value>{Value("a"_sd)})}});
 }
 
 TEST(Accumulators, AddToSetRespectsMaxMemoryConstraint) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     const int maxMemoryBytes = 20ull;
-    auto addToSet = AccumulatorAddToSet(expCtx, maxMemoryBytes);
+    auto addToSet = AccumulatorAddToSet(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(
         addToSet.process(
             Value("This is a large string. Certainly we must be over 20 bytes by now"_sd), false),
@@ -358,9 +358,9 @@ TEST(Accumulators, AddToSetRespectsMaxMemoryConstraint) {
 }
 
 TEST(Accumulators, PushRespectsMaxMemoryConstraint) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     const int maxMemoryBytes = 20ull;
-    auto addToSet = AccumulatorPush(expCtx, maxMemoryBytes);
+    auto addToSet = AccumulatorPush(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(
         addToSet.process(
             Value("This is a large string. Certainly we must be over 20 bytes by now"_sd), false),
@@ -371,52 +371,52 @@ TEST(Accumulators, PushRespectsMaxMemoryConstraint) {
 /* ------------------------- AccumulatorMergeObjects -------------------------- */
 
 TEST(AccumulatorMergeObjects, MergingZeroObjectsShouldReturnEmptyDocument) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
-    assertExpectedResults<AccumulatorMergeObjects>(expCtx, {{{}, {Value(Document({}))}}});
+    assertExpectedResults<AccumulatorMergeObjects>(&expCtx, {{{}, {Value(Document({}))}}});
 }
 
 TEST(AccumulatorMergeObjects, MergingWithSingleObjectShouldLeaveUnchanged) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
-    assertExpectedResults<AccumulatorMergeObjects>(expCtx, {{{}, {Value(Document({}))}}});
+    assertExpectedResults<AccumulatorMergeObjects>(&expCtx, {{{}, {Value(Document({}))}}});
 
     auto doc = Value(Document({{"a", 1}, {"b", 1}}));
-    assertExpectedResults<AccumulatorMergeObjects>(expCtx, {{{doc}, doc}});
+    assertExpectedResults<AccumulatorMergeObjects>(&expCtx, {{{doc}, doc}});
 }
 
 TEST(AccumulatorMergeObjects, MergingDisjointObjectsShouldIncludeAllFields) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto first = Value(Document({{"a", 1}, {"b", 1}}));
     auto second = Value(Document({{"c", 1}}));
     assertExpectedResults<AccumulatorMergeObjects>(
-        expCtx, {{{first, second}, Value(Document({{"a", 1}, {"b", 1}, {"c", 1}}))}});
+        &expCtx, {{{first, second}, Value(Document({{"a", 1}, {"b", 1}, {"c", 1}}))}});
 }
 
 TEST(AccumulatorMergeObjects, MergingIntersectingObjectsShouldOverrideInOrderReceived) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto first = Value(Document({{"a", "oldValue"_sd}, {"b", 0}, {"c", 1}}));
     auto second = Value(Document({{"a", "newValue"_sd}}));
     assertExpectedResults<AccumulatorMergeObjects>(
-        expCtx, {{{first, second}, Value(Document({{"a", "newValue"_sd}, {"b", 0}, {"c", 1}}))}});
+        &expCtx, {{{first, second}, Value(Document({{"a", "newValue"_sd}, {"b", 0}, {"c", 1}}))}});
 }
 
 TEST(AccumulatorMergeObjects, MergingIntersectingEmbeddedObjectsShouldOverrideInOrderReceived) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto firstSubDoc = Document({{"a", 1}, {"b", 2}, {"c", 3}});
     auto secondSubDoc = Document({{"a", 2}, {"b", 1}});
     auto first = Value(Document({{"d", 1}, {"subDoc", firstSubDoc}}));
     auto second = Value(Document({{"subDoc", secondSubDoc}}));
     auto expected = Value(Document({{"d", 1}, {"subDoc", secondSubDoc}}));
-    assertExpectedResults<AccumulatorMergeObjects>(expCtx, {{{first, second}, expected}});
+    assertExpectedResults<AccumulatorMergeObjects>(&expCtx, {{{first, second}, expected}});
 }
 
 TEST(AccumulatorMergeObjects, MergingWithEmptyDocumentShouldIgnore) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto first = Value(Document({{"a", 0}, {"b", 1}, {"c", 1}}));
     auto second = Value(Document({}));
     auto expected = Value(Document({{"a", 0}, {"b", 1}, {"c", 1}}));
-    assertExpectedResults<AccumulatorMergeObjects>(expCtx, {{{first, second}, expected}});
+    assertExpectedResults<AccumulatorMergeObjects>(&expCtx, {{{first, second}, expected}});
 }
 
 }  // namespace AccumulatorTests

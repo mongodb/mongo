@@ -216,8 +216,8 @@ bool handleCursorCommand(OperationContext* opCtx,
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
 
-        auto* expCtx = exec->getExpCtx().get();
-        BSONObj next = expCtx->needsMerge ? nextDoc.toBsonWithMetaData() : nextDoc.toBson();
+        BSONObj next =
+            exec->getExpCtx()->needsMerge ? nextDoc.toBsonWithMetaData() : nextDoc.toBson();
         if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
             exec->enqueue(nextDoc);
             stashedResult = true;

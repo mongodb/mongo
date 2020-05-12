@@ -76,15 +76,17 @@ using ProjectionExecutorVisitorContext =
 
 template <typename Executor>
 auto makeProjectionPreImageExpression(const ProjectionExecutorVisitorData<Executor>& data) {
-    return ExpressionFieldPath::parse(data.expCtx, "$$ROOT", data.expCtx->variablesParseState);
+    return ExpressionFieldPath::parse(
+        data.expCtx.get(), "$$ROOT", data.expCtx->variablesParseState);
 }
 
 template <typename Executor>
 auto makeProjectionPostImageExpression(const ProjectionExecutorVisitorData<Executor>& data) {
     return data.rootReplacementExpression
         ? data.rootReplacementExpression
-        : ExpressionFieldPath::parse(
-              data.expCtx, "$$" + kProjectionPostImageVarName, data.expCtx->variablesParseState);
+        : ExpressionFieldPath::parse(data.expCtx.get(),
+                                     "$$" + kProjectionPostImageVarName,
+                                     data.expCtx->variablesParseState);
 }
 
 /**
@@ -106,7 +108,7 @@ auto createFindPositionalExpression(const projection_ast::ProjectionPositionalAS
         exact_pointer_cast<projection_ast::MatchExpressionASTNode*>(children[0].get());
     invariant(matchExprNode);
 
-    return make_intrusive<ExpressionInternalFindPositional>(data.expCtx,
+    return make_intrusive<ExpressionInternalFindPositional>(data.expCtx.get(),
                                                             makeProjectionPreImageExpression(data),
                                                             makeProjectionPostImageExpression(data),
                                                             path,
@@ -125,8 +127,11 @@ auto createFindSliceExpression(const projection_ast::ProjectionSliceASTNode* nod
                                const FieldPath& path) {
     invariant(node);
 
-    return make_intrusive<ExpressionInternalFindSlice>(
-        data.expCtx, makeProjectionPostImageExpression(data), path, node->skip(), node->limit());
+    return make_intrusive<ExpressionInternalFindSlice>(data.expCtx.get(),
+                                                       makeProjectionPostImageExpression(data),
+                                                       path,
+                                                       node->skip(),
+                                                       node->limit());
 }
 
 /**
@@ -146,7 +151,7 @@ auto createFindElemMatchExpression(const projection_ast::ProjectionElemMatchASTN
         exact_pointer_cast<projection_ast::MatchExpressionASTNode*>(children[0].get());
     invariant(matchExprNode);
 
-    return make_intrusive<ExpressionInternalFindElemMatch>(data.expCtx,
+    return make_intrusive<ExpressionInternalFindElemMatch>(data.expCtx.get(),
                                                            makeProjectionPreImageExpression(data),
                                                            path,
                                                            matchExprNode->matchExpression());

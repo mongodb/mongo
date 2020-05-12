@@ -40,13 +40,12 @@ namespace mongo {
  */
 class ExpressionFunction final : public Expression {
 public:
-    static boost::intrusive_ptr<Expression> parse(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        BSONElement expr,
-        const VariablesParseState& vps);
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
 
     static boost::intrusive_ptr<ExpressionFunction> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        ExpressionContext* const expCtx,
         boost::intrusive_ptr<Expression> passedArgs,
         std::string funcSourceString,
         std::string lang) {
@@ -60,7 +59,7 @@ public:
     // This method is intended for use when you want to bind obj to an argument for desugaring
     // $where.
     static boost::intrusive_ptr<ExpressionFunction> createForWhere(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        ExpressionContext* const expCtx,
         boost::intrusive_ptr<Expression> passedArgs,
         std::string funcSourceString,
         std::string lang) {
@@ -80,7 +79,7 @@ public:
     static constexpr auto kJavaScript = "js";
 
 private:
-    ExpressionFunction(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    ExpressionFunction(ExpressionContext* const expCtx,
                        boost::intrusive_ptr<Expression> passedArgs,
                        bool assignFirstArgToThis,
                        std::string funcSourceString,

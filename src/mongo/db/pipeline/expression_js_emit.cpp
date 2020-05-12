@@ -88,10 +88,9 @@ BSONObj emitFromJS(const BSONObj& args, void* data) {
 }
 }  // namespace
 
-ExpressionInternalJsEmit::ExpressionInternalJsEmit(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::intrusive_ptr<Expression> thisRef,
-    std::string funcSource)
+ExpressionInternalJsEmit::ExpressionInternalJsEmit(ExpressionContext* const expCtx,
+                                                   boost::intrusive_ptr<Expression> thisRef,
+                                                   std::string funcSource)
     : Expression(expCtx, {std::move(thisRef)}),
       _emitState{{}, internalQueryMaxJsEmitBytes.load(), 0},
       _thisRef(_children[0]),
@@ -101,10 +100,9 @@ void ExpressionInternalJsEmit::_doAddDependencies(mongo::DepsTracker* deps) cons
     _children[0]->addDependencies(deps);
 }
 
-boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(ExpressionContext* const expCtx,
+                                                                 BSONElement expr,
+                                                                 const VariablesParseState& vps) {
 
     uassert(4660801,
             str::stream() << kExpressionName << " cannot be used inside a validator.",
@@ -142,7 +140,7 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
 
     // If the scope does not exist and is created by the following call, then make sure to
     // re-bind emit() and the given function to the new scope.
-    ExpressionContext* expCtx = getExpressionContext().get();
+    ExpressionContext* expCtx = getExpressionContext();
 
     auto jsExec = expCtx->getJsExecWithScope();
     // Inject the native "emit" function to be called from the user-defined map function. This

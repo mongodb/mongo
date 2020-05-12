@@ -169,7 +169,7 @@ public:
     /**
      * Seed let parameters with the given BSONObj.
      */
-    void seedVariablesWithLetParameters(boost::intrusive_ptr<ExpressionContext> expCtx,
+    void seedVariablesWithLetParameters(ExpressionContext* const expCtx,
                                         const BSONObj letParameters);
 
     bool hasValue(Variables::Id id) const {

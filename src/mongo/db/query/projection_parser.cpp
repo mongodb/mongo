@@ -295,7 +295,7 @@ bool attemptToParseGenericExpression(ParseContext* parseCtx,
     }
 
     auto expr = Expression::parseExpression(
-        parseCtx->expCtx, subObj, parseCtx->expCtx->variablesParseState);
+        parseCtx->expCtx.get(), subObj, parseCtx->expCtx->variablesParseState);
     addNodeAtPath(parent, path, std::make_unique<ExpressionASTNode>(expr));
     parseCtx->hasMeta = parseCtx->hasMeta || isMeta;
     return true;
@@ -468,7 +468,7 @@ void parseExclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* 
 void parseLiteral(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* parent) {
     verifyComputedFieldsAllowed(ctx->policies);
 
-    auto expr = Expression::parseOperand(ctx->expCtx, elem, ctx->expCtx->variablesParseState);
+    auto expr = Expression::parseOperand(ctx->expCtx.get(), elem, ctx->expCtx->variablesParseState);
 
     FieldPath pathFromParent(elem.fieldNameStringData());
     addNodeAtPath(parent, pathFromParent, std::make_unique<ExpressionASTNode>(expr));

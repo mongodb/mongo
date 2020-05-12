@@ -45,10 +45,9 @@ REGISTER_MULTI_STAGE_ALIAS(bucket,
                            DocumentSourceBucket::createFromBson);
 
 namespace {
-intrusive_ptr<ExpressionConstant> getExpressionConstant(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expressionElem,
-    const VariablesParseState& vps) {
+intrusive_ptr<ExpressionConstant> getExpressionConstant(ExpressionContext* const expCtx,
+                                                        BSONElement expressionElem,
+                                                        const VariablesParseState& vps) {
     auto expr = Expression::parseOperand(expCtx, expressionElem, vps)->optimize();
     return dynamic_cast<ExpressionConstant*>(expr.get());
 }
@@ -95,7 +94,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                 argument.type() == BSONType::Array);
 
             for (auto&& boundaryElem : argument.embeddedObject()) {
-                auto exprConst = getExpressionConstant(pExpCtx, boundaryElem, vps);
+                auto exprConst = getExpressionConstant(pExpCtx.get(), boundaryElem, vps);
                 uassert(40191,
                         str::stream() << "The $bucket 'boundaries' field must be an array of "
                                          "constant values, but found value: "
@@ -134,7 +133,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
         } else if ("default" == argName) {
             // If there is a default, make sure that it parses to a constant expression then add
             // default to switch.
-            auto exprConst = getExpressionConstant(pExpCtx, argument, vps);
+            auto exprConst = getExpressionConstant(pExpCtx.get(), argument, vps);
             uassert(40195,
                     str::stream()
                         << "The $bucket 'default' field must be a constant expression, but found: "

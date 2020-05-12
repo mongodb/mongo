@@ -91,9 +91,9 @@ public:
     void run() {
         BSONObj specObject = BSON("" << spec());
         BSONElement specElement = specObject.firstElement();
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        VariablesParseState vps = expCtx->variablesParseState;
-        intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
+        auto expCtx = ExpressionContextForTest{};
+        VariablesParseState vps = expCtx.variablesParseState;
+        intrusive_ptr<Expression> expression = Expression::parseOperand(&expCtx, specElement, vps);
         intrusive_ptr<Expression> optimized = expression->optimize();
         ASSERT_BSONOBJ_EQ(constify(expectedOptimized()), expressionToBson(optimized));
     }
@@ -122,16 +122,16 @@ public:
         OptimizeBase::run();
         BSONObj specObject = BSON("" << spec());
         BSONElement specElement = specObject.firstElement();
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        VariablesParseState vps = expCtx->variablesParseState;
-        intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
+        auto expCtx = ExpressionContextForTest{};
+        VariablesParseState vps = expCtx.variablesParseState;
+        intrusive_ptr<Expression> expression = Expression::parseOperand(&expCtx, specElement, vps);
         // Check expression spec round trip.
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
         // Check evaluation result.
-        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(expression->evaluate({}, &expCtx->variables)));
+        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(expression->evaluate({}, &expCtx.variables)));
         // Check that the result is the same after optimizing.
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(optimized->evaluate({}, &expCtx->variables)));
+        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(optimized->evaluate({}, &expCtx.variables)));
     }
 
 protected:
@@ -160,11 +160,11 @@ class ParseError {
 public:
     virtual ~ParseError() {}
     void run() {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expCtx = ExpressionContextForTest{};
         BSONObj specObject = BSON("" << spec());
         BSONElement specElement = specObject.firstElement();
-        VariablesParseState vps = expCtx->variablesParseState;
-        ASSERT_THROWS(Expression::parseOperand(expCtx, specElement, vps), AssertionException);
+        VariablesParseState vps = expCtx.variablesParseState;
+        ASSERT_THROWS(Expression::parseOperand(&expCtx, specElement, vps), AssertionException);
     }
 
 protected:
@@ -365,10 +365,10 @@ public:
     void run() {
         BSONObj specObject = BSON("" << BSON("$ne" << BSON_ARRAY("a" << 1)));
         BSONElement specElement = specObject.firstElement();
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        VariablesParseState vps = expCtx->variablesParseState;
-        intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
-        ASSERT_VALUE_EQ(expression->evaluate({}, &expCtx->variables), Value(true));
+        auto expCtx = ExpressionContextForTest{};
+        VariablesParseState vps = expCtx.variablesParseState;
+        intrusive_ptr<Expression> expression = Expression::parseOperand(&expCtx, specElement, vps);
+        ASSERT_VALUE_EQ(expression->evaluate({}, &expCtx.variables), Value(true));
     }
 };
 

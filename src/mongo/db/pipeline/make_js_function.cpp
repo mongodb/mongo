@@ -35,8 +35,7 @@ namespace mongo {
 
 // Given a function represented as a string, constructs a JS execution context and attempts to parse
 // it as a JS function.
-ScriptingFunction makeJsFunc(boost::intrusive_ptr<ExpressionContext> expCtx,
-                             const std::string& func) {
+ScriptingFunction makeJsFunc(ExpressionContext* const expCtx, const std::string& func) {
     auto jsExec =
         expCtx->getJsExecWithScope();  // default arg forceLoadOfStoredProcedures is false here.
     ScriptingFunction parsedFunc = jsExec->getScope()->createFunction(func.c_str());
