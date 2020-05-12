@@ -310,6 +310,9 @@ fi
 %{_bindir}/mongocryptd
 
 %changelog
+* Wed May 13 2020 MongoDB Packaging <packaging@mongodb.com>
+- Update packaging contact
+
 * Thu Dec 19 2013 Ernie Hershey <ernie.hershey@mongodb.com>
 - Packaging file cleanup
 
