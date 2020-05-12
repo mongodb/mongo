@@ -29,6 +29,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
+#include <iterator>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/server_ping_monitor.h"
@@ -255,6 +257,9 @@ void ServerPingMonitor::onTopologyDescriptionChangedEvent(
         return;
     }
 
+    const auto startingSize = _serverPingMonitorMap.size();
+    size_t numRemoved = 0;
+
     // Remove monitors that are missing from the topology.
     auto it = _serverPingMonitorMap.begin();
     while (it != _serverPingMonitorMap.end()) {
@@ -264,13 +269,18 @@ void ServerPingMonitor::onTopologyDescriptionChangedEvent(
             singleMonitor->drop();
             LOGV2_DEBUG(462899,
                         kLogLevel,
-                        "ServerPingMonitor for host {addr} was removed from being monitored.",
-                        "addr"_attr = serverAddress);
-            it = _serverPingMonitorMap.erase(it, ++it);
+                        "ServerPingMonitor for host {host} was removed from being monitored",
+                        "ServerPingMonitor for host was removed from being monitored",
+                        "host"_attr = serverAddress,
+                        "replicaSet"_attr = _setUri.getSetName());
+            it = _serverPingMonitorMap.erase(it, std::next(it));
+            numRemoved++;
         } else {
             ++it;
         }
     }
+
+    invariant(_serverPingMonitorMap.size() == (startingSize - numRemoved));
 }
 
 }  // namespace mongo

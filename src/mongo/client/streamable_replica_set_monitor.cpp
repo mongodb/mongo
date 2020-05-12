@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <set>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/connpool.h"
@@ -49,6 +50,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
@@ -153,13 +155,19 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
       _connectionManager(connectionManager),
       _executor(executor),
       _random(PseudoRandom(SecureRandom().nextInt64())) {
+    // Maintain order of original seed list
+    std::vector<HostAndPort> seedsNoDups;
+    std::set<HostAndPort> alreadyAdded;
 
-    std::vector<HostAndPort> seeds;
-    for (const auto& seed : uri.getServers()) {
-        seeds.push_back(seed);
+    const auto& seeds = uri.getServers();
+    for (const auto& seed : seeds) {
+        if (alreadyAdded.find(seed) == alreadyAdded.end()) {
+            seedsNoDups.push_back(seed);
+            alreadyAdded.insert(seed);
+        }
     }
 
-    _sdamConfig = SdamConfiguration(seeds);
+    _sdamConfig = SdamConfiguration(seedsNoDups);
 }
 
 ReplicaSetMonitorPtr StreamableReplicaSetMonitor::make(
