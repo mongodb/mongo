@@ -12,7 +12,6 @@ selector:
   - jstests/sharding/query/*[aA]uth*.js
   - jstests/sharding/change_streams/*[aA]uth*.js
 
-  - jstests/sharding/cleanup_orphaned_auth.js
   - jstests/sharding/localhostAuthBypass.js
   - jstests/sharding/kill_sessions.js
   - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
@@ -144,8 +143,6 @@ selector:
   - jstests/sharding/config_rs_change.js
   - jstests/sharding/empty_cluster_init.js
   # Temporarily blacklisted until more robust
-  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
-  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
   # Expects same secondaries for entire test
   - jstests/sharding/commands_that_write_accept_wc_configRS.js
   - jstests/sharding/commands_that_write_accept_wc_shards.js
@@ -157,9 +154,6 @@ selector:
   - jstests/sharding/migration_ignore_interrupts_1.js
   - jstests/sharding/migration_sets_fromMigrate_flag.js
   - jstests/sharding/migration_waits_for_majority_commit.js
-  # Stepping down the config can cause moveChunks stopped on shards via killOp to be restarted.
-  - jstests/sharding/migration_ignore_interrupts_3.js
-  - jstests/sharding/migration_ignore_interrupts_4.js
   # listCollections is not retryable
   - jstests/sharding/sessions_collection_auto_healing.js
   # shardCollection is not retryable

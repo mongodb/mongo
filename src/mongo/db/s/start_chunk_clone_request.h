@@ -72,8 +72,7 @@ public:
                                 const BSONObj& chunkMinKey,
                                 const BSONObj& chunkMaxKey,
                                 const BSONObj& shardKeyPattern,
-                                const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                bool resumableRangeDeleterDisabled);
+                                const MigrationSecondaryThrottleOptions& secondaryThrottle);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -128,10 +127,6 @@ public:
         return _secondaryThrottle;
     }
 
-    bool resumableRangeDeleterDisabled() const {
-        return _resumableRangeDeleterDisabled;
-    }
-
 private:
     StartChunkCloneRequest(NamespaceString nss,
                            MigrationSessionId sessionId,
@@ -163,8 +158,6 @@ private:
 
     // The parsed secondary throttle options
     MigrationSecondaryThrottleOptions _secondaryThrottle;
-
-    bool _resumableRangeDeleterDisabled{false};
 };
 
 }  // namespace mongo

@@ -152,12 +152,10 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
         }
     }
 
-    if (obj.getField("uuid")) {
-        request._migrationId = UUID::parse(obj);
-        request._lsid = LogicalSessionId::parse(IDLParserErrorContext("StartChunkCloneRequest"),
-                                                obj[kLsid].Obj());
-        request._txnNumber = obj.getField(kTxnNumber).Long();
-    }
+    request._migrationId = UUID::parse(obj);
+    request._lsid =
+        LogicalSessionId::parse(IDLParserErrorContext("StartChunkCloneRequest"), obj[kLsid].Obj());
+    request._txnNumber = obj.getField(kTxnNumber).Long();
 
     return request;
 }
@@ -175,19 +173,16 @@ void StartChunkCloneRequest::appendAsCommand(
     const BSONObj& chunkMinKey,
     const BSONObj& chunkMaxKey,
     const BSONObj& shardKeyPattern,
-    const MigrationSecondaryThrottleOptions& secondaryThrottle,
-    bool resumableRangeDeleterDisabled) {
+    const MigrationSecondaryThrottleOptions& secondaryThrottle) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
     invariant(fromShardConnectionString.isValid());
 
     builder->append(kRecvChunkStart, nss.ns());
 
-    if (!resumableRangeDeleterDisabled) {
-        migrationId.appendToBuilder(builder, kMigrationId);
-        builder->append(kLsid, lsid.toBSON());
-        builder->append(kTxnNumber, txnNumber);
-    }
+    migrationId.appendToBuilder(builder, kMigrationId);
+    builder->append(kLsid, lsid.toBSON());
+    builder->append(kTxnNumber, txnNumber);
 
     sessionId.append(builder);
     builder->append(kFromShardConnectionString, fromShardConnectionString.toString());

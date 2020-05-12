@@ -77,8 +77,7 @@ public:
     virtual Status startClone(OperationContext* opCtx,
                               const UUID& migrationId,
                               const LogicalSessionId& lsid,
-                              TxnNumber txnNumber,
-                              bool resumableRangeDeleterDisabled) = 0;
+                              TxnNumber txnNumber) = 0;
 
     /**
      * Blocking method, which uses some custom selected logic for deciding whether it is appropriate

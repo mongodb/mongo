@@ -110,7 +110,7 @@ function testShardedLookup(shardingTest) {
  * Takes in two mongod/mongos configuration options and runs a basic
  * sharding test to see if they can work together...
  */
-function mixedShardTest(options1, options2, shouldSucceed, disableResumableRangeDeleter) {
+function mixedShardTest(options1, options2, shouldSucceed) {
     let authSucceeded = false;
     try {
         // Start ShardingTest with enableBalancer because ShardingTest attempts to turn
@@ -123,19 +123,12 @@ function mixedShardTest(options1, options2, shouldSucceed, disableResumableRange
         //
         // Once SERVER-14017 is fixed the "enableBalancer" line can be removed.
         // TODO: SERVER-43899 Make sharding_with_x509.js and mixed_mode_sharded_transition.js start
-        // shards as replica sets and remove disableResumableRangeDeleter parameter.
-        let otherOptions = {enableBalancer: true};
-
-        if (disableResumableRangeDeleter) {
-            otherOptions.shardAsReplicaSet = false;
-            otherOptions.shardOptions = {setParameter: {"disableResumableRangeDeleter": true}};
-        }
-
+        // shards as replica sets.
         var st = new ShardingTest({
             mongos: [options1],
             config: [options1],
             shards: [options1, options2],
-            other: otherOptions
+            other: {enableBalancer: true, shardAsReplicaSet: false},
         });
 
         // Create admin user in case the options include auth

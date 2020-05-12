@@ -31,7 +31,6 @@ selector:
   - jstests/sharding/killop.js
   - jstests/sharding/verify_sessions_expiration_sharded.js
   # Enable when 4.6 becomes last stable
-  - jstests/sharding/disable_resumable_range_deleter_flag.js
   - jstests/sharding/mongos_dataSize.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js

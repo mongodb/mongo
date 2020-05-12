@@ -51,7 +51,6 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -134,8 +133,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
       _stats(ShardingStatistics::get(_opCtx)) {
     invariant(!_opCtx->lockState()->isLocked());
 
-    _enableResumableRangeDeleter = !disableResumableRangeDeleter.load();
-
     // Disallow moving a chunk to ourselves
     uassert(ErrorCodes::InvalidOptions,
             "Destination shard cannot be the same as source",
@@ -146,8 +143,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
           "{collectionEpoch}",
           "Starting chunk migration donation",
           "requestParameters"_attr = redact(_args.toString()),
-          "collectionEpoch"_attr = _args.getVersionEpoch(),
-          "resumableRangeDeleterEnabled"_attr = _enableResumableRangeDeleter);
+          "collectionEpoch"_attr = _args.getVersionEpoch());
 
     // Force refresh of the metadata to ensure we have the latest
     forceShardFilteringMetadataRefresh(_opCtx, getNss());
@@ -287,15 +283,12 @@ Status MigrationSourceManager::startClone() {
             _opCtx, readConcernArgs, PrepareConflictBehavior::kEnforce);
     }
 
-    if (_enableResumableRangeDeleter) {
-        _coordinator->startMigration(_opCtx);
-    }
+    _coordinator->startMigration(_opCtx);
 
     Status startCloneStatus = _cloneDriver->startClone(_opCtx,
                                                        _coordinator->getMigrationId(),
                                                        _coordinator->getLsid(),
-                                                       _coordinator->getTxnNumber(),
-                                                       !_enableResumableRangeDeleter);
+                                                       _coordinator->getTxnNumber());
     if (!startCloneStatus.isOK()) {
         return startCloneStatus;
     }
@@ -468,10 +461,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
                     "have re-received the chunk"};
         }
 
-        if (_enableResumableRangeDeleter) {
-            _coordinator->setMigrationDecision(
-                migrationutil::MigrationCoordinator::Decision::kAborted);
-        }
+        _coordinator->setMigrationDecision(migrationutil::MigrationCoordinator::Decision::kAborted);
 
         // The chunk modification was not applied, so report the original error
         return migrationCommitStatus.withContext("Chunk move was not successful");
@@ -484,10 +474,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
           "updatedCollectionVersion"_attr = refreshedMetadata.getCollVersion(),
           "migrationId"_attr = _coordinator->getMigrationId());
 
-    if (_enableResumableRangeDeleter) {
-        _coordinator->setMigrationDecision(
-            migrationutil::MigrationCoordinator::Decision::kCommitted);
-    }
+    _coordinator->setMigrationDecision(migrationutil::MigrationCoordinator::Decision::kCommitted);
 
     hangBeforeLeavingCriticalSection.pauseWhileSet();
 
@@ -521,61 +508,20 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         << "Moved chunks successfully but failed to clean up " << getNss().ns() << " range "
         << redact(range.toString()) << " due to: ";
 
-    if (_enableResumableRangeDeleter) {
-        if (_args.getWaitForDelete()) {
-            LOGV2(22019,
-                  "Waiting for migration cleanup after chunk commit for the namespace {namespace} "
-                  "and range {range}",
-                  "Waiting for migration cleanup after chunk commit",
-                  "namespace"_attr = getNss().ns(),
-                  "range"_attr = redact(range.toString()),
-                  "migrationId"_attr = _coordinator->getMigrationId());
+    if (_args.getWaitForDelete()) {
+        LOGV2(22019,
+              "Waiting for migration cleanup after chunk commit for the namespace {namespace} "
+              "and range {range}",
+              "Waiting for migration cleanup after chunk commit",
+              "namespace"_attr = getNss().ns(),
+              "range"_attr = redact(range.toString()),
+              "migrationId"_attr = _coordinator->getMigrationId());
 
-            invariant(_cleanupCompleteFuture);
-            auto deleteStatus = _cleanupCompleteFuture->getNoThrow(_opCtx);
-            if (!deleteStatus.isOK()) {
-                return {ErrorCodes::OrphanedRangeCleanUpFailed,
-                        orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
-            }
-        }
-    } else {
-        auto cleanupCompleteFuture = [&] {
-            auto const whenToClean = _args.getWaitForDelete() ? CollectionShardingRuntime::kNow
-                                                              : CollectionShardingRuntime::kDelayed;
-            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-            AutoGetCollection autoColl(_opCtx, getNss(), MODE_IS);
-            return CollectionShardingRuntime::get(_opCtx, getNss())
-                ->cleanUpRange(range, boost::none, whenToClean);
-        }();
-
-        if (_args.getWaitForDelete()) {
-            LOGV2(22020,
-                  "Waiting for migration cleanup after chunk commit for the namespace {namespace} "
-                  "and range {range}",
-                  "Waiting for migration cleanup after chunk commit",
-                  "namespace"_attr = getNss().ns(),
-                  "range"_attr = redact(range.toString()));
-
-            auto deleteStatus = cleanupCompleteFuture.getNoThrow(_opCtx);
-
-            if (!deleteStatus.isOK()) {
-                return {ErrorCodes::OrphanedRangeCleanUpFailed,
-                        orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
-            }
-
-            return Status::OK();
-        }
-
-        if (cleanupCompleteFuture.isReady() && !cleanupCompleteFuture.getNoThrow(_opCtx).isOK()) {
+        invariant(_cleanupCompleteFuture);
+        auto deleteStatus = _cleanupCompleteFuture->getNoThrow(_opCtx);
+        if (!deleteStatus.isOK()) {
             return {ErrorCodes::OrphanedRangeCleanUpFailed,
-                    orphanedRangeCleanUpErrMsg + redact(cleanupCompleteFuture.getNoThrow(_opCtx))};
-        } else {
-            LOGV2(22021,
-                  "Leaving migration cleanup after chunk commit to complete in background; "
-                  "namespace: {namespace}, range: {range}",
-                  "Leaving migration cleanup after chunk commit to complete in background",
-                  "namespace"_attr = getNss().ns(),
-                  "range"_attr = redact(range.toString()));
+                    orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
         }
     }
 
@@ -727,26 +673,24 @@ void MigrationSourceManager::_cleanup() {
         ShardingStateRecovery::endMetadataOp(_opCtx);
     }
 
-    if (_enableResumableRangeDeleter) {
-        if (_state >= kCloning) {
-            invariant(_coordinator);
-            if (_state < kCommittingOnConfig) {
-                _coordinator->setMigrationDecision(
-                    migrationutil::MigrationCoordinator::Decision::kAborted);
-            }
-            // This can be called on an exception path after the OperationContext has been
-            // interrupted, so use a new OperationContext. Note, it's valid to call
-            // getServiceContext on an interrupted OperationContext.
-            auto newClient = _opCtx->getServiceContext()->makeClient("MigrationCoordinator");
-            {
-                stdx::lock_guard<Client> lk(*newClient.get());
-                newClient->setSystemOperationKillable(lk);
-            }
-            AlternativeClientRegion acr(newClient);
-            auto newOpCtxPtr = cc().makeOperationContext();
-            auto newOpCtx = newOpCtxPtr.get();
-            _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
+    if (_state >= kCloning) {
+        invariant(_coordinator);
+        if (_state < kCommittingOnConfig) {
+            _coordinator->setMigrationDecision(
+                migrationutil::MigrationCoordinator::Decision::kAborted);
         }
+        // This can be called on an exception path after the OperationContext has been
+        // interrupted, so use a new OperationContext. Note, it's valid to call
+        // getServiceContext on an interrupted OperationContext.
+        auto newClient = _opCtx->getServiceContext()->makeClient("MigrationCoordinator");
+        {
+            stdx::lock_guard<Client> lk(*newClient.get());
+            newClient->setSystemOperationKillable(lk);
+        }
+        AlternativeClientRegion acr(newClient);
+        auto newOpCtxPtr = cc().makeOperationContext();
+        auto newOpCtx = newOpCtxPtr.get();
+        _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
     }
 
     _state = kDone;

@@ -70,8 +70,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         BSON("Key" << -100),
         BSON("Key" << 100),
         BSON("Key" << 1),
-        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        false);
+        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff));
 
     BSONObj cmdObj = builder.obj();
 

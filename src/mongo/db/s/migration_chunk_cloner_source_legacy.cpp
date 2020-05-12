@@ -242,8 +242,7 @@ MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
 Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
                                                     const UUID& migrationId,
                                                     const LogicalSessionId& lsid,
-                                                    TxnNumber txnNumber,
-                                                    bool resumableRangeDeleterDisabled) {
+                                                    TxnNumber txnNumber) {
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());
 
@@ -296,8 +295,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
                                             _args.getMinKey(),
                                             _args.getMaxKey(),
                                             _shardKeyPattern.toBSON(),
-                                            _args.getSecondaryThrottle(),
-                                            resumableRangeDeleterDisabled);
+                                            _args.getSecondaryThrottle());
 
     // Commands sent to shards that accept writeConcern, must always have writeConcern. So if the
     // StartChunkCloneRequest didn't add writeConcern (from secondaryThrottle), then we add the
