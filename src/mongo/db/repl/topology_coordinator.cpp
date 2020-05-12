@@ -3046,6 +3046,11 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(
         return false;
     }
 
+    // If we are configured with slaveDelay, do not re-evaluate our sync source.
+    if (_selfIndex == -1 || _selfConfig().getSlaveDelay() > Seconds(0)) {
+        return false;
+    }
+
     const bool primaryOnly = (readPreference == ReadPreference::PrimaryOnly);
     const bool primaryPreferredAndAlreadySyncing =
         (readPreference == ReadPreference::PrimaryPreferred &&

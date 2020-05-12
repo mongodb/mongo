@@ -4311,6 +4311,57 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenCandidatePingTimeIsMissing) {
                                                                     ReadPreference::Nearest));
 }
 
+TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSlaveDelay) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017"
+                                               << "slaveDelay" << 1 << "priority" << 0)
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1),
+                 0);
+
+    // Set up so that without slaveDelay, the node otherwise would have changed sync sources.
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                    MemberState::RS_SECONDARY,
+                                                                    lastOpTimeFetched,
+                                                                    now(),
+                                                                    ReadPreference::Nearest));
+}
+
+TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeNotFoundInConfig) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017"
+                                               << "slaveDelay" << 1 << "priority" << 0)
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1),
+                 -1);
+
+    // Set up so that without slaveDelay and not being in the config, the node otherwise would have
+    // changed sync sources.
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                    MemberState::RS_SECONDARY,
+                                                                    lastOpTimeFetched,
+                                                                    now(),
+                                                                    ReadPreference::Nearest));
+}
+
 class HeartbeatResponseReconfigTestV1 : public TopoCoordTest {
 public:
     virtual void setUp() {
