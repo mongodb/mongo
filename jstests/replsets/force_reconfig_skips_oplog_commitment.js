@@ -7,6 +7,7 @@
 (function() {
 "use strict";
 load("jstests/libs/write_concern_util.js");
+load("jstests/replsets/rslib.js");  // For reconnect.
 
 const dbName = "test";
 const collName = "coll";

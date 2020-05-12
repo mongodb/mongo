@@ -75,10 +75,6 @@
 var ReplSetTest = function(opts) {
     'use strict';
 
-    load("jstests/libs/parallelTester.js");   // For Thread.
-    load("jstests/libs/fail_point_util.js");  // For configureFailPoint.
-    load("jstests/replsets/rslib.js");        // For setFailPoint.
-
     if (!(this instanceof ReplSetTest)) {
         return new ReplSetTest(opts);
     }
@@ -108,6 +104,19 @@ var ReplSetTest = function(opts) {
     var oplogName = 'oplog.rs';
 
     // Publicly exposed variables
+
+    /**
+     * Tries to load the 'jstests/libs/parallelTester.js' dependency. Returns true if the file is
+     * loaded successfully, and false otherwise.
+     */
+    function tryLoadParallelTester() {
+        try {
+            load("jstests/libs/parallelTester.js");  // For Thread.
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
 
     /**
      * Returns the config document reported from the specified connection.
@@ -249,6 +258,20 @@ var ReplSetTest = function(opts) {
 
             return wrapped.call(this, node, ...wrappedArgs);
         };
+    }
+
+    /**
+     * Helper functions for setting/clearing a failpoint.
+     */
+    function setFailPoint(node, failpoint, data = {}) {
+        print("Setting fail point " + failpoint);
+        assert.commandWorked(
+            node.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data: data}));
+    }
+
+    function clearFailPoint(node, failpoint) {
+        print("Clearing fail point " + failpoint);
+        assert.commandWorked(node.adminCommand({configureFailPoint: failpoint, mode: "off"}));
     }
 
     /**
@@ -1164,7 +1187,7 @@ var ReplSetTest = function(opts) {
         // operations. This is only an optimization so it's OK if we bypass it in some suites.
         let skipWaitFp;
         if (failPointsSupported) {
-            skipWaitFp = configureFailPoint(this.nodes[0], "skipOplogBatcherWaitForData");
+            setFailPoint(this.nodes[0], "skipOplogBatcherWaitForData");
         }
 
         // replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error if a
@@ -1179,7 +1202,7 @@ var ReplSetTest = function(opts) {
         // primary to be ready very soon. We also turn the failpoint off once we have a primary.
         this.getPrimary(self.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
         if (failPointsSupported) {
-            skipWaitFp.off();
+            clearFailPoint(this.nodes[0], "skipOplogBatcherWaitForData");
         }
 
         print("ReplSetTest initiate command took " + (new Date() - initiateStart) + "ms for " +
@@ -2953,7 +2976,7 @@ var ReplSetTest = function(opts) {
      *
      * @param {int[]} ports the array of mongo ports to run validation on
      */
-    this.validateNodes = function(ports) {
+    this._validateNodes = function(ports) {
         // Perform collection validation on each node in parallel.
         let validators = [];
         for (let i = 0; i < ports.length; i++) {
@@ -3032,17 +3055,20 @@ var ReplSetTest = function(opts) {
 
         let startTime = new Date();  // Measure the execution time of shutting down nodes.
 
-        // Optionally validate collections on all nodes.
+        // Optionally validate collections on all nodes. Parallel validation depends on use of the
+        // 'Thread' object, so we check for and load that dependency here. If the dependency is not
+        // met, we validate each node serially on shutdown.
+        const parallelValidate = tryLoadParallelTester();
         if (opts.skipValidation) {
             print("ReplSetTest stopSet skipping validation before stopping nodes.");
-        } else {
+        } else if (parallelValidate) {
             print("ReplSetTest stopSet validating all replica set nodes before stopping them.");
-            this.validateNodes(this.ports);
+            this._validateNodes(this.ports);
         }
 
-        // Stop all nodes without waiting for them to terminate. We also skip validation since we
-        // have already done it above.
-        opts = Object.merge(opts, {skipValidation: true});
+        // Stop all nodes without waiting for them to terminate. We can skip validation on shutdown
+        // if we have already done it above.
+        opts = Object.merge(opts, {skipValidation: (parallelValidate || opts.skipValidation)});
         for (let i = 0; i < this.ports.length; i++) {
             this.stop(i, signal, opts, {waitpid: false});
         }
