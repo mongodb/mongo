@@ -1054,6 +1054,12 @@ TEST_F(RadixStoreTest, EraseKeyThatOverlapsAnotherKeyTest) {
     ASSERT_EQ(iter->first, otherKey);
 }
 
+TEST_F(RadixStoreTest, EraseInternalNodeShouldFail) {
+    thisStore.insert({"aaaa", "a"});
+    thisStore.insert({"aaab", "b"});
+    ASSERT_FALSE(thisStore.erase("aaa"));
+}
+
 TEST_F(RadixStoreTest, CopyTest) {
     value_type value1 = std::make_pair("foo", "1");
     value_type value2 = std::make_pair("bar", "2");
