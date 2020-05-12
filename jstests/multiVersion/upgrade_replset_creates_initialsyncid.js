@@ -6,6 +6,7 @@
 "use strict";
 
 load('jstests/multiVersion/libs/multi_rs.js');
+load("jstests/replsets/rslib.js");
 
 const oldVersion = "last-stable";
 

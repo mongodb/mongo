@@ -9,6 +9,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 "use strict";
 
 load("jstests/multiVersion/libs/multi_cluster.js");  // For upgradeCluster.
+load("jstests/replsets/rslib.js");
 
 const testName = "map_reduce_multiversion_cluster";
 const dbName = "test_" + testName;

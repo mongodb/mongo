@@ -7,6 +7,7 @@
 
 load('./jstests/multiVersion/libs/multi_rs.js');
 load('./jstests/multiVersion/libs/multi_cluster.js');
+load("jstests/replsets/rslib.js");
 
 // When checking UUID consistency, the shell attempts to run a command on the node it believes is
 // primary in each shard. However, this test restarts shards, and the node that is elected primary

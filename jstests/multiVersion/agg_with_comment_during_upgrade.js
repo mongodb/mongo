@@ -17,6 +17,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 load("jstests/multiVersion/libs/multi_cluster.js");  // For upgradeCluster().
 load("jstests/multiVersion/libs/multi_rs.js");       // For upgradeSet().
+load("jstests/replsets/rslib.js");
 
 // Start with a last-stable cluster with two shards.
 const st = new ShardingTest({

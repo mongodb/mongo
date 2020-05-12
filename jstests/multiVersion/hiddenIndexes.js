@@ -13,6 +13,7 @@
 
 load("jstests/libs/analyze_plan.js");                // For assertStagesForExplainOfCommand.
 load("jstests/multiVersion/libs/multi_cluster.js");  // For upgradeCluster.
+load("jstests/replsets/rslib.js");
 
 TestData.skipCheckDBHashes = true;  // Skip db hashes when restarting the replset.
 

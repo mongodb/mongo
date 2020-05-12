@@ -5,6 +5,7 @@
 // @tags: [requires_sharding, requires_persistence, requires_journaling]
 (function() {
 "use strict";
+load("jstests/replsets/rslib.js");  // For reconnect.
 
 function runTest(conn, failPointConn, restartFn) {
     // Set a default rwc.
