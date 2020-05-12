@@ -133,6 +133,14 @@ public:
 
     virtual Status dropView(OperationContext* const opCtx, NamespaceString viewName) const = 0;
 
+    /**
+     * A MODE_IX collection lock must be held for this call. Throws a WriteConflictException error
+     * if the collection already exists (say if another thread raced to create it).
+     *
+     * Surrounding writeConflictRetry loops must encompass checking that the collection exists as
+     * well as creating it. Otherwise the loop will endlessly throw WCEs: the caller must check that
+     * the collection exists to break free.
+     */
     virtual Collection* createCollection(OperationContext* const opCtx,
                                          const NamespaceString& nss,
                                          const CollectionOptions& options = CollectionOptions(),
