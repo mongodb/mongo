@@ -66,8 +66,7 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
             _cursor = _session->getCachedCursor(uri, tableID, config.c_str());
         }
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        LOGV2_ERROR(23719, "{ex}", "ex"_attr = ex);
-        fassertFailedNoTrace(50883);
+        LOGV2_FATAL_NOTRACE(50883, "{ex}", "Cursor not found", "error"_attr = ex);
     }
 }
 

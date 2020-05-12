@@ -529,10 +529,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             try {
                 boost::filesystem::create_directory(journalPath);
             } catch (std::exception& e) {
-                LOGV2(22312,
-                      "error creating journal dir {journalPath_string} {e_what}",
-                      "journalPath_string"_attr = journalPath.string(),
-                      "e_what"_attr = e.what());
+                LOGV2_ERROR(22312,
+                            "error creating journal dir {directory} {error}",
+                            "Error creating journal directory",
+                            "directory"_attr = journalPath.generic_string(),
+                            "error"_attr = e.what());
                 throw;
             }
         }
@@ -625,9 +626,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                 boost::filesystem::remove_all(journalPath);
             } catch (std::exception& e) {
                 LOGV2_ERROR(22355,
-                            "error removing journal dir {journalPath_string} {e_what}",
-                            "journalPath_string"_attr = journalPath.string(),
-                            "e_what"_attr = e.what());
+                            "error removing journal dir {directory} {error}",
+                            "Error removing journal directory",
+                            "directory"_attr = journalPath.generic_string(),
+                            "error"_attr = e.what());
                 throw;
             }
         }
@@ -799,7 +801,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
     }
 
     if (!_inRepairMode) {
-        LOGV2_FATAL_NOTRACE(28595, "Terminating.", "Reason"_attr = wtRCToStatus(ret).reason());
+        LOGV2_FATAL_NOTRACE(28595, "Terminating.", "reason"_attr = wtRCToStatus(ret).reason());
     }
 
     // Always attempt to salvage metadata regardless of error code when in repair mode.
@@ -813,8 +815,8 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
     }
 
     LOGV2_FATAL_NOTRACE(50947,
-                        "Failed to salvage WiredTiger metadata.",
-                        "Details"_attr = wtRCToStatus(ret).reason());
+                        "Failed to salvage WiredTiger metadata",
+                        "details"_attr = wtRCToStatus(ret).reason());
 }
 
 void WiredTigerKVEngine::cleanShutdown() {
@@ -975,9 +977,10 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
     if (filePath) {
         const boost::filesystem::path corruptFile(filePath->string() + ".corrupt");
         LOGV2_WARNING(22352,
-                      "Moving data file {filePath_string} to backup as {corruptFile_string}",
-                      "filePath_string"_attr = filePath->string(),
-                      "corruptFile_string"_attr = corruptFile.string());
+                      "Moving data file {file} to backup as {backup}",
+                      "Moving data file to backup",
+                      "file"_attr = filePath->generic_string(),
+                      "backup"_attr = corruptFile.generic_string());
 
         auto status = fsyncRename(filePath.get(), corruptFile);
         if (!status.isOK()) {
@@ -985,29 +988,42 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
         }
     }
 
-    LOGV2_WARNING(22353, "Rebuilding ident {identName}", "identName"_attr = identName);
+    LOGV2_WARNING(22353, "Rebuilding ident {ident}", "Rebuilding ident", "ident"_attr = identName);
 
     // This is safe to call after moving the file because it only reads from the metadata, and not
     // the data file itself.
     auto swMetadata = WiredTigerUtil::getMetadataCreate(session, uri);
     if (!swMetadata.isOK()) {
-        LOGV2_ERROR(22357, "Failed to get metadata for {uri}", "uri"_attr = uri);
-        return swMetadata.getStatus();
+        auto status = swMetadata.getStatus();
+        LOGV2_ERROR(22357,
+                    "Failed to get metadata for {uri}",
+                    "Rebuilding ident failed: failed to get metadata",
+                    "uri"_attr = uri,
+                    "error"_attr = status);
+        return status;
     }
 
     int rc = session->drop(session, uri, nullptr);
     if (rc != 0) {
-        LOGV2_ERROR(22358, "Failed to drop {uri}", "uri"_attr = uri);
-        return wtRCToStatus(rc);
+        auto status = wtRCToStatus(rc);
+        LOGV2_ERROR(22358,
+                    "Failed to drop {uri}",
+                    "Rebuilding ident failed: failed to drop",
+                    "uri"_attr = uri,
+                    "error"_attr = status);
+        return status;
     }
 
     rc = session->create(session, uri, swMetadata.getValue().c_str());
     if (rc != 0) {
+        auto status = wtRCToStatus(rc);
         LOGV2_ERROR(22359,
-                    "Failed to create {uri} with config: {swMetadata_getValue}",
+                    "Failed to create {uri} with config: {config}",
+                    "Rebuilding ident failed: failed to create with config",
                     "uri"_attr = uri,
-                    "swMetadata_getValue"_attr = swMetadata.getValue());
-        return wtRCToStatus(rc);
+                    "config"_attr = swMetadata.getValue(),
+                    "error"_attr = status);
+        return status;
     }
     LOGV2(22329, "Successfully re-created table", "uri"_attr = uri);
     return {ErrorCodes::DataModifiedByRepair,
@@ -1469,19 +1485,20 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
     tmpFile += ".tmp";
 
     LOGV2(22332,
-          "{Renaming_data_file_identFilePath_string_to_temporary_file_tmpFile_string}",
-          "Renaming_data_file_identFilePath_string_to_temporary_file_tmpFile_string"_attr =
-              "Renaming data file " + identFilePath->string() + " to temporary file " +
-              tmpFile.string());
+          "Renaming data file {file} to temporary file {temporary}",
+          "Renaming data file to temporary",
+          "file"_attr = identFilePath->generic_string(),
+          "temporary"_attr = tmpFile.generic_string());
     auto status = fsyncRename(identFilePath.get(), tmpFile);
     if (!status.isOK()) {
         return status;
     }
 
     LOGV2(22333,
-          "Creating new RecordStore for collection {nss} with UUID: {options_uuid}",
-          "nss"_attr = nss,
-          "options_uuid"_attr = options.uuid);
+          "Creating new RecordStore for collection {namespace} with UUID: {uuid}",
+          "Creating new RecordStore",
+          "namespace"_attr = nss,
+          "uuid"_attr = options.uuid);
 
     status = createGroupedRecordStore(opCtx, nss.ns(), ident, options, KVPrefix::kNotPrefixed);
     if (!status.isOK()) {
@@ -1489,9 +1506,9 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
     }
 
     LOGV2(22334,
-          "{Moving_orphaned_data_file_back_as_identFilePath_string}",
-          "Moving_orphaned_data_file_back_as_identFilePath_string"_attr =
-              "Moving orphaned data file back as " + identFilePath->string());
+          "Moving orphaned data file back as {file}",
+          "Restoring orphaned data file"
+          "file"_attr = identFilePath->generic_string());
 
     boost::filesystem::remove(*identFilePath, ec);
     if (ec) {
@@ -1507,9 +1524,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
         return status;
     }
 
-    LOGV2(22335,
-          "{Salvaging_ident_ident}",
-          "Salvaging_ident_ident"_attr = "Salvaging ident " + ident);
+    LOGV2(22335, "Salvaging ident {ident}", "Salvaging ident", "ident"_attr = ident);
 
     WiredTigerSession sessionWrapper(_conn);
     WT_SESSION* session = sessionWrapper.getSession();
@@ -1521,7 +1536,9 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
     }
     LOGV2_WARNING(22354,
                   "Could not salvage data. Rebuilding ident: {status_reason}",
-                  "status_reason"_attr = status.reason());
+                  "Could not salvage data. Rebuilding ident",
+                  "ident"_attr = ident,
+                  "error"_attr = status.reason());
 
     //  If the data is unsalvageable, we should completely rebuild the ident.
     return _rebuildIdent(session, _uri(ident).c_str());
@@ -1887,9 +1904,10 @@ void WiredTigerKVEngine::_ensureIdentPath(StringData ident) {
                 boost::filesystem::create_directory(subdir);
             } catch (const std::exception& e) {
                 LOGV2_ERROR(22361,
-                            "error creating path {subdir_string} {e_what}",
-                            "subdir_string"_attr = subdir.string(),
-                            "e_what"_attr = e.what());
+                            "error creating path {directory} {error}",
+                            "Error creating directory",
+                            "directory"_attr = subdir.string(),
+                            "error"_attr = e.what());
                 throw;
             }
         }

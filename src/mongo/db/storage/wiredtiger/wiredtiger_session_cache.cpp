@@ -92,20 +92,21 @@ void _openCursor(WT_SESSION* session,
     }
 
     if (ret != 0) {
+        auto status = wtRCToStatus(ret);
         std::string cursorErrMsg = str::stream()
-            << "Failed to open a WiredTiger cursor. Reason: " << wtRCToStatus(ret)
-            << ", uri: " << uri << ", config: " << config;
+            << "Failed to open a WiredTiger cursor. Reason: " << status << ", uri: " << uri
+            << ", config: " << config;
 
         if (ret == ENOENT) {
             uasserted(ErrorCodes::CursorNotFound, cursorErrMsg);
         }
 
-        LOGV2_ERROR(22421, "{cursorErrMsg}", "cursorErrMsg"_attr = cursorErrMsg);
-        LOGV2_ERROR(22422,
-                    "This may be due to data corruption. {kWTRepairMsg}",
-                    "kWTRepairMsg"_attr = kWTRepairMsg);
-
-        fassertFailedNoTrace(50882);
+        LOGV2_FATAL_NOTRACE(50882,
+                            "Failed to open WiredTiger cursor. This may be due to data corruption",
+                            "uri"_attr = uri,
+                            "config"_attr = config,
+                            "error"_attr = status,
+                            "message"_attr = kWTRepairMsg);
     }
 }
 }  // namespace

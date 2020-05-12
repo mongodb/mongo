@@ -584,6 +584,7 @@ protected:
         LOGV2_WARNING(51783,
                       "failed to create WiredTiger bulk cursor: {error} falling back to non-bulk "
                       "cursor for index {index}",
+                      "Failed to create WiredTiger bulk cursor, falling back to non-bulk",
                       "error"_attr = wiredtiger_strerror(err),
                       "index"_attr = idx->uri());
 
@@ -1144,6 +1145,7 @@ protected:
                 LOGV2(51790,
                       "WTIndex::updatePosition -- the new key ({newKey}) is less than the previous "
                       "key ({prevKey}), which is a bug.",
+                      "WTIndex::updatePosition -- new key is less than previous key",
                       "newKey"_attr = redact(toHex(item.data, item.size)),
                       "prevKey"_attr = redact(_key.toString()));
 
@@ -1338,6 +1340,7 @@ private:
             LOGV2_FATAL(28608,
                         "Unique index cursor seeing multiple records for key {key} in index "
                         "{index} ({uri}) belonging to collection {collection}",
+                        "Unique index cursor seeing multiple records for key in index",
                         "key"_attr = redact(curr(kWantKey)->key),
                         "index"_attr = _idx.indexName(),
                         "uri"_attr = _idx.uri(),
@@ -1710,8 +1713,9 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     if (!foundId) {
         auto key = KeyString::toBson(keyString, _ordering);
         LOGV2_WARNING(51797,
-                      "{id} not found in index for key {key}",
-                      "id"_attr = id,
+                      "{record} not found in index for key {key}",
+                      "Record not found in index",
+                      "recordId"_attr = id,
                       "key"_attr = redact(key));
         return;  // nothing to do
     }
