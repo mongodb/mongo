@@ -320,6 +320,9 @@ fi
 %{_bindir}/mongocryptd
 
 %changelog
+* Wed May 13 2020 MongoDB Packaging <packaging@mongodb.com>
+- Update packaging contact
+
 * Mon Oct 10 2016 Sam Kleinman <sam@mongodb.com>
 - Support for systemd init processes.
 
