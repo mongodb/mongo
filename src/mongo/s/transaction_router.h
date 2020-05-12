@@ -408,7 +408,7 @@ public:
          * TODO SERVER-37207: Change batch writes to retry only the failed writes in a batch, to
          * allow retrying writes beyond the first overall statement.
          */
-        bool canContinueOnStaleShardOrDbError(StringData cmdName) const;
+        bool canContinueOnStaleShardOrDbError(StringData cmdName, const Status& status) const;
 
         /**
          * Updates the transaction state to allow for a retry of the current command on a stale
@@ -417,7 +417,7 @@ public:
          */
         void onStaleShardOrDbError(OperationContext* opCtx,
                                    StringData cmdName,
-                                   const Status& errorStatus);
+                                   const Status& status);
 
         /**
          * Returns true if the current transaction can retry on a snapshot error. This is only true
@@ -431,7 +431,7 @@ public:
          * abortTransaction to all cleared participants. Will throw if the transaction cannot be
          * continued.
          */
-        void onSnapshotError(OperationContext* opCtx, const Status& errorStatus);
+        void onSnapshotError(OperationContext* opCtx, const Status& status);
 
         /**
          * Updates the transaction tracking state to allow for a retry attempt on a view resolution
@@ -490,7 +490,7 @@ public:
          * Sends abort to all shards in the current participant list. Will retry on retryable
          * errors, but ignores the responses from each shard.
          */
-        void implicitlyAbortTransaction(OperationContext* opCtx, const Status& errorStatus);
+        void implicitlyAbortTransaction(OperationContext* opCtx, const Status& status);
 
         /**
          * If a coordinator has been selected for this transaction already, constructs a recovery
@@ -576,9 +576,10 @@ public:
 
         /**
          * Removes all participants created during the current statement from the participant list
-         * and sends abortTransaction to each. Waits for all responses before returning.
+         * and sends abortTransaction to each if there is more than one participant and the status
+         * is not stale . Waits for all responses before returning.
          */
-        void _clearPendingParticipants(OperationContext* opCtx);
+        void _clearPendingParticipants(OperationContext* opCtx, boost::optional<Status> optStatus);
 
         /**
          * Creates a new participant for the shard.
@@ -601,7 +602,7 @@ public:
         /**
          * Updates relevant metrics when the router begins an implicit abort after an error.
          */
-        void _onImplicitAbort(OperationContext* opCtx, const Status& errorStatus);
+        void _onImplicitAbort(OperationContext* opCtx, const Status& status);
 
         /**
          * Updates relevant metrics when a transaction is about to begin commit.
@@ -659,6 +660,12 @@ public:
          * Updates the LastClientInfo object with the given Client's information.
          */
         void _updateLastClientInfo(Client* client);
+
+        /**
+         * Returns true if a status contains a stale shard or db routing error and the transaction
+         * is retryable
+         */
+        bool _errorAllowsRetryOnStaleShardOrDb(const Status& status) const;
 
         TransactionRouter::PrivateState& p() {
             return _tr->_p;

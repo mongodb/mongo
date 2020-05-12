@@ -532,7 +532,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                                                      ex->getVersionReceived());
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName)) {
+                if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {
                     throw;
                 }
 
@@ -585,7 +585,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName)) {
+                if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {
                     if (ex.code() == ErrorCodes::ShardInvalidatedForTargeting) {
                         (void)catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, query.nss());
                     }

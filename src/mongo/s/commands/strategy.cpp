@@ -681,7 +681,7 @@ void runCommand(OperationContext* opCtx,
 
                     // TODO SERVER-39704 Allow mongos to retry on stale shard, stale db, snapshot,
                     // or shard invalidated for targeting errors.
-                    if (!txnRouter.canContinueOnStaleShardOrDbError(commandName)) {
+                    if (!txnRouter.canContinueOnStaleShardOrDbError(commandName, ex.toStatus())) {
                         (void)catalogCache->getCollectionRoutingInfoWithRefresh(
                             opCtx, ex.extraInfo<ShardInvalidatedForTargetingInfo>()->getNss());
                         addContextForTransactionAbortingError(
@@ -724,7 +724,6 @@ void runCommand(OperationContext* opCtx,
                 }
 
                 auto catalogCache = Grid::get(opCtx)->catalogCache();
-
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
                     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
                         opCtx,
@@ -758,7 +757,7 @@ void runCommand(OperationContext* opCtx,
 
                     // TODO SERVER-39704 Allow mongos to retry on stale shard, stale db, snapshot,
                     // or shard invalidated for targeting errors.
-                    if (!txnRouter.canContinueOnStaleShardOrDbError(commandName)) {
+                    if (!txnRouter.canContinueOnStaleShardOrDbError(commandName, ex.toStatus())) {
                         addContextForTransactionAbortingError(
                             txnRouter.txnIdToString(),
                             txnRouter.getLatestStmtId(),
@@ -799,7 +798,7 @@ void runCommand(OperationContext* opCtx,
 
                     // TODO SERVER-39704 Allow mongos to retry on stale shard, stale db, snapshot,
                     // or shard invalidated for targeting errors.
-                    if (!txnRouter.canContinueOnStaleShardOrDbError(commandName)) {
+                    if (!txnRouter.canContinueOnStaleShardOrDbError(commandName, ex.toStatus())) {
                         addContextForTransactionAbortingError(
                             txnRouter.txnIdToString(),
                             txnRouter.getLatestStmtId(),

@@ -694,30 +694,35 @@ std::vector<ShardId> TransactionRouter::Router::_getPendingParticipants() const 
     return pendingParticipants;
 }
 
-void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCtx) {
+void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCtx,
+                                                          boost::optional<Status> optStatus) {
     const auto pendingParticipants = _getPendingParticipants();
 
-    // Send abort to each pending participant. This resets their transaction state and guarantees no
-    // transactions will be left open if the retry does not re-target any of these shards.
-    std::vector<AsyncRequestsSender::Request> abortRequests;
-    for (const auto& participant : pendingParticipants) {
-        abortRequests.emplace_back(participant,
-                                   BSON("abortTransaction"
-                                        << 1 << WriteConcernOptions::kWriteConcernField
-                                        << WriteConcernOptions().toBSON()));
-    }
-    auto responses = gatherResponses(opCtx,
-                                     NamespaceString::kAdminDb,
-                                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                     Shard::RetryPolicy::kIdempotent,
-                                     abortRequests);
+    // If there was a stale shard or db routing error and the transaction is retryable then we don't
+    // send abort to any participant to prevent a race between the aborts and the commands retried
+    if (!optStatus || !_errorAllowsRetryOnStaleShardOrDb(*optStatus)) {
+        // Send abort to each pending participant. This resets their transaction state and
+        // guarantees no transactions will be left open if the retry does not re-target any of these
+        // shards.
+        std::vector<AsyncRequestsSender::Request> abortRequests;
+        for (const auto& participant : pendingParticipants) {
+            abortRequests.emplace_back(participant,
+                                       BSON("abortTransaction"
+                                            << 1 << WriteConcernOptions::kWriteConcernField
+                                            << WriteConcernOptions().toBSON()));
+        }
+        auto responses = gatherResponses(opCtx,
+                                         NamespaceString::kAdminDb,
+                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                         Shard::RetryPolicy::kIdempotent,
+                                         abortRequests);
 
-    // Verify each abort succeeded or failed with NoSuchTransaction, which may happen if the
-    // transaction was already implicitly aborted on the shard.
-    for (const auto& response : responses) {
-        _assertAbortStatusIsOkOrNoSuchTransaction(response);
+        // Verify each abort succeeded or failed with NoSuchTransaction, which may happen if the
+        // transaction was already implicitly aborted on the shard.
+        for (const auto& response : responses) {
+            _assertAbortStatusIsOkOrNoSuchTransaction(response);
+        }
     }
-
     // Remove each aborted participant from the participant list. Remove after sending abort, so
     // they are not added back to the participant list by the transaction tracking inside the ARS.
     for (const auto& participant : pendingParticipants) {
@@ -745,7 +750,8 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
     invariant(o().participants.count(*o().coordinatorId) == 1);
 }
 
-bool TransactionRouter::Router::canContinueOnStaleShardOrDbError(StringData cmdName) const {
+bool TransactionRouter::Router::canContinueOnStaleShardOrDbError(StringData cmdName,
+                                                                 const Status& status) const {
     if (MONGO_unlikely(enableStaleVersionAndSnapshotRetriesWithinTransactions.shouldFail())) {
         // We can always retry on the first overall statement because all targeted participants must
         // be pending, so the retry will restart the local transaction on each one, overwriting any
@@ -767,13 +773,13 @@ bool TransactionRouter::Router::canContinueOnStaleShardOrDbError(StringData cmdN
         }
     }
 
-    return false;
+    return _errorAllowsRetryOnStaleShardOrDb(status);
 }
 
 void TransactionRouter::Router::onStaleShardOrDbError(OperationContext* opCtx,
                                                       StringData cmdName,
-                                                      const Status& errorStatus) {
-    invariant(canContinueOnStaleShardOrDbError(cmdName));
+                                                      const Status& status) {
+    invariant(canContinueOnStaleShardOrDbError(cmdName, status));
 
     LOGV2_DEBUG(
         22885,
@@ -782,11 +788,11 @@ void TransactionRouter::Router::onStaleShardOrDbError(OperationContext* opCtx,
         "Clearing pending participants after stale version error",
         "sessionId"_attr = _sessionId().getId(),
         "txnNumber"_attr = o().txnNumber,
-        "error"_attr = errorStatus);
+        "error"_attr = redact(status));
 
     // Remove participants created during the current statement so they are sent the correct options
     // if they are targeted again by the retry.
-    _clearPendingParticipants(opCtx);
+    _clearPendingParticipants(opCtx, status);
 }
 
 void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
@@ -806,7 +812,7 @@ void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
     // Requests against views are always routed to the primary shard for its database, but the retry
     // on the resolved namespace does not have to re-target the primary, so pending participants
     // should be cleared.
-    _clearPendingParticipants(opCtx);
+    _clearPendingParticipants(opCtx, boost::none);
 }
 
 bool TransactionRouter::Router::canContinueOnSnapshotError() const {
@@ -817,8 +823,7 @@ bool TransactionRouter::Router::canContinueOnSnapshotError() const {
     return false;
 }
 
-void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx,
-                                                const Status& errorStatus) {
+void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const Status& status) {
     invariant(canContinueOnSnapshotError());
 
     LOGV2_DEBUG(
@@ -831,13 +836,13 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx,
         "snapshot error",
         "sessionId"_attr = _sessionId().getId(),
         "txnNumber"_attr = o().txnNumber,
-        "error"_attr = errorStatus,
+        "error"_attr = redact(status),
         "previousGlobalSnapshotTimestamp"_attr = o().atClusterTime->getTime());
 
     // The transaction must be restarted on all participants because a new read timestamp will be
     // selected, so clear all pending participants. Snapshot errors are only retryable on the first
     // client statement, so all participants should be cleared, including the coordinator.
-    _clearPendingParticipants(opCtx);
+    _clearPendingParticipants(opCtx, status);
     invariant(o().participants.empty());
     invariant(!o().coordinatorId);
 
@@ -1243,7 +1248,7 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
 }
 
 void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opCtx,
-                                                           const Status& errorStatus) {
+                                                           const Status& status) {
     invariant(isInitialized());
 
     if (o().commitType == CommitType::kTwoPhaseCommit ||
@@ -1257,13 +1262,13 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
             "coordinating the commit decision may have been handed off to the coordinator shard",
             "sessionId"_attr = _sessionId().getId(),
             "txnNumber"_attr = o().txnNumber,
-            "error"_attr = errorStatus);
+            "error"_attr = redact(status));
         return;
     }
 
     // Update stats on scope exit so the transaction is considered "active" while waiting on abort
     // responses.
-    auto updateStatsGuard = makeGuard([&] { _onImplicitAbort(opCtx, errorStatus); });
+    auto updateStatsGuard = makeGuard([&] { _onImplicitAbort(opCtx, status); });
 
     if (o().participants.empty()) {
         return;
@@ -1286,7 +1291,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
                 "sessionId"_attr = _sessionId().getId(),
                 "txnNumber"_attr = o().txnNumber,
                 "numParticipantShards"_attr = o().participants.size(),
-                "error"_attr = errorStatus);
+                "error"_attr = redact(status));
 
     try {
         // Ignore the responses.
@@ -1532,8 +1537,7 @@ std::string TransactionRouter::Router::_transactionInfoForLog(
     return sb.str();
 }
 
-void TransactionRouter::Router::_onImplicitAbort(OperationContext* opCtx,
-                                                 const Status& errorStatus) {
+void TransactionRouter::Router::_onImplicitAbort(OperationContext* opCtx, const Status& status) {
     if (o().metricsTracker->commitHasStarted() && !o().metricsTracker->isTrackingOver()) {
         // If commit was started but an end time wasn't set, then we don't know the commit result
         // and can't consider the transaction over until the client retries commit and definitively
@@ -1546,7 +1550,7 @@ void TransactionRouter::Router::_onImplicitAbort(OperationContext* opCtx,
     // for a txnNumber after receiving an error, so only remember the first abort cause.
     if (o().abortCause.empty()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).abortCause = errorStatus.codeString();
+        o(lk).abortCause = status.codeString();
     }
 
     _endTransactionTrackingIfNecessary(opCtx, TerminationCause::kAborted);
@@ -1636,6 +1640,18 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
 void TransactionRouter::Router::_updateLastClientInfo(Client* client) {
     stdx::lock_guard<Client> lk(*client);
     o(lk).lastClientInfo.update(client);
+}
+
+bool TransactionRouter::Router::_errorAllowsRetryOnStaleShardOrDb(const Status& status) const {
+    const auto staleInfo = status.extraInfo<StaleConfigInfo>();
+    const auto staleDB = status.extraInfo<StaleDbRoutingVersion>();
+
+    // We can retry on the first operation of stale config or db routing version error if there was
+    // only one participant in the transaction because there would only be one request sent, and at
+    // this point that request has finished so there can't be any outstanding requests that would
+    // race with a retry
+    return (staleInfo || staleDB) && o().participants.size() == 1 &&
+        p().latestStmtId == p().firstStmtId;
 }
 
 Microseconds TransactionRouter::TimingStats::getDuration(TickSource* tickSource,
