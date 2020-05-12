@@ -324,6 +324,7 @@ class EvergreenMultiversionConfigGenerator(object):
 
         if self.options.is_jstestfuzz:
             self._generate_fuzzer_tasks(build_variant, version_configs, is_sharded)
+            return
 
         suites = self.generate_resmoke_suites()
         sub_tasks = set()
