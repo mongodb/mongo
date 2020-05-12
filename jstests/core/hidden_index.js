@@ -4,8 +4,6 @@
  * catalog and for TTL purposes.
  * @tags: [
  *  requires_non_retryable_commands,    # CollMod is not retryable.
- *  # TODO SERVER-47960: Remove this tag after SERVER-47840 is backported to 4.4.
- *  multiversion_incompatible,
  * ]
  */
 
