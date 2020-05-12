@@ -4574,7 +4574,6 @@ env.SConscript(
     ],
 )
 
-
 if get_option("install-mode") != "hygienic":
     allTargets = ['core', 'tools', 'unittests', 'integration_tests', 'libfuzzer_tests', 'benchmarks']
 
@@ -4585,9 +4584,9 @@ if get_option("install-mode") != "hygienic":
 
 # run the Dagger tool if it's installed
 if should_dagger:
-    dependencyDb = env.Alias("dagger", env.Dagger('library_dependency_graph.json'))
-    # Require everything to be built before trying to extract build dependency information
-    env.Requires(dependencyDb, 'all')
+    dagger = env.Dagger('library_dependency_graph.json')
+    env.Depends(dagger, env.Alias("install-all") if get_option("install-mode") == "hygienic" else "all")
+    dependencyDb = env.Alias("dagger", dagger)
 
 # Declare the cache prune target
 cachePrune = env.Command(
