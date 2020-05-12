@@ -439,10 +439,14 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         transitionIfAllowed(State.kSyncSourceOpsBeforeRollback);
 
-        // Insert one document to ensure rollback will not be skipped.
+        // Insert one document to ensure rollback will not be skipped. This needs to be journaled to
+        // ensure that this document is not lost due to unclean shutdowns. Ephemeral and in-memory
+        // storage engines are an exception because journaling isn't supported.
+        let writeConcern = TestData.rollbackShutdowns ? {w: 1, j: true} : {w: 1};
         let dbName = "EnsureThereIsAtLeastOneOperationToRollback";
         assert.commandWorked(curPrimary.getDB(dbName).ensureRollback.insert(
-            {thisDocument: 'is inserted to ensure rollback is not skipped'}));
+            {thisDocument: 'is inserted to ensure rollback is not skipped'},
+            {writeConcern: writeConcern}));
 
         log(`Isolating the primary ${curPrimary.host} so it will step down`);
         // We should have already disconnected the primary from the secondary during the first stage
