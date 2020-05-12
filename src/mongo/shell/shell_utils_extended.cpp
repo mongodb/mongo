@@ -179,13 +179,14 @@ BSONObj cat(const BSONObj& args, void* data) {
     stringstream ss;
     ifstream f(filePath.valuestrsafe(), mode);
     uassert(CANT_OPEN_FILE, "couldn't open file", f.is_open());
+    std::streamsize fileSize = 0;
+    // will throw on filesystem error
+    fileSize = boost::filesystem::file_size(filePath.valuestrsafe());
 
     std::streamsize sz = 0;
-    while (1) {
+    while (sz < fileSize) {
         char ch = 0;
         f.get(ch);
-        if (ch == 0)
-            break;
         ss << ch;
         sz += 1;
         uassert(13301, "cat() : file too big to load as a variable", sz < 1024 * 1024 * 16);
