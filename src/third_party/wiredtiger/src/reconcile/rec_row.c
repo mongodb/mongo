@@ -294,7 +294,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_ADDR *addr;
     WT_BTREE *btree;
     WT_CELL *cell;
-    WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
+    WT_CELL_UNPACK_ADDR *kpack, _kpack, *vpack, _vpack;
     WT_CHILD_STATE state;
     WT_DECL_RET;
     WT_IKEY *ikey;
@@ -353,7 +353,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         ikey = __wt_ref_key_instantiated(ref);
         if (ikey != NULL && ikey->cell_offset != 0) {
             cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-            __wt_cell_unpack(session, page, cell, kpack);
+            __wt_cell_unpack_addr(session, page->dsk, cell, kpack);
             key_onpage_ovfl =
               F_ISSET(kpack, WT_CELL_UNPACK_OVERFLOW) && kpack->raw != WT_CELL_KEY_OVFL_RM;
         }
@@ -433,7 +433,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
             __wt_rec_cell_build_addr(session, r, addr, NULL, state == WT_CHILD_PROXY, WT_RECNO_OOB);
             __wt_time_aggregate_copy(&ta, &addr->ta);
         } else {
-            __wt_cell_unpack(session, page, ref->addr, vpack);
+            __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
             if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
                 /*
                  * The transaction ids are cleared after restart. Repack the cell with new validity
@@ -535,7 +535,7 @@ __rec_row_zero_len(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
      */
     return ((tw->stop_ts == WT_TS_MAX && tw->stop_txn == WT_TXN_MAX) &&
       ((tw->start_ts == WT_TS_NONE && tw->start_txn == WT_TXN_NONE) ||
-              __wt_txn_visible_all(session, tw->start_txn, tw->start_ts)));
+              __wt_txn_visible_all(session, tw->start_txn, tw->durable_start_ts)));
 }
 
 /*
@@ -633,8 +633,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
  *     Repack a cell.
  */
 static inline int
-__rec_cell_repack(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_RECONCILE *r, WT_CELL_UNPACK *vpack,
-  WT_TIME_WINDOW *tw)
+__rec_cell_repack(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_RECONCILE *r,
+  WT_CELL_UNPACK_KV *vpack, WT_TIME_WINDOW *tw)
 {
     WT_DECL_ITEM(tmpval);
     WT_DECL_RET;
@@ -671,7 +671,7 @@ __wt_rec_row_leaf(
     static WT_UPDATE upd_tombstone = {.txnid = WT_TXN_NONE, .type = WT_UPDATE_TOMBSTONE};
     WT_BTREE *btree;
     WT_CELL *cell;
-    WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
+    WT_CELL_UNPACK_KV *kpack, _kpack, *vpack, _vpack;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(tmpkey);
     WT_DECL_RET;
@@ -740,7 +740,7 @@ __wt_rec_row_leaf(
             kpack = NULL;
         else {
             kpack = &_kpack;
-            __wt_cell_unpack(session, page, cell, kpack);
+            __wt_cell_unpack_kv(session, page->dsk, cell, kpack);
         }
 
         /* Unpack the on-page value cell. */
@@ -767,7 +767,7 @@ __wt_rec_row_leaf(
          * new updates for that key, skip writing that key.
          */
         if (upd == NULL && (tw.stop_txn != WT_TXN_MAX || tw.stop_ts != WT_TS_MAX) &&
-          __wt_txn_visible_all(session, tw.stop_txn, tw.stop_ts))
+          __wt_txn_visible_all(session, tw.stop_txn, tw.durable_stop_ts))
             upd = &upd_tombstone;
 
         /* Build value cell. */
@@ -910,7 +910,7 @@ __wt_rec_row_leaf(
                 goto build;
 
             kpack = &_kpack;
-            __wt_cell_unpack(session, page, cell, kpack);
+            __wt_cell_unpack_kv(session, page->dsk, cell, kpack);
             if (btree->huffman_key == NULL && kpack->type == WT_CELL_KEY &&
               tmpkey->size >= kpack->prefix && tmpkey->size != 0) {
                 /*

@@ -287,6 +287,8 @@ main(int argc, char *argv[])
 
         TIMED_MAJOR_OP(wts_read_scan());
 
+        wts_checkpoints();
+
         /* Operations. */
         for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps)
             operations(ops_seconds, reps == FORMAT_OPERATION_REPS);

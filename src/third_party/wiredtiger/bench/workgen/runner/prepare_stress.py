@@ -96,7 +96,7 @@ for i in range(0, table_count):
     tname = "table:test" + str(i)
     table = Table(tname)
     s.create(tname, wtperf_table_config +\
-             compress_table_config + table_config)
+             compress_table_config + table_config + ",log=(enabled=false)")
     table.options.key_size = 200
     table.options.value_size = 5000
     tables.append(table)

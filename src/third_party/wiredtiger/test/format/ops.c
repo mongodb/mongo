@@ -204,16 +204,6 @@ operations(u_int ops_seconds, bool lastrun)
     if (g.c_txn_timestamps)
         testutil_check(__wt_thread_create(NULL, &timestamp_tid, timestamp, tinfo_list));
 
-    /*
-     * Configuring WiredTiger library checkpoints is done separately, rather than as part of the
-     * original database open because format tests small caches and you can get into cache stuck
-     * trouble during the initial load (where bulk load isn't configured). There's a single thread
-     * doing lots of inserts and creating huge leaf pages. Those pages can't be evicted if there's a
-     * checkpoint running in the tree, and the cache can get stuck. That workload is unlikely enough
-     * we're not going to fix it in the library, so configure it away by delaying checkpoint start.
-     */
-    if (g.c_checkpoint_flag == CHECKPOINT_WIREDTIGER)
-        wts_checkpoints();
     if (g.c_checkpoint_flag == CHECKPOINT_ON)
         testutil_check(__wt_thread_create(NULL, &checkpoint_tid, checkpoint, NULL));
 

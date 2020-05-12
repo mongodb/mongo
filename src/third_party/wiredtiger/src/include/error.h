@@ -166,6 +166,9 @@
     } while (0)
 #endif
 
+/* Verbose messages. */
+#define WT_VERBOSE_ISSET(session, flag) (FLD_ISSET(S2C(session)->verbose, flag))
+
 /*
  * __wt_verbose --
  *     Display a verbose message. Not an inlined function because you can't inline functions taking
@@ -174,8 +177,8 @@
  *     additional argument, there's no portable way to remove the comma before an empty __VA_ARGS__
  *     value.
  */
-#define __wt_verbose(session, flag, fmt, ...)               \
-    do {                                                    \
-        if (WT_VERBOSE_ISSET(session, flag))                \
-            __wt_verbose_worker(session, fmt, __VA_ARGS__); \
+#define __wt_verbose(session, flag, fmt, ...)                              \
+    do {                                                                   \
+        if (WT_VERBOSE_ISSET(session, flag))                               \
+            __wt_verbose_worker(session, "[" #flag "] " fmt, __VA_ARGS__); \
     } while (0)

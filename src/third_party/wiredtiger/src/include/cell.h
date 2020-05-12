@@ -144,37 +144,64 @@ struct __wt_cell {
     uint8_t __chunk[1 + 1 + 1 + 7 * WT_INTPACK64_MAXSIZE + WT_INTPACK32_MAXSIZE];
 };
 
-/*
- * WT_CELL_UNPACK --
- *	Unpacked cell.
- */
-struct __wt_cell_unpack {
-    WT_CELL *cell; /* Cell's disk image address */
-
-    WT_TIME_AGGREGATE ta; /* Address validity window */
-    WT_TIME_WINDOW tw;    /* Value validity window */
-
-    uint64_t v; /* RLE count or recno */
-
-    /*
-     * !!!
-     * The size and __len fields are reasonably type size_t; don't change
-     * the type, performance drops significantly if they're type size_t.
-     */
-    const void *data; /* Data */
-    uint32_t size;    /* Data size */
-
-    uint32_t __len; /* Cell + data length (usually) */
-
-    uint8_t prefix; /* Cell prefix length */
-
-    uint8_t raw;  /* Raw cell type (include "shorts") */
-    uint8_t type; /* Cell type */
-
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_CELL_UNPACK_OVERFLOW 0x1u            /* cell is an overflow */
 #define WT_CELL_UNPACK_PREPARE 0x2u             /* cell is part of a prepared transaction */
 #define WT_CELL_UNPACK_TIME_WINDOW_CLEARED 0x4u /* time window cleared because of restart */
                                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
-    uint8_t flags;
+
+/*
+ * We have two "unpacked cell" structures: one holding holds unpacked cells from internal nodes
+ * (address pages), and one holding unpacked cells from leaf nodes (key/value pages). They share a
+ * common set of initial fields: in a few places where a function has to handle both types of
+ * unpacked cells, the unpacked cell structures are cast to an "unpack-common" structure that can
+ * only reference shared fields.
+ */
+#define WT_CELL_COMMON_FIELDS                                                                   \
+    WT_CELL *cell; /* Cell's disk image address */                                              \
+                                                                                                \
+    uint64_t v; /* RLE count or recno */                                                        \
+                                                                                                \
+    /*                                                                                          \
+     * The size and __len fields are reasonably type size_t; don't change the type, performance \
+     * drops significantly if they're type size_t.                                              \
+     */                                                                                         \
+    const void *data; /* Data */                                                                \
+    uint32_t size;    /* Data size */                                                           \
+                                                                                                \
+    uint32_t __len; /* Cell + data length (usually) */                                          \
+                                                                                                \
+    uint8_t prefix; /* Cell prefix length */                                                    \
+                                                                                                \
+    uint8_t raw;  /* Raw cell type (include "shorts") */                                        \
+    uint8_t type; /* Cell type */                                                               \
+                                                                                                \
+    uint8_t flags
+
+/*
+ * WT_CELL_UNPACK_COMMON --
+ *     Unpacked address cell, the common fields.
+ */
+struct __wt_cell_unpack_common {
+    WT_CELL_COMMON_FIELDS;
+};
+
+/*
+ * WT_CELL_UNPACK_ADDR --
+ *     Unpacked address cell.
+ */
+struct __wt_cell_unpack_addr {
+    WT_CELL_COMMON_FIELDS;
+
+    WT_TIME_AGGREGATE ta; /* Address validity window */
+};
+
+/*
+ * WT_CELL_UNPACK_KV --
+ *     Unpacked value cell.
+ */
+struct __wt_cell_unpack_kv {
+    WT_CELL_COMMON_FIELDS;
+
+    WT_TIME_WINDOW tw; /* Value validity window */
 };
