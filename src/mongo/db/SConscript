@@ -956,6 +956,9 @@ env.Library(
     LIBDEPS=[
         "db_raii",
     ],
+    LIBDEPS_PRIVATE=[
+       "concurrency/write_conflict_exception",
+    ],
 )
 
 env.Library(
