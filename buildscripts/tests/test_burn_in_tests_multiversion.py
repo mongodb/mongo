@@ -145,25 +145,24 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         tasks = evg_config_dict["tasks"]
         self.assertEqual(len(tasks), NUM_REPL_MIXED_VERSION_CONFIGS * n_tests)
 
-    # TODO (SERVER-47822): Uncomment once sharding tests are re-enabled.
-    # @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
-    # def test_n_task_one_test(self, mock_hash):
-    #    mock_hash.return_value = MONGO_4_2_HASH
-    #    n_tasks = 2
-    #    n_tests = 1
-    #    gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-    #                           project="project", build_variant="build_variant", task_id="task_id",
-    #                           target_resmoke_time=60)
-    #    evg_api = MagicMock()
+    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
+    def test_n_task_one_test(self, mock_hash):
+        mock_hash.return_value = MONGO_4_2_HASH
+        n_tasks = 2
+        n_tests = 1
+        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
+                               project="project", build_variant="build_variant", task_id="task_id",
+                               target_resmoke_time=60)
+        evg_api = MagicMock()
 
-    #    tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-    #    build_variant = under_test.create_multiversion_generate_tasks_config(
-    #        tests_by_task, evg_api, gen_config)
-    #    evg_config_dict = build_variant.as_dict()
-    #    tasks = evg_config_dict["tasks"]
-    #    self.assertEqual(
-    #         len(tasks),
-    #         (NUM_REPL_MIXED_VERSION_CONFIGS + NUM_SHARDED_MIXED_VERSION_CONFIGS) * n_tests)
+        tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
+        build_variant = under_test.create_multiversion_generate_tasks_config(
+            tests_by_task, evg_api, gen_config)
+        evg_config_dict = build_variant.as_dict()
+        tasks = evg_config_dict["tasks"]
+        self.assertEqual(
+            len(tasks),
+            (NUM_REPL_MIXED_VERSION_CONFIGS + NUM_SHARDED_MIXED_VERSION_CONFIGS) * n_tests)
 
     @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
     def test_one_task_n_test(self, mock_hash):
@@ -182,25 +181,24 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         tasks = evg_config_dict["tasks"]
         self.assertEqual(len(tasks), NUM_REPL_MIXED_VERSION_CONFIGS * n_tests)
 
-    # TODO (SERVER-47822): Uncomment once sharding tests are re-enabled.
-    # @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
-    # def test_n_task_m_test(self, mock_hash):
-    #    mock_hash.return_value = MONGO_4_2_HASH
-    #    n_tasks = 2
-    #    n_tests = 3
-    #    gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
-    #                           project="project", build_variant="build_variant", task_id="task_id",
-    #                           target_resmoke_time=60)
-    #    evg_api = MagicMock()
+    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
+    def test_n_task_m_test(self, mock_hash):
+        mock_hash.return_value = MONGO_4_2_HASH
+        n_tasks = 2
+        n_tests = 3
+        gen_config = MagicMock(run_build_variant="variant", fallback_num_sub_suites=1,
+                               project="project", build_variant="build_variant", task_id="task_id",
+                               target_resmoke_time=60)
+        evg_api = MagicMock()
 
-    #    tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
-    #    build_variant = under_test.create_multiversion_generate_tasks_config(
-    #        tests_by_task, evg_api, gen_config)
-    #    evg_config_dict = build_variant.as_dict()
-    #    tasks = evg_config_dict["tasks"]
-    #    self.assertEqual(
-    #         len(tasks),
-    #         (NUM_REPL_MIXED_VERSION_CONFIGS + NUM_SHARDED_MIXED_VERSION_CONFIGS) * n_tests)
+        tests_by_task = create_multiversion_tests_by_task_mock(n_tasks, n_tests)
+        build_variant = under_test.create_multiversion_generate_tasks_config(
+            tests_by_task, evg_api, gen_config)
+        evg_config_dict = build_variant.as_dict()
+        tasks = evg_config_dict["tasks"]
+        self.assertEqual(
+            len(tasks),
+            (NUM_REPL_MIXED_VERSION_CONFIGS + NUM_SHARDED_MIXED_VERSION_CONFIGS) * n_tests)
 
 
 class TestRepeatConfig(unittest.TestCase):

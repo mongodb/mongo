@@ -5551,7 +5551,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_sharded_collections_multiversion_passthrough_gen
-# tags: ["multiversion_passthrough"]
+  tags: ["multiversion_passthrough"]
   depends_on:
   - name: change_streams_multiversion_gen
   commands:
@@ -6397,7 +6397,7 @@ tasks:
 
 - <<: *task_template
   name: sharded_collections_jscore_multiversion_passthrough_gen
-# tags: ["multiversion_passthrough"]
+  tags: ["multiversion_passthrough"]
   commands:
   - func: "generate multiversion tasks"
     vars:
@@ -6419,7 +6419,7 @@ tasks:
 
 - <<: *task_template
   name: sharding_jscore_multiversion_passthrough_gen
-# tags: ["multiversion_passthrough"]
+  tags: ["multiversion_passthrough"]
   commands:
   - func: "generate multiversion tasks"
     vars:
@@ -6660,7 +6660,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication_multiversion_gen
-# tags: [multiversion_passthrough]
+  tags: ["multiversion_passthrough"]
   commands:
   - func: "generate multiversion tasks"
     vars:
