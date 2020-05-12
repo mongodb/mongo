@@ -241,6 +241,10 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
             invariant(renameOpTimeFromApplyOps.isNull());
         }
 
+        BackgroundOperation::assertNoBgOpInProgForNs(targetColl->ns().ns());
+        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
+            targetColl->uuid());
+
         auto numRecords = targetColl->numRecords(opCtx);
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
         auto renameOpTime = opObserver->preRenameCollection(
@@ -263,10 +267,6 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
 
         // No logOp necessary because the entire renameCollection command is one logOp.
         repl::UnreplicatedWritesBlock uwb(opCtx);
-
-        BackgroundOperation::assertNoBgOpInProgForNs(targetColl->ns().ns());
-        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            targetColl->uuid());
 
         auto status = db->dropCollection(opCtx, targetColl->ns(), renameOpTime);
         if (!status.isOK())
