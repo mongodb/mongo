@@ -43,6 +43,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/progress_meter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -145,6 +146,14 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     long long numRecords = 0;
     long long dataSize = 0;
 
+    const char* curopMessage = "Index Build: scanning collection";
+    ProgressMeterHolder progressMeter;
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        progressMeter.set(
+            CurOp::get(opCtx)->setProgress_inlock(curopMessage, coll->numRecords(opCtx)));
+    }
+
     auto cursor = rs->getCursor(opCtx);
     auto record = cursor->next();
     while (record) {
@@ -177,6 +186,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                                   "id"_attr = id,
                                   "error"_attr = redact(validStatus));
                     rs->deleteRecord(opCtx, id);
+                    // Must reduce the progress meter's expected total after deleting an invalid
+                    // document from the collection.
+                    progressMeter->setTotalWhileRunning(coll->numRecords(opCtx));
                 } else {
                     numRecords++;
                     dataSize += data.size();
@@ -184,6 +196,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                     if (!insertStatus.isOK()) {
                         return insertStatus;
                     }
+                    progressMeter.hit();
                 }
                 record = cursor->next();
             }
@@ -206,6 +219,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
             return status;
         }
     }
+
+    progressMeter.finished();
 
     Status status = builder->dumpInsertsFromBulk(opCtx);
     if (!status.isOK()) {
