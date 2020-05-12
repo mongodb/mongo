@@ -26,9 +26,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/client/server_is_master_monitor.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#include <algorithm>
+#include <iterator>
+
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/sdam/sdam.h"
@@ -499,36 +503,41 @@ void ServerIsMasterMonitor::onTopologyDescriptionChangedEvent(
                         "RSM {replicaSet} host {host} was removed from the topology",
                         "RSM host was removed from the topology",
                         "replicaSet"_attr = _setUri.getSetName(),
-                        "host"_attr = serverAddress);
-            it = _singleMonitors.erase(it, ++it);
+                        "addr"_attr = serverAddress);
+            it = _singleMonitors.erase(it, std::next(it));
         } else {
             ++it;
         }
     }
 
     // add new monitors
-    newDescription->findServers([this](const sdam::ServerDescriptionPtr& serverDescription) {
-        const auto& serverAddress = serverDescription->getAddress();
-        bool isMissing =
-            _singleMonitors.find(serverDescription->getAddress()) == _singleMonitors.end();
-        if (isMissing) {
-            LOGV2_DEBUG(4333226,
-                        kLogLevel,
-                        "RSM {replicaSet} {host} was added to the topology",
-                        "RSM host was added to the topology",
-                        "replicaSet"_attr = _setUri.getSetName(),
-                        "host"_attr = serverAddress);
-            _singleMonitors[serverAddress] = std::make_shared<SingleServerIsMasterMonitor>(
-                _setUri,
-                serverAddress,
-                serverDescription->getTopologyVersion(),
-                _sdamConfiguration.getHeartBeatFrequency(),
-                _eventPublisher,
-                _executor);
-            _singleMonitors[serverAddress]->init();
-        }
-        return isMissing;
-    });
+    const auto servers = newDescription->getServers();
+    std::for_each(servers.begin(),
+                  servers.end(),
+                  [this](const sdam::ServerDescriptionPtr& serverDescription) {
+                      const auto& serverAddress = serverDescription->getAddress();
+                      bool isMissing = _singleMonitors.find(serverDescription->getAddress()) ==
+                          _singleMonitors.end();
+                      if (isMissing) {
+                          LOGV2_DEBUG(4333226,
+                                      kLogLevel,
+                                      "RSM {replicaSet} {host} was added to the topology",
+                                      "RSM host was added to the topology",
+                                      "replicaSet"_attr = _setUri.getSetName(),
+                                      "host"_attr = serverAddress);
+                          _singleMonitors[serverAddress] =
+                              std::make_shared<SingleServerIsMasterMonitor>(
+                                  _setUri,
+                                  serverAddress,
+                                  serverDescription->getTopologyVersion(),
+                                  _sdamConfiguration.getHeartBeatFrequency(),
+                                  _eventPublisher,
+                                  _executor);
+                          _singleMonitors[serverAddress]->init();
+                      }
+                  });
+
+    invariant(_singleMonitors.size() == servers.size());
 }
 
 std::shared_ptr<executor::TaskExecutor> ServerIsMasterMonitor::_setupExecutor(
