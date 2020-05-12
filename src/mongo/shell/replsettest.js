@@ -3039,15 +3039,20 @@ var ReplSetTest = function(opts) {
         if (_callIsMaster()) {
             asCluster(this._liveNodes, () => {
                 for (let node of this._liveNodes) {
+                    let res;
                     try {
-                        print(
-                            "ReplSetTest stopSet disabling 'waitForStepDownOnNonCommandShutdown' on " +
-                            node.host);
-                        assert.commandWorked(node.adminCommand({
+                        res = node.adminCommand({
                             setParameter: 1,
                             waitForStepDownOnNonCommandShutdown: false,
-                        }));
+                        });
                     } catch (e) {
+                        print("Failed to set waitForStepDownOnNonCommandShutdown.");
+                        print(e);
+                    }
+                    if (res && res.ok === 0 &&
+                        !res.errmsg.includes("attempted to set unrecognized parameter")) {
+                        print("Failed to set waitForStepDownOnNonCommandShutdown.");
+                        printjson(res);
                     }
                 }
             });
