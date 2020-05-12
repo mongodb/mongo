@@ -2037,6 +2037,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          std::shared_ptr<ReplIndexBuildState> replState,
                                          const IndexBuildOptions& indexBuildOptions) {
+    // Read without a timestamp. When we commit, we block writes which guarantees all writes are
+    // visible.
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     _scanCollectionAndInsertKeysIntoSorter(opCtx, replState);
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     _signalPrimaryForCommitReadiness(opCtx, replState);

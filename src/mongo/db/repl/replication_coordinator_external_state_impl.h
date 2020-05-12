@@ -104,7 +104,7 @@ public:
     virtual bool tooStale();
     void dropAllSnapshots() final;
     void updateCommittedSnapshot(const OpTime& newCommitPoint) final;
-    void updateLocalSnapshot(const OpTime& optime) final;
+    void updateLastAppliedSnapshot(const OpTime& optime) final;
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
     boost::optional<OpTime> getEarliestDropPendingOpTime() const final;
