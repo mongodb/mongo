@@ -27,14 +27,7 @@ const rst = new ReplSetTest({
     useBridge: true
 });
 rst.startSet();
-
-// TODO (SERVER-47142): Replace with initiateWithHighElectionTimeout. The automatic reconfig will
-// dropAllSnapshots asynchronously, precluding waiting on a stable recovery timestamp.
-const cfg = rst.getReplSetConfig();
-cfg.settings = cfg.settings || {};
-cfg.settings["electionTimeoutMillis"] = ReplSetTest.kForeverMillis;
-rst.initiateWithAnyNodeAsPrimary(
-    cfg, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);

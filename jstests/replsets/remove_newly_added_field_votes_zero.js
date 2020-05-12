@@ -20,14 +20,7 @@ const collName = "testcoll";
 const rst = new ReplSetTest(
     {name: testName, nodes: 1, nodeOptions: {setParameter: {enableAutomaticReconfig: true}}});
 rst.startSet();
-
-// TODO(SERVER-47142): Replace with initiateWithHighElectionTimeout. The automatic reconfig will
-// dropAllSnapshots asynchronously, precluding waiting on a stable recovery timestamp.
-let cfg = rst.getReplSetConfig();
-cfg.settings = cfg.settings || {};
-cfg.settings["electionTimeoutMillis"] = ReplSetTest.kForeverMillis;
-rst.initiateWithAnyNodeAsPrimary(
-    cfg, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
@@ -114,7 +107,7 @@ assertVoteCount(primary, {
 });
 
 jsTestLog("Reconfiguring new node to have 0 votes");
-cfg = rst.getReplSetConfigFromNode(primary.nodeId);
+let cfg = rst.getReplSetConfigFromNode(primary.nodeId);
 cfg.version += 1;
 cfg.members[2].votes = 0;
 assert.commandWorked(
