@@ -7,6 +7,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
+
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();

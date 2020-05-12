@@ -8,6 +8,7 @@
 
 load("jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js");
 load("jstests/sharding/libs/shard_versioning_util.js");
+load("jstests/libs/fail_point_util.js");
 
 // This test creates inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;

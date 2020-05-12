@@ -15,6 +15,7 @@
 "use strict";
 
 load('jstests/noPassthrough/libs/index_build.js');
+load("jstests/libs/fail_point_util.js");
 
 // Use a 3-node replica set config to ensure that the primary waits for the secondaries when the
 // commit quorum is in effect.

@@ -7,6 +7,7 @@
 
 load('jstests/libs/sessions_collection.js');
 load("jstests/sharding/libs/shard_versioning_util.js");
+load("jstests/libs/fail_point_util.js");
 
 let st = new ShardingTest({shards: 2});
 

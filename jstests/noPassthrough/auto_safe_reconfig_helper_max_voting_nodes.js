@@ -7,6 +7,8 @@
 (function() {
 "use strict";
 
+load("jstests/replsets/rslib.js");
+
 // Make secondaries unelectable. Add 7 voting nodes, which is the maximum allowed.
 const replTest = new ReplSetTest({
     nodes: [
