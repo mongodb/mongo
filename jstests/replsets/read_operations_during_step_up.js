@@ -1,8 +1,6 @@
 /*
  * Test that the read operations are not killed and their connections are also not
  * closed during step up.
- *
- * @tags: [requires_fcv_46]
  */
 load('jstests/libs/parallelTester.js');
 load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().

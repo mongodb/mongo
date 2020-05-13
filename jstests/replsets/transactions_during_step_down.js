@@ -3,7 +3,7 @@
  *  1) Active transactional operations (like read and write) are killed and the transaction is
  * aborted, but the connection not closed.
  *  2) Inactive transaction is aborted.
- * @tags: [uses_transactions, requires_fcv_46]
+ * @tags: [uses_transactions]
  */
 (function() {
 "use strict";
