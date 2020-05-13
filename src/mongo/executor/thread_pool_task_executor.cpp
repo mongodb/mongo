@@ -835,10 +835,10 @@ void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> c
     // 'expectedExhaustIter' so that we can still remove this task from the 'poolInProgressQueue' if
     // this happens, but we do not want to reset the 'exhaustIter' value in this case.
     if (cbState->exhaustIter) {
-        _poolInProgressQueue.erase(expectedExhaustIter);
         if (cbState->exhaustIter.get() == expectedExhaustIter) {
             cbState->exhaustIter = boost::none;
         }
+        _poolInProgressQueue.erase(expectedExhaustIter);
     }
 
     if (_inShutdown_inlock() && _poolInProgressQueue.empty()) {
