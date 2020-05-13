@@ -87,6 +87,19 @@ def get_session_catalog():
     return session_catalog_dec[1]
 
 
+def get_session_kv_pairs():
+    """Return the SessionRuntimeInfoMap stored in the global SessionCatalog object.
+
+    Returns a list of (LogicalSessionId, std::unique_ptr<SessionRuntimeInfo>) key-value pairs. For
+    key-value pair 'session_kv', access the key with 'session_kv["first"]' and access the value with
+    'session_kv["second"]'.
+    """
+    session_catalog = get_session_catalog()
+    if session_catalog is None:
+        return list()
+    return list(absl_get_nodes(session_catalog["_sessions"]))  # pylint: disable=undefined-variable
+
+
 def get_decorations(obj):
     """Return an iterator to all decorations on a given object.
 
@@ -266,8 +279,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
                 "No SessionCatalog object was found on the ServiceContext. Not dumping any sessions."
             )
             return
-        lsid_map = session_catalog["_sessions"]
-        session_kv_pairs = list(absl_get_nodes(lsid_map))  # pylint: disable=undefined-variable
+        session_kv_pairs = get_session_kv_pairs()
         print("Dumping %d Session objects from the SessionCatalog" % len(session_kv_pairs))
 
         # Optionally search for a specified session, based on its id.
@@ -434,7 +446,7 @@ MongoDBDumpLocks()
 
 
 class MongoDBDumpRecoveryUnits(gdb.Command):
-    """Dump recovery unit info for each client in a mongod process."""
+    """Dump recovery unit info for each client and session in a mongod process."""
 
     def __init__(self):
         """Initialize MongoDBDumpRecoveryUnits."""
@@ -442,7 +454,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
 
     def invoke(self, arg, _from_tty):
         """Invoke MongoDBDumpRecoveryUnits."""
-        print("Dumping recovery unit info for all clients")
+        print("Dumping recovery unit info for all clients and sessions")
 
         if not arg:
             arg = "mongo::WiredTigerRecoveryUnit"  # default to "mongo::WiredTigerRecoveryUnit"
@@ -454,7 +466,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             print("Not invoking mongod recovery unit dump for: %s" % (main_binary_name))
 
     @staticmethod
-    def dump_recovery_units(recovery_unit_impl_type):
+    def dump_recovery_units(recovery_unit_impl_type):  # pylint: disable=too-many-locals
         """GDB in-process python supplement."""
 
         # Temporarily disable printing static members to make the output more readable
@@ -464,6 +476,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             enabled_at_start = True
             gdb.execute("set print static-members off")
 
+        # Dump active recovery unit info for each client in a mongod process
         service_context = get_global_service_context()
         client_set = absl_get_nodes(service_context["_clients"])  # pylint: disable=undefined-variable
 
@@ -483,6 +496,35 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
                 # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
                 recovery_unit = recovery_unit_handle.dereference().cast(
                     gdb.lookup_type(recovery_unit_impl_type))
+
+            output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
+            print(json.dumps(output_doc))
+            if recovery_unit:
+                print(recovery_unit)
+
+        # Dump stashed recovery unit info for each session in a mongod process
+        for session_kv in get_session_kv_pairs():
+            session_runtime_info = get_unique_ptr(session_kv["second"]).dereference()  # pylint: disable=undefined-variable
+            session = session_runtime_info["session"]
+
+            # Prepare structured output doc
+            session_lsid = str(session["_sessionId"]["_id"])[1:-1]
+            txn_participant_dec = get_decoration(session, "TransactionParticipant")
+            output_doc = {"session": session_lsid, "txnResourceStash": "0x0"}
+
+            recovery_unit_handle = None
+            recovery_unit = None
+            if txn_participant_dec:
+                txn_participant_observable_state = txn_participant_dec[1]["_o"]
+                txn_resource_stash = get_boost_optional(
+                    txn_participant_observable_state["txnResourceStash"])
+
+                if txn_resource_stash:
+                    output_doc["txnResourceStash"] = str(txn_resource_stash.address)
+                    recovery_unit_handle = get_unique_ptr(txn_resource_stash["_recoveryUnit"])  # pylint: disable=undefined-variable
+                    # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
+                    recovery_unit = recovery_unit_handle.dereference().cast(
+                        gdb.lookup_type(recovery_unit_impl_type))
 
             output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
             print(json.dumps(output_doc))
