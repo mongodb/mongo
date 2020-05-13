@@ -311,7 +311,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
     for (i = 0; i < WT_BLKINCR_MAX; ++i) {
         blk = &conn->incr_backups[i];
         __wt_verbose(session, WT_VERB_BACKUP, "blk[%u] flags 0x%" PRIx64, i, blk->flags);
-        /* If it isn't use, we can use it. */
+        /* If it isn't already in use, we can use it. */
         if (!F_ISSET(blk, WT_BLKINCR_INUSE))
             break;
     }

@@ -983,6 +983,16 @@ wiredtiger_open_common =\
         size and the default config would extend log files in allocations of
         the maximum log file size.''',
         type='list', choices=['data', 'log']),
+    Config('file_close_sync', 'true', r'''
+        control whether to flush modified files to storage independent
+        of a global checkpoint when closing file handles to acquire exclusive
+        access to a table. If set to false, and logging is disabled, API calls that
+        require exclusive access to tables will return EBUSY if there have been
+        changes made to the table since the last global checkpoint. When logging
+        is enabled, the value for <code>file_close_sync</code> has no effect, and,
+        modified file is always flushed to storage when closing file handles to
+        acquire exclusive access to the table''',
+        type='boolean'),
     Config('hazard_max', '1000', r'''
         maximum number of simultaneous hazard pointers per session
         handle''',

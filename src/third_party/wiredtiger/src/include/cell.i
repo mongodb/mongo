@@ -60,7 +60,8 @@ __cell_check_value_validity(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
  *     Pack the validity window for a value.
  */
 static inline void
-__cell_pack_value_validity(WT_SESSION_IMPL *session, uint8_t **pp, WT_TIME_WINDOW *tw)
+__cell_pack_value_validity(
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t **pp, WT_TIME_WINDOW *tw)
 {
     uint8_t flags, *flagsp;
 
@@ -112,8 +113,15 @@ __cell_pack_value_validity(WT_SESSION_IMPL *session, uint8_t **pp, WT_TIME_WINDO
             LF_SET(WT_CELL_TS_DURABLE_STOP);
         }
     }
-    if (tw->prepare)
+    if (LF_ISSET(
+          WT_CELL_TS_START | WT_CELL_TS_DURABLE_START | WT_CELL_TS_STOP | WT_CELL_TS_DURABLE_STOP))
+        r->rec_page_cell_with_ts = true;
+    if (LF_ISSET(WT_CELL_TXN_START | WT_CELL_TXN_STOP))
+        r->rec_page_cell_with_txn_id = true;
+    if (tw->prepare) {
         LF_SET(WT_CELL_PREPARE);
+        r->rec_page_cell_with_prepared_txn = true;
+    }
     *flagsp = flags;
 }
 
@@ -276,8 +284,8 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, ui
  *     Set a value item's WT_CELL contents.
  */
 static inline size_t
-__wt_cell_pack_value(
-  WT_SESSION_IMPL *session, WT_CELL *cell, WT_TIME_WINDOW *tw, uint64_t rle, size_t size)
+__wt_cell_pack_value(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_CELL *cell, WT_TIME_WINDOW *tw,
+  uint64_t rle, size_t size)
 {
     uint8_t byte, *p;
     bool validity;
@@ -286,7 +294,7 @@ __wt_cell_pack_value(
     p = cell->__chunk;
     *p = '\0';
 
-    __cell_pack_value_validity(session, &p, tw);
+    __cell_pack_value_validity(session, r, &p, tw);
 
     /*
      * Short data cells without a validity window or run-length encoding have 6 bits of data length
@@ -408,8 +416,8 @@ __wt_cell_pack_value_match(
  *     Write a copy value cell.
  */
 static inline size_t
-__wt_cell_pack_copy(
-  WT_SESSION_IMPL *session, WT_CELL *cell, WT_TIME_WINDOW *tw, uint64_t rle, uint64_t v)
+__wt_cell_pack_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_CELL *cell, WT_TIME_WINDOW *tw,
+  uint64_t rle, uint64_t v)
 {
     uint8_t *p;
 
@@ -417,7 +425,7 @@ __wt_cell_pack_copy(
     p = cell->__chunk;
     *p = '\0';
 
-    __cell_pack_value_validity(session, &p, tw);
+    __cell_pack_value_validity(session, r, &p, tw);
 
     if (rle < 2)
         cell->__chunk[0] |= WT_CELL_VALUE_COPY; /* Type */
@@ -437,7 +445,8 @@ __wt_cell_pack_copy(
  *     Write a deleted value cell.
  */
 static inline size_t
-__wt_cell_pack_del(WT_SESSION_IMPL *session, WT_CELL *cell, WT_TIME_WINDOW *tw, uint64_t rle)
+__wt_cell_pack_del(
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_CELL *cell, WT_TIME_WINDOW *tw, uint64_t rle)
 {
     uint8_t *p;
 
@@ -446,7 +455,7 @@ __wt_cell_pack_del(WT_SESSION_IMPL *session, WT_CELL *cell, WT_TIME_WINDOW *tw, 
     *p = '\0';
 
     /* FIXME-WT-6124: we should set the time window prepare value. */
-    __cell_pack_value_validity(session, &p, tw);
+    __cell_pack_value_validity(session, r, &p, tw);
 
     if (rle < 2)
         cell->__chunk[0] |= WT_CELL_DEL; /* Type */
@@ -532,8 +541,8 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size_t size)
  *     Pack an overflow cell.
  */
 static inline size_t
-__wt_cell_pack_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell, uint8_t type, WT_TIME_WINDOW *tw,
-  uint64_t rle, size_t size)
+__wt_cell_pack_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_CELL *cell, uint8_t type,
+  WT_TIME_WINDOW *tw, uint64_t rle, size_t size)
 {
     uint8_t *p;
 
@@ -549,7 +558,7 @@ __wt_cell_pack_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell, uint8_t type, WT_TI
         break;
     case WT_CELL_VALUE_OVFL:
     case WT_CELL_VALUE_OVFL_RM:
-        __cell_pack_value_validity(session, &p, tw);
+        __cell_pack_value_validity(session, r, &p, tw);
         break;
     }
 

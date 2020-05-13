@@ -34,26 +34,27 @@ from wtdataset import simple_key
 from wtscenario import make_scenarios
 import glob
 
-# test_backup14.py
+# test_backup15.py
 # Test cursor backup with a block-based incremental cursor.
-class test_backup14(wttest.WiredTigerTestCase, suite_subprocess):
-    conn_config='cache_size=1G,log=(enabled,file_max=100K)'
-    dir='backup.dir'                    # Backup directory name
-    logmax="100K"
-    uri="table:main"
-    uri2="table:extra"
-    uri_logged="table:logged_table"
-    uri_not_logged="table:not_logged_table"
-    full_out = "./backup_block_full"
-    incr_out = "./backup_block_incr"
+class test_backup15(wttest.WiredTigerTestCase, suite_subprocess):
     bkp_home = "WT_BLOCK"
+    counter=0
+    conn_config='cache_size=1G,log=(enabled,file_max=100K)'
+    logmax="100K"
+    max_iteration=7
+    mult=0
+    nops=100000
+    savefirst=0
+    savekey='NOTSET'
+    uri="table:main"
+
+    dir='backup.dir'                    # Backup directory name
     home_full = "WT_BLOCK_LOG_FULL"
     home_incr = "WT_BLOCK_LOG_INCR"
+
+    full_out = "./backup_block_full"
+    incr_out = "./backup_block_incr"
     logpath = "logpath"
-    nops=1000
-    mult=0
-    max_iteration=7
-    counter=0
     new_table=False
     initial_backup=False
 
@@ -130,6 +131,7 @@ class test_backup14(wttest.WiredTigerTestCase, suite_subprocess):
     def take_incr_backup(self):
         # Open the backup data source for incremental backup.
         buf = 'incremental=(src_id="ID' +  str(self.counter-1) + '",this_id="ID' + str(self.counter) + '")'
+        self.pr(buf)
         bkup_c = self.session.open_cursor('backup:', None, buf)
         while True:
             ret = bkup_c.next()
@@ -176,14 +178,25 @@ class test_backup14(wttest.WiredTigerTestCase, suite_subprocess):
                 else:
                     self.pr('Range copy file ' + newfile + ' offset ' + str(offset) + ' len ' + str(size))
                     read_from = newfile
+                    if self.counter > 0:
+                        old_to = self.home_incr + '.' + str(self.counter - 1) + '/' + newfile
+                    else:
+                        old_to = newfile
+                    write_to = self.home_incr + '.' + str(self.counter) + '/' + newfile
                     write_to = self.home_incr + '.' + str(self.counter) + '/' + newfile
                     rfp = open(read_from, "r+b")
-                    wfp = open(write_to, "w+b")
+                    self.pr('RANGE CHECK file ' + old_to + ' offset ' + str(offset) + ' len ' + str(size))
+                    rfp2 = open(old_to, "r+b")
                     rfp.seek(offset, 0)
-                    wfp.seek(offset, 0)
+                    rfp2.seek(offset, 0)
                     buf = rfp.read(size)
+                    buf2 = rfp2.read(size)
+                    self.assertNotEqual(buf, buf2)
+                    wfp = open(write_to, "w+b")
+                    wfp.seek(offset, 0)
                     wfp.write(buf)
                     rfp.close()
+                    rfp2.close()
                     wfp.close()
                 dup_cnt += 1
             self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
@@ -224,13 +237,25 @@ class test_backup14(wttest.WiredTigerTestCase, suite_subprocess):
     #
     # Add data to the given uri.
     #
-    def add_data(self, uri, bulk_option):
-        c = self.session.open_cursor(uri, None, bulk_option)
-        for i in range(0, self.nops):
-            num = i + (self.mult * self.nops)
-            key = self.bigkey + str(num)
-            val = self.bigval + str(num)
+    def add_data(self, uri):
+        c = self.session.open_cursor(uri, None, None)
+        # The first time we want to add in a lot of data. Then after that we want to
+        # rapidly change a single key to create a hotspot in one block.
+        if self.savefirst < 2:
+            nops = self.nops
+        else:
+            nops = self.nops // 10
+        for i in range(0, nops):
+            num = i + (self.mult * nops)
+            if self.savefirst >= 2:
+                key = self.savekey
+            else:
+                key = str(num) + self.bigkey + str(num)
+            val = str(num) + self.bigval + str(num)
             c[key] = val
+        if self.savefirst == 0:
+            self.savekey = key
+        self.savefirst += 1
         c.close()
 
         # Increase the multiplier so that later calls insert unique items.
@@ -240,108 +265,43 @@ class test_backup14(wttest.WiredTigerTestCase, suite_subprocess):
             self.counter += 1
 
     #
-    # Remove data from uri (table:main)
-    #
-    def remove_data(self):
-        c = self.session.open_cursor(self.uri)
-        #
-        # We run the outer loop until mult value to make sure we remove all the inserted records
-        # from the main table.
-        #
-        for i in range(0, self.mult):
-            for j in range(i, self.nops):
-                num = j + (i * self.nops)
-                key = self.bigkey + str(num)
-                c.set_key(key)
-                self.assertEquals(c.remove(), 0)
-        c.close()
-        # Increase the counter so that later backups have unique ids.
-        self.counter += 1
-
-    #
     # This function will add records to the table (table:main), take incremental/full backups and
     # validate the backups.
     #
     def add_data_validate_backups(self):
         self.pr('Adding initial data')
         self.initial_backup = True
-        self.add_data(self.uri, None)
+        self.add_data(self.uri)
         self.take_full_backup()
         self.initial_backup = False
         self.session.checkpoint()
 
-        self.add_data(self.uri, None)
+        # Each call now to take a full backup will make a copy into a full directory. Then
+        # each incremental will take an incremental backup and we can compare them.
+        self.add_data(self.uri)
+        self.session.checkpoint()
         self.take_full_backup()
         self.take_incr_backup()
         self.compare_backups(self.uri)
 
-    #
-    # This function will remove all the records from table (table:main), take backup and validate the
-    # backup.
-    #
-    def remove_all_records_validate(self):
-        self.remove_data()
+        self.add_data(self.uri)
+        self.session.checkpoint()
+        self.take_incr_backup()
+        self.take_full_backup()
+        self.compare_backups(self.uri)
+
+        self.add_data(self.uri)
+        self.session.checkpoint()
         self.take_full_backup()
         self.take_incr_backup()
         self.compare_backups(self.uri)
 
-    #
-    # This function will drop the existing table uri (table:main) that is part of the backups and
-    # create new table uri2 (table:extra), take incremental backup and validate.
-    #
-    def drop_old_add_new_table(self):
-
-        # Drop main table.
-        self.session.drop(self.uri)
-
-        # Create uri2 (table:extra)
-        self.session.create(self.uri2, "key_format=S,value_format=S")
-
-        self.new_table = True
-        self.add_data(self.uri2, None)
+        self.add_data(self.uri)
         self.take_incr_backup()
-
-        table_list = 'tablelist.txt'
-        # Assert if the dropped table (table:main) exists in the incremental folder.
-        self.runWt(['-R', '-h', self.home, 'list'], outfilename=table_list)
-        ret = os.system("grep " + self.uri + " " + table_list)
-        self.assertNotEqual(ret, 0, self.uri + " dropped, but table exists in " + self.home)
-
-    #
-    # This function will create previously dropped table uri (table:main) and add different content to
-    # it, take backups and validate the backups.
-    #
-    def create_dropped_table_add_new_content(self):
-        self.session.create(self.uri, "key_format=S,value_format=S")
-        self.add_data(self.uri, None)
         self.take_full_backup()
-        self.take_incr_backup()
         self.compare_backups(self.uri)
 
-    #
-    # This function will insert bulk data in logged and not-logged table, take backups and validate the
-    # backups.
-    #
-    def insert_bulk_data(self):
-        #
-        # Insert bulk data into uri3 (table:logged_table).
-        #
-        self.session.create(self.uri_logged, "key_format=S,value_format=S")
-        self.add_data(self.uri_logged, 'bulk')
-        self.take_full_backup()
-        self.take_incr_backup()
-        self.compare_backups(self.uri_logged)
-
-        #
-        # Insert bulk data into uri4 (table:not_logged_table).
-        #
-        self.session.create(self.uri_not_logged, "key_format=S,value_format=S,log=(enabled=false)")
-        self.add_data(self.uri_not_logged, 'bulk')
-        self.take_full_backup()
-        self.take_incr_backup()
-        self.compare_backups(self.uri_not_logged)
-
-    def test_backup14(self):
+    def test_backup15(self):
         os.mkdir(self.bkp_home)
         self.home = self.bkp_home
         self.session.create(self.uri, "key_format=S,value_format=S")
@@ -350,18 +310,6 @@ class test_backup14(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.pr('*** Add data, checkpoint, take backups and validate ***')
         self.add_data_validate_backups()
-
-        self.pr('*** Remove old records and validate ***')
-        self.remove_all_records_validate()
-
-        self.pr('*** Drop old and add new table ***')
-        self.drop_old_add_new_table()
-
-        self.pr('*** Create previously dropped table and add new content ***')
-        self.create_dropped_table_add_new_content()
-
-        self.pr('*** Insert data into Logged and Not-Logged tables ***')
-        self.insert_bulk_data()
 
 if __name__ == '__main__':
     wttest.run()
