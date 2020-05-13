@@ -61,7 +61,9 @@ const m = MongoRunner.runMongod();
 runTest(m, m);
 MongoRunner.stopMongod(m);
 
-const st = new ShardingTest({shards: 1, mongos: 1, config: 1, keyFile: 'jstests/libs/key1'});
-runTest(st.s0, st.shard0);
-st.stop();
+if (!jsTestOptions().noJournal) {
+    const st = new ShardingTest({shards: 1, mongos: 1, config: 1, keyFile: 'jstests/libs/key1'});
+    runTest(st.s0, st.shard0);
+    st.stop();
+}
 })();
