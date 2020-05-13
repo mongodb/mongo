@@ -210,6 +210,14 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
         WT_STAT_CONN_INCR(session, cache_write_restore);
         WT_STAT_DATA_INCR(session, cache_write_restore);
     }
+    if (!WT_IS_HS(btree)) {
+        if (r->rec_page_cell_with_txn_id)
+            WT_STAT_CONN_INCR(session, rec_pages_with_txn);
+        if (r->rec_page_cell_with_ts)
+            WT_STAT_CONN_INCR(session, rec_pages_with_ts);
+        if (r->rec_page_cell_with_prepared_txn)
+            WT_STAT_CONN_INCR(session, rec_pages_with_prepare);
+    }
     if (r->multi_next > btree->rec_multiblock_max)
         btree->rec_multiblock_max = r->multi_next;
 
@@ -595,6 +603,11 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->update_modify_cbt.ref = ref;
     r->update_modify_cbt.iface.value_format = btree->value_format;
     r->update_modify_cbt.upd_value = &r->update_modify_cbt._upd_value;
+
+    /* Clear stats related data. */
+    r->rec_page_cell_with_ts = false;
+    r->rec_page_cell_with_txn_id = false;
+    r->rec_page_cell_with_prepared_txn = false;
 
 /*
  * If we allocated the reconciliation structure and there was an error, clean up. If our caller
@@ -2304,7 +2317,7 @@ __wt_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *k
     WT_ERR(__wt_buf_set(session, &kv->buf, addr, size));
 
     /* Build the cell and return. */
-    kv->cell_len = __wt_cell_pack_ovfl(session, &kv->cell, type, tw, rle, kv->buf.size);
+    kv->cell_len = __wt_cell_pack_ovfl(session, r, &kv->cell, type, tw, rle, kv->buf.size);
     kv->len = kv->cell_len + kv->buf.size;
 
 err:

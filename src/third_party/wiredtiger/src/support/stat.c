@@ -839,8 +839,12 @@ static const char *const __stats_connection_desc[] = {
   "perf: operation write latency histogram (bucket 4) - 1000-9999us",
   "perf: operation write latency histogram (bucket 5) - 10000us+",
   "reconciliation: fast-path pages deleted", "reconciliation: page reconciliation calls",
-  "reconciliation: page reconciliation calls for eviction", "reconciliation: pages deleted",
-  "reconciliation: split bytes currently awaiting free",
+  "reconciliation: page reconciliation calls for eviction",
+  "reconciliation: page reconciliation calls that resulted in values with prepared transaction "
+  "metadata",
+  "reconciliation: page reconciliation calls that resulted in values with timestamps",
+  "reconciliation: page reconciliation calls that resulted in values with transaction ids",
+  "reconciliation: pages deleted", "reconciliation: split bytes currently awaiting free",
   "reconciliation: split objects currently awaiting free", "session: open session count",
   "session: session query timestamp calls", "session: table alter failed calls",
   "session: table alter successful calls", "session: table alter unchanged and skipped",
@@ -1274,6 +1278,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->rec_page_delete_fast = 0;
     stats->rec_pages = 0;
     stats->rec_pages_eviction = 0;
+    stats->rec_pages_with_prepare = 0;
+    stats->rec_pages_with_ts = 0;
+    stats->rec_pages_with_txn = 0;
     stats->rec_page_delete = 0;
     /* not clearing rec_split_stashed_bytes */
     /* not clearing rec_split_stashed_objects */
@@ -1735,6 +1742,9 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
     to->rec_pages += WT_STAT_READ(from, rec_pages);
     to->rec_pages_eviction += WT_STAT_READ(from, rec_pages_eviction);
+    to->rec_pages_with_prepare += WT_STAT_READ(from, rec_pages_with_prepare);
+    to->rec_pages_with_ts += WT_STAT_READ(from, rec_pages_with_ts);
+    to->rec_pages_with_txn += WT_STAT_READ(from, rec_pages_with_txn);
     to->rec_page_delete += WT_STAT_READ(from, rec_page_delete);
     to->rec_split_stashed_bytes += WT_STAT_READ(from, rec_split_stashed_bytes);
     to->rec_split_stashed_objects += WT_STAT_READ(from, rec_split_stashed_objects);

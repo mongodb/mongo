@@ -38,7 +38,7 @@ except ImportError:
     import unittest
 
 from contextlib import contextmanager
-import glob, os, re, shutil, sys, time, traceback
+import errno, glob, os, re, shutil, sys, time, traceback
 import wiredtiger, wtscenario
 
 def shortenWithEllipsis(s, maxlen):
@@ -568,12 +568,13 @@ class WiredTigerTestCase(unittest.TestCase):
     def raisesBusy(self, expr):
         """
         Execute the expression, returning true if a 'Resource busy' exception
-        is raised, returning false if no exception is raised. Some systems
-        report 'Device or resource busy', allow either.
+        is raised, returning false if no exception is raised. The actual exception
+        message can be different across platforms and therefore we rely on os
+        libraries to give use the correct exception message.
         Any other exception raises a test suite failure.
         """
         return self.assertRaisesException(wiredtiger.WiredTigerError, \
-            expr, exceptionString='/[Rr]esource busy/', optional=True)
+            expr, os.strerror(errno.EBUSY), optional=True)
 
     def assertTimestampsEqual(self, ts1, ts2):
         """

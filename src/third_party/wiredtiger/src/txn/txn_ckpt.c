@@ -745,8 +745,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_ISOLATION saved_isolation;
     wt_timestamp_t ckpt_tmp_ts;
-    uint64_t finish_secs, hs_ckpt_duration_usecs, time_start_hs, time_stop_hs;
-    uint64_t fsync_duration_usecs, generation, time_start_fsync, time_stop_fsync;
+    uint64_t fsync_duration_usecs, generation, hs_ckpt_duration_usecs;
+    uint64_t time_start_fsync, time_stop_fsync, time_start_hs, time_stop_hs;
     u_int i;
     bool can_skip, failed, full, idle, logging, tracking, use_timestamp;
     void *saved_meta_next;
@@ -985,16 +985,6 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
                 conn->txn_global.last_ckpt_timestamp = conn->txn_global.recovery_timestamp;
         } else
             conn->txn_global.last_ckpt_timestamp = WT_TS_NONE;
-
-        /*
-         * Save clock value marking end of checkpoint processing. If a hot backup starts before the
-         * next checkpoint, we will need to keep all checkpoints up to this clock value until the
-         * backup completes.
-         */
-        __wt_seconds(session, &finish_secs);
-        /* Be defensive: time is only monotonic per session */
-        if (finish_secs > conn->ckpt_finish_secs)
-            conn->ckpt_finish_secs = finish_secs;
     }
 
 err:
@@ -1259,27 +1249,20 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
             continue;
         is_wt_ckpt = WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT);
 
-/*
- * If there is a hot backup, don't delete any WiredTiger checkpoint that could possibly have been
- * created before the backup started. Fail if trying to delete any other named checkpoint.
- */
-#ifdef DISABLED_CODE
-        if (conn->hot_backup_start != 0 && ckpt->sec <= conn->hot_backup_start) {
-#else
         /*
-         * N.B. Despite the comment above, dropping checkpoints during backup can corrupt the
-         * backup. For now we retain all WiredTiger checkpoints.
+         * If there is a hot backup, don't delete any WiredTiger checkpoint that could possibly have
+         * been created before the backup started. Fail if trying to delete any other named
+         * checkpoint.
          */
-        if (conn->hot_backup_start != 0) {
-#endif
+        if (conn->hot_backup_start != 0 && ckpt->sec <= conn->hot_backup_start) {
             if (is_wt_ckpt) {
                 F_CLR(ckpt, WT_CKPT_DELETE);
                 continue;
             }
             WT_RET_MSG(session, EBUSY,
               "checkpoint %s blocked by hot backup: it would "
-              "delete an existing checkpoint, and checkpoints "
-              "cannot be deleted during a hot backup",
+              "delete an existing named checkpoint, and such "
+              "checkpoints cannot be deleted during a hot backup",
               ckpt->name);
         }
         /*
@@ -1816,16 +1799,17 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
-    bool bulk, need_tracking;
+    bool bulk, metadata, need_tracking;
 
     btree = S2BT(session);
     bulk = F_ISSET(btree, WT_BTREE_BULK);
+    metadata = WT_IS_METADATA(session->dhandle);
 
     /*
      * We've done the final checkpoint before the final close, subsequent writes to normal objects
      * are wasted effort. Discard the objects to validate exit accounting.
      */
-    if (final && !WT_IS_METADATA(session->dhandle))
+    if (final && !metadata)
         return (__wt_evict_file(session, WT_SYNC_DISCARD));
 
     /*
@@ -1839,11 +1823,13 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
     }
 
     /*
-     * Don't flush data from trees when there is a stable timestamp set: that can lead to files that
-     * are inconsistent on disk after a crash.
+     * Don't flush data from modified trees independent of system-wide checkpoint when either there
+     * is a stable timestamp set or the connection is configured to disallow such operation.
+     * Flushing trees can lead to files that are inconsistent on disk after a crash.
      */
-    if (btree->modified && !bulk && S2C(session)->txn_global.has_stable_timestamp &&
-      !__wt_btree_immediately_durable(session))
+    if (btree->modified && !bulk && !__wt_btree_immediately_durable(session) &&
+      (S2C(session)->txn_global.has_stable_timestamp ||
+          (!F_ISSET(S2C(session), WT_CONN_FILE_CLOSE_SYNC) && !metadata && !final)))
         return (__wt_set_return(session, EBUSY));
 
     /*

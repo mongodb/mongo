@@ -152,7 +152,7 @@ struct __wt_named_extractor {
  */
 #define WT_CONN_HOTBACKUP_START(conn)                        \
     do {                                                     \
-        (conn)->hot_backup_start = (conn)->ckpt_finish_secs; \
+        (conn)->hot_backup_start = (conn)->ckpt_most_recent; \
         (conn)->hot_backup_list = NULL;                      \
     } while (0)
 
@@ -276,7 +276,7 @@ struct __wt_connection_impl {
     wt_thread_t ckpt_tid;          /* Checkpoint thread */
     bool ckpt_tid_set;             /* Checkpoint thread set */
     WT_CONDVAR *ckpt_cond;         /* Checkpoint wait mutex */
-    uint64_t ckpt_finish_secs;     /* Clock value of last completed checkpoint */
+    uint64_t ckpt_most_recent;     /* Clock value of most recent checkpoint */
 #define WT_CKPT_LOGSIZE(conn) ((conn)->ckpt_logsize != 0)
     wt_off_t ckpt_logsize; /* Checkpoint log size period */
     bool ckpt_signalled;   /* Checkpoint signalled */
@@ -527,25 +527,26 @@ struct __wt_connection_impl {
 #define WT_CONN_DEBUG_REALLOC_EXACT 0x00000200u
 #define WT_CONN_DEBUG_SLOW_CKPT 0x00000400u
 #define WT_CONN_EVICTION_RUN 0x00000800u
-#define WT_CONN_HS_OPEN 0x00001000u
-#define WT_CONN_INCR_BACKUP 0x00002000u
-#define WT_CONN_IN_MEMORY 0x00004000u
-#define WT_CONN_LEAK_MEMORY 0x00008000u
-#define WT_CONN_LSM_MERGE 0x00010000u
-#define WT_CONN_OPTRACK 0x00020000u
-#define WT_CONN_PANIC 0x00040000u
-#define WT_CONN_READONLY 0x00080000u
-#define WT_CONN_RECONFIGURING 0x00100000u
-#define WT_CONN_RECOVERING 0x00200000u
-#define WT_CONN_SALVAGE 0x00400000u
-#define WT_CONN_SERVER_ASYNC 0x00800000u
-#define WT_CONN_SERVER_CAPACITY 0x01000000u
-#define WT_CONN_SERVER_CHECKPOINT 0x02000000u
-#define WT_CONN_SERVER_LOG 0x04000000u
-#define WT_CONN_SERVER_LSM 0x08000000u
-#define WT_CONN_SERVER_STATISTICS 0x10000000u
-#define WT_CONN_SERVER_SWEEP 0x20000000u
-#define WT_CONN_WAS_BACKUP 0x40000000u
+#define WT_CONN_FILE_CLOSE_SYNC 0x00001000u
+#define WT_CONN_HS_OPEN 0x00002000u
+#define WT_CONN_INCR_BACKUP 0x00004000u
+#define WT_CONN_IN_MEMORY 0x00008000u
+#define WT_CONN_LEAK_MEMORY 0x00010000u
+#define WT_CONN_LSM_MERGE 0x00020000u
+#define WT_CONN_OPTRACK 0x00040000u
+#define WT_CONN_PANIC 0x00080000u
+#define WT_CONN_READONLY 0x00100000u
+#define WT_CONN_RECONFIGURING 0x00200000u
+#define WT_CONN_RECOVERING 0x00400000u
+#define WT_CONN_SALVAGE 0x00800000u
+#define WT_CONN_SERVER_ASYNC 0x01000000u
+#define WT_CONN_SERVER_CAPACITY 0x02000000u
+#define WT_CONN_SERVER_CHECKPOINT 0x04000000u
+#define WT_CONN_SERVER_LOG 0x08000000u
+#define WT_CONN_SERVER_LSM 0x10000000u
+#define WT_CONN_SERVER_STATISTICS 0x20000000u
+#define WT_CONN_SERVER_SWEEP 0x40000000u
+#define WT_CONN_WAS_BACKUP 0x80000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };

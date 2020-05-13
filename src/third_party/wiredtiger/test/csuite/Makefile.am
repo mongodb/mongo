@@ -57,8 +57,7 @@ noinst_PROGRAMS += test_wt2246_col_append
 
 test_wt2323_join_visibility_SOURCES = wt2323_join_visibility/main.c
 noinst_PROGRAMS += test_wt2323_join_visibility
-# Temporarily disabled
-# all_TESTS += test_wt2323_join_visibility
+all_TESTS += test_wt2323_join_visibility
 
 test_wt2535_insert_race_SOURCES = wt2535_insert_race/main.c
 noinst_PROGRAMS += test_wt2535_insert_race
