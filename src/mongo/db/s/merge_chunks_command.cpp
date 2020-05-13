@@ -84,8 +84,8 @@ Status mergeChunks(OperationContext* opCtx,
                    const OID& epoch) {
     // Get the distributed lock
     // TODO(SERVER-25086): Remove distLock acquisition from merge chunk
-    const string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey
-                                       << " to " << maxKey;
+    const string whyMessage = stream() << "merging chunks in " << nss.ns() << " from "
+                                       << redact(minKey) << " to " << redact(maxKey);
 
     auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
         opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);

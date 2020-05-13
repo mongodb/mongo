@@ -147,7 +147,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
         opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
     if (!scopedDistLock.isOK()) {
         errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
-                               << " to split chunk " << chunkRange.toString() << " "
+                               << " to split chunk " << redact(chunkRange.toString()) << " "
                                << causedBy(scopedDistLock.getStatus());
         return {scopedDistLock.getStatus().code(), errmsg};
     }
