@@ -5,10 +5,9 @@
  * sessionDB.coll.find() will throw "Cannot run a legacy query on a session".
  *
  * @tags: [
- *   requires_find_command,
- *   uses_multi_shard_transaction,
- *   uses_transactions,
- *   need_fixing_for_46
+ *  requires_find_command,
+ *  uses_multi_shard_transaction,
+ *  uses_transactions,
  * ]
  */
 (function() {
