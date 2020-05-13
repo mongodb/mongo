@@ -90,7 +90,7 @@ public:
         AutoGetCollectionForReadCommand autoColl(opCtx, nss);
         Collection* const collection = autoColl.getCollection();
         if (!collection) {
-            errmsg = "Collection '" + nss.ns() + "' does not exist (ns not found)";
+            errmsg = "ns not found";
             return false;
         }
 

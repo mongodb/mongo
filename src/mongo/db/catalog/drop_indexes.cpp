@@ -65,8 +65,7 @@ Status checkView(OperationContext* opCtx,
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "Cannot drop indexes on view " << nss);
         }
-        return Status(ErrorCodes::NamespaceNotFound,
-                      "Namespace '" + nss.ns() + "' does not exists (ns not found)");
+        return Status(ErrorCodes::NamespaceNotFound, str::stream() << "ns not found " << nss);
     }
     return Status::OK();
 }

@@ -53,12 +53,9 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangDropCollectionBeforeLockAcquisition);
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 
-Status _checkNssAndReplState(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             Collection* coll) {
+Status _checkNssAndReplState(OperationContext* opCtx, Collection* coll) {
     if (!coll) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      "Namespace '" + nss.ns() + "' does not exist (ns not found)");
+        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
 
     if (opCtx->writesAreReplicated() &&
@@ -75,14 +72,12 @@ Status _dropView(OperationContext* opCtx,
                  const NamespaceString& collectionName,
                  BSONObjBuilder& result) {
     if (!db) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      "Namespace '" + collectionName.ns() + "' does not exist (ns not found)");
+        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
     auto view =
         ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(opCtx, collectionName.ns());
     if (!view) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      "Namespace '" + collectionName.ns() + "' does not exist (ns not found)");
+        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
 
     // Validates the view or throws an "invalid view" error.
@@ -140,7 +135,7 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
 
     Collection* coll =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, startingNss);
-    Status status = _checkNssAndReplState(opCtx, startingNss, coll);
+    Status status = _checkNssAndReplState(opCtx, coll);
     if (!status.isOK()) {
         return status;
     }
@@ -189,7 +184,7 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
 
         coll = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
-        status = _checkNssAndReplState(opCtx, startingNss, coll);
+        status = _checkNssAndReplState(opCtx, coll);
         if (!status.isOK()) {
             return status;
         }
@@ -237,7 +232,7 @@ Status _dropCollection(OperationContext* opCtx,
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
     Collection* coll =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collectionName);
-    Status status = _checkNssAndReplState(opCtx, collectionName, coll);
+    Status status = _checkNssAndReplState(opCtx, coll);
     if (!status.isOK()) {
         return status;
     }
@@ -296,9 +291,7 @@ Status dropCollection(OperationContext* opCtx,
                 AutoGetDb autoDb(opCtx, collectionName.db(), MODE_IX);
                 Database* db = autoDb.getDb();
                 if (!db) {
-                    return Status(ErrorCodes::NamespaceNotFound,
-                                  "Namespace '" + collectionName.ns() +
-                                      "' does not exist (ns not found)");
+                    return Status(ErrorCodes::NamespaceNotFound, "ns not found");
                 }
 
                 Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
@@ -313,9 +306,9 @@ Status dropCollection(OperationContext* opCtx,
                 opCtx, collectionName, systemCollectionMode, result);
         });
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The shell depends on the NamespaceNotFound error code.
-        return Status(ErrorCodes::NamespaceNotFound,
-                      "Namespace '" + collectionName.ns() + "' does not exist (ns not found)");
+        // The shell requires that NamespaceNotFound error codes return the "ns not found"
+        // string.
+        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
 }
 
@@ -335,8 +328,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         AutoGetDb autoDb(opCtx, collectionName.db(), MODE_IX);
         Database* db = autoDb.getDb();
         if (!db) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          "Namespace '" + collectionName.ns() + "' does not exist (ns not found)");
+            return Status(ErrorCodes::NamespaceNotFound, "ns not found");
         }
 
         Collection* coll =
