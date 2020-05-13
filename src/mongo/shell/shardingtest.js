@@ -1544,6 +1544,12 @@ var ShardingTest = function(params) {
         options = Object.merge(options, otherParams.mongosOptions);
         options = Object.merge(options, otherParams["s" + i]);
 
+        // The default time for mongos quiesce mode in response to SIGTERM is 15 seconds.
+        // Reduce this to 100ms for faster shutdown.
+        options.setParameter = options.setParameter || {};
+        options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown =
+            options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown || 100;
+
         options.port = options.port || _allocatePortForMongos();
 
         mongosOptions.push(options);

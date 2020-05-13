@@ -70,12 +70,11 @@ public:
     void enterQuiesceMode();
 
     /**
-     * While in quiesce mode, we will sleep for 100ms. This allows short running operations to
-     * continue. We will also accept new operations, but we fail isMaster requests with
+     * While in quiesce mode, we will sleep for quiesceTime. This allows short running operations
+     * to continue. We will also accept new operations, but we fail isMaster requests with
      * ShutdownInProgress.
-     * TODO SERVER-46958: Modify comment with correct timeout value.
      */
-    void enterQuiesceModeAndWait(OperationContext* opCtx);
+    void enterQuiesceModeAndWait(OperationContext* opCtx, Milliseconds quiesceTime);
 
     TopologyVersion getTopologyVersion() const {
         stdx::lock_guard lk(_mutex);

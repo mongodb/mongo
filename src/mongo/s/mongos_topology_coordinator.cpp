@@ -192,7 +192,8 @@ void MongosTopologyCoordinator::enterQuiesceMode() {
     IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
 }
 
-void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx) {
+void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
+                                                        Milliseconds quiesceTime) {
     enterQuiesceMode();
 
     if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {
@@ -200,11 +201,8 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx)
         hangDuringQuiesceMode.pauseWhileSet(opCtx);
     }
 
-    // TODO SERVER-46958: Determine what the quiesce time should be by checking the
-    // shutdownTimeoutMillisForSignaledShutdown mongos server parameter.
-    auto timeout = Milliseconds(100);
-    LOGV2(4695701, "Entering quiesce mode for mongos shutdown", "quiesceTime"_attr = timeout);
-    opCtx->sleepFor(timeout);
+    LOGV2(4695701, "Entering quiesce mode for mongos shutdown", "quiesceTime"_attr = quiesceTime);
+    opCtx->sleepFor(quiesceTime);
     LOGV2(4695702, "Exiting quiesce mode for mongos shutdown");
 }
 

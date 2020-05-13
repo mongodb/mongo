@@ -86,3 +86,13 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
     default: true
+
+  mongosShutdownTimeoutMillisForSignaledShutdown:
+    description: >-
+        The time taken for quiesce mode at shutdown in response to SIGTERM.
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: "mongosShutdownTimeoutMillisForSignaledShutdown"
+    default: 15000
+    validator:
+        gte: 0

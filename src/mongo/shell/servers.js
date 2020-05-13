@@ -626,14 +626,17 @@ var _isMongodVersionEqualOrAfter = function(version1, version2) {
     return false;
 };
 
-// Removes a setParameter parameter from mongods running a version that won't recognize them.
-var _removeSetParameterIfBeforeVersion = function(opts, parameterName, requiredVersion) {
+// Removes a setParameter parameter from mongods or mongoses running a version that won't recognize
+// them.
+var _removeSetParameterIfBeforeVersion = function(
+    opts, parameterName, requiredVersion, isMongos = false) {
+    var processString = isMongos ? "mongos" : "mongod";
     var versionCompatible = (opts.binVersion === "" || opts.binVersion === undefined ||
                              _isMongodVersionEqualOrAfter(requiredVersion, opts.binVersion));
     if (!versionCompatible && opts.setParameter && opts.setParameter[parameterName] != undefined) {
         print("Removing '" + parameterName + "' setParameter with value " +
-              opts.setParameter[parameterName] +
-              " because it isn't compatibile with mongod running version " + opts.binVersion);
+              opts.setParameter[parameterName] + " because it isn't compatible with " +
+              processString + " running version " + opts.binVersion);
         delete opts.setParameter[parameterName];
     }
 };
@@ -792,6 +795,9 @@ MongoRunner.mongosOptions = function(opts) {
     if (!opts.hasOwnProperty('binVersion') && testOptions.mongosBinVersion) {
         opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongosBinVersion);
     }
+
+    _removeSetParameterIfBeforeVersion(
+        opts, "mongosShutdownTimeoutMillisForSignaledShutdown", "4.5.0", true);
 
     // If the mongos is being restarted with a newer version, make sure we remove any options
     // that no longer exist in the newer version.
