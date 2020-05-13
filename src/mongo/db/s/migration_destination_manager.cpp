@@ -1366,6 +1366,8 @@ SharedSemiFuture<void> MigrationDestinationManager::_notePending(OperationContex
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_X);
     auto* const css = CollectionShardingRuntime::get(opCtx, _nss);
+    // Keep the collection metadata from changing for the rest of this scope.
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, css);
     const auto optMetadata = css->getCurrentMetadataIfKnown();
 
     // This can currently happen because drops and shard key refine operations aren't guaranteed to
@@ -1397,6 +1399,8 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx, ChunkR
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
     auto* const css = CollectionShardingRuntime::get(opCtx, _nss);
+    // Keep the collection metadata from changing for the rest of this scope.
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, css);
     const auto optMetadata = css->getCurrentMetadataIfKnown();
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
