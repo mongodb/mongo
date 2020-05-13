@@ -1,13 +1,18 @@
-// Tests the behavior of a $lookup when a shard contains incorrect routing information for the
-// local and/or foreign collections.  This includes when the shard thinks the collection is sharded
-// when it's not, and likewise when it thinks the collection is unsharded but is actually sharded.
-//
-// We restart a mongod to cause it to forget that a collection was sharded. When restarted, we
-// expect it to still have all the previous data.
-// @tags: [
-//   requires_persistence,
-//   need_fixing_for_46
-// ]
+/**
+ * Tests the behavior of a $lookup when a shard contains incorrect routing information for the
+ * local and/or foreign collections. This includes when the shard thinks the collection is sharded
+ * when it's not, and likewise when it thinks the collection is unsharded but is actually sharded.
+ *
+ * We restart a mongod to cause it to forget that a collection was sharded. When restarted, we
+ * expect it to still have all the previous data.
+ *
+ * @tags: [
+ *  requires_fcv_46,
+ *  requires_persistence,
+ * ]
+ *
+ * TODO (SERVER-47265): Remove the requires_fcv_46 flag
+ */
 (function() {
 "use strict";
 
