@@ -4,19 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-generateActionTypes = env.Command(
-    target=[
-        'action_type.h', 'action_type.cpp'
-    ],
-    source=[
-        'generate_action_types.py',
-        'action_types.txt'
-    ],
-    action='$PYTHON $SOURCES $TARGETS',
-)
-
-env.Alias('generated-sources', generateActionTypes)
-
 env.Library(
     target='authentication_restriction',
     source=[
