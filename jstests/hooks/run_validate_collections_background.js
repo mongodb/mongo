@@ -74,6 +74,17 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
         return {ok: 1};
     }
 
+    let versionStr = conn.adminCommand({buildInfo: 1})["version"];
+    if (MongoRunner.compareBinVersions(versionStr, "4.2") <= 0) {
+        // SERVER-48215: Background validation was introduced in 4.4. Running the same command
+        // against 4.2 and earlier will run foreground validation (taking a collection MODE_X
+        // lock). In addition to being generally disruptive, some tests make assumptions that their
+        // operations never compete over locks.
+        print("Skipping background validation against test node: " + host +
+              " because it's not 4.4+. Version: " + versionStr);
+        return {ok: 1};
+    }
+
     print("Running background validation on all collections on test node: " + host);
 
     // Save a map of namespace to validate cmd results for any cmds that fail so that we can return
