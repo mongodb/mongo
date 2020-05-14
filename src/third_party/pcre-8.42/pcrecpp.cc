@@ -99,8 +99,7 @@ static const char *start_options[] = {
 void RE::Init(const string& pat, const RE_Options* options) {
   pattern_ = pat;
   if (options == NULL) {
-    static const RE_Options& default_options = *new RE_Options();
-    options_ = default_options;
+    options_ = RE_Options();
   } else {
     options_ = *options;
   }
