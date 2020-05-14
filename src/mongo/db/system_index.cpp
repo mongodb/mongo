@@ -107,9 +107,11 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
         BSONObj indexSpec = fassert(40452, indexSpecStatus);
 
         LOGV2(22488,
-              "No authorization index detected on {ns} collection. Attempting to recover by "
+              "No authorization index detected on {namespace} collection. Attempting to recover by "
               "creating an index with spec: {indexSpec}",
-              "ns"_attr = ns,
+              "No authorization index detected. Attempting to recover by "
+              "creating an index",
+              logAttrs(ns),
               "indexSpec"_attr = indexSpec);
 
         auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
@@ -118,9 +120,10 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
             opCtx, collectionUUID, {indexSpec}, indexConstraints, fromMigrate);
     } catch (const DBException& e) {
         LOGV2_FATAL_CONTINUE(22490,
-                             "Failed to regenerate index for {ns}. Exception: {e_what}",
-                             "ns"_attr = ns,
-                             "e_what"_attr = e.what());
+                             "Failed to regenerate index for {namespace}. Exception: {error}",
+                             "Failed to regenerate index",
+                             logAttrs(ns),
+                             "error"_attr = e.what());
         throw;
     }
 }

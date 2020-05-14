@@ -72,22 +72,17 @@ void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx) {
             client.count(NamespaceString::kConfigSettingsNamespace,
                          BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
         if (numPersistedDocuments != 0) {
-            LOGV2_OPTIONS(4615612, {logv2::LogTag::kStartupWarnings}, "");
-            LOGV2_OPTIONS(4615613,
-                          {logv2::LogTag::kStartupWarnings},
-                          "** WARNING: This node is running as a shard server, but persisted "
-                          "Read/Write Concern (RWC) defaults");
-            LOGV2_OPTIONS(4615614,
-                          {logv2::LogTag::kStartupWarnings},
-                          "**          are present in {configSettingsNamespace}. This node was "
-                          "likely previously in an unsharded",
-                          "configSettingsNamespace"_attr =
-                              NamespaceString::kConfigSettingsNamespace);
-            LOGV2_OPTIONS(4615615,
-                          {logv2::LogTag::kStartupWarnings},
-                          "**          replica set or a config server. The RWC defaults on this "
-                          "node will not be used.");
-            LOGV2_OPTIONS(4615616, {logv2::LogTag::kStartupWarnings}, "");
+            LOGV2_OPTIONS(
+                4615613,
+                {logv2::LogTag::kStartupWarnings},
+                "This node is running as a shard server, but persisted Read/Write Concern (RWC) "
+                "defaults are present in {configSettingsNamespace}. This node was likely "
+                "previously in an unsharded replica set or a config server. The RWC defaults on "
+                "this node will not be used",
+                "This node is running as a shard server, but persisted Read/Write Concern (RWC) "
+                "defaults are present. This node was likely previously in an unsharded replica set "
+                "or a config server. The RWC defaults on this node will not be used",
+                "configSettingsNamespace"_attr = NamespaceString::kConfigSettingsNamespace);
         }
     }
 }
