@@ -912,6 +912,17 @@ private:
                                         const OpTime& lastOpTimeFetched,
                                         ReadPreference readPreference);
 
+    /*
+     * Clear this node's sync source.
+     */
+    void _clearSyncSource();
+
+    /**
+     * Sets this node's sync source. It will also update whether the sync source was forced and add
+     * a new entry to recent sync source changes.
+     */
+    void _setSyncSource(HostAndPort newSyncSource, Date_t now, bool forced = false);
+
     // Returns the oldest acceptable OpTime that a node must have for us to choose it as our sync
     // source.
     const OpTime _getOldestSyncOpTime() const;
@@ -1043,6 +1054,9 @@ private:
     std::map<HostAndPort, Date_t> _syncSourceBlacklist;
     // The next sync source to be chosen, requested via a replSetSyncFrom command
     int _forceSyncSourceIndex;
+    // Whether the current sync source has been set via a replSetSyncFrom command or
+    // forceSyncSourceCandidate failpoint.
+    bool _syncSourceCurrentlyForced;
 
     // Options for this TopologyCoordinator
     Options _options;

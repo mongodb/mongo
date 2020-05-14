@@ -210,6 +210,7 @@ TopologyCoordinator::TopologyCoordinator(Options options)
       _term(OpTime::kUninitializedTerm),
       _currentPrimaryIndex(-1),
       _forceSyncSourceIndex(-1),
+      _syncSourceCurrentlyForced(false),
       _options(std::move(options)),
       _selfIndex(-1),
       _maintenanceModeCalls(0),
@@ -237,26 +238,36 @@ HostAndPort TopologyCoordinator::getSyncSourceAddress() const {
     return _syncSource;
 }
 
+void TopologyCoordinator::_clearSyncSource() {
+    _syncSource = HostAndPort();
+    _syncSourceCurrentlyForced = false;
+}
+
+void TopologyCoordinator::_setSyncSource(HostAndPort newSyncSource, Date_t now, bool forced) {
+    _syncSource = newSyncSource;
+    _syncSourceCurrentlyForced = forced;
+
+    // If we chose another node rather than clearing the sync source, update the recent sync source
+    // changes.
+    if (!_syncSource.empty()) {
+        _recentSyncSourceChanges.addNewEntry(now);
+    }
+}
+
 HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                                                      const OpTime& lastOpTimeFetched,
                                                      ReadPreference readPreference) {
-    ON_BLOCK_EXIT([&]() {
-        // If we chose another sync source, update the recent sync source changes.
-        if (!_syncSource.empty()) {
-            _recentSyncSourceChanges.addNewEntry(now);
-        }
-    });
-    // Check to make sure we can choose a sync source, and choose a forced one if
-    // set.
+    // Check to make sure we can choose a sync source, and choose a forced one if set.
     auto maybeSyncSource = _chooseSyncSourceInitialStep(now);
     if (maybeSyncSource) {
-        _syncSource = *maybeSyncSource;
+        bool forced = !maybeSyncSource->empty();
+        _setSyncSource(*maybeSyncSource, now, forced);
         return _syncSource;
     }
 
     // If we are only allowed to sync from the primary, use it as the sync source if possible.
     if (readPreference == ReadPreference::PrimaryOnly) {
-        _syncSource = _choosePrimaryAsSyncSource(now, lastOpTimeFetched);
+        _setSyncSource(_choosePrimaryAsSyncSource(now, lastOpTimeFetched), now);
         if (_syncSource.empty()) {
             if (readPreference == ReadPreference::PrimaryOnly) {
                 LOGV2_DEBUG(3873104,
@@ -273,12 +284,12 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
         return _syncSource;
     } else if (readPreference == ReadPreference::PrimaryPreferred) {
         // If we prefer the primary, try it first.
-        _syncSource = _choosePrimaryAsSyncSource(now, lastOpTimeFetched);
+        _setSyncSource(_choosePrimaryAsSyncSource(now, lastOpTimeFetched), now);
         if (!_syncSource.empty()) {
             return _syncSource;
         }
     }
-    _syncSource = _chooseNearbySyncSource(now, lastOpTimeFetched, readPreference);
+    _setSyncSource(_chooseNearbySyncSource(now, lastOpTimeFetched, readPreference), now);
     return _syncSource;
 }
 
@@ -2188,7 +2199,7 @@ void TopologyCoordinator::_updateHeartbeatDataForReconfig(const ReplSetConfig& n
         // We don't need data for the other nodes (which no longer know about us, or soon won't)
         _memberData.clear();
         // We're not in the config, we can't sync any more.
-        _syncSource = HostAndPort();
+        _clearSyncSource();
         // We shouldn't get a sync source until we've received pings for our new config.
         pingsInConfig = 0;
         MemberData newHeartbeatData;
@@ -2529,7 +2540,7 @@ void TopologyCoordinator::processWinElection(OID electionId, Timestamp electionO
     _setLeaderMode(LeaderMode::kLeaderElect);
     setElectionInfo(electionId, electionOpTime);
     _currentPrimaryIndex = _selfIndex;
-    _syncSource = HostAndPort();
+    _clearSyncSource();
     _forceSyncSourceIndex = -1;
     // Prevent last committed optime from updating until we finish draining.
     _firstOpTimeOfMyTerm =
@@ -3054,6 +3065,12 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     // If we have already changed sync sources more than 'maxNumSyncSourceChangesPerHour' in the
     // past hour, do not re-evaluate our sync source.
     if (_recentSyncSourceChanges.changedTooOftenRecently(now)) {
+        return false;
+    }
+
+    // Do not re-evaluate our sync source if it was set via the replSetSyncFrom command or the
+    // forceSyncSourceCandidate failpoint.
+    if (_syncSourceCurrentlyForced) {
         return false;
     }
 

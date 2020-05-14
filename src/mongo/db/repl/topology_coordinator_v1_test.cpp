@@ -53,6 +53,7 @@
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
@@ -4501,6 +4502,52 @@ TEST_F(TopoCoordTest, DontChangeWhenNodeRequiresMorePings) {
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                     MemberState::RS_SECONDARY,
                                                                     lastFetched,
+                                                                    now(),
+                                                                    ReadPreference::Nearest));
+}
+
+TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByReplSetSyncFromCommand) {
+    getTopoCoord().setForceSyncSourceIndex(1);
+
+    // This will cause us to set that the current sync source is forced.
+    getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQUALS(HostAndPort("host2"), getTopoCoord().getSyncSourceAddress());
+
+    // Set up so that without forcing the sync source, the node otherwise would have changed sync
+    // sources.
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                    MemberState::RS_SECONDARY,
+                                                                    lastOpTimeFetched,
+                                                                    now(),
+                                                                    ReadPreference::Nearest));
+}
+
+TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByFailPoint) {
+    auto forceSyncSourceCandidateFailPoint =
+        globalFailPointRegistry().find("forceSyncSourceCandidate");
+    forceSyncSourceCandidateFailPoint->setMode(FailPoint::alwaysOn,
+                                               0,
+                                               BSON("hostAndPort"
+                                                    << "host2:27017"));
+
+    // Make sure to turn off the failpoint at the end of this test.
+    ON_BLOCK_EXIT([&]() { forceSyncSourceCandidateFailPoint->setMode(FailPoint::off); });
+
+    // This will cause us to set that the current sync source is forced.
+    getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQUALS(HostAndPort("host2"), getTopoCoord().getSyncSourceAddress());
+
+    // Set up so that without forcing the sync source, the node otherwise would have changed sync
+    // sources.
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                    MemberState::RS_SECONDARY,
+                                                                    lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
 }
