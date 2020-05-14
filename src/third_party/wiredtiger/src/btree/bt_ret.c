@@ -249,7 +249,7 @@ __wt_value_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
          * still required for fixed length column store as we have issues with this table type in
          * durable history which we're planning to address in PM-1814.
          */
-        WT_ASSERT(session, cbt->btree->type == BTREE_COL_FIX);
+        WT_ASSERT(session, CUR2BT(cbt)->type == BTREE_COL_FIX);
         WT_RET(__value_return(cbt));
     } else {
         /*

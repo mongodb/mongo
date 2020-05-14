@@ -361,7 +361,7 @@ __rollback_abort_row_ondisk_kv(
     vpack = &_vpack;
     upd = NULL;
     __wt_row_leaf_value_cell(session, page, rip, NULL, vpack);
-    prepared = F_ISSET(vpack, WT_CELL_UNPACK_PREPARE);
+    prepared = vpack->tw.prepare;
     if (vpack->tw.durable_start_ts > rollback_timestamp ||
       (vpack->tw.durable_stop_ts == WT_TS_NONE && prepared)) {
         __wt_verbose(session, WT_VERB_RTS,
@@ -679,7 +679,7 @@ __rollback_page_needs_abort(
         /* Check if the page is obsolete using the page disk address. */
         __wt_cell_unpack_addr(session, ref->home->dsk, (WT_CELL *)addr, &vpack);
         durable_ts = WT_MAX(vpack.ta.newest_start_durable_ts, vpack.ta.newest_stop_durable_ts);
-        prepared = F_ISSET(&vpack, WT_CELL_UNPACK_PREPARE);
+        prepared = vpack.ta.prepare;
         result = (durable_ts > rollback_timestamp) || prepared;
     } else if (addr != NULL) {
         tag = "address";

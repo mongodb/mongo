@@ -533,9 +533,9 @@ __rec_row_zero_len(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
      * tempted to check the time window against the default here - the check is subtly different due
      * to the grouping.
      */
-    return ((tw->stop_ts == WT_TS_MAX && tw->stop_txn == WT_TXN_MAX) &&
+    return (!__wt_time_window_has_stop(tw) &&
       ((tw->start_ts == WT_TS_NONE && tw->start_txn == WT_TXN_NONE) ||
-              __wt_txn_visible_all(session, tw->start_txn, tw->durable_start_ts)));
+        __wt_txn_tw_start_visible_all(session, tw)));
 }
 
 /*
@@ -766,8 +766,7 @@ __wt_rec_row_leaf(
          * If we reconcile an on disk key with a globally visible stop time pair and there are no
          * new updates for that key, skip writing that key.
          */
-        if (upd == NULL && (tw.stop_txn != WT_TXN_MAX || tw.stop_ts != WT_TS_MAX) &&
-          __wt_txn_visible_all(session, tw.stop_txn, tw.durable_stop_ts))
+        if (upd == NULL && __wt_txn_tw_stop_visible_all(session, &tw))
             upd = &upd_tombstone;
 
         /* Build value cell. */
@@ -862,7 +861,8 @@ __wt_rec_row_leaf(
                  */
                 if (F_ISSET(S2C(session), WT_CONN_HS_OPEN) && !WT_IS_HS(btree)) {
                     WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
-                    WT_ERR(__wt_hs_delete_key(session, btree->id, tmpkey));
+                    /* Start from WT_TS_NONE to delete all the history store content of the key. */
+                    WT_ERR(__wt_hs_delete_key_from_ts(session, btree->id, tmpkey, WT_TS_NONE));
                     WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
                 }
 

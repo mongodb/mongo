@@ -1029,8 +1029,7 @@ err:
      * database was idle.
      */
     if (full && logging) {
-        if (ret == 0 &&
-          F_ISSET(((WT_CURSOR_BTREE *)session->meta_cursor)->btree, WT_BTREE_SKIP_CKPT))
+        if (ret == 0 && F_ISSET(CUR2BT(session->meta_cursor), WT_BTREE_SKIP_CKPT))
             idle = true;
         WT_TRET(__wt_txn_checkpoint_log(session, full,
           (ret == 0 && !idle) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_CLEANUP, NULL));
@@ -1829,7 +1828,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
      */
     if (btree->modified && !bulk && !__wt_btree_immediately_durable(session) &&
       (S2C(session)->txn_global.has_stable_timestamp ||
-          (!F_ISSET(S2C(session), WT_CONN_FILE_CLOSE_SYNC) && !metadata && !final)))
+          (!F_ISSET(S2C(session), WT_CONN_FILE_CLOSE_SYNC) && !metadata)))
         return (__wt_set_return(session, EBUSY));
 
     /*

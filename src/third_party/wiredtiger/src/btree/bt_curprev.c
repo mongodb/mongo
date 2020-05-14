@@ -48,7 +48,7 @@ restart:
      */
     recno = WT_INSERT_RECNO(cbt->ins);
     while ((current = cbt->ins) != PREV_INS(cbt, 0)) {
-        if (cbt->btree->type == BTREE_ROW) {
+        if (CUR2BT(cbt)->type == BTREE_ROW) {
             key.data = WT_INSERT_KEY(current);
             key.size = WT_INSERT_KEY_SIZE(current);
             WT_RET(__wt_search_insert(session, cbt, cbt->ins_head, &key));

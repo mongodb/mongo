@@ -655,6 +655,9 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     __wt_buf_free(session, &cursor->key);
     __wt_buf_free(session, &cursor->value);
 
+    /* Discard the underlying WT_CURSOR_BTREE buffers. */
+    __wt_btcur_cache((WT_CURSOR_BTREE *)cursor);
+
     /*
      * Acquire a reference while decrementing the in-use counter. After this point, the dhandle may
      * be marked dead, but the actual handle won't be removed.

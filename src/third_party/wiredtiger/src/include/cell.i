@@ -836,10 +836,8 @@ copy_cell_restart:
             break;
         flags = *p++; /* skip second descriptor byte */
 
-        if (LF_ISSET(WT_CELL_PREPARE)) {
-            F_SET(unpack, WT_CELL_UNPACK_PREPARE);
+        if (LF_ISSET(WT_CELL_PREPARE))
             ta->prepare = 1;
-        }
         if (LF_ISSET(WT_CELL_TS_START))
             WT_RET(
               __wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ta->oldest_start_ts));
@@ -886,10 +884,8 @@ copy_cell_restart:
             break;
         flags = *p++; /* skip second descriptor byte */
 
-        if (LF_ISSET(WT_CELL_PREPARE)) {
-            F_SET(unpack, WT_CELL_UNPACK_PREPARE);
+        if (LF_ISSET(WT_CELL_PREPARE))
             tw->prepare = 1;
-        }
         if (LF_ISSET(WT_CELL_TS_START))
             WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &tw->start_ts));
         if (LF_ISSET(WT_CELL_TXN_START))

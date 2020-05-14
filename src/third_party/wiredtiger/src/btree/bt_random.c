@@ -474,7 +474,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     uint64_t n, skip;
     uint32_t read_flags;
 
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     session = CUR2S(cbt);
 

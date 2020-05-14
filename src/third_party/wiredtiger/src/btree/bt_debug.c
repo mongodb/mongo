@@ -878,12 +878,15 @@ int
 __wt_debug_cursor_page(void *cursor_arg, const char *ofile)
   WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-    WT_CURSOR *cursor;
     WT_CURSOR_BTREE *cbt;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
 
-    cursor = cursor_arg;
     cbt = cursor_arg;
-    return (__wt_debug_page(cursor->session, cbt->btree, cbt->ref, ofile));
+    session = CUR2S(cursor_arg);
+
+    WT_WITH_BTREE(session, CUR2BT(cbt), ret = __wt_debug_page(session, NULL, cbt->ref, ofile));
+    return (ret);
 }
 
 /*
@@ -905,7 +908,7 @@ __wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
 
     WT_RET(__wt_hs_cursor(session, &session_flags, &is_owner));
     cbt = (WT_CURSOR_BTREE *)session->hs_cursor;
-    ret = __wt_debug_tree_all(session, cbt->btree, NULL, ofile);
+    WT_WITH_BTREE(session, CUR2BT(cbt), ret = __wt_debug_tree_all(session, NULL, NULL, ofile));
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
 
     return (ret);
