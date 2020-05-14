@@ -249,7 +249,7 @@ repos:
       - s390x
       - arm64
     repos:
-      - apt/ubuntu/dists/bionic/mongodb-org
+      - apt/ubuntu/dists/focal/mongodb-org
 
 ####################
 #
@@ -468,4 +468,4 @@ repos:
       - s390x
       - arm64
     repos:
-      - apt/ubuntu/dists/bionic/mongodb-enterprise
+      - apt/ubuntu/dists/focal/mongodb-enterprise
