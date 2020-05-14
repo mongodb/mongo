@@ -88,6 +88,22 @@ public:
         return false;
     }
 
+    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
+                                                 repl::ReadConcernLevel level) const final {
+
+        static const Status kReadConcernNotSupported{ErrorCodes::InvalidOptions,
+                                                     "read concern not supported"};
+        static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
+                                                            "default read concern not permitted"};
+        // The dbHash command only supports local and snapshot read concern. Additionally, snapshot
+        // read concern is only supported if test commands are enabled.
+        return {{level != repl::ReadConcernLevel::kLocalReadConcern &&
+                     (!getTestCommandsEnabled() ||
+                      level != repl::ReadConcernLevel::kSnapshotReadConcern),
+                 kReadConcernNotSupported},
+                kDefaultReadConcernNotPermitted};
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {
