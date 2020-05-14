@@ -145,6 +145,9 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
     std::string dbname = request.getDatabase().toString();
     const BSONObj& cmdObj = request.body;
+    uassert(ErrorCodes::FailedToParse,
+            "Unrecognized field 'jsonSchema'. This command may be meant for a mongocryptd process.",
+            !cmdObj.hasField("jsonSchema"_sd));
     ExplainOptions::Verbosity verbosity = uassertStatusOK(ExplainOptions::parseCmdBSON(cmdObj));
     uassert(ErrorCodes::BadValue,
             "explain command requires a nested object",
