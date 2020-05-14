@@ -35,13 +35,6 @@ else
   echo "Using java binary [$JAVA_BINARY]"
 fi
 
-# Count CPUs. Linux has cpuinfo, Mac has sysctl, otherwise use a default.
-if [ -e "/proc/cpuinfo" ]; then
-  WORKERS=$(grep -c processor /proc/cpuinfo)
-elif ! WORKERS=$(sysctl -n hw.logicalcpu); then
-  WORKERS=8 # default
-fi
-
 cd "$1"
 # Defer liveness checks to the end with -lncheck, for speed.
-"$JAVA_BINARY" -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -lncheck final -workers "$WORKERS" "$TLA_FILE"
+"$JAVA_BINARY" -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -lncheck final -workers auto "$TLA_FILE"
