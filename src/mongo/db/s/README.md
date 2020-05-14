@@ -154,7 +154,7 @@ version information from another node.
 
 For each request sent from an origin node to a remote node, the origin node will attach its cached
 version information for the corresponding chunk or database. There are two possible versioning
-scenarios: 
+scenarios:
 
 1. If the remote node detects a shard version mismatch, the remote node will return a message to the origin node stating as such. Whichever node that reports having an older version will attempt to refresh. The origin node will then retry the request.
 1. If the remote node and the origin node have the same version, the request will proceed.
@@ -187,7 +187,7 @@ Ignore the chunk version for this request | 0             | 0             | Max 
 
 Database version conventions
 
-Convention Type | UUID   | Last Modified | 
+Convention Type | UUID   | Last Modified |
 --------------- | ----   | ------------- |
 New database    | UUID() | 1             |
 Config database | UUID() | 0             |
@@ -284,7 +284,7 @@ This sequence of steps is orchestrated by the MigrationCoordinator:
 config.migrationCoordinators collection. This document contains a unique ID along with other fields that are needed to recover the migration upon failure.
 1. The donor shard writes the [range deletion document](https://github.com/mongodb/mongo/blob/49159e1cf859d21c767f6b582dd6e6b2d675808d/src/mongo/db/s/range_deletion_task.idl#L50-L76) to its local config.rangeDeletions collection with the pending flag set to true. This will prevent the range from being deleted until it is marked as ready.
 1. Before the recipient shard begins migrating documents from the donor, if there is an overlapping range already in the config.rangeDeletions collection, the recipient will [wait for it to be deleted](https://github.com/mongodb/mongo/blob/ea576519e5c3445bf11aa7f880aedbee1501010c/src/mongo/db/s/migration_destination_manager.cpp#L865-L885). The recipient then [writes a range deletion document](https://github.com/mongodb/mongo/blob/ea576519e5c3445bf11aa7f880aedbee1501010c/src/mongo/db/s/migration_destination_manager.cpp#L895) to its local config.rangeDeletions collection before the clone step begins.
-1. Once the migration is completed, the MigrationCoordinator records the decision in the migration coordinator document on the donor. 
+1. Once the migration is completed, the MigrationCoordinator records the decision in the migration coordinator document on the donor.
     * If the migration succeeded, then the commit sequence is executed. This involves [deleting the range deletion document on the recipient](https://github.com/mongodb/mongo/blob/49159e1cf859d21c767f6b582dd6e6b2d675808d/src/mongo/db/s/migration_coordinator.cpp#L204) and then [marking the range](https://github.com/mongodb/mongo/blob/49159e1cf859d21c767f6b582dd6e6b2d675808d/src/mongo/db/s/migration_coordinator.cpp#L211) as ready to be deleted on the donor. The range is then [submitted for deletion](https://github.com/mongodb/mongo/blob/49159e1cf859d21c767f6b582dd6e6b2d675808d/src/mongo/db/s/migration_coordinator.cpp#L225) on the donor.
     * If the migration failed, then the abort sequence is executed. This involves [deleting the range deletion task on the donor](https://github.com/mongodb/mongo/blob/49159e1cf859d21c767f6b582dd6e6b2d675808d/src/mongo/db/s/migration_coordinator.cpp#L255) and then [marking the range as ready](https://github.com/mongodb/mongo/blob/49159e1cf859d21c767f6b582dd6e6b2d675808d/src/mongo/db/s/migration_coordinator.cpp#L261) to be deleted on the recipient. The range is then [submitted for deletion](https://github.com/mongodb/mongo/blob/52a73692175cad37f942ff5e6f3d70aacbbb113d/src/mongo/db/s/shard_server_op_observer.cpp#L383-L393) on the recipient by the ShardServerOpObserver when the [write is committed]((https://github.com/mongodb/mongo/blob/52a73692175cad37f942ff5e6f3d70aacbbb113d/src/mongo/db/s/shard_server_op_observer.cpp#L131)).
 1. The migration coordinator document is then [deleted](https://github.com/mongodb/mongo/blob/49159e1cf859d21c767f6b582dd6e6b2d675808d/src/mongo/db/s/migration_coordinator.cpp#L270).
@@ -520,7 +520,36 @@ transactions table. Inside the class, this is known as the "reap" function. Ever
 * [The periodic job to clean up the session catalog and transactions table (the "reap" function)](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache_impl.cpp#L141-L205)
 * [Location of the session catalog and transactions table cleanup code on mongod](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/session_catalog_mongod.cpp#L331-L398)
 
-## The logical sessions catalog
+## The logical session catalog
+
+The logical session catalog of a mongod or mongos is an in-memory catalog that stores the runtime state
+for sessions with transactions or retryable writes on that node. The runtime state of each session is
+maintained by the session checkout mechanism, which also serves to serialize client operations on
+the session. This mechanism requires every operation with an `lsid` and a `txnNumber` (i.e.
+transaction and retryable write) to check out its session from the session catalog prior to execution,
+and to check the session back in upon completion. When a session is checked out, it remains unavailable
+until it is checked back in, forcing other operations to wait for the ongoing operation to complete
+or yield the session.
+
+The runtime state for a session consists of the last checkout time and operation, the number of operations
+waiting to check out the session, and the number of kills requested. The last checkout time is used by
+the periodic job inside the logical session cache to determine when a session should be reaped from the
+session catalog, whereas the number of operations waiting to check out a session is used to block reaping
+of sessions that are still in use. The last checkout operation is used to determine the operation to kill
+when a session is killed, whereas the number of kills requested is used to make sure that sessions
+are only killed on the first kill request.
+
+To keep the in-memory transaction state of all sessions in sync with the content of the `config.transactions`
+collection (the collection that stores documents used to support retryable writes and transactions), the
+transaction state and the session catalog on each mongod is [invalidated](https://github.com/mongodb/mongo/blob/56655b06ac46825c5937ccca5947dc84ccbca69c/src/mongo/db/session_catalog_mongod.cpp#L324) whenever the `config.transactions` collection is dropped and whenever there is a rollback. When invalidation occurs, all
+active sessions are killed, and the in-memory transaction state is marked as invalid to force it to be
+[reloaded from storage the next time a session is checked out](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog_mongod.cpp#L426).
+
+#### Code references
+* [**SessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog.h)
+* [**MongoDSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog_mongod.h)
+* [**RouterSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/session_catalog_router.h)
+* How [**mongod**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/service_entry_point_common.cpp#L537) and [**mongos**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/strategy.cpp#L412) check out a session prior to executing a command.
 
 ## Retryable writes
 
