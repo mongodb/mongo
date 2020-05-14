@@ -399,6 +399,11 @@ std::unique_ptr<Result> Suite::run(const std::string& filter,
             continue;
         }
 
+        // This test hasn't been skipped, and is about to run. If it's the first one in this suite
+        // (ie. _tests is zero), then output the suite header before running it.
+        if (r->_tests == 0) {
+            LOGV2(23063, "Running", "suite"_attr = _name);
+        }
         ++r->_tests;
 
         struct Event {
@@ -444,7 +449,10 @@ std::unique_ptr<Result> Suite::run(const std::string& filter,
 
     r->_millis = timer.millis();
 
-    LOGV2(23060, "Done running tests");
+    // Only show the footer if some tests were run in this suite.
+    if (r->_tests > 0) {
+        LOGV2(23060, "Done running tests");
+    }
 
     return r;
 }
@@ -481,7 +489,6 @@ int Suite::run(const std::vector<std::string>& suites,
         std::shared_ptr<Suite>& s = suitesMap()[name];
         fassert(16145, s != nullptr);
 
-        LOGV2(23063, "Running", "suite"_attr = name);
         auto result = s->run(filter, fileNameFilter, runsPerTest);
         results.push_back(std::move(result));
     }
@@ -514,8 +521,11 @@ int Suite::run(const std::vector<std::string>& suites,
     totals._millis = millis;
 
     for (const auto& r : results) {
-        LOGV2_OPTIONS(
-            4680101, {logv2::LogTruncation::Disabled}, "Result", "suite"_attr = r->toBSON());
+        // Only show results from a suite if some tests were run in it.
+        if (r->_tests > 0) {
+            LOGV2_OPTIONS(
+                4680101, {logv2::LogTruncation::Disabled}, "Result", "suite"_attr = r->toBSON());
+        }
     }
     LOGV2(23065, "Totals", "totals"_attr = totals.toBSON());
 
