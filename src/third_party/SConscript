@@ -14,7 +14,7 @@ Import("wiredtiger")
 boostSuffix = "-1.70.0"
 snappySuffix = '-1.1.7'
 zlibSuffix = '-1.2.11'
-zstdSuffix = '-1.4.3'
+zstdSuffix = '-1.4.4'
 pcreSuffix = "-8.42"
 mozjsSuffix = '-60'
 yamlSuffix = '-0.6.2'

@@ -51,7 +51,7 @@ a notice will be included in
 | [wiredtiger]               |                   |                  | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
 | [yaml-cpp]                 | MIT               | 0.6.3            | 0.6.2             |                      |                ✗                |
 | [Zlib]                     | Zlib              | 1.2.11           | 1.2.11            |          ✗           |                ✗                |
-| [Zstandard]                | BSD-3-Clause      | 1.4.4            | 1.4.3             |          ✗           |                ✗                |
+| [Zstandard]                | BSD-3-Clause      | 1.4.4            | 1.4.4             |          ✗           |                ✗                |
 
 [abseil-cpp]: https://github.com/abseil/abseil-cpp
 [ASIO]: https://github.com/chriskohlhoff/asio

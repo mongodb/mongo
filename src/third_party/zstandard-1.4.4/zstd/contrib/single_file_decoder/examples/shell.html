@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+	<title>Emscripten Shell</title>
+	<style>
+body   {background:#333; font-family:"Verdana","Helvetica Neue","Helvetica","Arial",sans-serif; margin:1em 0;}
+#canvas{position:absolute; top:0px; left:0px; border:none; margin:0; width: 100%; height: 100%; overflow: hidden; display: block;}
+	</style>
+</head>
+<body>
+	<canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+	<script>
+function trace(msg) {
+	console.log(msg);
+}
+
+var Module = {
+	print: trace, printErr: trace, setStatus: trace, monitorRunDependencies: trace,
+	canvas: (function() {
+		return document.getElementById("canvas");
+	})(),
+	preRun: [], postRun: [],
+};
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>
