@@ -106,9 +106,10 @@ bool sustainerAdvanced(const std::vector<repl::MemberData>& prevMemberData,
     if (currMemberData.size() == 0 || currMemberData.size() != prevMemberData.size()) {
         LOGV2_WARNING(22223,
                       "Flow control detected a change in topology. PrevMemberSize: "
-                      "{prevMemberData_size} CurrMemberSize: {currMemberData_size}",
-                      "prevMemberData_size"_attr = prevMemberData.size(),
-                      "currMemberData_size"_attr = currMemberData.size());
+                      "{prevSize} CurrMemberSize: {currSize}",
+                      "Flow control detected a change in topology",
+                      "prevSize"_attr = prevMemberData.size(),
+                      "currSize"_attr = currMemberData.size());
         return false;
     }
 
@@ -118,9 +119,10 @@ bool sustainerAdvanced(const std::vector<repl::MemberData>& prevMemberData,
     if (currSustainerAppliedTs < prevSustainerAppliedTs) {
         LOGV2_WARNING(22224,
                       "Flow control's sustainer time decreased. PrevSustainer: "
-                      "{prevSustainerAppliedTs} CurrSustainer: {currSustainerAppliedTs}",
-                      "prevSustainerAppliedTs"_attr = prevSustainerAppliedTs,
-                      "currSustainerAppliedTs"_attr = currSustainerAppliedTs);
+                      "{prevApplied} CurrSustainer: {currApplied}",
+                      "Flow control's sustainer time decreased",
+                      "prevApplied"_attr = prevSustainerAppliedTs,
+                      "currApplied"_attr = currSustainerAppliedTs);
         return false;
     }
 
