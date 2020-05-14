@@ -471,8 +471,10 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
 
     // Read the commit quorum value from config.system.indexBuilds collection.
-    auto swCommitQuorum = indexbuildentryhelpers::getCommitQuorum(opCtx, replState->buildUUID);
-    auto commitQuorum = invariantStatusOK(swCommitQuorum);
+    auto commitQuorum = uassertStatusOKWithContext(
+        indexbuildentryhelpers::getCommitQuorum(opCtx, replState->buildUUID),
+        str::stream() << "failed to get commit quorum before committing index build: "
+                      << replState->buildUUID);
 
     // Check if the commit quorum is disabled for the index build.
     if (commitQuorum.numNodes != CommitQuorumOptions::kDisabled) {

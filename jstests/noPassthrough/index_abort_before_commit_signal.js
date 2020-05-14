@@ -49,15 +49,17 @@ checkLog.containsJson(primary, 4656010);
 // Unblock the index build and wait for the threads to join.
 failPoint.off();
 
-abortIndexThread({checkExitSuccess: false});
+abortIndexThread();
 
-createIndex({checkExitSuccess: false});
+// Index build should be removed from the config.system.indexBuilds collection.
+assert.isnull(indexBuildsColl.findOne({_id: indexBuildUUID}));
 
-assert.soon(function() {
-    return rawMongoProgramOutput().search(
-               /Invariant failure.*NoMatchingDocument: No matching IndexBuildEntry found/) >= 0;
-});
+createIndex();
 
-TestData.skipCheckDBHashes = true;
+jsTestLog('Waiting for index build to complete');
+IndexBuildTest.waitForIndexBuildToStop(testDB, coll.getName(), 'a_1');
+
+IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+
 rst.stopSet();
 })();
