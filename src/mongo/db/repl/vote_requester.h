@@ -51,7 +51,13 @@ class VoteRequester {
     VoteRequester& operator=(const VoteRequester&) = delete;
 
 public:
-    enum class Result { kSuccessfullyElected, kStaleTerm, kInsufficientVotes, kPrimaryRespondedNo };
+    enum class Result {
+        kSuccessfullyElected,
+        kStaleTerm,
+        kInsufficientVotes,
+        kPrimaryRespondedNo,
+        kCancelled
+    };
 
     class Algorithm : public ScatterGatherAlgorithm {
     public:

@@ -3004,6 +3004,59 @@ TEST_F(PrimaryCatchUpTest, CatchUpFailsDueToPrimaryStepDown) {
                   .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
 }
 
+class VoteRequesterRunnerTest : public ReplCoordTest {
+protected:
+    void testVoteRequesterCancellation(bool dryRun) {
+        auto configObj = configWithMembers(
+            2, 1, BSON_ARRAY(member(1, "node1:12345") << member(2, "node2:12345")));
+        assertStartSuccess(configObj, {"node1", 12345});
+        // Clean up existing heartbeat requests on startup.
+        replyToReceivedHeartbeatV1();
+
+        auto config = ReplSetConfig::parse(configObj);
+        auto selfIndex = 0;
+        auto newTerm = 2;
+        OpTime lastApplied{Timestamp(1, 1), 1};
+        VoteRequester voteRequester;
+        auto endEvh = voteRequester.start(
+            getReplExec(), config, selfIndex, newTerm, dryRun, lastApplied, -1 /* primaryIndex */);
+        ASSERT_OK(endEvh.getStatus());
+
+        // Process a vote request.
+        enterNetwork();
+        auto noi = getNet()->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        LOGV2(
+            214650, "processing", "target"_attr = request.target, "request"_attr = request.cmdObj);
+        ASSERT_EQ(request.cmdObj.firstElement().fieldNameStringData(), "replSetRequestVotes");
+
+        ReplSetRequestVotesResponse response;
+        response.setVoteGranted(true);
+        response.setTerm(newTerm);
+        auto responseObj = (BSONObjBuilder(response.toBSON()) << "ok" << 1).obj();
+        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));
+        getNet()->runReadyNetworkOperations();
+        exitNetwork();
+
+        // Election succeeds.
+        ASSERT(voteRequester.getResult() == VoteRequester::Result::kSuccessfullyElected);
+
+        voteRequester.cancel();
+        ASSERT(voteRequester.getResult() == VoteRequester::Result::kCancelled);
+
+        // The event should be signaled, so this returns immediately.
+        getReplExec()->waitForEvent(endEvh.getValue());
+    }
+};
+
+TEST_F(VoteRequesterRunnerTest, DryRunCancel) {
+    testVoteRequesterCancellation(true);
+}
+
+TEST_F(VoteRequesterRunnerTest, Cancel) {
+    testVoteRequesterCancellation(false);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
