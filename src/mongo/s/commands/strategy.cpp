@@ -77,6 +77,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/session_catalog_router.h"
@@ -891,6 +892,26 @@ void runCommand(OperationContext* opCtx,
     }
 }
 
+/**
+ * Attaches the topology version to the response.
+ */
+void attachTopologyVersionDuringShutdown(OperationContext* opCtx,
+                                         const DBException& ex,
+                                         BSONObjBuilder* errorBuilder) {
+    // Only attach the topology version if the mongos is in quiesce mode. If the mongos is in
+    // quiesce mode, this shutdown error is due to mongos rather than a shard.
+    auto code = ex.code();
+    if (code && ErrorCodes::isA<ErrorCategory::ShutdownError>(code)) {
+        if (auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx);
+            mongosTopCoord && mongosTopCoord->inQuiesceMode()) {
+            // Append the topology version to the response.
+            const auto topologyVersion = mongosTopCoord->getTopologyVersion();
+            BSONObjBuilder topologyVersionBuilder(errorBuilder->subobjStart("topologyVersion"));
+            topologyVersion.serialize(&topologyVersionBuilder);
+        }
+    }
+}
+
 }  // namespace
 
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
@@ -1078,10 +1099,13 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
         if (propagateException) {
             throw;
         }
+
         reply->reset();
         auto bob = reply->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(bob, ex.toStatus());
         appendRequiredFieldsToResponse(opCtx, &bob);
+
+        attachTopologyVersionDuringShutdown(opCtx, ex, &errorBuilder);
         bob.appendElements(errorBuilder.obj());
     }
 

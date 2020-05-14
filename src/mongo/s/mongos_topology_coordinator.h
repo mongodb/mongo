@@ -81,6 +81,12 @@ public:
         return _topologyVersion;
     }
 
+    bool inQuiesceMode() const {
+        stdx::lock_guard lk(_mutex);
+        return _inQuiesceMode;
+    }
+
+
 private:
     using SharedPromiseOfMongosIsMasterResponse =
         SharedPromise<std::shared_ptr<const MongosIsMasterResponse>>;

@@ -138,6 +138,8 @@ MONGO_FAIL_POINT_DEFINE(failReplicaSetChangeConfigServerUpdateHook);
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(pauseWhileKillingOperationsAtShutdown);
+
 #if defined(_WIN32)
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoS", L"MongoDB Router", L"MongoDB Sharding Router"};
@@ -315,6 +317,11 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 
         if (serviceContext) {
             serviceContext->setKillAllOperations();
+
+            if (MONGO_unlikely(pauseWhileKillingOperationsAtShutdown.shouldFail())) {
+                LOGV2(4701800, "pauseWhileKillingOperationsAtShutdown failpoint enabled");
+                sleepsecs(1);
+            }
         }
 
         // Perform all shutdown operations after setKillAllOperations is called in order to ensure
