@@ -3450,6 +3450,97 @@ TEST_F(ReplCoordTest, DoNotEnterQuiesceModeInStatesOtherThanSecondary) {
     ASSERT_FALSE(getReplCoord()->enterQuiesceModeIfSecondary());
 }
 
+TEST_F(ReplCoordTest, IsMasterReturnsErrorInQuiesceModeWhenNodeIsRemoved) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 2))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
+
+    // Enter quiesce mode. Test that we increment the topology version.
+    auto topologyVersionBeforeQuiesceMode = getTopoCoord().getTopologyVersion();
+    ASSERT(getReplCoord()->enterQuiesceModeIfSecondary());
+    auto topologyVersionAfterQuiesceMode = getTopoCoord().getTopologyVersion();
+    ASSERT_EQUALS(topologyVersionBeforeQuiesceMode.getCounter() + 1,
+                  topologyVersionAfterQuiesceMode.getCounter());
+
+    // Remove the node.
+    auto net = getNet();
+    enterNetwork();
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    auto&& request = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("node2", 12345), request.target);
+    ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+    ReplSetHeartbeatResponse hbResp;
+    auto removedFromConfig =
+        ReplSetConfig::parse(BSON("_id"
+                                  << "mySet"
+                                  << "protocolVersion" << 1 << "version" << 2 << "members"
+                                  << BSON_ARRAY(BSON("host"
+                                                     << "node2:12345"
+                                                     << "_id" << 2))));
+    hbResp.setConfig(removedFromConfig);
+    hbResp.setConfigVersion(2);
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
+    net->runReadyNetworkOperations();
+    exitNetwork();
+
+    // Wait for the node to be removed. Test that we increment the topology version.
+    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
+    ASSERT_EQUALS(removedFromConfig.getConfigVersion(),
+                  getReplCoord()->getConfig().getConfigVersion());
+    auto topologyVersionAfterRemoved = getTopoCoord().getTopologyVersion();
+    ASSERT_EQUALS(topologyVersionAfterQuiesceMode.getCounter() + 1,
+                  topologyVersionAfterRemoved.getCounter());
+
+    // Test isMaster requests.
+
+    auto opCtx = makeOperationContext();
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+
+    // Stale topology version
+    ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
+                           opCtx.get(), {}, topologyVersionAfterQuiesceMode, deadline),
+                       AssertionException,
+                       ErrorCodes::ShutdownInProgress);
+
+    // Current topology version
+    ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
+                           opCtx.get(), {}, topologyVersionAfterRemoved, deadline),
+                       AssertionException,
+                       ErrorCodes::ShutdownInProgress);
+
+    // Different process ID
+    auto differentPid = OID::gen();
+    ASSERT_NOT_EQUALS(differentPid, topologyVersionAfterRemoved.getProcessId());
+    auto topologyVersionWithDifferentProcessId =
+        TopologyVersion(differentPid, topologyVersionAfterRemoved.getCounter());
+    ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
+                           opCtx.get(), {}, topologyVersionWithDifferentProcessId, deadline),
+                       AssertionException,
+                       ErrorCodes::ShutdownInProgress);
+
+    // No topology version
+    ASSERT_THROWS_CODE(
+        getReplCoord()->awaitIsMasterResponse(opCtx.get(), {}, boost::none, boost::none),
+        AssertionException,
+        ErrorCodes::ShutdownInProgress);
+}
+
 TEST_F(ReplCoordTest, AllIsMasterFieldsRespectHorizon) {
     init();
     const auto primaryHostName = "node1:12345";
