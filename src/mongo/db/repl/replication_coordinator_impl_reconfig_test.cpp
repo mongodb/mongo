@@ -1402,7 +1402,6 @@ TEST_F(ReplCoordReconfigTest, StartElectionOnReconfigToSingleNode) {
 
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getReplCoord()->getMemberState().s);
 }
-
 }  // anonymous namespace
 }  // namespace repl
 }  // namespace mongo

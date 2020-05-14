@@ -200,20 +200,23 @@ void ReplicationCoordinatorImpl::_processDryRunResult(long long originalTerm,
         return;
     }
 
-    const VoteRequester::Result endResult = _voteRequester->getResult();
-
-    if (endResult == VoteRequester::Result::kInsufficientVotes) {
-        LOGV2(21440, "Not running for primary, we received insufficient votes");
-        return;
-    } else if (endResult == VoteRequester::Result::kStaleTerm) {
-        LOGV2(21441, "Not running for primary, we have been superseded already");
-        return;
-    } else if (endResult == VoteRequester::Result::kPrimaryRespondedNo) {
-        LOGV2(21442, "Not running for primary, the current primary responded no in the dry run");
-        return;
-    } else if (endResult != VoteRequester::Result::kSuccessfullyElected) {
-        LOGV2(21443, "Not running for primary, we received an unexpected problem");
-        return;
+    const auto endResult = _voteRequester->getResult();
+    switch (endResult) {
+        case VoteRequester::Result::kInsufficientVotes:
+            LOGV2(21440, "Not running for primary, we received insufficient votes");
+            return;
+        case VoteRequester::Result::kStaleTerm:
+            LOGV2(21441, "Not running for primary, we have been superseded already");
+            return;
+        case VoteRequester::Result::kPrimaryRespondedNo:
+            LOGV2(21442,
+                  "Not running for primary, the current primary responded no in the dry run");
+            return;
+        case VoteRequester::Result::kCancelled:
+            LOGV2(214400, "Not running for primary, election has been cancelled");
+            return;
+        case VoteRequester::Result::kSuccessfullyElected:
+            break;
     }
 
     long long newTerm = originalTerm + 1;
@@ -368,6 +371,9 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm,
     invariant(endResult != VoteRequester::Result::kPrimaryRespondedNo);
 
     switch (endResult) {
+        case VoteRequester::Result::kCancelled:
+            LOGV2(214480, "Not becoming primary, election has been cancelled");
+            return;
         case VoteRequester::Result::kInsufficientVotes:
             LOGV2(21448, "Not becoming primary, we received insufficient votes");
             return;
