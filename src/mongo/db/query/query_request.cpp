@@ -396,6 +396,12 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
                 return status;
             }
             qr->_internalReadAtClusterTime = el.timestamp();
+        } else if (isMongocryptdArgument(fieldName)) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "Failed to parse: " << cmdObj.toString()
+                              << ". Unrecognized field '" << fieldName
+                              << "'. This command may be meant for a mongocryptd process.");
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "

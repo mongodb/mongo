@@ -170,6 +170,9 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
     std::string dbName = request.getDatabase().toString();
     const BSONObj& cmdObj = request.body;
+    uassert(ErrorCodes::FailedToParse,
+            "Unrecognized field 'jsonSchema'. This command may be meant for a mongocryptd process.",
+            !cmdObj.hasField("jsonSchema"_sd));
     ExplainOptions::Verbosity verbosity = uassertStatusOK(ExplainOptions::parseCmdBSON(cmdObj));
 
     // This is the nested command which we are explaining. We need to propagate generic

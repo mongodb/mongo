@@ -249,6 +249,10 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
             } else {
                 writeConcernOptionsSet = true;
             }
+        } else if (isMongocryptdArgument(field)) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "unrecognized field '" << field
+                                  << "'. This command may be meant for a mongocryptd process."};
         } else if (!isGenericArgument(field) &&
                    !std::count(_knownFields.begin(), _knownFields.end(), field)) {
             return {ErrorCodes::Error(51177),

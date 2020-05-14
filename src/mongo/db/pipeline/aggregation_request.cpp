@@ -234,6 +234,10 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
+        } else if (isMongocryptdArgument(fieldName)) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "unrecognized field '" << elem.fieldName()
+                                  << "'. This command may be meant for a mongocryptd process."};
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};

@@ -107,4 +107,8 @@ bool isReplyStripArgument(StringData arg) {
     return p && p->stripFromReply;
 }
 
+bool isMongocryptdArgument(StringData arg) {
+    return arg == "jsonSchema"_sd;
+}
+
 }  // namespace mongo
