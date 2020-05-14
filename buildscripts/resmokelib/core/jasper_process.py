@@ -30,10 +30,13 @@ class Process(_process.Process):
 
     def start(self):
         """Start the process and the logger pipes for its stdout and stderr."""
-        log_type = self.jasper_pb2.LogType.Value("LOGINHERIT")
         log_format = self.jasper_pb2.LogFormat.Value("LOGFORMATPLAIN")
-        log_options = self.jasper_pb2.LogOptions(format=log_format)
-        logger = self.jasper_pb2.Logger(log_type=log_type, log_options=log_options)
+        log_level = self.jasper_pb2.LogLevel()
+        buffered = self.jasper_pb2.BufferOptions()
+        base_opts = self.jasper_pb2.BaseOptions(format=log_format, level=log_level, buffer=buffered)
+        log_opts = self.jasper_pb2.InheritedLoggerOptions(base=base_opts)
+        logger = self.jasper_pb2.LoggerConfig()
+        logger.inherited.CopyFrom(log_opts)
 
         output_opts = self.jasper_pb2.OutputOptions(loggers=[logger])
         create_options = self.jasper_pb2.CreateOptions(

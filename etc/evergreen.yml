@@ -1766,6 +1766,9 @@ functions:
     - *update_task_timeout
     - command: expansions.update
       params:
+        env:
+          CEDAR_USER: ${cedar_user}
+          CEDAR_API_KEY: ${cedar_api_key}
         updates:
         - key: aws_key_remote
           value: ${mongodatafiles_aws_key}

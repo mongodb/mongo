@@ -4,70 +4,144 @@ package jasper;
 option go_package = "internal";
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 
-message Logger {
-    LogType log_type = 1;
-    LogOptions log_options = 2;
+message LoggerConfig {
+  oneof producer {
+    DefaultLoggerOptions default = 1;
+    FileLoggerOptions file = 2;
+    InheritedLoggerOptions inherited = 3;
+    SumoLogicLoggerOptions sumo = 4;
+    InMemoryLoggerOptions in_memory = 5;
+    SplunkLoggerOptions splunk = 6;
+    BuildloggerV2Options buildloggerv2 = 7;
+    BuildloggerV3Options buildloggerv3 = 8;
+    RawLoggerConfig raw = 9;
+  }
+}
+
+message LogLevel {
+  int32 threshold = 1;
+  int32 default = 2;
+}
+
+message BufferOptions {
+  bool buffered = 1;
+  int64 duration = 2;
+  int64 max_size = 3;
+}
+
+enum LogFormat {
+  LOGFORMATUNKNOWN = 0;
+  LOGFORMATDEFAULT = 1;
+  LOGFORMATJSON = 2;
+  LOGFORMATPLAIN = 3;
+}
+
+message BaseOptions {
+  LogLevel level = 1;
+  BufferOptions buffer = 2;
+  LogFormat format = 3;
+}
+
+message DefaultLoggerOptions {
+  string prefix = 1;
+  BaseOptions base = 2;
+}
+
+message FileLoggerOptions {
+  string filename = 1;
+  BaseOptions base = 2;
+}
+
+message InheritedLoggerOptions {
+  BaseOptions base = 1;
+}
+
+message SumoLogicLoggerOptions {
+  string sumo_endpoint = 1;
+  BaseOptions base = 2;
+}
+
+message InMemoryLoggerOptions {
+  int64 in_memory_cap = 1;
+  BaseOptions base = 2;
+}
+
+message SplunkInfo {
+  string url = 1;
+  string token = 2;
+  string channel = 3;
+}
+
+message SplunkLoggerOptions {
+  SplunkInfo splunk = 1;
+  BaseOptions base = 2;
+}
+
+message BuildloggerV2Info {
+  bool create_test = 1;
+  string url = 2;
+  int64 number = 3;
+  string phase = 4;
+  string builder = 5;
+  string test = 6;
+  string command = 7;
+}
+
+message BuildloggerV2Options {
+  BuildloggerV2Info buildlogger = 1;
+  BaseOptions base = 2;
+}
+
+message BuildloggerV3Info {
+  string project = 1;
+  string version = 2;
+  string variant = 3;
+  string task_name = 4;
+  string task_id = 5;
+  int32 execution = 6;
+  string test_name = 7;
+  int32 trial = 8;
+  string process_name = 9;
+  LogFormat format = 10;
+  repeated string tags = 11;
+  map<string, string> args = 12;
+  bool mainline = 13;
+  int64 max_buffer_size = 14;
+  int64 flush_interval = 15;
+  bool disable_new_line_check = 16;
+  string base_address = 17;
+  string rpc_port = 18;
+  bool insecure = 19;
+  string username = 20;
+  string api_key = 21;
+}
+
+message BuildloggerV3Options {
+  BuildloggerV3Info buildloggerv3 = 1;
+  string name = 2;
+  LogLevel level = 3;
+}
+
+enum RawLoggerConfigFormat {
+  RAWLOGGERCONFIGFORMATJSON = 0;
+  RAWLOGGERCONFIGFORMATBSON = 1;
+  RAWLOGGERCONFIGFORMATUNKNOWN = 2;
+}
+
+message RawLoggerConfig {
+  RawLoggerConfigFormat format = 1;
+  bytes config_data = 2;
 }
 
 message OutputOptions {
-  repeated Logger loggers = 1;
+  repeated LoggerConfig loggers = 1;
   bool suppress_output = 2;
   bool suppress_error = 3;
   bool redirect_output_to_error = 4;
   bool redirect_error_to_output = 5;
-}
-
-enum LogType {
-    LOGUNKNOWN = 0;
-    LOGBUILDLOGGERV2 = 1;
-    LOGBUILDLOGGERV3 = 2;
-    LOGDEFAULT = 3;
-    LOGFILE = 4;
-    LOGINHERIT = 5;
-    LOGSPLUNK = 6;
-    LOGSUMOLOGIC = 7;
-    LOGINMEMORY = 8;
-}
-
-enum LogFormat {
-    LOGFORMATUNKNOWN = 0;
-    LOGFORMATDEFAULT = 1;
-    LOGFORMATJSON = 2;
-    LOGFORMATPLAIN = 3;
-}
-
-message LogOptions {
-    BufferOptions buffer_options = 1;
-    BuildloggerOptions buildlogger_options = 2;
-    string default_prefix = 3;
-    string file_name = 4;
-    LogFormat format = 5;
-    int64 in_memory_cap = 6;
-    SplunkOptions splunk_options = 7;
-    string sumo_endpoint = 8;
-}
-
-message BufferOptions {
-    bool buffered = 1;
-    int64 duration = 2;
-    int64 max_size = 3;
-}
-
-message BuildloggerOptions {
-    bool create_test = 1;
-    string url = 2;
-    int64 number = 3;
-    string phase = 4;
-    string builder = 5;
-    string test = 6;
-    string command = 7;
-}
-
-message SplunkOptions {
-    string url = 1;
-    string token = 2;
-    string channel = 3;
 }
 
 message CreateOptions {
@@ -81,6 +155,11 @@ message CreateOptions {
   repeated CreateOptions on_failure = 8;
   repeated CreateOptions on_timeout = 9;
   OutputOptions output = 10;
+  bytes standard_input_bytes = 11;
+}
+
+message IDResponse {
+  string value = 1;
 }
 
 message ProcessInfo {
@@ -93,6 +172,8 @@ message ProcessInfo {
   bool timedout = 7;
   CreateOptions options = 8;
   int32 exit_code = 9;
+  google.protobuf.Timestamp start_at = 10;
+  google.protobuf.Timestamp end_at = 11;
 }
 
 message StatusResponse {
@@ -125,8 +206,8 @@ enum Signals {
   INIT = 4;
   USER1 = 5;
   USER2 = 6;
+  ABRT= 7;
 }
-
 
 message TagName {
   string value = 1;
@@ -148,45 +229,61 @@ message OperationOutcome {
 }
 
 message BuildOptions {
-    string target = 1;
-    string arch = 2;
-    string edition = 3;
-    bool debug = 4;
+  string target = 1;
+  string arch = 2;
+  string edition = 3;
+  bool debug = 4;
 }
 
 message MongoDBDownloadOptions {
-    BuildOptions build_options = 1;
-    string path = 2;
-    repeated string releases = 3;
+  BuildOptions build_opts = 1;
+  string path = 2;
+  repeated string releases = 3;
 }
 
 message CacheOptions {
-    bool disabled = 1;
-    int64 prune_delay = 2;
-    int64 max_size = 3;
+  bool disabled = 1;
+  int64 prune_delay_seconds = 2;
+  int64 max_size = 3;
 }
 
 enum ArchiveFormat {
-    ARCHIVEUNKNOWN = 0;
-    ARCHIVEAUTO = 1;
-    ARCHIVETARGZ = 2;
-    ARCHIVEZIP = 3;
+  ARCHIVEUNKNOWN = 0;
+  ARCHIVEAUTO = 1;
+  ARCHIVETARGZ = 2;
+  ARCHIVEZIP = 3;
 }
 
 message ArchiveOptions {
-    bool should_extract = 1;
-    ArchiveFormat format = 2;
-    string target_path = 3;
+  bool should_extract = 1;
+  ArchiveFormat format = 2;
+  string target_path = 3;
 }
 
 message DownloadInfo {
-    string url = 1;
-    string path = 2;
-    ArchiveOptions archive_opts = 3;
+  string url = 1;
+  string path = 2;
+  ArchiveOptions archive_opts = 3;
+}
+
+message WriteFileInfo {
+  string path = 1;
+  bytes content = 2;
+  bool append = 4;
+  uint32 perm = 3;
 }
 
 message BuildloggerURLs {
-    repeated string urls = 1;
+  repeated string urls = 1;
+}
+
+message LogRequest {
+  JasperProcessID id = 1;
+  int64 count = 2;
+}
+message LogStream {
+  repeated string logs = 1;
+  bool done = 2;
 }
 
 enum SignalTriggerID {
@@ -203,24 +300,182 @@ message EventName {
   string value = 1;
 }
 
+message ScriptingHarnessID {
+  string id = 1;
+  bool setup = 2;
+}
+
+message ScriptingOptionsGolang {
+  string gopath = 1;
+  string goroot = 2;
+  repeated string packages = 3;
+  string directory = 4;
+  bool update_packages = 5;
+}
+
+message ScriptingOptionsPython {
+  string virtual_env_path = 1;
+  string requirements_path = 2;
+  string interpreter_binary = 3;
+  repeated string packages = 4;
+  bool legacy_python = 5;
+  bool add_test_reqs = 6;
+}
+
+message ScriptingOptionsRoswell {
+  string path = 1;
+  repeated string systems = 2;
+  string lisp = 3;
+}
+
+message ScriptingOptions {
+  oneof value {
+    ScriptingOptionsGolang golang = 1;
+    ScriptingOptionsPython python = 2;
+    ScriptingOptionsRoswell roswell = 3;
+  }
+  map<string, string> environment = 4;
+  OutputOptions output = 5;
+  int64 duration = 6;
+}
+
+message ScriptingHarnessRunArgs {
+  string id = 1;
+  repeated string args = 2;
+}
+
+message ScriptingHarnessBuildArgs {
+  string id = 1;
+  string directory = 2;
+  repeated string args = 3;
+}
+
+message ScriptingHarnessBuildResponse {
+  OperationOutcome outcome = 1;
+  string path = 2;
+}
+
+message ScriptingHarnessRunScriptArgs {
+  string id = 1;
+  string script = 2;
+}
+
+message ScriptingHarnessTestArgs {
+  string id = 1;
+  string directory = 2;
+  repeated ScriptingHarnessTestOptions options = 3;
+}
+
+message ScriptingHarnessTestOptions {
+  string name = 1;
+  repeated string args = 2;
+  string pattern = 3;
+  google.protobuf.Duration timeout = 4;
+  int32 count = 5;
+}
+
+message ScriptingHarnessTestResult {
+  string name = 1;
+  google.protobuf.Timestamp start_at = 2;
+  google.protobuf.Duration duration = 3;
+  string outcome = 4;
+}
+
+message ScriptingHarnessTestResponse {
+  OperationOutcome outcome = 1;
+  repeated ScriptingHarnessTestResult results = 2;
+}
+
+message LoggingCacheCreateArgs {
+  string name = 1;
+  OutputOptions options = 2;
+}
+
+message LoggingCacheArgs {
+  string name = 1;
+}
+
+message LoggingCacheInstance {
+  OperationOutcome outcome = 1 ;
+  string id = 2;
+  string manager = 3;
+  google.protobuf.Timestamp accessed = 4;
+}
+
+message LoggingCacheSize {
+  OperationOutcome outcome = 1 ;
+  string id = 2;
+  int64 size = 3;
+}
+
+enum LoggingPayloadFormat {
+  FORMATUNKNONW = 0;
+  FORMATBSON = 1;
+  FORMATJSON = 2;
+  FORMATSTRING = 3;
+}
+
+message LoggingPayloadData {
+  oneof data {
+    string msg = 1;
+    bytes raw = 2;
+  }
+}
+
+message LoggingPayload {
+  string LoggerID = 1;
+  int32 priority = 2;
+  LoggingPayloadFormat format = 3;
+  bool is_multi = 4;
+  bool prefer_send_to_error = 5;
+  bool add_metadata = 6;
+  repeated LoggingPayloadData data = 7;
+}
+
 service JasperProcessManager {
-  rpc Status(google.protobuf.Empty) returns (StatusResponse);
+  // Manager functions
+  rpc ID(google.protobuf.Empty) returns (IDResponse);
   rpc Create(CreateOptions) returns (ProcessInfo);
   rpc List(Filter) returns (stream ProcessInfo);
   rpc Group(TagName) returns (stream ProcessInfo);
   rpc Get(JasperProcessID) returns (ProcessInfo);
-  rpc Wait(JasperProcessID) returns (OperationOutcome);
-  rpc Respawn(JasperProcessID) returns (ProcessInfo);
   rpc Signal(SignalProcess) returns (OperationOutcome);
   rpc Clear(google.protobuf.Empty) returns (OperationOutcome);
   rpc Close(google.protobuf.Empty) returns (OperationOutcome);
+
+  // Process functions
   rpc TagProcess(ProcessTags) returns (OperationOutcome);
   rpc ResetTags(JasperProcessID) returns (OperationOutcome);
   rpc GetTags(JasperProcessID) returns (ProcessTags);
+  rpc RegisterSignalTriggerID(SignalTriggerParams) returns (OperationOutcome);
+  rpc Wait(JasperProcessID) returns (OperationOutcome);
+  rpc Respawn(JasperProcessID) returns (ProcessInfo);
+
+  // ScriptingHarness functions
+  rpc ScriptingHarnessCreate(ScriptingOptions) returns (ScriptingHarnessID);
+  rpc ScriptingHarnessCheck(ScriptingHarnessID) returns (OperationOutcome);
+  rpc ScriptingHarnessSetup(ScriptingHarnessID) returns (OperationOutcome);
+  rpc ScriptingHarnessCleanup(ScriptingHarnessID) returns (OperationOutcome);
+  rpc ScriptingHarnessRun(ScriptingHarnessRunArgs) returns (OperationOutcome);
+  rpc ScriptingHarnessBuild(ScriptingHarnessBuildArgs) returns (ScriptingHarnessBuildResponse);
+  rpc ScriptingHarnessRunScript(ScriptingHarnessRunScriptArgs) returns (OperationOutcome);
+  rpc ScriptingHarnessTest(ScriptingHarnessTestArgs) returns (ScriptingHarnessTestResponse);
+
+  // Logging functions
+  rpc LoggingCacheCreate(LoggingCacheCreateArgs) returns (LoggingCacheInstance);
+  rpc LoggingCacheGet(LoggingCacheArgs) returns (LoggingCacheInstance);
+  rpc LoggingCacheRemove(LoggingCacheArgs) returns (OperationOutcome);
+  rpc LoggingCacheLen(google.protobuf.Empty) returns (LoggingCacheSize);
+  rpc LoggingCachePrune(google.protobuf.Timestamp) returns (OperationOutcome);
+
+  // Remote specific functions
+  rpc Status(google.protobuf.Empty) returns (StatusResponse);
+  rpc ConfigureCache(CacheOptions) returns (OperationOutcome);
   rpc DownloadFile(DownloadInfo) returns (OperationOutcome);
   rpc DownloadMongoDB(MongoDBDownloadOptions) returns (OperationOutcome);
-  rpc ConfigureCache(CacheOptions) returns (OperationOutcome);
+  rpc GetLogStream(LogRequest) returns (LogStream);
   rpc GetBuildloggerURLs(JasperProcessID) returns (BuildloggerURLs);
-  rpc RegisterSignalTriggerID(SignalTriggerParams) returns (OperationOutcome);
   rpc SignalEvent(EventName) returns (OperationOutcome);
+  rpc WriteFile(stream WriteFileInfo) returns (OperationOutcome);
+  rpc SendMessages(LoggingPayload) returns (OperationOutcome);
 }

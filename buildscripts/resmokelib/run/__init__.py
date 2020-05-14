@@ -297,10 +297,13 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
             self._archive.exit()
 
     # pylint: disable=too-many-instance-attributes,too-many-statements,too-many-locals
-    def _setup_jasper(self):
-        """Start up the jasper process manager."""
-        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    def _get_jasper_reqs(self):
+        """Ensure that we have all requirements for running jasper."""
+        root_dir = os.getcwd()
         proto_file = os.path.join(root_dir, "buildscripts", "resmokelib", "core", "jasper.proto")
+        if not os.path.exists(proto_file):
+            raise RuntimeError("Resmoke must be run from the root of the mongo repo.")
+
         try:
             well_known_protos_include = pkg_resources.resource_filename("grpc_tools", "_proto")
         except ImportError:
@@ -335,18 +338,12 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         if ret != 0:
             raise RuntimeError("Failed to generated gRPC files from the jasper.proto file")
 
-        sys.path.append(os.path.dirname(proto_out))
-
-        from jasper import jasper_pb2
-        from jasper import jasper_pb2_grpc
-
-        jasper_process.Process.jasper_pb2 = jasper_pb2
-        jasper_process.Process.jasper_pb2_grpc = jasper_pb2_grpc
+        sys.path.extend([os.path.dirname(proto_out), proto_out])
 
         curator_path = "build/curator"
         if sys.platform == "win32":
             curator_path += ".exe"
-        git_hash = "d846f0c875716e9377044ab2a50542724369662a"
+        git_hash = "d11f83290729dc42138af106fe01bc0714c24a8b"
         curator_exists = os.path.isfile(curator_path)
         curator_same_version = False
         if curator_exists:
@@ -376,10 +373,25 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
             with tarfile.open(mode="r|gz", fileobj=response.raw) as tf:
                 tf.extractall(path="./build/")
 
+        return curator_path
+
+    def _setup_jasper(self):
+        """Start up the jasper process manager."""
+        curator_path = self._get_jasper_reqs()
+
+        from jasper import jasper_pb2
+        from jasper import jasper_pb2_grpc
+
+        jasper_process.Process.jasper_pb2 = jasper_pb2
+        jasper_process.Process.jasper_pb2_grpc = jasper_pb2_grpc
+
         jasper_port = config.BASE_PORT - 1
         jasper_conn_str = "localhost:%d" % jasper_port
         jasper_process.Process.connection_str = jasper_conn_str
-        jasper_command = [curator_path, "jasper", "grpc", "--port", str(jasper_port)]
+        jasper_command = [
+            curator_path, "jasper", "service", "run", "rpc", "--port",
+            str(jasper_port)
+        ]
         self._jasper_server = process.Process(self._resmoke_logger, jasper_command)
         self._jasper_server.start()
 
