@@ -96,7 +96,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     const char *file;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
-    btree = cb->incr_cursor == NULL ? NULL : ((WT_CURSOR_BTREE *)cb->incr_cursor)->btree;
+    btree = cb->incr_cursor == NULL ? NULL : CUR2BT(cb->incr_cursor);
     raw = F_MASK(cursor, WT_CURSTD_RAW);
     CURSOR_API_CALL(cursor, session, get_value, btree);
     F_CLR(cursor, WT_CURSTD_RAW);

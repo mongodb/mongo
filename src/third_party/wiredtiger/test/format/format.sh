@@ -17,12 +17,13 @@ onintr()
 trap 'onintr' 2
 
 usage() {
-	echo "usage: $0 [-aEFSv] [-b format-binary] [-c config] "
+	echo "usage: $0 [-aEFSv] [-b format-binary] [-c config] [-e env-var]"
 	echo "    [-h home] [-j parallel-jobs] [-n total-jobs] [-t minutes] [format-configuration]"
 	echo
 	echo "    -a           abort/recovery testing (defaults to off)"
 	echo "    -b binary    format binary (defaults to "./t")"
 	echo "    -c config    format configuration file (defaults to CONFIG.stress)"
+	echo "    -e envvar    Environment variable setting (default to none)"
 	echo "    -E           skip known errors (defaults to off)"
 	echo "    -F           quit on first failure (defaults to off)"
 	echo "    -h home      run directory (defaults to .)"
@@ -77,6 +78,7 @@ timing_stress_split_test=0
 total_jobs=0
 verbose=0
 format_binary="./t"
+env_var=""
 
 while :; do
 	case "$1" in
@@ -88,6 +90,9 @@ while :; do
 		shift ; shift ;;
 	-c)
 		config="$2"
+		shift ; shift ;;
+	-e)
+		env_var="$2"
 		shift ; shift ;;
 	-E)
 		skip_errors=1
@@ -437,13 +442,22 @@ format()
 	fi
 
 	cmd="$format_binary -c "$config" -h "$dir" -1 $args quiet=1"
-	verbose "$name: $cmd"
+	echo "$name: $cmd"
 
 	# Disassociate the command from the shell script so we can exit and let the command
 	# continue to run.
 	# Run format in its own session so child processes are in their own process gorups
 	# and we can individually terminate (and clean up) running jobs and their children.
-	nohup setsid $cmd > $log 2>&1 &
+	eval $env_var setsid $cmd > $log 2>&1 &
+
+	# Check for setsid command failed execution, and forcibly quit.
+	# The RUNDIR is not successfully created in this failure type.
+	sleep 1
+	grep -E -i 'setsid: failed to execute' $log > /dev/null && {
+		failure=$(($failure + 1))
+		force_quit=1
+		echo "$name: job in $dir failed to execute"
+	}
 }
 
 seconds=$((minutes * 60))
@@ -504,4 +518,5 @@ echo "$name: $success successful jobs, $failure failed jobs"
 
 verbose "$name: run ending at $(date)"
 [[ $failure -ne 0 ]] && exit 1
+[[ $success -eq 0 ]] && exit 1
 exit 0

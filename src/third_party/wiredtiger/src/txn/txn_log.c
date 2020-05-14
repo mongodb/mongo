@@ -45,7 +45,7 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
         key.size = WT_INSERT_KEY_SIZE(cbt->ins);
     }
 
-    WT_ASSERT(session, __wt_compare(session, cbt->btree->collator, &key, &cursor->key, &cmp) == 0);
+    WT_ASSERT(session, __wt_compare(session, CUR2BT(cbt)->collator, &key, &cursor->key, &cmp) == 0);
     WT_ASSERT(session, cmp == 0);
 
     __wt_buf_free(session, &key);
@@ -74,7 +74,7 @@ __txn_op_log(
      * Log the row- or column-store insert, modify, remove or update. Our caller doesn't log reserve
      * operations, we shouldn't see them here.
      */
-    if (cbt->btree->type == BTREE_ROW) {
+    if (CUR2BT(cbt)->type == BTREE_ROW) {
 #ifdef HAVE_DIAGNOSTIC
         __txn_op_log_row_key_check(session, cbt);
 #endif

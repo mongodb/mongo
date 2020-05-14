@@ -730,7 +730,7 @@ __txn_fixup_prepared_update(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_CURSOR *
         } else
             tombstone = upd;
 
-        WT_WITH_BTREE(session, cbt->btree,
+        WT_WITH_BTREE(session, CUR2BT(cbt),
           ret = __wt_row_modify(cbt, &cbt->iface.key, NULL, tombstone, WT_UPDATE_INVALID, true));
         WT_ERR(ret);
         tombstone = NULL;
@@ -774,7 +774,7 @@ __txn_search_prepared_op(
     txn = session->txn;
 
     cursor = *cursorp;
-    if (cursor == NULL || ((WT_CURSOR_BTREE *)cursor)->btree->id != op->btree->id) {
+    if (cursor == NULL || CUR2BT(cursor)->id != op->btree->id) {
         *cursorp = NULL;
         if (cursor != NULL)
             WT_RET(cursor->close(cursor));

@@ -28,6 +28,12 @@ struct __wt_reconcile {
     /* Track the oldest running transaction. */
     uint64_t last_running;
 
+    /* Track the oldest running id. This one doesn't consider checkpoint. */
+    uint64_t rec_start_oldest_id;
+
+    /* Track the pinned timestamp at the time reconciliation started. */
+    wt_timestamp_t rec_start_pinned_ts;
+
     /* Track the page's min/maximum transactions. */
     uint64_t max_txn;
     wt_timestamp_t max_ts;

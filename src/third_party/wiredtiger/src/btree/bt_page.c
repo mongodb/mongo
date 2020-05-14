@@ -541,13 +541,14 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 
     btree = S2BT(session);
     prepare = false;
+    WT_CLEAR(buf);
 
-    instantiate_prepared = F_ISSET_ATOMIC(page, WT_PAGE_INSTANTIATE_PREPARE_UPDATE);
+    instantiate_prepared = F_ISSET(session, WT_SESSION_INSTANTIATE_PREPARE);
 
     /* Walk the page, building indices. */
     rip = page->pg_row;
     WT_CELL_FOREACH_KV (session, page->dsk, unpack) {
-        if (instantiate_prepared && !prepare && F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE))
+        if (instantiate_prepared && !prepare && unpack.tw.prepare)
             prepare = true;
         switch (unpack.type) {
         case WT_CELL_KEY_OVFL:
@@ -573,9 +574,9 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
              * The visibility information is not referenced on the page so we need to ensure that
              * the value is globally visible at the point in time where we read the page into cache.
              */
-            if (!btree->huffman_value && unpack.tw.stop_txn == WT_TXN_MAX &&
-              unpack.tw.stop_ts == WT_TS_MAX && !F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE) &&
-              __wt_txn_visible_all(session, unpack.tw.start_txn, unpack.tw.durable_start_ts))
+            if (!btree->huffman_value && (__wt_time_window_is_empty(&unpack.tw) ||
+                                           (!__wt_time_window_has_stop(&unpack.tw) &&
+                                             __wt_txn_tw_start_visible_all(session, &unpack.tw))))
                 __wt_row_leaf_value_set(page, rip - 1, &unpack);
             break;
         case WT_CELL_VALUE_OVFL:
@@ -605,8 +606,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
         WT_ROW_FOREACH (page, rip, i) {
             /* Unpack the on-page value cell. */
             __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
-            if (F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE)) {
-                if (unpack.tw.stop_ts == WT_TS_MAX && unpack.tw.stop_txn == WT_TXN_MAX) {
+            if (unpack.tw.prepare) {
+                if (!__wt_time_window_has_stop(&unpack.tw)) {
                     /* Take the value from the original page cell. */
                     WT_RET(__wt_page_cell_data_ref(session, page, &unpack, &buf));
 

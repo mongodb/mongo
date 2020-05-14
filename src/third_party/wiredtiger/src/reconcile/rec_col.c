@@ -982,7 +982,7 @@ compare:
                         (last.tw.durable_start_ts == tw.durable_start_ts &&
                           last.tw.start_ts == WT_TS_NONE && last.tw.start_txn == WT_TXN_NONE &&
                           last.tw.durable_stop_ts == tw.durable_stop_ts &&
-                          last.tw.stop_ts == WT_TS_MAX && last.tw.stop_txn == WT_TXN_MAX));
+                          !__wt_time_window_has_stop(&last.tw)));
                     ++rle;
                     goto next;
                 }

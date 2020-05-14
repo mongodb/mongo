@@ -486,7 +486,8 @@ prepare_transaction(TINFO *tinfo)
 {
     WT_DECL_RET;
     WT_SESSION *session;
-    uint64_t longwait, pause_ms, ts;
+    uint64_t ts;
+    uint32_t longwait, pause_ms;
     char buf[64];
 
     session = tinfo->session;
