@@ -354,8 +354,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     // chunk. This is guaranteed by the setFCV command serializing with donating and receiving
     // chunks via the ActiveMigrationsRegistry.
     _enableResumableRangeDeleter =
-        fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
-        !disableResumableRangeDeleter.load();
+        fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
 
     _state = READY;
     _stateChangedCV.notify_all();
@@ -871,6 +870,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         if (_enableResumableRangeDeleter) {
             while (migrationutil::checkForConflictingDeletions(
                 outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
+                uassert(ErrorCodes::ResumableRangeDeleterDisabled,
+                        "Failing migration because the disableResumableRangeDeleter server "
+                        "parameter is set to true on the recipient shard, which contains range "
+                        "deletion tasks overlapping the incoming range.",
+                        !disableResumableRangeDeleter.load());
+
                 LOGV2(22001,
                       "Migration paused because the requested range {range} for {namespace} "
                       "overlaps with a range already scheduled for deletion",

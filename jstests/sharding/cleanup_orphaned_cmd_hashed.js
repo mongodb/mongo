@@ -1,14 +1,10 @@
-//
 // Tests cleanup of orphaned data in hashed sharded coll via the orphaned data cleanup command
-//
-// requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
-// @tags: [requires_fcv_44]
 
 (function() {
 "use strict";
 
-var st = new ShardingTest(
-    {shards: 2, mongos: 1, shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}});
+var st = new ShardingTest({shards: 2, mongos: 1});
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");

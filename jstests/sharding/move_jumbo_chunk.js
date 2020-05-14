@@ -3,18 +3,17 @@
  * 'forceJumbo' option is set to true.
  *
  * Remove requires_fcv_44 tag if SERVER-42273 is backported or 4.4 becomes last-stable.
- * @tags: [requires_fcv_44]
+ * TODO (SERVER-46420): Fix test to allow it to work with the resumable range deleter enabled.
+ * @tags: [requires_fcv_44, __TEMPORARILY_DISABLED__]
  */
 
 (function() {
 'use strict';
 
-// TODO(SERVER-46420): Update test to run with resumable range deleter enabled.
 let st = new ShardingTest({
     shards: 2,
     mongos: 1,
     other: {chunkSize: 1},
-    shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}
 });
 
 let kDbName = "test";

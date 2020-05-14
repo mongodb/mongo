@@ -4,9 +4,6 @@
 //
 // Note: don't use coll1 in this test after a coll1 migration is interrupted -- the distlock isn't
 // released promptly when interrupted.
-//
-// Uses the disableResumableRangeDeleter parameter, which was introduced in v4.4.
-// @tags: [requires_fcv_44]
 
 load('./jstests/libs/chunk_manipulation_util.js');
 
@@ -15,10 +12,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
 var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
-// This test only makes sense if resumable range deletion is off, because when it is on, it is not
-// possible for the donor to begin a new migration before having completed the previous one.
-var st = new ShardingTest(
-    {shards: 3, shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}});
+var st = new ShardingTest({shards: 3});
+
+// This test does not make sense in FCV 4.4+, where it is not possible for the donor to begin a new
+// migration before having delivered the decision for the previous one (and delivering the decision
+// blocks behind the active migration thread on the recipient, since that thread has the migration's
+// session checked out).
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
 var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
     ns2 = dbName + ".bar", coll1 = mongos.getCollection(ns1), coll2 = mongos.getCollection(ns2),

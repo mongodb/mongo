@@ -1,11 +1,7 @@
-//
 // Tests failed cleanup of orphaned data when we have pending chunks
-//
-// requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
-// @tags: [requires_fcv_44]
 
-var st = new ShardingTest(
-    {shards: 2, shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}});
+var st = new ShardingTest({shards: 2});
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");

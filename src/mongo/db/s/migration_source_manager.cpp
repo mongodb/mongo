@@ -51,7 +51,6 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -161,7 +160,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             fcvVersion != ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo44 &&
                 fcvVersion != ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42);
 
-    _enableResumableRangeDeleter = isFCVLatest() && !disableResumableRangeDeleter.load();
+    _enableResumableRangeDeleter = isFCVLatest();
 
     // Disallow moving a chunk to ourselves
     uassert(ErrorCodes::InvalidOptions,

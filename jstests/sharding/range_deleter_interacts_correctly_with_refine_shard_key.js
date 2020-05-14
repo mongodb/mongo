@@ -66,7 +66,7 @@ function test(st, description, testBody) {
     jsTest.log(`Finished Running Test: ${description}`);
 }
 
-// Tests with resumable range deleter enabled.
+// Tests of range deletion tasks submitted in FCV 4.4.
 (() => {
     const st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
     test(st,
@@ -303,15 +303,16 @@ function test(st, description, testBody) {
     st.stop();
 })();
 
-// Tests with resumable range deleter disabled.
+// Tests of range deletion tasks submitted in FCV 4.2.
 (() => {
-    const st = new ShardingTest(
-        {shards: 2, shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}});
+    const st = new ShardingTest({shards: 2});
 
     test(st,
          "Refining the shard key does not prevent removal of orphaned documents on a donor" +
              " shard after a successful migration",
          () => {
+             assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
+
              // Enable failpoint which will cause range deletion to hang indefinitely.
              let suspendRangeDeletionFailpoint =
                  configureFailPoint(st.rs0.getPrimary(), "suspendRangeDeletion");
@@ -322,8 +323,9 @@ function test(st, description, testBody) {
                  {moveChunk: ns, find: shardKeyValueInChunk, to: st.shard1.shardName}));
 
              jsTestLog("Waiting for the suspendRangeDeletion failpoint to be hit");
-
              suspendRangeDeletionFailpoint.wait();
+
+             assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
 
              jsTestLog("Refining the shard key");
 
@@ -352,6 +354,8 @@ function test(st, description, testBody) {
          "Chunks with a refined shard key cannot migrate back onto a shard with " +
              "an orphaned range created with the prior shard key",
          () => {
+             assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
+
              // Enable failpoint which will cause range deletion to hang indefinitely.
              let suspendRangeDeletionFailpoint =
                  configureFailPoint(st.rs0.getPrimary(), "suspendRangeDeletion");
@@ -362,8 +366,9 @@ function test(st, description, testBody) {
                  {moveChunk: ns, find: shardKeyValueInChunk, to: st.shard1.shardName}));
 
              jsTestLog("Waiting for the suspendRangeDeletion failpoint to be hit");
-
              suspendRangeDeletionFailpoint.wait();
+
+             assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
 
              jsTestLog("Refining the shard key");
 
@@ -428,30 +433,21 @@ function test(st, description, testBody) {
 
     test(st,
          "Refining the shard key does not prevent removal of orphaned documents on a recipient" +
-             " shard after a failed migration",
+             " shard on which the shard key index was never built",
          () => {
-             let hangRecipientAfterCloningDocuments =
-                 configureFailPoint(st.rs1.getPrimary(), "migrateThreadHangAtStep3");
+             // Fail a migration of a chunk from shard 0 to shard 1 so that shard 1 creates the
+             // collection on itself with the correct UUID.
+             let migrationCommitVersionError =
+                 configureFailPoint(st.configRS.getPrimary(), "migrationCommitVersionError");
+             assert.commandFailedWithCode(st.s.adminCommand({
+                 moveChunk: ns,
+                 find: shardKeyValueInChunk,
+                 to: st.shard1.shardName,
+             }),
+                                          ErrorCodes.StaleEpoch);
+             migrationCommitVersionError.off();
 
-             // Attempt to move the chunk to shard 1. This will clone all documents from shard 0 to
-             // shard 1 and then block behind the hangRecipientAfterCloningDocuments failpoint.
-             // Then, when the index is created on the refined shard key, the migration will be
-             // interrupted, causing it to fail with error code Interrupted.
-             const awaitResult =
-                 startParallelShell(funWithArgs(function(ns, shardKeyValueInChunk, toShardName) {
-                                        assert.commandFailedWithCode(db.adminCommand({
-                                            moveChunk: ns,
-                                            find: shardKeyValueInChunk,
-                                            to: toShardName,
-                                            _waitForDelete: true
-                                        }),
-                                                                     ErrorCodes.Interrupted);
-                                        jsTestLog("Recipient failed in parallel shell");
-                                    }, ns, shardKeyValueInChunk, st.shard1.shardName), st.s.port);
-
-             jsTestLog("Waiting for recipient to finish cloning documents");
-
-             hangRecipientAfterCloningDocuments.wait();
+             assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
 
              jsTestLog("Refining the shard key");
 
@@ -465,20 +461,15 @@ function test(st, description, testBody) {
              // The index on the original shard key shouldn't be required anymore.
              assert.commandWorked(st.s.getCollection(ns).dropIndex(originalShardKey));
 
-             // Turn off failpoint and wait for recipient to fail.
-             hangRecipientAfterCloningDocuments.off();
-             awaitResult();
+             assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
+             // Ensure it's possible to move a chunk from shard 0 to shard 1, though shard 1 did not
+             // own any chunks when the refined shard key index was created.
              // TODO (SERVER-47025): Without creating this index, the range deleter will hang
              // indefinitely looking for a shard key index.
              assert.commandWorked(st.shard1.getCollection(ns).createIndex(refinedShardKey));
-
-             jsTestLog("Waiting for orphans to be removed from shard 1");
-
-             // The range deletion should eventually succeed in the background on the recipient.
-             assert.soon(() => {
-                 return st.rs1.getPrimary().getCollection(ns).find().itcount() == 0;
-             });
+             assert.commandWorked(st.s.adminCommand(
+                 {moveChunk: ns, find: refinedShardKeyValueInChunk, to: st.shard1.shardName}));
          });
 
     st.stop();

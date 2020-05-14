@@ -92,7 +92,10 @@ server_parameters:
         default: 900
 
     disableResumableRangeDeleter:
-        description: 'Disable the resumable range deleter and revert to prior behavior.'
+        description: >-
+          Disable the resumable range deleter. Ranges will not be submitted for deletion, and if an
+          incoming migration sees orphans in the incoming range, the migration will fail. The
+          resumable range deleter replaced the old non-durable range deleter as of FCV 4.4.
         set_at: [startup]
         cpp_vartype: AtomicWord<bool>
         cpp_varname : disableResumableRangeDeleter

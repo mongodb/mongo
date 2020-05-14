@@ -325,8 +325,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
     return Status::OK();
 }
 
-// TODO (SERVER-44787): Remove this overload after 4.4 is released AND
-// disableResumableRangeDeleter has been removed from server parameters.
+// TODO (SERVER-44787): Remove this overload after 4.4 is released.
 Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());

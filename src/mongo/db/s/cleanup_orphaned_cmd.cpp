@@ -60,11 +60,11 @@ namespace {
 enum class CleanupResult { kDone, kContinue, kError };
 
 /**
- * In FCV 4.2 or if the resumable range deleter is disabled:
+ * In FCV 4.2:
  * Cleans up one range of orphaned data starting from a range that overlaps or starts at
  * 'startingFromKey'.  If empty, startingFromKey is the minimum key of the sharded range.
  *
- * If the resumable range deleter is enabled:
+ * In FCV 4.4+:
  * Waits for all possibly orphaned ranges on 'nss' to be cleaned up.
  *
  * @return CleanupResult::kContinue and 'stoppedAtKey' if orphaned range was found and cleaned
@@ -87,10 +87,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                 fcvVersion ==
                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
 
-    // Note that 'disableResumableRangeDeleter' is a startup-only parameter, so it cannot change
-    // while this process is running.
-    if (fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
-        !disableResumableRangeDeleter.load()) {
+    if (fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
         boost::optional<ChunkRange> range;
         boost::optional<UUID> collectionUuid;
         {
@@ -143,6 +140,12 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         // sleep for a short time and then try waitForClean again.
         while (auto numRemainingDeletionTasks =
                    migrationutil::checkForConflictingDeletions(opCtx, *range, *collectionUuid)) {
+            uassert(
+                ErrorCodes::ResumableRangeDeleterDisabled,
+                "Failing cleanupOrphaned because the disableResumableRangeDeleter server parameter "
+                "is set to true and this shard contains range deletion tasks for the collection.",
+                !disableResumableRangeDeleter.load());
+
             LOGV2(4416003,
                   "cleanupOrphaned going to wait for range deletion tasks to complete",
                   "namespace"_attr = ns.ns(),
@@ -249,7 +252,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 }
 
 /**
- * In FCV 4.2 or if 'disableResumableRangeDeleter=true':
+ * In FCV 4.2:
  *
  * Cleanup orphaned data command.  Called on a particular namespace, and if the collection
  * is sharded will clean up a single orphaned data range which overlaps or starts after a
@@ -278,7 +281,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
  *      writeConcern: { <writeConcern options> }
  * }
  *
- * In FCV 4.4 if 'disableResumableRangeDeleter=false':
+ * In FCV 4.4+:
  *
  * Called on a particular namespace, and if the collection is sharded will wait for the number of
  * range deletion tasks on the collection on this shard to reach zero. Returns true on completion,

@@ -1,9 +1,8 @@
-//
 // Basic tests of cleanupOrphaned. Validates that non allowed uses of the cleanupOrphaned
 // command fail.
 //
-// requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
-// requires_persistence because it restarts a shard.
+// requires_fcv_44 because the test sets the FCV to 4.4.
+// requires_persistence because the test restarts a shard.
 // @tags: [requires_fcv_44, requires_persistence]
 
 (function() {
@@ -25,9 +24,9 @@ MongoRunner.stopMongod(mongod);
  * Bad invocations of cleanupOrphaned command.
  ****************************************************************************/
 
-var st = new ShardingTest({
-    other: {rs: true, rsOptions: {nodes: 2, setParameter: {"disableResumableRangeDeleter": true}}}
-});
+var st = new ShardingTest({other: {rs: true, rsOptions: {nodes: 2}}});
+
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
 var mongos = st.s0;
 var mongosAdmin = mongos.getDB('admin');
@@ -126,15 +125,12 @@ function testBadStartingFromKeys(shardAdmin) {
         {cleanupOrphaned: coll2.getFullName(), startingFromKey: {a: 'someValue', c: 1}}));
 }
 
-// Test when disableResumableRangeDeleter=true.
 testBadStartingFromKeys(shardAdmin);
 
-// Restart the shard with disableResumableRangeDeleter=false and test bad startingFromKey's. Note
-// that the 'startingFromKey' parameter is validated when disableResumableRangeDeleter=false and the
-// FCV is 4.4, but is not otherwise used (cleanupOrphaned waits for there to be no orphans in the
-// entire key space).
-st.rs0.stopSet(null /* signal */, true /* forRestart */);
-st.rs0.startSet({restart: true, setParameter: {disableResumableRangeDeleter: false}});
+// Set the FCV to 4.4 and test bad startingFromKey's.
+// Note the 'startingFromKey' parameter is validated FCV is 4.4+, but is not otherwise used (in
+// FCV 4.4+, cleanupOrphaned waits for there to be no orphans in the entire key space).
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
 testBadStartingFromKeys(st.rs0.getPrimary().getDB("admin"));
 
 st.stop();

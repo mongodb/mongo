@@ -76,8 +76,7 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
                                    std::move(sessionIdStatus.getValue()),
                                    std::move(secondaryThrottleStatus.getValue()));
 
-    // TODO (SERVER-44787): Remove this existence check after 4.4 is released and the
-    // disableResumableRangeDeleter option is removed.
+    // TODO (SERVER-44787): Remove this existence check after 4.4 is released.
     if (obj.getField("uuid")) {
         request._migrationId = UUID::parse(obj);
         request._lsid = LogicalSessionId::parse(IDLParserErrorContext("StartChunkCloneRequest"),

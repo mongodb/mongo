@@ -1,10 +1,6 @@
-//
 // Tests cleanupOrphaned concurrent with moveChunk.
 // Inserts orphan documents to the donor and recipient shards during the moveChunk and
 // verifies that cleanupOrphaned removes orphans.
-//
-// requires_fcv_44 because the 'disableResumableRangeDeleter' parameter was introduced in v4.4.
-// @tags: [requires_fcv_44]
 
 load('./jstests/libs/chunk_manipulation_util.js');
 load('./jstests/libs/cleanup_orphaned_util.js');
@@ -16,8 +12,8 @@ var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 var st = new ShardingTest({
     shards: 2,
     other: {separateConfig: true},
-    shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}
 });
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
 var mongos = st.s0, admin = mongos.getDB('admin'), dbName = 'foo', ns = dbName + '.bar',
     coll = mongos.getCollection(ns), donor = st.shard0, recipient = st.shard1,

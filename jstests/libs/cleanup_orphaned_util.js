@@ -39,8 +39,9 @@ function testCleanupOrphaned(options) {
     var st = new ShardingTest({
         shards: 2,
         mongos: 2,
-        shardOptions: {setParameter: {"disableResumableRangeDeleter": true}}
     });
+
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
     var mongos = st.s0, admin = mongos.getDB('admin'),
         shards = mongos.getCollection('config.shards').find().toArray(),

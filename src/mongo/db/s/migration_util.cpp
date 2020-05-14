@@ -53,6 +53,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/write_concern.h"
@@ -293,6 +294,13 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
             }
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
+
+            uassert(
+                ErrorCodes::ResumableRangeDeleterDisabled,
+                str::stream()
+                    << "Not submitting range deletion task " << redact(deletionTask.toBSON())
+                    << " because the disableResumableRangeDeleter server parameter is set to true",
+                !disableResumableRangeDeleter.load());
 
             // Make sure the collection metadata is up-to-date.
             {
