@@ -5,7 +5,7 @@ selector:
   include_files:
   # The trailing asterisk is for handling the .exe extension on Windows.
   - build/**/system_resource_canary_bm*
-  - build/**/mongo/s/**/*
+  - build/install/bin/chunk_manager_refresh_bm*
 
 executor:
   config: {}
