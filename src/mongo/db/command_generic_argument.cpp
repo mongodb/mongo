@@ -115,4 +115,8 @@ bool isReplyStripArgument(StringData arg) {
     return filteredSpecialsContains<&SpecialArgRecord::stripFromReply>(arg);
 }
 
+bool isMongocryptdArgument(StringData arg) {
+    return arg == "jsonSchema"_sd;
+}
+
 }  // namespace mongo

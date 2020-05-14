@@ -229,6 +229,10 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                                       << typeName(elem.type())};
             }
             request.setIsMapReduceCommand(elem.boolean());
+        } else if (isMongocryptdArgument(fieldName)) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "unrecognized field '" << elem.fieldName()
+                                  << "'. This command may be meant for a mongocryptd process."};
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
