@@ -58,6 +58,11 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
     if (BSONType::Object != cmdObj.firstElement().type()) {
         return Status(ErrorCodes::FailedToParse, "explain command requires a nested object");
     }
+    if (cmdObj.hasField("jsonSchema"_sd)) {
+        return Status(ErrorCodes::FailedToParse,
+                      "Unrecognized field 'jsonSchema'. This command may be meant for a "
+                      "mongocryptd process.");
+    }
 
     auto verbosity = Verbosity::kExecAllPlans;
     if (auto verbosityElt = cmdObj[kVerbosityName]) {
