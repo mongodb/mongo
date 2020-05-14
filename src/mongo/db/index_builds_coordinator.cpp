@@ -2051,7 +2051,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     // Collection scan and insert into index.
     {
-        AutoGetDb autoDb(opCtx, replState->dbName, MODE_IX);
+        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
@@ -2093,7 +2093,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
-        AutoGetDb autoDb(opCtx, replState->dbName, MODE_IX);
+        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
@@ -2115,7 +2115,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     // Perform the second drain while stopping writes on the collection.
     {
-        AutoGetDb autoDb(opCtx, replState->dbName, MODE_IX);
+        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
 
         // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions. See
         // SERVER-42621.
@@ -2146,7 +2146,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     const IndexBuildOptions& indexBuildOptions,
     const Timestamp& commitIndexBuildTimestamp) {
 
-    AutoGetDb autoDb(opCtx, replState->dbName, MODE_IX);
+    Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
 
     // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by waiting
     // for a a strong collection lock. See SERVER-42621.
