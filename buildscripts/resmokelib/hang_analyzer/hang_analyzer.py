@@ -18,7 +18,7 @@ import logging
 import platform
 import traceback
 
-from buildscripts.resmokelib.commands import interface
+from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 from buildscripts.resmokelib.hang_analyzer import extractor
 from buildscripts.resmokelib.hang_analyzer import dumper
@@ -26,7 +26,7 @@ from buildscripts.resmokelib.hang_analyzer import process_list
 from buildscripts.resmokelib.hang_analyzer.process import signal_process, signal_python
 
 
-class HangAnalyzer(interface.Subcommand):
+class HangAnalyzer(Subcommand):
     """Main class for the hang analyzer subcommand."""
 
     def __init__(self, options):
@@ -185,3 +185,48 @@ def _check_dump_quota(quota, ext):
         size_sum += os.path.getsize(file_name)
 
     return size_sum <= quota
+
+
+class HangAnalyzerPlugin(PluginInterface):
+    """Integration-point for hang-analyzer."""
+
+    def parse(self, subcommand, parser, parsed_args, **kwargs):
+        """Parse command-line options."""
+        if subcommand == 'hang-analyzer':
+            return HangAnalyzer(parsed_args)
+        return None
+
+    def add_subcommand(self, subparsers):
+        """Create and add the parser for the hang analyzer subcommand."""
+        parser = subparsers.add_parser("hang-analyzer", help=__doc__)
+
+        parser.add_argument(
+            '-m', '--process-match', dest='process_match', choices=('contains',
+                                                                    'exact'), default='contains',
+            help="Type of match for process names (-p & -g), specify 'contains', or"
+            " 'exact'. Note that the process name match performs the following"
+            " conversions: change all process names to lowecase, strip off the file"
+            " extension, like '.exe' on Windows. Default is 'contains'.")
+        parser.add_argument('-p', '--process-names', dest='process_names',
+                            help='Comma separated list of process names to analyze')
+        parser.add_argument('-g', '--go-process-names', dest='go_process_names',
+                            help='Comma separated list of go process names to analyze')
+        parser.add_argument(
+            '-d', '--process-ids', dest='process_ids', default=None,
+            help='Comma separated list of process ids (PID) to analyze, overrides -p &'
+            ' -g')
+        parser.add_argument('-c', '--dump-core', dest='dump_core', action="store_true",
+                            default=False, help='Dump core file for each analyzed process')
+        parser.add_argument('-s', '--max-core-dumps-size', dest='max_core_dumps_size',
+                            default=10000,
+                            help='Maximum total size of core dumps to keep in megabytes')
+        parser.add_argument(
+            '-o', '--debugger-output', dest='debugger_output', action="append", choices=('file',
+                                                                                         'stdout'),
+            default=None, help="If 'stdout', then the debugger's output is written to the Python"
+            " process's stdout. If 'file', then the debugger's output is written"
+            " to a file named debugger_<process>_<pid>.log for each process it"
+            " attaches to. This option can be specified multiple times on the"
+            " command line to have the debugger's output written to multiple"
+            " locations. By default, the debugger's output is written only to the"
+            " Python process's stdout.")

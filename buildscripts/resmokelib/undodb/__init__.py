@@ -1,7 +1,7 @@
 """Interactions with the undodb tool-suite."""
 from typing import Optional
 
-from buildscripts.resmokelib.commands import interface
+from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _HELP = """
 Info on how to install undodb.
@@ -38,37 +38,11 @@ Please also refer to William Schultz's intro talk for a getting started primer:
 _COMMAND = "undodb"
 
 
-def add_subcommand(subparsers) -> None:
-    """
-    Add 'undodb' subcommand.
-
-    :param subparsers: argparse parser to add to
-    :return: None
-    """
-    parser = subparsers.add_parser(_COMMAND, help=_HELP)
-    # Accept arbitrary args like 'resmoke.py undodb foobar', but ignore them.
-    parser.add_argument("args", nargs="*")
-
-
-def subcommand(command: str, parsed_args) -> Optional[interface.Subcommand]:
-    """
-    Return UndoDb if command is one we recognize.
-
-    :param command: The first arg to resmoke.py (e.g. resmoke.py run => command = run).
-    :param parsed_args: Additional arguments parsed as a result of the `parser.parse` call.
-    :return: Callback if the command is for undodb else none.
-    """
-    if command != _COMMAND:
-        return None
-    return UndoDb(parsed_args)
-
-
-class UndoDb(interface.Subcommand):
+class UndoDb(Subcommand):
     """Interact with UndoDB."""
 
-    def __init__(self, _):
+    def __init__(self):
         """Constructor."""
-        pass
 
     def execute(self) -> None:
         """
@@ -77,3 +51,32 @@ class UndoDb(interface.Subcommand):
         :return: None
         """
         print(_MESSAGE)
+
+
+class UndoDbPlugin(PluginInterface):
+    """Interact with UndoDB."""
+
+    def add_subcommand(self, subparsers):
+        """
+        Add 'undodb' subcommand.
+
+        :param subparsers: argparse parser to add to
+        :return: None
+        """
+        parser = subparsers.add_parser(_COMMAND, help=_HELP)
+        # Accept arbitrary args like 'resmoke.py undodb foobar', but ignore them.
+        parser.add_argument("args", nargs="*")
+
+    def parse(self, subcommand, parser, parsed_args, **kwargs):
+        """
+        Return UndoDb if command is one we recognize.
+
+        :param subcommand: equivalent to parsed_args.command
+        :param parser: parser used
+        :param parsed_args: output of parsing
+        :param kwargs: additional args
+        :return: None or a Subcommand
+        """
+        if subcommand != _COMMAND:
+            return None
+        return UndoDb()
