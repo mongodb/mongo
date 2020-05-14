@@ -37,4 +37,4 @@ fi
 
 cd "$1"
 # Defer liveness checks to the end with -lncheck, for speed.
-"$JAVA_BINARY" -XX:+UseParallelGC -cp ../tla2tools.jar tlc2.TLC -lncheck final -workers auto "$TLA_FILE"
+"$JAVA_BINARY" -XX:+UseParallelGC -Dtlc2.tool.fp.FPSet.impl=tlc2.tool.fp.OffHeapDiskFPSet -cp ../tla2tools.jar tlc2.TLC -lncheck final -workers auto "$TLA_FILE"
