@@ -3038,9 +3038,8 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
                                                               const OpTime& lastOpTimeFetched,
                                                               Date_t now,
                                                               const ReadPreference readPreference) {
-    // If the ping time for currentSource is longer than 'changeSyncSourceThresholdMillis' and we
-    // find an eligible sync source that has a ping time shorter than
-    // 'changeSyncSourceThresholdMillis', return true.
+    // If we find an eligible sync source that is significantly closer than our current sync source,
+    // return true.
 
     // If we are in initial sync, do not re-evaluate our sync source.
     const bool nodeInInitialSync = (memberState.startup() || memberState.startup2());
@@ -3081,35 +3080,33 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
 
     const auto syncSourcePingTime =
         durationCount<Milliseconds>(_pings.at(currentSource).getMillis());
-    if (syncSourcePingTime <= changeSyncSourceThreshold) {
-        return false;
-    }
 
-    // Look for another viable sync source that has ping times under the threshold.
+    // Use ping times to look for another viable sync source that is significantly closer.
     for (size_t candidateIndex = 0; candidateIndex < _memberData.size(); candidateIndex++) {
         const auto candidateNode = _memberData[candidateIndex].getHostAndPort();
         if (_pings.count(candidateNode) == 0) {
-            // Ping data for the candidateNode could not be found. Continue to the next node.
+            // Either we are the candidate node or ping data for the candidateNode could not be
+            // found. Continue to the next node.
             continue;
         }
 
+        // Only choose a new sync source if ping times indicate that the candidate is significantly
+        // closer than our current sync source and it is an eligible sync source.
         const auto candidateSyncSourcePingTime =
             durationCount<Milliseconds>(_pings.at(candidateNode).getMillis());
-        if (candidateSyncSourcePingTime > changeSyncSourceThreshold) {
-            // No need to proceed with verifying that the candidate node is eligible to be our
-            // sync source, since the node's ping time is also over the threshold.
+        if (syncSourcePingTime - candidateSyncSourcePingTime <= changeSyncSourceThreshold) {
             continue;
         }
 
         if (_isEligibleSyncSource(
                 candidateIndex, now, lastOpTimeFetched, readPreference, true /* firstAttempt */)) {
             LOGV2(4744901,
-                  "Choosing new sync source because the ping time of our sync source is longer "
-                  "than our accepted threshold and we have found another potential sync source "
-                  "with a ping time under the threshold",
+                  "Choosing new sync source because we have found another potential sync "
+                  "source that is significantly closer than our current sync source",
                   "syncSourcePingTime"_attr = syncSourcePingTime,
                   "changeSyncSourceThreshold"_attr = changeSyncSourceThreshold,
-                  "candidateNode"_attr = candidateNode);
+                  "candidateNode"_attr = candidateNode,
+                  "candidatePingTime"_attr = candidateSyncSourcePingTime);
             return true;
         }
     }
