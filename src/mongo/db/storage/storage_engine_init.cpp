@@ -214,7 +214,7 @@ void createLockFile(ServiceContext* service) {
                                 "previously not shut down cleanly.");
         }
         LOGV2_WARNING(22271,
-                      "Detected unclean shutdown - Lock file is not empty.",
+                      "Detected unclean shutdown - Lock file is not empty",
                       "lockFile"_attr = lockFile->getFilespec());
         startingAfterUncleanShutdown(service) = true;
     }
