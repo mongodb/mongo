@@ -912,16 +912,18 @@ IndexBuildsCoordinator::TryAbortResult IndexBuildsCoordinator::_tryAbort(
             IndexBuildState::kAborted, skipCheck, abortTimestamp, reason);
 
         // Interrupt the builder thread so that it can no longer acquire locks or make progress.
+        // It is possible that the index build thread may have completed its operation and removed
+        // itself from the ServiceContext. This may happen in the case of an explicit db.killOp()
+        // operation or during shutdown.
+        // During normal operation, the abort logic, initiated through external means such as
+        // dropIndexes or internally through an indexing error, should have set the state in
+        // ReplIndexBuildState so that this code would not be reachable as it is no longer necessary
+        // to interrupt the builder thread here.
         auto serviceContext = opCtx->getServiceContext();
-        auto target = serviceContext->getLockedClient(replState->opId);
-        if (!target) {
-            LOGV2_FATAL(4656001,
-                        "Index builder thread did not appear to be running while aborting",
-                        "buildUUID"_attr = replState->buildUUID,
-                        "opId"_attr = replState->opId);
+        if (auto target = serviceContext->getLockedClient(replState->opId)) {
+            auto targetOpCtx = target->getOperationContext();
+            serviceContext->killOperation(target, targetOpCtx, ErrorCodes::IndexBuildAborted);
         }
-        serviceContext->killOperation(
-            target, target->getOperationContext(), ErrorCodes::IndexBuildAborted);
 
         // Set the signal. Because we have already interrupted the index build, it will not observe
         // this signal. We do this so that other observers do not also try to abort the index build.
