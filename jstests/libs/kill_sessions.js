@@ -253,7 +253,7 @@ var _kill_sessions_api_module = (function() {
                     assert(checkLog.checkContainsOnceJsonStringMatch(
                                hostToCheck,
                                20528,
-                               'id',
+                               'cursorId',
                                this._cursors[hostToCheck.host].exactValueString),
                            "cursor kill was not logged by " + hostToCheck.host);
                 } else {

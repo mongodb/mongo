@@ -663,28 +663,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             LOGV2_WARNING_OPTIONS(
                 20547,
                 {logv2::LogTag::kStartupWarnings},
-                "** WARNING: mongod started without --replSet yet document(s) are present in "
-                "{namespace}",
-                "Document(s) exist in replSet namespace, but started without --replSet",
-                "namespace"_attr = NamespaceString::kSystemReplSetNamespace);
-            LOGV2_WARNING_OPTIONS(20548,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "**          Database contents may appear inconsistent with the "
-                                  "oplog and may appear to not contain");
-            LOGV2_WARNING_OPTIONS(20549,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "**           writes that were visible when this node was "
-                                  "running as part of a replica set");
-            LOGV2_WARNING_OPTIONS(20550,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "**          Restart with --replSet unless you are doing "
-                                  "maintenance and no other clients are connected");
-            LOGV2_WARNING_OPTIONS(
-                20551,
-                {logv2::LogTag::kStartupWarnings},
-                "**          The TTL collection monitor will not start because of this");
-            LOGV2(20553,
-                  "**          For more info see http://dochub.mongodb.org/core/ttlcollections");
+                "Document(s) exist in 'system.replset', but started without --replSet. Database "
+                "contents may appear inconsistent with the writes that were visible when this node "
+                "was running as part of a replica set. Restart with --replSet unless you are doing "
+                "maintenance and no other clients are connected. The TTL collection monitor will "
+                "not start because of this. For more info see "
+                "http://dochub.mongodb.org/core/ttlcollections");
         } else {
             startTTLMonitor(serviceContext);
         }

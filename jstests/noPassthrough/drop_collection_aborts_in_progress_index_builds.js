@@ -44,7 +44,7 @@ const awaitDrop = startParallelShell(() => {
 }, conn.port);
 
 try {
-    checkLog.contains(testDB.getMongo(), "About to abort all index builders on collection");
+    checkLog.containsJson(testDB.getMongo(), 23879);  // "About to abort all index builders"
 } finally {
     IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 }

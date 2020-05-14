@@ -195,7 +195,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             invariant(readTimestamp);
             LOGV2(20576,
                   "Tried reading at no-overlap time, but future catalog changes are pending. "
-                  "Trying again without reading at no-overlap time.",
+                  "Trying again without reading at no-overlap time",
                   "noOverlapTimestamp"_attr = *readTimestamp,
                   "collection"_attr = nss.ns(),
                   "collectionMinSnapshot"_attr = *minSnapshot);

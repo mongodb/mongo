@@ -302,7 +302,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
             CurOp::get(opCtx.get())
                 ->completeAndLogOperation(opCtx.get(), MONGO_LOGV2_DEFAULT_COMPONENT);
         } catch (const DBException& e) {
-            LOGV2(4656002, "unable to log operation", "reason"_attr = e);
+            LOGV2(4656002, "unable to log operation", "error"_attr = e);
         }
     });
 
@@ -392,11 +392,12 @@ void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
         auto action = replState->waitForNextAction->getFuture().get(opCtx);
 
         LOGV2(3856200,
-              "Not signaling \"{signalAction}\" as it was previously signaled with "
-              "\"{signalActionSet}\" for index build: {buildUUID}",
-              "signalAction"_attr =
+              "Not signaling \"{skippedAction}\" as it was previously signaled with "
+              "\"{previousAction}\" for index build: {buildUUID}",
+              "Skipping signaling as it was previously signaled for index build",
+              "skippedAction"_attr =
                   _indexBuildActionToString(IndexBuildAction::kCommitQuorumSatisfied),
-              "signalActionSet"_attr = _indexBuildActionToString(action),
+              "previousAction"_attr = _indexBuildActionToString(action),
               "buildUUID"_attr = replState->buildUUID);
     }
 }
@@ -425,8 +426,7 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     if (!commitQuorumSatisfied)
         return;
 
-    LOGV2(
-        3856201, "Index build commit quorum satisfied:", "indexBuildEntry"_attr = indexBuildEntry);
+    LOGV2(3856201, "Index build commit quorum satisfied", "indexBuildEntry"_attr = indexBuildEntry);
     _sendCommitQuorumSatisfiedSignal(opCtx, replState);
 }
 

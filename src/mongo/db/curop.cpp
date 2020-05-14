@@ -478,7 +478,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                         "Failed to gather storage statistics for {opId} due to {reason}",
                         "Failed to gather storage statistics for slow operation",
                         "opId"_attr = opCtx->getOpID(),
-                        "reason"_attr = "lock acquire timeout"_sd);
+                        "error"_attr = "lock acquire timeout"_sd);
                 }
             } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
                 LOGV2_WARNING_OPTIONS(
@@ -487,7 +487,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                     "Failed to gather storage statistics for {opId} due to {reason}",
                     "Failed to gather storage statistics for slow operation",
                     "opId"_attr = opCtx->getOpID(),
-                    "reason"_attr = redact(ex));
+                    "error"_attr = redact(ex));
             }
         }
 
