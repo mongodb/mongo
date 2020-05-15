@@ -66,7 +66,7 @@ __cell_pack_value_validity(
     uint8_t flags, *flagsp;
 
     /* Globally visible values have no associated validity window. */
-    if (__wt_time_window_is_empty(tw)) {
+    if (WT_TIME_WINDOW_IS_EMPTY(tw)) {
         ++*pp;
         return;
     }
@@ -184,7 +184,7 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, WT_TIME_AGGREG
     uint8_t flags, *flagsp;
 
     /* Globally visible values have no associated validity window. */
-    if (__wt_time_aggregate_is_empty(ta)) {
+    if (WT_TIME_AGGREGATE_IS_EMPTY(ta)) {
         ++*pp;
         return;
     }
@@ -748,14 +748,14 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
     if (unpack_addr == NULL) {
         unpack = (WT_CELL_UNPACK_COMMON *)unpack_value;
         tw = &unpack_value->tw;
-        __wt_time_window_init(tw);
+        WT_TIME_WINDOW_INIT(tw);
         ta = NULL;
     } else {
         WT_ASSERT(session, unpack_value == NULL);
 
         unpack = (WT_CELL_UNPACK_COMMON *)unpack_addr;
         ta = &unpack_addr->ta;
-        __wt_time_aggregate_init(ta);
+        WT_TIME_AGGREGATE_INIT(ta);
         tw = NULL;
     }
 
@@ -950,7 +950,7 @@ copy_cell_restart:
         copy.v = unpack->v;
         copy.len = WT_PTRDIFF32(p, cell);
         tw = &copy.tw;
-        __wt_time_window_init(tw);
+        WT_TIME_WINDOW_INIT(tw);
         cell = (WT_CELL *)((uint8_t *)cell - v);
         goto copy_cell_restart;
 
@@ -1114,7 +1114,7 @@ __wt_cell_unpack_kv(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL
          * If there isn't any value validity window (which is what it will take to get to a
          * zero-length item), the value must be stable.
          */
-        __wt_time_window_init(&unpack_value->tw);
+        WT_TIME_WINDOW_INIT(&unpack_value->tw);
 
         return;
     }

@@ -34,27 +34,53 @@ static inline int
 read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
 {
     WT_DECL_RET;
+    uint64_t start, now;
 
     /*
      * Read operations wait out prepare-conflicts. (As part of the snapshot isolation checks, we
      * repeat reads that succeeded before, they should be repeatable.)
      */
+    __wt_seconds(NULL, &start);
     switch (op) {
     case NEXT:
-        while ((ret = cursor->next(cursor)) == WT_PREPARE_CONFLICT)
+        while ((ret = cursor->next(cursor)) == WT_PREPARE_CONFLICT) {
             __wt_yield();
+
+            /* Ignore clock reset. */
+            __wt_seconds(NULL, &now);
+            testutil_assertfmt(now < start || now - start < 60,
+              "%s: timed out with prepare-conflict", "WT_CURSOR.next");
+        }
         break;
     case PREV:
-        while ((ret = cursor->prev(cursor)) == WT_PREPARE_CONFLICT)
+        while ((ret = cursor->prev(cursor)) == WT_PREPARE_CONFLICT) {
             __wt_yield();
+
+            /* Ignore clock reset. */
+            __wt_seconds(NULL, &now);
+            testutil_assertfmt(now < start || now - start < 60,
+              "%s: timed out with prepare-conflict", "WT_CURSOR.prev");
+        }
         break;
     case SEARCH:
-        while ((ret = cursor->search(cursor)) == WT_PREPARE_CONFLICT)
+        while ((ret = cursor->search(cursor)) == WT_PREPARE_CONFLICT) {
             __wt_yield();
+
+            /* Ignore clock reset. */
+            __wt_seconds(NULL, &now);
+            testutil_assertfmt(now < start || now - start < 60,
+              "%s: timed out with prepare-conflict", "WT_CURSOR.search");
+        }
         break;
     case SEARCH_NEAR:
-        while ((ret = cursor->search_near(cursor, exactp)) == WT_PREPARE_CONFLICT)
+        while ((ret = cursor->search_near(cursor, exactp)) == WT_PREPARE_CONFLICT) {
             __wt_yield();
+
+            /* Ignore clock reset. */
+            __wt_seconds(NULL, &now);
+            testutil_assertfmt(now < start || now - start < 60,
+              "%s: timed out with prepare-conflict", "WT_CURSOR.search_near");
+        }
         break;
     }
     return (ret);

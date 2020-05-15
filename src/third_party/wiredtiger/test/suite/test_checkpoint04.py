@@ -50,13 +50,14 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             tables[uri] = ds
         return tables
 
-    def add_updates(self, uri, ds, value, nrows, ts):
+    def add_updates(self, uri, ds, value, nrows):
         session = self.session
         cursor = session.open_cursor(uri)
+        self.pr('update: ' + uri + ' for ' + str(nrows) + ' rows')
         for i in range(0, nrows):
             session.begin_transaction()
             cursor[ds.key(i)] = value
-            session.commit_transaction('commit_timestamp=' + timestamp_str(ts))
+            session.commit_transaction()
         cursor.close()
 
     def get_stat(self, stat):
@@ -69,14 +70,11 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
         nrows = 100
         ntables = 5
 
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
-
         # Create many tables and perform many updates so our checkpoint stats are populated.
         value = "wired" * 100
         tables = self.create_tables(ntables)
         for uri, ds in tables.items():
-            self.add_updates(uri, ds, value, nrows, 20)
+            self.add_updates(uri, ds, value, nrows)
 
         # Perform a checkpoint.
         self.session.checkpoint()
@@ -85,23 +83,48 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
         value = "tiger" * 100
         tables = self.create_tables(ntables)
         for uri, ds in tables.items():
-            self.add_updates(uri, ds, value, nrows, 30)
+            self.add_updates(uri, ds, value, nrows)
 
         # Perform a checkpoint.
         self.session.checkpoint()
 
         # Check the statistics.
-        self.assertEqual(self.get_stat(stat.conn.txn_checkpoint), 2)
-        self.assertEqual(self.get_stat(stat.conn.txn_checkpoint_running), 0)
-        self.assertEqual(self.get_stat(stat.conn.txn_checkpoint_prep_running), 0)
-        self.assertLess(self.get_stat(stat.conn.txn_checkpoint_prep_min),
-            self.get_stat(stat.conn.txn_checkpoint_time_min))
-        self.assertLess(self.get_stat(stat.conn.txn_checkpoint_prep_max),
-            self.get_stat(stat.conn.txn_checkpoint_time_max))
-        self.assertLess(self.get_stat(stat.conn.txn_checkpoint_prep_recent),
-            self.get_stat(stat.conn.txn_checkpoint_time_recent))
-        self.assertLess(self.get_stat(stat.conn.txn_checkpoint_prep_total),
-            self.get_stat(stat.conn.txn_checkpoint_time_total))
+        # Set them into a variable so that we can print them all out. We've had a failure
+        # on Windows that is very difficult to reproduce so collect what info we can.
+        num_ckpt = self.get_stat(stat.conn.txn_checkpoint)
+        self.pr('txn_checkpoint, number of checkpoints ' + str(num_ckpt))
+        running = self.get_stat(stat.conn.txn_checkpoint_running)
+        self.pr('txn_checkpoint_running ' + str(running))
+        prep_running = self.get_stat(stat.conn.txn_checkpoint_prep_running)
+        self.pr('txn_checkpoint_prep_running ' + str(prep_running))
+
+        prep_min = self.get_stat(stat.conn.txn_checkpoint_prep_min)
+        self.pr('txn_checkpoint_prep_min ' + str(prep_min))
+        time_min = self.get_stat(stat.conn.txn_checkpoint_time_min)
+        self.pr('txn_checkpoint_time_min ' + str(time_min))
+
+        prep_max = self.get_stat(stat.conn.txn_checkpoint_prep_max)
+        self.pr('txn_checkpoint_prep_max ' + str(prep_max))
+        time_max = self.get_stat(stat.conn.txn_checkpoint_time_max)
+        self.pr('txn_checkpoint_time_max ' + str(time_max))
+
+        prep_recent = self.get_stat(stat.conn.txn_checkpoint_prep_recent)
+        self.pr('txn_checkpoint_prep_recent ' + str(prep_recent))
+        time_recent = self.get_stat(stat.conn.txn_checkpoint_time_recent)
+        self.pr('txn_checkpoint_time_recent ' + str(time_recent))
+
+        prep_total = self.get_stat(stat.conn.txn_checkpoint_prep_total)
+        self.pr('txn_checkpoint_prep_total ' + str(prep_total))
+        time_total = self.get_stat(stat.conn.txn_checkpoint_time_total)
+        self.pr('txn_checkpoint_time_total ' + str(time_total))
+
+        self.assertEqual(num_ckpt, 2)
+        self.assertEqual(running, 0)
+        self.assertEqual(prep_running, 0)
+        self.assertLess(prep_min, time_min)
+        self.assertLess(prep_max, time_max)
+        self.assertLess(prep_recent, time_recent)
+        self.assertLess(prep_total, time_total)
 
 if __name__ == '__main__':
     wttest.run()

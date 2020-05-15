@@ -186,7 +186,7 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
     __wt_seconds(session, &ckptbase->sec);
     WT_ERR(__wt_metadata_search(session, dhandle->name, &config));
     WT_ERR(__wt_meta_block_metadata(session, config, ckptbase));
-    __wt_time_aggregate_init(&ckptbase->ta);
+    WT_TIME_AGGREGATE_INIT(&ckptbase->ta);
     ckptbase->write_gen = btree->write_gen;
     F_SET(ckptbase, WT_CKPT_ADD);
 
@@ -1164,7 +1164,7 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * regardless of a value's timestamps or transaction IDs.
          */
         WT_ERR(__wt_calloc_one(session, &addr));
-        __wt_time_aggregate_init(&addr->ta);
+        WT_TIME_AGGREGATE_INIT(&addr->ta);
         WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
         addr->size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
@@ -1767,7 +1767,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
          * regardless of a value's timestamps or transaction IDs.
          */
         WT_ERR(__wt_calloc_one(session, &addr));
-        __wt_time_aggregate_init(&addr->ta);
+        WT_TIME_AGGREGATE_INIT(&addr->ta);
         WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
         addr->size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;

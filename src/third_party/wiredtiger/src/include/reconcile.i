@@ -52,9 +52,9 @@ __wt_rec_addr_ts_init(WT_RECONCILE *r, WT_TIME_AGGREGATE *ta)
      * simple durability.
      */
     if (r->page->type == WT_PAGE_COL_FIX)
-        __wt_time_aggregate_init(ta);
+        WT_TIME_AGGREGATE_INIT(ta);
     else
-        __wt_time_aggregate_init_max(ta);
+        WT_TIME_AGGREGATE_INIT_MAX(ta);
 }
 
 /*
