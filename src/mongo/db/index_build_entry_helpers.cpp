@@ -267,7 +267,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     // Must not be interruptible. This fail point is used to test the scenario where the index
     // build's OperationContext is interrupted by an abort, which will subsequently remove index
     // build entry from the config db collection.
-    hangBeforeGettingIndexBuildEntry.pauseWhileSet(/* Interruptible::notInterruptible() */);
+    hangBeforeGettingIndexBuildEntry.pauseWhileSet(Interruptible::notInterruptible());
 
     if (!collection) {
         str::stream ss;
