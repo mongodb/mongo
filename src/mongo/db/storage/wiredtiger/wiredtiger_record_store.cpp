@@ -1532,9 +1532,8 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     auto sessRaii = cache->getSession();
-    WT_SESSION* sess = sessRaii->getSession();
-    WT_CURSOR* cursor;
-    invariantWTOK(sess->open_cursor(sess, _uri.c_str(), nullptr, nullptr, &cursor));
+    WT_CURSOR* cursor = sessRaii->getCachedCursor(_uri, _tableId, nullptr);
+    ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor); });
     int ret = cursor->prev(cursor);
     if (ret == WT_NOTFOUND) {
         return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
@@ -1542,7 +1541,6 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     invariantWTOK(ret);
 
     RecordId recordId = getKey(cursor);
-    invariantWTOK(sess->reset(sess));
 
     return {Timestamp(static_cast<unsigned long long>(recordId.repr()))};
 }
@@ -1556,9 +1554,8 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
     if (_cappedFirstRecord == RecordId()) {
         WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
         auto sessRaii = cache->getSession();
-        WT_SESSION* sess = sessRaii->getSession();
-        WT_CURSOR* cursor;
-        invariantWTOK(sess->open_cursor(sess, _uri.c_str(), nullptr, nullptr, &cursor));
+        WT_CURSOR* cursor = sessRaii->getCachedCursor(_uri, _tableId, nullptr);
+        ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor); });
         auto ret = cursor->next(cursor);
         if (ret == WT_NOTFOUND) {
             return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
@@ -1566,7 +1563,6 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
         invariantWTOK(ret);
 
         _cappedFirstRecord = getKey(cursor);
-        invariantWTOK(sess->reset(sess));
     }
 
     return {Timestamp(static_cast<unsigned long long>(_cappedFirstRecord.repr()))};
