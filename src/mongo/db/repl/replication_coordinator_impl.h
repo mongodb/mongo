@@ -1426,14 +1426,6 @@ private:
      */
     int64_t _nextRandomInt64_inlock(int64_t limit);
 
-    /**
-     * Runs the command using DBDirectClient and returns the response received for that command.
-     * Callers of this function should not hold any locks.
-     */
-    BSONObj _runCmdOnSelfOnAlternativeClient(OperationContext* opCtx,
-                                             const std::string& dbName,
-                                             const BSONObj& cmdObj);
-
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
