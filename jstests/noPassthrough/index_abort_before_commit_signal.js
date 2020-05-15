@@ -18,6 +18,13 @@ rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
+
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    jsTestLog('Two phase index builds not enabled, skipping test.');
+    rst.stopSet();
+    return;
+}
+
 const testDB = primary.getDB('test');
 const coll = testDB.getCollection('coll');
 const indexBuildsColl = primary.getCollection('config.system.indexBuilds');
