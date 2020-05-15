@@ -114,7 +114,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
 
     r = cbulk->reconcile;
     btree = S2BT(session);
-    __wt_time_window_init(&tw);
+    WT_TIME_WINDOW_INIT(&tw);
 
     val = &r->v;
     if (deleted) {
@@ -138,7 +138,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
     if (btree->dictionary)
         WT_RET(__wt_rec_dict_replace(session, r, &tw, cbulk->rle, val));
     __wt_rec_image_copy(session, r, val);
-    __wt_time_aggregate_update(&r->cur_ptr->ta, &tw);
+    WT_TIME_AGGREGATE_UPDATE(&r->cur_ptr->ta, &tw);
 
     /* Update the starting record number in case we split. */
     r->recno += cbulk->rle;
@@ -178,7 +178,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Copy the value onto the page. */
         __wt_rec_image_copy(session, r, val);
-        __wt_time_aggregate_merge(&r->cur_ptr->ta, &addr->ta);
+        WT_TIME_AGGREGATE_MERGE(&r->cur_ptr->ta, &addr->ta);
     }
     return (0);
 }
@@ -205,7 +205,7 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
     page = pageref->page;
     child = NULL;
     hazard = false;
-    __wt_time_aggregate_init(&ta);
+    WT_TIME_AGGREGATE_INIT(&ta);
 
     val = &r->v;
     vpack = &_vpack;
@@ -280,10 +280,10 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
             val->buf.size = __wt_cell_total_len(vpack);
             val->cell_len = 0;
             val->len = val->buf.size;
-            __wt_time_aggregate_copy(&ta, &vpack->ta);
+            WT_TIME_AGGREGATE_COPY(&ta, &vpack->ta);
         } else {
             __wt_rec_cell_build_addr(session, r, addr, NULL, false, ref->ref_recno);
-            __wt_time_aggregate_copy(&ta, &addr->ta);
+            WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
         }
         WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
@@ -293,7 +293,7 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 
         /* Copy the value onto the page. */
         __wt_rec_image_copy(session, r, val);
-        __wt_time_aggregate_merge(&r->cur_ptr->ta, &ta);
+        WT_TIME_AGGREGATE_MERGE(&r->cur_ptr->ta, &ta);
     }
     WT_INTL_FOREACH_END;
 
@@ -547,7 +547,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
     if (!deleted && !overflow_type && btree->dictionary)
         WT_RET(__wt_rec_dict_replace(session, r, tw, rle, val));
     __wt_rec_image_copy(session, r, val);
-    __wt_time_aggregate_update(&r->cur_ptr->ta, tw);
+    WT_TIME_AGGREGATE_UPDATE(&r->cur_ptr->ta, tw);
 
     /* Update the starting record number in case we split. */
     r->recno += rle;
@@ -592,14 +592,14 @@ __wt_rec_col_var(
     upd = NULL;
     size = 0;
     data = NULL;
-    __wt_time_window_init(&default_tw);
+    WT_TIME_WINDOW_INIT(&default_tw);
 
     cbt = &r->update_modify_cbt;
     cbt->iface.session = (WT_SESSION *)session;
 
     /* Set the "last" values to cause failure if they're not set. */
     last.value = r->last;
-    __wt_time_window_init_max(&last.tw);
+    WT_TIME_WINDOW_INIT_MAX(&last.tw);
     last.deleted = false;
 
     /*
@@ -607,7 +607,7 @@ __wt_rec_col_var(
      * [-Werror=maybe-uninitialized]
      */
     /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
-    __wt_time_window_init_max(&tw);
+    WT_TIME_WINDOW_INIT_MAX(&tw);
 
     WT_RET(__wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp));
 
@@ -626,7 +626,7 @@ __wt_rec_col_var(
     if (salvage != NULL && salvage->missing != 0) {
         if (salvage->skip == 0) {
             rle = salvage->missing;
-            __wt_time_window_init(&last.tw);
+            WT_TIME_WINDOW_INIT(&last.tw);
             last.deleted = true;
 
             /*
@@ -726,12 +726,12 @@ record_loop:
                  */
                 deleted = orig_deleted;
                 if (deleted || salvage) {
-                    __wt_time_window_init(&tw);
+                    WT_TIME_WINDOW_INIT(&tw);
 
                     if (deleted)
                         goto compare;
                 } else
-                    __wt_time_window_copy(&tw, &vpack->tw);
+                    WT_TIME_WINDOW_COPY(&tw, &vpack->tw);
 
                 /*
                  * If we are handling overflow items, use the overflow item itself exactly once,
@@ -780,7 +780,7 @@ record_loop:
                     break;
                 }
             } else {
-                __wt_time_window_copy(&tw, &upd_select.tw);
+                WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
 
                 switch (upd->type) {
                 case WT_UPDATE_MODIFY:
@@ -797,7 +797,7 @@ record_loop:
                     size = upd->size;
                     break;
                 case WT_UPDATE_TOMBSTONE:
-                    __wt_time_window_init(&tw);
+                    WT_TIME_WINDOW_INIT(&tw);
                     deleted = true;
                     break;
                 default:
@@ -813,7 +813,7 @@ compare:
              * record number, we've been doing that all along.
              */
             if (rle != 0) {
-                if (__wt_time_windows_equal(&tw, &last.tw) &&
+                if (WT_TIME_WINDOWS_EQUAL(&tw, &last.tw) &&
                   ((deleted && last.deleted) ||
                       (!deleted && !last.deleted && last.value->size == size &&
                         memcmp(last.value->data, data, size) == 0))) {
@@ -824,7 +824,7 @@ compare:
                      * visible.
                      */
                     WT_ASSERT(
-                      session, (!deleted && !last.deleted) || __wt_time_window_is_empty(&last.tw));
+                      session, (!deleted && !last.deleted) || WT_TIME_WINDOW_IS_EMPTY(&last.tw));
                     rle += repeat_count;
                     continue;
                 }
@@ -853,7 +853,7 @@ compare:
                     WT_ERR(__wt_buf_set(session, last.value, data, size));
             }
 
-            __wt_time_window_copy(&last.tw, &tw);
+            WT_TIME_WINDOW_COPY(&last.tw, &tw);
             last.deleted = deleted;
             rle = repeat_count;
         }
@@ -916,7 +916,7 @@ compare:
                      * tombstone to write to disk and the deletion of the keys must be globally
                      * visible.
                      */
-                    WT_ASSERT(session, __wt_time_window_is_empty(&last.tw));
+                    WT_ASSERT(session, WT_TIME_WINDOW_IS_EMPTY(&last.tw));
                     /*
                      * The record adjustment is decremented by one so we can naturally fall into the
                      * RLE accounting below, where we increment rle by one, then continue in the
@@ -927,14 +927,14 @@ compare:
                     src_recno += skip;
                 } else
                     /* Set time pairs for the first deleted key in a deleted range. */
-                    __wt_time_window_init(&tw);
+                    WT_TIME_WINDOW_INIT(&tw);
             } else if (upd == NULL) {
                 /* The updates on the key are all uncommitted so we write a deleted key to disk. */
-                __wt_time_window_init(&tw);
+                WT_TIME_WINDOW_INIT(&tw);
                 deleted = true;
             } else {
                 /* Set time pairs for a key. */
-                __wt_time_window_copy(&tw, &upd_select.tw);
+                WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
 
                 switch (upd->type) {
                 case WT_UPDATE_MODIFY:
@@ -954,7 +954,7 @@ compare:
                     size = upd->size;
                     break;
                 case WT_UPDATE_TOMBSTONE:
-                    __wt_time_window_init(&tw);
+                    WT_TIME_WINDOW_INIT(&tw);
                     deleted = true;
                     break;
                 default:
@@ -967,9 +967,9 @@ compare:
              * the same thing.
              */
             if (rle != 0) {
-                if (__wt_time_windows_equal(&last.tw, &tw) &&
+                if (WT_TIME_WINDOWS_EQUAL(&last.tw, &tw) &&
                   ((deleted && last.deleted) ||
-                      (!deleted && !last.deleted && last.value->size == size &&
+                      (!deleted && !last.deleted && size != 0 && last.value->size == size &&
                         memcmp(last.value->data, data, size) == 0))) {
                     /*
                      * The start time pair for deleted keys must be (WT_TS_NONE, WT_TXN_NONE) and
@@ -982,7 +982,7 @@ compare:
                         (last.tw.durable_start_ts == tw.durable_start_ts &&
                           last.tw.start_ts == WT_TS_NONE && last.tw.start_txn == WT_TXN_NONE &&
                           last.tw.durable_stop_ts == tw.durable_stop_ts &&
-                          !__wt_time_window_has_stop(&last.tw)));
+                          !WT_TIME_WINDOW_HAS_STOP(&last.tw)));
                     ++rle;
                     goto next;
                 }
@@ -1006,7 +1006,7 @@ compare:
             }
 
             /* Ready for the next loop, reset the RLE counter. */
-            __wt_time_window_copy(&last.tw, &tw);
+            WT_TIME_WINDOW_COPY(&last.tw, &tw);
             last.deleted = deleted;
             rle = 1;
 

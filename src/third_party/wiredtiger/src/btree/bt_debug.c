@@ -932,7 +932,7 @@ __wt_debug_cursor_hs(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor)
     uint8_t hs_upd_type;
 
     ds = &_ds;
-    __wt_time_window_init(&tw);
+    WT_TIME_WINDOW_INIT(&tw);
 
     WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
     WT_ERR(__wt_scr_alloc(session, 0, &hs_value));

@@ -383,7 +383,7 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
          * don't need to append a tombstone.
          */
         __wt_read_row_time_window(session, page, rip, &tw);
-        if (!__wt_time_window_has_stop(&tw)) {
+        if (!WT_TIME_WINDOW_HAS_STOP(&tw)) {
             WT_ERR(__tombstone_update_alloc(session, page_del, &upd, &size));
             upd->next = upd_array[WT_ROW_SLOT(page, rip)];
             upd_array[WT_ROW_SLOT(page, rip)] = upd;

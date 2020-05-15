@@ -76,7 +76,7 @@ __rebalance_leaf_append(WT_SESSION_IMPL *session, const uint8_t *key, size_t key
 
     WT_RET(__wt_calloc_one(session, &copy_addr));
     copy->addr = copy_addr;
-    __wt_time_aggregate_copy(&copy_addr->ta, &unpack->ta);
+    WT_TIME_AGGREGATE_COPY(&copy_addr->ta, &unpack->ta);
     WT_RET(__wt_memdup(session, unpack->data, unpack->size, &copy_addr->addr));
     copy_addr->size = (uint8_t)unpack->size;
     copy_addr->type = unpack->type == WT_CELL_ADDR_LEAF ? WT_ADDR_LEAF : WT_ADDR_LEAF_NO;

@@ -79,7 +79,7 @@ __read_col_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, W
     WT_CELL_UNPACK_KV unpack;
 
     __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-    __wt_time_window_copy(tw, &unpack.tw);
+    WT_TIME_WINDOW_COPY(tw, &unpack.tw);
 }
 
 /*
@@ -91,7 +91,7 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
 {
     WT_CELL_UNPACK_KV unpack;
 
-    __wt_time_window_init(tw);
+    WT_TIME_WINDOW_INIT(tw);
     /*
      * If a value is simple and is globally visible at the time of reading a page into cache, we set
      * the time pairs as globally visible.
@@ -100,7 +100,7 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
         return;
 
     __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
-    __wt_time_window_copy(tw, &unpack.tw);
+    WT_TIME_WINDOW_COPY(tw, &unpack.tw);
 }
 
 /*
@@ -125,7 +125,7 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_WINDOW *tw
         __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
     } else {
         /* WT_PAGE_COL_FIX: return the default time pairs. */
-        __wt_time_window_init(tw);
+        WT_TIME_WINDOW_INIT(tw);
     }
 }
 
@@ -160,14 +160,14 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
          */
         if (__wt_row_leaf_value(page, rip, buf)) {
             if (tw != NULL)
-                __wt_time_window_init(tw);
+                WT_TIME_WINDOW_INIT(tw);
             return (0);
         }
 
         /* Take the value from the original page cell. */
         __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
         if (tw != NULL)
-            __wt_time_window_copy(tw, &unpack.tw);
+            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));
     }
 
@@ -176,7 +176,7 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
         cell = WT_COL_PTR(page, &page->pg_var[cbt->slot]);
         __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
         if (tw != NULL)
-            __wt_time_window_copy(tw, &unpack.tw);
+            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));
     }
 
@@ -186,7 +186,7 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
      * FIXME-WT-6126: Should also check visibility here
      */
     if (tw != NULL)
-        __wt_time_window_init(tw);
+        WT_TIME_WINDOW_INIT(tw);
     v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
     return (__wt_buf_set(session, buf, &v, 1));
 }

@@ -1232,7 +1232,7 @@ __wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t ne
         r->cur_ptr->min_recno = r->recno;
         if (S2BT(session)->type == BTREE_ROW)
             WT_RET(__rec_split_row_promote(session, r, &r->cur_ptr->min_key, r->page->type));
-        __wt_time_aggregate_copy(&r->cur_ptr->ta_min, &r->cur_ptr->ta);
+        WT_TIME_AGGREGATE_COPY(&r->cur_ptr->ta_min, &r->cur_ptr->ta);
 
         /* Assert we're not re-entering this code. */
         WT_ASSERT(session, r->cur_ptr->min_offset == 0);
@@ -1283,7 +1283,7 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
          * boundaries and create a single chunk.
          */
         prev_ptr->entries += cur_ptr->entries;
-        __wt_time_aggregate_merge(&prev_ptr->ta, &cur_ptr->ta);
+        WT_TIME_AGGREGATE_MERGE(&prev_ptr->ta, &cur_ptr->ta);
         dsk = r->cur_ptr->image.mem;
         memcpy((uint8_t *)r->prev_ptr->image.mem + prev_ptr->image.size,
           WT_PAGE_HEADER_BYTE(btree, dsk), cur_ptr->image.size - WT_PAGE_HEADER_BYTE_SIZE(btree));
@@ -1326,11 +1326,11 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         cur_ptr->recno = prev_ptr->min_recno;
         WT_RET(
           __wt_buf_set(session, &cur_ptr->key, prev_ptr->min_key.data, prev_ptr->min_key.size));
-        __wt_time_aggregate_merge(&cur_ptr->ta, &prev_ptr->ta);
+        WT_TIME_AGGREGATE_MERGE(&cur_ptr->ta, &prev_ptr->ta);
         cur_ptr->image.size += len_to_move;
 
         prev_ptr->entries = prev_ptr->min_entries;
-        __wt_time_aggregate_copy(&prev_ptr->ta, &prev_ptr->ta_min);
+        WT_TIME_AGGREGATE_COPY(&prev_ptr->ta, &prev_ptr->ta_min);
         prev_ptr->image.size -= len_to_move;
     }
 
@@ -1711,7 +1711,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
     multi = &r->multi[r->multi_next++];
 
     /* Initialize the address (set the addr type for the parent). */
-    __wt_time_aggregate_copy(&multi->addr.ta, &chunk->ta);
+    WT_TIME_AGGREGATE_COPY(&multi->addr.ta, &chunk->ta);
 
     switch (page->type) {
     case WT_PAGE_COL_FIX:
@@ -2026,7 +2026,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     bm = btree->bm;
     mod = page->modify;
     ref = r->ref;
-    __wt_time_aggregate_init(&ta);
+    WT_TIME_AGGREGATE_INIT(&ta);
 
     /*
      * This page may have previously been reconciled, and that information is now about to be

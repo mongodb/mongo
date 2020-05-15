@@ -78,7 +78,6 @@ timing_stress_split_test=0
 total_jobs=0
 verbose=0
 format_binary="./t"
-env_var=""
 
 while :; do
 	case "$1" in
@@ -92,7 +91,7 @@ while :; do
 		config="$2"
 		shift ; shift ;;
 	-e)
-		env_var="$2"
+		export "$2"
 		shift ; shift ;;
 	-E)
 		skip_errors=1
@@ -448,10 +447,11 @@ format()
 	# continue to run.
 	# Run format in its own session so child processes are in their own process gorups
 	# and we can individually terminate (and clean up) running jobs and their children.
-	eval $env_var setsid $cmd > $log 2>&1 &
+	nohup setsid $cmd > $log 2>&1 &
 
-	# Check for setsid command failed execution, and forcibly quit.
-	# The RUNDIR is not successfully created in this failure type.
+	# Check for setsid command failed execution, and forcibly quit (setsid exits 0 if the
+	# command execution fails so we can't check the exit status). The RUNDIR directory is
+	# not created in this failure type, check the log file explicitly.
 	sleep 1
 	grep -E -i 'setsid: failed to execute' $log > /dev/null && {
 		failure=$(($failure + 1))

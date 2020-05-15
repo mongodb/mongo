@@ -199,7 +199,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     r = cbulk->reconcile;
     btree = S2BT(session);
     cursor = &cbulk->cbt.iface;
-    __wt_time_window_init(&tw);
+    WT_TIME_WINDOW_INIT(&tw);
 
     key = &r->k;
     val = &r->v;
@@ -232,7 +232,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
             WT_RET(__wt_rec_dict_replace(session, r, &tw, 0, val));
         __wt_rec_image_copy(session, r, val);
     }
-    __wt_time_aggregate_update(&r->cur_ptr->ta, &tw);
+    WT_TIME_AGGREGATE_UPDATE(&r->cur_ptr->ta, &tw);
 
     /* Update compression state. */
     __rec_key_state_update(r, ovfl_key);
@@ -276,7 +276,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         /* Copy the key and value onto the page. */
         __wt_rec_image_copy(session, r, key);
         __wt_rec_image_copy(session, r, val);
-        __wt_time_aggregate_merge(&r->cur_ptr->ta, &addr->ta);
+        WT_TIME_AGGREGATE_MERGE(&r->cur_ptr->ta, &addr->ta);
 
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);
@@ -431,7 +431,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
          */
         if (__wt_off_page(page, addr)) {
             __wt_rec_cell_build_addr(session, r, addr, NULL, state == WT_CHILD_PROXY, WT_RECNO_OOB);
-            __wt_time_aggregate_copy(&ta, &addr->ta);
+            WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
         } else {
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
             if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
@@ -452,7 +452,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
                 val->cell_len = 0;
                 val->len = val->buf.size;
             }
-            __wt_time_aggregate_copy(&ta, &vpack->ta);
+            WT_TIME_AGGREGATE_COPY(&ta, &vpack->ta);
         }
         WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
@@ -506,7 +506,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         /* Copy the key and value onto the page. */
         __wt_rec_image_copy(session, r, key);
         __wt_rec_image_copy(session, r, val);
-        __wt_time_aggregate_merge(&r->cur_ptr->ta, &ta);
+        WT_TIME_AGGREGATE_MERGE(&r->cur_ptr->ta, &ta);
 
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);
@@ -533,7 +533,7 @@ __rec_row_zero_len(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
      * tempted to check the time window against the default here - the check is subtly different due
      * to the grouping.
      */
-    return (!__wt_time_window_has_stop(tw) &&
+    return (!WT_TIME_WINDOW_HAS_STOP(tw) &&
       ((tw->start_ts == WT_TS_NONE && tw->start_txn == WT_TXN_NONE) ||
         __wt_txn_tw_start_visible_all(session, tw)));
 }
@@ -568,7 +568,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
         if ((upd = upd_select.upd) == NULL)
             continue;
 
-        __wt_time_window_copy(&tw, &upd_select.tw);
+        WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
 
         switch (upd->type) {
         case WT_UPDATE_MODIFY:
@@ -619,7 +619,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                 WT_RET(__wt_rec_dict_replace(session, r, &tw, 0, val));
             __wt_rec_image_copy(session, r, val);
         }
-        __wt_time_aggregate_update(&r->cur_ptr->ta, &tw);
+        WT_TIME_AGGREGATE_UPDATE(&r->cur_ptr->ta, &tw);
 
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);
@@ -691,7 +691,7 @@ __wt_rec_row_leaf(
     btree = S2BT(session);
     page = pageref->page;
     slvg_skip = salvage == NULL ? 0 : salvage->skip;
-    __wt_time_window_init(&tw);
+    WT_TIME_WINDOW_INIT(&tw);
 
     cbt = &r->update_modify_cbt;
     cbt->iface.session = (WT_SESSION *)session;
@@ -756,11 +756,11 @@ __wt_rec_row_leaf(
          */
         if (upd == NULL) {
             if (!salvage)
-                __wt_time_window_copy(&tw, &vpack->tw);
+                WT_TIME_WINDOW_COPY(&tw, &vpack->tw);
             else
-                __wt_time_window_init(&tw);
+                WT_TIME_WINDOW_INIT(&tw);
         } else
-            __wt_time_window_copy(&tw, &upd_select.tw);
+            WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
 
         /*
          * If we reconcile an on disk key with a globally visible stop time pair and there are no
@@ -964,7 +964,7 @@ build:
                 WT_ERR(__wt_rec_dict_replace(session, r, &tw, 0, val));
             __wt_rec_image_copy(session, r, val);
         }
-        __wt_time_aggregate_update(&r->cur_ptr->ta, &tw);
+        WT_TIME_AGGREGATE_UPDATE(&r->cur_ptr->ta, &tw);
 
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);

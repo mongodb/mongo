@@ -927,7 +927,7 @@ __verify_dsk_col_var(
 
     last.data = NULL;
     last.size = 0;
-    __wt_time_window_init(&last.tw);
+    WT_TIME_WINDOW_INIT(&last.tw);
     last.deleted = false;
 
     cell_num = 0;
@@ -960,7 +960,7 @@ __verify_dsk_col_var(
          * The time windows must match and we otherwise don't have to care about data encoding, a
          * byte comparison is enough.
          */
-        if (!__wt_time_windows_equal(&unpack->tw, &last.tw))
+        if (!WT_TIME_WINDOWS_EQUAL(&unpack->tw, &last.tw))
             ;
         else if (last.deleted) {
             if (cell_type == WT_CELL_DEL)
@@ -972,7 +972,7 @@ match_err:
                              " on page at %s are identical and should have been run-length encoded",
           cell_num - 1, cell_num, tag);
 
-        __wt_time_window_copy(&last.tw, &unpack->tw);
+        WT_TIME_WINDOW_COPY(&last.tw, &unpack->tw);
         switch (cell_type) {
         case WT_CELL_DEL:
             last.data = NULL;
