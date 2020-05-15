@@ -105,41 +105,46 @@ void assertMultikeyPathsEqual(const MultikeyPaths& expectedMultikeyPaths,
     }
 }
 
-long long getCellID(int x, int y, bool multiPoint = false) {
-    BSONObj obj;
-    if (multiPoint) {
-        obj = BSON("a" << BSON("type"
-                               << "MultiPoint"
-                               << "coordinates" << BSON_ARRAY(BSON_ARRAY(x << y))));
-    } else {
-        obj = BSON("a" << BSON("type"
-                               << "Point"
-                               << "coordinates" << BSON_ARRAY(x << y)));
+struct S2KeyGeneratorTest : public unittest::Test {
+    SharedBufferFragmentBuilder allocator{KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+
+    long long getCellID(int x, int y, bool multiPoint = false) {
+        BSONObj obj;
+        if (multiPoint) {
+            obj = BSON("a" << BSON("type"
+                                   << "MultiPoint"
+                                   << "coordinates" << BSON_ARRAY(BSON_ARRAY(x << y))));
+        } else {
+            obj = BSON("a" << BSON("type"
+                                   << "Point"
+                                   << "coordinates" << BSON_ARRAY(x << y)));
+        }
+        BSONObj keyPattern = fromjson("{a: '2dsphere'}");
+        BSONObj infoObj = fromjson("{key: {a: '2dsphere'}, '2dsphereIndexVersion': 3}");
+        S2IndexingParams params;
+        const CollatorInterface* collator = nullptr;
+        ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+
+        KeyStringSet keys;
+        // There's no need to compute the prefixes of the indexed fields that cause the index to be
+        // multikey when computing the cell id of the geo field.
+        MultikeyPaths* multikeyPaths = nullptr;
+        ExpressionKeysPrivate::getS2Keys(allocator,
+                                         obj,
+                                         keyPattern,
+                                         params,
+                                         &keys,
+                                         multikeyPaths,
+                                         KeyString::Version::kLatestVersion,
+                                         Ordering::make(BSONObj()));
+
+        ASSERT_EQUALS(1U, keys.size());
+        auto key = KeyString::toBson(*keys.begin(), Ordering::make(BSONObj()));
+        return key.firstElement().Long();
     }
-    BSONObj keyPattern = fromjson("{a: '2dsphere'}");
-    BSONObj infoObj = fromjson("{key: {a: '2dsphere'}, '2dsphereIndexVersion': 3}");
-    S2IndexingParams params;
-    const CollatorInterface* collator = nullptr;
-    ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
+};
 
-    KeyStringSet keys;
-    // There's no need to compute the prefixes of the indexed fields that cause the index to be
-    // multikey when computing the cell id of the geo field.
-    MultikeyPaths* multikeyPaths = nullptr;
-    ExpressionKeysPrivate::getS2Keys(obj,
-                                     keyPattern,
-                                     params,
-                                     &keys,
-                                     multikeyPaths,
-                                     KeyString::Version::kLatestVersion,
-                                     Ordering::make(BSONObj()));
-
-    ASSERT_EQUALS(1U, keys.size());
-    auto key = KeyString::toBson(*keys.begin(), Ordering::make(BSONObj()));
-    return key.firstElement().Long();
-}
-
-TEST(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjects) {
+TEST_F(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjects) {
     BSONObj keyPattern = fromjson("{'a.b.nongeo': 1, 'a.b.geo': '2dsphere'}");
     BSONObj genKeysFrom = fromjson(
         "{a: {b: [{nongeo: 1, geo: {type: 'Point', coordinates: [0, 0]}}, "
@@ -152,7 +157,8 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjects
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(genKeysFrom,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     genKeysFrom,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -179,7 +185,7 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjects
     assertMultikeyPathsEqual(MultikeyPaths{{1U}, {1U}}, actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) {
+TEST_F(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) {
     BSONObj keyPattern = fromjson("{'a.nongeo': 1, geo: '2dsphere'}");
     BSONObj genKeysFrom = fromjson(
         "{a: [{nongeo: [1, 2]}, {nongeo: [2, 3]}], "
@@ -192,7 +198,8 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(genKeysFrom,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     genKeysFrom,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -215,7 +222,7 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) {
     assertMultikeyPathsEqual(MultikeyPaths{{0U, 1U}, MultikeyComponents{}}, actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
+TEST_F(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
     BSONObj keyPattern = fromjson("{nongeo: 1, geo: '2dsphere'}");
     BSONObj genKeysFrom =
         fromjson("{nongeo: 1, geo: {type: 'MultiPoint', coordinates: [[0, 0], [1, 0], [1, 1]]}}");
@@ -226,7 +233,8 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(genKeysFrom,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     genKeysFrom,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -250,7 +258,7 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
     assertMultikeyPathsEqual(MultikeyPaths{MultikeyComponents{}, {0U}}, actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
+TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
     BSONObj obj = fromjson("{a: {type: 'Point', coordinates: [0, 0]}, b: 'string'}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
@@ -260,7 +268,8 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -279,7 +288,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
                              actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
+TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
     BSONObj obj = fromjson("{a: 'string', b: {type: 'Point', coordinates: [0, 0]}}");
     BSONObj keyPattern = fromjson("{a: 1, b: '2dsphere'}");
     BSONObj infoObj = fromjson("{key: {a: 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
@@ -289,7 +298,8 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -309,7 +319,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
                              actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
+TEST_F(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
     BSONObj obj = fromjson("{a: 'string', b: {type: 'Point', coordinates: [0, 0]}, c: 'string2'}");
     BSONObj keyPattern = fromjson("{a: 1, b: '2dsphere', c: 1}");
     BSONObj infoObj = fromjson("{key: {a: 1, b: '2dsphere', c: 1}, '2dsphereIndexVersion': 3}");
@@ -319,7 +329,8 @@ TEST(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -341,7 +352,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
         actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathComponents) {
+TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathComponents) {
     BSONObj obj = fromjson("{a: {type: 'Point', coordinates: [0, 0]}, b: {c: {d: 'string'}}}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', 'b.c.d': 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', 'b.c.d': 1}, '2dsphereIndexVersion': 3}");
@@ -351,7 +362,8 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathComp
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -370,7 +382,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathComp
                              actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
+TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
     BSONObj obj = fromjson("{a: {type: 'Point', coordinates: [0, 0]}, b: ['string', 'string2']}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
@@ -380,7 +392,8 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -402,7 +415,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
     assertMultikeyPathsEqual(MultikeyPaths{MultikeyComponents{}, {0U}}, actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
+TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
     BSONObj obj = fromjson(
         "{a: {type: 'Point', coordinates: [0, 0]}, b: ['string', 'string2'], c: ['abc', 'def']}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1, c: 1}");
@@ -413,7 +426,8 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -452,7 +466,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
     assertMultikeyPathsEqual(MultikeyPaths{MultikeyComponents{}, {0U}, {0U}}, actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
+TEST_F(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     BSONObj obj = fromjson("{a: {type: 'Point', coordinates: [0, 0]}, b: 5}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
@@ -462,7 +476,8 @@ TEST(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -480,7 +495,7 @@ TEST(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
                              actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
+TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
     BSONObj obj = fromjson("{a: {type: 'Point', coordinates: [0, 0]}, b: {c: 'string'}}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
@@ -490,7 +505,8 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -510,7 +526,7 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
                              actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, NoCollation) {
+TEST_F(S2KeyGeneratorTest, NoCollation) {
     BSONObj obj = fromjson("{a: {type: 'Point', coordinates: [0, 0]}, b: 'string'}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
@@ -520,7 +536,8 @@ TEST(S2KeyGeneratorTest, NoCollation) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -539,7 +556,7 @@ TEST(S2KeyGeneratorTest, NoCollation) {
                              actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, EmptyArrayForLeadingFieldIsConsideredMultikey) {
+TEST_F(S2KeyGeneratorTest, EmptyArrayForLeadingFieldIsConsideredMultikey) {
     BSONObj obj = fromjson("{a: [], b: {type: 'Point', coordinates: [0, 0]}}");
     BSONObj keyPattern = fromjson("{a: 1, b: '2dsphere'}");
     BSONObj infoObj = fromjson("{key: {a: 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
@@ -549,7 +566,8 @@ TEST(S2KeyGeneratorTest, EmptyArrayForLeadingFieldIsConsideredMultikey) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -566,7 +584,7 @@ TEST(S2KeyGeneratorTest, EmptyArrayForLeadingFieldIsConsideredMultikey) {
     assertMultikeyPathsEqual(MultikeyPaths{{0U}, MultikeyComponents{}}, actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, EmptyArrayForTrailingFieldIsConsideredMultikey) {
+TEST_F(S2KeyGeneratorTest, EmptyArrayForTrailingFieldIsConsideredMultikey) {
     BSONObj obj = fromjson("{a: {type: 'Point', coordinates: [0, 0]}, b: []}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', a: 1}, '2dsphereIndexVersion': 3}");
@@ -576,7 +594,8 @@ TEST(S2KeyGeneratorTest, EmptyArrayForTrailingFieldIsConsideredMultikey) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -593,7 +612,7 @@ TEST(S2KeyGeneratorTest, EmptyArrayForTrailingFieldIsConsideredMultikey) {
     assertMultikeyPathsEqual(MultikeyPaths{MultikeyComponents{}, {0U}}, actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
+TEST_F(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
     BSONObj obj = fromjson("{a: {c: [99]}, b: {type: 'Point', coordinates: [0, 0]}}");
     BSONObj keyPattern = fromjson("{'a.c': 1, b: '2dsphere'}");
     BSONObj infoObj = fromjson("{key: {'a.c': 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
@@ -603,7 +622,8 @@ TEST(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,
@@ -620,7 +640,7 @@ TEST(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
     assertMultikeyPathsEqual(MultikeyPaths{{1U}, MultikeyComponents{}}, actualMultikeyPaths);
 }
 
-TEST(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
+TEST_F(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
     BSONObj obj = fromjson("{a: [{c: 99}], b: {type: 'Point', coordinates: [0, 0]}}");
     BSONObj keyPattern = fromjson("{'a.c': 1, b: '2dsphere'}");
     BSONObj infoObj = fromjson("{key: {'a.c': 1, b: '2dsphere'}, '2dsphereIndexVersion': 3}");
@@ -630,7 +650,8 @@ TEST(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2Keys(obj,
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     obj,
                                      keyPattern,
                                      params,
                                      &actualKeys,

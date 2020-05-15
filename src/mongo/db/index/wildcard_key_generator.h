@@ -74,36 +74,43 @@ public:
      * document, in the following format:
      *      { '': 1, '': 'path.to.array' }
      */
-    void generateKeys(BSONObj inputDoc,
+    void generateKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                      BSONObj inputDoc,
                       KeyStringSet* keys,
                       KeyStringSet* multikeyPaths,
                       boost::optional<RecordId> id = boost::none) const;
 
 private:
     // Traverses every path of the post-projection document, adding keys to the set as it goes.
-    void _traverseWildcard(BSONObj obj,
+    void _traverseWildcard(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                           BSONObj obj,
                            bool objIsArray,
                            FieldRef* path,
-                           KeyStringSet* keys,
-                           KeyStringSet* multikeyPaths,
+                           KeyStringSet::sequence_type* keys,
+                           KeyStringSet::sequence_type* multikeyPaths,
                            boost::optional<RecordId> id) const;
 
     // Helper functions to format the entry appropriately before adding it to the key/path tracker.
-    void _addMultiKey(const FieldRef& fullPath, KeyStringSet* multikeyPaths) const;
-    void _addKey(BSONElement elem,
+    void _addMultiKey(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                      const FieldRef& fullPath,
+                      KeyStringSet::sequence_type* multikeyPaths) const;
+    void _addKey(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                 BSONElement elem,
                  const FieldRef& fullPath,
-                 KeyStringSet* keys,
+                 KeyStringSet::sequence_type* keys,
                  boost::optional<RecordId> id) const;
 
     // Helper to check whether the element is a nested array, and conditionally add it to 'keys'.
-    bool _addKeyForNestedArray(BSONElement elem,
+    bool _addKeyForNestedArray(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                               BSONElement elem,
                                const FieldRef& fullPath,
                                bool enclosingObjIsArray,
-                               KeyStringSet* keys,
+                               KeyStringSet::sequence_type* keys,
                                boost::optional<RecordId> id) const;
-    bool _addKeyForEmptyLeaf(BSONElement elem,
+    bool _addKeyForEmptyLeaf(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                             BSONElement elem,
                              const FieldRef& fullPath,
-                             KeyStringSet* keys,
+                             KeyStringSet::sequence_type* keys,
                              boost::optional<RecordId> id) const;
 
     WildcardProjection _proj;

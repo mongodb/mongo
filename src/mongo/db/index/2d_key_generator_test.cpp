@@ -92,14 +92,22 @@ KeyString::Value make2DKey(const TwoDIndexingParams& params,
     return keyString.release();
 }
 
-TEST(2dKeyGeneratorTest, TrailingField) {
+struct TwoDKeyGeneratorTest : public unittest::Test {
+    SharedBufferFragmentBuilder allocator{KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+};
+
+TEST_F(TwoDKeyGeneratorTest, TrailingField) {
     BSONObj obj = fromjson("{a: [0, 0], b: 5}");
     BSONObj infoObj = fromjson("{key: {a: '2d', b: 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
     KeyStringSet actualKeys;
-    ExpressionKeysPrivate::get2DKeys(
-        obj, params, &actualKeys, KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
+    ExpressionKeysPrivate::get2DKeys(allocator,
+                                     obj,
+                                     params,
+                                     &actualKeys,
+                                     KeyString::Version::kLatestVersion,
+                                     Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << 5);
@@ -108,14 +116,18 @@ TEST(2dKeyGeneratorTest, TrailingField) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(2dKeyGeneratorTest, ArrayTrailingField) {
+TEST_F(TwoDKeyGeneratorTest, ArrayTrailingField) {
     BSONObj obj = fromjson("{a: [0, 0], b: [5, 6]}");
     BSONObj infoObj = fromjson("{key: {a: '2d', b: 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
     KeyStringSet actualKeys;
-    ExpressionKeysPrivate::get2DKeys(
-        obj, params, &actualKeys, KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
+    ExpressionKeysPrivate::get2DKeys(allocator,
+                                     obj,
+                                     params,
+                                     &actualKeys,
+                                     KeyString::Version::kLatestVersion,
+                                     Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << BSON_ARRAY(5 << 6));
@@ -124,14 +136,18 @@ TEST(2dKeyGeneratorTest, ArrayTrailingField) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(2dKeyGeneratorTest, ArrayOfObjectsTrailingField) {
+TEST_F(TwoDKeyGeneratorTest, ArrayOfObjectsTrailingField) {
     BSONObj obj = fromjson("{a: [0, 0], b: [{c: 5}, {c: 6}]}");
     BSONObj infoObj = fromjson("{key: {a: '2d', 'b.c': 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
     KeyStringSet actualKeys;
-    ExpressionKeysPrivate::get2DKeys(
-        obj, params, &actualKeys, KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
+    ExpressionKeysPrivate::get2DKeys(allocator,
+                                     obj,
+                                     params,
+                                     &actualKeys,
+                                     KeyString::Version::kLatestVersion,
+                                     Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
     BSONObj trailingFields = BSON("" << BSON_ARRAY(5 << 6));

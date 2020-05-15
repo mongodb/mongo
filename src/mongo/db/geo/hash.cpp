@@ -480,7 +480,8 @@ void GeoHash::clearUnusedBits() {
     _hash &= ~mask;
 }
 
-static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
+namespace {
+void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
     char buf[8];
     if constexpr (kNativeLittle) {
         // Reverse the order of bytes when copying between BinData and GeoHash.
@@ -495,7 +496,8 @@ static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const c
     builder->appendBinData(fieldName, 8, bdtCustom, buf);
 }
 
-static void appendHashToKeyString(long long hash, KeyString::Builder* ks) {
+template <typename KeyStringBuilder>
+void appendHashToKeyString(long long hash, KeyStringBuilder* ks) {
     char buf[8];
     if constexpr (kNativeLittle) {
         // Reverse the order of bytes when copying between BinData and GeoHash.
@@ -509,6 +511,7 @@ static void appendHashToKeyString(long long hash, KeyString::Builder* ks) {
     }
     ks->appendBinData(BSONBinData(buf, 8, bdtCustom));
 }
+}  // namespace
 
 void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
@@ -516,6 +519,11 @@ void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) cons
 }
 
 void GeoHash::appendHashMin(KeyString::Builder* ks) const {
+    // The min bound of a GeoHash region has all the unused suffix bits set to 0
+    appendHashToKeyString(_hash, ks);
+}
+
+void GeoHash::appendHashMin(KeyString::PooledBuilder* ks) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
     appendHashToKeyString(_hash, ks);
 }

@@ -59,7 +59,7 @@ void WildcardAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBu
                                      KeyStringSet* multikeyMetadataKeys,
                                      MultikeyPaths* multikeyPaths,
                                      boost::optional<RecordId> id) const {
-    _keyGen.generateKeys(obj, keys, multikeyMetadataKeys, id);
+    _keyGen.generateKeys(pooledBufferBuilder, obj, keys, multikeyMetadataKeys, id);
 }
 
 FieldRef WildcardAccessMethod::extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
