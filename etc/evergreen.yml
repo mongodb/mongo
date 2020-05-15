@@ -8781,7 +8781,7 @@ buildvariants:
 - <<: *linux-64-debug-template
   name: linux-64-debug-wtdevelop
   display_name: "~ Linux DEBUG WiredTiger develop"
-  batchtime: 1440 # 1 day
+  batchtime: 240 # 4 hours
   modules:
   - wtdevelop
   expansions:
@@ -9790,6 +9790,7 @@ buildvariants:
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-wtdevelop
   display_name: "~ Enterprise Windows WiredTiger develop"
+  batchtime: 240 # 4 hours
   modules:
   - enterprise
   - wtdevelop
