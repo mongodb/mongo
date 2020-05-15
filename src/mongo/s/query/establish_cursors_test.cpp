@@ -163,32 +163,6 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableError) {
     future.default_timed_get();
 }
 
-TEST_F(EstablishCursorsTest, SingleRemoteInterruptedBeforeCommandSent) {
-    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
-        {kTestShardIds[0], cmdObj},
-    };
-
-    auto future = launchAsync([&] {
-        ASSERT_THROWS(establishCursors(operationContext(),
-                                       executor(),
-                                       _nss,
-                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                       remotes,
-                                       false),  // allowPartialResults
-                      ExceptionFor<ErrorCodes::CursorKilled>);
-    });
-
-    // Now interrupt the opCtx which the cursor is running under.
-    {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
-        operationContext()->getServiceContext()->killOperation(
-            lk, operationContext(), ErrorCodes::CursorKilled);
-    }
-
-    future.default_timed_get();
-}
-
 TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
@@ -198,7 +172,8 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     // Hang before sending the command but after resolving the host to send it to.
     auto fp = globalFailPointRegistry().find("hangBeforeSchedulingRemoteCommand");
     invariant(fp);
-    fp->setMode(FailPoint::alwaysOn, 0, BSON("hostAndPort" << kTestShardHosts[0].toString()));
+    auto startCount =
+        fp->setMode(FailPoint::alwaysOn, 0, BSON("hostAndPort" << kTestShardHosts[0].toString()));
 
     auto future = launchAsync([&] {
         ASSERT_THROWS(establishCursors(operationContext(),
@@ -211,7 +186,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     });
 
     // Verify that the failpoint is hit.
-    fp->waitForTimesEntered(2ULL);
+    fp->waitForTimesEntered(startCount + 1);
 
     // Now interrupt the opCtx which the cursor is running under.
     {
@@ -224,8 +199,27 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     // killOperations for the two remotes.
     fp->setMode(FailPoint::off);
 
-    // Expect a killOperation for the outstanding remote request.
-    expectKillOperations(1);
+    // The OperationContext was marked as killed before the request was scheduled, however the exact
+    // timing of when the interrupt condition is detected is not deterministic in this test.
+    // However, since the failpoint is in a position where the remote hostAndPort is resolved, we
+    // are guaranteed to get a killOperation for it but we may first see the original remote
+    // request.
+    auto killOpSeen = false;
+    onCommand([&](const RemoteCommandRequest& request) {
+        if (request.dbname == "admin" && request.cmdObj.hasField("_killOperations")) {
+            killOpSeen = true;
+            return BSON("ok" << 1);
+        }
+
+        // Otherwise expect the original request and mock the response.
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+        CursorResponse cursorResponse(_nss, CursorId(123), {});
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    if (!killOpSeen) {
+        expectKillOperations(1);
+    }
 
     future.default_timed_get();
 }
