@@ -326,15 +326,12 @@ public:
     }
 
     /**
-     * Take 100msec pauses for as long as the FailPoint is active.
+     * Take 'kWaitGranularity' pauses for as long as the FailPoint is active.
      * This calls `shouldFail()` with kFirstTimeEntered once and with kEnteredAlready thereafter, so
      * affects FailPoint counters once.
      */
     void pauseWhileSet() {
-        for (auto entryMode = kFirstTimeEntered; MONGO_unlikely(shouldFail(entryMode));
-             entryMode = kEnteredAlready) {
-            sleepmillis(100);
-        }
+        pauseWhileSet(Interruptible::notInterruptible());
     }
 
     /**
