@@ -19,6 +19,7 @@
  * }
  */
 load("jstests/multiVersion/libs/multi_rs.js");  // Used by upgradeSet.
+load("jstests/replsets/rslib.js");              // For awaitRSClientHosts.
 
 ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
     options = options || {};
@@ -107,7 +108,6 @@ ShardingTest.prototype.waitUntilStable = function() {
         rs.test.awaitSecondaryNodes();
         shardPrimaries.push(rs.test.getPrimary());
     }
-
     // Wait for the ReplicaSetMonitor on mongoS and each shard to reflect the state of all shards.
     for (let client of [...this._mongos, ...shardPrimaries]) {
         awaitRSClientHosts(client, shardPrimaries, {ok: true, ismaster: true});
