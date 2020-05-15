@@ -94,7 +94,7 @@ var pipeline = {
         }
     }
 };
-assertErrorCode(coll, pipeline, 40093);
+assertErrorCode(coll, pipeline, 40091);
 
 pipeline = {
     $project: {
@@ -103,7 +103,7 @@ pipeline = {
         }
     }
 };
-assertErrorCode(coll, pipeline, 40094);
+assertErrorCode(coll, pipeline, 40092);
 
 pipeline = {
     $project: {output: {$indexOfCP: ["abc", "b", "bad"]}}

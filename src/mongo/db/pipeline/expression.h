@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <boost/algorithm/searching/boyer_moore.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <functional>
 #include <map>
@@ -1556,34 +1557,63 @@ private:
 };
 
 
-class ExpressionIndexOfBytes final : public ExpressionRangedArity<ExpressionIndexOfBytes, 2, 4> {
+template <typename SubClass>
+class ExpressionIndexOfBase : public ExpressionRangedArity<SubClass, 2, 4> {
+public:
+    explicit ExpressionIndexOfBase(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionRangedArity<SubClass, 2, 4>(expCtx) {}
+
+    ~ExpressionIndexOfBase() {
+        delete _search;
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const;
+    boost::intrusive_ptr<Expression> optimize();
+
+protected:
+    boost::algorithm::boyer_moore<std::string::const_iterator>* _search = nullptr;
+    std::string _token;
+};
+
+
+class ExpressionIndexOfBytes final : public ExpressionIndexOfBase<ExpressionIndexOfBytes> {
 public:
     explicit ExpressionIndexOfBytes(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ExpressionRangedArity<ExpressionIndexOfBytes, 2, 4>(expCtx) {}
+        : ExpressionIndexOfBase<ExpressionIndexOfBytes>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
+
+    Value finishEvaluate(const Document& root,
+                         Variables* variables,
+                         const std::string& input,
+                         const size_t startIndex,
+                         const std::string& token) const;
 };
 
 
 /**
  * Implements indexOf behavior for strings with UTF-8 encoding.
  */
-class ExpressionIndexOfCP final : public ExpressionRangedArity<ExpressionIndexOfCP, 2, 4> {
+class ExpressionIndexOfCP final : public ExpressionIndexOfBase<ExpressionIndexOfCP> {
 public:
     explicit ExpressionIndexOfCP(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ExpressionRangedArity<ExpressionIndexOfCP, 2, 4>(expCtx) {}
+        : ExpressionIndexOfBase<ExpressionIndexOfCP>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
+
+    Value finishEvaluate(const Document& root,
+                         Variables* variables,
+                         const std::string& input,
+                         const size_t startIndex,
+                         const std::string& token) const;
 };
 
 
