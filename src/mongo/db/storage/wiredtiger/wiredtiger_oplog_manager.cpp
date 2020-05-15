@@ -102,8 +102,8 @@ void WiredTigerOplogManager::haltVisibilityThread() {
 
 void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
     stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-    if (!_opsWaitingForOplogVisibility) {
-        _opsWaitingForOplogVisibility = true;
+    if (!_triggerOplogVisibilityUpdate) {
+        _triggerOplogVisibilityUpdate = true;
         _oplogVisibilityThreadCV.notify_one();
     }
 }
@@ -133,6 +133,12 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     opCtx->recoveryUnit()->abandonSnapshot();
 
     stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
+
+    // Prevent any scheduled oplog visibility updates from being delayed for batching and blocking
+    // this wait excessively.
+    ++_opsWaitingForOplogVisibilityUpdate;
+    invariant(_opsWaitingForOplogVisibilityUpdate > 0);
+    auto exitGuard = makeGuard([&] { --_opsWaitingForOplogVisibilityUpdate; });
 
     // Out of order writes to the oplog always call triggerOplogVisibilityUpdate() on commit to
     // prompt the OplogVisibilityThread to run and update the oplog visibility. We simply need to
@@ -180,7 +186,7 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
         {
             MONGO_IDLE_THREAD_BLOCK;
             _oplogVisibilityThreadCV.wait(
-                lk, [&] { return _shuttingDown || _opsWaitingForOplogVisibility; });
+                lk, [&] { return _shuttingDown || _triggerOplogVisibilityUpdate; });
 
             // If we are not shutting down and nobody is actively waiting for the oplog to become
             // visible, delay a bit to batch more requests into one update and reduce system load.
@@ -188,7 +194,7 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
             auto deadline = now + Milliseconds(kDelayMillis);
 
             auto wakeUpEarlyForWaitersPredicate = [&] {
-                return _shuttingDown || _opsWaitingForOplogVisibility ||
+                return _shuttingDown || _opsWaitingForOplogVisibilityUpdate ||
                     oplogRecordStore->haveCappedWaiters();
             };
 
@@ -212,8 +218,8 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
             return;
         }
 
-        invariant(_opsWaitingForOplogVisibility);
-        _opsWaitingForOplogVisibility = false;
+        invariant(_triggerOplogVisibilityUpdate);
+        _triggerOplogVisibilityUpdate = false;
 
         lk.unlock();
 

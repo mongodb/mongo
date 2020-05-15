@@ -134,6 +134,13 @@ private:
 
     bool _isRunning = false;
     bool _shuttingDown = false;
-    bool _opsWaitingForOplogVisibility = false;
+
+    // Triggers an oplog visibility update -- can be delayed if no callers are waiting for an
+    // update, per the _opsWaitingForOplogVisibility counter.
+    bool _triggerOplogVisibilityUpdate = false;
+
+    // Incremented when a caller is waiting for more of the oplog to become visible, to avoid update
+    // delays for batching.
+    int64_t _opsWaitingForOplogVisibilityUpdate = 0;
 };
 }  // namespace mongo
