@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
