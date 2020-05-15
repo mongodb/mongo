@@ -115,11 +115,11 @@ auto FailPoint::waitForTimesEntered(EntryCountT targetTimesEntered) const noexce
     return timesEntered;
 }
 
-auto FailPoint::waitForTimesEntered(OperationContext* opCtx, EntryCountT targetTimesEntered) const
-    -> EntryCountT {
+auto FailPoint::waitForTimesEntered(Interruptible* interruptible,
+                                    EntryCountT targetTimesEntered) const -> EntryCountT {
     auto timesEntered = _timesEntered.load();
     for (; timesEntered < targetTimesEntered; timesEntered = _timesEntered.load()) {
-        opCtx->sleepFor(kWaitGranularity);
+        interruptible->sleepFor(kWaitGranularity);
     };
     return timesEntered;
 }
