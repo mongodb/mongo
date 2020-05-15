@@ -2355,28 +2355,6 @@ void ReplicationCoordinatorImpl::cancelCbkHandle(CallbackHandle activeHandle) {
     _replExecutor->cancel(activeHandle);
 }
 
-BSONObj ReplicationCoordinatorImpl::_runCmdOnSelfOnAlternativeClient(OperationContext* opCtx,
-                                                                     const std::string& dbName,
-                                                                     const BSONObj& cmdObj) {
-
-    auto client = opCtx->getServiceContext()->makeClient("DBDirectClientCmd");
-    // We want the command's opCtx that gets executed via DBDirectClient to be interruptible
-    // so that we don't block state transitions. Callers of this function might run opCtx
-    // in an uninterruptible mode. To be on safer side, run the command in AlternativeClientRegion,
-    // to make sure that the command's opCtx is interruptible.
-    AlternativeClientRegion acr(client);
-    auto uniqueNewOpCtx = cc().makeOperationContext();
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationKillable(lk);
-    }
-
-    DBDirectClient dbClient(uniqueNewOpCtx.get());
-    const auto commandResponse = dbClient.runCommand(OpMsgRequest::fromDBAndBody(dbName, cmdObj));
-
-    return commandResponse->getCommandReply();
-}
-
 BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     OperationContext* opCtx,
     const std::string& dbName,
@@ -2386,27 +2364,14 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     // About to make network and DBDirectClient (recursive) calls, so we should not hold any locks.
     invariant(!opCtx->lockState()->isLocked());
 
-    const auto myHostAndPort = getMyHostAndPort();
     const auto primaryHostAndPort = getCurrentPrimaryHostAndPort();
-
-    if (myHostAndPort.empty()) {
-        // Possibly because either rsconfig is uninitialized or the node got removed from config.
-        uassertStatusOK(Status{ErrorCodes::NodeNotFound, "Address unknown."});
-    }
-
     if (primaryHostAndPort.empty()) {
         uassertStatusOK(Status{ErrorCodes::NoConfigMaster, "Primary is unknown/down."});
     }
 
-    auto iAmPrimary = (myHostAndPort == primaryHostAndPort) ? true : false;
-
-    if (iAmPrimary) {
-        // Run command using DBDirectClient to avoid tcp connection.
-        return _runCmdOnSelfOnAlternativeClient(opCtx, dbName, cmdObj);
-    }
-
-    // Node is not primary, so we will run the remote command via AsyncDBClient. To use
-    // AsyncDBClient, we will be using repl task executor.
+    // Run the command via AsyncDBClient which performs a network call. This is also the desired
+    // behaviour when running this command locally as to avoid using the DBDirectClient which would
+    // provide additional management when trying to cancel the request with differing clients.
     executor::RemoteCommandRequest request(primaryHostAndPort, dbName, cmdObj, nullptr);
     executor::RemoteCommandResponse cbkResponse(
         Status{ErrorCodes::InternalError, "Uninitialized value"});

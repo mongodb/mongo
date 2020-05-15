@@ -1435,14 +1435,6 @@ private:
     int64_t _nextRandomInt64_inlock(int64_t limit);
 
     /**
-     * Runs the command using DBDirectClient and returns the response received for that command.
-     * Callers of this function should not hold any locks.
-     */
-    BSONObj _runCmdOnSelfOnAlternativeClient(OperationContext* opCtx,
-                                             const std::string& dbName,
-                                             const BSONObj& cmdObj);
-
-    /**
      * This is called by a primary when they become aware that a node has completed initial sync.
      * That primary initiates a reconfig to remove the 'newlyAdded' for that node, if it was set.
      */
