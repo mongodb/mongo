@@ -207,9 +207,8 @@ function test(st, description, testBody) {
              const newPrimary = st.rs0.getSecondary();
              let hangInMigrationRecoveryFailpoint =
                  configureFailPoint(newPrimary, "hangBeforeFilteringMetadataRefresh");
-             assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
+             st.rs0.stepUp(newPrimary);
              st.rs0.waitForState(newPrimary, ReplSetTest.State.PRIMARY);
-             st.rs0.awaitNodesAgreeOnPrimary();
 
              jsTestLog("Waiting for the new primary to hang in migration recovery");
              hangInMigrationRecoveryFailpoint.wait();
