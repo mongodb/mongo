@@ -215,6 +215,12 @@ function test(st, description, testBody) {
              // Clean up the failpoint on the old primary.
              hangBeforeWritingDecisionFailpoint.off();
 
+             // Wait for relevant nodes to detect the new primary, which may take some time using
+             // the RSM protocols other than streamable.
+             awaitRSClientHosts(st.s, newPrimary, {ok: true, ismaster: true});
+             awaitRSClientHosts(st.rs1.getPrimary(), newPrimary, {ok: true, ismaster: true});
+             awaitRSClientHosts(st.configRS.getPrimary(), newPrimary, {ok: true, ismaster: true});
+
              // Refine the collection's shard key while the recovery task is hung.
              jsTestLog("Refining the shard key");
              assert.commandWorked(st.s.getCollection(ns).createIndex({x: 1, y: 1, z: 1}));
@@ -232,8 +238,6 @@ function test(st, description, testBody) {
              });
 
              // Verify we can move the chunk back to the original donor once the orphans are gone.
-             awaitRSClientHosts(
-                 st.rs1.getPrimary(), st.rs0.getPrimary(), {ok: true, ismaster: true});
              assert.commandWorked(st.s.adminCommand({
                  moveChunk: ns,
                  find: {x: 1, y: 1, z: 1},
