@@ -1165,6 +1165,7 @@ env.Library(
         's/sharding_api_d',
         'stats/serveronly_stats',
         'storage/oplog_hack',
+        'storage/snapshot_helper',
         'storage/storage_options',
         'storage/remove_saver',
         'update/update_driver',

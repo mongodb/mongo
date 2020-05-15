@@ -108,6 +108,14 @@ boost::optional<RecoveryUnit::ReadSource> getNewReadSource(OperationContext* opC
         // Shifting from reading without a timestamp to reading with a timestamp can be dangerous
         // because writes will appear to vanish. This case is intended for new reads on secondaries
         // and query yield recovery after state transitions from primary to secondary.
+
+        // If a query recovers from a yield and the node is no longer primary, it must start reading
+        // at the no-overlap point because reading without a timestamp is not safe. The no-overlap
+        // point (the minimum of WT all_durable and lastApplied) is safe to use because step-down
+        // closes all oplog holes, which hold back all_durable. The all_durable timestamp will then
+        // be at least equal to the timestamp of the last write before the state transition, meaning
+        // a reader performing an untimestamped read before the state transition will see all of the
+        // same writes after the state transition.
         if (readAtNoOverlap) {
             LOGV2_DEBUG(4452901, 2, "Changing ReadSource to kNoOverlap", logAttrs(nss));
             return RecoveryUnit::ReadSource::kNoOverlap;

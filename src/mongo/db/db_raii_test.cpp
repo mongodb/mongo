@@ -37,6 +37,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/query/find_common.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/logv2/log.h"
@@ -64,6 +66,32 @@ public:
     const ClientAndCtx client1 = makeClientWithLocker("client1");
     const ClientAndCtx client2 = makeClientWithLocker("client2");
 };
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(OperationContext* opCtx,
+                                                                           Collection* collection) {
+    auto qr = std::make_unique<QueryRequest>(collection->ns());
+    qr->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+
+    awaitDataState(opCtx).shouldWaitForInserts = true;
+    awaitDataState(opCtx).waitForInsertsDeadline =
+        opCtx->getServiceContext()->getPreciseClockSource()->now() + Seconds(1);
+    CurOp::get(opCtx)->ensureStarted();
+
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx,
+                                                     std::move(qr),
+                                                     expCtx,
+                                                     ExtensionsCallbackNoop(),
+                                                     MatchExpressionParser::kBanAllSpecialFeatures);
+    ASSERT_OK(statusWithCQ.getStatus());
+    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+    bool permitYield = true;
+    auto swExec = getExecutorFind(opCtx, collection, std::move(cq), permitYield);
+    ASSERT_OK(swExec.getStatus());
+    return std::move(swExec.getValue());
+}
 
 void failsWithLockTimeout(std::function<void()> func, Milliseconds timeoutMillis) {
     Date_t t1 = Date_t::now();
@@ -310,35 +338,62 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUsesNoOverlapOnSecondary) {
     auto opCtx = client1.second.get();
-    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
+
+    // Use a tailable query on a capped collection because we can anticipate it automatically
+    // yielding locks when it reaches the end of a capped collection.
+    CollectionOptions options;
+    options.capped = true;
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
+    AutoGetCollectionForRead autoColl(opCtx, nss);
+    auto exec = makeTailableQueryPlan(opCtx, autoColl.getCollection());
+
+    // The collection scan should use the default ReadSource on a primary.
+    ASSERT_EQ(RecoveryUnit::ReadSource::kUnset, opCtx->recoveryUnit()->getTimestampReadSource());
+
+    // When the tailable query recovers from its yield, it should discover that the node is
+    // secondary and change its read source.
+    ASSERT_OK(
+        repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    BSONObj unused;
+    auto state = exec->getNext(&unused, nullptr);
+    ASSERT_EQ(state, PlanExecutor::ExecState::IS_EOF);
+
+    // After restoring, the collection scan should now be reading with kNoOverlap, the default on
+    // secondaries.
+    ASSERT_EQ(RecoveryUnit::ReadSource::kNoOverlap,
+              opCtx->recoveryUnit()->getTimestampReadSource());
+    ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&unused, nullptr));
+}
+
+TEST_F(DBRAIITestFixture, AutoGetCollectionForReadChangedReadSourceAfterStepUp) {
+    auto opCtx = client1.second.get();
+
+    // Use a tailable query on a capped collection because we can anticipate it automatically
+    // yielding locks when it reaches the end of a capped collection.
+    CollectionOptions options;
+    options.capped = true;
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
     AutoGetCollectionForRead autoColl(opCtx, nss);
-    auto exec = InternalPlanner::collectionScan(opCtx,
-                                                nss.ns(),
-                                                autoColl.getCollection(),
-                                                PlanExecutor::YIELD_MANUAL,
-                                                InternalPlanner::FORWARD);
+    auto exec = makeTailableQueryPlan(opCtx, autoColl.getCollection());
 
     // The collection scan should use the default ReadSource on a secondary.
     ASSERT_EQ(RecoveryUnit::ReadSource::kNoOverlap,
               opCtx->recoveryUnit()->getTimestampReadSource());
 
-    // While yielding the collection scan, simulate stepping-up to a primary.
-    exec->saveState();
-    Locker::LockSnapshot lockSnapshot;
-    ASSERT_TRUE(opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot));
+    // When the tailable query recovers from its yield, it should discover that the node is primary
+    // and change its ReadSource.
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    BSONObj unused;
+    auto state = exec->getNext(&unused, nullptr);
+    ASSERT_EQ(state, PlanExecutor::ExecState::IS_EOF);
 
-    // After restoring, the collection scan should now be reading with kNoOverlap, the default on
-    // secondaries.
-    opCtx->lockState()->restoreLockState(opCtx, lockSnapshot);
-    exec->restoreState();
-    ASSERT_EQ(RecoveryUnit::ReadSource::kNoOverlap,
-              opCtx->recoveryUnit()->getTimestampReadSource());
-    BSONObj obj;
-    ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));
+    // After restoring, the collection scan should now be reading with kUnset, the default on
+    // primaries.
+    ASSERT_EQ(RecoveryUnit::ReadSource::kUnset, opCtx->recoveryUnit()->getTimestampReadSource());
+    ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&unused, nullptr));
 }
 
 }  // namespace

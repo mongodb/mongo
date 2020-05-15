@@ -80,6 +80,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
 MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
+MONGO_FAIL_POINT_DEFINE(planExecutorHangWhileYieldedInWaitForInserts);
 
 /**
  * Constructs a PlanYieldPolicy based on 'policy'.
@@ -480,6 +481,12 @@ PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierDa
     auto yieldResult = _yieldPolicy->yieldOrInterrupt([opCtx, notifierData] {
         const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
         notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
+        if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
+            LOGV2(4452903,
+                  "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point "
+                  "enabled. Blocking until fail point is disabled");
+            planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
+        }
     });
     notifierData->lastEOFVersion = currentNotifierVersion;
 
