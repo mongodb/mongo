@@ -598,6 +598,65 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     ASSERT_EQ(myConfig.getConfigTerm(), UninitializedTerm);
 }
 
+TEST_F(ReplCoordHBV1Test, RejectHeartbeatReconfigDuringElection) {
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{
+        logv2::LogComponent::kReplicationHeartbeats, logv2::LogSeverity::Debug(1)};
+
+    auto term = 1;
+    auto version = 1;
+    auto members = BSON_ARRAY(member(1, "h1:1") << member(2, "h2:1") << member(3, "h3:1"));
+    auto configObj = configWithMembers(version, term, members);
+    assertStartSuccess(configObj, {"h1", 1});
+
+    OpTime time1(Timestamp(100, 1), 0);
+    replCoordSetMyLastAppliedAndDurableOpTime(time1, getNet()->now());
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    simulateEnoughHeartbeatsForAllNodesUp();
+    simulateSuccessfulDryRun();
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    // Attach a config with a higher version and the same term.
+    ReplSetConfig rsConfig = assertMakeRSConfig(configWithMembers(version + 1, term, members));
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfig(rsConfig);
+    hbResp.setAppliedOpTimeAndWallTime({time1, getNet()->now()});
+    hbResp.setDurableOpTimeAndWallTime({time1, getNet()->now()});
+    auto hbRespObj = (BSONObjBuilder(hbResp.toBSON()) << "ok" << 1).obj();
+
+    startCapturingLogMessages();
+    getReplCoord()->handleHeartbeatResponse_forTest(hbRespObj, 1);
+    getNet()->enterNetwork();
+    getNet()->runReadyNetworkOperations();
+    getNet()->exitNetwork();
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Not scheduling a heartbeat reconfig when running for election"));
+
+    auto net = getNet();
+    net->enterNetwork();
+    while (net->hasReadyRequests()) {
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        LOGV2(482571, "processing", "to"_attr = request.target, "cmd"_attr = request.cmdObj);
+        if (request.cmdObj.firstElementFieldNameStringData() != "replSetRequestVotes") {
+            net->blackHole(noi);
+        } else {
+            auto response = BSON("ok" << 1 << "term" << term << "voteGranted" << true << "reason"
+                                      << "");
+            net->scheduleResponse(noi, net->now(), makeResponseStatus(response));
+        }
+        net->runReadyNetworkOperations();
+    }
+    net->exitNetwork();
+
+    getReplCoord()->waitForElectionFinish_forTest();
+    ASSERT(getReplCoord()->getMemberState().primary());
+}
+
 TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {
     init();
     assertStartSuccess(BSON("_id"

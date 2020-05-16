@@ -583,26 +583,17 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
             "cannot accept writes yet.");
         return;
     }
+
+    // Prevent heartbeat reconfigs from running concurrently with an election.
+    if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
+        LOGV2_FOR_HEARTBEATS(
+            482570, 1, "Not scheduling a heartbeat reconfig when running for election");
+        return;
+    }
+
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm());
-    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
-        LOGV2_FOR_HEARTBEATS(
-            4615624,
-            2,
-            "Rescheduling heartbeat reconfig to config with {newConfigVersionAndTerm} to "
-            "be processed after election is cancelled.",
-            "Rescheduling heartbeat reconfig to be processed after election is cancelled",
-            "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
-
-        _replExecutor
-            ->onEvent(electionFinishedEvent,
-                      [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                          _heartbeatReconfigStore(cbData, newConfig);
-                      })
-            .status_with_transitional_ignore();
-        return;
-    }
     _replExecutor
         ->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& cbData) {
             _heartbeatReconfigStore(cbData, newConfig);
