@@ -10116,6 +10116,9 @@ buildvariants:
   - name: replica_sets_reconfig_jscore_stepdown_passthrough
     distros:
     - rhel62-large
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough
+    distros:
+    - rhel62-large
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
