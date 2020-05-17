@@ -8676,6 +8676,7 @@ buildvariants:
   - name: .ocsp
   - name: .read_write_concern
   - name: .replica_sets !.encrypt
+  - name: replica_sets_reconfig_jscore_passthrough
   - name: .retry
   - name: .read_only
   - name: session_jscore_passthrough
@@ -10099,6 +10100,9 @@ buildvariants:
     - rhel62-large
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel62-large
+  - name: replica_sets_reconfig_jscore_passthrough
     distros:
     - rhel62-large
   - name: retryable_writes_jscore_passthrough_gen
