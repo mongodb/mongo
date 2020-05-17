@@ -9,7 +9,11 @@ TestData.disableImplicitSessions = true;
 
 var replTest = new ReplSetTest({
     name: 'refresh',
-    nodes: [{rsConfig: {votes: 1, priority: 1}}, {rsConfig: {votes: 0, priority: 0}}]
+    nodes: [
+        {/* primary */},
+        {/* secondary */ rsConfig: {priority: 0}},
+        {/* arbiter */ rsConfig: {arbiterOnly: true}}
+    ]
 });
 var nodes = replTest.startSet();
 
@@ -20,6 +24,11 @@ var primaryAdmin = primary.getDB("admin");
 replTest.awaitSecondaryNodes();
 var secondary = replTest.getSecondary();
 var secondaryAdmin = secondary.getDB("admin");
+
+let arbiter = replTest.getArbiter();
+
+const refreshErrorMsgRegex =
+    new RegExp("Failed to refresh session cache, will try again at the next refresh interval");
 
 // Get the current value of the TTL index so that we can verify it's being properly applied.
 let res = assert.commandWorked(
@@ -64,6 +73,22 @@ let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
     replTest.awaitReplication();
     validateSessionsCollection(secondary, false, false, timeoutMinutes);
 }
+
+// Test that a refresh on an arbiter does not create the sessions collection.
+{
+    validateSessionsCollection(primary, false, false, timeoutMinutes);
+
+    assert.commandWorked(arbiter.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(arbiter.adminCommand({refreshLogicalSessionCacheNow: 1}));
+
+    validateSessionsCollection(primary, false, false, timeoutMinutes);
+
+    if (!jsTest.options().useRandomBinVersionsWithinReplicaSet) {
+        // Verify that the arbiter did not try to set up the session collection or refresh.
+        assert.eq(false, checkLog.checkContainsOnce(arbiter, refreshErrorMsgRegex));
+    }
+}
+
 // Test that a refresh on the primary creates the sessions collection.
 {
     validateSessionsCollection(primary, false, false, timeoutMinutes);
@@ -83,6 +108,15 @@ let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
     validateSessionsCollection(primary, true, false, timeoutMinutes);
 
     assert.commandWorked(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+
+    validateSessionsCollection(primary, true, false, timeoutMinutes);
+}
+
+// Test that a refresh on an arbiter will not create the TTL index on the sessions collection.
+{
+    validateSessionsCollection(primary, true, false, timeoutMinutes);
+
+    assert.commandWorked(arbiter.adminCommand({refreshLogicalSessionCacheNow: 1}));
 
     validateSessionsCollection(primary, true, false, timeoutMinutes);
 }

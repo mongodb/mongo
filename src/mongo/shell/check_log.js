@@ -34,9 +34,17 @@ checkLog = (function() {
         if (logMessages === null) {
             return false;
         }
-        for (let logMsg of logMessages) {
-            if (logMsg.includes(msg)) {
-                return true;
+        if (msg instanceof RegExp) {
+            for (let logMsg of logMessages) {
+                if (logMsg.search(msg) != -1) {
+                    return true;
+                }
+            }
+        } else {
+            for (let logMsg of logMessages) {
+                if (logMsg.includes(msg)) {
+                    return true;
+                }
             }
         }
         return false;
