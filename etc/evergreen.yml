@@ -8684,6 +8684,7 @@ buildvariants:
   - name: .read_write_concern
   - name: .replica_sets !.encrypt
   - name: replica_sets_reconfig_jscore_passthrough
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough
   - name: .retry
   - name: .read_only
   - name: session_jscore_passthrough
@@ -10110,6 +10111,9 @@ buildvariants:
     distros:
     - rhel62-large
   - name: replica_sets_reconfig_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough
     distros:
     - rhel62-large
   - name: retryable_writes_jscore_passthrough_gen
