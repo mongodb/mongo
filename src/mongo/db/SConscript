@@ -1373,6 +1373,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         's/sharding_api_d',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface'
     ]
 )
 

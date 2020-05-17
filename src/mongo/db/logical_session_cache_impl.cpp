@@ -37,6 +37,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -211,6 +212,21 @@ void LogicalSessionCacheImpl::_periodicReap(Client* client) {
 }
 
 Status LogicalSessionCacheImpl::_reap(Client* client) {
+    boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
+    auto* const opCtx = [&] {
+        if (client->getOperationContext()) {
+            return client->getOperationContext();
+        }
+
+        uniqueCtx.emplace(client->makeOperationContext());
+        return uniqueCtx->get();
+    }();
+
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord && replCoord->getMemberState().arbiter()) {
+        return Status::OK();
+    }
+
     // Take the lock to update some stats.
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -223,16 +239,6 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
         _stats.setLastTransactionReaperJobTimestamp(now());
         _stats.setTransactionReaperJobCount(_stats.getTransactionReaperJobCount() + 1);
     }
-
-    boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
-    auto* const opCtx = [&] {
-        if (client->getOperationContext()) {
-            return client->getOperationContext();
-        }
-
-        uniqueCtx.emplace(client->makeOperationContext());
-        return uniqueCtx->get();
-    }();
 
     int numReaped = 0;
 
@@ -280,6 +286,22 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
 }
 
 void LogicalSessionCacheImpl::_refresh(Client* client) {
+    // get or make an opCtx
+    boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
+    auto* const opCtx = [&client, &uniqueCtx] {
+        if (client->getOperationContext()) {
+            return client->getOperationContext();
+        }
+
+        uniqueCtx.emplace(client->makeOperationContext());
+        return uniqueCtx->get();
+    }();
+
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord && replCoord->getMemberState().arbiter()) {
+        return;
+    }
+
     // Stats for serverStatus:
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -301,17 +323,6 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         auto millis = now() - _stats.getLastSessionsCollectionJobTimestamp();
         _stats.setLastSessionsCollectionJobDurationMillis(millis.count());
     });
-
-    // get or make an opCtx
-    boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
-    auto* const opCtx = [&client, &uniqueCtx] {
-        if (client->getOperationContext()) {
-            return client->getOperationContext();
-        }
-
-        uniqueCtx.emplace(client->makeOperationContext());
-        return uniqueCtx->get();
-    }();
 
     ON_BLOCK_EXIT([&opCtx] { clearShardingOperationFailedStatus(opCtx); });
 
