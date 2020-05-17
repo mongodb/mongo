@@ -230,11 +230,6 @@ add_option('noshell',
     nargs=0,
 )
 
-add_option('safeshell',
-    help="don't let shell scripts run programs (still, don't run untrusted scripts)",
-    nargs=0,
-)
-
 add_option('dbg',
     choices=['on', 'off'],
     const='on',

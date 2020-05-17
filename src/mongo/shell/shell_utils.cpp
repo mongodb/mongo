@@ -475,11 +475,8 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("fileExists", fileExistsJS);
     scope.injectNative("isInteractive", isInteractive);
 
-#ifndef MONGO_SAFE_SHELL
-    // can't launch programs
     installShellUtilsLauncher(scope);
     installShellUtilsExtended(scope);
-#endif
 }
 
 void setEnterpriseShellCallback(EnterpriseShellCallback* callback) {

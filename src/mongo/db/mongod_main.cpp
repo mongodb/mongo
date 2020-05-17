@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/mongod_main.h"
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/optional.hpp>
 #include <fstream>
@@ -1262,7 +1264,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 #endif
 }
 
-int mongoDbMain(int argc, char* argv[], char** envp) {
+}  // namespace
+
+int mongod_main(int argc, char* argv[], char** envp) {
     ThreadSafetyContext::getThreadSafetyContext()->forbidMultiThreading();
 
     registerShutdownTask(shutdownTask);
@@ -1339,23 +1343,4 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
     return 0;
 }
 
-}  // namespace
 }  // namespace mongo
-
-#if defined(_WIN32)
-// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
-// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
-// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
-// and makes them available through the argv() and envp() members.  This enables mongoDbMain()
-// to process UTF-8 encoded arguments and environment variables without regard to platform.
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    int exitCode = mongo::mongoDbMain(argc, wcl.argv(), wcl.envp());
-    mongo::quickExit(exitCode);
-}
-#else
-int main(int argc, char* argv[], char** envp) {
-    int exitCode = mongo::mongoDbMain(argc, argv, envp);
-    mongo::quickExit(exitCode);
-}
-#endif

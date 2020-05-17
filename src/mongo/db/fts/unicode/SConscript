@@ -48,7 +48,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/linenoise_utf8',
+        '$BUILD_DIR/mongo/shell/linenoise_utf8',
     ]
 )
 

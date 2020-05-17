@@ -18,10 +18,11 @@ env.Library(
     ],
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
-    PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
-        '$BUILD_DIR/mongo/mongos',
+    LIBDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongod_initializers',
+        '$BUILD_DIR/mongo/mongos_initializers',
     ],
+
 )
 
 if wiredtiger:

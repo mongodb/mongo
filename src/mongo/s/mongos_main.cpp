@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/mongos_main.h"
+
 #include <boost/optional.hpp>
 #include <memory>
 
@@ -883,7 +885,6 @@ ExitCode main(ServiceContext* serviceContext) {
     return runMongosServer(serviceContext);
 }
 
-namespace {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     forkServerOrDie();
@@ -913,7 +914,7 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManage
 
 }  // namespace
 
-ExitCode mongoSMain(int argc, char* argv[], char** envp) {
+ExitCode mongos_main(int argc, char* argv[], char** envp) {
     setMongos();
 
     if (argc < 1)
@@ -985,21 +986,4 @@ ExitCode mongoSMain(int argc, char* argv[], char** envp) {
     }
 }
 
-}  // namespace
 }  // namespace mongo
-
-#if defined(_WIN32)
-// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
-// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
-// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
-// and makes them available through the argv() and envp() members.  This enables mongoSMain()
-// to process UTF-8 encoded arguments and environment variables without regard to platform.
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    mongo::exitCleanly(mongo::mongoSMain(argc, wcl.argv(), wcl.envp()));
-}
-#else
-int main(int argc, char* argv[], char** envp) {
-    mongo::exitCleanly(mongo::mongoSMain(argc, argv, envp));
-}
-#endif

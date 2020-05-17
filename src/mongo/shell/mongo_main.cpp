@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/shell/mongo_main.h"
+
 #include <boost/core/null_deleter.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
@@ -98,13 +100,14 @@
 #endif
 
 using namespace std::literals::string_literals;
-using namespace mongo;
+
+namespace mongo {
+namespace {
 
 bool gotInterrupted = false;
 bool inMultiLine = false;
 static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
 
-namespace {
 const std::string kDefaultMongoHost = "127.0.0.1"s;
 const std::string kDefaultMongoPort = "27017"s;
 const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoPort;
@@ -213,10 +216,6 @@ public:
     }
 };
 
-}  // namespace
-
-namespace mongo {
-
 enum ShellExitCode : int {
     kDBException = 1,
     kInputFileError = -3,
@@ -227,7 +226,6 @@ enum ShellExitCode : int {
 };
 
 Scope* shellMainScope;
-}  // namespace mongo
 
 bool isSessionTimedOut() {
     static Date_t previousCommandTime = Date_t::now();
@@ -697,7 +695,6 @@ static void edit(const std::string& whatToEdit) {
     }
 }
 
-namespace {
 bool mechanismRequiresPassword(const MongoURI& uri) {
     if (const auto authMechanisms = uri.getOption("authMechanism")) {
         constexpr std::array<StringData, 3> passwordlessMechanisms{
@@ -711,465 +708,461 @@ bool mechanismRequiresPassword(const MongoURI& uri) {
     }
     return true;
 }
+
 }  // namespace
 
-int _main(int argc, char* argv[], char** envp) {
-    registerShutdownTask([] {
-        // NOTE: This function may be called at any time. It must not
-        // depend on the prior execution of mongo initializers or the
-        // existence of threads.
-        ::killOps();
-        ::shellHistoryDone();
-    });
+int mongo_main(int argc, char* argv[], char** envp) {
 
-    setupSignalHandlers();
-    setupSignals();
+    try {
 
-    // Log to stdout for any early logging before we re-configure the logger
-    auto& lv2Manager = logv2::LogManager::global();
-    logv2::LogDomainGlobal::ConfigurationOptions lv2Config;
-    uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
+        registerShutdownTask([] {
+            // NOTE: This function may be called at any time. It must not
+            // depend on the prior execution of mongo initializers or the
+            // existence of threads.
+            killOps();
+            shellHistoryDone();
+        });
 
-    mongo::shell_utils::RecordMyLocation(argv[0]);
+        setupSignalHandlers();
+        setupSignals();
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
-    setGlobalServiceContext(ServiceContext::make());
-    // TODO This should use a TransportLayerManager or TransportLayerFactory
-    auto serviceContext = getGlobalServiceContext();
+        // Log to stdout for any early logging before we re-configure the logger
+        auto& lv2Manager = logv2::LogManager::global();
+        logv2::LogDomainGlobal::ConfigurationOptions lv2Config;
+        uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
 
-    OCSPManager::get()->startThreadPool();
+        mongo::shell_utils::RecordMyLocation(argv[0]);
 
-    transport::TransportLayerASIO::Options opts;
-    opts.enableIPv6 = shellGlobalParams.enableIPv6;
-    opts.mode = transport::TransportLayerASIO::Options::kEgress;
+        mongo::runGlobalInitializersOrDie(argc, argv, envp);
+        setGlobalServiceContext(ServiceContext::make());
+        // TODO This should use a TransportLayerManager or TransportLayerFactory
+        auto serviceContext = getGlobalServiceContext();
 
-    serviceContext->setTransportLayer(
-        std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
-    auto tlPtr = serviceContext->getTransportLayer();
-    uassertStatusOK(tlPtr->setup());
-    uassertStatusOK(tlPtr->start());
+        OCSPManager::get()->startThreadPool();
 
-    // hide password from ps output
-    redactPasswordOptions(argc, argv);
+        transport::TransportLayerASIO::Options opts;
+        opts.enableIPv6 = shellGlobalParams.enableIPv6;
+        opts.mode = transport::TransportLayerASIO::Options::kEgress;
 
-    ErrorExtraInfo::invariantHaveAllParsers();
+        serviceContext->setTransportLayer(
+            std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
+        auto tlPtr = serviceContext->getTransportLayer();
+        uassertStatusOK(tlPtr->setup());
+        uassertStatusOK(tlPtr->start());
 
-    if (!mongo::serverGlobalParams.quiet.load())
-        std::cout << mongoShellVersion(VersionInfoInterface::instance()) << std::endl;
+        // hide password from ps output
+        redactPasswordOptions(argc, argv);
 
-    auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
-    consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),
-                                                           lv2Manager.getGlobalSettings()));
-    consoleSink->set_formatter(ShellFormatter());
+        ErrorExtraInfo::invariantHaveAllParsers();
 
-    consoleSink->locked_backend()->add_stream(
-        boost::shared_ptr<std::ostream>(&logv2::Console::out(), boost::null_deleter()));
+        if (!mongo::serverGlobalParams.quiet.load())
+            std::cout << mongoShellVersion(VersionInfoInterface::instance()) << std::endl;
 
-    consoleSink->locked_backend()->auto_flush();
+        auto consoleSink = boost::make_shared<boost::log::sinks::synchronous_sink<ShellBackend>>();
+        consoleSink->set_filter(logv2::ComponentSettingsFilter(lv2Manager.getGlobalDomain(),
+                                                               lv2Manager.getGlobalSettings()));
+        consoleSink->set_formatter(ShellFormatter());
 
-    // Remove the initial config from above when setting this sink, otherwise we log everything
-    // twice.
-    lv2Config.makeDisabled();
-    uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
+        consoleSink->locked_backend()->add_stream(
+            boost::shared_ptr<std::ostream>(&logv2::Console::out(), boost::null_deleter()));
 
-    boost::log::core::get()->add_sink(std::move(consoleSink));
+        consoleSink->locked_backend()->auto_flush();
 
-    // Get the URL passed to the shell
-    std::string& cmdlineURI = shellGlobalParams.url;
+        // Remove the initial config from above when setting this sink, otherwise we log everything
+        // twice.
+        lv2Config.makeDisabled();
+        uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
 
-    // Parse the output of getURIFromArgs which will determine if --host passed in a URI
-    MongoURI parsedURI;
-    parsedURI = uassertStatusOK(MongoURI::parse(getURIFromArgs(
-        cmdlineURI, str::escape(shellGlobalParams.dbhost), str::escape(shellGlobalParams.port))));
+        boost::log::core::get()->add_sink(std::move(consoleSink));
 
-    // TODO: add in all of the relevant shellGlobalParams to parsedURI
-    parsedURI.setOptionIfNecessary("compressors"s, shellGlobalParams.networkMessageCompressors);
-    parsedURI.setOptionIfNecessary("authMechanism"s, shellGlobalParams.authenticationMechanism);
-    parsedURI.setOptionIfNecessary("authSource"s, shellGlobalParams.authenticationDatabase);
-    parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
-    parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
+        // Get the URL passed to the shell
+        std::string& cmdlineURI = shellGlobalParams.url;
+
+        // Parse the output of getURIFromArgs which will determine if --host passed in a URI
+        MongoURI parsedURI;
+        parsedURI =
+            uassertStatusOK(MongoURI::parse(getURIFromArgs(cmdlineURI,
+                                                           str::escape(shellGlobalParams.dbhost),
+                                                           str::escape(shellGlobalParams.port))));
+
+        // TODO: add in all of the relevant shellGlobalParams to parsedURI
+        parsedURI.setOptionIfNecessary("compressors"s, shellGlobalParams.networkMessageCompressors);
+        parsedURI.setOptionIfNecessary("authMechanism"s, shellGlobalParams.authenticationMechanism);
+        parsedURI.setOptionIfNecessary("authSource"s, shellGlobalParams.authenticationDatabase);
+        parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
+        parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
 #ifdef MONGO_CONFIG_SSL
-    if (!awsIam::saslAwsClientGlobalParams.awsSessionToken.empty()) {
-        parsedURI.setOptionIfNecessary("authmechanismproperties"s,
-                                       std::string("AWS_SESSION_TOKEN:") +
-                                           awsIam::saslAwsClientGlobalParams.awsSessionToken);
-    }
+        if (!awsIam::saslAwsClientGlobalParams.awsSessionToken.empty()) {
+            parsedURI.setOptionIfNecessary("authmechanismproperties"s,
+                                           std::string("AWS_SESSION_TOKEN:") +
+                                               awsIam::saslAwsClientGlobalParams.awsSessionToken);
+        }
 #endif
 
-    if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
-        std::stringstream ss;
-        ss << "DB.prototype._defaultAuthenticationMechanism = \""
-           << str::escape(authMechanisms.get()) << "\";" << std::endl;
-        mongo::shell_utils::dbConnect += ss.str();
-    }
-
-    if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
-        std::stringstream ss;
-        ss << "DB.prototype._defaultGssapiServiceName = \"" << str::escape(gssapiServiveName.get())
-           << "\";" << std::endl;
-        mongo::shell_utils::dbConnect += ss.str();
-    }
-
-    if (!shellGlobalParams.nodb) {  // connect to db
-        bool usingPassword = !shellGlobalParams.password.empty();
-
-        if (mechanismRequiresPassword(parsedURI) &&
-            (parsedURI.getUser().size() || shellGlobalParams.username.size())) {
-            usingPassword = true;
+        if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
+            std::stringstream ss;
+            ss << "DB.prototype._defaultAuthenticationMechanism = \""
+               << str::escape(authMechanisms.get()) << "\";" << std::endl;
+            mongo::shell_utils::dbConnect += ss.str();
         }
 
-        if (usingPassword && parsedURI.getPassword().empty()) {
-            if (!shellGlobalParams.password.empty()) {
-                parsedURI.setPassword(stdx::as_const(shellGlobalParams.password));
-            } else {
-                parsedURI.setPassword(mongo::askPassword());
+        if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
+            std::stringstream ss;
+            ss << "DB.prototype._defaultGssapiServiceName = \""
+               << str::escape(gssapiServiveName.get()) << "\";" << std::endl;
+            mongo::shell_utils::dbConnect += ss.str();
+        }
+
+        if (!shellGlobalParams.nodb) {  // connect to db
+            bool usingPassword = !shellGlobalParams.password.empty();
+
+            if (mechanismRequiresPassword(parsedURI) &&
+                (parsedURI.getUser().size() || shellGlobalParams.username.size())) {
+                usingPassword = true;
             }
+
+            if (usingPassword && parsedURI.getPassword().empty()) {
+                if (!shellGlobalParams.password.empty()) {
+                    parsedURI.setPassword(stdx::as_const(shellGlobalParams.password));
+                } else {
+                    parsedURI.setPassword(mongo::askPassword());
+                }
+            }
+
+            if (parsedURI.getUser().empty() && !shellGlobalParams.username.empty()) {
+                parsedURI.setUser(stdx::as_const(shellGlobalParams.username));
+            }
+
+            std::stringstream ss;
+            if (mongo::serverGlobalParams.quiet.load()) {
+                ss << "__quiet = true;" << std::endl;
+            }
+
+            ss << "db = connect( \"" << parsedURI.canonicalizeURIAsString() << "\");" << std::endl;
+
+            if (shellGlobalParams.shouldRetryWrites || parsedURI.getRetryWrites()) {
+                // If the --retryWrites cmdline argument or retryWrites URI param was specified,
+                // then replace the global `db` object with a DB object started in a session. The
+                // resulting Mongo connection checks its _retryWrites property.
+                ss << "db = db.getMongo().startSession().getDatabase(db.getName());" << std::endl;
+            }
+
+            mongo::shell_utils::dbConnect += ss.str();
         }
 
-        if (parsedURI.getUser().empty() && !shellGlobalParams.username.empty()) {
-            parsedURI.setUser(stdx::as_const(shellGlobalParams.username));
-        }
+        mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
+        mongo::ScriptEngine::setup();
+        mongo::getGlobalScriptEngine()->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
+        mongo::getGlobalScriptEngine()->setScopeInitCallback(mongo::shell_utils::initScope);
+        mongo::getGlobalScriptEngine()->enableJIT(!shellGlobalParams.nojit);
+        mongo::getGlobalScriptEngine()->enableJavaScriptProtection(
+            shellGlobalParams.javascriptProtection);
 
-        std::stringstream ss;
-        if (mongo::serverGlobalParams.quiet.load()) {
-            ss << "__quiet = true;" << std::endl;
-        }
+        auto poolGuard = makeGuard([] { ScriptEngine::dropScopeCache(); });
 
-        ss << "db = connect( \"" << parsedURI.canonicalizeURIAsString() << "\");" << std::endl;
+        std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
+        shellMainScope = scope.get();
 
-        if (shellGlobalParams.shouldRetryWrites || parsedURI.getRetryWrites()) {
-            // If the --retryWrites cmdline argument or retryWrites URI param was specified, then
-            // replace the global `db` object with a DB object started in a session. The resulting
-            // Mongo connection checks its _retryWrites property.
-            ss << "db = db.getMongo().startSession().getDatabase(db.getName());" << std::endl;
-        }
+        if (shellGlobalParams.runShell && !mongo::serverGlobalParams.quiet.load())
+            std::cout << "type \"help\" for help" << std::endl;
 
-        mongo::shell_utils::dbConnect += ss.str();
-    }
-
-    mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
-    mongo::ScriptEngine::setup();
-    mongo::getGlobalScriptEngine()->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
-    mongo::getGlobalScriptEngine()->setScopeInitCallback(mongo::shell_utils::initScope);
-    mongo::getGlobalScriptEngine()->enableJIT(!shellGlobalParams.nojit);
-    mongo::getGlobalScriptEngine()->enableJavaScriptProtection(
-        shellGlobalParams.javascriptProtection);
-
-    auto poolGuard = makeGuard([] { ScriptEngine::dropScopeCache(); });
-
-    std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
-    shellMainScope = scope.get();
-
-    if (shellGlobalParams.runShell && !mongo::serverGlobalParams.quiet.load())
-        std::cout << "type \"help\" for help" << std::endl;
-
-    // Load and execute /etc/mongorc.js before starting shell
-    std::string rcGlobalLocation;
+        // Load and execute /etc/mongorc.js before starting shell
+        std::string rcGlobalLocation;
 #ifndef _WIN32
-    rcGlobalLocation = "/etc/mongorc.js";
+        rcGlobalLocation = "/etc/mongorc.js";
 #else
-    wchar_t programDataPath[MAX_PATH];
-    if (S_OK == SHGetFolderPathW(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, programDataPath)) {
-        rcGlobalLocation = str::stream()
-            << toUtf8String(programDataPath) << "\\MongoDB\\mongorc.js";
-    }
+        wchar_t programDataPath[MAX_PATH];
+        if (S_OK == SHGetFolderPathW(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, programDataPath)) {
+            rcGlobalLocation = str::stream()
+                << toUtf8String(programDataPath) << "\\MongoDB\\mongorc.js";
+        }
 #endif
-    if (!rcGlobalLocation.empty() && ::mongo::shell_utils::fileExists(rcGlobalLocation)) {
-        if (!scope->execFile(rcGlobalLocation, false, true)) {
-            std::cout << "The \"" << rcGlobalLocation << "\" file could not be executed"
-                      << std::endl;
-        }
-    }
-
-    if (!shellGlobalParams.script.empty()) {
-        mongo::shell_utils::MongoProgramScope s;
-        if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false)) {
-            std::cout << "exiting with code " << static_cast<int>(kEvalError) << std::endl;
-            return kEvalError;
-        }
-        scope->exec("shellPrintHelper( __lastres__ );", "(shell2 eval)", true, true, false);
-    }
-
-    for (size_t i = 0; i < shellGlobalParams.files.size(); ++i) {
-        mongo::shell_utils::MongoProgramScope s;
-
-        if (shellGlobalParams.files.size() > 1)
-            std::cout << "loading file: " << shellGlobalParams.files[i] << std::endl;
-
-        if (!scope->execFile(shellGlobalParams.files[i], false, true)) {
-            std::cout << "failed to load: " << shellGlobalParams.files[i] << std::endl;
-            std::cout << "exiting with code " << static_cast<int>(kInputFileError) << std::endl;
-            return kInputFileError;
-        }
-
-        // Check if the process left any running child processes.
-        std::vector<ProcessId> pids = mongo::shell_utils::getRunningMongoChildProcessIds();
-
-        if (!pids.empty()) {
-            std::cout << "terminating the following processes started by "
-                      << shellGlobalParams.files[i] << ": ";
-            std::copy(pids.begin(), pids.end(), std::ostream_iterator<ProcessId>(std::cout, " "));
-            std::cout << std::endl;
-
-            if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
-                std::cout << "one more more child processes exited with an error during "
-                          << shellGlobalParams.files[i] << std::endl;
-                std::cout << "exiting with code " << static_cast<int>(kProcessTerminationError)
+        if (!rcGlobalLocation.empty() && ::mongo::shell_utils::fileExists(rcGlobalLocation)) {
+            if (!scope->execFile(rcGlobalLocation, false, true)) {
+                std::cout << "The \"" << rcGlobalLocation << "\" file could not be executed"
                           << std::endl;
-                return kProcessTerminationError;
-            }
-
-            bool failIfUnterminatedProcesses = false;
-            const StringData code =
-                "function() { return typeof TestData === 'object' && TestData !== null && "
-                "TestData.hasOwnProperty('failIfUnterminatedProcesses') && "
-                "TestData.failIfUnterminatedProcesses; }"_sd;
-            shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
-            failIfUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
-
-            if (failIfUnterminatedProcesses) {
-                std::cout << "exiting with a failure due to unterminated processes, "
-                             "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
-                             "ShardingTest#stop() may be missing from the test"
-                          << std::endl;
-                std::cout << "exiting with code " << static_cast<int>(kUnterminatedProcess)
-                          << std::endl;
-                return kUnterminatedProcess;
             }
         }
-    }
 
-    if (shellGlobalParams.files.size() == 0 && shellGlobalParams.script.empty())
-        shellGlobalParams.runShell = true;
+        if (!shellGlobalParams.script.empty()) {
+            mongo::shell_utils::MongoProgramScope s;
+            if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false)) {
+                std::cout << "exiting with code " << static_cast<int>(kEvalError) << std::endl;
+                return kEvalError;
+            }
+            scope->exec("shellPrintHelper( __lastres__ );", "(shell2 eval)", true, true, false);
+        }
 
-    bool lastLineSuccessful = true;
-    if (shellGlobalParams.runShell) {
-        mongo::shell_utils::MongoProgramScope s;
-        // If they specify norc, assume it's not their first time
-        bool hasMongoRC = shellGlobalParams.norc;
-        std::string rcLocation;
-        if (!shellGlobalParams.norc) {
-#ifndef _WIN32
-            if (getenv("HOME") != nullptr)
-                rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js";
-#else
-            if (getenv("HOMEDRIVE") != nullptr && getenv("HOMEPATH") != nullptr)
-                rcLocation = str::stream()
-                    << toUtf8String(_wgetenv(L"HOMEDRIVE")) << toUtf8String(_wgetenv(L"HOMEPATH"))
-                    << "\\.mongorc.js";
-#endif
-            if (!rcLocation.empty() && ::mongo::shell_utils::fileExists(rcLocation)) {
-                hasMongoRC = true;
-                if (!scope->execFile(rcLocation, false, true)) {
-                    std::cout
-                        << "The \".mongorc.js\" file located in your home folder could not be "
-                           "executed"
-                        << std::endl;
-                    std::cout << "exiting with code " << static_cast<int>(kMongorcError)
+        for (size_t i = 0; i < shellGlobalParams.files.size(); ++i) {
+            mongo::shell_utils::MongoProgramScope s;
+
+            if (shellGlobalParams.files.size() > 1)
+                std::cout << "loading file: " << shellGlobalParams.files[i] << std::endl;
+
+            if (!scope->execFile(shellGlobalParams.files[i], false, true)) {
+                std::cout << "failed to load: " << shellGlobalParams.files[i] << std::endl;
+                std::cout << "exiting with code " << static_cast<int>(kInputFileError) << std::endl;
+                return kInputFileError;
+            }
+
+            // Check if the process left any running child processes.
+            std::vector<ProcessId> pids = mongo::shell_utils::getRunningMongoChildProcessIds();
+
+            if (!pids.empty()) {
+                std::cout << "terminating the following processes started by "
+                          << shellGlobalParams.files[i] << ": ";
+                std::copy(
+                    pids.begin(), pids.end(), std::ostream_iterator<ProcessId>(std::cout, " "));
+                std::cout << std::endl;
+
+                if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
+                    std::cout << "one more more child processes exited with an error during "
+                              << shellGlobalParams.files[i] << std::endl;
+                    std::cout << "exiting with code " << static_cast<int>(kProcessTerminationError)
                               << std::endl;
-                    return kMongorcError;
+                    return kProcessTerminationError;
+                }
+
+                bool failIfUnterminatedProcesses = false;
+                const StringData code =
+                    "function() { return typeof TestData === 'object' && TestData !== null && "
+                    "TestData.hasOwnProperty('failIfUnterminatedProcesses') && "
+                    "TestData.failIfUnterminatedProcesses; }"_sd;
+                shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
+                failIfUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
+
+                if (failIfUnterminatedProcesses) {
+                    std::cout << "exiting with a failure due to unterminated processes, "
+                                 "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
+                                 "ShardingTest#stop() may be missing from the test"
+                              << std::endl;
+                    std::cout << "exiting with code " << static_cast<int>(kUnterminatedProcess)
+                              << std::endl;
+                    return kUnterminatedProcess;
                 }
             }
         }
 
-        if (!hasMongoRC && isatty(fileno(stdin))) {
-            std::cout
-                << "Welcome to the MongoDB shell.\n"
-                   "For interactive help, type \"help\".\n"
-                   "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
-                   "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user"
-                << std::endl;
-            File f;
-            f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
-        }
+        if (shellGlobalParams.files.size() == 0 && shellGlobalParams.script.empty())
+            shellGlobalParams.runShell = true;
 
-        if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet.load() &&
-            isatty(fileno(stdin))) {
-            scope->exec(
-                "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings)", false, true, false);
-
-            scope->exec(
-                "shellHelper( 'show', 'freeMonitoring' )", "(freeMonitoring)", false, true, false);
-
-            scope->exec("shellHelper( 'show', 'automationNotices' )",
-                        "(automationnotices)",
-                        false,
-                        true,
-                        false);
-
-            scope->exec("shellHelper( 'show', 'nonGenuineMongoDBCheck' )",
-                        "(nonGenuineMongoDBCheck)",
-                        false,
-                        true,
-                        false);
-        }
-
-        shellHistoryInit();
-
-        std::string prompt;
-        int promptType;
-
-        while (1) {
-            inMultiLine = false;
-            gotInterrupted = false;
-
-            promptType = scope->type("prompt");
-            if (promptType == String) {
-                prompt = scope->getString("prompt");
-            } else if ((promptType == Code) && execPrompt(*scope, "prompt", prompt)) {
-            } else if (execPrompt(*scope, "defaultPrompt", prompt)) {
-            } else {
-                prompt = "> ";
+        bool lastLineSuccessful = true;
+        if (shellGlobalParams.runShell) {
+            mongo::shell_utils::MongoProgramScope s;
+            // If they specify norc, assume it's not their first time
+            bool hasMongoRC = shellGlobalParams.norc;
+            std::string rcLocation;
+            if (!shellGlobalParams.norc) {
+#ifndef _WIN32
+                if (getenv("HOME") != nullptr)
+                    rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js";
+#else
+                if (getenv("HOMEDRIVE") != nullptr && getenv("HOMEPATH") != nullptr)
+                    rcLocation = str::stream()
+                        << toUtf8String(_wgetenv(L"HOMEDRIVE"))
+                        << toUtf8String(_wgetenv(L"HOMEPATH")) << "\\.mongorc.js";
+#endif
+                if (!rcLocation.empty() && ::mongo::shell_utils::fileExists(rcLocation)) {
+                    hasMongoRC = true;
+                    if (!scope->execFile(rcLocation, false, true)) {
+                        std::cout
+                            << "The \".mongorc.js\" file located in your home folder could not be "
+                               "executed"
+                            << std::endl;
+                        std::cout << "exiting with code " << static_cast<int>(kMongorcError)
+                                  << std::endl;
+                        return kMongorcError;
+                    }
+                }
             }
 
-            char* line = shellReadline(prompt.c_str());
-
-            char* linePtr = line;  // can't clobber 'line', we need to free() it later
-            if (linePtr) {
-                while (linePtr[0] == ' ')
-                    ++linePtr;
-                int lineLen = strlen(linePtr);
-                while (lineLen > 0 && linePtr[lineLen - 1] == ' ')
-                    linePtr[--lineLen] = 0;
+            if (!hasMongoRC && isatty(fileno(stdin))) {
+                std::cout
+                    << "Welcome to the MongoDB shell.\n"
+                       "For interactive help, type \"help\".\n"
+                       "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
+                       "Questions? Try the support "
+                       "group\n\thttp://groups.google.com/group/mongodb-user"
+                    << std::endl;
+                File f;
+                f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
             }
 
-            if (!linePtr || (strlen(linePtr) == 4 && strstr(linePtr, "exit"))) {
-                if (!mongo::serverGlobalParams.quiet.load())
-                    std::cout << "bye" << std::endl;
-                if (line)
+            if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet.load() &&
+                isatty(fileno(stdin))) {
+                scope->exec("shellHelper( 'show', 'startupWarnings' )",
+                            "(shellwarnings)",
+                            false,
+                            true,
+                            false);
+
+                scope->exec("shellHelper( 'show', 'freeMonitoring' )",
+                            "(freeMonitoring)",
+                            false,
+                            true,
+                            false);
+
+                scope->exec("shellHelper( 'show', 'automationNotices' )",
+                            "(automationnotices)",
+                            false,
+                            true,
+                            false);
+
+                scope->exec("shellHelper( 'show', 'nonGenuineMongoDBCheck' )",
+                            "(nonGenuineMongoDBCheck)",
+                            false,
+                            true,
+                            false);
+            }
+
+            shellHistoryInit();
+
+            std::string prompt;
+            int promptType;
+
+            while (1) {
+                inMultiLine = false;
+                gotInterrupted = false;
+
+                promptType = scope->type("prompt");
+                if (promptType == String) {
+                    prompt = scope->getString("prompt");
+                } else if ((promptType == Code) && execPrompt(*scope, "prompt", prompt)) {
+                } else if (execPrompt(*scope, "defaultPrompt", prompt)) {
+                } else {
+                    prompt = "> ";
+                }
+
+                char* line = shellReadline(prompt.c_str());
+
+                char* linePtr = line;  // can't clobber 'line', we need to free() it later
+                if (linePtr) {
+                    while (linePtr[0] == ' ')
+                        ++linePtr;
+                    int lineLen = strlen(linePtr);
+                    while (lineLen > 0 && linePtr[lineLen - 1] == ' ')
+                        linePtr[--lineLen] = 0;
+                }
+
+                if (!linePtr || (strlen(linePtr) == 4 && strstr(linePtr, "exit"))) {
+                    if (!mongo::serverGlobalParams.quiet.load())
+                        std::cout << "bye" << std::endl;
+                    if (line)
+                        free(line);
+                    break;
+                }
+
+                std::string code = linePtr;
+                if (code == "exit" || code == "exit;") {
                     free(line);
-                break;
-            }
+                    break;
+                }
 
-            std::string code = linePtr;
-            if (code == "exit" || code == "exit;") {
-                free(line);
-                break;
-            }
+                // Support idle session lifetime limits
+                if (isSessionTimedOut()) {
+                    std::cout << "Idle Connection Timeout: Shell session has expired" << std::endl;
+                    if (line)
+                        free(line);
+                    break;
+                }
 
-            // Support idle session lifetime limits
-            if (isSessionTimedOut()) {
-                std::cout << "Idle Connection Timeout: Shell session has expired" << std::endl;
-                if (line)
+                if (code == "cls") {
                     free(line);
-                break;
-            }
+                    linenoiseClearScreen();
+                    continue;
+                }
 
-            if (code == "cls") {
-                free(line);
-                linenoiseClearScreen();
-                continue;
-            }
+                if (code.size() == 0) {
+                    free(line);
+                    continue;
+                }
 
-            if (code.size() == 0) {
-                free(line);
-                continue;
-            }
+                if (str::startsWith(linePtr, "edit ")) {
+                    shellHistoryAdd(linePtr);
 
-            if (str::startsWith(linePtr, "edit ")) {
-                shellHistoryAdd(linePtr);
+                    const char* s = linePtr + 5;  // skip "edit "
+                    while (*s && isspace(*s))
+                        s++;
 
-                const char* s = linePtr + 5;  // skip "edit "
-                while (*s && isspace(*s))
-                    s++;
+                    edit(s);
+                    free(line);
+                    continue;
+                }
 
-                edit(s);
-                free(line);
-                continue;
-            }
+                gotInterrupted = false;
+                code = finishCode(code);
+                if (gotInterrupted) {
+                    std::cout << std::endl;
+                    free(line);
+                    continue;
+                }
 
-            gotInterrupted = false;
-            code = finishCode(code);
-            if (gotInterrupted) {
-                std::cout << std::endl;
-                free(line);
-                continue;
-            }
+                if (code.size() == 0) {
+                    free(line);
+                    break;
+                }
 
-            if (code.size() == 0) {
-                free(line);
-                break;
-            }
+                bool wascmd = false;
+                {
+                    std::string cmd = linePtr;
+                    std::string::size_type firstSpace;
+                    if ((firstSpace = cmd.find(" ")) != std::string::npos)
+                        cmd = cmd.substr(0, firstSpace);
 
-            bool wascmd = false;
-            {
-                std::string cmd = linePtr;
-                std::string::size_type firstSpace;
-                if ((firstSpace = cmd.find(" ")) != std::string::npos)
-                    cmd = cmd.substr(0, firstSpace);
+                    if (cmd.find("\"") == std::string::npos) {
+                        try {
+                            lastLineSuccessful = scope->exec(
+                                std::string("__iscmd__ = shellHelper[\"") + cmd + "\"];",
+                                "(shellhelp1)",
+                                false,
+                                true,
+                                true);
+                            if (scope->getBoolean("__iscmd__")) {
+                                lastLineSuccessful =
+                                    scope->exec(std::string("shellHelper( \"") + cmd + "\" , \"" +
+                                                    code.substr(cmd.size()) + "\");",
+                                                "(shellhelp2)",
+                                                false,
+                                                true,
+                                                false);
+                                wascmd = true;
+                            }
+                        } catch (std::exception& e) {
+                            std::cout << "error2:" << e.what() << std::endl;
+                            wascmd = true;
+                            lastLineSuccessful = false;
+                        }
+                    }
+                }
 
-                if (cmd.find("\"") == std::string::npos) {
+                if (!wascmd) {
                     try {
                         lastLineSuccessful =
-                            scope->exec(std::string("__iscmd__ = shellHelper[\"") + cmd + "\"];",
-                                        "(shellhelp1)",
-                                        false,
-                                        true,
-                                        true);
-                        if (scope->getBoolean("__iscmd__")) {
-                            lastLineSuccessful =
-                                scope->exec(std::string("shellHelper( \"") + cmd + "\" , \"" +
-                                                code.substr(cmd.size()) + "\");",
-                                            "(shellhelp2)",
-                                            false,
-                                            true,
-                                            false);
-                            wascmd = true;
+                            scope->exec(code.c_str(), "(shell)", false, true, false);
+                        if (lastLineSuccessful) {
+                            scope->exec(
+                                "shellPrintHelper( __lastres__ );", "(shell2)", true, true, false);
                         }
                     } catch (std::exception& e) {
-                        std::cout << "error2:" << e.what() << std::endl;
-                        wascmd = true;
+                        std::cout << "error:" << e.what() << std::endl;
                         lastLineSuccessful = false;
                     }
                 }
+
+                shellHistoryAdd(code.c_str());
+                free(line);
             }
 
-            if (!wascmd) {
-                try {
-                    lastLineSuccessful = scope->exec(code.c_str(), "(shell)", false, true, false);
-                    if (lastLineSuccessful) {
-                        scope->exec(
-                            "shellPrintHelper( __lastres__ );", "(shell2)", true, true, false);
-                    }
-                } catch (std::exception& e) {
-                    std::cout << "error:" << e.what() << std::endl;
-                    lastLineSuccessful = false;
-                }
-            }
-
-            shellHistoryAdd(code.c_str());
-            free(line);
+            shellHistoryDone();
         }
 
-        shellHistoryDone();
-    }
+        return (lastLineSuccessful ? 0 : 1);
 
-    return (lastLineSuccessful ? 0 : 1);
-}
-
-#ifdef _WIN32
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    int returnCode;
-    try {
-        WindowsCommandLine wcl(argc, argvW, envpW);
-        returnCode = _main(argc, wcl.argv(), wcl.envp());
-    } catch (mongo::DBException& e) {
+    } catch (DBException& e) {
         std::cout << "exception: " << e.what() << std::endl;
         std::cout << "exiting with code " << static_cast<int>(kDBException) << std::endl;
-        returnCode = kDBException;
+        return kDBException;
     }
-    quickExit(returnCode);
 }
-#else   // #ifdef _WIN32
-int main(int argc, char* argv[], char** envp) {
-    int returnCode;
-    try {
-        returnCode = _main(argc, argv, envp);
-    } catch (mongo::DBException& e) {
-        std::cout << "exception: " << e.what() << std::endl;
-        std::cout << "exiting with code " << static_cast<int>(kDBException) << std::endl;
-        returnCode = kDBException;
-    }
-    quickExit(returnCode);
-}
-#endif  // #ifdef _WIN32
+
+}  // namespace mongo
