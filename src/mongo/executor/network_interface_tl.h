@@ -114,14 +114,8 @@ private:
         /**
          * Use the current RequestState to send out a command request.
          */
-        virtual Future<RemoteCommandResponse> sendRequest(size_t reqId) = 0;
-
-        /**
-         * Return the maximum number of request failures this Command can tolerate
-         */
-        virtual size_t maxRequestFailures() {
-            return 1;
-        }
+        virtual Future<RemoteCommandResponse> sendRequest(
+            std::shared_ptr<RequestState> requestState) = 0;
 
         /**
          * Set a timer to fulfill the promise with a timeout error.
@@ -148,6 +142,24 @@ private:
          */
         void doMetadataHook(const RemoteCommandOnAnyResponse& response);
 
+        /**
+         * Return the maximum amount of requests that can come from this command.
+         */
+        size_t maxConcurrentRequests() const noexcept {
+            if (!requestOnAny.hedgeOptions) {
+                return 1ull;
+            }
+
+            return requestOnAny.hedgeOptions->count + 1ull;
+        }
+
+        /**
+         * Return the most connections we expect to be able to acquire.
+         */
+        size_t maxPossibleConns() const noexcept {
+            return requestOnAny.target.size();
+        }
+
         NetworkInterfaceTL* interface;
 
         RemoteCommandRequestOnAny requestOnAny;
@@ -161,6 +173,8 @@ private:
 
         std::unique_ptr<RequestManager> requestManager;
 
+        // TODO replace the finishLine with an atomic bool. It is no longer tracking allowed
+        // failures accurately.
         StrongWeakFinishLine finishLine;
 
         boost::optional<UUID> operationKey;
@@ -178,7 +192,8 @@ private:
                          RemoteCommandRequestOnAny request,
                          const TaskExecutor::CallbackHandle& cbHandle);
 
-        Future<RemoteCommandResponse> sendRequest(size_t reqId) override;
+        Future<RemoteCommandResponse> sendRequest(
+            std::shared_ptr<RequestState> requestState) override;
 
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
@@ -201,7 +216,8 @@ private:
                          const TaskExecutor::CallbackHandle& cbHandle,
                          RemoteCommandOnReplyFn&& onReply);
 
-        Future<RemoteCommandResponse> sendRequest(size_t reqId) override;
+        Future<RemoteCommandResponse> sendRequest(
+            std::shared_ptr<RequestState> requestState) override;
 
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
@@ -213,42 +229,26 @@ private:
         RemoteCommandOnReplyFn onReplyFn;
     };
 
-    enum class ConnStatus { Unset, OK, Failed };
-
     struct RequestManager {
-        RequestManager(size_t numHedges, std::shared_ptr<CommandStateBase> cmdState_)
-            : connStatus(cmdState_->requestOnAny.target.size(), ConnStatus::Unset),
-              requests(numHedges),
-              cmdState(cmdState_){};
-
-        std::shared_ptr<RequestState> makeRequest();
-        std::shared_ptr<RequestState> getRequest(size_t reqId);
-        std::shared_ptr<RequestState> getNextRequest();
+        RequestManager(CommandStateBase* cmdState);
 
         void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept;
         void cancelRequests();
         void killOperationsForPendingRequests();
 
-        bool sentNone() const;
-        bool sentAll() const;
-
-        ConnStatus getConnStatus(size_t reqId);
-        bool usedAllConn() const;
-
-        std::vector<ConnStatus> connStatus;
+        CommandStateBase* cmdState;
         std::vector<std::weak_ptr<RequestState>> requests;
-        std::weak_ptr<CommandStateBase> cmdState;
+
+        Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::RequestManager::mutex");
+
+        // Number of connections we've resolved.
+        size_t connsResolved{0};
 
         // Number of sent requests.
-        AtomicWord<size_t> sentIdx{0};
-
-        // Number of requests to send.
-        AtomicWord<size_t> requestCount{0};
+        size_t sentIdx{0};
 
         // Set to true when the command finishes or is canceled to block remaining requests.
         bool isLocked{false};
-
-        Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::RequestManager::mutex");
     };
 
     struct RequestState final : public std::enable_shared_from_this<RequestState> {
@@ -275,14 +275,6 @@ private:
          * This must be called from the networking thread (i.e. the reactor).
          */
         void returnConnection(Status status) noexcept;
-
-        /**
-         * Attempt to send a request using the given connection
-         */
-        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept;
-
-        void send(StatusWith<ConnectionPool::ConnectionHandle> swConn,
-                  RemoteCommandRequest remoteCommandRequest) noexcept;
 
         /**
          * Resolve an eventual response
