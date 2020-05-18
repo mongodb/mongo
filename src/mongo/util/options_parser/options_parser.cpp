@@ -595,15 +595,17 @@ StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
     }
 
     LOGV2(23318,
-          "Processing {expansion_getExpansionName} config expansion for: {nodeName}",
-          "expansion_getExpansionName"_attr = expansion.getExpansionName(),
-          "nodeName"_attr = nodeName);
+          "Processing {expansion} config expansion for: {node}",
+          "Processing config expansion",
+          "expansion"_attr = expansion.getExpansionName(),
+          "node"_attr = nodeName);
     const auto action = expansion.getAction();
     LOGV2_DEBUG(23319,
                 2,
-                "{prefix}{expansion_getExpansionName}: {action}",
+                "{prefix}{expansion}: {action}",
+                "Performing expansion action",
                 "prefix"_attr = prefix,
-                "expansion_getExpansionName"_attr = expansion.getExpansionName(),
+                "expansion"_attr = expansion.getExpansionName(),
                 "action"_attr = action);
 
     if (expansion.isRestExpansion()) {
@@ -666,11 +668,12 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
             type = iterator->_type;
             *option = &*iterator;
             if (isDeprecated) {
-                LOGV2_WARNING(
-                    23320,
-                    "Option: {key} is deprecated. Please use {iterator_dottedName} instead.",
-                    "key"_attr = key,
-                    "iterator_dottedName"_attr = iterator->_dottedName);
+                LOGV2_WARNING(23320,
+                              "Option: Given key {deprecatedKey} is deprecated. "
+                              "Please use preferred key {preferredKey} instead.",
+                              "Option: Given key is deprecated. Please use preferred key instead.",
+                              "deprecatedKey"_attr = key,
+                              "preferredKey"_attr = iterator->_dottedName);
             }
         }
     }
@@ -809,9 +812,10 @@ Status checkLongName(const po::variables_map& vm,
         if (!vm[long_name].defaulted() && singleName != option._singleName) {
             LOGV2_WARNING(
                 23321,
-                "Option: {singleName} is deprecated. Please use {option_singleName} instead.",
-                "singleName"_attr = singleName,
-                "option_singleName"_attr = option._singleName);
+                "Option: {deprecatedName} is deprecated. Please use {preferredName} instead.",
+                "Option: This name is deprecated. Please use the preferred name instead.",
+                "deprecatedName"_attr = singleName,
+                "preferredName"_attr = option._singleName);
         } else if (long_name == "sslMode") {
             LOGV2_WARNING(23322, "Option: sslMode is deprecated. Please use tlsMode instead.");
         }
