@@ -105,7 +105,20 @@ bool closeToMaxMemory() {
 }  // namespace
 
 thread_local MozJSImplScope::ASANHandles* kCurrentASANHandles = nullptr;
-thread_local MozJSImplScope* kCurrentScope = nullptr;
+
+
+// You may wonder what the point is to making this thread local
+// variable atomic. We found that without making this atomic, in
+// dynamic builds, the hang analyzer (GDB script) would sometimes see
+// a stale value here which pointed to a destroyed scope. The theory
+// is that this is due to the different TLS model that applies when
+// building a dynamic library. We never dug down to a complete root
+// cause, but emperically demonstrated that making it atomic allowed
+// the hang analyzer tests to pass. Given that we do intend to read
+// this from "another thread" (being GDB), it makes some sense. Or it
+// might be a GDB bug of some sort that forcing it into an atomic
+// papers over.
+thread_local std::atomic<MozJSImplScope*> kCurrentScope = nullptr;  // NOLINT
 
 struct MozJSImplScope::MozJSEntry {
     MozJSEntry(MozJSImplScope* scope)
@@ -419,41 +432,47 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _statusProto(_context),
       _timestampProto(_context),
       _uriProto(_context) {
-    kCurrentScope = this;
 
-    JS_AddInterruptCallback(_context, _interruptCallback);
-    JS_SetGCCallback(_context, _gcCallback, this);
-    JS_SetContextPrivate(_context, this);
-    JSAutoRequest ar(_context);
+    try {
+        kCurrentScope = this;
 
-    JSAutoCompartment ac(_context, _global);
+        JS_AddInterruptCallback(_context, _interruptCallback);
+        JS_SetGCCallback(_context, _gcCallback, this);
+        JS_SetContextPrivate(_context, this);
+        JSAutoRequest ar(_context);
 
-    _checkErrorState(JS_InitStandardClasses(_context, _global));
+        JSAutoCompartment ac(_context, _global);
 
-    installBSONTypes();
+        _checkErrorState(JS_InitStandardClasses(_context, _global));
 
-    JS_FireOnNewGlobalObject(_context, _global);
+        installBSONTypes();
 
-    execSetup(JSFiles::assert);
-    execSetup(JSFiles::types);
+        JS_FireOnNewGlobalObject(_context, _global);
 
-    // install global utility functions
-    installGlobalUtils(*this);
-    _mongoHelpersProto.install(_global);
+        execSetup(JSFiles::assert);
+        execSetup(JSFiles::types);
 
-    // install process-specific utilities in the global scope (dependancy: types.js, assert.js)
-    if (_engine->getScopeInitCallback())
-        _engine->getScopeInitCallback()(*this);
+        // install global utility functions
+        installGlobalUtils(*this);
+        _mongoHelpersProto.install(_global);
+
+        // install process-specific utilities in the global scope (dependancy: types.js, assert.js)
+        if (_engine->getScopeInitCallback())
+            _engine->getScopeInitCallback()(*this);
+    } catch (...) {
+        kCurrentScope = nullptr;
+        throw;
+    }
 }
 
 MozJSImplScope::~MozJSImplScope() {
+    kCurrentScope = nullptr;
+
     for (auto&& x : _funcs) {
         x.reset();
     }
 
     unregisterOperation();
-
-    kCurrentScope = nullptr;
 }
 
 bool MozJSImplScope::hasOutOfMemoryException() {
