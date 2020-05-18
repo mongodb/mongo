@@ -50,19 +50,23 @@ def callo(args, logger):
     return subprocess.check_output(args).decode('utf-8', 'replace')
 
 
-def signal_python(logger, pinfo):
-    """Send appropriate dumping signal to python processes."""
+def signal_python(logger, pname, pid):
+    """
+    Send appropriate dumping signal to python processes.
+
+    :param logger: Where to log output
+    :param pname: name of the python process.
+    :param pid: python process pid to signal.
+    """
 
     # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
     # a signal handler to wait for the signal since it supports POSIX signals.
     if _IS_WINDOWS:
-        logger.info("Calling SetEvent to signal python process %s with PID %d", pinfo.name,
-                    pinfo.pid)
-        signal_event_object(logger, pinfo.pid)
+        logger.info("Calling SetEvent to signal python process %s with PID %d", pname, pid)
+        signal_event_object(logger, pid)
     else:
-        logger.info("Sending signal SIGUSR1 to python process %s with PID %d", pinfo.name,
-                    pinfo.pid)
-        signal_process(logger, pinfo.pid, signal.SIGUSR1)
+        logger.info("Sending signal SIGUSR1 to python process %s with PID %d", pname, pid)
+        signal_process(logger, pid, signal.SIGUSR1)
 
 
 def signal_event_object(logger, pid):
