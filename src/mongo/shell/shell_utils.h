@@ -34,6 +34,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/client/mongo_uri.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -52,7 +53,7 @@ void RecordMyLocation(const char* _argv0);
 void installShellUtils(Scope& scope);
 
 void initScope(Scope& scope);
-void onConnect(DBClientBase& c);
+void onConnect(DBClientBase& c, StringData uri);
 
 boost::filesystem::path getHistoryFilePath();
 void setEnterpriseShellCallback(EnterpriseShellCallback* callback);
@@ -77,7 +78,7 @@ private:
 class ConnectionRegistry {
 public:
     ConnectionRegistry();
-    void registerConnection(DBClientBase& client);
+    void registerConnection(DBClientBase& client, StringData uri);
     void killOperationsOnAllConnections(bool withPrompt) const;
 
 private:

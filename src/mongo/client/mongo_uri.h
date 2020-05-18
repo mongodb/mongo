@@ -133,7 +133,7 @@ public:
     // whichever map type is used provides that guarantee.
     using OptionsMap = std::map<CaseInsensitiveString, std::string>;
 
-    static StatusWith<MongoURI> parse(const std::string& url);
+    static StatusWith<MongoURI> parse(StringData url);
 
     /*
      * Returns true if str starts with one of the uri schemes (e.g. mongodb:// or mongodb+srv://)
@@ -280,7 +280,7 @@ private:
     boost::optional<BSONObj> _makeAuthObjFromOptions(
         int maxWireVersion, const std::vector<std::string>& saslMechsForAuth) const;
 
-    static MongoURI parseImpl(const std::string& url);
+    static MongoURI parseImpl(StringData url);
 
     ConnectionString _connectString;
     std::string _user;
