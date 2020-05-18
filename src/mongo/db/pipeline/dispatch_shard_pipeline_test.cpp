@@ -172,7 +172,8 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
 
     // Mock out an error response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"};
+        return createErrorCursorResponse(
+            {Status{ErrorCodes::StaleShardVersion, "Mock error: shard version mismatch"}});
     });
     future.default_timed_get();
 }
