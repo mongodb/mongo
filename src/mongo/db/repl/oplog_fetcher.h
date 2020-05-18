@@ -346,6 +346,28 @@ private:
      */
     Milliseconds _getRetriedFindMaxTime() const;
 
+    /**
+     * Checks the first batch of results from query.
+     * 'documents' are the first batch of results returned from tailing the remote oplog.
+     * 'remoteLastOpApplied' is the last OpTime applied on the sync source.
+     * 'remoteRBID' is a RollbackId for the sync source returned in this oplog query. This is
+     * optional for compatibility with 3.4 servers that do not send OplogQueryMetadata.
+     *
+     * Returns TooStaleToSyncFromSource if we are too stale to sync from our source.
+     * Returns OplogStartMissing if we should go into rollback.
+     */
+    Status _checkRemoteOplogStart(const OplogFetcher::Documents& documents,
+                                  OpTime remoteLastOpApplied,
+                                  int remoteRBID);
+
+    /**
+     * Distinguishes between needing to rollback and being too stale to sync from our sync source.
+     * This will be called when we check the first batch of results and our last fetched optime does
+     * not equal the first document in that batch. This function should never return Status::OK().
+     */
+    Status _checkTooStaleToSyncFromSource(const OpTime lastFetched,
+                                          const OpTime firstOpTimeInDocument);
+
     // Protects member data of this OplogFetcher.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogFetcher::_mutex");
 

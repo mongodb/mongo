@@ -342,7 +342,7 @@ void SyncSourceResolver::_firstOplogEntryFetcherCallback(
     if (_lastOpTimeFetched.getTimestamp() < remoteEarliestOpTime.getTimestamp()) {
         // We're too stale to use this sync source.
         const auto blacklistDuration = kTooStaleBlacklistDuration;
-        const auto until = _taskExecutor->now() + Minutes(1);
+        const auto until = _taskExecutor->now() + blacklistDuration;
 
         LOGV2(21771,
               "We are too stale to use {candidate} as a sync source. Blacklisting this sync source "
@@ -553,7 +553,7 @@ Status SyncSourceResolver::_chooseAndProbeNextSyncSource(OpTime earliestOpTimeSe
         }
 
         SyncSourceResolverResponse response;
-        response.syncSourceStatus = {ErrorCodes::OplogStartMissing, "too stale to catch up"};
+        response.syncSourceStatus = {ErrorCodes::TooStaleToSyncFromSource, "too stale to catch up"};
         response.earliestOpTimeSeen = earliestOpTimeSeen;
         return _finishCallback(response);
     }

@@ -428,7 +428,7 @@ TEST_F(SyncSourceResolverTest,
 }
 
 TEST_F(SyncSourceResolverTest,
-       SyncSourceResolverReturnsOplogStartMissingAndEarliestOpTimeAvailableWhenAllSourcesTooFresh) {
+       SyncSourceResolverReturnsTooStaleAndEarliestOpTimeAvailableWhenAllSourcesTooFresh) {
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
     HostAndPort candidate3("node3", 12345);
@@ -448,7 +448,7 @@ TEST_F(SyncSourceResolverTest,
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(ErrorCodes::OplogStartMissing, _response.syncSourceStatus);
+    ASSERT_EQUALS(ErrorCodes::TooStaleToSyncFromSource, _response.syncSourceStatus);
     ASSERT_EQUALS(Timestamp(200, 2), _response.earliestOpTimeSeen.getTimestamp());
 }
 

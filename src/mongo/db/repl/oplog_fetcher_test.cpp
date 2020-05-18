@@ -951,10 +951,104 @@ TEST_F(OplogFetcherTest, MetadataIsNotProcessedOnBatchThatTriggersRollback) {
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
     auto entry = makeNoopOplogEntry(Seconds(456));
 
+    // Set the remote node's first oplog entry to equal to lastFetched.
+    auto remoteFirstOplogEntry = makeNoopOplogEntry(lastFetched);
+    _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
+
     ASSERT_EQUALS(
         ErrorCodes::OplogStartMissing,
         processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
+
     ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
+}
+
+TEST_F(OplogFetcherTest, TooStaleToSyncFromSyncSource) {
+    CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto entry = makeNoopOplogEntry(Seconds(456));
+
+    // Set the remote node's first oplog entry to be later than lastFetched, so we have fallen off
+    // the sync source's oplog.
+    auto remoteFirstOplogEntry = makeNoopOplogEntry(Seconds(200));
+    _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
+
+    ASSERT_EQUALS(
+        ErrorCodes::TooStaleToSyncFromSource,
+        processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
+}
+
+TEST_F(OplogFetcherTest, NotTooStaleShouldReturnOplogStartMissing) {
+    CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto entry = makeNoopOplogEntry(Seconds(456));
+
+    // Set the remote node's first oplog entry to be earlier than lastFetched, so we have not fallen
+    // off the sync source's oplog.
+    auto remoteFirstOplogEntry = makeNoopOplogEntry(Seconds(1));
+    _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
+
+    ASSERT_EQUALS(
+        ErrorCodes::OplogStartMissing,
+        processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
+}
+
+TEST_F(OplogFetcherTest, BadRemoteFirstOplogEntryReturnsInvalidBSON) {
+    CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto entry = makeNoopOplogEntry(Seconds(456));
+
+    // Set the remote node's first oplog entry to be an invalid BSON.
+    auto remoteFirstOplogEntry = BSON("ok" << false);
+    _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
+
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidBSON,
+        processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
+}
+
+TEST_F(OplogFetcherTest, EmptyRemoteFirstOplogEntryReturnsInvalidBSON) {
+    CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto entry = makeNoopOplogEntry(Seconds(456));
+
+    // Set the remote node's first oplog entry to be an empty BSON.
+    auto remoteFirstOplogEntry = BSONObj();
+    _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
+
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidBSON,
+        processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
+}
+
+TEST_F(OplogFetcherTest, RemoteFirstOplogEntryWithNullTimestampReturnsInvalidBSON) {
+    CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto entry = makeNoopOplogEntry(Seconds(456));
+
+    // Set the remote node's first oplog entry to have a null timestamp.
+    auto remoteFirstOplogEntry = makeNoopOplogEntry(Seconds(0));
+    _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
+
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidBSON,
+        processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
+}
+
+TEST_F(OplogFetcherTest, RemoteFirstOplogEntryWithExtraFieldsReturnsOplogStartMissing) {
+    CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto entry = makeNoopOplogEntry(Seconds(456));
+
+    // Set the remote node's first oplog entry to include extra fields.
+    auto remoteFirstOplogEntry = BSON("ts" << Timestamp(1, 0) << "t" << 1 << "extra"
+                                           << "field");
+    _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
+
+    // We should have parsed the OpTime correctly and realized that we have not fallen off the sync
+    // source's oplog, so we should go into rollback.
+    ASSERT_EQUALS(
+        ErrorCodes::OplogStartMissing,
+        processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
 }
 
 TEST_F(OplogFetcherTest, FailingInitialCreateNewCursorNoRetriesShutsDownOplogFetcher) {
@@ -1457,6 +1551,11 @@ TEST_F(
     CursorId cursorId = 22LL;
     auto entry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+
+    // Set the remote node's first oplog entry to equal to lastFetched.
+    auto remoteFirstOplogEntry = makeNoopOplogEntry(lastFetched);
+    _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
+
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
                   processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj))->getStatus());
 }

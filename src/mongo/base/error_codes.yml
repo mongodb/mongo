@@ -366,6 +366,10 @@ error_codes:
     - {code: 313,name: ResumableRangeDeleterDisabled}
     - {code: 314,name: ObjectIsBusy}
     
+
+    # The code below is for internal use only and must never be returned in a network response
+    - {code: 315,name: TooStaleToSyncFromSource}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
