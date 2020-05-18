@@ -514,7 +514,7 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     const auto shouldAppendTopologyVersion =
         (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
          isNotMasterError) ||
-        (replCoord->inQuiesceMode() && isShutdownError);
+        (isShutdownError && replCoord->inQuiesceMode());
 
     if (!shouldAppendTopologyVersion) {
         return;
