@@ -140,6 +140,30 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
         }));
 }
 
+void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj response,
+                                                                 int targetIndex,
+                                                                 Milliseconds ping) {
+    CallbackHandle handle;
+    RemoteCommandRequest request;
+    request.target = _rsConfig.getMemberAt(targetIndex).getHostAndPort();
+    executor::TaskExecutor::ResponseStatus status(response, ping);
+    executor::TaskExecutor::RemoteCommandCallbackArgs cbData(
+        _replExecutor.get(), handle, request, status);
+
+    {
+        stdx::unique_lock<Latch> lk(_mutex);
+
+        // Simulate preparing a heartbeat request so that the target's ping stats are initialized.
+        _topCoord->prepareHeartbeatRequestV1(
+            _replExecutor->now(), _rsConfig.getReplSetName(), request.target);
+
+        // Pretend we sent a request so that _untrackHeartbeatHandle_inlock succeeds.
+        _trackHeartbeatHandle_inlock(handle);
+    }
+
+    _handleHeartbeatResponse(cbData, targetIndex);
+}
+
 void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, int targetIndex) {
     stdx::unique_lock<Latch> lk(_mutex);

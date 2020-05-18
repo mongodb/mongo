@@ -439,6 +439,10 @@ public:
     void cleanupStableOpTimeCandidates_forTest(std::set<OpTimeAndWallTime>* candidates,
                                                OpTimeAndWallTime stableOpTime);
     std::set<OpTimeAndWallTime> getStableOpTimeCandidates_forTest();
+    void handleHeartbeatResponse_forTest(BSONObj response,
+                                         int targetIndex,
+                                         Milliseconds ping = Milliseconds(100));
+
 
     /**
      * Non-blocking version of updateTerm.
