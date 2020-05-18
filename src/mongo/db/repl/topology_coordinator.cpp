@@ -50,6 +50,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
@@ -78,6 +79,13 @@ MONGO_FAIL_POINT_DEFINE(voteYesInDryRunButNoInRealElection);
 MONGO_FAIL_POINT_DEFINE(disableMaxSyncSourceLagSecs);
 
 constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
+
+// Tracks the number of times we decide to change sync sources in order to sync from a significantly
+// closer node.
+Counter64 numSyncSourceChangesDueToSignificantlyCloserNode;
+ServerStatusMetricField<Counter64> displayNumSyncSourceChangesDueToSignificantlyCloserNode(
+    "repl.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode",
+    &numSyncSourceChangesDueToSignificantlyCloserNode);
 
 using namespace fmt::literals;
 
@@ -257,11 +265,10 @@ void TopologyCoordinator::_setSyncSource(HostAndPort newSyncSource, Date_t now, 
 HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                                                      const OpTime& lastOpTimeFetched,
                                                      ReadPreference readPreference) {
-    // Check to make sure we can choose a sync source, and choose a forced one if set.
+    // Check to make sure we can choose a sync source, and choose a forced one if set. This function
+    // will set _syncSource if a sync source was chosen, so we don't need to set it here.
     auto maybeSyncSource = _chooseSyncSourceInitialStep(now);
     if (maybeSyncSource) {
-        bool forced = !maybeSyncSource->empty();
-        _setSyncSource(*maybeSyncSource, now, forced);
         return _syncSource;
     }
 
@@ -547,6 +554,7 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
         std::string msg(str::stream() << "syncing from: " << syncSource.toString()
                                       << " by 'forceSyncSourceCandidate' parameter");
         setMyHeartbeatMessage(now, msg);
+        _setSyncSource(syncSource, now, false /* forced */);
         return syncSource;
     }
 
@@ -559,6 +567,7 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
         std::string msg(str::stream()
                         << "syncing from: " << syncSource.toString() << " by request");
         setMyHeartbeatMessage(now, msg);
+        _setSyncSource(syncSource, now, true /* forced */);
         return syncSource;
     }
 
@@ -3051,6 +3060,13 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     // If we find an eligible sync source that is significantly closer than our current sync source,
     // return true.
 
+    // Do not re-evaluate our sync source if it was set via the replSetSyncFrom command or the
+    // forceSyncSourceCandidate failpoint.
+    auto sfp = forceSyncSourceCandidate.scoped();
+    if (_syncSourceCurrentlyForced || MONGO_unlikely(sfp.isActive())) {
+        return false;
+    }
+
     // If we are in initial sync, do not re-evaluate our sync source.
     const bool nodeInInitialSync = (memberState.startup() || memberState.startup2());
     if (nodeInInitialSync) {
@@ -3065,12 +3081,6 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     // If we have already changed sync sources more than 'maxNumSyncSourceChangesPerHour' in the
     // past hour, do not re-evaluate our sync source.
     if (_recentSyncSourceChanges.changedTooOftenRecently(now)) {
-        return false;
-    }
-
-    // Do not re-evaluate our sync source if it was set via the replSetSyncFrom command or the
-    // forceSyncSourceCandidate failpoint.
-    if (_syncSourceCurrentlyForced) {
         return false;
     }
 
@@ -3095,7 +3105,6 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     if (numPingsNeeded > 0) {
         return false;
     }
-
 
     if (_pings.count(currentSource) == 0) {
         // Ping data for our current sync source could not be found.
@@ -3131,6 +3140,7 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
                   "changeSyncSourceThreshold"_attr = changeSyncSourceThreshold,
                   "candidateNode"_attr = candidateNode,
                   "candidatePingTime"_attr = candidateSyncSourcePingTime);
+            numSyncSourceChangesDueToSignificantlyCloserNode.increment();
             return true;
         }
     }
