@@ -3033,12 +3033,11 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
     return false;
 }
 
-bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(
-    const HostAndPort& currentSource,
-    const MemberState& memberState,
-    const OpTime& lastOpTimeFetched,
-    Date_t now,
-    const ReadPreference readPreference) const {
+bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort& currentSource,
+                                                              const MemberState& memberState,
+                                                              const OpTime& lastOpTimeFetched,
+                                                              Date_t now,
+                                                              const ReadPreference readPreference) {
     // If the ping time for currentSource is longer than 'changeSyncSourceThresholdMillis' and we
     // find an eligible sync source that has a ping time shorter than
     // 'changeSyncSourceThresholdMillis', return true.
@@ -3051,6 +3050,12 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(
 
     // If we are configured with slaveDelay, do not re-evaluate our sync source.
     if (_selfIndex == -1 || _selfConfig().getSlaveDelay() > Seconds(0)) {
+        return false;
+    }
+
+    // If we have already changed sync sources more than 'maxNumSyncSourceChangesPerHour' in the
+    // past hour, do not re-evaluate our sync source.
+    if (_recentSyncSourceChanges.changedTooOftenRecently(now)) {
         return false;
     }
 

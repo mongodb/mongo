@@ -4362,6 +4362,57 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeNotFoundInConfig) {
                                                                     ReadPreference::Nearest));
 }
 
+TEST_F(ReevalSyncSourceTest, NoChangeWhenChangedTooManyTimesRecently) {
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
+
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+
+    auto first = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(first);
+
+    auto second = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(second);
+
+    auto third = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(third);
+
+    assertTimesEqual({first, second, third}, recentSyncSourceChanges->getChanges_forTest());
+    ASSERT_TRUE(recentSyncSourceChanges->changedTooOftenRecently(now()));
+
+    // We should not change sync sources because we have already changed sync sources more than
+    // 'maxNumSyncSourceChangesPerHour' in the past hour.
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                    MemberState::RS_SECONDARY,
+                                                                    lastOpTimeFetched,
+                                                                    now(),
+                                                                    ReadPreference::Nearest));
+}
+
+TEST_F(ReevalSyncSourceTest, ChangeWhenHaveNotChangedTooManyTimesRecently) {
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
+
+    auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
+
+    auto first = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(first);
+
+    auto second = Date_t::now();
+    recentSyncSourceChanges->addNewEntry(second);
+
+    assertTimesEqual({first, second}, recentSyncSourceChanges->getChanges_forTest());
+    ASSERT_FALSE(recentSyncSourceChanges->changedTooOftenRecently(now()));
+
+    // We should allow changing sync sources because we have not yet changed sync sources more times
+    // than 'maxNumSyncSourceChangesPerHour' in the past hour.
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                   MemberState::RS_SECONDARY,
+                                                                   lastOpTimeFetched,
+                                                                   now(),
+                                                                   ReadPreference::Nearest));
+}
+
 class HeartbeatResponseReconfigTestV1 : public TopoCoordTest {
 public:
     virtual void setUp() {

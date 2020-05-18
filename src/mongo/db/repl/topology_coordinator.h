@@ -279,7 +279,7 @@ public:
                                              const MemberState& memberState,
                                              const OpTime& lastOpTimeFetched,
                                              Date_t now,
-                                             const ReadPreference readPreference) const;
+                                             const ReadPreference readPreference);
 
     /**
      * Sets the reported mode of this node to one of RS_SECONDARY, RS_STARTUP2, RS_ROLLBACK or
