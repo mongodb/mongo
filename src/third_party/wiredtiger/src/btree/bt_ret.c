@@ -94,7 +94,7 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
     WT_TIME_WINDOW_INIT(tw);
     /*
      * If a value is simple and is globally visible at the time of reading a page into cache, we set
-     * the time pairs as globally visible.
+     * the start time point as globally visible.
      */
     if (__wt_row_leaf_value_exists(rip))
         return;
@@ -105,7 +105,7 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
 
 /*
  * __wt_read_cell_time_window --
- *     Read the time pairs from the cell.
+ *     Read the time window from the cell.
  */
 void
 __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_WINDOW *tw)
@@ -124,7 +124,7 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_WINDOW *tw
     } else if (page->type == WT_PAGE_COL_VAR) {
         __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
     } else {
-        /* WT_PAGE_COL_FIX: return the default time pairs. */
+        /* WT_PAGE_COL_FIX: return the default time window. */
         WT_TIME_WINDOW_INIT(tw);
     }
 }

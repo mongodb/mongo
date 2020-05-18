@@ -43,24 +43,28 @@ smoke_base_1="data_source=table rows=100000 threads=6 timer=4"
 smoke_base_2="$smoke_base_1 leaf_page_max=9 internal_page_max=9"
 smoke_list=(
 	# Three access methods.
-	"$smoke_base_1 file_type=fix"
 	"$smoke_base_1 file_type=row"
-	"$smoke_base_1 file_type=var"
+    # Temporarily disabled
+	# "$smoke_base_1 file_type=fix"
+	# "$smoke_base_1 file_type=var"
 
 	# Huffman key/value encoding.
 	"$smoke_base_1 file_type=row huffman_key=1 huffman_value=1"
-	"$smoke_base_1 file_type=var huffman_key=1 huffman_value=1"
+    # Temporarily disabled
+	# "$smoke_base_1 file_type=var huffman_key=1 huffman_value=1"
 
 	# LSM
-	"$smoke_base_1 file_type=row data_source=lsm"
+    # Temporarily disabled
+	# "$smoke_base_1 file_type=row data_source=lsm"
 
 	# Force tree rebalance and the statistics server.
 	"$smoke_base_1 file_type=row statistics_server=1 rebalance=1"
 
 	# Overflow testing.
-	"$smoke_base_2 file_type=var value_min=256"
 	"$smoke_base_2 file_type=row key_min=256"
 	"$smoke_base_2 file_type=row key_min=256 value_min=256"
+    # Temporarily disabled
+	# "$smoke_base_2 file_type=var value_min=256"
 )
 smoke_next=0
 

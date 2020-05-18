@@ -552,8 +552,19 @@ config_directio(void)
      */
     if (g.c_backups) {
         if (config_is_perm("backup"))
-            testutil_die(EINVAL, "backup are incompatible with direct I/O");
+            testutil_die(EINVAL, "direct I/O is incompatible with backup configurations");
         config_single("backup=off", false);
+    }
+
+    /*
+     * Direct I/O may not work with mmap. Theoretically, Linux ignores direct I/O configurations in
+     * the presence of shared cache configurations (including mmap), but we've seen file corruption
+     * and it doesn't make much sense (the library disallows the combination).
+     */
+    if (g.c_mmap_all != 0) {
+        if (config_is_perm("disk.mmap_all"))
+            testutil_die(EINVAL, "direct I/O is incompatible with mmap_all configurations");
+        config_single("disk.mmap_all=off", false);
     }
 
     /*
@@ -564,12 +575,12 @@ config_directio(void)
      */
     if (g.c_rebalance) {
         if (config_is_perm("ops.rebalance"))
-            testutil_die(EINVAL, "rebalance is incompatible with direct I/O");
+            testutil_die(EINVAL, "direct I/O is incompatible with rebalance configurations");
         config_single("ops.rebalance=off", false);
     }
     if (g.c_salvage) {
         if (config_is_perm("ops.salvage"))
-            testutil_die(EINVAL, "salvage is incompatible with direct I/O");
+            testutil_die(EINVAL, "direct I/O is incompatible with salvage configurations");
         config_single("ops.salvage=off", false);
     }
 }

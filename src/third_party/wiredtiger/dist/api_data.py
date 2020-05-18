@@ -1001,7 +1001,8 @@ wiredtiger_open_common =\
         Use memory mapping when accessing files in a read-only mode''',
         type='boolean'),
     Config('mmap_all', 'false', r'''
-        Use memory mapping to read and write all data files''',
+        Use memory mapping to read and write all data files, may not be configured with direct
+        I/O''',
         type='boolean'),
     Config('multiprocess', 'false', r'''
         permit sharing between processes (will automatically start an
@@ -1377,7 +1378,7 @@ methods = {
 'WT_SESSION.upgrade' : Method([]),
 'WT_SESSION.verify' : Method([
     Config('dump_address', 'false', r'''
-        Display page addresses, start and stop time pairs and page types as
+        Display page addresses, time windows, and page types as
         pages are verified, using the application's message handler,
         intended for debugging''',
         type='boolean'),
@@ -1386,7 +1387,7 @@ methods = {
         using the application's message handler, intended for debugging''',
         type='boolean'),
     Config('dump_history', 'false', r'''
-        Display a key's values along with its start and stop time pairs as
+        Display a key's values along with its time window as
         they are verified against the history store, using the application's
         message handler, intended for debugging''',
         type='boolean'),

@@ -553,17 +553,16 @@ tasks:
         vars:
           directory: test/bloom
 
-  # Temporarily disabled
-  # - name: checkpoint-test
-  #   tags: ["pull_request"]
-  #   depends_on:
-  #     - name: compile
-  #   commands:
-  #     - func: "fetch artifacts"
-  #     - func: "compile wiredtiger"
-  #     - func: "make check directory"
-  #       vars:
-  #         directory: test/checkpoint
+  - name: checkpoint-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - func: "make check directory"
+        vars:
+          directory: test/checkpoint
 
   - name: cursor-order-test
     tags: ["pull_request"]

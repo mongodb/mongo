@@ -1705,15 +1705,15 @@ struct __wt_session {
 	 * @param name the URI of the table or file to verify, optional if verifying the history
 	 * store
 	 * @configstart{WT_SESSION.verify, see dist/api_data.py}
-	 * @config{dump_address, Display page addresses\, start and stop time pairs and page types
-	 * as pages are verified\, using the application's message handler\, intended for
-	 * debugging., a boolean flag; default \c false.}
+	 * @config{dump_address, Display page addresses\, time windows\, and page types as pages are
+	 * verified\, using the application's message handler\, intended for debugging., a boolean
+	 * flag; default \c false.}
 	 * @config{dump_blocks, Display the contents of on-disk blocks as they are verified\, using
 	 * the application's message handler\, intended for debugging., a boolean flag; default \c
 	 * false.}
-	 * @config{dump_history, Display a key's values along with its start and stop time pairs as
-	 * they are verified against the history store\, using the application's message handler\,
-	 * intended for debugging., a boolean flag; default \c false.}
+	 * @config{dump_history, Display a key's values along with its time window as they are
+	 * verified against the history store\, using the application's message handler\, intended
+	 * for debugging., a boolean flag; default \c false.}
 	 * @config{dump_layout, Display the layout of the files as they are verified\, using the
 	 * application's message handler\, intended for debugging; requires optional support from
 	 * the block manager., a boolean flag; default \c false.}
@@ -2974,8 +2974,8 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{mmap, Use memory mapping when accessing files in a read-only mode., a boolean flag;
  * default \c true.}
- * @config{mmap_all, Use memory mapping to read and write all data files., a boolean flag; default
- * \c false.}
+ * @config{mmap_all, Use memory mapping to read and write all data files\, may not be configured
+ * with direct I/O., a boolean flag; default \c false.}
  * @config{multiprocess, permit sharing between processes (will automatically start an RPC server
  * for primary processes and use RPC for secondary processes). <b>Not yet supported in
  * WiredTiger</b>., a boolean flag; default \c false.}

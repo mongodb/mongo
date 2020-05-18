@@ -703,8 +703,10 @@ static inline bool
 __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp)
 {
     WT_TXN *txn;
+    WT_TXN_SHARED *txn_shared;
 
     txn = session->txn;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
 
     if (!__txn_visible_id(session, id))
         return (false);
@@ -717,7 +719,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp
     if (!F_ISSET(txn, WT_TXN_HAS_TS_READ) || timestamp == WT_TS_NONE)
         return (true);
 
-    return (timestamp <= txn->read_timestamp);
+    return (timestamp <= txn_shared->read_timestamp);
 }
 
 /*
@@ -735,6 +737,13 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
         WT_ORDERED_READ(prepare_state, upd->prepare_state);
         if (prepare_state == WT_PREPARE_LOCKED)
             continue;
+
+        if (F_ISSET(session, WT_SESSION_RESOLVING_MODIFY) && upd->txnid != WT_TXN_ABORTED &&
+          upd->type == WT_UPDATE_STANDARD) {
+            /* If we are resolving a modify then the btree must be the history store. */
+            WT_ASSERT(session, WT_IS_HS(S2BT(session)));
+            return (WT_VISIBLE_TRUE);
+        }
 
         upd_visible = __wt_txn_visible(session, upd->txnid, upd->start_ts);
 
@@ -912,10 +921,10 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
     }
 
     /*
-     * If the stop pair is set, that means that there is a tombstone at that time. If it is not
-     * prepared and the stop time pair is visible to our txn then that means we've just spotted a
-     * tombstone and should return "not found", except for history store scan during rollback to
-     * stable and when we are told to ignore non-globally visible tombstones.
+     * If the stop time point is set, that means that there is a tombstone at that time. If it is
+     * not prepared and the it is visible to our txn then that means we've just spotted a tombstone
+     * and should return "not found", except for history store scan during rollback to stable and
+     * when we are told to ignore non-globally visible tombstones.
      */
     if (__wt_txn_tw_stop_visible(session, &tw) &&
       ((!F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&
@@ -930,8 +939,8 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
         return (0);
     }
 
-    /* If the start time pair is visible then we need to return the ondisk value. */
-    if (__wt_txn_tw_start_visible(session, &tw) || F_ISSET(session, WT_SESSION_RESOLVING_MODIFY)) {
+    /* If the start time point is visible then we need to return the ondisk value. */
+    if (F_ISSET(session, WT_SESSION_RESOLVING_MODIFY) || __wt_txn_tw_start_visible(session, &tw)) {
         /* If we are resolving a modify then the btree must be the history store. */
         WT_ASSERT(
           session, (F_ISSET(session, WT_SESSION_RESOLVING_MODIFY) && WT_IS_HS(S2BT(session))) ||

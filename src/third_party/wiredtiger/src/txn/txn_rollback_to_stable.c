@@ -60,7 +60,7 @@ __rollback_abort_newer_update(WT_SESSION_IMPL *session, WT_UPDATE *first_upd,
      * Clear the history store flag for the stable update to indicate that this update should not be
      * written into the history store later, when all the aborted updates are removed from the
      * history store. The next time when this update is moved into the history store, it will have a
-     * different stop time pair.
+     * different stop time point.
      */
     if (first_upd != NULL) {
         F_CLR(first_upd, WT_UPDATE_HS);
@@ -196,11 +196,11 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
     cbt = (WT_CURSOR_BTREE *)hs_cursor;
 
     /*
-     * Scan the history store for the given btree and key with maximum start and stop time pair to
-     * let the search point to the last version of the key and start traversing backwards to find
-     * out the satisfying record according the given timestamp. Any satisfying history store record
-     * is moved into data store and removed from history store. If none of the history store records
-     * satisfy the given timestamp, the key is removed from data store.
+     * Scan the history store for the given btree and key with maximum start timestamp to let the
+     * search point to the last version of the key and start traversing backwards to find out the
+     * satisfying record according the given timestamp. Any satisfying history store record is moved
+     * into data store and removed from history store. If none of the history store records satisfy
+     * the given timestamp, the key is removed from data store.
      */
     ret = __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, key, WT_TS_MAX);
     for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {

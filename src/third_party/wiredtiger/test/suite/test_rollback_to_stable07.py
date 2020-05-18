@@ -52,7 +52,7 @@ class test_rollback_to_stable07(test_rollback_to_stable_base):
     scenarios = make_scenarios(prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all),log=(enabled=true)'
+        config = 'cache_size=5MB,statistics=(all),log=(enabled=true)'
         return config
 
     def simulate_crash_restart(self, uri, olddir, newdir):

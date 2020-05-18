@@ -2583,9 +2583,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
     conn->mmap = cval.val != 0;
-
     WT_ERR(__wt_config_gets(session, cfg, "mmap_all", &cval));
     conn->mmap_all = cval.val != 0;
+    if (conn->direct_io && conn->mmap_all)
+        WT_ERR_MSG(
+          session, EINVAL, "direct I/O configuration is incompatible with mmap_all configuration");
 
     WT_ERR(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
     conn->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
