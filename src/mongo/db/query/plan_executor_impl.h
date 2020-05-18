@@ -72,7 +72,7 @@ public:
     ExecState getNext(Document* objOut, RecordId* dlOut) final;
     ExecState getNext(BSONObj* out, RecordId* dlOut) final;
     bool isEOF() final;
-    Status executePlan() final;
+    void executePlan() final;
     void markAsKilled(Status killStatus) final;
     void dispose(OperationContext* opCtx) final;
     void enqueue(const Document& obj) final;
@@ -83,9 +83,6 @@ public:
     bool isDetached() const final;
     Timestamp getLatestOplogTimestamp() const final;
     BSONObj getPostBatchResumeToken() const final;
-
-    Status getMemberObjectStatus(const Document& memberObj) const final;
-    Status getMemberObjectStatus(const BSONObj& memberObj) const final;
 
 private:
     /**
@@ -138,17 +135,12 @@ private:
     std::shared_ptr<CappedInsertNotifier> _getCappedInsertNotifier();
 
     /**
-     * Yields locks and waits for inserts to the collection. Returns ADVANCED if there has been an
-     * insertion and there may be new results. Returns FAILURE if the PlanExecutor was killed during
-     * a yield. This method is only to be used for tailable and awaitData cursors, so rather than
-     * returning FAILURE if the operation has exceeded its time limit, we return IS_EOF to preserve
-     * this PlanExecutor for future use.
-     *
-     * If an error is encountered and 'errorObj' is provided, it is populated with an object
-     * describing the error.
+     * Called for tailable and awaitData cursors in order to yield locks and waits for inserts to
+     * the collection being tailed. Returns control to the caller once there has been an insertion
+     * and there may be new results. If the PlanExecutor was killed during a yield, throws an
+     * exception.
      */
-    ExecState _waitForInserts(CappedInsertNotifierData* notifierData,
-                              Snapshotted<Document>* errorObj);
+    void _waitForInserts(CappedInsertNotifierData* notifierData);
 
     /**
      * Common implementation for getNext() and getNextSnapshotted().

@@ -178,9 +178,9 @@ private:
      * Checks whether we need to perform either a timing-based yield or a yield for a document
      * fetch. If so, then uses 'yieldPolicy' to actually perform the yield.
      *
-     * Returns a non-OK status if killed during a yield or if the query has exceeded its time limit.
+     * Throws an exception if yield recovery fails.
      */
-    Status tryYield(PlanYieldPolicy* yieldPolicy);
+    void tryYield(PlanYieldPolicy* yieldPolicy);
 
     static const int kNoSuchPlan = -1;
 
@@ -205,25 +205,14 @@ private:
     // uses -1 / kNoSuchPlan when best plan is not (yet) known
     int _backupPlanIdx;
 
-    // Set if this MultiPlanStage cannot continue, and the query must fail. This can happen in
-    // two ways. The first is that all candidate plans fail. Note that one plan can fail
-    // during normal execution of the plan competition.  Here is an example:
+    // Count of the number of candidate plans that have failed during the trial period. The
+    // multi-planner swallows resource exhaustion errors (QueryExceededMemoryLimitNoDiskUseAllowed).
+    // This means that if one candidate involves a blocking sort, and the other does not, the entire
+    // query will not fail if the blocking sort hits the limit on its allowed memory footprint.
     //
-    // Plan 1: collection scan with sort.  Sort runs out of memory.
-    // Plan 2: ixscan that provides sort.  Won't run out of memory.
-    //
-    // We want to choose plan 2 even if plan 1 fails.
-    //
-    // The second way for failure to occur is that the execution of this query is killed during
-    // a yield, by some concurrent event such as a collection drop.
-    bool _failure;
-
-    // If everything fails during the plan competition, we can't pick one.
-    size_t _failureCount;
-
-    // if pickBestPlan fails, this is set to the wsid of the statusMember
-    // returned by ::work()
-    WorkingSetID _statusMemberId;
+    // Arbitrary error codes are not swallowed by the multi-planner, since it is not know whether it
+    // is safe for the query to continue executing.
+    size_t _failureCount = 0u;
 
     // Stats
     MultiPlanStats _specificStats;

@@ -204,23 +204,22 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
             uasserted(ErrorCodes::InternalError, "Failing for test");
         }
 
-        PlanExecutor::ExecState state = exec->getNext(&deletedObj, nullptr);
-
-        if (state == PlanExecutor::IS_EOF) {
-            break;
-        }
-
-        if (state == PlanExecutor::FAILURE) {
+        PlanExecutor::ExecState state;
+        try {
+            state = exec->getNext(&deletedObj, nullptr);
+        } catch (...) {
             LOGV2_WARNING(
                 23776,
-                "{PlanExecutor_statestr_state} - cursor error while trying to delete {min} to "
-                "{max} in {nss}: FAILURE, stats: {Explain_getWinningPlanStats_exec_get}",
-                "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
+                "cursor error while trying to delete {min} to {max} in {nss}, stats: {stats}",
+                "cursor error while trying to delete range",
                 "min"_attr = redact(min),
                 "max"_attr = redact(max),
                 "nss"_attr = nss,
-                "Explain_getWinningPlanStats_exec_get"_attr =
-                    Explain::getWinningPlanStats(exec.get()));
+                "stats"_attr = Explain::getWinningPlanStats(exec.get()));
+            break;
+        }
+
+        if (state == PlanExecutor::IS_EOF) {
             break;
         }
 

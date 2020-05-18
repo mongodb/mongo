@@ -542,30 +542,28 @@ public:
         long long size = 0;
         long long numObjects = 0;
 
-        RecordId loc;
-        BSONObj obj;
-        PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
-            if (estimate)
-                size += avgObjSize;
-            else
-                size += collection->getRecordStore()->dataFor(opCtx, loc).size();
+        try {
+            RecordId loc;
+            while (PlanExecutor::ADVANCED == exec->getNext(static_cast<BSONObj*>(nullptr), &loc)) {
+                if (estimate)
+                    size += avgObjSize;
+                else
+                    size += collection->getRecordStore()->dataFor(opCtx, loc).size();
 
-            numObjects++;
+                numObjects++;
 
-            if ((maxSize && size > maxSize) || (maxObjects && numObjects > maxObjects)) {
-                result.appendBool("maxReached", true);
-                break;
+                if ((maxSize && size > maxSize) || (maxObjects && numObjects > maxObjects)) {
+                    result.appendBool("maxReached", true);
+                    break;
+                }
             }
-        }
-
-        if (PlanExecutor::FAILURE == state) {
+        } catch (DBException& exception) {
             LOGV2_WARNING(23801,
                           "Internal error while reading {namespace}",
                           "Internal error while reading",
                           "namespace"_attr = ns);
-            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                "Executor error while reading during dataSize command"));
+            exception.addContext("Executor error while reading during dataSize command");
+            throw;
         }
 
         ostringstream os;

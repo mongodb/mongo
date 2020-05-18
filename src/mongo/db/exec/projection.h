@@ -71,7 +71,7 @@ private:
      * Runs either the default complete implementation or a fast path depending on how this was
      * constructed.
      */
-    virtual Status transform(WorkingSetMember* member) const = 0;
+    virtual void transform(WorkingSetMember* member) const = 0;
 
     // Used to retrieve a WorkingSetMember as part of 'doWork()'.
     WorkingSet& _ws;
@@ -99,7 +99,7 @@ public:
     }
 
 private:
-    Status transform(WorkingSetMember* member) const final;
+    void transform(WorkingSetMember* member) const final;
 
     // Represents all metadata used in the projection.
     const QueryMetadataBitSet _requestedMetadata;
@@ -129,7 +129,7 @@ public:
     }
 
 private:
-    Status transform(WorkingSetMember* member) const final;
+    void transform(WorkingSetMember* member) const final;
 
     // Field names present in the simple projection.
     FieldSet _includedFields;
@@ -167,7 +167,7 @@ public:
     }
 
 private:
-    Status transform(WorkingSetMember* member) const final;
+    void transform(WorkingSetMember* member) const final;
 
     // Has the field names present in the simple projection.
     stdx::unordered_set<std::string> _includedFields;

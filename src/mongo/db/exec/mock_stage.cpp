@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,52 +27,46 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/platform/basic.h"
 
-#include <memory>
+#include "mongo/db/exec/mock_stage.h"
 
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::vector;
+MockStage::MockStage(ExpressionContext* expCtx, WorkingSet* ws)
+    : PlanStage(kStageType.rawData(), expCtx), _ws(ws) {}
 
-const char* QueuedDataStage::kStageType = "QUEUED_DATA";
-
-QueuedDataStage::QueuedDataStage(ExpressionContext* expCtx, WorkingSet* ws)
-    : PlanStage(kStageType, expCtx), _ws(ws) {}
-
-PlanStage::StageState QueuedDataStage::doWork(WorkingSetID* out) {
-    if (isEOF()) {
-        return PlanStage::IS_EOF;
-    }
-
-    *out = _members.front();
-    _members.pop();
-    return PlanStage::ADVANCED;
-}
-
-bool QueuedDataStage::isEOF() {
-    return _members.empty();
-}
-
-unique_ptr<PlanStageStats> QueuedDataStage::getStats() {
+std::unique_ptr<PlanStageStats> MockStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret =
-        std::make_unique<PlanStageStats>(_commonStats, STAGE_QUEUED_DATA);
+    std::unique_ptr<PlanStageStats> ret =
+        std::make_unique<PlanStageStats>(_commonStats, StageType::STAGE_MOCK);
     ret->specific = std::make_unique<MockStats>(_specificStats);
     return ret;
 }
 
+PlanStage::StageState MockStage::doWork(WorkingSetID* out) {
+    if (isEOF()) {
+        return PlanStage::IS_EOF;
+    }
 
-const SpecificStats* QueuedDataStage::getSpecificStats() const {
-    return &_specificStats;
-}
+    auto nextResult = _results.front();
+    _results.pop();
 
-void QueuedDataStage::pushBack(const WorkingSetID& id) {
-    _members.push(id);
+    auto returnState = stdx::visit(
+        visit_helper::Overloaded{
+            [](WorkingSetID wsid) -> PlanStage::StageState { return PlanStage::ADVANCED; },
+            [](PlanStage::StageState state) -> PlanStage::StageState { return state; },
+            [](Status status) -> PlanStage::StageState {
+                uassertStatusOK(status);
+                MONGO_UNREACHABLE;
+            }},
+        nextResult);
+    if (returnState == PlanStage::ADVANCED) {
+        *out = stdx::get<WorkingSetID>(nextResult);
+    }
+    return returnState;
 }
 
 }  // namespace mongo

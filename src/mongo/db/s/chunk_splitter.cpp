@@ -326,15 +326,15 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                     "maxChunkSizeBytes"_attr = maxChunkSizeBytes);
 
         chunkSplitStateDriver->prepareSplit();
-        auto splitPoints = uassertStatusOK(splitVector(opCtx.get(),
-                                                       nss,
-                                                       shardKeyPattern.toBSON(),
-                                                       chunk.getMin(),
-                                                       chunk.getMax(),
-                                                       false,
-                                                       boost::none,
-                                                       boost::none,
-                                                       maxChunkSizeBytes));
+        auto splitPoints = splitVector(opCtx.get(),
+                                       nss,
+                                       shardKeyPattern.toBSON(),
+                                       chunk.getMin(),
+                                       chunk.getMax(),
+                                       false,
+                                       boost::none,
+                                       boost::none,
+                                       maxChunkSizeBytes);
 
         if (splitPoints.empty()) {
             LOGV2_DEBUG(21907,

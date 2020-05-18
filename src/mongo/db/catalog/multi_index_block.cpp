@@ -386,39 +386,39 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     bool readOnce = useReadOnceCursorsForIndexBuilds.load();
     opCtx->recoveryUnit()->setReadOnce(readOnce);
 
-    BSONObj objToIndex;
-    RecordId loc;
-    PlanExecutor::ExecState state;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc)) ||
-           MONGO_unlikely(hangAfterStartingIndexBuild.shouldFail())) {
-        auto interruptStatus = opCtx->checkForInterruptNoAssert();
-        if (!interruptStatus.isOK())
-            return opCtx->checkForInterruptNoAssert();
+    try {
+        BSONObj objToIndex;
+        RecordId loc;
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc)) ||
+               MONGO_unlikely(hangAfterStartingIndexBuild.shouldFail())) {
+            auto interruptStatus = opCtx->checkForInterruptNoAssert();
+            if (!interruptStatus.isOK())
+                return opCtx->checkForInterruptNoAssert();
 
-        if (PlanExecutor::ADVANCED != state) {
-            continue;
+            if (PlanExecutor::ADVANCED != state) {
+                continue;
+            }
+
+            progress->setTotalWhileRunning(collection->numRecords(opCtx));
+
+            failPointHangDuringBuild(&hangBeforeIndexBuildOf, "before", objToIndex);
+
+            // The external sorter is not part of the storage engine and therefore does not need a
+            // WriteUnitOfWork to write keys.
+            Status ret = insert(opCtx, objToIndex, loc);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            failPointHangDuringBuild(&hangAfterIndexBuildOf, "after", objToIndex);
+
+            // Go to the next document.
+            progress->hit();
+            n++;
         }
-
-        progress->setTotalWhileRunning(collection->numRecords(opCtx));
-
-        failPointHangDuringBuild(&hangBeforeIndexBuildOf, "before", objToIndex);
-
-        // The external sorter is not part of the storage engine and therefore does not need a
-        // WriteUnitOfWork to write keys.
-        Status ret = insert(opCtx, objToIndex, loc);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        failPointHangDuringBuild(&hangAfterIndexBuildOf, "after", objToIndex);
-
-        // Go to the next document.
-        progress->hit();
-        n++;
-    }
-
-    if (state != PlanExecutor::IS_EOF) {
-        return exec->getMemberObjectStatus(objToIndex);
+    } catch (...) {
+        return exceptionToStatus();
     }
 
     if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {

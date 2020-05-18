@@ -587,17 +587,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     } else if (PlanStage::IS_EOF == status) {
         // The child is out of results, and therefore so are we.
         return PlanStage::IS_EOF;
-    } else if (PlanStage::FAILURE == status) {
-        *out = id;
-        // If a stage fails, it may create a status WSM to indicate why it failed, in which case
-        // 'id' is valid.  If ID is invalid, we create our own error message.
-        if (WorkingSet::INVALID_ID == id) {
-            const std::string errmsg = "update stage failed to read in results from child";
-            *out = WorkingSetCommon::allocateStatusMember(
-                _ws, Status(ErrorCodes::InternalError, errmsg));
-            return PlanStage::FAILURE;
-        }
-        return status;
     } else if (PlanStage::NEED_YIELD == status) {
         *out = id;
     }

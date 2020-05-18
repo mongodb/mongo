@@ -48,8 +48,8 @@
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/dbtests/dbtests.h"
@@ -108,18 +108,14 @@ public:
     }
 
     /**
-     * Executes plan stage until EOF.
-     * Returns number of results seen if execution reaches EOF successfully.
-     * Otherwise, returns -1 on stage failure.
+     * Executes plan stage until EOF.  Returns number of results seen if execution reaches EOF
+     * successfully. Throws on stage failure.
      */
     int countResults(PlanStage* stage) {
         int count = 0;
         while (!stage->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = stage->work(&id);
-            if (PlanStage::FAILURE == status) {
-                return -1;
-            }
             if (PlanStage::ADVANCED != status) {
                 continue;
             }
@@ -129,18 +125,13 @@ public:
     }
 
     /**
-     * Gets the next result from 'stage'.
-     *
-     * Fails if the stage fails or returns FAILURE, if the returned working
-     * set member is not fetched, or if there are no more results.
+     * Gets the next result from 'stage'. Asserts that the returned working set member is fetched,
+     * and that there are more results.
      */
     BSONObj getNext(PlanStage* stage, WorkingSet* ws) {
         while (!stage->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = stage->work(&id);
-
-            // We shouldn't fail or be dead.
-            ASSERT(PlanStage::FAILURE != status);
 
             if (PlanStage::ADVANCED != status) {
                 continue;
@@ -432,8 +423,9 @@ public:
         params.direction = -1;
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), params, &ws, nullptr));
 
-        // Stage execution should fail.
-        ASSERT_EQUALS(-1, countResults(ah.get()));
+        ASSERT_THROWS_CODE(countResults(ah.get()),
+                           DBException,
+                           ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
     }
 };
 
@@ -585,7 +577,9 @@ public:
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), params, &ws, nullptr));
 
         // Stage execution should fail.
-        ASSERT_EQUALS(-1, countResults(ah.get()));
+        ASSERT_THROWS_CODE(countResults(ah.get()),
+                           DBException,
+                           ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
     }
 };
 
@@ -811,47 +805,42 @@ public:
 
         const BSONObj dataObj = fromjson("{'foo': 'bar'}");
 
-        // Confirm PlanStage::FAILURE when children contain the following WorkingSetMembers:
+        // Confirm exception is thrown when children contain the following WorkingSetMembers:
         //     Child1:  Data
         //     Child2:  NEED_TIME, FAILURE
         {
             WorkingSet ws;
             const auto andHashStage = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
-            auto childStage1 = std::make_unique<QueuedDataStage>(_expCtx.get(), &ws);
+            auto childStage1 = std::make_unique<MockStage>(_expCtx.get(), &ws);
             {
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(1);
                 wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
-                childStage1->pushBack(id);
+                childStage1->enqueueAdvanced(id);
             }
 
-            auto childStage2 = std::make_unique<QueuedDataStage>(_expCtx.get(), &ws);
-            childStage2->pushBack(PlanStage::NEED_TIME);
-            childStage2->pushBack(PlanStage::FAILURE);
+            auto childStage2 = std::make_unique<MockStage>(_expCtx.get(), &ws);
+            childStage2->enqueueStateCode(PlanStage::NEED_TIME);
+            childStage2->enqueueError(Status{ErrorCodes::InternalError, "mock error"});
 
             andHashStage->addChild(std::move(childStage1));
             andHashStage->addChild(std::move(childStage2));
 
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = PlanStage::NEED_TIME;
-            while (PlanStage::NEED_TIME == state) {
-                state = andHashStage->work(&id);
-            }
-
-            ASSERT_EQ(PlanStage::FAILURE, state);
+            ASSERT_THROWS_CODE(
+                getNext(andHashStage.get(), &ws), DBException, ErrorCodes::InternalError);
         }
 
-        // Confirm PlanStage::FAILURE when children contain the following WorkingSetMembers:
+        // Confirm exception is thrown when children contain the following WorkingSetMembers:
         //     Child1:  Data, FAILURE
         //     Child2:  Data
         {
             WorkingSet ws;
             const auto andHashStage = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
-            auto childStage1 = std::make_unique<QueuedDataStage>(_expCtx.get(), &ws);
+            auto childStage1 = std::make_unique<MockStage>(_expCtx.get(), &ws);
 
             {
                 WorkingSetID id = ws.allocate();
@@ -859,70 +848,60 @@ public:
                 wsm->recordId = RecordId(1);
                 wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
-                childStage1->pushBack(id);
+                childStage1->enqueueAdvanced(id);
             }
-            childStage1->pushBack(PlanStage::FAILURE);
+            childStage1->enqueueError(Status{ErrorCodes::InternalError, "mock error"});
 
-            auto childStage2 = std::make_unique<QueuedDataStage>(_expCtx.get(), &ws);
+            auto childStage2 = std::make_unique<MockStage>(_expCtx.get(), &ws);
             {
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(2);
                 wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
-                childStage2->pushBack(id);
+                childStage2->enqueueAdvanced(id);
             }
 
             andHashStage->addChild(std::move(childStage1));
             andHashStage->addChild(std::move(childStage2));
 
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = PlanStage::NEED_TIME;
-            while (PlanStage::NEED_TIME == state) {
-                state = andHashStage->work(&id);
-            }
-
-            ASSERT_EQ(PlanStage::FAILURE, state);
+            ASSERT_THROWS_CODE(
+                getNext(andHashStage.get(), &ws), DBException, ErrorCodes::InternalError);
         }
 
-        // Confirm PlanStage::FAILURE when children contain the following WorkingSetMembers:
+        // Confirm throws exception when children contain the following WorkingSetMembers:
         //     Child1:  Data
         //     Child2:  Data, FAILURE
         {
             WorkingSet ws;
             const auto andHashStage = std::make_unique<AndHashStage>(_expCtx.get(), &ws);
 
-            auto childStage1 = std::make_unique<QueuedDataStage>(_expCtx.get(), &ws);
+            auto childStage1 = std::make_unique<MockStage>(_expCtx.get(), &ws);
             {
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(1);
                 wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
-                childStage1->pushBack(id);
+                childStage1->enqueueAdvanced(id);
             }
 
-            auto childStage2 = std::make_unique<QueuedDataStage>(_expCtx.get(), &ws);
+            auto childStage2 = std::make_unique<MockStage>(_expCtx.get(), &ws);
             {
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* wsm = ws.get(id);
                 wsm->recordId = RecordId(2);
                 wsm->doc = {SnapshotId(), Document{dataObj}};
                 ws.transitionToRecordIdAndObj(id);
-                childStage2->pushBack(id);
+                childStage2->enqueueAdvanced(id);
             }
-            childStage2->pushBack(PlanStage::FAILURE);
+            childStage2->enqueueError(Status{ErrorCodes::InternalError, "internal error"});
 
             andHashStage->addChild(std::move(childStage1));
             andHashStage->addChild(std::move(childStage2));
 
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = PlanStage::NEED_TIME;
-            while (PlanStage::NEED_TIME == state) {
-                state = andHashStage->work(&id);
-            }
-
-            ASSERT_EQ(PlanStage::FAILURE, state);
+            ASSERT_THROWS_CODE(
+                getNext(andHashStage.get(), &ws), DBException, ErrorCodes::InternalError);
         }
     }
 };

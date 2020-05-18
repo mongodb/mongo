@@ -138,8 +138,7 @@ static void extractGeometries(const BSONObj& doc,
     }
 }
 
-static StatusWith<double> computeGeoNearDistance(const GeoNearParams& nearParams,
-                                                 WorkingSetMember* member) {
+static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSetMember* member) {
     //
     // Generic GeoNear distance computation
     // Distances are computed by projecting the stored geometry into the query CRS, and
@@ -183,7 +182,7 @@ static StatusWith<double> computeGeoNearDistance(const GeoNearParams& nearParams
 
     if (minDistance < 0) {
         // No distance to report
-        return StatusWith<double>(-1);
+        return -1;
     }
 
     if (nearParams.addDistMeta) {
@@ -201,7 +200,7 @@ static StatusWith<double> computeGeoNearDistance(const GeoNearParams& nearParams
         member->metadata().setGeoNearPoint(minDistanceMetadata);
     }
 
-    return StatusWith<double>(minDistance);
+    return minDistance;
 }
 
 static R2Annulus geoNearDistanceBounds(const GeoNearExpression& query) {
@@ -565,13 +564,11 @@ static R2Annulus projectBoundsToTwoDDegrees(R2Annulus sphereBounds) {
                      outerDegrees + maxErrorDegrees);
 }
 
-StatusWith<NearStage::CoveredInterval*>  //
-GeoNear2DStage::nextInterval(OperationContext* opCtx,
-                             WorkingSet* workingSet,
-                             const Collection* collection) {
+std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(
+    OperationContext* opCtx, WorkingSet* workingSet, const Collection* collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
-        return StatusWith<CoveredInterval*>(nullptr);
+        return nullptr;
     }
 
     //
@@ -710,11 +707,11 @@ GeoNear2DStage::nextInterval(OperationContext* opCtx,
     _children.emplace_back(std::make_unique<FetchStageWithMatch>(
         expCtx(), workingSet, std::move(scan), docMatcher, collection));
 
-    return StatusWith<CoveredInterval*>(new CoveredInterval(
-        _children.back().get(), nextBounds.getInner(), nextBounds.getOuter(), isLastInterval));
+    return std::make_unique<CoveredInterval>(
+        _children.back().get(), nextBounds.getInner(), nextBounds.getOuter(), isLastInterval);
 }
 
-StatusWith<double> GeoNear2DStage::computeDistance(WorkingSetMember* member) {
+double GeoNear2DStage::computeDistance(WorkingSetMember* member) {
     return computeGeoNearDistance(_nearParams, member);
 }
 
@@ -959,13 +956,11 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
     return state;
 }
 
-StatusWith<NearStage::CoveredInterval*>  //
-GeoNear2DSphereStage::nextInterval(OperationContext* opCtx,
-                                   WorkingSet* workingSet,
-                                   const Collection* collection) {
+std::unique_ptr<NearStage::CoveredInterval> GeoNear2DSphereStage::nextInterval(
+    OperationContext* opCtx, WorkingSet* workingSet, const Collection* collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
-        return StatusWith<CoveredInterval*>(nullptr);
+        return nullptr;
     }
 
     //
@@ -1033,11 +1028,11 @@ GeoNear2DSphereStage::nextInterval(OperationContext* opCtx,
     _children.emplace_back(std::make_unique<FetchStage>(
         expCtx(), workingSet, std::move(scan), _nearParams.filter, collection));
 
-    return StatusWith<CoveredInterval*>(new CoveredInterval(
-        _children.back().get(), nextBounds.getInner(), nextBounds.getOuter(), isLastInterval));
+    return std::make_unique<CoveredInterval>(
+        _children.back().get(), nextBounds.getInner(), nextBounds.getOuter(), isLastInterval);
 }
 
-StatusWith<double> GeoNear2DSphereStage::computeDistance(WorkingSetMember* member) {
+double GeoNear2DSphereStage::computeDistance(WorkingSetMember* member) {
     return computeGeoNearDistance(_nearParams, member);
 }
 

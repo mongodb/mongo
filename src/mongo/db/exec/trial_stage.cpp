@@ -141,18 +141,6 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
             _specificStats.trialCompleted = _specificStats.trialSucceeded = true;
             _replaceCurrentPlan(_queuedData);
             return NEED_TIME;
-        case PlanStage::FAILURE:
-            // Either of these cause us to immediately end the trial phase and switch to the backup.
-            auto statusDoc = WorkingSetCommon::getStatusMemberDocument(*_ws, *out);
-            BSONObj statusObj = statusDoc ? statusDoc->toBson() : BSONObj();
-            LOGV2_DEBUG(20604,
-                        1,
-                        "Trial plan failed; switching to backup plan. Status: {statusObj}",
-                        "statusObj"_attr = redact(statusObj));
-            _specificStats.trialCompleted = true;
-            _replaceCurrentPlan(_backupPlan);
-            *out = WorkingSet::INVALID_ID;
-            return NEED_TIME;
     }
 
     MONGO_UNREACHABLE;

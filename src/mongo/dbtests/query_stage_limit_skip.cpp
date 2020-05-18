@@ -39,8 +39,8 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/limit.h"
+#include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
@@ -55,22 +55,24 @@ using std::unique_ptr;
 
 static const int N = 50;
 
-/* Populate a QueuedDataStage and return it.  Caller owns it. */
-std::unique_ptr<QueuedDataStage> getMS(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       WorkingSet* ws) {
-    auto ms = std::make_unique<QueuedDataStage>(expCtx.get(), ws);
+/**
+ * Populates a 'MockStage' and returns it.
+ */
+std::unique_ptr<MockStage> getMS(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 WorkingSet* ws) {
+    auto ms = std::make_unique<MockStage>(expCtx.get(), ws);
 
     // Put N ADVANCED results into the mock stage, and some other stalling results (YIELD/TIME).
     for (int i = 0; i < N; ++i) {
-        ms->pushBack(PlanStage::NEED_TIME);
+        ms->enqueueStateCode(PlanStage::NEED_TIME);
 
         WorkingSetID id = ws->allocate();
         WorkingSetMember* wsm = ws->get(id);
         wsm->doc = {SnapshotId(), Document{BSON("x" << i)}};
         wsm->transitionToOwnedObj();
-        ms->pushBack(id);
+        ms->enqueueAdvanced(id);
 
-        ms->pushBack(PlanStage::NEED_TIME);
+        ms->enqueueStateCode(PlanStage::NEED_TIME);
     }
 
     return ms;

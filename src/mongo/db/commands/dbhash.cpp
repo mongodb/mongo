@@ -360,21 +360,21 @@ private:
         md5_state_t st;
         md5_init(&st);
 
-        long long n = 0;
-        PlanExecutor::ExecState state;
-        BSONObj c;
-        verify(nullptr != exec.get());
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&c, nullptr))) {
-            md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
-            n++;
-        }
-        if (PlanExecutor::IS_EOF != state) {
+        try {
+            long long n = 0;
+            BSONObj c;
+            verify(nullptr != exec.get());
+            while (exec->getNext(&c, nullptr) == PlanExecutor::ADVANCED) {
+                md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
+                n++;
+            }
+        } catch (DBException& exception) {
             LOGV2_WARNING(
                 20456, "Error while hashing, db possibly dropped", "namespace"_attr = nss);
-            uasserted(34371,
-                      "Plan executor error while running dbHash command: " +
-                          WorkingSetCommon::toStatusString(c));
+            exception.addContext("Plan executor error while running dbHash command");
+            throw;
         }
+
         md5digest d;
         md5_finish(&st, d);
         std::string hash = digestToString(d);

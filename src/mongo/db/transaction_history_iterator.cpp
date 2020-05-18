@@ -90,16 +90,19 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
     auto exec = uassertStatusOK(
         getExecutorFind(opCtx, oplogRead.getCollection(), std::move(cq), permitYield));
 
-    auto getNextResult = exec->getNext(&oplogBSON, nullptr);
+    PlanExecutor::ExecState getNextResult;
+    try {
+        getNextResult = exec->getNext(&oplogBSON, nullptr);
+    } catch (DBException& exception) {
+        exception.addContext("PlanExecutor error in TransactionHistoryIterator");
+        throw;
+    }
+
     uassert(ErrorCodes::IncompleteTransactionHistory,
             str::stream() << "oplog no longer contains the complete write history of this "
                              "transaction, log with opTime "
                           << opTime.toBSON() << " cannot be found",
             getNextResult != PlanExecutor::IS_EOF);
-    if (getNextResult != PlanExecutor::ADVANCED) {
-        uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(oplogBSON),
-                                   "PlanExecutor error in TransactionHistoryIterator");
-    }
 
     return oplogBSON.getOwned();
 }

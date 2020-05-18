@@ -378,13 +378,14 @@ private:
                                                  PlanExecutor::YIELD_AUTO,
                                                  direction);
 
-        Status result = exec->executePlan();
-        if (!result.isOK()) {
+        try {
+            exec->executePlan();
+        } catch (const DBException& exception) {
             LOGV2_ERROR(22543,
                         "ttl query execution for index {index} failed with status: {error}",
                         "TTL query execution failed",
                         "index"_attr = idx,
-                        "error"_attr = redact(result));
+                        "error"_attr = redact(exception.toStatus()));
             return;
         }
 

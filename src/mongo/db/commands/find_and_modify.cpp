@@ -83,36 +83,29 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
 namespace {
 
 /**
- * If the operation succeeded, then Status::OK() is returned, possibly with a document value
- * to return to the client. If no matching document to update or remove was found, then none
- * is returned. Otherwise, the updated or deleted document is returned.
- *
- * If the operation failed, throws.
+ * If the operation succeeded, then returns either a document to return to the client, or
+ * boost::none if no matching document to update/remove was found. If the operation failed, throws.
  */
 boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
                                          PlanExecutor* exec,
                                          bool isRemove) {
     BSONObj value;
-    PlanExecutor::ExecState state = exec->getNext(&value, nullptr);
+    PlanExecutor::ExecState state;
+    try {
+        state = exec->getNext(&value, nullptr);
+    } catch (DBException& exception) {
+        LOGV2_WARNING(23802,
+                      "Plan executor error during findAndModify: {error}, stats: {stats}",
+                      "Plan executor error during findAndModify",
+                      "error"_attr = exception.toStatus(),
+                      "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
+
+        exception.addContext("Plan executor error during findAndModify");
+        throw;
+    }
 
     if (PlanExecutor::ADVANCED == state) {
         return {std::move(value)};
-    }
-
-    if (PlanExecutor::FAILURE == state) {
-        // We should always have a valid status member object at this point.
-        auto status = WorkingSetCommon::getMemberObjectStatus(value);
-        invariant(!status.isOK());
-        LOGV2_WARNING(
-            23802,
-            "Plan executor error during findAndModify: {state}, status: {error}, stats: {stats}",
-            "Plan executor error during findAndModify",
-            "state"_attr = PlanExecutor::statestr(state),
-            "error"_attr = status,
-            "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
-
-        uassertStatusOKWithContext(status, "Plan executor error during findAndModify");
-        MONGO_UNREACHABLE;
     }
 
     invariant(state == PlanExecutor::IS_EOF);

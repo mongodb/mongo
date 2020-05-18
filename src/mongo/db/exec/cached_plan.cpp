@@ -102,7 +102,28 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState state = child()->work(&id);
+        PlanStage::StageState state;
+        try {
+            state = child()->work(&id);
+        } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {
+            // The plan failed by hitting the limit we impose on memory consumption. It's possible
+            // that a different plan is less resource-intensive, so we fall back to replanning the
+            // whole query. We neither evict the existing cache entry nor cache the result of
+            // replanning.
+            LOGV2_DEBUG(20579,
+                        1,
+                        "Execution of cached plan failed, falling back to replan. query: "
+                        "{query} planSummary: {planSummary} status: {status}",
+                        "Execution of cached plan failed, failling back to replan",
+                        "query"_attr = redact(_canonicalQuery->toStringShort()),
+                        "planSummary"_attr = Explain::getPlanSummary(child().get()),
+                        "status"_attr = redact(ex.toStatus()));
+
+            const bool shouldCache = false;
+            return replan(yieldPolicy,
+                          shouldCache,
+                          str::stream() << "cached plan returned: " << ex.toStatus());
+        }
 
         if (PlanStage::ADVANCED == state) {
             // Save result for later.
@@ -136,26 +157,6 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             if (!yieldStatus.isOK()) {
                 return yieldStatus;
             }
-        } else if (PlanStage::FAILURE == state) {
-            // On failure, fall back to replanning the whole query. We neither evict the
-            // existing cache entry nor cache the result of replanning.
-            BSONObj statusObj = WorkingSetCommon::getStatusMemberDocument(*_ws, id)->toBson();
-
-            LOGV2_DEBUG(20579,
-                        1,
-                        "Execution of cached plan failed, falling back to replan. query: "
-                        "{canonicalQuery_Short} planSummary: {Explain_getPlanSummary_child_get} "
-                        "status: {statusObj}",
-                        "canonicalQuery_Short"_attr = redact(_canonicalQuery->toStringShort()),
-                        "Explain_getPlanSummary_child_get"_attr =
-                            Explain::getPlanSummary(child().get()),
-                        "statusObj"_attr = redact(statusObj));
-
-            const bool shouldCache = false;
-            return replan(yieldPolicy,
-                          shouldCache,
-                          str::stream() << "cached plan returned: "
-                                        << WorkingSetCommon::toStatusString(statusObj));
         } else {
             invariant(PlanStage::NEED_TIME == state);
         }

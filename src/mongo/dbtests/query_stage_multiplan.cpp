@@ -40,9 +40,9 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
@@ -451,12 +451,12 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
  * Allocates a new WorkingSetMember with data 'dataObj' in 'ws', and adds the WorkingSetMember
  * to 'qds'.
  */
-void addMember(QueuedDataStage* qds, WorkingSet* ws, BSONObj dataObj) {
+void addMember(MockStage* mockStage, WorkingSet* ws, BSONObj dataObj) {
     WorkingSetID id = ws->allocate();
     WorkingSetMember* wsm = ws->get(id);
     wsm->doc = {SnapshotId(), Document{BSON("x" << 1)}};
     wsm->transitionToOwnedObj();
-    qds->pushBack(id);
+    mockStage->enqueueAdvanced(id);
 }
 
 // Test the structure and values of the explain output.
@@ -467,15 +467,15 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     const int nDocs = 500;
 
     auto ws = std::make_unique<WorkingSet>();
-    auto firstPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
-    auto secondPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
+    auto firstPlan = std::make_unique<MockStage>(_expCtx.get(), ws.get());
+    auto secondPlan = std::make_unique<MockStage>(_expCtx.get(), ws.get());
 
     for (int i = 0; i < nDocs; ++i) {
         addMember(firstPlan.get(), ws.get(), BSON("x" << 1));
 
         // Make the second plan slower by inserting a NEED_TIME between every result.
         addMember(secondPlan.get(), ws.get(), BSON("x" << 1));
-        secondPlan->pushBack(PlanStage::NEED_TIME);
+        secondPlan->enqueueStateCode(PlanStage::NEED_TIME);
     }
 
     AutoGetCollectionForReadCommand ctx(_opCtx.get(), nss);
@@ -496,7 +496,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 
     auto root = static_cast<MultiPlanStage*>(exec->getRootStage());
     ASSERT_TRUE(root->bestPlanChosen());
-    // The first QueuedDataStage should have won.
+    // The first candidate plan should have won.
     ASSERT_EQ(root->bestPlanIdx(), 0);
 
     BSONObjBuilder bob;
@@ -510,7 +510,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     ASSERT_EQ(allPlansStats.size(), 2UL);
     for (auto&& planStats : allPlansStats) {
         int maxEvaluationResults = internalQueryPlanEvaluationMaxResults.load();
-        ASSERT_EQ(planStats["executionStages"]["stage"].String(), "QUEUED_DATA");
+        ASSERT_EQ(planStats["executionStages"]["stage"].String(), "MOCK");
         if (planStats["executionStages"]["needTime"].Int() > 0) {
             // This is the losing plan. Should only have advanced about half the time.
             ASSERT_LT(planStats["nReturned"].Int(), maxEvaluationResults);
@@ -545,7 +545,7 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
         uassertStatusOK(getExecutor(opCtx(), coll, std::move(cq), PlanExecutor::NO_YIELD, 0));
     ASSERT_EQ(exec->getRootStage()->stageType(), STAGE_MULTI_PLAN);
 
-    ASSERT_OK(exec->executePlan());
+    exec->executePlan();
 
     PlanSummaryStats stats;
     Explain::getSummaryStats(*exec, &stats);
@@ -596,8 +596,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(serviceContext()->getFastClockSource());
     const auto status = multiPlanStage.pickBestPlan(&alwaysTimeOutPolicy);
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status);
-    ASSERT_STRING_CONTAINS(status.reason(),
-                           "multiplanner encountered a failure while selecting best plan");
+    ASSERT_STRING_CONTAINS(status.reason(), "error while multiplanner was selecting best plan");
 }
 
 TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
@@ -686,14 +685,9 @@ TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
         createQuerySolution(), std::make_unique<ThrowyPlanStage>(_expCtx.get()), sharedWs.get());
 
     PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
-    ASSERT_THROWS_WITH_CHECK(multiPlanStage.pickBestPlan(&yieldPolicy),
-                             AssertionException,
-                             [](const AssertionException& ex) {
-                                 ASSERT_EQ(ex.toStatus().code(), ErrorCodes::InternalError);
-                                 ASSERT_STRING_CONTAINS(
-                                     ex.what(),
-                                     "exception thrown while multiplanner was selecting best plan");
-                             });
+    auto status = multiPlanStage.pickBestPlan(&yieldPolicy);
+    ASSERT_EQ(ErrorCodes::InternalError, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "error while multiplanner was selecting best plan");
 }
 
 }  // namespace

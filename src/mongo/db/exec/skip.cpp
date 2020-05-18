@@ -72,12 +72,6 @@ PlanStage::StageState SkipStage::doWork(WorkingSetID* out) {
 
         *out = id;
         return PlanStage::ADVANCED;
-    } else if (PlanStage::FAILURE == status) {
-        // The stage which produces a failure is responsible for allocating a working set member
-        // with error details.
-        invariant(WorkingSet::INVALID_ID != id);
-        *out = id;
-        return status;
     } else if (PlanStage::NEED_YIELD == status) {
         *out = id;
     }

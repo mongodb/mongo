@@ -675,7 +675,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
     }
 
-    uassertStatusOK(exec->executePlan());
+    exec->executePlan();
 
     PlanSummaryStats summary;
     Explain::getSummaryStats(*exec, &summary);
@@ -913,7 +913,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
     }
 
-    uassertStatusOK(exec->executePlan());
+    exec->executePlan();
     long long n = DeleteStage::getNumDeleted(*exec);
     curOp.debug().additiveMetrics.ndeleted = n;
 

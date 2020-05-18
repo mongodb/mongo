@@ -35,8 +35,6 @@
 
 namespace mongo {
 
-class CanonicalQuery;
-class Collection;
 class OperationContext;
 class SeekableRecordCursor;
 
@@ -56,54 +54,6 @@ public:
                       WorkingSetID id,
                       unowned_ptr<SeekableRecordCursor> cursor,
                       const NamespaceString& ns);
-
-    /**
-     * Build a Document which represents a Status to return in a WorkingSet.
-     */
-    static Document buildMemberStatusObject(const Status& status);
-
-    /**
-     * Allocate a new WSM and initialize it with
-     * the code and reason from the status.
-     * Owned BSON object will have the following layout:
-     * {
-     *     ok: <ok>, // 1 for OK; 0 otherwise.
-     *     code: <code>, // Status::code()
-     *     errmsg: <errmsg> // Status::reason()
-     * }
-     */
-    static WorkingSetID allocateStatusMember(WorkingSet* ws, const Status& status);
-
-    /**
-     * Returns true if object was created by allocateStatusMember().
-     */
-    static bool isValidStatusMemberObject(const Document& obj);
-    static bool isValidStatusMemberObject(const BSONObj& obj);
-
-    /**
-     * If the working set member represents an error status, returns it as a Document (which can
-     * subsequently be converted to Status). Otherwise returns boost::none.
-     */
-    static boost::optional<Document> getStatusMemberDocument(const WorkingSet& ws,
-                                                             WorkingSetID wsid);
-
-    /**
-     * Returns status from working set member object.
-     * Assumes isValidStatusMemberObject().
-     */
-    static Status getMemberObjectStatus(const BSONObj& memberObj);
-    static Status getMemberObjectStatus(const Document& memberObj);
-
-    /**
-     * Returns status from working set member created with allocateStatusMember().
-     * Assumes isValidStatusMemberObject().
-     */
-    static Status getMemberStatus(const WorkingSetMember& member);
-
-    /**
-     * Formats working set member object created with allocateStatusMember().
-     */
-    static std::string toStatusString(const BSONObj& obj);
 };
 
 }  // namespace mongo

@@ -139,20 +139,7 @@ PlanStage::StageState ProjectionStage::doWork(WorkingSetID* out) {
     if (PlanStage::ADVANCED == status) {
         WorkingSetMember* member = _ws.get(id);
         // Punt to our specific projection impl.
-        Status projStatus = transform(member);
-        if (!projStatus.isOK()) {
-            LOGV2_WARNING(23827,
-                          "Couldn't execute projection, status = {projStatus}",
-                          "projStatus"_attr = redact(projStatus));
-            *out = WorkingSetCommon::allocateStatusMember(&_ws, projStatus);
-            return PlanStage::FAILURE;
-        }
-
-        *out = id;
-    } else if (PlanStage::FAILURE == status) {
-        // The stage which produces a failure is responsible for allocating a working set member
-        // with error details.
-        invariant(WorkingSet::INVALID_ID != id);
+        transform(member);
         *out = id;
     } else if (PlanStage::NEED_YIELD == status) {
         *out = id;
@@ -184,7 +171,7 @@ ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionCo
       _executor{projection_executor::buildProjectionExecutor(
           expCtx, projection, {}, projection_executor::kDefaultBuilderParams)} {}
 
-Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
+void ProjectionStageDefault::transform(WorkingSetMember* member) const {
     Document input;
 
     // Most metadata should have already been stored within the WSM when we project out a document.
@@ -226,8 +213,6 @@ Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
     // constructed from the input one backed by BSON which is owned by the storage system, so we
     // need to  make sure we transition an owned document.
     transitionMemberToOwnedObj(projected.getOwned(), member);
-
-    return Status::OK();
 }
 
 ProjectionStageCovered::ProjectionStageCovered(ExpressionContext* expCtx,
@@ -265,7 +250,7 @@ ProjectionStageCovered::ProjectionStageCovered(ExpressionContext* expCtx,
     }
 }
 
-Status ProjectionStageCovered::transform(WorkingSetMember* member) const {
+void ProjectionStageCovered::transform(WorkingSetMember* member) const {
     BSONObjBuilder bob;
 
     // We're pulling data out of the key.
@@ -284,7 +269,6 @@ Status ProjectionStageCovered::transform(WorkingSetMember* member) const {
         ++keyIndex;
     }
     transitionMemberToOwnedObj(bob.obj(), member);
-    return Status::OK();
 }
 
 ProjectionStageSimple::ProjectionStageSimple(ExpressionContext* expCtx,
@@ -298,7 +282,7 @@ ProjectionStageSimple::ProjectionStageSimple(ExpressionContext* expCtx,
                        projection->getRequiredFields().end()};
 }
 
-Status ProjectionStageSimple::transform(WorkingSetMember* member) const {
+void ProjectionStageSimple::transform(WorkingSetMember* member) const {
     BSONObjBuilder bob;
     // SIMPLE_DOC implies that we expect an object so it's kind of redundant.
     // If we got here because of SIMPLE_DOC the planner shouldn't have messed up.
@@ -320,7 +304,6 @@ Status ProjectionStageSimple::transform(WorkingSetMember* member) const {
     }
 
     transitionMemberToOwnedObj(bob.obj(), member);
-    return Status::OK();
 }
 
 }  // namespace mongo

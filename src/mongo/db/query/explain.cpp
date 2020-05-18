@@ -868,7 +868,7 @@ void Explain::explainPipelineExecutor(PlanExecutor* exec,
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         // TODO SERVER-32732: An execution error should be reported in explain, but should not
         // cause the explain itself to fail.
-        uassertStatusOK(exec->executePlan());
+        exec->executePlan();
     }
 
     *out << "stages" << Value(pps->writeExplainOps(verbosity));
@@ -888,7 +888,11 @@ void Explain::explainStages(PlanExecutor* exec,
 
     // If we need execution stats, then run the plan in order to gather the stats.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        executePlanStatus = exec->executePlan();
+        try {
+            exec->executePlan();
+        } catch (const DBException&) {
+            executePlanStatus = exceptionToStatus();
+        }
 
         // If executing the query failed, for any number of reasons other than a planning failure,
         // then the collection may no longer be valid. We conservatively set our collection pointer

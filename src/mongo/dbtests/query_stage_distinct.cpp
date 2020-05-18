@@ -289,7 +289,6 @@ public:
         std::vector<int> seen;
 
         while (PlanStage::IS_EOF != (state = distinct.work(&wsid))) {
-            ASSERT_NE(PlanStage::FAILURE, state);
             if (PlanStage::ADVANCED == state) {
                 seen.push_back(getIntFieldDotted(ws, wsid, "b"));
             }

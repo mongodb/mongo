@@ -120,11 +120,11 @@ public:
         _intervals.push_back(std::make_unique<MockInterval>(data, min, max));
     }
 
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
-                                                      WorkingSet* workingSet,
-                                                      const Collection* collection) {
+    std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
+                                                  WorkingSet* workingSet,
+                                                  const Collection* collection) final {
         if (_pos == static_cast<int>(_intervals.size()))
-            return StatusWith<CoveredInterval*>(nullptr);
+            return nullptr;
 
         const MockInterval& interval = *_intervals[_pos++];
 
@@ -142,13 +142,13 @@ public:
         }
 
         _children.push_back(std::move(queuedStage));
-        return StatusWith<CoveredInterval*>(
-            new CoveredInterval(_children.back().get(), interval.min, interval.max, lastInterval));
+        return std::make_unique<CoveredInterval>(
+            _children.back().get(), interval.min, interval.max, lastInterval);
     }
 
-    StatusWith<double> computeDistance(WorkingSetMember* member) final {
+    double computeDistance(WorkingSetMember* member) final {
         ASSERT(member->hasObj());
-        return StatusWith<double>(member->doc.value()["distance"].getDouble());
+        return member->doc.value()["distance"].getDouble();
     }
 
     virtual StageState initialize(OperationContext* opCtx,

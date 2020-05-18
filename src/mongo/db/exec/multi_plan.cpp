@@ -78,10 +78,7 @@ MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
       _cachingMode(cachingMode),
       _query(cq),
       _bestPlanIdx(kNoSuchPlan),
-      _backupPlanIdx(kNoSuchPlan),
-      _failure(false),
-      _failureCount(0),
-      _statusMemberId(WorkingSet::INVALID_ID) {}
+      _backupPlanIdx(kNoSuchPlan) {}
 
 void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
                              std::unique_ptr<PlanStage> root,
@@ -96,10 +93,6 @@ void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
 }
 
 bool MultiPlanStage::isEOF() {
-    if (_failure) {
-        return true;
-    }
-
     // If _bestPlanIdx hasn't been found, can't be at EOF
     if (!bestPlanChosen()) {
         return false;
@@ -112,11 +105,6 @@ bool MultiPlanStage::isEOF() {
 }
 
 PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
-    if (_failure) {
-        *out = _statusMemberId;
-        return PlanStage::FAILURE;
-    }
-
     CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
 
     // Look for an already produced result that provides the data the caller wants.
@@ -128,26 +116,24 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
 
     // best plan had no (or has no more) cached results
 
-    StageState state = bestPlan.root->work(out);
+    StageState state;
+    try {
+        state = bestPlan.root->work(out);
+    } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>&) {
+        // The winning plan ran out of memory. If we have a backup plan with no blocking states,
+        // then switch to it.
+        if (!hasBackupPlan()) {
+            throw;
+        }
 
-    if (PlanStage::FAILURE == state && hasBackupPlan()) {
-        LOGV2_DEBUG(20588, 5, "Best plan errored out switching to backup");
-        // Uncache the bad solution if we fall back
-        // on the backup solution.
-        //
-        // XXX: Instead of uncaching we should find a way for the
-        // cached plan runner to fall back on a different solution
-        // if the best solution fails. Alternatively we could try to
-        // defer cache insertion to be after the first produced result.
+        LOGV2_DEBUG(20588, 5, "Best plan errored, switching to backup plan");
 
-        CollectionQueryInfo::get(collection())
-            .getPlanCache()
-            ->remove(*_query)
-            .transitional_ignore();
+        // Attempt to remove the plan from the cache. This will fail if the plan has already been
+        // removed, and we intentionally ignore such errors.
+        CollectionQueryInfo::get(collection()).getPlanCache()->remove(*_query).ignore();
 
         _bestPlanIdx = _backupPlanIdx;
         _backupPlanIdx = kNoSuchPlan;
-
         return _candidates[_bestPlanIdx].root->work(out);
     }
 
@@ -159,24 +145,15 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
     return state;
 }
 
-Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
+void MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     // These are the conditions which can cause us to yield:
     //   1) The yield policy's timer elapsed, or
     //   2) some stage requested a yield, or
     //   3) we need to yield and retry due to a WriteConflictException.
     // In all cases, the actual yielding happens here.
     if (yieldPolicy->shouldYieldOrInterrupt()) {
-        auto yieldStatus = yieldPolicy->yieldOrInterrupt();
-
-        if (!yieldStatus.isOK()) {
-            _failure = true;
-            _statusMemberId =
-                WorkingSetCommon::allocateStatusMember(_candidates[0].ws, yieldStatus);
-            return yieldStatus;
-        }
+        uassertStatusOK(yieldPolicy->yieldOrInterrupt());
     }
-
-    return Status::OK();
 }
 
 // static
@@ -229,15 +206,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             }
         }
     } catch (DBException& e) {
-        e.addContext("exception thrown while multiplanner was selecting best plan");
-        throw;
-    }
-
-    if (_failure) {
-        invariant(WorkingSet::INVALID_ID != _statusMemberId);
-        WorkingSetMember* member = _candidates[0].ws->get(_statusMemberId);
-        return WorkingSetCommon::getMemberStatus(*member).withContext(
-            "multiplanner encountered a failure while selecting best plan");
+        return e.toStatus().withContext("error while multiplanner was selecting best plan");
     }
 
     // After picking best plan, ranking will own plan stats from
@@ -397,12 +366,28 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
         }
 
         // Might need to yield between calls to work due to the timer elapsing.
-        if (!(tryYield(yieldPolicy)).isOK()) {
-            return false;
-        }
+        tryYield(yieldPolicy);
 
         WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState state = candidate.root->work(&id);
+        PlanStage::StageState state;
+        try {
+            state = candidate.root->work(&id);
+        } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>&) {
+            // If a candidate fails due to exceeding allowed resource consumption, then mark the
+            // candidate as failed but proceed with the multi-plan trial period. The MultiPlanStage
+            // as a whole only fails if _all_ candidates hit their resource consumption limit, or if
+            // a different, query-fatal error code is thrown.
+            candidate.failed = true;
+            ++_failureCount;
+
+            // If all children have failed, then rethrow. Otherwise, swallow the error and move onto
+            // the next candidate plan.
+            if (_failureCount == _candidates.size()) {
+                throw;
+            }
+
+            continue;
+        }
 
         if (PlanStage::ADVANCED == state) {
             // Save result for later.
@@ -430,26 +415,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
                 yieldPolicy->forceYield();
             }
 
-            if (!(tryYield(yieldPolicy)).isOK()) {
-                return false;
-            }
-        } else if (PlanStage::NEED_TIME != state) {
-            // On FAILURE, mark this candidate as failed, but keep executing the other
-            // candidates. The MultiPlanStage as a whole only fails when every candidate
-            // plan fails.
-
-            candidate.failed = true;
-            ++_failureCount;
-
-            // Propagate most recent seen failure to parent.
-            invariant(state == PlanStage::FAILURE);
-            _statusMemberId = id;
-
-
-            if (_failureCount == _candidates.size()) {
-                _failure = true;
-                return false;
-            }
+            tryYield(yieldPolicy);
         }
     }
 

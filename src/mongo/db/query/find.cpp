@@ -84,10 +84,6 @@ bool shouldSaveCursor(OperationContext* opCtx,
                       const Collection* collection,
                       PlanExecutor::ExecState finalState,
                       PlanExecutor* exec) {
-    if (PlanExecutor::FAILURE == finalState) {
-        return false;
-    }
-
     const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
     if (!qr.wantMore()) {
         return false;
@@ -106,18 +102,8 @@ bool shouldSaveCursor(OperationContext* opCtx,
     return !exec->isEOF();
 }
 
-bool shouldSaveCursorGetMore(PlanExecutor::ExecState finalState,
-                             PlanExecutor* exec,
-                             bool isTailable) {
-    if (PlanExecutor::FAILURE == finalState) {
-        return false;
-    }
-
-    if (isTailable) {
-        return true;
-    }
-
-    return !exec->isEOF();
+bool shouldSaveCursorGetMore(PlanExecutor* exec, bool isTailable) {
+    return isTailable || !exec->isEOF();
 }
 
 void beginQueryOp(OperationContext* opCtx,
@@ -164,15 +150,12 @@ void endQueryOp(OperationContext* opCtx,
 namespace {
 
 /**
- * Uses 'cursor' to fill out 'bb' with the batch of result documents to
- * be returned by this getMore.
+ * Uses 'cursor' to fill out 'bb' with the batch of result documents to be returned by this getMore.
  *
  * Returns the number of documents in the batch in 'numResults', which must be initialized to
- * zero by the caller. Returns the final ExecState returned by the cursor in *state. Returns
- * whether or not to save the ClientCursor in 'shouldSaveCursor'.
+ * zero by the caller. Returns the final ExecState returned by the cursor in *state.
  *
- * Returns an OK status if the batch was successfully generated, and a non-OK status if the
- * PlanExecutor encounters a failure.
+ * Throws an exception if the PlanExecutor encounters a failure.
  */
 void generateBatch(int ntoreturn,
                    ClientCursor* cursor,
@@ -181,42 +164,31 @@ void generateBatch(int ntoreturn,
                    PlanExecutor::ExecState* state) {
     PlanExecutor* exec = cursor->getExecutor();
 
-    Document doc;
-    while (!FindCommon::enoughForGetMore(ntoreturn, *numResults) &&
-           PlanExecutor::ADVANCED == (*state = exec->getNext(&doc, nullptr))) {
-        BSONObj obj = doc.toBson();
+    try {
+        Document doc;
+        while (!FindCommon::enoughForGetMore(ntoreturn, *numResults) &&
+               PlanExecutor::ADVANCED == (*state = exec->getNext(&doc, nullptr))) {
+            BSONObj obj = doc.toBson();
 
-        // If we can't fit this result inside the current batch, then we stash it for later.
-        if (!FindCommon::haveSpaceForNext(obj, *numResults, bb->len())) {
-            exec->enqueue(obj);
-            break;
+            // If we can't fit this result inside the current batch, then we stash it for later.
+            if (!FindCommon::haveSpaceForNext(obj, *numResults, bb->len())) {
+                exec->enqueue(obj);
+                break;
+            }
+
+            // Add result to output buffer.
+            bb->appendBuf((void*)obj.objdata(), obj.objsize());
+
+            // Count the result.
+            (*numResults)++;
         }
-
-        // Add result to output buffer.
-        bb->appendBuf((void*)obj.objdata(), obj.objsize());
-
-        // Count the result.
-        (*numResults)++;
+    } catch (DBException& exception) {
+        LOGV2_ERROR(20918,
+                    "getMore executor error, stats: {stats}",
+                    "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
+        exception.addContext("Executor error during OP_GET_MORE");
+        throw;
     }
-
-    // Propagate any errors to the caller.
-    switch (*state) {
-        // Log an error message and then perform the cleanup.
-        case PlanExecutor::FAILURE: {
-            LOGV2_ERROR(20918,
-                        "getMore executor error, stats: {Explain_getWinningPlanStats_exec}",
-                        "Explain_getWinningPlanStats_exec"_attr =
-                            redact(Explain::getWinningPlanStats(exec)));
-            // We should always have a valid status object by this point.
-            auto status = WorkingSetCommon::getMemberObjectStatus(doc);
-            invariant(!status.isOK());
-            uassertStatusOK(status);
-        }
-        default:
-            return;
-    }
-
-    MONGO_UNREACHABLE;
 }
 
 Message makeCursorNotFoundResponse() {
@@ -533,7 +505,7 @@ Message getMore(OperationContext* opCtx,
     // the pin's destructor will be invoked, which will call release() on the pin.  Because our
     // ClientCursorPin is declared after our lock is declared, this will happen under the lock if
     // any locking was necessary.
-    if (!shouldSaveCursorGetMore(state, exec, cursorPin->isTailable())) {
+    if (!shouldSaveCursorGetMore(exec, cursorPin->isTailable())) {
         // cc is now invalid, as is the executor
         cursorid = 0;
         curOp.debug().cursorExhausted = true;
@@ -708,45 +680,43 @@ bool runQuery(OperationContext* opCtx,
         curOp.setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
     }
 
-    Document doc;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
-        obj = doc.toBson();
+    try {
+        Document doc;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
+            obj = doc.toBson();
 
-        // If we can't fit this result inside the current batch, then we stash it for later.
-        if (!FindCommon::haveSpaceForNext(obj, numResults, bb.len())) {
-            exec->enqueue(obj);
-            break;
+            // If we can't fit this result inside the current batch, then we stash it for later.
+            if (!FindCommon::haveSpaceForNext(obj, numResults, bb.len())) {
+                exec->enqueue(obj);
+                break;
+            }
+
+            // Add result to output buffer.
+            bb.appendBuf((void*)obj.objdata(), obj.objsize());
+
+            // Count the result.
+            ++numResults;
+
+            if (FindCommon::enoughForFirstBatch(qr, numResults)) {
+                LOGV2_DEBUG(20915,
+                            5,
+                            "Enough for first batch, wantMore={qr_wantMore} "
+                            "ntoreturn={qr_getNToReturn_value_or_0} numResults={numResults}",
+                            "qr_wantMore"_attr = qr.wantMore(),
+                            "qr_getNToReturn_value_or_0"_attr = qr.getNToReturn().value_or(0),
+                            "numResults"_attr = numResults);
+                break;
+            }
         }
-
-        // Add result to output buffer.
-        bb.appendBuf((void*)obj.objdata(), obj.objsize());
-
-        // Count the result.
-        ++numResults;
-
-        if (FindCommon::enoughForFirstBatch(qr, numResults)) {
-            LOGV2_DEBUG(20915,
-                        5,
-                        "Enough for first batch, wantMore={qr_wantMore} "
-                        "ntoreturn={qr_getNToReturn_value_or_0} numResults={numResults}",
-                        "qr_wantMore"_attr = qr.wantMore(),
-                        "qr_getNToReturn_value_or_0"_attr = qr.getNToReturn().value_or(0),
-                        "numResults"_attr = numResults);
-            break;
-        }
-    }
-
-    // Caller expects exceptions thrown in certain cases.
-    if (PlanExecutor::FAILURE == state) {
+    } catch (DBException& exception) {
         LOGV2_ERROR(20919,
-                    "Plan executor error during find: {PlanExecutor_statestr_state}, stats: "
-                    "{Explain_getWinningPlanStats_exec_get}",
-                    "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
-                    "Explain_getWinningPlanStats_exec_get"_attr =
-                        redact(Explain::getWinningPlanStats(exec.get())));
-        uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(doc),
-                                   "Executor error during OP_QUERY find");
-        MONGO_UNREACHABLE;
+                    "Plan executor error during find: {error}, stats: {stats}",
+                    "Plan executor error during find",
+                    "error"_attr = redact(exception.toStatus()),
+                    "stats"_attr = redact(Explain::getWinningPlanStats(exec.get())));
+
+        exception.addContext("Executor error during find");
+        throw;
     }
 
     // Fill out CurOp based on query results. If we have a cursorid, we will fill out CurOp with

@@ -115,23 +115,19 @@ protected:
     //
 
     /**
-     * Constructs the next covering over the next interval to buffer results from, or NULL
-     * if the full range has been searched.  Use the provided working set as the working
-     * set for the covering stage if required.
-     *
-     * Returns !OK on failure to create next stage.
+     * Constructs the next covering over the next interval to buffer results from, or nullptr if the
+     * full range has been searched.  Use the provided working set as the working set for the
+     * covering stage if required.
      */
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
-                                                      WorkingSet* workingSet,
-                                                      const Collection* collection) = 0;
+    virtual std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
+                                                          WorkingSet* workingSet,
+                                                          const Collection* collection) = 0;
 
     /**
      * Computes the distance value for the given member data, or -1 if the member should not be
      * returned in the sorted results.
-     *
-     * Returns !OK on invalid member data.
      */
-    virtual StatusWith<double> computeDistance(WorkingSetMember* member) = 0;
+    virtual double computeDistance(WorkingSetMember* member) = 0;
 
     /*
      * Initialize near stage before buffering the data.
@@ -157,7 +153,7 @@ private:
     //
 
     StageState initNext(WorkingSetID* out);
-    StageState bufferNext(WorkingSetID* toReturn, Status* error);
+    StageState bufferNext(WorkingSetID* toReturn);
     StageState advanceNext(WorkingSetID* toReturn);
 
     //

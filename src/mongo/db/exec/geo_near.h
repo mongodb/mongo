@@ -74,11 +74,11 @@ public:
                    const IndexDescriptor* twoDIndex);
 
 protected:
-    StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
-                                              WorkingSet* workingSet,
-                                              const Collection* collection) final;
+    std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
+                                                  WorkingSet* workingSet,
+                                                  const Collection* collection) final;
 
-    StatusWith<double> computeDistance(WorkingSetMember* member) final;
+    double computeDistance(WorkingSetMember* member) final;
 
     PlanStage::StageState initialize(OperationContext* opCtx,
                                      WorkingSet* workingSet,
@@ -142,11 +142,11 @@ public:
     ~GeoNear2DSphereStage();
 
 protected:
-    StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
-                                              WorkingSet* workingSet,
-                                              const Collection* collection) final;
+    std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
+                                                  WorkingSet* workingSet,
+                                                  const Collection* collection) final;
 
-    StatusWith<double> computeDistance(WorkingSetMember* member) final;
+    double computeDistance(WorkingSetMember* member) final;
 
     PlanStage::StageState initialize(OperationContext* opCtx,
                                      WorkingSet* workingSet,

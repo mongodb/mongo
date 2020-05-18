@@ -85,10 +85,7 @@ public:
         PlanStage::StageState state = PlanStage::NEED_TIME;
         while (PlanStage::ADVANCED != state) {
             state = ixscan->work(&out);
-
-            // There are certain states we shouldn't get.
             ASSERT_NE(PlanStage::IS_EOF, state);
-            ASSERT_NE(PlanStage::FAILURE, state);
         }
 
         return _ws.get(out);

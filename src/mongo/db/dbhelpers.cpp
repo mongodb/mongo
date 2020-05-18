@@ -117,9 +117,6 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     if (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
         return loc;
     }
-    massert(34427,
-            "Plan executor error: " + WorkingSetCommon::toStatusString(obj),
-            PlanExecutor::IS_EOF == state);
     return RecordId();
 }
 

@@ -95,10 +95,10 @@ private:
 
     /**
      * Extracts the timestamp from the 'ts' field of 'record', and sets '_latestOplogEntryTimestamp'
-     * to that time if it isn't already greater.  Returns an error if the 'ts' field cannot be
+     * to that time if it isn't already greater. Throws an exception if the 'ts' field cannot be
      * extracted.
      */
-    Status setLatestOplogEntryTimestamp(const Record& record);
+    void setLatestOplogEntryTimestamp(const Record& record);
 
     // WorkingSet is not owned by us.
     WorkingSet* _workingSet;

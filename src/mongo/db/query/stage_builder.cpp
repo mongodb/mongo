@@ -358,6 +358,7 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
         case STAGE_DELETE:
         case STAGE_EOF:
         case STAGE_IDHACK:
+        case STAGE_MOCK:
         case STAGE_MULTI_ITERATOR:
         case STAGE_MULTI_PLAN:
         case STAGE_PIPELINE_PROXY:

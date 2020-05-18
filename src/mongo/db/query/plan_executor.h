@@ -71,29 +71,11 @@ extern const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommitte
 class PlanExecutor {
 public:
     enum ExecState {
-        // We successfully populated the out parameter.
+        // Successfully returned the next document and/or record id.
         ADVANCED,
 
-        // We're EOF.  We won't return any more results (edge case exception: capped+tailable).
+        // Execution is complete. There is no next document to return.
         IS_EOF,
-
-        // getNext() was asked for data it cannot provide, or the underlying PlanStage had an
-        // unrecoverable error, or the executor died, usually due to a concurrent catalog event
-        // such as a collection drop.
-        //
-        // If the underlying PlanStage has any information on the error, it will be available in
-        // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
-        // details from the output BSON object.
-        //
-        // The PlanExecutor is no longer capable of executing. The caller may extract stats from the
-        // underlying plan stages, but should not attempt to do anything else with the executor
-        // other than dispose() and destroy it.
-        //
-        // N.B.: If the plan's YieldPolicy allows yielding, FAILURE can be returned on interrupt,
-        // and any locks acquired might possibly be released, regardless of the use of any RAII
-        // locking helpers such as AutoGetCollection.  Code must be written to expect this
-        // situation.
-        FAILURE,
     };
 
     /**
@@ -103,10 +85,11 @@ public:
     enum YieldPolicy {
         // Any call to getNext() may yield. In particular, the executor may die on any call to
         // getNext() due to a required index or collection becoming invalid during yield. If this
-        // occurs, getNext() will produce an error during yield recovery and will return FAILURE.
-        // Additionally, this will handle all WriteConflictExceptions that occur while processing
-        // the query.  With this yield policy, it is possible for getNext() to return FAILURE with
-        // locks released, if the operation is killed while yielding.
+        // occurs, getNext() will produce an error during yield recovery and will throw an
+        // exception. Additionally, this will handle all WriteConflictExceptions that occur while
+        // processing the query.  With this yield policy, it is possible for getNext() to return
+        // throw with locks released. Cleanup that happens while the stack unwinds cannot assume
+        // locks are held.
         YIELD_AUTO,
 
         // This will handle WriteConflictExceptions that occur while processing the query, but will
@@ -136,13 +119,11 @@ public:
         INTERRUPT_ONLY,
 
         // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
-        // yield, returning FAILURE with an error object encoding a ErrorCodes::ExceededTimeLimit
-        // message.
+        // yield, throwing an ErrorCodes::ExceededTimeLimit error.
         ALWAYS_TIME_OUT,
 
         // Used for testing, this yield policy will cause the PlanExecutor to be marked as killed on
-        // the first yield, returning FAILURE with an error object encoding a
-        // ErrorCodes::QueryPlanKilled message.
+        // the first yield, throwing an ErrorCodes::QueryPlanKilled error.
         ALWAYS_MARK_KILLED,
     };
 
@@ -397,6 +378,22 @@ public:
     virtual ExecState getNextSnapshotted(Snapshotted<Document>* objOut, RecordId* dlOut) = 0;
     virtual ExecState getNextSnapshotted(Snapshotted<BSONObj>* objOut, RecordId* dlOut) = 0;
 
+    /**
+     * Produces the next document from the query execution plan. The caller can request that the
+     * executor returns documents by passing a non-null pointer for the 'objOut' output parameter,
+     * and similarly can request the RecordId by passing a non-null pointer for 'dlOut'.
+     *
+     * If a query-fatal error occurs, this method will throw an exception. If an exception is
+     * thrown, then the PlanExecutor is no longer capable of executing. The caller may extract stats
+     * from the underlying plan stages, but should not attempt to do anything else with the executor
+     * other than dispose() and destroy it.
+     *
+     * If the plan's YieldPolicy allows yielding, then any call to this method can result in a
+     * yield. This relinquishes any locks that were previously acquired, regardless of the use of
+     * any RAII locking helpers such as 'AutoGetCollection'. Furthermore, if an error is encountered
+     * during yield recovery, an exception can be thrown while locks are not held. Callers cannot
+     * expect locks to be held when this method throws an exception.
+     */
     virtual ExecState getNext(Document* objOut, RecordId* dlOut) = 0;
 
     /**
@@ -413,16 +410,14 @@ public:
     virtual bool isEOF() = 0;
 
     /**
-     * Execute the plan to completion, throwing out the results.  Used when you want to work the
+     * Execute the plan to completion, throwing out the results. Used when you want to work the
      * underlying tree without getting results back.
      *
      * If a YIELD_AUTO policy is set on this executor, then this will automatically yield.
      *
-     * Returns ErrorCodes::QueryPlanKilled if the plan executor was killed during a yield. If this
-     * error occurs, it is illegal to subsequently access the collection, since it may have been
-     * dropped.
+     * Throws an exception if this plan results in a runtime error or is killed.
      */
-    virtual Status executePlan() = 0;
+    virtual void executePlan() = 0;
 
     //
     // Concurrency-related methods.
@@ -430,10 +425,9 @@ public:
 
     /**
      * Notifies a PlanExecutor that it should die. Callers must specify the reason for why this
-     * executor is being killed. Subsequent calls to getNext() will return FAILURE, and fill
-     * 'objOut'
+     * executor is being killed. Subsequent calls to getNext() will throw a query-fatal exception
      * with an error reflecting 'killStatus'. If this method is called multiple times, only the
-     * first 'killStatus' will be retained. It is an error to call this method with Status::OK.
+     * first 'killStatus' will be retained. It is illegal to call this method with Status::OK.
      */
     virtual void markAsKilled(Status killStatus) = 0;
 
@@ -488,12 +482,6 @@ public:
      * for the batch that is currently being built. Otherwise, return an empty object.
      */
     virtual BSONObj getPostBatchResumeToken() const = 0;
-
-    /**
-     * Turns a Document representing an error status produced by getNext() into a Status.
-     */
-    virtual Status getMemberObjectStatus(const Document& memberObj) const = 0;
-    virtual Status getMemberObjectStatus(const BSONObj& memberObj) const = 0;
 };
 
 }  // namespace mongo

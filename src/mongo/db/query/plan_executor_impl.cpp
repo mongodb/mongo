@@ -285,15 +285,14 @@ PlanExecutorImpl::~PlanExecutorImpl() {
     invariant(_currentState == kDisposed);
 }
 
-string PlanExecutor::statestr(ExecState s) {
-    if (PlanExecutor::ADVANCED == s) {
-        return "ADVANCED";
-    } else if (PlanExecutor::IS_EOF == s) {
-        return "IS_EOF";
-    } else {
-        verify(PlanExecutor::FAILURE == s);
-        return "FAILURE";
+std::string PlanExecutor::statestr(ExecState execState) {
+    switch (execState) {
+        case PlanExecutor::ADVANCED:
+            return "ADVANCED";
+        case PlanExecutor::IS_EOF:
+            return "IS_EOF";
     }
+    MONGO_UNREACHABLE;
 }
 
 WorkingSet* PlanExecutorImpl::getWorkingSet() const {
@@ -464,8 +463,7 @@ std::shared_ptr<CappedInsertNotifier> PlanExecutorImpl::_getCappedInsertNotifier
     return collection->getCappedInsertNotifier();
 }
 
-PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierData* notifierData,
-                                                          Snapshotted<Document>* errorObj) {
+void PlanExecutorImpl::_waitForInserts(CappedInsertNotifierData* notifierData) {
     invariant(notifierData->notifier);
 
     // The notifier wait() method will not wait unless the version passed to it matches the
@@ -490,36 +488,19 @@ PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierDa
     });
     notifierData->lastEOFVersion = currentNotifierVersion;
 
-    if (yieldResult.isOK()) {
-        // There may be more results, try to get more data.
-        return ADVANCED;
-    }
-
-    if (errorObj) {
-        *errorObj = Snapshotted<Document>(SnapshotId(),
-                                          WorkingSetCommon::buildMemberStatusObject(yieldResult));
-    }
-    return FAILURE;
+    uassertStatusOK(yieldResult);
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* objOut,
                                                        RecordId* dlOut) {
     if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
-        Status status(ErrorCodes::InternalError,
-                      str::stream() << "PlanExecutor hit planExecutorAlwaysFails fail point");
-        *objOut =
-            Snapshotted<Document>(SnapshotId(), WorkingSetCommon::buildMemberStatusObject(status));
-
-        return PlanExecutor::FAILURE;
+        uasserted(ErrorCodes::Error(4382101),
+                  "PlanExecutor hit planExecutorAlwaysFails fail point");
     }
 
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {
-        if (nullptr != objOut) {
-            *objOut = Snapshotted<Document>(SnapshotId(),
-                                            WorkingSetCommon::buildMemberStatusObject(_killStatus));
-        }
-        return PlanExecutor::FAILURE;
+        uassertStatusOK(_killStatus);
     }
 
     if (!_stash.empty()) {
@@ -547,14 +528,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
         //   3) we need to yield and retry due to a WriteConflictException.
         // In all cases, the actual yielding happens here.
         if (_yieldPolicy->shouldYieldOrInterrupt()) {
-            auto yieldStatus = _yieldPolicy->yieldOrInterrupt();
-            if (!yieldStatus.isOK()) {
-                if (objOut) {
-                    *objOut = Snapshotted<Document>(
-                        SnapshotId(), WorkingSetCommon::buildMemberStatusObject(yieldStatus));
-                }
-                return PlanExecutor::FAILURE;
-            }
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt());
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;
@@ -624,7 +598,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             }
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
-        } else if (PlanStage::IS_EOF == code) {
+        } else {
+            invariant(PlanStage::IS_EOF == code);
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
                         if (data.hasField("namespace") &&
@@ -641,22 +616,9 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             if (!_shouldWaitForInserts()) {
                 return PlanExecutor::IS_EOF;
             }
-            const ExecState waitResult = _waitForInserts(&cappedInsertNotifierData, objOut);
-            if (waitResult == PlanExecutor::ADVANCED) {
-                // There may be more results, keep going.
-                continue;
-            }
-            return waitResult;
-        } else {
-            invariant(PlanStage::FAILURE == code);
-
-            if (nullptr != objOut) {
-                invariant(WorkingSet::INVALID_ID != id);
-                auto statusObj = WorkingSetCommon::getStatusMemberDocument(*_workingSet, id);
-                *objOut = Snapshotted<Document>(SnapshotId(), *statusObj);
-            }
-
-            return PlanExecutor::FAILURE;
+            _waitForInserts(&cappedInsertNotifierData);
+            // There may be more results, keep going.
+            continue;
         }
     }
 }
@@ -683,7 +645,7 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx) {
     _currentState = kDisposed;
 }
 
-Status PlanExecutorImpl::executePlan() {
+void PlanExecutorImpl::executePlan() {
     invariant(_currentState == kUsable);
     Document obj;
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
@@ -691,22 +653,13 @@ Status PlanExecutorImpl::executePlan() {
         state = this->getNext(&obj, nullptr);
     }
 
-    if (PlanExecutor::FAILURE == state) {
-        if (isMarkedAsKilled()) {
-            return _killStatus;
-        }
-
-        auto errorStatus = getMemberObjectStatus(obj);
-        invariant(!errorStatus.isOK());
-        return errorStatus.withContext(str::stream() << "Exec error resulting in state "
-                                                     << PlanExecutor::statestr(state));
+    if (isMarkedAsKilled()) {
+        uassertStatusOK(_killStatus);
     }
 
     invariant(!isMarkedAsKilled());
     invariant(PlanExecutor::IS_EOF == state);
-    return Status::OK();
 }
-
 
 void PlanExecutorImpl::enqueue(const Document& obj) {
     _stash.push(obj.getOwned());
@@ -764,11 +717,4 @@ BSONObj PlanExecutorImpl::getPostBatchResumeToken() const {
     }
 }
 
-Status PlanExecutorImpl::getMemberObjectStatus(const Document& memberObj) const {
-    return WorkingSetCommon::getMemberObjectStatus(memberObj);
-}
-
-Status PlanExecutorImpl::getMemberObjectStatus(const BSONObj& memberObj) const {
-    return WorkingSetCommon::getMemberObjectStatus(memberObj);
-}
 }  // namespace mongo

@@ -246,53 +246,49 @@ public:
         BSONElementSet values(executor.getValue()->getCanonicalQuery()->getCollator());
 
         const int kMaxResponseSize = BSONObjMaxUserSize - 4096;
-        size_t listApproxBytes = 0;
-        BSONObj obj;
-        PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = executor.getValue()->getNext(&obj, nullptr))) {
-            // Distinct expands arrays.
-            //
-            // If our query is covered, each value of the key should be in the index key and
-            // available to us without this.  If a collection scan is providing the data, we may
-            // have to expand an array.
-            BSONElementSet elts;
-            dps::extractAllElementsAlongPath(obj, key, elts);
 
-            for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
-                BSONElement elt = *it;
-                if (values.count(elt)) {
-                    continue;
+        try {
+            size_t listApproxBytes = 0;
+            BSONObj obj;
+            while (PlanExecutor::ADVANCED == executor.getValue()->getNext(&obj, nullptr)) {
+                // Distinct expands arrays.
+                //
+                // If our query is covered, each value of the key should be in the index key and
+                // available to us without this.  If a collection scan is providing the data, we may
+                // have to expand an array.
+                BSONElementSet elts;
+                dps::extractAllElementsAlongPath(obj, key, elts);
+
+                for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
+                    BSONElement elt = *it;
+                    if (values.count(elt)) {
+                        continue;
+                    }
+
+                    // This is an approximate size check which safeguards against use of unbounded
+                    // memory by the distinct command. We perform a more precise check at the end of
+                    // this method to confirm that the response size is less than 16MB.
+                    listApproxBytes += elt.size();
+                    uassert(
+                        17217, "distinct too big, 16mb cap", listApproxBytes < kMaxResponseSize);
+
+                    auto distinctObj = elt.wrap();
+                    values.insert(distinctObj.firstElement());
+                    distinctValueHolder.push_back(std::move(distinctObj));
                 }
-
-                // This is an approximate size check which safeguards against use of unbounded
-                // memory by the distinct command. We perform a more precise check at the end of
-                // this method to confirm that the response size is less than 16MB.
-                listApproxBytes += elt.size();
-                uassert(17217, "distinct too big, 16mb cap", listApproxBytes < kMaxResponseSize);
-
-                auto distinctObj = elt.wrap();
-                values.insert(distinctObj.firstElement());
-                distinctValueHolder.push_back(std::move(distinctObj));
             }
-        }
-
-        // Return an error if execution fails for any reason.
-        if (PlanExecutor::FAILURE == state) {
-            // We should always have a valid status member object at this point.
-            auto status = WorkingSetCommon::getMemberObjectStatus(obj);
-            invariant(!status.isOK());
+        } catch (DBException& exception) {
             LOGV2_WARNING(23797,
-                          "Plan executor error during distinct command: {state}, status: {error}, "
+                          "Plan executor error during distinct command: {error}, "
                           "stats: {stats}",
                           "Plan executor error during distinct command",
-                          "state"_attr = redact(PlanExecutor::statestr(state)),
-                          "error"_attr = status,
+                          "error"_attr = exception.toStatus(),
                           "stats"_attr =
                               redact(Explain::getWinningPlanStats(executor.getValue().get())));
 
-            uassertStatusOK(status.withContext("Executor error during distinct command"));
+            exception.addContext("Executor error during distinct command");
+            throw;
         }
-
 
         auto curOp = CurOp::get(opCtx);
 

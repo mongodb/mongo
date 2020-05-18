@@ -422,7 +422,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
     WorkingSetID id = WorkingSet::INVALID_ID;
 
     // Check that failed seek causes the entire resume to fail.
-    ASSERT_EQUALS(PlanStage::FAILURE, ps->work(&id));
+    ASSERT_THROWS_CODE(ps->work(&id), DBException, ErrorCodes::KeyNotFound);
 }
 
 }  // namespace query_stage_collection_scan

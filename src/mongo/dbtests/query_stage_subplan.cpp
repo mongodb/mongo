@@ -505,7 +505,6 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     while (stageState != PlanStage::IS_EOF) {
         WorkingSetID id = WorkingSet::INVALID_ID;
         stageState = subplan->work(&id);
-        ASSERT_NE(stageState, PlanStage::FAILURE);
         if (stageState == PlanStage::ADVANCED) {
             ++numResults;
         }

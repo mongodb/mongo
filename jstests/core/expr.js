@@ -2,6 +2,9 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_non_retryable_writes,
+//   # Explain reports errors from $expr differently in 4.4 and older, so this test assumes that all
+//   # nodes are at least binary version 4.6.
+//   requires_fcv_46,
 // ]
 
 // Tests for $expr in the CRUD commands.
@@ -113,10 +116,15 @@ assert.throws(function() {
     coll.find({$expr: {$eq: ["$a", "$$unbound"]}}).explain();
 });
 
-// $expr with division by zero in find with explain with executionStats throws.
-assert.throws(function() {
-    coll.find({$expr: {$divide: [1, "$a"]}}).explain("executionStats");
-});
+// $expr which causes a runtime error should be caught be explain and reported as an error in the
+// 'executionSuccess' field.
+let explain = coll.find({$expr: {$divide: [1, "$a"]}}).explain("executionStats");
+// Accommodate format differences between explain via mongos and explain directly on a mongod.
+if (!isMongos) {
+    assert(explain.hasOwnProperty("executionStats"), explain);
+    assert.eq(explain.executionStats.executionSuccess, false, explain);
+    assert.eq(explain.executionStats.errorCode, 16609, explain);
+}
 
 // $expr is not allowed in $elemMatch projection.
 coll.drop();

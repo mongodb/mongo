@@ -507,39 +507,37 @@ public:
             Document doc;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             std::uint64_t numResults = 0;
-            while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
-                   PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
-                // If we can't fit this result inside the current batch, then we stash it for later.
-                BSONObj obj = doc.toBson();
-                if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
-                    exec->enqueue(obj);
-                    break;
+
+            try {
+                while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
+                       PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
+                    // If we can't fit this result inside the current batch, then we stash it for
+                    // later.
+                    BSONObj obj = doc.toBson();
+                    if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
+                        exec->enqueue(obj);
+                        break;
+                    }
+
+                    // If this executor produces a postBatchResumeToken, add it to the response.
+                    firstBatch.setPostBatchResumeToken(exec->getPostBatchResumeToken());
+
+                    // Add result to output buffer.
+                    firstBatch.append(obj);
+                    numResults++;
                 }
-
-                // If this executor produces a postBatchResumeToken, add it to the response.
-                firstBatch.setPostBatchResumeToken(exec->getPostBatchResumeToken());
-
-                // Add result to output buffer.
-                firstBatch.append(obj);
-                numResults++;
-            }
-
-            // Throw an assertion if query execution fails for any reason.
-            if (PlanExecutor::FAILURE == state) {
+            } catch (DBException& exception) {
                 firstBatch.abandon();
 
-                // We should always have a valid status member object at this point.
-                auto status = WorkingSetCommon::getMemberObjectStatus(doc);
-                invariant(!status.isOK());
                 LOGV2_WARNING(23798,
-                              "Plan executor error during find command: {state}, status: {error}, "
+                              "Plan executor error during find command: {error}, "
                               "stats: {stats}",
                               "Plan executor error during find command",
-                              "state"_attr = PlanExecutor::statestr(state),
-                              "error"_attr = status,
+                              "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(Explain::getWinningPlanStats(exec.get())));
 
-                uassertStatusOK(status.withContext("Executor error during find command"));
+                exception.addContext("Executor error during find command");
+                throw;
             }
 
             // Set up the cursor for getMore.

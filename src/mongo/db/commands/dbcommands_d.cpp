@@ -307,69 +307,68 @@ public:
                 exec.reset();
             });
 
-            BSONObj obj;
-            PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
-                BSONElement ne = obj["n"];
-                verify(ne.isNumber());
-                int myn = ne.numberInt();
-                if (n != myn) {
-                    if (partialOk) {
-                        break;  // skipped chunk is probably on another shard
+            try {
+                BSONObj obj;
+                while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
+                    BSONElement ne = obj["n"];
+                    verify(ne.isNumber());
+                    int myn = ne.numberInt();
+                    if (n != myn) {
+                        if (partialOk) {
+                            break;  // skipped chunk is probably on another shard
+                        }
+                        LOGV2(20452,
+                              "Should have chunk: {expected} have: {observed}",
+                              "Unexpected chunk",
+                              "expected"_attr = n,
+                              "observed"_attr = myn);
+                        dumpChunks(opCtx, nss.ns(), query, sort);
+                        uassert(10040, "chunks out of order", n == myn);
                     }
-                    LOGV2(20452,
-                          "Should have chunk: {expected} have: {observed}",
-                          "Unexpected chunk",
-                          "expected"_attr = n,
-                          "observed"_attr = myn);
-                    dumpChunks(opCtx, nss.ns(), query, sort);
-                    uassert(10040, "chunks out of order", n == myn);
+
+                    // make a copy of obj since we access data in it while yielding locks
+                    BSONObj owned = obj.getOwned();
+                    uassert(50848,
+                            str::stream() << "The element that calls binDataClean() must be type "
+                                             "of BinData, but type of misisng found. Field name is "
+                                             "required",
+                            owned["data"]);
+                    uassert(50849,
+                            str::stream() << "The element that calls binDataClean() must be type "
+                                             "of BinData, but type of "
+                                          << owned["data"].type() << " found.",
+                            owned["data"].type() == BSONType::BinData);
+
+                    exec->saveState();
+                    // UNLOCKED
+                    ctx.reset();
+
+                    int len;
+                    const char* data = owned["data"].binDataClean(len);
+                    // This is potentially an expensive operation, so do it out of the lock
+                    md5_append(&st, (const md5_byte_t*)(data), len);
+                    n++;
+
+                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                        &waitInFilemd5DuringManualYield, opCtx, "waitInFilemd5DuringManualYield");
+
+                    try {
+                        // RELOCKED
+                        ctx.reset(new AutoGetCollectionForReadCommand(opCtx, nss));
+                    } catch (const StaleConfigException&) {
+                        LOGV2_DEBUG(
+                            20453,
+                            1,
+                            "Chunk metadata changed during filemd5, will retarget and continue");
+                        break;
+                    }
+
+                    // Now that we have the lock again, we can restore the PlanExecutor.
+                    exec->restoreState();
                 }
-
-                // make a copy of obj since we access data in it while yielding locks
-                BSONObj owned = obj.getOwned();
-                uassert(50848,
-                        str::stream() << "The element that calls binDataClean() must be type "
-                                         "of BinData, but type of misisng found. Field name is "
-                                         "required",
-                        owned["data"]);
-                uassert(50849,
-                        str::stream() << "The element that calls binDataClean() must be type "
-                                         "of BinData, but type of "
-                                      << owned["data"].type() << " found.",
-                        owned["data"].type() == BSONType::BinData);
-
-                exec->saveState();
-                // UNLOCKED
-                ctx.reset();
-
-                int len;
-                const char* data = owned["data"].binDataClean(len);
-                // This is potentially an expensive operation, so do it out of the lock
-                md5_append(&st, (const md5_byte_t*)(data), len);
-                n++;
-
-                CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                    &waitInFilemd5DuringManualYield, opCtx, "waitInFilemd5DuringManualYield");
-
-                try {
-                    // RELOCKED
-                    ctx.reset(new AutoGetCollectionForReadCommand(opCtx, nss));
-                } catch (const StaleConfigException&) {
-                    LOGV2_DEBUG(
-                        20453,
-                        1,
-                        "Chunk metadata changed during filemd5, will retarget and continue");
-                    break;
-                }
-
-                // Now that we have the lock again, we can restore the PlanExecutor.
-                exec->restoreState();
-            }
-
-            if (PlanExecutor::FAILURE == state) {
-                uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                    "Executor error during filemd5 command"));
+            } catch (DBException& exception) {
+                exception.addContext("Executor error during filemd5 command");
+                throw;
             }
 
             if (partialOk)

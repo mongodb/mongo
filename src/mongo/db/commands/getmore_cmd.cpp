@@ -285,27 +285,28 @@ public:
          * Uses 'cursor' and 'request' to fill out 'nextBatch' with the batch of result documents to
          * be returned by this getMore.
          *
-         * Returns the number of documents in the batch in *numResults, which must be initialized to
-         * zero by the caller. Returns the final ExecState returned by the cursor in *state.
+         * Returns true if the cursor should be saved for subsequent getMores, and false otherwise.
+         * Fills out *numResults with the number of documents in the batch, which must be
+         * initialized to zero by the caller.
          *
-         * Returns an OK status if the batch was successfully generated, and a non-OK status if the
-         * PlanExecutor encounters a failure.
+         * Throws an exception on failure.
          */
-        Status generateBatch(OperationContext* opCtx,
-                             ClientCursor* cursor,
-                             const GetMoreRequest& request,
-                             CursorResponseBuilder* nextBatch,
-                             PlanExecutor::ExecState* state,
-                             std::uint64_t* numResults) {
+        bool generateBatch(OperationContext* opCtx,
+                           ClientCursor* cursor,
+                           const GetMoreRequest& request,
+                           const bool isTailable,
+                           CursorResponseBuilder* nextBatch,
+                           std::uint64_t* numResults) {
             PlanExecutor* exec = cursor->getExecutor();
 
             // If an awaitData getMore is killed during this process due to our max time expiring at
             // an interrupt point, we just continue as normal and return rather than reporting a
             // timeout to the user.
             Document doc;
+            PlanExecutor::ExecState state;
             try {
                 while (!FindCommon::enoughForGetMore(request.batchSize.value_or(0), *numResults) &&
-                       PlanExecutor::ADVANCED == (*state = exec->getNext(&doc, nullptr))) {
+                       PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
                     // Note that "needsMerge" implies a find or aggregate operation, which should
                     // always have a non-NULL 'expCtx' value.
                     BSONObj obj = cursor->needsMerge() ? doc.toBsonWithMetaData() : doc.toBson();
@@ -326,37 +327,29 @@ public:
                     (*numResults)++;
                 }
             } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
-                // FAILURE state will make getMore command close the cursor even if it's tailable.
-                *state = PlanExecutor::FAILURE;
-                return Status::OK();
+                // This exception indicates that we should close the cursor without reporting an
+                // error.
+                return false;
+            } catch (DBException& exception) {
+                nextBatch->abandon();
+
+                LOGV2_WARNING(20478,
+                              "getMore command executor error: {error}, stats: {stats}",
+                              "getMore command executor error",
+                              "error"_attr = exception.toStatus(),
+                              "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
+
+                exception.addContext("Executor error during getMore");
+                throw;
             }
 
-            switch (*state) {
-                case PlanExecutor::FAILURE: {
-                    // We should always have a valid status member object at this point.
-                    auto status = WorkingSetCommon::getMemberObjectStatus(doc);
-                    invariant(!status.isOK());
-                    // Log an error message and then perform the cleanup.
-                    LOGV2_WARNING(
-                        20478,
-                        "getMore command executor error: {state}, status: {error}, stats: {stats}",
-                        "getMore command executor error",
-                        "state"_attr = PlanExecutor::statestr(*state),
-                        "error"_attr = status,
-                        "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
-
-                    nextBatch->abandon();
-                    return status;
-                }
-                case PlanExecutor::IS_EOF:
-                    // The latest oplog timestamp may advance even when there are no results. Ensure
-                    // that we have the latest postBatchResumeToken produced by the plan executor.
-                    nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
-                default:
-                    return Status::OK();
+            if (state == PlanExecutor::IS_EOF) {
+                // The latest oplog timestamp may advance even when there are no results. Ensure
+                // that we have the latest postBatchResumeToken produced by the plan executor.
+                nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
             }
 
-            MONGO_UNREACHABLE;
+            return shouldSaveCursorGetMore(exec, isTailable);
         }
 
         void acquireLocksAndIterateCursor(OperationContext* opCtx,
@@ -582,7 +575,6 @@ public:
             options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
             CursorResponseBuilder nextBatch(reply, options);
             BSONObj obj;
-            PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             std::uint64_t numResults = 0;
 
             // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To
@@ -628,8 +620,12 @@ public:
                     _request.nss);
             });
 
-            uassertStatusOK(generateBatch(
-                opCtx, cursorPin.getCursor(), _request, &nextBatch, &state, &numResults));
+            const auto shouldSaveCursor = generateBatch(opCtx,
+                                                        cursorPin.getCursor(),
+                                                        _request,
+                                                        cursorPin->isTailable(),
+                                                        &nextBatch,
+                                                        &numResults);
 
             PlanSummaryStats postExecutionStats;
             Explain::getSummaryStats(*exec, &postExecutionStats);
@@ -649,7 +645,7 @@ public:
                 curOp->debug().execStats = execStatsBob.obj();
             }
 
-            if (shouldSaveCursorGetMore(state, exec, cursorPin->isTailable())) {
+            if (shouldSaveCursor) {
                 respondWithId = _request.cursorid;
 
                 exec->saveState();

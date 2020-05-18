@@ -133,12 +133,10 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // only time we'd need to create a cursor after already getting a record out of it
                 // and updating our _lastSeenId.
                 if (!_cursor->seekExact(_lastSeenId)) {
-                    Status status(ErrorCodes::CappedPositionLost,
-                                  str::stream() << "CollectionScan died due to failure to restore "
-                                                << "tailable cursor position. "
-                                                << "Last seen record id: " << _lastSeenId);
-                    *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
-                    return PlanStage::FAILURE;
+                    uasserted(ErrorCodes::CappedPositionLost,
+                              str::stream() << "CollectionScan died due to failure to restore "
+                                            << "tailable cursor position. "
+                                            << "Last seen record id: " << _lastSeenId);
                 }
             }
 
@@ -152,14 +150,12 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // returned this one prior to the resume.
                 auto recordIdToSeek = *_params.resumeAfterRecordId;
                 if (!_cursor->seekExact(recordIdToSeek)) {
-                    Status status(
+                    uasserted(
                         ErrorCodes::KeyNotFound,
                         str::stream()
                             << "Failed to resume collection scan: the recordId from which we are "
                             << "attempting to resume no longer exists in the collection. "
                             << "recordId: " << recordIdToSeek);
-                    *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
-                    return PlanStage::FAILURE;
                 }
             }
 
@@ -205,11 +201,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
     _lastSeenId = record->id;
     if (_params.shouldTrackLatestOplogTimestamp) {
-        auto status = setLatestOplogEntryTimestamp(*record);
-        if (!status.isOK()) {
-            *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
-            return PlanStage::FAILURE;
-        }
+        setLatestOplogEntryTimestamp(*record);
     }
 
     WorkingSetID id = _workingSet->allocate();
@@ -221,17 +213,14 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     return returnIfMatches(member, id, out);
 }
 
-Status CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
+void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
     auto tsElem = record.data.toBson()[repl::OpTime::kTimestampFieldName];
-    if (tsElem.type() != BSONType::bsonTimestamp) {
-        Status status(ErrorCodes::InternalError,
-                      str::stream() << "CollectionScan was asked to track latest operation time, "
-                                       "but found a result without a valid 'ts' field: "
-                                    << record.data.toBson().toString());
-        return status;
-    }
+    uassert(ErrorCodes::Error(4382100),
+            str::stream() << "CollectionScan was asked to track latest operation time, "
+                             "but found a result without a valid 'ts' field: "
+                          << record.data.toBson().toString(),
+            tsElem.type() == BSONType::bsonTimestamp);
     _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, tsElem.timestamp());
-    return Status::OK();
 }
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,

@@ -196,18 +196,6 @@ public:
         }
 
         resultBuilder.done();
-
-        if (PlanExecutor::FAILURE == state) {
-            LOGV2_ERROR(23795,
-                        "Plan executor error during StageDebug command: FAILURE, stats: "
-                        "{Explain_getWinningPlanStats_exec_get}",
-                        "Explain_getWinningPlanStats_exec_get"_attr =
-                            redact(Explain::getWinningPlanStats(exec.get())));
-
-            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                "Executor error during StageDebug command"));
-        }
-
         return true;
     }
 

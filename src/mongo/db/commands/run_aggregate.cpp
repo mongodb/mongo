@@ -181,37 +181,32 @@ bool handleCursorCommand(OperationContext* opCtx,
         try {
             state = exec->getNext(&nextDoc, nullptr);
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
-            // This exception is thrown when a $changeStream stage encounters an event
-            // that invalidates the cursor. We should close the cursor and return without
-            // error.
+            // This exception is thrown when a $changeStream stage encounters an event that
+            // invalidates the cursor. We should close the cursor and return without error.
             cursor = nullptr;
             exec = nullptr;
             break;
+        } catch (DBException& exception) {
+            LOGV2_WARNING(23799,
+                          "Aggregate command executor error: {error}, stats: {stats}",
+                          "Aggregate command executor error",
+                          "error"_attr = exception.toStatus(),
+                          "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
+
+            exception.addContext("PlanExecutor error during aggregation");
+            throw;
         }
 
         if (state == PlanExecutor::IS_EOF) {
             if (!cursor->isTailable()) {
-                // make it an obvious error to use cursor or executor after this point
+                // Make it an obvious error to use cursor or executor after this point.
                 cursor = nullptr;
                 exec = nullptr;
             }
             break;
         }
 
-        if (PlanExecutor::ADVANCED != state) {
-            // We should always have a valid status member object at this point.
-            auto status = WorkingSetCommon::getMemberObjectStatus(nextDoc);
-            invariant(!status.isOK());
-            LOGV2_WARNING(
-                23799,
-                "Aggregate command executor error: {state}, status: {error}, stats: {stats}",
-                "Aggregate command executor error",
-                "state"_attr = PlanExecutor::statestr(state),
-                "error"_attr = status,
-                "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
-
-            uassertStatusOK(status.withContext("PlanExecutor error during aggregation"));
-        }
+        invariant(state == PlanExecutor::ADVANCED);
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.

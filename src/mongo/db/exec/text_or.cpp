@@ -197,19 +197,6 @@ PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
         _internalState = State::kReturningResults;
 
         return PlanStage::NEED_TIME;
-    } else if (PlanStage::FAILURE == childState) {
-        // If a stage fails, it may create a status WSM to indicate why it
-        // failed, in which case 'id' is valid.  If ID is invalid, we
-        // create our own error message.
-        if (WorkingSet::INVALID_ID == id) {
-            str::stream ss;
-            ss << "TEXT_OR stage failed to read in results from child";
-            Status status(ErrorCodes::InternalError, ss);
-            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
-        } else {
-            *out = id;
-        }
-        return PlanStage::FAILURE;
     } else {
         // Propagate WSID from below.
         *out = id;

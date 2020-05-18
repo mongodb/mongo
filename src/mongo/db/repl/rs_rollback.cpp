@@ -1031,61 +1031,43 @@ void dropCollection(OperationContext* opCtx,
         // in order to keep an archive of items that were rolled back.
         auto exec = InternalPlanner::collectionScan(
             opCtx, nss.toString(), collection, PlanExecutor::YIELD_AUTO);
-        BSONObj curObj;
+
         PlanExecutor::ExecState execState;
-        while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, nullptr))) {
-            auto status = removeSaver.goingToDelete(curObj);
-            if (!status.isOK()) {
-                LOGV2_FATAL_CONTINUE(
-                    21740,
-                    "Rolling back createCollection on {namespace} failed to write document to "
-                    "remove saver file: {error}",
-                    "Rolling back createCollection failed to write document to remove saver file",
-                    "namespace"_attr = nss,
-                    "error"_attr = redact(status));
-                throw RSFatalException(
-                    "Rolling back createCollection. Failed to write document to remove saver "
-                    "file.");
+        try {
+            BSONObj curObj;
+            while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, nullptr))) {
+                auto status = removeSaver.goingToDelete(curObj);
+                if (!status.isOK()) {
+                    LOGV2_FATAL_CONTINUE(21740,
+                                         "Rolling back createCollection on {namespace} failed to "
+                                         "write document to remove saver file: {error}",
+                                         "Rolling back createCollection failed to write document "
+                                         "to remove saver file",
+                                         "namespace"_attr = nss,
+                                         "error"_attr = redact(status));
+                    throw RSFatalException(
+                        "Rolling back createCollection. Failed to write document to remove saver "
+                        "file.");
+                }
             }
+        } catch (const DBException&) {
+            LOGV2_FATAL_CONTINUE(21741,
+                                 "Rolling back createCollection on {namespace} failed with "
+                                 "{error}. A full resync is necessary",
+                                 "Rolling back createCollection failed. A full resync is necessary",
+                                 "namespace"_attr = nss,
+                                 "error"_attr = redact(exceptionToStatus()));
+            throw RSFatalException(
+                "Rolling back createCollection failed. A full resync is necessary.");
         }
 
-        // If we exited the above for loop with any other execState than IS_EOF, this means that
-        // a FAILURE state was returned. If a FAILURE state was returned, either an unrecoverable
-        // error was thrown by exec, or we attempted to retrieve data that could not be provided
-        // by the PlanExecutor. In both of these cases it is necessary for a full resync of the
-        // server.
-
-        if (execState != PlanExecutor::IS_EOF) {
-            if (execState == PlanExecutor::FAILURE &&
-                WorkingSetCommon::isValidStatusMemberObject(curObj)) {
-                Status errorStatus = WorkingSetCommon::getMemberObjectStatus(curObj);
-                LOGV2_FATAL_CONTINUE(
-                    21741,
-                    "Rolling back createCollection on {namespace} failed with {error}. A "
-                    "full resync is necessary.",
-                    "Rolling back createCollection failed. A full resync is necessary",
-                    "namespace"_attr = nss,
-                    "error"_attr = redact(errorStatus));
-                throw RSFatalException(
-                    "Rolling back createCollection failed. A full resync is necessary.");
-            } else {
-                LOGV2_FATAL_CONTINUE(
-                    21742,
-                    "Rolling back createCollection on {namespace} failed. A full resync is "
-                    "necessary.",
-                    "Rolling back createCollection failed. A full resync is necessary",
-                    "namespace"_attr = nss);
-                throw RSFatalException(
-                    "Rolling back createCollection failed. A full resync is necessary.");
-            }
-        }
+        invariant(execState == PlanExecutor::IS_EOF);
     }
 
     WriteUnitOfWork wunit(opCtx);
 
-    // We permanently drop the collection rather than 2-phase drop the collection
-    // here. By not passing in an opTime to dropCollectionEvenIfSystem() the collection
-    // is immediately dropped.
+    // We permanently drop the collection rather than 2-phase drop the collection here. By not
+    // passing in an opTime to dropCollectionEvenIfSystem() the collection is immediately dropped.
     fassert(40504, db->dropCollectionEvenIfSystem(opCtx, nss));
     wunit.commit();
 }

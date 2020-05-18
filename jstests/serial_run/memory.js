@@ -38,7 +38,7 @@ function assertMemoryError(func) {
     try {
         func();
     } catch (e) {
-        if (e.message.includes('"errmsg" : "Out of memory"')) {
+        if (e.message.includes("Out of memory")) {
             return;
         }
         throw e;

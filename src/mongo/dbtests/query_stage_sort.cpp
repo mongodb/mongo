@@ -412,7 +412,6 @@ public:
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = ss->work(&id);
             if (PlanStage::ADVANCED != status) {
-                ASSERT_NE(status, PlanStage::FAILURE);
                 continue;
             }
             WorkingSetMember* member = exec->getWorkingSet()->get(id);
@@ -506,7 +505,6 @@ public:
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = ss->work(&id);
             if (PlanStage::ADVANCED != status) {
-                ASSERT_NE(status, PlanStage::FAILURE);
                 continue;
             }
             WorkingSetMember* member = exec->getWorkingSet()->get(id);
@@ -593,9 +591,9 @@ public:
             _expCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
-        PlanExecutor::ExecState runnerState =
-            exec->getNext(static_cast<BSONObj*>(nullptr), nullptr);
-        ASSERT_EQUALS(PlanExecutor::FAILURE, runnerState);
+        ASSERT_THROWS_CODE(exec->getNext(static_cast<BSONObj*>(nullptr), nullptr),
+                           DBException,
+                           ErrorCodes::BadValue);
     }
 };
 

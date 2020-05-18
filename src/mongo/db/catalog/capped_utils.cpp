@@ -174,12 +174,12 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     Snapshotted<BSONObj> objToClone;
     RecordId loc;
-    PlanExecutor::ExecState state = PlanExecutor::FAILURE;  // suppress uninitialized warnings
 
     DisableDocumentValidation validationDisabler(opCtx);
 
     int retries = 0;  // non-zero when retrying our last document.
     while (true) {
+        PlanExecutor::ExecState state = PlanExecutor::IS_EOF;
         if (!retries) {
             state = exec->getNextSnapshotted(&objToClone, &loc);
         }
@@ -195,9 +195,6 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                 }
                 break;
             }
-            default:
-                // A collection scan plan which does not yield should never fail.
-                MONGO_UNREACHABLE;
         }
 
         try {

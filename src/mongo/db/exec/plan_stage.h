@@ -74,6 +74,10 @@ class RecordId;
  * saveState() if any underlying database state changes.  If saveState() is called,
  * restoreState() must be called again before any work() is done.
  *
+ * If an error occurs at runtime (e.g. we reach resource limits for the request), then work() throws
+ * an exception. At this point, statistics may be extracted from the execution plan, but the
+ * execution tree is otherwise unusable and the plan must be discarded.
+ *
  * Here is a very simple usage example:
  *
  * WorkingSet workingSet;
@@ -91,9 +95,6 @@ class RecordId;
  *         break;
  *     case PlanStage::NEED_TIME:
  *         // Need more time.
- *         break;
- *     case PlanStage::FAILURE:
- *         // Throw exception or return error
  *         break;
  *     }
  *
@@ -170,28 +171,20 @@ public:
         // wants fetched. On the next call to work() that stage can assume a fetch was performed
         // on the WSM that the held WSID refers to.
         NEED_YIELD,
-
-        // Something has gone unrecoverably wrong.  Stop running this query.
-        // If the out parameter does not refer to an invalid working set member,
-        // call WorkingSetCommon::getStatusMemberObject() to get details on the failure.
-        // Any class implementing this interface must set the WSID out parameter to
-        // INVALID_ID or a valid WSM ID if FAILURE is returned.
-        FAILURE,
     };
 
     static std::string stateStr(const StageState& state) {
-        if (ADVANCED == state) {
-            return "ADVANCED";
-        } else if (IS_EOF == state) {
-            return "IS_EOF";
-        } else if (NEED_TIME == state) {
-            return "NEED_TIME";
-        } else if (NEED_YIELD == state) {
-            return "NEED_YIELD";
-        } else {
-            verify(FAILURE == state);
-            return "FAILURE";
+        switch (state) {
+            case PlanStage::ADVANCED:
+                return "ADVANCED";
+            case PlanStage::IS_EOF:
+                return "IS_EOF";
+            case PlanStage::NEED_TIME:
+                return "NEED_TIME";
+            case PlanStage::NEED_YIELD:
+                return "NEED_YIELD";
         }
+        MONGO_UNREACHABLE;
     }
 
 
@@ -199,13 +192,21 @@ public:
      * Perform a unit of work on the query.  Ask the stage to produce the next unit of output.
      * Stage returns StageState::ADVANCED if *out is set to the next unit of output.  Otherwise,
      * returns another value of StageState to indicate the stage's status.
+     *
+     * Throws an exception if an error is encountered while executing the query.
      */
     StageState work(WorkingSetID* out) {
         auto optTimer(getOptTimer());
 
         ++_commonStats.works;
 
-        StageState workResult = doWork(out);
+        StageState workResult;
+        try {
+            workResult = doWork(out);
+        } catch (...) {
+            _commonStats.failed = true;
+            throw;
+        }
 
         if (StageState::ADVANCED == workResult) {
             ++_commonStats.advanced;
@@ -213,8 +214,6 @@ public:
             ++_commonStats.needTime;
         } else if (StageState::NEED_YIELD == workResult) {
             ++_commonStats.needYield;
-        } else if (StageState::FAILURE == workResult) {
-            _commonStats.failed = true;
         }
 
         return workResult;

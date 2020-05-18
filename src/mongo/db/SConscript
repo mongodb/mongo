@@ -1072,6 +1072,7 @@ env.Library(
         'exec/index_scan.cpp',
         'exec/limit.cpp',
         'exec/merge_sort.cpp',
+        'exec/mock_stage.cpp',
         'exec/multi_iterator.cpp',
         'exec/multi_plan.cpp',
         'exec/near.cpp',

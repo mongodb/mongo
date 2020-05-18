@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -32,42 +32,37 @@
 #include <queue>
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/working_set.h"
 
 namespace mongo {
 
-class RecordId;
-
 /**
- * QueuedDataStage is a data-producing stage.  Unlike the other two leaf stages (CollectionScan
- * and IndexScan) QueuedDataStage does not require any underlying storage layer.
- *
- * A QueuedDataStage is "programmed" by pushing return values from work() onto its internal
- * queue.  Calls to QueuedDataStage::work() pop values off that queue and return them in FIFO
- * order, annotating the working set with data when appropriate.
+ * A stage designed for use in unit tests. The test can queue a sequence of results which will be
+ * returned to the parent stage using the 'enqueue*()' methods.
  */
-class QueuedDataStage final : public PlanStage {
+class MockStage final : public PlanStage {
 public:
-    QueuedDataStage(ExpressionContext* expCtx, WorkingSet* ws);
+    static constexpr StringData kStageType = "MOCK"_sd;
+
+    MockStage(ExpressionContext* expCtx, WorkingSet* ws);
 
     StageState doWork(WorkingSetID* out) final;
 
-    bool isEOF() final;
-
-    StageType stageType() const final {
-        return STAGE_QUEUED_DATA;
+    bool isEOF() final {
+        return _results.empty();
     }
 
-    //
-    // Exec stats
-    //
+    StageType stageType() const final {
+        return STAGE_MOCK;
+    }
 
     std::unique_ptr<PlanStageStats> getStats() final;
 
-    const SpecificStats* getSpecificStats() const final;
+    const SpecificStats* getSpecificStats() const final {
+        return &_specificStats;
+    }
 
     /**
-     * Add a result to the back of the queue.
+     * Adds a WorkingSetMember to the back of the queue.
      *
      * The caller is responsible for allocating 'id' and filling out the WSM keyed by 'id'
      * appropriately.
@@ -75,18 +70,39 @@ public:
      * The QueuedDataStage takes ownership of 'id', so the caller should not call WorkingSet::free()
      * on it.
      */
-    void pushBack(const WorkingSetID& id);
+    void enqueueAdvanced(WorkingSetID wsid) {
+        _results.push(wsid);
+    }
 
-    static const char* kStageType;
+    /**
+     * Adds a StageState code such as 'NEED_TIME' or 'NEED_YIELD' to the back of the queue. Illegal
+     * to call with 'ADVANCED' -- 'enqueueAdvanced()' should be used instead. Also illegal to call
+     * with 'IS_EOF', since EOF is implied when the mock stage's queue is emptied.
+     */
+    void enqueueStateCode(StageState stageState) {
+        invariant(stageState != PlanStage::ADVANCED);
+        invariant(stageState != PlanStage::IS_EOF);
+        _results.push(stageState);
+    }
+
+    /**
+     * Adds 'status' to the queue. When the 'status' is dequeued, it will be thrown from 'work()' as
+     * an exception.
+     */
+    void enqueueError(Status status) {
+        invariant(!status.isOK());
+        _results.push(status);
+    }
 
 private:
-    // We don't own this.
+    // The mock stage holds a queue of objects of this type. Each element in the queue can either be
+    // a document to return, a StageState code, or a Status representing an error.
+    using MockResult = stdx::variant<WorkingSetID, PlanStage::StageState, Status>;
+
     WorkingSet* _ws;
 
-    // The data we return.
-    std::queue<WorkingSetID> _members;
+    std::queue<MockResult> _results;
 
-    // Stats
     MockStats _specificStats;
 };
 
