@@ -678,8 +678,16 @@ public:
         WT_SESSION* session = WiredTigerRecoveryUnit::get(_opCtx)->getSession()->getSession();
 
         if (!_cursor) {
-            invariantWTOK(session->open_cursor(
+            auto status = wtRCToStatus(session->open_cursor(
                 session, _rs->_uri.c_str(), nullptr, _config.c_str(), &_cursor));
+            if (status == ErrorCodes::ObjectIsBusy) {
+                // This can happen if you try to open a cursor on the oplog table and a verify is
+                // currently running on it.
+                uasserted(
+                    4820000,
+                    "Failed to open a cursor on a collection because it was locked by WiredTiger.");
+            }
+            invariantStatusOK(status);
             invariant(_cursor);
         }
         return true;

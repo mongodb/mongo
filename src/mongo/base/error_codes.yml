@@ -364,7 +364,8 @@ error_codes:
     - {code: 312,name: OperationIsKilledAndDelisted,categories: [CancelationError]}
 
     - {code: 313,name: ResumableRangeDeleterDisabled}
-
+    - {code: 314,name: ObjectIsBusy}
+    
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

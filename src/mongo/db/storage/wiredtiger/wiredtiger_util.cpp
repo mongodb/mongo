@@ -74,6 +74,9 @@ Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == EMFILE) {
         return Status(ErrorCodes::TooManyFilesOpen, s);
     }
+    if (retCode == EBUSY) {
+        return Status(ErrorCodes::ObjectIsBusy, s);
+    }
 
     uassert(ErrorCodes::ExceededMemoryLimit, s, retCode != WT_CACHE_FULL);
 
