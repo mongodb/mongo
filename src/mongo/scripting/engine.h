@@ -259,12 +259,12 @@ public:
     void setScopeInitCallback(void (*func)(Scope&)) {
         _scopeInitCallback = func;
     }
-    static void setConnectCallback(void (*func)(DBClientBase&)) {
+    static void setConnectCallback(void (*func)(DBClientBase&, StringData)) {
         _connectCallback = func;
     }
-    static void runConnectCallback(DBClientBase& c) {
+    static void runConnectCallback(DBClientBase& c, StringData uri) {
         if (_connectCallback)
-            _connectCallback(c);
+            _connectCallback(c, uri);
     }
 
     // engine implementation may either respond to interrupt events or
@@ -281,7 +281,7 @@ protected:
     void (*_scopeInitCallback)(Scope&);
 
 private:
-    static void (*_connectCallback)(DBClientBase&);
+    static void (*_connectCallback)(DBClientBase&, StringData);
 };
 
 void installGlobalUtils(Scope& scope);

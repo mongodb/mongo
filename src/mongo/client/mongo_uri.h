@@ -134,7 +134,7 @@ public:
     // whichever map type is used provides that guarantee.
     using OptionsMap = std::map<CaseInsensitiveString, std::string>;
 
-    static StatusWith<MongoURI> parse(const std::string& url);
+    static StatusWith<MongoURI> parse(StringData url);
 
     /*
      * Returns true if str starts with one of the uri schemes (e.g. mongodb:// or mongodb+srv://)
@@ -281,7 +281,7 @@ private:
           _sslMode(sslMode),
           _options(std::move(options)) {}
 
-    static MongoURI parseImpl(const std::string& url);
+    static MongoURI parseImpl(StringData url);
 
     ConnectionString _connectString;
     std::string _user;

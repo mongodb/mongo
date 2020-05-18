@@ -577,7 +577,7 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
     return p;
 }
 
-void (*ScriptEngine::_connectCallback)(DBClientBase&) = nullptr;
+void (*ScriptEngine::_connectCallback)(DBClientBase&, StringData) = nullptr;
 
 ScriptEngine* getGlobalScriptEngine() {
     if (hasGlobalServiceContext())
