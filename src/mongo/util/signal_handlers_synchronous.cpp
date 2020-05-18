@@ -195,6 +195,7 @@ void writeMallocFreeStreamToLog() {
         4757800,
         logv2::LogOptions(logv2::FatalMode::kContinue, logv2::LogTruncation::Disabled),
         "{message}",
+        "Writing fatal message",
         "message"_attr = mallocFreeOStream.str());
     mallocFreeOStream.rewind();
 }
@@ -272,8 +273,9 @@ void myInvalidParameterHandler(const wchar_t* expression,
                                uintptr_t pReserved) {
     LOGV2_FATAL_CONTINUE(
         23815,
-        "Invalid parameter detected in function {function} File: "
-        "{file} Line: {line} Expression: {expression}. Immediate exit due to invalid parameter",
+        "Invalid parameter detected in function {function} in {file} at line {line} "
+        "with expression '{expression}'",
+        "Invalid parameter detected",
         "function"_attr = toUtf8String(function),
         "file"_attr = toUtf8String(file),
         "line"_attr = line,
@@ -353,15 +355,11 @@ void setupSynchronousSignalHandlers() {
         }
         if (sigaction(spec.signal, &sa, nullptr) != 0) {
             int savedErr = errno;
-            LOGV2_FATAL(
-                31334,
-                "{format_FMT_STRING_Failed_to_install_signal_handler_for_signal_with_sigaction_"
-                "spec_signal_strerror_savedErr}",
-                "format_FMT_STRING_Failed_to_install_signal_handler_for_signal_with_sigaction_spec_signal_strerror_savedErr"_attr =
-                    format(FMT_STRING(
-                               "Failed to install signal handler for signal {} with sigaction: {}"),
-                           spec.signal,
-                           strerror(savedErr)));
+            LOGV2_FATAL(31334,
+                        "Failed to install sigaction for signal {signal}: {error}",
+                        "Failed to install sigaction for signal",
+                        "signal"_attr = spec.signal,
+                        "error"_attr = strerror(savedErr));
         }
     }
     setupSIGTRAPforDebugger();
