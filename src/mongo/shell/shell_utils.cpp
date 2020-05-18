@@ -541,12 +541,11 @@ bool Prompter::confirm() {
 
 ConnectionRegistry::ConnectionRegistry() = default;
 
-void ConnectionRegistry::registerConnection(DBClientBase& client) {
+void ConnectionRegistry::registerConnection(DBClientBase& client, StringData uri) {
     BSONObj info;
     if (client.runCommand("admin", BSON("whatsmyuri" << 1), info)) {
-        std::string connstr = client.getServerAddress();
         stdx::lock_guard<Latch> lk(_mutex);
-        _connectionUris[connstr].insert(info["you"].str());
+        _connectionUris[uri.toString()].insert(info["you"].str());
     }
 }
 
@@ -554,15 +553,10 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
     Prompter prompter("do you want to kill the current op(s) on the server?");
     stdx::lock_guard<Latch> lk(_mutex);
     for (auto& connection : _connectionUris) {
-        auto status = ConnectionString::parse(connection.first);
-        if (!status.isOK()) {
-            continue;
-        }
-
-        const ConnectionString cs(status.getValue());
-
         std::string errmsg;
-        std::unique_ptr<DBClientBase> conn(cs.connect("MongoDB Shell", errmsg));
+
+        auto uri = uassertStatusOK(MongoURI::parse(connection.first));
+        std::unique_ptr<DBClientBase> conn(uri.connect("MongoDB Shell", errmsg));
         if (!conn) {
             continue;
         }
@@ -620,7 +614,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
 
 ConnectionRegistry connectionRegistry;
 
-void onConnect(DBClientBase& c) {
+void onConnect(DBClientBase& c, StringData uri) {
     if (shellGlobalParams.nokillop) {
         return;
     }
@@ -630,7 +624,7 @@ void onConnect(DBClientBase& c) {
         c.setClientRPCProtocols(*shellGlobalParams.rpcProtocols);
     }
 
-    connectionRegistry.registerConnection(c);
+    connectionRegistry.registerConnection(c, uri);
 }
 
 bool fileExists(const std::string& file) {
