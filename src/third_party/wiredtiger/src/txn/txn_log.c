@@ -395,7 +395,7 @@ __wt_txn_ts_log(WT_SESSION_IMPL *session)
     WT_ITEM *logrec;
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
-    wt_timestamp_t commit, durable, first_commit, pinned_read, prepare, read;
+    wt_timestamp_t commit, durable, first_commit, prepare, read;
 
     conn = S2C(session);
     txn = session->txn;
@@ -419,7 +419,7 @@ __wt_txn_ts_log(WT_SESSION_IMPL *session)
 
     WT_RET(__txn_logrec_init(session));
     logrec = txn->logrec;
-    commit = durable = first_commit = pinned_read = prepare = read = WT_TS_NONE;
+    commit = durable = first_commit = prepare = read = WT_TS_NONE;
     if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
         commit = txn->commit_timestamp;
         first_commit = txn->first_commit_timestamp;
@@ -428,14 +428,12 @@ __wt_txn_ts_log(WT_SESSION_IMPL *session)
         durable = txn->durable_timestamp;
     if (F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
         prepare = txn->prepare_timestamp;
-    if (F_ISSET(txn, WT_TXN_HAS_TS_READ)) {
-        read = txn->read_timestamp;
-        pinned_read = txn_shared->pinned_read_timestamp;
-    }
+    if (F_ISSET(txn, WT_TXN_HAS_TS_READ))
+        read = txn_shared->read_timestamp;
 
     __wt_epoch(session, &t);
     return (__wt_logop_txn_timestamp_pack(session, logrec, (uint64_t)t.tv_sec, (uint64_t)t.tv_nsec,
-      commit, durable, first_commit, prepare, read, pinned_read));
+      commit, durable, first_commit, prepare, read));
 }
 
 /*

@@ -560,7 +560,7 @@ __wt_modify_reconstruct_from_upd_list(
         /*
          * Callers of this function set the cursor slot to an impossible value to check we don't try
          * and return on-page values when the update list should have been sufficient (which
-         * happens, for example, if an update list was truncated, deleting some standard update
+         * happens, for example, if an update list was truncated, deleting the standard update
          * required by a previous modify update). Assert the case.
          */
         WT_ASSERT(session, cbt->slot != UINT32_MAX);
@@ -568,9 +568,10 @@ __wt_modify_reconstruct_from_upd_list(
         WT_ERR(__wt_value_return_buf(cbt, cbt->ref, &upd_value->buf, &tw));
         /*
          * Applying modifies on top of a tombstone is invalid. So if we're using the onpage value,
-         * the stop time pair should be unset.
+         * the stop time point should be unset.
          */
-        WT_ASSERT(session, tw.stop_txn == WT_TXN_MAX && tw.stop_ts == WT_TS_MAX);
+        WT_ASSERT(session,
+          tw.stop_txn == WT_TXN_MAX && tw.stop_ts == WT_TS_MAX && tw.durable_stop_ts == WT_TS_NONE);
     } else {
         /* The base update must not be a tombstone. */
         WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);

@@ -153,7 +153,7 @@ __debug_item_value(WT_DBG *ds, const char *tag, const void *data_arg, size_t siz
 
 /*
  * __debug_time_window --
- *     Dump a set of start and stop time pairs, with an optional tag.
+ *     Dump a time window, with an optional tag.
  */
 static inline int
 __debug_time_window(WT_DBG *ds, const char *tag, WT_TIME_WINDOW *tw)

@@ -532,14 +532,16 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK_KV unpack;
+    WT_DECL_RET;
     WT_ITEM buf;
     WT_ROW *rip;
-    WT_UPDATE **upd_array, *upd;
+    WT_UPDATE *tombstone, **upd_array, *upd;
     size_t size, total_size;
     uint32_t i;
     bool instantiate_prepared, prepare;
 
     btree = S2BT(session);
+    tombstone = upd = NULL;
     prepare = false;
     WT_CLEAR(buf);
 
@@ -607,22 +609,35 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
             /* Unpack the on-page value cell. */
             __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
             if (unpack.tw.prepare) {
-                if (!WT_TIME_WINDOW_HAS_STOP(&unpack.tw)) {
-                    /* Take the value from the original page cell. */
-                    WT_RET(__wt_page_cell_data_ref(session, page, &unpack, &buf));
+                /* Take the value from the original page cell. */
+                WT_RET(__wt_page_cell_data_ref(session, page, &unpack, &buf));
 
-                    WT_RET(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, &size));
-                    upd->durable_ts = WT_TS_NONE;
-                    upd->start_ts = unpack.tw.start_ts;
-                    upd->txnid = unpack.tw.start_txn;
+                WT_RET(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, &size));
+                upd->durable_ts = unpack.tw.durable_start_ts;
+                upd->start_ts = unpack.tw.start_ts;
+                upd->txnid = unpack.tw.start_txn;
+
+                /*
+                 * Instantiating both update and tombstone if the prepared update is a tombstone.
+                 * This is required to ensure that written prepared delete operation must be removed
+                 * from the data store, when the prepared transaction gets rollback.
+                 */
+                if (WT_TIME_WINDOW_HAS_STOP(&unpack.tw)) {
+                    WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &size));
+                    tombstone->durable_ts = WT_TS_NONE;
+                    tombstone->start_ts = unpack.tw.stop_ts;
+                    tombstone->txnid = unpack.tw.stop_txn;
+                    tombstone->prepare_state = WT_PREPARE_INPROGRESS;
+                    F_SET(tombstone, WT_UPDATE_PREPARE_RESTORED_FROM_DISK);
+                    tombstone->next = upd;
                 } else {
-                    WT_RET(__wt_upd_alloc_tombstone(session, &upd, &size));
                     upd->durable_ts = WT_TS_NONE;
-                    upd->start_ts = unpack.tw.stop_ts;
-                    upd->txnid = unpack.tw.stop_txn;
+                    upd->prepare_state = WT_PREPARE_INPROGRESS;
+                    F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK);
+                    tombstone = upd;
                 }
-                upd->prepare_state = WT_PREPARE_INPROGRESS;
-                upd_array[WT_ROW_SLOT(page, rip)] = upd;
+
+                upd_array[WT_ROW_SLOT(page, rip)] = tombstone;
                 total_size += size;
             }
         }
@@ -630,5 +645,10 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
         __wt_cache_page_inmem_incr(session, page, total_size);
     }
 
-    return (0);
+    if (0) {
+err:
+        __wt_free(session, upd);
+    }
+
+    return (ret);
 }

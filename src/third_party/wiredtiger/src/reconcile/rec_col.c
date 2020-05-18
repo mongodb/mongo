@@ -721,8 +721,9 @@ record_loop:
                     repeat_count = WT_INSERT_RECNO(ins) - src_recno;
 
                 /*
-                 * The key on the old disk image is unchanged. If a deleted record or salvaging the
-                 * file, clear the time pair information, else take the time pairs from the cell.
+                 * The key on the old disk image is unchanged. If it is a deleted record or we are
+                 * salvaging the file, clear the time window information, else take the time window
+                 * from the cell.
                  */
                 deleted = orig_deleted;
                 if (deleted || salvage) {
@@ -817,12 +818,7 @@ compare:
                   ((deleted && last.deleted) ||
                       (!deleted && !last.deleted && last.value->size == size &&
                         memcmp(last.value->data, data, size) == 0))) {
-                    /*
-                     * The start time pair for deleted keys must be (WT_TS_NONE, WT_TXN_NONE) and
-                     * stop time pair must be (WT_TS_MAX, WT_TXN_MAX) since we no longer select
-                     * tombstone to write to disk and the deletion of the keys must be globally
-                     * visible.
-                     */
+                    /* The time window for deleted keys must be empty. */
                     WT_ASSERT(
                       session, (!deleted && !last.deleted) || WT_TIME_WINDOW_IS_EMPTY(&last.tw));
                     rle += repeat_count;
@@ -910,12 +906,7 @@ compare:
             if (src_recno < n) {
                 deleted = true;
                 if (last.deleted) {
-                    /*
-                     * The start time pair for deleted keys must be (WT_TS_NONE, WT_TXN_NONE) and
-                     * stop time pair must be (WT_TS_MAX, WT_TXN_MAX) since we no longer select
-                     * tombstone to write to disk and the deletion of the keys must be globally
-                     * visible.
-                     */
+                    /* The time window for deleted keys must be empty. */
                     WT_ASSERT(session, WT_TIME_WINDOW_IS_EMPTY(&last.tw));
                     /*
                      * The record adjustment is decremented by one so we can naturally fall into the
@@ -926,14 +917,14 @@ compare:
                     rle += skip;
                     src_recno += skip;
                 } else
-                    /* Set time pairs for the first deleted key in a deleted range. */
+                    /* Set time window for the first deleted key in a deleted range. */
                     WT_TIME_WINDOW_INIT(&tw);
             } else if (upd == NULL) {
                 /* The updates on the key are all uncommitted so we write a deleted key to disk. */
                 WT_TIME_WINDOW_INIT(&tw);
                 deleted = true;
             } else {
-                /* Set time pairs for a key. */
+                /* Set time window for the key. */
                 WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
 
                 switch (upd->type) {
@@ -972,17 +963,10 @@ compare:
                       (!deleted && !last.deleted && size != 0 && last.value->size == size &&
                         memcmp(last.value->data, data, size) == 0))) {
                     /*
-                     * The start time pair for deleted keys must be (WT_TS_NONE, WT_TXN_NONE) and
-                     * stop time pair must be (WT_TS_MAX, WT_TXN_MAX) since we no longer select
-                     * tombstone to write to disk and the deletion of the keys must be globally
-                     * visible.
+                     * The time window for deleted keys must be empty.
                      */
-                    WT_ASSERT(session,
-                      (!deleted && !last.deleted) ||
-                        (last.tw.durable_start_ts == tw.durable_start_ts &&
-                          last.tw.start_ts == WT_TS_NONE && last.tw.start_txn == WT_TXN_NONE &&
-                          last.tw.durable_stop_ts == tw.durable_stop_ts &&
-                          !WT_TIME_WINDOW_HAS_STOP(&last.tw)));
+                    WT_ASSERT(
+                      session, (!deleted && !last.deleted) || WT_TIME_WINDOW_IS_EMPTY(&last.tw));
                     ++rle;
                     goto next;
                 }

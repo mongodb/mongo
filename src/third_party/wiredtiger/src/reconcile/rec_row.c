@@ -752,7 +752,7 @@ __wt_rec_row_leaf(
 
         /*
          * Figure out the timestamps. If there's no update and salvaging the file, clear the time
-         * pair information, else take the time pairs from the cell.
+         * pair information, else take the time window from the cell.
          */
         if (upd == NULL) {
             if (!salvage)
@@ -763,7 +763,7 @@ __wt_rec_row_leaf(
             WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
 
         /*
-         * If we reconcile an on disk key with a globally visible stop time pair and there are no
+         * If we reconcile an on disk key with a globally visible stop time point and there are no
          * new updates for that key, skip writing that key.
          */
         if (upd == NULL && __wt_txn_tw_stop_visible_all(session, &tw))
