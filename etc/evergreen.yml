@@ -367,6 +367,7 @@ variables:
   - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu1804-arm64
+  - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-64
@@ -435,10 +436,12 @@ variables:
   - ubuntu-dynamic-1604-clang
   - ubuntu1804
   - ubuntu1804-arm64
+  - ubuntu2004-arm64
   - ubuntu1804-s390x
   - ubuntu2004
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu1804-arm64
+  - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-64
@@ -9374,6 +9377,82 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu2004-small
+
+- name: enterprise-ubuntu2004-arm64
+  display_name: Enterprise Ubuntu 20.04 arm64
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu2004-arm64-large
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-ubuntu2004
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: arm64
+    packager_distro: ubuntu2004
+    repo_edition: enterprise
+    multiversion_platform: ubuntu2004
+    multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile_all_run_unittests_TG
+  - name: aggregation
+  - name: aggregation_wildcard_fuzzer_gen
+  - name: .auth !.audit !.multiversion !.jscore
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency
+  - name: fle
+  - name: .jscore .common !.auth
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: sharding_gen
+  - name: sharding_jscore_passthrough
+  - name: .ssl
+  - name: .stitch
+  - name: .publish
+    distros:
+    - ubuntu2004-test
+
+- name: ubuntu2004-arm64
+  display_name: Ubuntu 20.04 arm64
+  run_on:
+  - ubuntu2004-arm64-large
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-ubuntu2004
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: arm64
+    packager_distro: ubuntu2004
+    repo_edition: org
+    multiversion_platform: ubuntu2004
+    multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
+    multiversion_edition: targeted
+  tasks:
+  - name: compile_all_run_unittests_TG
+  - name: free_monitoring
+  - name: jsCore
+  - name: replica_sets_jscore_passthrough
+  - name: .publish
+    distros:
+    - ubuntu2004-test
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
