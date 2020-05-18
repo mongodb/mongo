@@ -137,8 +137,8 @@ function mixedShardTest(options1, options2, shouldSucceed) {
 
         authSucceeded = true;
 
-        // TODO (SERVER-xxx): Run this test in FCV 4.4. It currently cannot be because the resumable
-        // range deleter only works on replica set shards.
+        // TODO (SERVER-48261): Run this test in FCV 4.4. It currently cannot be because the
+        // resumable range deleter only works on replica set shards.
         assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
         st.stopBalancer();
