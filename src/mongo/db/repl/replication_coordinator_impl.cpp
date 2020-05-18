@@ -5017,6 +5017,25 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
             int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
             _scheduleHeartbeatToTarget_inlock(senderHost, senderIndex, now);
         }
+    } else if (result.isOK() && args.getPrimaryId() >= 0 &&
+               (!response->hasPrimaryId() || response->getPrimaryId() != args.getPrimaryId())) {
+        // If the sender thinks the primary is different from what we think and if the sender itself
+        // is the primary, then we want to update our view of primary by immediately sending out a
+        // new round of heartbeats, whose responses should inform us of the new primary. We only do
+        // this if the term of the heartbeat is greater than or equal to our own, to prevent
+        // updating our view to a stale primary.
+        if (args.hasSender() && args.getSenderId() == args.getPrimaryId() &&
+            args.getTerm() >= _topCoord->getTerm()) {
+            std::string myPrimaryId =
+                (response->hasPrimaryId() ? (str::stream() << response->getPrimaryId())
+                                          : std::string("none"));
+            LOGV2(2903000,
+                  "Restarting heartbeats after learning of a new primary",
+                  "myPrimaryId"_attr = myPrimaryId,
+                  "senderAndPrimaryId"_attr = args.getPrimaryId(),
+                  "senderTerm"_attr = args.getTerm());
+            _restartHeartbeats_inlock();
+        }
     }
     return result;
 }

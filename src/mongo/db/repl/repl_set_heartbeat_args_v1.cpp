@@ -49,6 +49,7 @@ const std::string kSenderHostFieldName = "from";
 const std::string kSenderIdFieldName = "fromId";
 const std::string kSetNameFieldName = "replSetHeartbeat";
 const std::string kTermFieldName = "term";
+const std::string kPrimaryIdFieldName = "primaryId";
 }  // namespace
 
 Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
@@ -95,6 +96,13 @@ Status ReplSetHeartbeatArgsV1::initialize(const BSONObj& argsObj) {
             return status;
         _hasSender = true;
     }
+
+    // If sender is in an older version, the request object may not have the 'primaryId' field, but
+    // we still parse and allow it whenever it is present.
+    status = bsonExtractIntegerFieldWithDefault(
+        argsObj, kPrimaryIdFieldName, kEmptyPrimaryId, &_primaryId);
+    if (!status.isOK())
+        return status;
 
     status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
     if (!status.isOK())
@@ -145,6 +153,14 @@ void ReplSetHeartbeatArgsV1::setCheckEmpty() {
     _checkEmpty = true;
 }
 
+void ReplSetHeartbeatArgsV1::setPrimaryId(long long primaryId) {
+    _primaryId = primaryId;
+}
+
+void ReplSetHeartbeatArgsV1::setIsArbiter(bool isArbiter) {
+    _isArbiter = isArbiter;
+}
+
 BSONObj ReplSetHeartbeatArgsV1::toBSON() const {
     invariant(isInitialized());
     BSONObjBuilder builder;
@@ -170,6 +186,16 @@ void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kSenderHostFieldName, _hasSender ? _senderHost.toString() : "");
     builder->appendIntOrLL(kSenderIdFieldName, _senderId);
     builder->appendIntOrLL(kTermFieldName, _term);
+
+    // Since arbiters always use the fully upgraded FCV, we must not append the primaryId field if
+    // we are an arbiter, since the rest of the replica set may have nodes running on older versions
+    // that are unable to parse the primaryId field. This should be safe for single version replica
+    // sets, since the primaryId field is only used when the sender is the primary.
+    if (serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
+        !_isArbiter) {
+        builder->append(kPrimaryIdFieldName, _primaryId);
+    }
 }
 
 }  // namespace repl

@@ -93,9 +93,12 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
     if (isInitialConfig) {
         hbArgs.setCheckEmpty();
     }
+    // hbArgs allows (but doesn't require) us to pass the current primary id as an optimization,
+    // but it is not readily available within QuorumChecker.
     hbArgs.setSenderHost(myConfig.getHostAndPort());
     hbArgs.setSenderId(myConfig.getId().getData());
     hbArgs.setTerm(_term);
+    hbArgs.setIsArbiter(myConfig.isArbiter());
     hbRequest = hbArgs.toBSON();
 
     // Send a bunch of heartbeat requests.

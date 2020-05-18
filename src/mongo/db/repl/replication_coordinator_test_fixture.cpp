@@ -361,6 +361,9 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
         ReplSetHeartbeatArgsV1 hbArgs;
         Status status = hbArgs.initialize(request.cmdObj);
         if (status.isOK()) {
+            if (replCoord->getMemberState().primary()) {
+                ASSERT_EQ(hbArgs.getPrimaryId(), replCoord->getMyId());
+            }
             ReplSetHeartbeatResponse hbResp;
             hbResp.setSetName(rsConfig.getReplSetName());
             hbResp.setState(MemberState::RS_SECONDARY);
