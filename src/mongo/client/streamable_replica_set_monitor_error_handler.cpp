@@ -59,7 +59,7 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
     const auto setImmediateCheckAction = [&result]() { result.requestImmediateCheck = true; };
     const auto setDropConnectionsAction = [&result]() { result.dropConnections = true; };
 
-    if (!_isNetworkError(status) && !_isNotMasterOrNotRecovering(status)) {
+    if (!_isNetworkError(status) && !_isNotMasterOrNodeRecovering(status)) {
         setCreateServerDescriptionAction();
         return result;
     }
@@ -77,7 +77,7 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
                     break;
             }
             setDropConnectionsAction();
-        } else if (_isNotMasterOrNotRecovering(status)) {
+        } else if (_isNotMasterOrNodeRecovering(status)) {
             setCreateServerDescriptionAction();
             setImmediateCheckAction();
             if (_isNodeShuttingDown(status)) {
@@ -131,7 +131,7 @@ bool SdamErrorHandler::_isNetworkError(const Status& status) const {
     return ErrorCodes::isA<ErrorCategory::NetworkError>(status.code());
 }
 
-bool SdamErrorHandler::_isNotMasterOrNotRecovering(const Status& status) const {
+bool SdamErrorHandler::_isNotMasterOrNodeRecovering(const Status& status) const {
     return _isNodeRecovering(status) || _isNotMaster(status);
 }
 

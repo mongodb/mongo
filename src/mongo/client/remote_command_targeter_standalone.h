@@ -58,6 +58,8 @@ public:
 
     void markHostUnreachable(const HostAndPort& host, const Status& status) override;
 
+    void markHostShuttingDown(const HostAndPort& host, const Status& status) override;
+
 private:
     const HostAndPort _hostAndPort;
 };
