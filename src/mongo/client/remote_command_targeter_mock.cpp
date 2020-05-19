@@ -87,6 +87,12 @@ void RemoteCommandTargeterMock::markHostUnreachable(const HostAndPort& host, con
     _hostsMarkedDown.insert(host);
 }
 
+void RemoteCommandTargeterMock::markHostShuttingDown(const HostAndPort& host,
+                                                     const Status& status) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _hostsMarkedDown.insert(host);
+}
+
 void RemoteCommandTargeterMock::setConnectionStringReturnValue(const ConnectionString returnValue) {
     _connectionStringReturnValue = std::move(returnValue);
 }

@@ -102,4 +102,10 @@ void RemoteCommandTargeterRS::markHostUnreachable(const HostAndPort& host, const
     _rsMonitor->failedHost(host, status);
 }
 
+void RemoteCommandTargeterRS::markHostShuttingDown(const HostAndPort& host, const Status& status) {
+    invariant(_rsMonitor);
+
+    _rsMonitor->failedHost(host, status);
+}
+
 }  // namespace mongo
