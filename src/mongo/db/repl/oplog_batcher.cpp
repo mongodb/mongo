@@ -363,8 +363,8 @@ std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* s
     // We can't change the timestamp source within a write unit of work.
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     // We're only reading oplog metadata, so the timestamp is not important.  If we read with the
-    // default (which is kLastApplied on secondaries), we may end up with a reader that is at
-    // kLastApplied.  If we then roll back, then when we reconstruct prepared transactions during
+    // default (which is lastApplied on secondaries), we may end up with a reader that is at
+    // lastApplied.  If we then roll back, then when we reconstruct prepared transactions during
     // rollback recovery we will be preparing transactions before the read timestamp, which triggers
     // an assertion in WiredTiger.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);

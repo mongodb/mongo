@@ -51,8 +51,8 @@ public:
     WiredTigerSnapshotManager() = default;
 
     void setCommittedSnapshot(const Timestamp& timestamp) final;
-    void setLocalSnapshot(const Timestamp& timestamp) final;
-    boost::optional<Timestamp> getLocalSnapshot() final;
+    void setLastApplied(const Timestamp& timestamp) final;
+    boost::optional<Timestamp> getLastApplied() final;
     void dropAllSnapshots() final;
 
     //
@@ -65,16 +65,6 @@ public:
      * Throws if there is currently no committed snapshot.
      */
     Timestamp beginTransactionOnCommittedSnapshot(
-        WT_SESSION* session,
-        PrepareConflictBehavior prepareConflictBehavior,
-        RoundUpPreparedTimestamps roundUpPreparedTimestamps) const;
-
-    /**
-     * Starts a transaction on the last stable local timestamp, set by setLocalSnapshot.
-     *
-     * Throws if no local snapshot has been set.
-     */
-    Timestamp beginTransactionOnLocalSnapshot(
         WT_SESSION* session,
         PrepareConflictBehavior prepareConflictBehavior,
         RoundUpPreparedTimestamps roundUpPreparedTimestamps) const;
@@ -95,9 +85,9 @@ private:
         MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_committedSnapshotMutex");
     boost::optional<Timestamp> _committedSnapshot;
 
-    // Snapshot to use for reads at a local stable timestamp.
-    mutable Mutex _localSnapshotMutex =  // Guards _localSnapshot.
-        MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_localSnapshotMutex");
-    boost::optional<Timestamp> _localSnapshot;
+    // Timestamp to use for reads at a the lastApplied timestamp.
+    mutable Mutex _lastAppliedMutex =  // Guards _lastApplied.
+        MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_lastAppliedMutex");
+    boost::optional<Timestamp> _lastApplied;
 };
 }  // namespace mongo

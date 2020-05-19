@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,56 +29,15 @@
 
 #pragma once
 
-#include <limits>
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace SnapshotHelper {
+// Returns a ReadSource if we should change our current ReadSource. Returns boost::none otherwise.
+boost::optional<RecoveryUnit::ReadSource> getNewReadSource(OperationContext* opCtx,
+                                                           const NamespaceString& nss);
 
-/**
- * Manages snapshots that can be read from at a later time.
- *
- * Implementations must be able to handle concurrent access to any methods. No methods are allowed
- * to acquire locks from the LockManager.
- */
-class SnapshotManager {
-public:
-    /**
-     * Sets the snapshot to be used for committed reads.
-     *
-     * Implementations are allowed to assume that all older snapshots have names that compare
-     * less than the passed in name, and newer ones compare greater.
-     *
-     * This is called while holding a very hot mutex. Therefore it should avoid doing any work that
-     * can be done later.
-     */
-    virtual void setCommittedSnapshot(const Timestamp& timestamp) = 0;
-
-    /**
-     *  Sets the lastApplied timestamp.
-     */
-    virtual void setLastApplied(const Timestamp& timestamp) = 0;
-
-    /**
-     * Returns the lastApplied timestamp.
-     */
-    virtual boost::optional<Timestamp> getLastApplied() = 0;
-
-    /**
-     * Drops all snapshots and clears the "committed" snapshot.
-     */
-    virtual void dropAllSnapshots() = 0;
-
-protected:
-    /**
-     * SnapshotManagers are not intended to be deleted through pointers to base type.
-     * (virtual is just to suppress compiler warnings)
-     */
-    virtual ~SnapshotManager() = default;
-};
-
+bool collectionChangesConflictWithRead(boost::optional<Timestamp> collectionMin,
+                                       boost::optional<Timestamp> readTimestamp);
+}  // namespace SnapshotHelper
 }  // namespace mongo

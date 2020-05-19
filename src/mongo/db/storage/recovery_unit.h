@@ -253,7 +253,6 @@ public:
      *  - when using ReadSource::kNoOverlap, the timestamp chosen by the storage engine.
      *  - when using ReadSource::kAllDurableSnapshot, the timestamp chosen using the storage
      * engine's all_durable timestamp.
-     *  - when using ReadSource::kLastApplied, the timestamp chosen using the storage engine's last
      * applied timestamp. Can return boost::none if no timestamp has been established.
      *  - when using ReadSource::kMajorityCommitted, the majority committed timestamp chosen by the
      * storage engine after a transaction has been opened or after a call to
@@ -399,11 +398,6 @@ public:
          */
         kNoOverlap,
         /**
-         * Read from the last applied timestamp. New transactions start at the most up-to-date
-         * timestamp.
-         */
-        kLastApplied,
-        /**
          * Read from the all_durable timestamp. New transactions will always read from the same
          * timestamp and never advance.
          */
@@ -413,6 +407,24 @@ public:
          */
         kProvided
     };
+
+    static std::string toString(ReadSource rs) {
+        switch (rs) {
+            case ReadSource::kUnset:
+                return "kUnset";
+            case ReadSource::kNoTimestamp:
+                return "kNoTimestamp";
+            case ReadSource::kMajorityCommitted:
+                return "kMajorityCommitted";
+            case ReadSource::kNoOverlap:
+                return "kNoOverlap";
+            case ReadSource::kAllDurableSnapshot:
+                return "kAllDurableSnapshot";
+            case ReadSource::kProvided:
+                return "kProvided";
+        }
+        MONGO_UNREACHABLE;
+    }
 
     /**
      * Sets which timestamp to use for read transactions. If 'provided' is supplied, only kProvided
