@@ -354,8 +354,10 @@ function autoReconfig(rst, targetConfig) {
  * @param config - the desired target config. After this function returns, the
  * given replica set should be in 'config', except with a higher version.
  * @param force - should this be a 'force' reconfig or not.
+ * @param doNotWaitForMembers - if set, we will skip waiting for all members to be in primary,
+ *     secondary, or arbiter states
  */
-reconfig = function(rst, config, force) {
+reconfig = function(rst, config, force, doNotWaitForMembers) {
     "use strict";
     var primary = rst.getPrimary();
     config = rst._updateConfigIfNotDurable(config);
@@ -372,7 +374,9 @@ reconfig = function(rst, config, force) {
     }
 
     var primaryAdminDB = rst.getPrimary().getDB("admin");
-    waitForAllMembers(primaryAdminDB);
+    if (!doNotWaitForMembers) {
+        waitForAllMembers(primaryAdminDB);
+    }
     return primaryAdminDB;
 };
 
