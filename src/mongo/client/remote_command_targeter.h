@@ -108,6 +108,13 @@ public:
      */
     virtual void markHostUnreachable(const HostAndPort& host, const Status& status) = 0;
 
+    /**
+     * Reports to the targeter that a 'status' indicating a shutdown error was received when trying
+     * to communicate with 'host', and so it should update its bookkeeping to avoid giving out the
+     * host again on a subsequent request for the primary.
+     */
+    virtual void markHostShuttingDown(const HostAndPort& host, const Status& status) = 0;
+
 protected:
     RemoteCommandTargeter() = default;
 };

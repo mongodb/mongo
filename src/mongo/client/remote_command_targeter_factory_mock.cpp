@@ -67,6 +67,10 @@ public:
         _mock->markHostUnreachable(host, status);
     }
 
+    void markHostShuttingDown(const HostAndPort& host, const Status& status) override {
+        _mock->markHostShuttingDown(host, status);
+    }
+
 private:
     const std::shared_ptr<RemoteCommandTargeter> _mock;
 };

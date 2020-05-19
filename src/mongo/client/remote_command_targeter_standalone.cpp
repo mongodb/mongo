@@ -64,4 +64,9 @@ void RemoteCommandTargeterStandalone::markHostUnreachable(const HostAndPort& hos
     dassert(host == _hostAndPort);
 }
 
+void RemoteCommandTargeterStandalone::markHostShuttingDown(const HostAndPort& host,
+                                                           const Status& status) {
+    dassert(host == _hostAndPort);
+}
+
 }  // namespace mongo

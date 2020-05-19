@@ -70,6 +70,9 @@ void RemoteCommandTargeterMock::markHostNotMaster(const HostAndPort& host, const
 void RemoteCommandTargeterMock::markHostUnreachable(const HostAndPort& host, const Status& status) {
 }
 
+void RemoteCommandTargeterMock::markHostShuttingDown(const HostAndPort& host,
+                                                     const Status& status) {}
+
 void RemoteCommandTargeterMock::setConnectionStringReturnValue(const ConnectionString returnValue) {
     _connectionStringReturnValue = std::move(returnValue);
 }

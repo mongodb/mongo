@@ -73,6 +73,11 @@ public:
     void markHostUnreachable(const HostAndPort& host, const Status& status) override;
 
     /**
+     * Adds host to a set of hosts marked down, otherwise a no-op.
+     */
+    void markHostShuttingDown(const HostAndPort& host, const Status& status) override;
+
+    /**
      * Sets the return value for the next call to connectionString.
      */
     void setConnectionStringReturnValue(const ConnectionString returnValue);
