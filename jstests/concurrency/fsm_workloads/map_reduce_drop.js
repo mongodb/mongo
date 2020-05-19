@@ -14,6 +14,8 @@
  * @tags: [
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
+ *   # The old implementation of mapReduce can conflict on temporary namespaces if run concurrently.
+ *   requires_fcv_44,
  * ]
  */
 var $config = (function() {

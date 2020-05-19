@@ -10,7 +10,9 @@
  * @tags: [
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
- *   uses_curop_agg_stage
+ *   uses_curop_agg_stage,
+ *   # The old implementation of mapReduce can conflict on temporary namespaces if run concurrently.
+ *   requires_fcv_44,
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                      // for extendWorkload
