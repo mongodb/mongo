@@ -524,7 +524,7 @@ prepare_transaction(TINFO *tinfo)
         longwait = mmrand(&tinfo->rnd, 0, 999);
         if (longwait < 10) {
             pause_ms = mmrand(&tinfo->rnd, 1, 10) << longwait;
-            __wt_sleep(0, pause_ms * WT_THOUSAND);
+            __wt_sleep(0, (uint64_t)pause_ms * WT_THOUSAND);
         }
     }
     return (ret);

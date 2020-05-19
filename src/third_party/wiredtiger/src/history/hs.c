@@ -574,14 +574,15 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
     WT_MODIFY entries[MAX_REVERSE_MODIFY_NUM];
     WT_MODIFY_VECTOR modifies;
     WT_SAVE_UPD *list;
-    WT_UPDATE *prev_upd, *upd;
+    WT_UPDATE *prev_upd, *second_older_than_prepare, *upd;
     WT_HS_TIME_POINT stop_time_point;
     wt_off_t hs_size;
     uint64_t insert_cnt, max_hs_size;
     uint32_t i;
     uint8_t *p;
     int nentries;
-    bool squashed;
+    bool squashed, track_prepare;
+    uint8_t upd_count;
 
     btree = S2BT(session);
     cursor = session->hs_cursor;
@@ -634,6 +635,9 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
           session, btree, upd = __wt_update_obsolete_check(session, page, list->onpage_upd, true));
         __wt_free_update_list(session, &upd);
         upd = list->onpage_upd;
+        second_older_than_prepare = NULL;
+        track_prepare = false;
+        upd_count = 0;
 
         /*
          * The algorithm assumes the oldest update on the update chain in memory is either a full
@@ -666,6 +670,32 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
             if (upd->txnid == WT_TXN_ABORTED)
                 continue;
             WT_ERR(__wt_modify_vector_push(&modifies, upd));
+
+            /*
+             * If the update is the second update older than the prepared update and we haven't seen
+             * a tombstone. Mark the update.
+             */
+            if (upd->prepare_state == WT_PREPARE_INPROGRESS) {
+                /*
+                 * No normal update between prepared updates and the first prepared update cannot be
+                 * a tombstone.
+                 */
+                WT_ASSERT(session, (track_prepare && upd_count == 0) ||
+                    (!track_prepare && upd->type != WT_UPDATE_TOMBSTONE));
+                track_prepare = true;
+            } else if (track_prepare) {
+                if (upd->type == WT_UPDATE_TOMBSTONE) {
+                    upd_count = 0;
+                    track_prepare = false;
+                } else if (upd_count == 0)
+                    ++upd_count;
+                else {
+                    second_older_than_prepare = upd;
+                    upd_count = 0;
+                    track_prepare = false;
+                }
+            }
+
             /*
              * If we've reached a full update and its in the history store we don't need to continue
              * as anything beyond this point won't help with calculating deltas.
@@ -763,13 +793,16 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
                  * It is not correct to check prev_upd == list->onpage_upd as we may have aborted
                  * updates in the middle.
                  *
-                 * We can't calculate reverse modify based on an uncommitted prepared update because
-                 * it may be aborted.
+                 * We must insert the first and second updates after a prepared update as full
+                 * values because if the prepared update is aborted, we will remove the first update
+                 * after it from the history store to the update chain. Readers reading the older
+                 * values need a full update as the base value for constructing reverse modifies.
                  */
                 nentries = MAX_REVERSE_MODIFY_NUM;
                 if (!F_ISSET(upd, WT_UPDATE_HS)) {
                     if (upd->type == WT_UPDATE_MODIFY &&
                       prev_upd->prepare_state != WT_PREPARE_INPROGRESS &&
+                      (second_older_than_prepare == NULL || upd != second_older_than_prepare) &&
                       __wt_calc_modify(session, prev_full_value, full_value,
                         prev_full_value->size / 10, entries, &nentries) == 0) {
                         WT_ERR(__wt_modify_pack(cursor, entries, nentries, &modify_value));
@@ -1049,11 +1082,9 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
      */
     WT_ERR(__wt_buf_set(session, &upd_value->buf, hs_value->data, hs_value->size));
 skip_buf:
-    upd_value->durable_ts = durable_timestamp;
-    upd_value->txnid = WT_TXN_NONE;
+    upd_value->tw.durable_start_ts = durable_timestamp;
+    upd_value->tw.start_txn = WT_TXN_NONE;
     upd_value->type = upd_type;
-    upd_value->prepare_state =
-      (hs_start_ts == durable_timestamp) ? WT_PREPARE_INIT : WT_PREPARE_RESOLVED;
 
 done:
 err:

@@ -685,6 +685,12 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction worker thread stable number", "cache: files with active eviction walks",
   "cache: files with new eviction walks started",
   "cache: force re-tuning of eviction workers once in a while",
+  "cache: forced eviction - history store pages failed to evict while session has history store "
+  "cursor open",
+  "cache: forced eviction - history store pages selected while session has history store cursor "
+  "open",
+  "cache: forced eviction - history store pages successfully evicted while session has history "
+  "store cursor open",
   "cache: forced eviction - pages evicted that were clean count",
   "cache: forced eviction - pages evicted that were clean time (usecs)",
   "cache: forced eviction - pages evicted that were dirty count",
@@ -1046,6 +1052,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing cache_eviction_walks_active */
     stats->cache_eviction_walks_started = 0;
     stats->cache_eviction_force_retune = 0;
+    stats->cache_eviction_force_hs_fail = 0;
+    stats->cache_eviction_force_hs = 0;
+    stats->cache_eviction_force_hs_success = 0;
     stats->cache_eviction_force_clean = 0;
     stats->cache_eviction_force_clean_time = 0;
     stats->cache_eviction_force_dirty = 0;
@@ -1493,6 +1502,9 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_eviction_walks_active += WT_STAT_READ(from, cache_eviction_walks_active);
     to->cache_eviction_walks_started += WT_STAT_READ(from, cache_eviction_walks_started);
     to->cache_eviction_force_retune += WT_STAT_READ(from, cache_eviction_force_retune);
+    to->cache_eviction_force_hs_fail += WT_STAT_READ(from, cache_eviction_force_hs_fail);
+    to->cache_eviction_force_hs += WT_STAT_READ(from, cache_eviction_force_hs);
+    to->cache_eviction_force_hs_success += WT_STAT_READ(from, cache_eviction_force_hs_success);
     to->cache_eviction_force_clean += WT_STAT_READ(from, cache_eviction_force_clean);
     to->cache_eviction_force_clean_time += WT_STAT_READ(from, cache_eviction_force_clean_time);
     to->cache_eviction_force_dirty += WT_STAT_READ(from, cache_eviction_force_dirty);

@@ -15,9 +15,8 @@
 static inline bool
 __rec_update_stable(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd)
 {
-    return (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
-        __wt_txn_upd_visible_all(session, upd) :
-        __wt_txn_upd_visible_type(session, upd) == WT_VISIBLE_TRUE &&
+    return (F_ISSET(r, WT_REC_VISIBLE_ALL) ? __wt_txn_upd_visible_all(session, upd) :
+                                             __wt_txn_upd_visible(session, upd) &&
           __wt_txn_visible(session, upd->txnid, upd->durable_ts));
 }
 
