@@ -77,6 +77,9 @@ MONGO_EXPORT_SERVER_PARAMETER(internalProhibitShardOperationRetry,
                               bool,
                               internalProhibitShardOperationRetryByDefault);
 
+constexpr int findChunksOnConfigTimeoutMSDefault = 900000;
+MONGO_EXPORT_SERVER_PARAMETER(findChunksOnConfigTimeoutMS, int, findChunksOnConfigTimeoutMSDefault);
+
 /**
  * Returns a new BSONObj describing the same command and arguments as 'cmdObj', but with maxTimeMS
  * replaced by maxTimeMSOverride (or removed if maxTimeMSOverride is Milliseconds::max()).
@@ -280,7 +283,6 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     auto fetcherCallback = [&status, &response](const Fetcher::QueryResponseStatus& dataStatus,
                                                 Fetcher::NextAction* nextAction,
                                                 BSONObjBuilder* getMoreBob) {
-
         // Throw out any accumulated results on error
         if (!dataStatus.isOK()) {
             status = dataStatus.getStatus();
@@ -373,7 +375,9 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     }
 
     const Milliseconds maxTimeMS =
-        std::min(opCtx->getRemainingMaxTimeMillis(), kDefaultConfigCommandTimeout);
+        std::min(opCtx->getRemainingMaxTimeMillis(),
+                 nss == ChunkType::ConfigNS ? Milliseconds(findChunksOnConfigTimeoutMS.load())
+                                            : kDefaultConfigCommandTimeout);
 
     BSONObjBuilder findCmdBuilder;
 
