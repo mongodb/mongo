@@ -19,15 +19,8 @@
 
 load("jstests/libs/storage_engine_utils.js");
 
-const rt = new ReplSetTest({
-    name: "drop_oplog_should_fail_if_storage_engine_supports_replSetResizeOplog_command",
-    nodes: 1
-});
-
-// Start as a standalone node.
-rt.start(0, {noReplSet: true});
-
-let master = rt.getPrimary();
+// Start a standalone node.
+let master = MongoRunner.runMongod();
 let localDB = master.getDB('local');
 
 // Standalone nodes don't start with an oplog; create one. The size of the oplog doesn't
@@ -43,5 +36,5 @@ if (storageEngineIsWiredTiger()) {
     assert.commandWorked(localDB.runCommand({drop: 'oplog.rs'}));
 }
 
-rt.stopSet();
+MongoRunner.stopMongod(master);
 }());
