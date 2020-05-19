@@ -5162,7 +5162,7 @@ tasks:
 
 ## jstestfuzz sharded multiversion cluster ##
 - <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_multiversion_gen
+  name: jstestfuzz_sharded_fcv42_multiversion_gen
   tags: [jstestfuzz_multiversion_gen]
   commands:
   - func: "generate multiversion tasks"
@@ -5170,7 +5170,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-      suite: jstestfuzz_sharded
+      suite: jstestfuzz_sharded_fcv42
       is_jstestfuzz: true
       use_multiversion: /data/multiversion
       npm_command: jstestfuzz
