@@ -183,10 +183,12 @@ const transactionTypes = {
     writeReadSingleShardExpectSingleShardCommit: txnNumber => {
         return [writeShard0(txnNumber), readShard0(txnNumber)];
     },
-    readOneShardWriteOtherShardExpectSingleWriteShardCommit: txnNumber => {
+    // TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
+    readOneShardWriteOtherShardExpectTwoPhaseCommit: txnNumber => {
         return [readShard0(txnNumber), writeShard1(txnNumber)];
     },
-    writeOneShardReadOtherShardExpectSingleWriteShardCommit: txnNumber => {
+    // TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
+    writeOneShardReadOtherShardExpectTwoPhaseCommit: txnNumber => {
         return [writeShard0(txnNumber), readShard1(txnNumber)];
     },
     readOneShardWriteTwoOtherShardsExpectTwoPhaseCommit: txnNumber => {

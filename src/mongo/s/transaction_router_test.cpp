@@ -1007,8 +1007,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     ASSERT(expectedHostAndPorts == seenHostAndPorts);
 }
 
+// TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
 TEST_F(TransactionRouterTestWithDefaultSession,
-       SendCommitDirectlyToReadOnlyShardsThenWriteShardForMultipleParticipantsOnlyOneDidAWrite) {
+       SendCoordinateCommitForMultipleParticipantsOnlyOneDidAWrite) {
     TxnNumber txnNum{3};
 
     auto txnRouter = TransactionRouter::get(operationContext());
@@ -1035,25 +1036,22 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         ASSERT_EQ("admin", request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
-        ASSERT_EQ(cmdName, "commitTransaction");
+        ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+        std::set<std::string> expectedParticipants = {shard1.toString(), shard2.toString()};
+        auto participantElements = request.cmdObj["participants"].Array();
+        ASSERT_EQ(expectedParticipants.size(), participantElements.size());
+
+        for (const auto& element : participantElements) {
+            auto shardId = element["shardId"].valuestr();
+            ASSERT_EQ(1ull, expectedParticipants.count(shardId));
+            expectedParticipants.erase(shardId);
+        }
 
         checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
 
         return BSON("ok" << 1);
     });
-
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(hostAndPort2, request.target);
-        ASSERT_EQ("admin", request.dbname);
-
-        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
-        ASSERT_EQ(cmdName, "commitTransaction");
-
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, false);
-
-        return BSON("ok" << 1);
-    });
-
 
     future.default_timed_get();
 }
@@ -2993,8 +2991,7 @@ protected:
         startCapturingLogMessages();
         auto future = launchAsync(
             [&] { txnRouter().commitTransaction(operationContext(), kDummyRecoveryToken); });
-        expectCommitTransaction();
-        expectCommitTransaction();
+        expectCoordinateCommitTransaction();
         future.default_timed_get();
         stopCapturingLogMessages();
     }
@@ -3262,15 +3259,15 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_SingleShard) {
     ASSERT_EQUALS(0, countLogLinesContaining("coordinator:"));
 }
 
+// TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
 TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_SingleWriteShard) {
     beginSlowTxnWithDefaultTxnNumber();
     runSingleWriteShardCommit();
 
-    ASSERT_EQUALS(1, countLogLinesContaining("commitType:singleWriteShard,"));
+    ASSERT_EQUALS(1, countLogLinesContaining("commitType:twoPhaseCommit,"));
+    ASSERT_EQUALS(1, countLogLinesContaining("coordinator:"));
     ASSERT_EQUALS(1, countLogLinesContaining("numParticipants:2"));
     ASSERT_EQUALS(1, countLogLinesContaining("commitDurationMicros:"));
-
-    ASSERT_EQUALS(0, countLogLinesContaining("coordinator:"));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_ReadOnly) {

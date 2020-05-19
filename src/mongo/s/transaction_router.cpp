@@ -1064,25 +1064,6 @@ BSONObj TransactionRouter::Router::_commitTransaction(
         return sendCommitDirectlyToShards(opCtx, readOnlyShards);
     }
 
-    if (writeShards.size() == 1) {
-        LOG(3) << txnIdToString() << " Committing single-write-shard transaction with "
-               << readOnlyShards.size()
-               << " read-only shards, write shard: " << writeShards.front();
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            o(lk).commitType = CommitType::kSingleWriteShard;
-            _onStartCommit(lk, opCtx);
-        }
-
-        const auto readOnlyShardsResponse = sendCommitDirectlyToShards(opCtx, readOnlyShards);
-
-        if (!getStatusFromCommandResult(readOnlyShardsResponse).isOK() ||
-            !getWriteConcernStatusFromCommandResult(readOnlyShardsResponse).isOK()) {
-            return readOnlyShardsResponse;
-        }
-        return sendCommitDirectlyToShards(opCtx, writeShards);
-    }
-
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).commitType = CommitType::kTwoPhaseCommit;
