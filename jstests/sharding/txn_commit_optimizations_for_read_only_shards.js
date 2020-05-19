@@ -6,7 +6,8 @@
  * no failures, a participant having failed over, a participant being unable to satisfy the client's
  * writeConcern, and an invalid client writeConcern.
  *
- * @tags: [uses_transactions, uses_multi_shard_transaction]
+ * TODO (SERVER-48341): Remove requires_fcv_46 after backporting SERVER-48307 to 4.4.
+ * @tags: [requires_fcv_46, uses_transactions, uses_multi_shard_transaction]
  */
 
 (function() {
@@ -184,10 +185,12 @@ const transactionTypes = {
     writeReadSingleShardExpectSingleShardCommit: txnNumber => {
         return [writeShard0(txnNumber), readShard0(txnNumber)];
     },
-    readOneShardWriteOtherShardExpectSingleWriteShardCommit: txnNumber => {
+    // TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
+    readOneShardWriteOtherShardExpectTwoPhaseCommit: txnNumber => {
         return [readShard0(txnNumber), writeShard1(txnNumber)];
     },
-    writeOneShardReadOtherShardExpectSingleWriteShardCommit: txnNumber => {
+    // TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
+    writeOneShardReadOtherShardExpectTwoPhaseCommit: txnNumber => {
         return [writeShard0(txnNumber), readShard1(txnNumber)];
     },
     readOneShardWriteTwoOtherShardsExpectTwoPhaseCommit: txnNumber => {
