@@ -254,7 +254,7 @@ void ProgramOutputMultiplexer::appendLine(int port,
     std::ostringstream ss;
     sinkProgramOutput(_buffer);
     sinkProgramOutput(ss);
-    LOGV2_OPTIONS(
+    LOGV2_INFO_OPTIONS(
         4615640,
         logv2::LogOptions(logv2::LogTag::kPlainShell | logv2::LogTag::kAllowDuringPromptingShell,
                           logv2::LogTruncation::Disabled),
