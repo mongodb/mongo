@@ -2265,7 +2265,8 @@ buildvariants:
     - name: recovery-stress-test
     - name: format-stress-sanitizer-test
     - name: format-stress-sanitizer-smoke-test
-    - name: format-stress-sanitizer-lsm-test
+    # Temporarily disabled (WT-6255)
+    # - name: format-stress-sanitizer-lsm-test
     - name: split-stress-test
     - name: format-stress-test
     - name: format-stress-smoke-test

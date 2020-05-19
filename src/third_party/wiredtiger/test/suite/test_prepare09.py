@@ -67,6 +67,11 @@ class test_prepare09(wttest.WiredTigerTestCase):
         self.assertEqual(self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(3)), 0)
         self.session.rollback_transaction()
 
+        # Get the previous update onto disk.
+        for i in range(2, 10000):
+            cursor2[i] = value3
+        cursor2.reset()
+
         # Do a search, if we've aborted the update correct we won't have inserted a tombstone
         # and the original value will be visible to us.
         cursor.set_key(1)

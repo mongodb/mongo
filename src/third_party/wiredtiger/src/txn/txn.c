@@ -666,9 +666,9 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
         goto done;
 
     WT_ERR(__wt_upd_alloc(session, hs_value, WT_UPDATE_STANDARD, &upd, &size));
-    upd->txnid = hs_cbt->upd_value->txnid;
-    upd->durable_ts = durable_ts;
-    upd->start_ts = hs_start_ts;
+    upd->txnid = hs_cbt->upd_value->tw.start_txn;
+    upd->durable_ts = hs_cbt->upd_value->tw.durable_start_ts;
+    upd->start_ts = hs_cbt->upd_value->tw.start_ts;
     *fix_updp = upd;
 
     /*
@@ -683,10 +683,9 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
     /* If the history store record has a valid stop time point, append it. */
     if (hs_stop_durable_ts != WT_TS_MAX) {
         WT_ERR(__wt_upd_alloc(session, NULL, WT_UPDATE_TOMBSTONE, &tombstone, &size));
-        tombstone->durable_ts = hs_stop_durable_ts;
-        /* FIXME: get the correct stop ts and txnid from the cell. */
-        tombstone->start_ts = hs_stop_durable_ts;
-        tombstone->txnid = WT_TXN_NONE;
+        tombstone->durable_ts = hs_cbt->upd_value->tw.durable_stop_ts;
+        tombstone->start_ts = hs_cbt->upd_value->tw.stop_ts;
+        tombstone->txnid = hs_cbt->upd_value->tw.stop_txn;
         tombstone->next = upd;
         total_size += size;
     } else
@@ -916,8 +915,11 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
         /*
          * Scan the history store for the given btree and key with maximum start timestamp to let
-         * the search point to the last version of the key.
+         * the search point to the last version of the key. We must ignore tombstone in the history
+         * store while retrieving the update from the history store to replace the update in the
+         * data store.
          */
+        F_SET(hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
         WT_ERR_NOTFOUND_OK(
           __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, &op->u.op_row.key, WT_TS_MAX),
           true);
@@ -999,8 +1001,10 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         WT_ERR(__txn_fixup_prepared_update(session, hs_cursor, fix_upd, commit));
 
 err:
-    if (hs_cursor != NULL)
+    if (hs_cursor != NULL) {
+        F_CLR(hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
         ret = __wt_hs_cursor_close(session, session_flags, is_owner);
+    }
     if (!upd_appended)
         __wt_free(session, fix_upd);
     return (ret);

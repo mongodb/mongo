@@ -381,6 +381,9 @@ struct __wt_connection_stats {
     int64_t cache_eviction_walks_active;
     int64_t cache_eviction_walks_started;
     int64_t cache_eviction_force_retune;
+    int64_t cache_eviction_force_hs_fail;
+    int64_t cache_eviction_force_hs;
+    int64_t cache_eviction_force_hs_success;
     int64_t cache_eviction_force_clean;
     int64_t cache_eviction_force_clean_time;
     int64_t cache_eviction_force_dirty;
