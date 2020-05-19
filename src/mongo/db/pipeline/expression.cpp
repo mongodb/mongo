@@ -6423,4 +6423,70 @@ Value ExpressionRegexMatch::evaluate(const Document& root, Variables* variables)
     return executionState.nullish() ? Value(false) : Value(execute(&executionState) > 0);
 }
 
+/* -------------------------- ExpressionRandom ------------------------------ */
+REGISTER_EXPRESSION(rand, ExpressionRandom::parse);
+
+static thread_local PseudoRandom threadLocalRNG(SecureRandom().nextInt64());
+
+ExpressionRandom::ExpressionRandom(ExpressionContext* const expCtx) : Expression(expCtx) {}
+
+intrusive_ptr<Expression> ExpressionRandom::parse(ExpressionContext* const expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps) {
+    bool hasConstField = false;
+    bool isConst = false;
+
+    uassert(3040500,
+            str::stream() << "$rand not allowed inside collection validators",
+            !expCtx->isParsingCollectionValidator);
+
+    for (const auto& elem : exprElement.Obj()) {
+        const auto fieldName = elem.fieldNameStringData();
+        if (fieldName == "const"_sd) {
+            uassert(
+                3040501, str::stream() << "'const' must be specified just once", !hasConstField);
+
+            uassert(3040502,
+                    str::stream() << "'const' argument must be a boolean, found "
+                                  << typeName(elem.type()),
+                    elem.type() == Bool);
+            isConst = elem.boolean();
+            hasConstField = true;
+        } else {
+            uasserted(3040503, str::stream() << "Unknown argument: " << fieldName);
+        }
+    }
+
+    if (isConst) {
+        ExpressionRandom exprRandom(expCtx);
+        return ExpressionConstant::create(expCtx, Value(exprRandom.getRandomValue()));
+    }
+
+    return new ExpressionRandom(expCtx);
+}
+
+const char* ExpressionRandom::getOpName() const {
+    return "$rand";
+}
+
+double ExpressionRandom::getRandomValue() const {
+    return kMinValue + (kMaxValue - kMinValue) * threadLocalRNG.nextCanonicalDouble();
+}
+
+Value ExpressionRandom::evaluate(const Document& root, Variables* variables) const {
+    return Value(getRandomValue());
+}
+
+intrusive_ptr<Expression> ExpressionRandom::optimize() {
+    // Already optimized to ExpressionConstant if "const" option passed in.
+    return intrusive_ptr<Expression>(this);
+}
+
+void ExpressionRandom::_doAddDependencies(DepsTracker* deps) const {
+    // Nothing to do.
+}
+
+Value ExpressionRandom::serialize(const bool explain) const {
+    return Value(DOC(getOpName() << DOC("const"_sd << Value(false))));
+}
 }  // namespace mongo

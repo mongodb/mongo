@@ -2833,4 +2833,38 @@ public:
 
     using ExpressionRegex::ExpressionRegex;
 };
+
+/**
+ * Returns a double-valued random number from 0.0 to 1.0.
+ */
+class ExpressionRandom final : public Expression {
+
+    static constexpr double kMinValue = 0.0;
+    static constexpr double kMaxValue = 1.0;
+
+public:
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const bool explain) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final override;
+
+private:
+    explicit ExpressionRandom(ExpressionContext* const expCtx);
+
+    double getRandomValue() const;
+};
 }  // namespace mongo

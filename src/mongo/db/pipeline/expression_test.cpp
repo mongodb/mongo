@@ -2952,4 +2952,50 @@ TEST(NowAndClusterTime, BasicTest) {
     }
 }
 }  // namespace NowAndClusterTime
+
+void assertRandomProperties(const std::function<double(void)>& fn) {
+    double sum = 0.0;
+    constexpr int N = 1000000;
+
+    for (int i = 0; i < N; i++) {
+        const double v = fn();
+        ASSERT_LTE(0.0, v);
+        ASSERT_GTE(1.0, v);
+        sum += v;
+    }
+
+    const double avg = sum / N;
+    // For continuous uniform distribution [0.0, 1.0] the variance is 1/12.
+    // Test certainty within 10 standard deviations.
+    const double err = 10.0 / sqrt(12.0 * N);
+    ASSERT_LT(0.5 - err, avg);
+    ASSERT_GT(0.5 + err, avg);
+}
+
+TEST(ExpressionRandom, Basic) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+
+    // Test const = false case, we generate new random value on every call to evaluate().
+    intrusive_ptr<Expression> expression =
+        Expression::parseExpression(&expCtx, fromjson("{ $rand: {} }"), vps);
+
+    const std::string& serialized = expression->serialize(false).getDocument().toString();
+    ASSERT_EQ("{$rand: {const: false}}", serialized);
+
+    const auto randFn1 = [&expression, &expCtx]() -> double {
+        return expression->evaluate({}, &expCtx.variables).getDouble();
+    };
+    assertRandomProperties(randFn1);
+
+    // Test const = true case, we optimize to a const.
+    const auto randFn2 = [&expression, &expCtx, &vps]() -> double {
+        expression =
+            Expression::parseExpression(&expCtx, fromjson("{ $rand: {const: true} }"), vps);
+        const std::string& serialized1 = expression->serialize(false).getDocument().toString();
+        ASSERT_TRUE(serialized1.find("{$const:") == 0);
+        return expression->evaluate({}, &expCtx.variables).getDouble();
+    };
+    assertRandomProperties(randFn2);
+}
 }  // namespace ExpressionTests
