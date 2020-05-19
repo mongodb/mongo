@@ -726,6 +726,10 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Ensure the added shard is visible to this process.
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    if (!shardRegistry->reload(opCtx)) {
+        shardRegistry->reload(opCtx);
+    }
+
     if (!shardRegistry->getShard(opCtx, shardType.getName()).isOK()) {
         return {ErrorCodes::OperationFailed,
                 "Could not find shard metadata for shard after adding it. This most likely "
@@ -854,8 +858,13 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         str::stream() << "error completing removeShard operation on: " << name);
 
     // The shard which was just removed must be reflected in the shard registry, before the replica
-    // set monitor is removed, otherwise the shard would be referencing a dropped RSM
-    Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+    // set monitor is removed, otherwise the shard would be referencing a dropped RSM. Check that
+    // this reload did not join an already running reload to be sure it picks up that the shard was
+    // removed.
+    if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+    }
+
     ReplicaSetMonitor::remove(name);
 
     // Record finish in changelog
