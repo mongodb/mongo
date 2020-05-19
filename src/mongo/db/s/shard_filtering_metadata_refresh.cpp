@@ -36,15 +36,12 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
@@ -134,61 +131,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
     forceDatabaseRefresh(opCtx, dbName);
 }
 
-const auto catalogCacheForFilteringDecoration =
-    ServiceContext::declareDecoration<std::unique_ptr<CatalogCache>>();
-
-const auto catalogCacheLoaderForFilteringDecoration =
-    ServiceContext::declareDecoration<std::unique_ptr<CatalogCacheLoader>>();
-
-CatalogCache& getCatalogCacheForFiltering(ServiceContext* serviceContext) {
-    if (hasAdditionalCatalogCacheForFiltering()) {
-        auto& catalogCacheForFiltering = catalogCacheForFilteringDecoration(serviceContext);
-        invariant(catalogCacheForFiltering);
-        return *catalogCacheForFiltering;
-    }
-    return *Grid::get(serviceContext)->catalogCache();
-}
-
-CatalogCache& getCatalogCacheForFiltering(OperationContext* opCtx) {
-    return getCatalogCacheForFiltering(opCtx->getServiceContext());
-}
-
 }  // namespace
-
-bool hasAdditionalCatalogCacheForFiltering() {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-    return getTestCommandsEnabled() && !storageGlobalParams.readOnly;
-}
-
-void setCatalogCacheForFiltering(ServiceContext* serviceContext,
-                                 std::unique_ptr<CatalogCache> catalogCache) {
-    invariant(hasAdditionalCatalogCacheForFiltering());
-    auto& catalogCacheForFiltering = catalogCacheForFilteringDecoration(serviceContext);
-    invariant(!catalogCacheForFiltering);
-    catalogCacheForFiltering = std::move(catalogCache);
-}
-
-void setCatalogCacheLoaderForFiltering(ServiceContext* serviceContext,
-                                       std::unique_ptr<CatalogCacheLoader> loader) {
-    invariant(hasAdditionalCatalogCacheForFiltering());
-    auto& catalogCacheLoader = catalogCacheLoaderForFilteringDecoration(serviceContext);
-    invariant(!catalogCacheLoader);
-    catalogCacheLoader = std::move(loader);
-}
-
-CatalogCacheLoader& getCatalogCacheLoaderForFiltering(ServiceContext* serviceContext) {
-    if (hasAdditionalCatalogCacheForFiltering()) {
-        auto& catalogCacheLoader = catalogCacheLoaderForFilteringDecoration(serviceContext);
-        invariant(catalogCacheLoader);
-        return *catalogCacheLoader;
-    }
-    return CatalogCacheLoader::get(serviceContext);
-}
-
-CatalogCacheLoader& getCatalogCacheLoaderForFiltering(OperationContext* opCtx) {
-    return getCatalogCacheLoaderForFiltering(opCtx->getServiceContext());
-}
-
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
                                       const NamespaceString& nss,
@@ -216,15 +159,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     auto* const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->canAcceptShardedCommands());
 
-    if (hasAdditionalCatalogCacheForFiltering()) {
-        Grid::get(opCtx)
-            ->catalogCache()
-            ->getCollectionRoutingInfoWithRefresh(opCtx, nss, forceRefreshFromThisThread)
-            .getStatus()
-            .ignore();
-    }
     auto routingInfo =
-        uassertStatusOK(getCatalogCacheForFiltering(opCtx).getCollectionRoutingInfoWithRefresh(
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
             opCtx, nss, forceRefreshFromThisThread));
     auto cm = routingInfo.cm();
 
@@ -334,16 +270,8 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
 
     DatabaseVersion refreshedDbVersion;
     try {
-        if (hasAdditionalCatalogCacheForFiltering()) {
-            Grid::get(opCtx)
-                ->catalogCache()
-                ->getDatabaseWithRefresh(opCtx, dbName)
-                .getStatus()
-                .ignore();
-        }
         refreshedDbVersion =
-            uassertStatusOK(
-                getCatalogCacheForFiltering(opCtx).getDatabaseWithRefresh(opCtx, dbName))
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName))
                 .databaseVersion();
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // db has been dropped, set the db version to boost::none

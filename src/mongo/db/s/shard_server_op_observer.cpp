@@ -42,7 +42,6 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state.h"
@@ -80,7 +79,7 @@ public:
     void commit(boost::optional<Timestamp>) override {
         invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
 
-        getCatalogCacheLoaderForFiltering(_opCtx).notifyOfCollectionVersionUpdate(_nss);
+        CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
