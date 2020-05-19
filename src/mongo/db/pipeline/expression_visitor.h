@@ -103,6 +103,7 @@ class ExpressionSize;
 class ExpressionReverseArray;
 class ExpressionSlice;
 class ExpressionIsArray;
+class ExpressionRandom;
 class ExpressionRound;
 class ExpressionSecond;
 class ExpressionSplit;
@@ -235,6 +236,7 @@ public:
     virtual void visit(ExpressionReverseArray*) = 0;
     virtual void visit(ExpressionSlice*) = 0;
     virtual void visit(ExpressionIsArray*) = 0;
+    virtual void visit(ExpressionRandom*) = 0;
     virtual void visit(ExpressionRound*) = 0;
     virtual void visit(ExpressionSplit*) = 0;
     virtual void visit(ExpressionSqrt*) = 0;

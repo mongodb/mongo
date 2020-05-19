@@ -6520,4 +6520,48 @@ Value ExpressionRegexMatch::evaluate(const Document& root, Variables* variables)
     return executionState.nullish() ? Value(false) : Value(execute(&executionState) > 0);
 }
 
+/* -------------------------- ExpressionRandom ------------------------------ */
+REGISTER_EXPRESSION(rand, ExpressionRandom::parse);
+
+static thread_local PseudoRandom threadLocalRNG(SecureRandom().nextInt64());
+
+ExpressionRandom::ExpressionRandom(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : Expression(expCtx) {}
+
+intrusive_ptr<Expression> ExpressionRandom::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement exprElement,
+    const VariablesParseState& vps) {
+    uassert(3040500,
+            "$rand not allowed inside collection validators",
+            !expCtx->isParsingCollectionValidator);
+
+    uassert(3040501, "$rand does not currently accept arguments", exprElement.Obj().isEmpty());
+
+    return new ExpressionRandom(expCtx);
+}
+
+const char* ExpressionRandom::getOpName() const {
+    return "$rand";
+}
+
+double ExpressionRandom::getRandomValue() const {
+    return kMinValue + (kMaxValue - kMinValue) * threadLocalRNG.nextCanonicalDouble();
+}
+
+Value ExpressionRandom::evaluate(const Document& root, Variables* variables) const {
+    return Value(getRandomValue());
+}
+
+intrusive_ptr<Expression> ExpressionRandom::optimize() {
+    return intrusive_ptr<Expression>(this);
+}
+
+void ExpressionRandom::_doAddDependencies(DepsTracker* deps) const {
+    // Nothing to do.
+}
+
+Value ExpressionRandom::serialize(const bool explain) const {
+    return Value(DOC(getOpName() << Document()));
+}
 }  // namespace mongo

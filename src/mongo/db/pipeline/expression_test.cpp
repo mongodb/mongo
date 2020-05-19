@@ -2951,4 +2951,40 @@ TEST(NowAndClusterTime, BasicTest) {
     }
 }
 }  // namespace NowAndClusterTime
+
+void assertRandomProperties(const std::function<double(void)>& fn) {
+    double sum = 0.0;
+    constexpr int N = 1000000;
+
+    for (int i = 0; i < N; i++) {
+        const double v = fn();
+        ASSERT_LTE(0.0, v);
+        ASSERT_GTE(1.0, v);
+        sum += v;
+    }
+
+    const double avg = sum / N;
+    // For continuous uniform distribution [0.0, 1.0] the variance is 1/12.
+    // Test certainty within 10 standard deviations.
+    const double err = 10.0 / sqrt(12.0 * N);
+    ASSERT_LT(0.5 - err, avg);
+    ASSERT_GT(0.5 + err, avg);
+}
+
+TEST(ExpressionRandom, Basic) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    VariablesParseState vps = expCtx->variablesParseState;
+
+    // We generate a new random value on every call to evaluate().
+    intrusive_ptr<Expression> expression =
+        Expression::parseExpression(expCtx, fromjson("{ $rand: {} }"), vps);
+
+    const std::string& serialized = expression->serialize(false).getDocument().toString();
+    ASSERT_EQ("{$rand: {}}", serialized);
+
+    const auto randFn = [&expression, &expCtx]() -> double {
+        return expression->evaluate({}, &expCtx->variables).getDouble();
+    };
+    assertRandomProperties(randFn);
+}
 }  // namespace ExpressionTests
