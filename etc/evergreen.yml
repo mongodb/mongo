@@ -12457,6 +12457,29 @@ buildvariants:
   tasks:
    - name: libfuzzertests_TG
 
+- name: enterprise-ubuntu2004-debug-tsan
+  display_name: ~ TSAN Enterprise Ubuntu 20.04 DEBUG (Biggie)
+  modules:
+    - enterprise
+  run_on:
+    - ubuntu2004-large
+  stepback: false
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
+    variant_path_suffix: /opt/mongodbtoolchain/v3/bin
+    lang_environment: LANG=C
+    san_options: TSAN_OPTIONS="suppressions=etc/tsan.suppressions:halt_on_error=1"
+    # TODO: Remove some of the excluded tags when the Biggie storage engine is
+    # further along in development: https://jira.mongodb.org/browse/SERVER-48325
+    test_flags: --storageEngine=biggie --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=thread --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    # Avoid starting too many mongod's under TSAN build.
+    resmoke_jobs_factor: 0.3
+    scons_cache_scope: shared
+  tasks:
+    - name: compile_all_run_unittests_TG
+
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
   batchtime: 240 # 4 hours
