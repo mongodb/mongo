@@ -138,16 +138,21 @@ var ReplSetTest = function(opts) {
         self._slaves = [];
 
         var twoPrimaries = false;
+        let isMaster = false;
+        // Ensure that only one node is in primary state.
         self.nodes.forEach(function(node) {
             try {
                 node.setSlaveOk();
                 var n = node.getDB('admin').runCommand({ismaster: 1});
                 self._liveNodes.push(node);
-                if (n.ismaster == true) {
+                // We verify that the node has a valid config by checking if n.me exists. Then, we
+                // check to see if the node is in primary state.
+                if (n.me && n.me == n.primary) {
                     if (self._master) {
                         twoPrimaries = true;
                     } else {
                         self._master = node;
+                        isMaster = n.ismaster;
                     }
                 } else {
                     self._slaves.push(node);
@@ -157,11 +162,11 @@ var ReplSetTest = function(opts) {
                 self._slaves.push(node);
             }
         });
-        if (twoPrimaries) {
+        if (twoPrimaries || !self._master || !isMaster) {
             return false;
         }
 
-        return self._master || false;
+        return self._master;
     }
 
     /**
