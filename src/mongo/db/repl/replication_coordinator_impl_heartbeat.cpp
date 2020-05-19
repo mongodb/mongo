@@ -44,8 +44,6 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -690,11 +688,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
         if (isArbiter) {
             _externalState->onBecomeArbiterHook();
-            // TODO SERVER-47914: move these actions into VectorClockMongoD::onBecomeArbiter().
-            LogicalClock::get(getGlobalServiceContext())->disable();
-            if (auto validator = LogicalTimeValidator::get(getGlobalServiceContext())) {
-                validator->stopKeyManager();
-            }
         }
 
         if (!isArbiter && isFirstConfig) {

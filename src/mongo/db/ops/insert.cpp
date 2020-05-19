@@ -34,8 +34,7 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/util/str.h"
 
@@ -163,7 +162,8 @@ StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj&
         if (hadId && e.fieldNameStringData() == "_id") {
             // no-op
         } else if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
-            auto nextTime = LogicalClock::get(service)->reserveTicks(1);
+            auto nextTime =
+                VectorClockMutable::get(service)->tick(VectorClock::Component::ClusterTime, 1);
             b.append(e.fieldName(), nextTime.asTimestamp());
         } else {
             b.append(e);

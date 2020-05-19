@@ -46,10 +46,19 @@ public:
     virtual ~VectorClockMongoS();
 
 protected:
-    void _gossipOutInternal(BSONObjBuilder* out) const override;
-    void _gossipOutExternal(BSONObjBuilder* out) const override;
-    LogicalTimeArray _gossipInInternal(const BSONObj& in) override;
-    LogicalTimeArray _gossipInExternal(const BSONObj& in) override;
+    bool _gossipOutInternal(OperationContext* opCtx,
+                            BSONObjBuilder* out,
+                            const LogicalTimeArray& time) const override;
+    bool _gossipOutExternal(OperationContext* opCtx,
+                            BSONObjBuilder* out,
+                            const LogicalTimeArray& time) const override;
+    LogicalTimeArray _gossipInInternal(OperationContext* opCtx,
+                                       const BSONObj& in,
+                                       bool couldBeUnauthenticated) override;
+    LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
+                                       const BSONObj& in,
+                                       bool couldBeUnauthenticated) override;
+    bool _permitRefreshDuringGossipOut() const override;
 };
 
 const auto vectorClockMongoSDecoration = ServiceContext::declareDecoration<VectorClockMongoS>();
@@ -67,36 +76,39 @@ VectorClockMongoS::VectorClockMongoS() = default;
 
 VectorClockMongoS::~VectorClockMongoS() = default;
 
-void VectorClockMongoS::_gossipOutInternal(BSONObjBuilder* out) const {
-    VectorTime now = getTime();
-    // TODO SERVER-47914: re-enable gossipping of VectorClock's ClusterTime once LogicalClock has
-    // been migrated into VectorClock.
-    // _gossipOutComponent(out, now, Component::ClusterTime);
-    _gossipOutComponent(out, now, Component::ConfigTime);
+bool VectorClockMongoS::_gossipOutInternal(OperationContext* opCtx,
+                                           BSONObjBuilder* out,
+                                           const LogicalTimeArray& time) const {
+    bool wasClusterTimeOutput = _gossipOutComponent(opCtx, out, time, Component::ClusterTime);
+    _gossipOutComponent(opCtx, out, time, Component::ConfigTime);
+    return wasClusterTimeOutput;
 }
 
-void VectorClockMongoS::_gossipOutExternal(BSONObjBuilder* out) const {
-    // TODO SERVER-47914: re-enable gossipping of VectorClock's ClusterTime once LogicalClock has
-    // been migrated into VectorClock.
-    // VectorTime now = getTime();
-    // _gossipOutComponent(out, now, Component::ClusterTime);
+bool VectorClockMongoS::_gossipOutExternal(OperationContext* opCtx,
+                                           BSONObjBuilder* out,
+                                           const LogicalTimeArray& time) const {
+    return _gossipOutComponent(opCtx, out, time, Component::ClusterTime);
 }
 
-VectorClock::LogicalTimeArray VectorClockMongoS::_gossipInInternal(const BSONObj& in) {
+VectorClock::LogicalTimeArray VectorClockMongoS::_gossipInInternal(OperationContext* opCtx,
+                                                                   const BSONObj& in,
+                                                                   bool couldBeUnauthenticated) {
     LogicalTimeArray newTime;
-    // TODO SERVER-47914: re-enable gossipping of VectorClock's ClusterTime once LogicalClock has
-    // been migrated into VectorClock.
-    // _gossipInComponent(in, &newTime, Component::ClusterTime);
-    _gossipInComponent(in, &newTime, Component::ConfigTime);
+    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
+    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ConfigTime);
     return newTime;
 }
 
-VectorClock::LogicalTimeArray VectorClockMongoS::_gossipInExternal(const BSONObj& in) {
+VectorClock::LogicalTimeArray VectorClockMongoS::_gossipInExternal(OperationContext* opCtx,
+                                                                   const BSONObj& in,
+                                                                   bool couldBeUnauthenticated) {
     LogicalTimeArray newTime;
-    // TODO SERVER-47914: re-enable gossipping of VectorClock's ClusterTime once LogicalClock has
-    // been migrated into VectorClock.
-    // _gossipInComponent(in, &newTime, Component::ClusterTime);
+    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
     return newTime;
+}
+
+bool VectorClockMongoS::_permitRefreshDuringGossipOut() const {
+    return true;
 }
 
 }  // namespace

@@ -35,10 +35,10 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/signed_logical_time.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/unittest/death_test.h"
@@ -2208,13 +2208,22 @@ TEST_F(OplogFetcherTest, HandleLogicalTimeMetaDataAndAdvanceClusterTime) {
     auto oldClusterTime = LogicalClock::get(getGlobalServiceContext())->getClusterTime();
 
     auto logicalTime = LogicalTime(Timestamp(123456, 78));
-    auto logicalTimeMetadata =
-        rpc::LogicalTimeMetadata(SignedLogicalTime(logicalTime, TimeProofService::TimeProof(), 0));
+    auto signedTime = SignedLogicalTime(logicalTime, TimeProofService::TimeProof(), 0);
 
     BSONObjBuilder bob;
     ASSERT_OK(replSetMetadata.writeToMetadata(&bob));
     ASSERT_OK(oqMetadata.writeToMetadata(&bob));
-    logicalTimeMetadata.writeToMetadata(&bob);
+
+    BSONObjBuilder subObjBuilder(bob.subobjStart("$clusterTime"));
+    signedTime.getTime().asTimestamp().append(subObjBuilder.bb(), "clusterTime");
+
+    BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
+    signedTime.getProof()->appendAsBinData(signatureObjBuilder, "hash");
+    signatureObjBuilder.append("keyId", signedTime.getKeyId());
+    signatureObjBuilder.doneFast();
+
+    subObjBuilder.doneFast();
+
     auto metadataObj = bob.obj();
 
     // Process one batch with the logical time metadata.

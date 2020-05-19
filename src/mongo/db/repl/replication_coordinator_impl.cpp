@@ -62,9 +62,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
@@ -91,6 +88,8 @@
 #include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -657,12 +656,6 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     } else {
         _externalState->onBecomeArbiterHook();
-        // TODO SERVER-47914: move these actions into VectorClockMongoD::onBecomeArbiter().
-        // The node is an arbiter hence will not need logical clock for external operations.
-        LogicalClock::get(getServiceContext())->disable();
-        if (auto validator = LogicalTimeValidator::get(getServiceContext())) {
-            validator->stopKeyManager();
-        }
     }
 
     const auto lastOpTime = lastOpTimeAndWallTime.opTime;
@@ -1391,7 +1384,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
 
     // The last applied opTime should never advance beyond the global timestamp (i.e. the latest
     // cluster time). Not enforced if the logical clock is disabled, e.g. for arbiters.
-    dassert(!LogicalClock::get(getServiceContext())->isEnabled() ||
+    dassert(!VectorClock::get(getServiceContext())->isEnabled() ||
             _externalState->getGlobalTimestamp(getServiceContext()) >= opTime.getTimestamp());
 
     _topCoord->setMyLastAppliedOpTimeAndWallTime(
@@ -4193,7 +4186,9 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
 void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) {
     invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
     _electionId = OID::fromTerm(_topCoord->getTerm());
-    auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
+    auto ts = VectorClockMutable::get(getServiceContext())
+                  ->tick(VectorClock::Component::ClusterTime, 1)
+                  .asTimestamp();
     _topCoord->processWinElection(_electionId, ts);
     const PostMemberStateUpdateAction nextAction = _updateMemberStateFromTopologyCoordinator(lk);
 

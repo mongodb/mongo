@@ -449,6 +449,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='vector_clock_mongos',
+    source=[
+        'vector_clock_mongos.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/vector_clock',
+    ],
+)
+
 env.CppUnitTest(
     target='s_test',
     source=[
@@ -504,11 +514,11 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/util/net/network',
         'catalog_cache_test_fixture',

@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -125,8 +126,9 @@ protected:
 
         // Set up a logical clock with an initial time.
         auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
-        logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
+        VectorClockMutable::get(getServiceContext())
+            ->tickTo(VectorClock::Component::ClusterTime, kInMemoryLogicalTime);
 
         // Set up a tick source for transaction metrics.
         auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
@@ -1428,7 +1430,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
     // Advance the latest time in the logical clock so the retry attempt will pick a later time.
     LogicalTime laterTime(Timestamp(1000, 1));
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, laterTime);
 
     // Simulate a snapshot error.
 
@@ -1477,7 +1480,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTimeSameStmt);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1501,7 +1505,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeNewStmt(Timestamp(1000, 1));
     ASSERT_GT(laterTimeNewStmt, laterTimeSameStmt);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTimeNewStmt);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, laterTimeNewStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1749,7 +1754,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTime(Timestamp(1000, 1));
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, laterTime);
 
     ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find", kDummyStatus));
     txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus);
@@ -2315,7 +2321,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTimeSameStmt);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 

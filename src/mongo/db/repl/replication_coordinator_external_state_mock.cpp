@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+#include "mongo/db/replica_set_aware_service.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -235,7 +236,9 @@ void ReplicationCoordinatorExternalStateMock::closeConnections() {
 
 void ReplicationCoordinatorExternalStateMock::onStepDownHook() {}
 
-void ReplicationCoordinatorExternalStateMock::onBecomeArbiterHook() {}
+void ReplicationCoordinatorExternalStateMock::onBecomeArbiterHook() {
+    ReplicaSetAwareServiceRegistry::get(getGlobalServiceContext()).onBecomeArbiter();
+}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 

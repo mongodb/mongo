@@ -33,10 +33,9 @@
 
 #include "mongo/base/data_view.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/db/vector_clock_mutable.h"
 
 namespace mongo {
 
@@ -63,7 +62,9 @@ ObjectReplaceExecutor::ObjectReplaceExecutor(BSONObj replacement)
             unsigned long long timestamp = timestampView.read<unsigned long long>();
             if (timestamp == 0) {
                 ServiceContext* service = getGlobalServiceContext();
-                auto ts = LogicalClock::get(service)->reserveTicks(1).asTimestamp();
+                auto ts = VectorClockMutable::get(service)
+                              ->tick(VectorClock::Component::ClusterTime, 1)
+                              .asTimestamp();
                 timestampView.write(tagLittleEndian(ts.asULL()));
             }
         }

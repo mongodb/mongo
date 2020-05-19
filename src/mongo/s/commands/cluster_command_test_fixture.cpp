@@ -41,6 +41,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/options_parser/startup_option_init.h"
@@ -54,8 +55,8 @@ void ClusterCommandTestFixture::setUp() {
 
     // Set up a logical clock with an initial time.
     auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
-    logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
     LogicalClock::set(getServiceContext(), std::move(logicalClock));
+    VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
     auto keysCollectionClient = std::make_unique<KeysCollectionClientSharded>(
         Grid::get(operationContext())->catalogClient());

@@ -68,7 +68,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -99,42 +98,6 @@ namespace {
 const auto kOperationTime = "operationTime"_sd;
 
 /**
- * Extract and process metadata from the command request body.
- */
-Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
-    ReadPreferenceSetting::get(opCtx) =
-        uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(cmdObj));
-
-    VectorClock::get(opCtx)->gossipIn(cmdObj, opCtx->getClient()->getSessionTags());
-
-    auto logicalClock = LogicalClock::get(opCtx);
-    invariant(logicalClock);
-
-    auto logicalTimeMetadata = rpc::LogicalTimeMetadata::readFromMetadata(cmdObj);
-    if (!logicalTimeMetadata.isOK()) {
-        return logicalTimeMetadata.getStatus();
-    }
-
-    auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
-    const auto& signedTime = logicalTimeMetadata.getValue().getSignedTime();
-
-    // No need to check proof is no time is given.
-    if (signedTime.getTime() == LogicalTime::kUninitialized) {
-        return Status::OK();
-    }
-
-    if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-        auto advanceClockStatus = logicalTimeValidator->validate(opCtx, signedTime);
-
-        if (!advanceClockStatus.isOK()) {
-            return advanceClockStatus;
-        }
-    }
-
-    return logicalClock->advanceClusterTime(signedTime.getTime());
-}
-
-/**
  * Invoking `shouldGossipLogicalTime()` is expected to always return "true" during normal execution.
  * SERVER-48013 uses this property to avoid the cost of calling this function during normal
  * execution. However, it might be desired to do the validation for test purposes (e.g.,
@@ -148,8 +111,6 @@ MONGO_FAIL_POINT_DEFINE(allowSkippingAppendRequiredFieldsToResponse);
  * Append required fields to command response.
  */
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
-    VectorClock::get(opCtx)->gossipOut(responseBuilder, opCtx->getClient()->getSessionTags());
-
     // TODO SERVER-48142 should remove the following block.
     if (MONGO_unlikely(allowSkippingAppendRequiredFieldsToResponse.shouldFail())) {
         auto validator = LogicalTimeValidator::get(opCtx);
@@ -159,35 +120,34 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
         }
     }
 
-    auto now = LogicalClock::get(opCtx)->getClusterTime();
+    // The appended operationTime must always be <= the appended $clusterTime, so in case we need to
+    // use $clusterTime as the operationTime below, take a $clusterTime value which is guaranteed to
+    // be <= the value output by gossipOut().
+    auto clusterTime = VectorClock::get(opCtx)->getTime()[VectorClock::Component::ClusterTime];
 
-    // Add operationTime.
-    auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
-    if (operationTime != LogicalTime::kUninitialized) {
-        LOGV2_DEBUG(22764,
-                    5,
-                    "Appending operationTime: {operationTime}",
-                    "Appending operationTime",
-                    "operationTime"_attr = operationTime.asTimestamp());
-        responseBuilder->append(kOperationTime, operationTime.asTimestamp());
-    } else if (now != LogicalTime::kUninitialized) {
-        // If we don't know the actual operation time, use the cluster time instead. This is
-        // safe but not optimal because we can always return a later operation time than actual.
-        LOGV2_DEBUG(22765,
-                    5,
-                    "Appending clusterTime as operationTime {clusterTime}",
-                    "Appending clusterTime as operationTime",
-                    "clusterTime"_attr = now.asTimestamp());
-        responseBuilder->append(kOperationTime, now.asTimestamp());
-    }
+    bool clusterTimeWasOutput = VectorClock::get(opCtx)->gossipOut(opCtx, responseBuilder);
 
-    // Add $clusterTime.
-    if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-        SignedLogicalTime dummySignedTime(now, TimeProofService::TimeProof(), 0);
-        rpc::LogicalTimeMetadata(dummySignedTime).writeToMetadata(responseBuilder);
-    } else {
-        auto currentTime = LogicalTimeValidator::get(opCtx)->signLogicalTime(opCtx, now);
-        rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
+    // Ensure that either both operationTime and $clusterTime are output, or neither.
+    if (clusterTimeWasOutput) {
+        auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
+        if (operationTime != LogicalTime::kUninitialized) {
+            LOGV2_DEBUG(22764,
+                        5,
+                        "Appending operationTime: {operationTime}",
+                        "Appending operationTime",
+                        "operationTime"_attr = operationTime.asTimestamp());
+            operationTime.appendAsOperationTime(responseBuilder);
+        } else if (clusterTime != LogicalTime::kUninitialized) {
+            // If we don't know the actual operation time, use the cluster time instead. This is
+            // safe but not optimal because we can always return a later operation time than
+            // actual.
+            LOGV2_DEBUG(22765,
+                        5,
+                        "Appending clusterTime as operationTime {clusterTime}",
+                        "Appending clusterTime as operationTime",
+                        "clusterTime"_attr = clusterTime.asTimestamp());
+            clusterTime.appendAsOperationTime(responseBuilder);
+        }
     }
 }
 
@@ -278,12 +238,10 @@ void execCommandClient(OperationContext* opCtx,
         trackingMetadata.initWithOperName(c->getName());
         rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
 
-        auto metadataStatus = processCommandMetadata(opCtx, request.body);
-        if (!metadataStatus.isOK()) {
-            auto body = result->getBodyBuilder();
-            CommandHelpers::appendCommandStatusNoThrow(body, metadataStatus);
-            return;
-        }
+        // Extract and process metadata from the command request body.
+        ReadPreferenceSetting::get(opCtx) =
+            uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(request.body));
+        VectorClock::get(opCtx)->gossipIn(opCtx, request.body, !c->requiresAuth());
 
         auto txnRouter = TransactionRouter::get(opCtx);
         if (txnRouter) {

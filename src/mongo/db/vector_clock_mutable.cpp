@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include <limits>
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/vector_clock_mutable.h"
@@ -65,13 +63,8 @@ void VectorClockMutable::registerVectorClockOnServiceContext(
     clock = std::move(vectorClockMutable);
 }
 
-bool VectorClockMutable::_lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks) {
-    return time.asTimestamp().getSecs() <= std::numeric_limits<uint32_t>::max() &&
-        time.asTimestamp().getInc() <= (std::numeric_limits<uint32_t>::max() - nTicks);
-}
-
 LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component, uint64_t nTicks) {
-    invariant(nTicks > 0 && nTicks <= std::numeric_limits<uint32_t>::max());
+    invariant(nTicks > 0 && nTicks <= kMaxValue);
 
     stdx::lock_guard<Latch> lock(_mutex);
 
@@ -90,10 +83,9 @@ LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component
     // in order to preserve compatibility with potentially signed or unsigned integral Timestamp
     // increment types. It is also unlikely to tick a clock by more than 2^31 in the span of one
     // second.
-    else if (time.asTimestamp().getInc() > (std::numeric_limits<uint32_t>::max() - nTicks)) {
+    else if (time.asTimestamp().getInc() > (kMaxValue - nTicks)) {
 
-        // TODO SERVER-47914: update this log id back to 20709.
-        LOGV2(4620000 /*20709*/,
+        LOGV2(20709,
               "Exceeded maximum allowable increment value within one second. Moving time forward "
               "to the next second.",
               "vectorClockComponent"_attr = _componentName(component));
@@ -102,10 +94,9 @@ LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component
         time = LogicalTime(Timestamp(time.asTimestamp().getSecs() + 1, 0));
     }
 
-    // TODO SERVER-47914: update this uassert id back to 40482.
-    uassert(4620001 /*40482*/,
+    uassert(40482,
             str::stream() << _componentName(component)
-                          << " cannot be advanced beyond the maximum cluster time value",
+                          << " cannot be advanced beyond the maximum logical time value",
             _lessThanOrEqualToMaxPossibleTime(time, nTicks));
 
     // Save the next time.
@@ -122,6 +113,14 @@ LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component
 
 void VectorClockMutable::_advanceComponentTimeTo(Component component, LogicalTime&& newTime) {
     stdx::lock_guard<Latch> lock(_mutex);
+
+    // Rate limit checks are skipped here so a server with no activity for longer than
+    // maxAcceptableLogicalClockDriftSecs seconds can still have its cluster time initialized.
+    uassert(40483,
+            str::stream() << _componentName(component)
+                          << " cannot be advanced beyond the maximum logical time value",
+            _lessThanOrEqualToMaxPossibleTime(newTime, 0));
+
     if (newTime > _vectorTime[component]) {
         _vectorTime[component] = std::move(newTime);
     }

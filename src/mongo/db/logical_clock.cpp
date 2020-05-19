@@ -32,25 +32,19 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_clock_gen.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
 
 namespace {
 const auto getLogicalClock = ServiceContext::declareDecoration<std::unique_ptr<LogicalClock>>();
-
-bool lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks) {
-    return time.asTimestamp().getSecs() <= LogicalClock::kMaxSignedInt &&
-        time.asTimestamp().getInc() <= (LogicalClock::kMaxSignedInt - nTicks);
-}
 }  // namespace
 
 LogicalTime LogicalClock::getClusterTimeForReplicaSet(ServiceContext* svcCtx) {
@@ -81,116 +75,7 @@ void LogicalClock::set(ServiceContext* service, std::unique_ptr<LogicalClock> cl
 LogicalClock::LogicalClock(ServiceContext* service) : _service(service) {}
 
 LogicalTime LogicalClock::getClusterTime() {
-    stdx::lock_guard<Latch> lock(_mutex);
-    return _clusterTime;
-}
-
-Status LogicalClock::advanceClusterTime(const LogicalTime newTime) {
-    stdx::lock_guard<Latch> lock(_mutex);
-
-    auto rateLimitStatus = _passesRateLimiter_inlock(newTime);
-    if (!rateLimitStatus.isOK()) {
-        return rateLimitStatus;
-    }
-
-    if (newTime > _clusterTime) {
-        _clusterTime = newTime;
-    }
-
-    return Status::OK();
-}
-
-LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
-    (void)VectorClockMutable::get(_service)->tick(VectorClock::Component::ClusterTime, nTicks);
-
-    invariant(nTicks > 0 && nTicks <= kMaxSignedInt);
-
-    stdx::lock_guard<Latch> lock(_mutex);
-
-    LogicalTime clusterTime = _clusterTime;
-
-    const unsigned wallClockSecs =
-        durationCount<Seconds>(_service->getFastClockSource()->now().toDurationSinceEpoch());
-    unsigned clusterTimeSecs = clusterTime.asTimestamp().getSecs();
-
-    // Synchronize clusterTime with wall clock time, if clusterTime was behind in seconds.
-    if (clusterTimeSecs < wallClockSecs) {
-        clusterTime = LogicalTime(Timestamp(wallClockSecs, 0));
-    }
-    // If reserving 'nTicks' would force the cluster timestamp's increment field to exceed (2^31-1),
-    // overflow by moving to the next second. We use the signed integer maximum as an overflow point
-    // in order to preserve compatibility with potentially signed or unsigned integral Timestamp
-    // increment types. It is also unlikely to apply more than 2^31 oplog entries in the span of one
-    // second.
-    else if (clusterTime.asTimestamp().getInc() > (kMaxSignedInt - nTicks)) {
-
-        LOGV2(20709,
-              "Exceeded maximum allowable increment value within one second. Moving clusterTime "
-              "forward to the next second.");
-
-        // Move time forward to the next second
-        clusterTime = LogicalTime(Timestamp(clusterTime.asTimestamp().getSecs() + 1, 0));
-    }
-
-    uassert(40482,
-            "cluster time cannot be advanced beyond its maximum value",
-            lessThanOrEqualToMaxPossibleTime(clusterTime, nTicks));
-
-    // Save the next cluster time.
-    clusterTime.addTicks(1);
-    _clusterTime = clusterTime;
-
-    // Add the rest of the requested ticks if needed.
-    if (nTicks > 1) {
-        _clusterTime.addTicks(nTicks - 1);
-    }
-
-    return clusterTime;
-}
-
-void LogicalClock::setClusterTimeFromTrustedSource(LogicalTime newTime) {
-    stdx::lock_guard<Latch> lock(_mutex);
-    // Rate limit checks are skipped here so a server with no activity for longer than
-    // maxAcceptableLogicalClockDriftSecs seconds can still have its cluster time initialized.
-
-    uassert(40483,
-            "cluster time cannot be advanced beyond its maximum value",
-            lessThanOrEqualToMaxPossibleTime(newTime, 0));
-
-    if (newTime > _clusterTime) {
-        _clusterTime = newTime;
-    }
-}
-
-Status LogicalClock::_passesRateLimiter_inlock(LogicalTime newTime) {
-    const unsigned wallClockSecs =
-        durationCount<Seconds>(_service->getFastClockSource()->now().toDurationSinceEpoch());
-    auto maxAcceptableDriftSecs = static_cast<const unsigned>(gMaxAcceptableLogicalClockDriftSecs);
-    auto newTimeSecs = newTime.asTimestamp().getSecs();
-
-    // Both values are unsigned, so compare them first to avoid wrap-around.
-    if ((newTimeSecs > wallClockSecs) && (newTimeSecs - wallClockSecs) > maxAcceptableDriftSecs) {
-        return Status(ErrorCodes::ClusterTimeFailsRateLimiter,
-                      str::stream() << "New cluster time, " << newTimeSecs
-                                    << ", is too far from this node's wall clock time, "
-                                    << wallClockSecs << ".");
-    }
-
-    uassert(40484,
-            "cluster time cannot be advanced beyond its maximum value",
-            lessThanOrEqualToMaxPossibleTime(newTime, 0));
-
-    return Status::OK();
-}
-
-bool LogicalClock::isEnabled() const {
-    stdx::lock_guard<Latch> lock(_mutex);
-    return _isEnabled;
-}
-
-void LogicalClock::disable() {
-    stdx::lock_guard<Latch> lock(_mutex);
-    _isEnabled = false;
+    return VectorClock::get(_service)->getTime()[VectorClock::Component::ClusterTime];
 }
 
 }  // namespace mongo

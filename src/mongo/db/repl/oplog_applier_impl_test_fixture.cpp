@@ -35,7 +35,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/vector_clock_mutable.h"
 
 namespace mongo {
 namespace repl {
@@ -131,7 +131,8 @@ void OplogApplierImplTest::setUp() {
 
     // This is necessary to generate ghost timestamps for index builds that are not 0, since 0 is an
     // invalid timestamp.
-    ASSERT_OK(LogicalClock::get(_opCtx.get())->advanceClusterTime(LogicalTime(Timestamp(1, 0))));
+    VectorClockMutable::get(_opCtx.get())
+        ->tickTo(VectorClock::Component::ClusterTime, LogicalTime(Timestamp(1, 0)));
 }
 
 void OplogApplierImplTest::tearDown() {

@@ -41,6 +41,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/platform/basic.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/session.h"
@@ -98,8 +99,9 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     mongo::ServiceContext::UniqueOperationContext opCtx =
         serviceContext->makeOperationContext(client.get());
     auto logicalClock = std::make_unique<mongo::LogicalClock>(serviceContext);
-    logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
     mongo::LogicalClock::set(serviceContext, std::move(logicalClock));
+    VectorClockMutable::get(getServiceContext())
+        ->tickTo(VectorClock::Component::ClusterTime, kInMemoryLogicalTime);
 
     int new_size = Size + sizeof(int);
     auto sb = mongo::SharedBuffer::allocate(new_size);
