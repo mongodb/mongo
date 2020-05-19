@@ -264,8 +264,13 @@ static void
 config_backup_incr(void)
 {
     /* Incremental backup requires backup. */
-    if (g.c_backups == 0)
+    if (g.c_backups == 0) {
+        if (!config_is_perm("backup.incremental"))
+            config_single("backup.incremental=off", false);
+        if (g.c_backup_incr_flag != INCREMENTAL_OFF)
+            testutil_die(EINVAL, "backup.incremental requires backups be configured");
         return;
+    }
 
     /*
      * Incremental backup using log files is incompatible with logging archival. Testing log file
@@ -298,6 +303,7 @@ config_backup_incr(void)
             if (g.c_logging_archive)
                 config_single("logging.archive=0", false);
             config_single("backup.incremental=log", false);
+            break;
         }
     /* FALLTHROUGH */
     case 7: /* 40% block based incremental */

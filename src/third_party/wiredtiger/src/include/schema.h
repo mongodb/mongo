@@ -264,7 +264,7 @@ struct __wt_table {
         if ((skipp) != (bool *)NULL)                            \
             *(bool *)(skipp) = true;                            \
         if (F_ISSET(session, WT_SESSION_LOCKED_HOTBACKUP)) {    \
-            if (!__conn->hot_backup) {                          \
+            if (__conn->hot_backup_start == 0) {                \
                 if ((skipp) != (bool *)NULL)                    \
                     *(bool *)(skipp) = false;                   \
                 op;                                             \
@@ -272,7 +272,7 @@ struct __wt_table {
         } else {                                                \
             __wt_readlock(session, &__conn->hot_backup_lock);   \
             F_SET(session, WT_SESSION_LOCKED_HOTBACKUP_READ);   \
-            if (!__conn->hot_backup) {                          \
+            if (__conn->hot_backup_start == 0) {                \
                 if ((skipp) != (bool *)NULL)                    \
                     *(bool *)(skipp) = false;                   \
                 op;                                             \

@@ -30,6 +30,7 @@ import glob
 import os
 import shutil
 import string
+import time
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
@@ -163,8 +164,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, total)
 
-    # Test that named checkpoints can't be deleted while backup cursors are
-    # open, but that normal checkpoints continue to work.
+    # Test interaction between checkpoints and a backup cursor.
     def test_checkpoint_delete(self):
         # You cannot name checkpoints including LSM tables, skip those.
         self.populate(1)
@@ -177,7 +177,8 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
             self.objs[0][0], None, "checkpoint=one"))
 
         # Confirm opening a backup cursor causes checkpoint to fail if dropping
-        # a named checkpoint, but does not stop a default checkpoint.
+        # a named checkpoint created before the backup cursor, but does not stop a
+        # default checkpoint.
         cursor = self.session.open_cursor('backup:', None, None)
         self.session.checkpoint()
         msg = '/checkpoints cannot be deleted during a hot backup/'
@@ -187,7 +188,23 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
         self.session.checkpoint()
+
+        # Need to pause a couple seconds; checkpoints that are assigned the same timestamp as
+        # the backup will be pinned, even if they occur after the backup starts.
+        time.sleep(2)
+        self.session.checkpoint("name=four")
+        self.session.checkpoint("drop=(four)")
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(
+            self.objs[0][0], None, "checkpoint=four"))
+
+        # Confirm that after closing the backup cursor the original named checkpoint can
+        # be deleted.
         cursor.close()
+        self.session.checkpoint("drop=(two)")
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(
+            self.objs[0][0], None, "checkpoint=two"))
 
 if __name__ == '__main__':
     wttest.run()

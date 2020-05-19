@@ -39,7 +39,7 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
      * backups, which only copies log files, or targeted backups, stops all block truncation
      * unnecessarily). We may want a more targeted solution at some point.
      */
-    if (!conn->hot_backup) {
+    if (conn->hot_backup_start == 0) {
         WT_WITH_HOTBACKUP_READ_LOCK(session, ret = __wt_ftruncate(session, block->fh, len), NULL);
     }
 
