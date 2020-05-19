@@ -185,6 +185,12 @@ public:
     void setOperationKey(OperationKey opKey);
 
     /**
+     * Removes the operation UUID associated with this operation.
+     * DO NOT call this function outside `~OperationContext()` and `killAndDelistOperation()`.
+     */
+    void releaseOperationKey();
+
+    /**
      * Returns the session ID associated with this operation, if there is one.
      */
     const boost::optional<LogicalSessionId>& getLogicalSessionId() const {

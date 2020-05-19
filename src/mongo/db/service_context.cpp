@@ -385,6 +385,8 @@ void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
     if (client->session()) {
         _numCurrentOps.subtractAndFetch(1);
     }
+
+    opCtx->releaseOperationKey();
 }
 
 void ServiceContext::killAndDelistOperation(OperationContext* opCtx,
