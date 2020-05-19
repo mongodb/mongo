@@ -626,6 +626,7 @@ functions:
       remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
       bucket: fuzzer-artifacts
       permissions: private
+      visibility: signed
       content_type: ${content_type|application/gzip}
       display_name: "Fuzzer Tests Corpus Tar Archive"
       optional: true
