@@ -41,7 +41,8 @@ function CollectionValidator() {
         // Optionally skip collections.
         if (Array.isArray(jsTest.options().skipValidationNamespaces) &&
             jsTest.options().skipValidationNamespaces.length > 0) {
-            let skippedCollections = [];
+            // SERVER-48294: Always skip validating the oplog in foreground validation.
+            let skippedCollections = ['local.oplog.rs'];
             for (let ns of jsTest.options().skipValidationNamespaces) {
                 // Attempt to strip the name of the database we are about to validate off of the
                 // namespace we wish to skip. If the replace() function does find a match with the
