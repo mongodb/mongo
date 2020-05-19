@@ -8,7 +8,8 @@
  * that because indexes are initially built in the background, reindexing is also done in the
  * background.
  *
- * @tags: [SERVER-40561, creates_background_indexes]
+ * SERVER-36709: Disabled for ephemeralForTest due to excessive memory usage
+ * @tags: [SERVER-40561, creates_background_indexes, incompatible_with_eft]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload

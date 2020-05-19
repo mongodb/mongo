@@ -71,6 +71,7 @@ void CreateCollectionTest::setUp() {
     auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     repl::ReplicationCoordinator::set(service, std::move(replCoord));
+    repl::setOplogCollectionName(service);
 
     _storage = std::make_unique<repl::StorageInterfaceImpl>();
 }
@@ -86,7 +87,9 @@ void CreateCollectionTest::tearDown() {
  * Creates an OperationContext.
  */
 ServiceContext::UniqueOperationContext makeOpCtx() {
-    return cc().makeOperationContext();
+    auto opCtx = cc().makeOperationContext();
+    repl::createOplog(opCtx.get());
+    return opCtx;
 }
 
 void CreateCollectionTest::validateValidator(const std::string& validatorStr,
@@ -105,6 +108,7 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
     ASSERT_TRUE(db) << "Cannot create collection " << newNss << " because database " << newNss.db()
                     << " does not exist.";
 
+    WriteUnitOfWork wuow(opCtx.get());
     const auto status =
         db->userCreateNS(opCtx.get(), newNss, options, false /*createDefaultIndexes*/);
     ASSERT_EQ(expectedError, status.code());

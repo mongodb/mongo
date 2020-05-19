@@ -63,9 +63,12 @@ public:
         options.uuid = UUID::gen();
         RecordId catalogId;
         std::unique_ptr<RecordStore> rs;
-        std::tie(catalogId, rs) = unittest::assertGet(
-            _storageEngine->getCatalog()->createCollection(opCtx, ns, options, true));
-
+        {
+            WriteUnitOfWork wuow(opCtx);
+            std::tie(catalogId, rs) = unittest::assertGet(
+                _storageEngine->getCatalog()->createCollection(opCtx, ns, options, true));
+            wuow.commit();
+        }
         std::unique_ptr<Collection> coll = std::make_unique<CollectionMock>(ns, catalogId);
         CollectionCatalog::get(opCtx).registerCollection(options.uuid.get(), &coll);
 

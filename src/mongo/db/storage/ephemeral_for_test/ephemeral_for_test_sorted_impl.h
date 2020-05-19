@@ -30,12 +30,12 @@
 
 #include "mongo/db/index/index_descriptor_fwd.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 
 class SortedDataBuilderBase : public SortedDataBuilderInterface {
 public:
@@ -148,5 +148,5 @@ public:
     std::unique_ptr<mongo::SortedDataInterface::Cursor> newCursor(
         OperationContext* opCtx, bool isForward = true) const override;
 };
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

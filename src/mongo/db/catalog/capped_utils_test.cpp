@@ -66,6 +66,8 @@ void CappedUtilsTest::setUp() {
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     repl::ReplicationCoordinator::set(service, std::move(replCoord));
 
+    repl::setOplogCollectionName(service);
+
     _storage = std::make_unique<repl::StorageInterfaceImpl>();
 }
 
@@ -80,7 +82,9 @@ void CappedUtilsTest::tearDown() {
  * Creates an OperationContext.
  */
 ServiceContext::UniqueOperationContext makeOpCtx() {
-    return cc().makeOperationContext();
+    auto opCtx = cc().makeOperationContext();
+    repl::createOplog(opCtx.get());
+    return opCtx;
 }
 
 /**

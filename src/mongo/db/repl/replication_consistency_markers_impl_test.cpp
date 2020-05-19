@@ -45,6 +45,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -229,18 +230,19 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     // Check oplog truncate after point document.
     ASSERT_EQUALS(endOpTime.getTimestamp(), consistencyMarkers.getOplogTruncateAfterPoint(opCtx));
 
-    // Recovery unit will be owned by "opCtx".
-    RecoveryUnitWithDurabilityTracking* recoveryUnit = new RecoveryUnitWithDurabilityTracking();
-    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recoveryUnit),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    // SERVER-49685: We can't use a RecoveryUnitNoop with ephemeralForTest
+    //// Recovery unit will be owned by "opCtx".
+    // RecoveryUnitWithDurabilityTracking* recoveryUnit = new RecoveryUnitWithDurabilityTracking();
+    // opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recoveryUnit),
+    //                       WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
-    // Set min valid without waiting for the changes to be durable.
-    OpTime endOpTime2({Seconds(789), 0}, 1LL);
-    consistencyMarkers.setMinValid(opCtx, endOpTime2);
-    consistencyMarkers.clearAppliedThrough(opCtx, {});
-    ASSERT_EQUALS(consistencyMarkers.getAppliedThrough(opCtx), OpTime());
-    ASSERT_EQUALS(consistencyMarkers.getMinValid(opCtx), endOpTime2);
-    ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);
+    //// Set min valid without waiting for the changes to be durable.
+    // OpTime endOpTime2({Seconds(789), 0}, 1LL);
+    // consistencyMarkers.setMinValid(opCtx, endOpTime2);
+    // consistencyMarkers.clearAppliedThrough(opCtx, {});
+    // ASSERT_EQUALS(consistencyMarkers.getAppliedThrough(opCtx), OpTime());
+    // ASSERT_EQUALS(consistencyMarkers.getMinValid(opCtx), endOpTime2);
+    // ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);
 }
 
 TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {

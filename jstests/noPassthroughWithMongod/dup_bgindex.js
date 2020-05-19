@@ -1,4 +1,6 @@
 // Try to create two identical indexes, via background. Shouldn't be allowed by the server.
+// SERVER-36709: Disabled for ephemeralForTest due to excessive memory usage
+// @tags: [incompatible_with_eft]
 (function() {
 var t = db.duplIndexTest;
 t.drop();

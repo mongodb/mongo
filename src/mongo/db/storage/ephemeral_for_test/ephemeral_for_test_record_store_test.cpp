@@ -34,55 +34,71 @@
 #include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_kv_engine.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace ephemeral_for_test {
 namespace {
 
-class EphemeralForTestHarnessHelper final : public RecordStoreHarnessHelper {
-public:
-    EphemeralForTestHarnessHelper() {}
+class RecordStoreHarnessHelper final : public ::mongo::RecordStoreHarnessHelper {
+    KVEngine _kvEngine{};
+    VisibilityManager _visibilityManager;
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
+public:
+    RecordStoreHarnessHelper() {}
+
+    virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore() {
         return newNonCappedRecordStore("a.b");
     }
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
-        return std::make_unique<EphemeralForTestRecordStore>(ns, &data);
+    virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore(const std::string& ns) {
+        return std::make_unique<RecordStore>(ns,
+                                             "ident"_sd /* ident */,
+                                             false /* isCapped */,
+                                             -1 /* cappedMaxSize */,
+                                             -1 /* cappedMaxDocs */,
+                                             nullptr /* cappedCallback */,
+                                             nullptr /* visibilityManager */);
     }
 
-    virtual std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
-                                                              int64_t cappedMaxDocs) {
+    virtual std::unique_ptr<mongo::RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
+                                                                     int64_t cappedMaxDocs) {
         return newCappedRecordStore("a.b", cappedSizeBytes, cappedMaxDocs);
     }
 
-    virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
-                                                              int64_t cappedSizeBytes,
-                                                              int64_t cappedMaxDocs) final {
-        return std::make_unique<EphemeralForTestRecordStore>(
-            ns, &data, true, cappedSizeBytes, cappedMaxDocs);
+    virtual std::unique_ptr<mongo::RecordStore> newCappedRecordStore(const std::string& ns,
+                                                                     int64_t cappedSizeBytes,
+                                                                     int64_t cappedMaxDocs) final {
+        return std::make_unique<RecordStore>(ns,
+                                             "ident"_sd,
+                                             /*isCapped*/ true,
+                                             cappedSizeBytes,
+                                             cappedMaxDocs,
+                                             /*cappedCallback*/ nullptr,
+                                             &_visibilityManager);
     }
 
-    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<EphemeralForTestRecoveryUnit>();
+    std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
+        return std::make_unique<RecoveryUnit>(&_kvEngine);
     }
 
     bool supportsDocLocking() final {
-        return false;
+        return true;
     }
-
-    std::shared_ptr<void> data;
 };
 
-std::unique_ptr<RecordStoreHarnessHelper> makeEphemeralForTestRecordStoreHarness() {
-    return std::make_unique<EphemeralForTestHarnessHelper>();
+std::unique_ptr<mongo::RecordStoreHarnessHelper> makeRecordStoreHarnessHelper() {
+    return std::make_unique<RecordStoreHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterRecordStoreHarnessFactory)(InitializerContext* const) {
-    mongo::registerRecordStoreHarnessHelperFactory(makeEphemeralForTestRecordStoreHarness);
+    mongo::registerRecordStoreHarnessHelperFactory(makeRecordStoreHarnessHelper);
     return Status::OK();
 }
 }  // namespace
+}  // namespace ephemeral_for_test
 }  // namespace mongo

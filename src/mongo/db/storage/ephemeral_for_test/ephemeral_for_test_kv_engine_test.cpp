@@ -29,49 +29,51 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/kv/kv_engine_test_harness.h"
+
 #include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/biggie/biggie_kv_engine.h"
-#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
-#include "mongo/db/storage/recovery_unit_test_harness.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_kv_engine.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace biggie {
-namespace {
+namespace ephemeral_for_test {
 
-class BiggieRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelper {
+class KVHarnessHelper : public mongo::KVHarnessHelper, public ScopedGlobalServiceContextForTest {
 public:
-    BiggieRecoveryUnitHarnessHelper() = default;
-
-    virtual std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<RecoveryUnit>(&_kvEngine);
+    KVHarnessHelper() {
+        invariant(hasGlobalServiceContext());
+        _engine = std::make_unique<KVEngine>();
+        repl::ReplicationCoordinator::set(
+            getGlobalServiceContext(),
+            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
+                getGlobalServiceContext(), repl::ReplSettings())));
     }
 
-    virtual std::unique_ptr<mongo::RecordStore> createRecordStore(OperationContext* opCtx,
-                                                                  const std::string& ns) {
-        return std::make_unique<RecordStore>(ns,
-                                             "ident"_sd /* ident */,
-                                             false /* isCapped */,
-                                             -1 /* cappedMaxSize */,
-                                             -1 /* cappedMaxDocs */,
-                                             nullptr /* cappedCallback */);
+    virtual KVEngine* getEngine() override {
+        return _engine.get();
+    }
+
+    virtual KVEngine* restartEngine() override {
+        return _engine.get();
     }
 
 private:
-    KVEngine _kvEngine{};
+    std::unique_ptr<KVEngine> _engine;
 };
 
-std::unique_ptr<RecoveryUnitHarnessHelper> makeBiggieRecoveryUnitHarnessHelper() {
-    return std::make_unique<BiggieRecoveryUnitHarnessHelper>();
+std::unique_ptr<mongo::KVHarnessHelper> makeHelper() {
+    return std::make_unique<KVHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterRecoveryUnitHarnessFactory)(InitializerContext* const) {
-    mongo::registerRecoveryUnitHarnessHelperFactory(makeBiggieRecoveryUnitHarnessHelper);
+MONGO_INITIALIZER(RegisterEphemeralForTestKVHarnessFactory)(InitializerContext*) {
+    KVHarnessHelper::registerFactory(makeHelper);
     return Status::OK();
 }
 
-}  // namespace
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

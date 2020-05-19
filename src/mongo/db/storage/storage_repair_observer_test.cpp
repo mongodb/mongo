@@ -101,6 +101,11 @@ public:
         return StorageRepairObserver::get(getServiceContext());
     }
 
+    void setUp() {
+        ServiceContextMongoDTest::setUp();
+        storageGlobalParams.repair = true;
+    }
+
     void tearDown() {
         auto repairObserver = getRepairObserver();
         if (_assertRepairIncompleteOnTearDown) {
@@ -117,6 +122,7 @@ public:
                       "mod_getDescription"_attr = mod.getDescription());
             }
         }
+        storageGlobalParams.repair = false;
     }
 
 private:

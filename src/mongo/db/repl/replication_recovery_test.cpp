@@ -187,6 +187,9 @@ private:
         ASSERT_OK(
             ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
 
+        repl::setOplogCollectionName(service);
+        repl::createOplog(_opCtx.get());
+
         ASSERT_OK(_storageInterface->createCollection(
             getOperationContext(), testNs, generateOptionsWithUuid()));
 
@@ -327,11 +330,6 @@ CollectionOptions _createOplogCollectionOptions() {
  * Creates an oplog with insert entries at the given timestamps.
  */
 void _setUpOplog(OperationContext* opCtx, StorageInterface* storage, std::vector<int> timestamps) {
-    ASSERT_OK(storage->createCollection(opCtx, oplogNs, _createOplogCollectionOptions()));
-
-    // Initialize the cached pointer to the oplog collection.
-    acquireOplogCollectionForLogging(opCtx);
-
     for (int ts : timestamps) {
         ASSERT_OK(storage->insertDocument(
             opCtx, oplogNs, _makeInsertOplogEntry(ts), OpTime::kUninitializedTerm));
@@ -446,21 +444,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryWithEmptyOplogSucceedsWithStableTimestam
     _assertDocsInTestCollection(opCtx, {});
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
-                   TruncateFassertsWithoutOplogCollection,
-                   "Fatal assertion.*34418.*NamespaceNotFound: Can't find local.oplog.rs") {
-    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
-    auto opCtx = getOperationContext();
-
-    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(4, 4));
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(3, 3), 1));
-
-    // Create the database.
-    ASSERT_OK(getStorageInterface()->createCollection(
-        opCtx, NamespaceString("local.other"), generateOptionsWithUuid()));
-
-    recovery.recoverFromOplog(opCtx, boost::none);
-}
 
 DEATH_TEST_F(ReplicationRecoveryTest,
              RecoveryInvariantsIfStableTimestampAndDoesNotSupportRecoveryTimestamp,

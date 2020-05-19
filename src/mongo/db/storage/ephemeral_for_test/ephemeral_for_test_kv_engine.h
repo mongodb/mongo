@@ -33,17 +33,19 @@
 #include <mutex>
 #include <set>
 
-#include "mongo/db/storage/biggie/biggie_record_store.h"
-#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
-#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_sorted_impl.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
+
+static constexpr char kEngineName[] = "ephemeralForTest";
 
 class JournalListener;
 /**
- * The biggie storage engine is intended for unit and performance testing.
+ * The ephemeral for test storage engine is intended for unit and performance testing.
  */
 class KVEngine : public mongo::KVEngine {
 public:
@@ -94,7 +96,7 @@ public:
     }
 
     /**
-     * Biggie does not write to disk.
+     * Ephemeral for test does not write to disk.
      */
     virtual bool isDurable() const {
         return false;
@@ -141,7 +143,7 @@ public:
         return boost::none;
     }
 
-    // Biggie Specific
+    // Ephemeral for test Specific
 
     /**
      * Returns a pair of the current version and copy of tree of the master.
@@ -172,5 +174,5 @@ private:
     StringStore _master;
     uint64_t _masterVersion = 0;
 };
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

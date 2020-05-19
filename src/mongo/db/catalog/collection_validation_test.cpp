@@ -267,16 +267,6 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastCount) {
                        /*numErrors*/ 0,
                        {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount});
 }
-TEST_F(CollectionValidationTest, ValidateEnforceFastCountError) {
-    FailPointEnableBlock failPoint("ephemeralForTestReturnIncorrectNumRecords");
-    auto opCtx = operationContext();
-    foregroundValidate(opCtx,
-                       /*valid*/ false,
-                       /*numRecords*/ insertDataRange(opCtx, 0, 5),
-                       /*numInvalidDocuments*/ 0,
-                       /*numErrors*/ 1,
-                       {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount});
-}
 
 /**
  * Waits for a parallel running collection validation operation to start and then hang at a

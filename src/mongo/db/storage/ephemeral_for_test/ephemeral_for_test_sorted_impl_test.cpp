@@ -29,30 +29,30 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_sorted_impl.h"
 
 #include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/biggie/biggie_kv_engine.h"
-#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
-#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_kv_engine.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 namespace {
 
-class BiggieSortedDataInterfaceTestHarnessHelper final
-    : public virtual SortedDataInterfaceHarnessHelper {
+class SortedDataInterfaceTestHarnessHelper final
+    : public virtual mongo::SortedDataInterfaceHarnessHelper {
 public:
-    BiggieSortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
+    SortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
 
     std::unique_ptr<mongo::SortedDataInterface> newIdIndexSortedDataInterface() final {
-        std::string ns = "test.biggie";
+        std::string ns = "test.ephemeral_for_test";
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
         BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
@@ -69,7 +69,7 @@ public:
 
     std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
                                                                        bool partial) final {
-        std::string ns = "test.biggie";
+        std::string ns = "test.ephemeral_for_test";
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
@@ -98,16 +98,14 @@ private:
     std::list<IndexDescriptor> _descs;
 };
 
-std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper>
-makeBiggieSortedDataInterfaceHarnessHelper() {
-    return std::make_unique<BiggieSortedDataInterfaceTestHarnessHelper>();
+std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper> makeSortedDataInterfaceHarnessHelper() {
+    return std::make_unique<SortedDataInterfaceTestHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
-    mongo::registerSortedDataInterfaceHarnessHelperFactory(
-        makeBiggieSortedDataInterfaceHarnessHelper);
+    mongo::registerSortedDataInterfaceHarnessHelperFactory(makeSortedDataInterfaceHarnessHelper);
     return Status::OK();
 }
 }  // namespace
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

@@ -31,18 +31,18 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/biggie/biggie_kv_engine.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_kv_engine.h"
 
 #include <memory>
 
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 
 KVEngine::KVEngine()
     : mongo::KVEngine(), _visibilityManager(std::make_unique<VisibilityManager>()) {}
@@ -164,5 +164,5 @@ public:
     void detachFromOperationContext() final {}
     void reattachToOperationContext(OperationContext* opCtx) final {}
 };
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

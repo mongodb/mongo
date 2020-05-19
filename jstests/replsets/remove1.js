@@ -8,8 +8,11 @@
  * Make sure both nodes are either primary or secondary
  *
  * This test assumes 'newlyAdded' fields are enabled, so blacklist from multiversion tests in 4.6.
+ *
+ * SERVER-49428: Disable for ephemeralForTest, writeConcernMajorityJournalDefault is not off
  * @tags: [
  *   requires_fcv_46,
+ *   incompatible_with_eft,
  * ]
  */
 

@@ -32,16 +32,16 @@
 #include "mongo/db/commands/server_status.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 
 class KVEngine;
 
 /**
  * Adds "biggie" to the results of db.serverStatus().
  */
-class BiggieServerStatusSection : public ServerStatusSection {
+class ServerStatusSection : public mongo::ServerStatusSection {
 public:
-    BiggieServerStatusSection(KVEngine* engine);
+    ServerStatusSection(KVEngine* engine);
     bool includeByDefault() const override;
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override;
@@ -50,5 +50,5 @@ private:
     KVEngine* _engine;
 };
 
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

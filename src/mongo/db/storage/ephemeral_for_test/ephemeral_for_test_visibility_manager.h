@@ -35,7 +35,7 @@
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 
 class RecordStore;
 
@@ -91,5 +91,5 @@ private:
     std::set<RecordId> _uncommittedRecords;  // RecordIds that have yet to be committed/rolled back.
 };
 
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

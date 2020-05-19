@@ -41,9 +41,9 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
-#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
-#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_sorted_impl.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/bufreader.h"
@@ -52,7 +52,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 namespace {
 
 // Helper to interpret index data buffer
@@ -1331,7 +1331,7 @@ void SortedDataInterfaceUnique::unindex(OperationContext* opCtx,
 // This function is, as of now, not in the interface, but there exists a server ticket to add
 // truncate to the list of commands able to be used.
 Status SortedDataInterfaceBase::truncate(mongo::RecoveryUnit* ru) {
-    auto bRu = checked_cast<biggie::RecoveryUnit*>(ru);
+    auto bRu = checked_cast<ephemeral_for_test::RecoveryUnit*>(ru);
     StringStore* workingCopy(bRu->getHead());
     std::vector<std::string> toDelete;
     auto end = workingCopy->upper_bound(_KSForIdentEnd);
@@ -1529,5 +1529,5 @@ std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterfaceStandard:
                                             _KSForIdentEnd);
 }
 
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

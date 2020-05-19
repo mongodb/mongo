@@ -216,7 +216,6 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
         uasserted(ErrorCodes::OperationFailed, "insert failed");
     }
 
-    ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
     onInsertsIsTargetDatabaseExclusivelyLocked =
         opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X);
 

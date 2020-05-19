@@ -1730,7 +1730,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, MigratingKnownStmtWhileOplogTrunc
 
     {
         AutoGetCollection oplogColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
+        WriteUnitOfWork wuow(opCtx);
         ASSERT_OK(oplogColl.getCollection()->truncate(opCtx));  // Empties the oplog collection.
+        wuow.commit();
     }
 
     {

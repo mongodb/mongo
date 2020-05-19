@@ -98,11 +98,13 @@ void MockReplCoordServerFixture::insertOplogEntry(const repl::OplogEntry& entry)
     auto coll = autoColl.getCollection();
     ASSERT_TRUE(coll != nullptr);
 
+    WriteUnitOfWork wuow(opCtx());
     auto status = coll->insertDocument(opCtx(),
                                        InsertStatement(entry.toBSON()),
                                        &CurOp::get(opCtx())->debug(),
                                        /* fromMigrate */ false);
     ASSERT_OK(status);
+    wuow.commit();
 }
 
 OperationContext* MockReplCoordServerFixture::opCtx() {

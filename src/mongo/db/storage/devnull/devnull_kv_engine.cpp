@@ -33,7 +33,7 @@
 
 #include <memory>
 
-#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
+#include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 

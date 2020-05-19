@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -42,7 +42,7 @@
 #include <tuple>
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 
 // Helper fixture to run radix tree modifications in parallel on different threads. The result will
 // be merged into a master tree and any merge conflicts will be retried. The fixture remembers the
@@ -408,5 +408,5 @@ TEST_F(ConcurrentRadixStoreTestNineThreads, InsertEraseUpdateSameBranch) {
     }
 }
 
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

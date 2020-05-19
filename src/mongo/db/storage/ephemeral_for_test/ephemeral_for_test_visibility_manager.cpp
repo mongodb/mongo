@@ -33,12 +33,12 @@
 
 #include <algorithm>
 
-#include "mongo/db/storage/biggie/biggie_record_store.h"
-#include "mongo/db/storage/biggie/biggie_visibility_manager.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_visibility_manager.h"
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 
 /**
  * Used by the visibility manager to register changes when the RecoveryUnit either commits or
@@ -121,5 +121,5 @@ void VisibilityManager::waitForAllEarlierOplogWritesToBeVisible(OperationContext
     });
 }
 
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

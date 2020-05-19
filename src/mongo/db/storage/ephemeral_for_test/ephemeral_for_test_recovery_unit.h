@@ -33,32 +33,31 @@
 #include <vector>
 
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_kv_engine.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
+namespace ephemeral_for_test {
 
-class SortedDataInterface;
-
-class EphemeralForTestRecoveryUnit : public RecoveryUnit {
+class RecoveryUnit : public ::mongo::RecoveryUnit {
 public:
-    EphemeralForTestRecoveryUnit(std::function<void()> cb = nullptr)
-        : _waitUntilDurableCallback(cb) {}
+    RecoveryUnit(KVEngine* parentKVEngine, std::function<void()> cb = nullptr);
+    ~RecoveryUnit();
 
-    virtual ~EphemeralForTestRecoveryUnit();
+    void beginUnitOfWork(OperationContext* opCtx) override final;
 
-    void beginUnitOfWork(OperationContext* opCtx) final;
+    bool inActiveTxn() const {
+        return _inUnitOfWork();
+    }
 
-    virtual bool waitUntilDurable(OperationContext* opCtx);
+    virtual bool waitUntilDurable(OperationContext* opCtx) override;
 
-    bool inActiveTxn() const;
+    virtual void setOrderedCommit(bool orderedCommit) override;
 
     Status obtainMajorityCommittedSnapshot() final;
 
-    virtual void registerChange(std::unique_ptr<Change> change);
-
-    virtual void setOrderedCommit(bool orderedCommit) {}
-
-    virtual void prepareUnitOfWork() override {}
+    void prepareUnitOfWork() override;
 
     virtual void setPrepareTimestamp(Timestamp ts) override {
         _prepareTimestamp = ts;
@@ -80,19 +79,47 @@ public:
         _commitTimestamp = Timestamp::min();
     }
 
+    Status setTimestamp(Timestamp timestamp) override;
+
+    // Ephemeral for test specific function declarations below.
+    StringStore* getHead() {
+        forkIfNeeded();
+        return &_workingCopy;
+    }
+
+    inline void makeDirty() {
+        _dirty = true;
+    }
+
+    /**
+     * Checks if there already exists a current working copy and merge base; if not fetches
+     * one and creates them.
+     */
+    bool forkIfNeeded();
+
+    static RecoveryUnit* get(OperationContext* opCtx);
+
 private:
-    void doCommitUnitOfWork() final;
-    void doAbortUnitOfWork() final;
+    void doCommitUnitOfWork() override final;
 
-    void doAbandonSnapshot() final;
+    void doAbortUnitOfWork() override final;
 
-    typedef std::vector<std::shared_ptr<Change>> Changes;
+    void doAbandonSnapshot() override final;
 
-    Changes _changes;
+    void _abort();
+
     std::function<void()> _waitUntilDurableCallback;
+    // Official master is kept by KVEngine
+    KVEngine* _KVEngine;
+    StringStore _mergeBase;
+    StringStore _workingCopy;
+
+    bool _forked = false;
+    bool _dirty = false;  // Whether or not we have written to this _workingCopy.
 
     Timestamp _prepareTimestamp = Timestamp::min();
     Timestamp _commitTimestamp = Timestamp::min();
 };
 
+}  // namespace ephemeral_for_test
 }  // namespace mongo

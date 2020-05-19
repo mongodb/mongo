@@ -1,6 +1,7 @@
 // Certain commands should be run-able from arbiters under localhost, but not from
 // any other nodes in the replset.
-// @tags: [requires_replication]
+// SERVER-48314: Disabled for ephemeralForTest due to lacking timestamp support
+// @tags: [requires_replication, incompatible_with_eft]
 
 (function() {
 

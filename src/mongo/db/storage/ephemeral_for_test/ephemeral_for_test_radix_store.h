@@ -43,7 +43,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 
 
 class merge_conflict_exception : std::exception {
@@ -1655,5 +1655,5 @@ template <class Key, class T>
 Metrics RadixStore<Key, T>::_metrics;
 
 using StringStore = RadixStore<std::string, std::string>;
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

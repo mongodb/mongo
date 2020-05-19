@@ -1217,10 +1217,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
 
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
         ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_IX));
-
-        // TODO: This is TRUE because Lock::CollectionLock converts IS lock to S
-        ASSERT(lockState->isCollectionLockedForMode(ns, MODE_S));
-
+        ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_S));
         ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_X));
     }
 
@@ -1246,12 +1243,10 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
     {
         Lock::CollectionLock collLock(opCtx.get(), ns, MODE_IX);
 
-        // TODO: This is TRUE because Lock::CollectionLock converts IX lock to X
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
-
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IX));
-        ASSERT(lockState->isCollectionLockedForMode(ns, MODE_S));
-        ASSERT(lockState->isCollectionLockedForMode(ns, MODE_X));
+        ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_S));
+        ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_X));
     }
 
     {

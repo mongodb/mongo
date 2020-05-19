@@ -11743,20 +11743,6 @@ buildvariants:
 # storage engine buildvariants #
 ################################
 
-- name: rhel-62-64-bit-biggie
-  display_name: RHEL 6.2 (Biggie)
-  run_on:
-  - rhel62-small
-  expansions:
-    test_flags: --storageEngine=biggie --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
-    compile_flags: MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    scons_cache_scope: shared
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
-  - name: jsCore
-
 - name: enterprise-rhel-62-benchmarks
   display_name: Enterprise RHEL 6.2 (Benchmarks)
   modules:
@@ -11837,7 +11823,7 @@ buildvariants:
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
   run_on:
-  - rhel62-small
+  - rhel62-large
   expansions:
     # Transactions are not explicitly supported on the ephemeralForTest storage engine.
     # Speculative majority reads are currently only allowed for change streams, which are only supported on WiredTiger.
@@ -11846,7 +11832,7 @@ buildvariants:
     # correctly after rollbackViaRefetch.
     test_flags: >-
       --storageEngine=ephemeralForTest
-      --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding
+      --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding,incompatible_with_eft
       --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
@@ -11854,26 +11840,17 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
   - name: .misc_js
   - name: concurrency
-    distros:
-    - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel62-large
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_replication
-    distros:
-    - rhel62-large
+  # SERVER-36709: Disabled due to excessive memory usage
+  # concurrency_replication
+  # concurrency_replication_causal_consistency
+  # concurrency_simultaneous
+  # concurrency_simultaneous_replication
   - name: .integration !.audit
-    distros:
-    - rhel62-large
   - name: .jscore .common !.txns !.decimal
   - name: jsCore_op_query
   - name: .jstestfuzz .common
@@ -11881,7 +11858,8 @@ buildvariants:
   - name: .read_write_concern .linearize
   - name: replica_sets
   - name: .replica_sets .common
-  - name: rollback_fuzzer_gen
+  # SERVER-49428: Disabled due to writeConcernMajorityJournalDefault is not off
+  # rollback_fuzzer_gen
   - name: .updatefuzzer
 
 - name: enterprise-rhel-71-ppc64le-inmem
@@ -12172,7 +12150,7 @@ buildvariants:
    - name: libfuzzertests_TG
 
 - name: enterprise-ubuntu2004-debug-tsan
-  display_name: ~ TSAN Enterprise Ubuntu 20.04 DEBUG (Biggie)
+  display_name: ~ TSAN Enterprise Ubuntu 20.04 DEBUG (ephemeralForTest)
   modules:
     - enterprise
   run_on:
@@ -12184,9 +12162,9 @@ buildvariants:
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
     san_options: TSAN_OPTIONS="die_after_fork=0:suppressions=etc/tsan.suppressions:halt_on_error=1"
-    # TODO: Remove some of the excluded tags when the Biggie storage engine is
+    # TODO: Remove some of the excluded tags when the ephemeralForTest storage engine is
     # further along in development: https://jira.mongodb.org/browse/SERVER-48325
-    test_flags: --storageEngine=biggie --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
+    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=thread --ssl --enable-free-mon=on --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo)
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3

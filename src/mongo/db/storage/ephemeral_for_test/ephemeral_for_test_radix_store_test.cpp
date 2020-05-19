@@ -31,11 +31,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace biggie {
+namespace ephemeral_for_test {
 
 using value_type = StringStore::value_type;
 
@@ -2770,5 +2770,5 @@ TEST_F(RadixStoreTest, LowerBoundEndpoint) {
     ASSERT_TRUE(it == thisStore.end());
 }
 
-}  // namespace biggie
+}  // namespace ephemeral_for_test
 }  // namespace mongo

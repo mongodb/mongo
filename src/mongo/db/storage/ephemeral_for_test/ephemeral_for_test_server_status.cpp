@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,50 +27,45 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
-#include <memory>
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_server_status.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_kv_engine.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
-namespace {
+namespace ephemeral_for_test {
 
-class EphemeralForTestKVHarnessHelper : public KVHarnessHelper,
-                                        public ScopedGlobalServiceContextForTest {
-public:
-    EphemeralForTestKVHarnessHelper() : _engine(new EphemeralForTestEngine()) {
-        repl::ReplicationCoordinator::set(
-            getGlobalServiceContext(),
-            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
-                getGlobalServiceContext(), repl::ReplSettings())));
-    }
+ServerStatusSection::ServerStatusSection(KVEngine* engine)
+    : mongo::ServerStatusSection(kEngineName), _engine(engine) {}
 
-    virtual KVEngine* restartEngine() {
-        // Intentionally not restarting since the in-memory storage engine
-        // does not persist data across restarts
-        return _engine.get();
-    }
-
-    virtual KVEngine* getEngine() {
-        return _engine.get();
-    }
-
-private:
-    std::unique_ptr<EphemeralForTestEngine> _engine;
-};
-
-std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return std::make_unique<EphemeralForTestKVHarnessHelper>();
+bool ServerStatusSection::includeByDefault() const {
+    return true;
 }
 
-MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
-    KVHarnessHelper::registerFactory(makeHelper);
-    return Status::OK();
+BSONObj ServerStatusSection::generateSection(OperationContext* opCtx,
+                                             const BSONElement& configElement) const {
+    Lock::GlobalLock lk(
+        opCtx, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked);
+    if (!lk.isLocked()) {
+        LOGV2_DEBUG(4919800, 2, "Failed to retrieve ephemeralForTest statistics");
+        return BSONObj();
+    }
+
+    BSONObjBuilder bob;
+    bob.append("totalMemoryUsage", StringStore::totalMemory());
+    bob.append("totalNodes", StringStore::totalNodes());
+    bob.append("averageChildren", StringStore::averageChildren());
+
+    return bob.obj();
 }
 
-}  // namespace
+}  // namespace ephemeral_for_test
 }  // namespace mongo
