@@ -11,6 +11,7 @@ except ImportError:
     pass
 
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib import errors
 from . import process as _process
 
 
@@ -52,23 +53,18 @@ class Process(_process.Process):
 
     def stop(self, mode=None):
         """Terminate the process."""
+        if mode is None:
+            mode = fixture_interface.TeardownMode.TERMINATE
 
-        should_kill = mode == fixture_interface.TeardownMode.KILL
-        signal = self.jasper_pb2.Signals.Value("TERMINATE")
-        if sys.platform == "win32":
-            if not should_kill:
-                event_name = self.jasper_pb2.EventName(value="Global\\Mongo_" + str(self.pid))
-                signal_event = self._stub.SignalEvent(event_name)
-                if signal_event.success:
-                    wait = self._stub.Wait(self._id, timeout=60)
-                    if wait.success:
-                        return
-            clean_termination_params = self.jasper_pb2.SignalTriggerParams(
-                processID=self._id,
-                signalTriggerID=self.jasper_pb2.SignalTriggerID.Value("CLEANTERMINATION"))
-            self._stub.RegisterSignalTriggerID(clean_termination_params)
-        elif should_kill:
+        if mode == fixture_interface.TeardownMode.KILL:
             signal = self.jasper_pb2.Signals.Value("KILL")
+        elif mode == fixture_interface.TeardownMode.TERMINATE:
+            signal = self.jasper_pb2.Signals.Value("TERMINATE")
+        elif mode == fixture_interface.TeardownMode.ABORT:
+            signal = self.jasper_pb2.Signals.Value("ABRT")
+        else:
+            raise errors.ProcessError("Process wrapper given unrecognized teardown mode: " +
+                                      mode.value)
 
         signal_process = self.jasper_pb2.SignalProcess(ProcessID=self._id, signal=signal)
         val = self._stub.Signal(signal_process)
