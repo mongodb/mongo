@@ -340,7 +340,7 @@ If the balancer has selected any chunks to move during a round, it will [schedul
 
 ### Jumbo Chunks
 
-By default, a chunk is considered "too large to migrate" if its size exceeds the maximum size specified in the chunk size configuration parameter. If a chunk is this large and the balancer schedules either a migration or splitChunk, the migration or splitChunk will fail and the balancer will set the chunk's "jumbo" flag to true. However, if the balancer configuration setting 'attemptToBalanceJumboChunks' is set to true, the balancer will not fail a migration or splitChunk due to the chunk's size. Regardless of whether 'attemptToBalanceJumboChunks' is true or false, the balancer will not attempt to schedule a migration or splitChunk if the chunk's "jumbo" flag is set to true. Note that because a chunk's "jumbo" flag is not set to true until a migration or splitChunk has failed due to its size, it is possible for a chunk to be larger than the maximum chunk size and not actually be marked "jumbo" internally. The reason that the balancer will not schedule a migration for a chunk marked "jumbo" is to avoid the risk of forever scheduling the same migration or split - if a chunk is marked "jumbo" it means a migration or splitChunk has already failed. The clearJumboFlag command can be run for a chunk in order to clear its "jumbo" flag so that the balancer will schedule this migration in the future. 
+By default, a chunk is considered "too large to migrate" if its size exceeds the maximum size specified in the chunk size configuration parameter. If a chunk is this large and the balancer schedules either a migration or splitChunk, the migration or splitChunk will fail and the balancer will set the chunk's "jumbo" flag to true. However, if the balancer configuration setting 'attemptToBalanceJumboChunks' is set to true, the balancer will not fail a migration or splitChunk due to the chunk's size. Regardless of whether 'attemptToBalanceJumboChunks' is true or false, the balancer will not attempt to schedule a migration or splitChunk if the chunk's "jumbo" flag is set to true. Note that because a chunk's "jumbo" flag is not set to true until a migration or splitChunk has failed due to its size, it is possible for a chunk to be larger than the maximum chunk size and not actually be marked "jumbo" internally. The reason that the balancer will not schedule a migration for a chunk marked "jumbo" is to avoid the risk of forever scheduling the same migration or split - if a chunk is marked "jumbo" it means a migration or splitChunk has already failed. The clearJumboFlag command can be run for a chunk in order to clear its "jumbo" flag so that the balancer will schedule this migration in the future.
 
 #### Code references
 * [**Balancer class**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/balancer/balancer.h)
@@ -455,7 +455,7 @@ mergeChunks, and moveChunk all take the chunk ResourceMutex.
 # The logical clock and causal consistency
 Starting from v3.6 MongoDB provides session based causal consistency. All operations in the causally
 consistent session will be execute in the order that preserves the causality. In particular it
-means that client of the session has guarantees to 
+means that client of the session has guarantees to
 * Read own writes
 * Monotonic reads and writes
 * Writes follow reads
@@ -471,11 +471,11 @@ i.e. primary nodes.
 ClusterTime refers to the time value of the node's logical clock. Its represented as an unsigned 64
 bit integer representing a combination of unix epoch (high 32 bit) and an integer 32 bit counter (low 32 bit). It's
 incremented only when state changing events occur. As the state is represented by the oplog entries
-the oplog optime is derived from the cluster time. 
+the oplog optime is derived from the cluster time.
 
 ### Cluster time gossiping
 Every node (mongod, mongos, config servers, clients) keep track on the maximum value of the
-ClusterTime it has seen. Every node adds this value to each message it sends. 
+ClusterTime it has seen. Every node adds this value to each message it sends.
 
 ### Cluster time ticking
 Every node in the cluster has a LogicalClock that keeps an in-memory version of the node's
@@ -506,7 +506,7 @@ could modify their maximum ClusterTime sent in a message.  For example, it could
 cluster time - 1> . This value, once written to the oplogs of replica set nodes, will not be incrementable and the
 nodes will be unable to accept any changes (writes against the database). The only way to recover from this situation
 would be to unload the data, clean it, and reload back with the correct OpTime. This malicious attack would take the
-affected shard offline, affecting the availability of the entire system. To mitigate this risk, 
+affected shard offline, affecting the availability of the entire system. To mitigate this risk,
 MongoDB added a HMAC- SHA1 signature that is used to verify the value of the ClusterTime on the server. ClusterTime values can be read
 by any node, but only MongoDB processes can sign new values. The signature cannot be generated by clients.
 
@@ -576,8 +576,8 @@ Below is an example of causally consistent "read own write" for the products col
 1. The client sends a read db.products.aggregate([{$count: "numProducts"}]) to mongos and it gets routed to all shards where this collection has chunks: i.e. Shard A and Shard B.
   To be sure that it can "read own write" the client includes the `afterClusterTime` field in the request and passes the `operationTime` value it received from the write.
 1. Shard B checks if the data with the requested OpTime is in its oplog. If not, it performs a noop write, then returns the result to mongos.
- It includes the `operationTime` that was the top of the oplog at the moment the read was performed. 
-1. Shard A checks if the data with the requested OpTime is in its oplog and returns the result to mongos. It includes the `operationTime` that was the top of the oplog at the moment the read was performed. 
+ It includes the `operationTime` that was the top of the oplog at the moment the read was performed.
+1. Shard A checks if the data with the requested OpTime is in its oplog and returns the result to mongos. It includes the `operationTime` that was the top of the oplog at the moment the read was performed.
 1. mongos aggregates the results and returns to the client with the largest `operationTime` it has seen in the responses from shards A and B.
 
 ---
@@ -697,10 +697,11 @@ when a session is killed, whereas the number of kills requested is used to make 
 are only killed on the first kill request.
 
 To keep the in-memory transaction state of all sessions in sync with the content of the `config.transactions`
-collection (the collection that stores documents used to support retryable writes and transactions), the
-transaction state and the session catalog on each mongod is [invalidated](https://github.com/mongodb/mongo/blob/56655b06ac46825c5937ccca5947dc84ccbca69c/src/mongo/db/session_catalog_mongod.cpp#L324) whenever the `config.transactions` collection is dropped and whenever there is a rollback. When invalidation occurs, all
-active sessions are killed, and the in-memory transaction state is marked as invalid to force it to be
-[reloaded from storage the next time a session is checked out](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog_mongod.cpp#L426).
+collection (the collection that stores documents used to support retryable writes and transactions, also
+referred to as the transaction table), the transaction state and the session catalog on each mongod is
+[invalidated](https://github.com/mongodb/mongo/blob/56655b06ac46825c5937ccca5947dc84ccbca69c/src/mongo/db/session_catalog_mongod.cpp#L324) whenever the `config.transactions` collection is dropped and whenever
+there is a rollback. When invalidation occurs, all active sessions are killed, and the in-memory transaction
+state is marked as invalid to force it to be [reloaded from storage the next time a session is checked out](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog_mongod.cpp#L426).
 
 #### Code references
 * [**SessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog.h)
@@ -709,6 +710,50 @@ active sessions are killed, and the in-memory transaction state is marked as inv
 * How [**mongod**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/service_entry_point_common.cpp#L537) and [**mongos**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/strategy.cpp#L412) check out a session prior to executing a command.
 
 ## Retryable writes
+
+Retryable writes allow drivers to automatically retry non-idempotent write commands on network errors or failovers.
+They are supported in logical sessions with `retryableWrites` enabled (default), with the caveat that the writes
+are executed with write concern `w` greater than 0 and outside of transactions. [Here](https://github.com/mongodb/specifications/blob/49589d66d49517f10cc8e1e4b0badd61dbb1917e/source/retryable-writes/retryable-writes.rst#supported-write-operations)
+is a complete list of retryable write commands.
+
+When a command is executed as a retryable write, it is sent from the driver with `lsid` and `txnNumber` attached.
+After that, all write operations inside the command are assigned a unique integer statement id `stmtId` by the
+mongos or mongod that executes the command. In other words, each write operation inside a batch write command
+is given its own `stmtId` and is individually retryable. The `lsid`, `txnNumber`, and `stmtId` constitute a
+unique identifier for a retryable write operation.
+
+This unique identifier enables a primary mongod to track and record its progress for a retryable write
+command using the `config.transactions` collection and augmented oplog entries. The oplog entry for a
+retryable write operation is written with a number of additional fields including `lsid`, `txnNumber`,
+`stmtId` and `prevOpTime`, where `prevOpTime` is the opTime of the write that precedes it. This results in
+a chain of write history that can be used to reconstruct the result of writes that have already executed.
+After generating the oplog entry for a retryable write operation, a primary mongod performs an upsert into
+`config.transactions` to write a document containing the `lsid` (`_id`), `txnNumber`, `stmtId` and
+`lastWriteOpTime`, where `lastWriteOpTime` is the opTime of the newly generated oplog entry. The `config.transactions` collection is indexed by `_id` so this document is replaced every time there is a new retryable write command
+(or transaction) on the session.
+
+The opTimes for all committed statements for the latest retryable write command is cached in an [in-memory table](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.h#L928) that gets [updated](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.cpp#L2125-L2127) after each
+write oplog entry is generated, and gets cleared every time a new retryable write command starts. Prior to executing
+a retryable write operation, a primary mongod first checks to see if it has the commit opTime for the `stmtId` of
+that write. If it does, the write operation is skipped and a response is constructed immediately based on the oplog
+entry with that opTime. Otherwise, the write operation is performed with the additional bookkeeping as described above.
+This in-memory cache of opTimes for committed statements is invalidated along with the entire in-memory transaction
+state whenever the `config.transactions` is dropped and whenever there is rollback. The invalidated transaction
+state is overwritten by the on-disk transaction history at the next session checkout.
+
+To support retryability of writes across migrations, the session state for the migrated chunk is propagated
+from the donor shard to the recipient shard. After entering the chunk cloning step, the recipient shard
+repeatedly sends [\_getNextSessionMods](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/migration_chunk_cloner_source_legacy_commands.cpp#L240-L359) (also referred to as MigrateSession) commands to
+the donor shard until the migration reaches the commit phase to clone any oplog entries that contain session
+information for the migrated chunk. Upon receiving each response, the recipient shard writes the oplog entries
+to disk and [updates](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.cpp#L2142-L2144) its in-memory transaction state to restore the session state for the chunk.
+
+#### Code references
+* [**TransactionParticipant class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.h)
+* How a write operation [checks if a statement has been executed](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/ops/write_ops_exec.cpp#L811-L816)
+* How mongos [assigns statement ids to writes in a batch write command](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/write_ops/batch_write_op.cpp#L483-L486)
+* How mongod [assigns statement ids to insert operations](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/ops/write_ops_exec.cpp#L573)
+* [Retryable writes specifications](https://github.com/mongodb/specifications/blob/49589d66d49517f10cc8e1e4b0badd61dbb1917e/source/retryable-writes/retryable-writes.rst)
 
 ## The historical routing table
 
