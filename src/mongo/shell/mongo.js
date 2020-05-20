@@ -1,6 +1,6 @@
 // mongo.js
 
-// Defined in mongo.cpp
+// Defined in mongojs.cpp
 
 if (!Mongo.prototype) {
     throw Error("Mongo.prototype not defined");
