@@ -1389,6 +1389,9 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     MONGO_IDLE_THREAD_BLOCK;
     _wtBackup.wtBackupDupCursorCV.wait(backupDupCursorLk, [&] { return !_wtBackup.dupCursor; });
 
+    // Persist the sizeStorer information to disk before extending the backup cursor.
+    syncSizeInfo(true);
+
     // The "target=(\"log:\")" configuration string for the cursor will ensure that we only see the
     // log files when iterating on the cursor.
     WT_CURSOR* cursor = nullptr;
