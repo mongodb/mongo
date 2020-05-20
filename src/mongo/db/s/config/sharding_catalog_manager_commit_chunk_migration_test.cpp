@@ -248,8 +248,8 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
     ASSERT_EQ(mver.getValue(), chunkDoc0.getVersion());
-    // The history should be updated.
-    ASSERT_EQ(1UL, chunkDoc0.getHistory().size());
+    // The new history entry should be added, but the old one preserved.
+    ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
 }
 
