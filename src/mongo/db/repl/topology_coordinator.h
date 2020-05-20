@@ -272,8 +272,8 @@ public:
                                 Date_t now) const;
 
     /**
-     * Returns true if we find an eligible sync source that is significantly closer than our current
-     * sync source.
+     * Returns true if we find an eligible sync source that is considered to be within the same data
+     * center as us and our current sync source is not in the same data center as us.
      */
     bool shouldChangeSyncSourceDueToPingTime(const HostAndPort& currentSource,
                                              const MemberState& memberState,

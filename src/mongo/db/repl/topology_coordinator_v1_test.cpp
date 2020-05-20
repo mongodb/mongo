@@ -4144,15 +4144,13 @@ public:
     // Set lastOpTimeFetched to be before the sync source's OpTime.
     const OpTime lastOpTimeFetched = OpTime(Timestamp(3, 0), 0);
 
-    const Milliseconds slightlyFurtherPingTime = Milliseconds(10);
-    const Milliseconds pingTime = Milliseconds(7);
-    const Milliseconds slightlyCloserPingTime = Milliseconds(4);
-    const Milliseconds significantlyCloserPingTime = Milliseconds(1);
+    const Milliseconds pingTimeAboveThreshold = Milliseconds(7);
+    const Milliseconds pingTimeBelowThreshold = Milliseconds(3);
 };
 
-TEST_F(ReevalSyncSourceTest, ChangeWhenSourceSignificantlyCloserNode) {
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+TEST_F(ReevalSyncSourceTest, ChangeWhenSourcePingTimeIsAboveThreshold) {
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                    MemberState::RS_SECONDARY,
@@ -4161,9 +4159,9 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenSourceSignificantlyCloserNode) {
                                                                    ReadPreference::Nearest));
 }
 
-TEST_F(ReevalSyncSourceTest, NoChangeWhenNodesEquidistant) {
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTime);
+TEST_F(ReevalSyncSourceTest, NoChangeWhenSourcePingTimeIsBelowThreshold) {
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeBelowThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                     MemberState::RS_SECONDARY,
@@ -4172,10 +4170,11 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodesEquidistant) {
                                                                     ReadPreference::Nearest));
 }
 
-TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeOnlySlightlyCloser) {
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), slightlyCloserPingTime);
+TEST_F(ReevalSyncSourceTest, NoChangeWhenOtherNodesPingTimesAreAboveThresholdToo) {
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeAboveThreshold);
 
+    // We should not change sync sources since all other nodes are also above the threshold.
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                     MemberState::RS_SECONDARY,
                                                                     lastOpTimeFetched,
@@ -4183,20 +4182,9 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeOnlySlightlyCloser) {
                                                                     ReadPreference::Nearest));
 }
 
-TEST_F(ReevalSyncSourceTest, NoChangeWhenFurtherNodeFound) {
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), slightlyFurtherPingTime);
-
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
-                                                                    MemberState::RS_SECONDARY,
-                                                                    lastOpTimeFetched,
-                                                                    now(),
-                                                                    ReadPreference::Nearest));
-}
-
-TEST_F(ReevalSyncSourceTest, NoChangeWhenSignificantlyCloserNodeButIsNotEligible) {
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+TEST_F(ReevalSyncSourceTest, NoChangeWhenOtherNodesPingTimeAreBelowThresholdButIsNotEligible) {
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     // Blacklist "host3" to make it not eligible to be our sync source.
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
@@ -4213,8 +4201,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenSignificantlyCloserNodeButIsNotEligible
 TEST_F(ReevalSyncSourceTest, NoChangeWhenThresholdIsZero) {
     changeSyncSourceThresholdMillis.store(0LL);
 
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     // We should not change sync sources since the threshold is 0.
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
@@ -4225,8 +4213,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenThresholdIsZero) {
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeIsInStartup) {
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     // We should not change sync sources because we are in initial sync.
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
@@ -4237,8 +4225,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeIsInStartup) {
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeIsInStartup2) {
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     // We should not change sync sources because we are in initial sync.
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
@@ -4249,8 +4237,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeIsInStartup2) {
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenPrimaryOnlyReadPref) {
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     // We should not change sync sources because we will only sync from the primary.
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
@@ -4269,8 +4257,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenPrimaryPrefAndCurrentlySyncingFromPrima
                                                             syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     // We should not change sync sources because we prefer to sync from the primary, and we are
     // currently doing so.
@@ -4291,8 +4279,8 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrim
                                                             syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     // We should allow changing sync sources due to ping times because we prefer to sync from the
     // primary, and we are not currently doing so.
@@ -4304,60 +4292,24 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrim
                                                            ReadPreference::PrimaryPreferred));
 }
 
-TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenSourcePingTimeIsMissing) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
-                 0);
-
-    // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
-    // should change sync sources due to ping time.
-    changeSyncSourceThresholdMillis.store(5LL);
-
-    auto lastFetched = OpTime(Timestamp(3, 0), 0);
-
+TEST_F(ReevalSyncSourceTest, NoChangeWhenSourcePingTimeIsMissing) {
     // Do not set ping time for "host2".
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), Milliseconds(5));
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                     MemberState::RS_SECONDARY,
-                                                                    lastFetched,
+                                                                    lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
 }
 
-TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenCandidatePingTimeIsMissing) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 5 << "term" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                               << "host1:27017")
-                                    << BSON("_id" << 1 << "host"
-                                                  << "host2:27017")
-                                    << BSON("_id" << 2 << "host"
-                                                  << "host3:27017"))
-                      << "protocolVersion" << 1),
-                 0);
-
-    // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
-    // should change sync sources due to ping time.
-    changeSyncSourceThresholdMillis.store(5LL);
-
-    auto lastFetched = OpTime(Timestamp(3, 0), 0);
-
+TEST_F(ReevalSyncSourceTest, NoChangeWhenCandidatePingTimeIsMissing) {
     // Do not set ping time for "host3".
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), Milliseconds(5));
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeBelowThreshold);
 
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                     MemberState::RS_SECONDARY,
-                                                                    lastFetched,
+                                                                    lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
 }
@@ -4377,8 +4329,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSlaveDelay) {
                  0);
 
     // Set up so that without slaveDelay, the node otherwise would have changed sync sources.
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                     MemberState::RS_SECONDARY,
@@ -4403,8 +4355,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeNotFoundInConfig) {
 
     // Set up so that without slaveDelay and not being in the config, the node otherwise would have
     // changed sync sources.
-    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
-    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTimeAboveThreshold);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTimeBelowThreshold);
 
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                     MemberState::RS_SECONDARY,
