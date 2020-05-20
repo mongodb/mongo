@@ -345,6 +345,8 @@ wt_open_corrupt(const char *sfx)
     WT_DECL_RET;
     char buf[1024];
 
+    /* The child should not abort the test in the message handler. Set it here, don't inherit. */
+    test_abort = false;
     if (sfx != NULL)
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s", home, sfx));
     else

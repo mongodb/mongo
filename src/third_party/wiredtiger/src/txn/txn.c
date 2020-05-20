@@ -631,17 +631,21 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
 
     WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
 
-    /* Stop before crossing over to the next btree */
-    if (hs_btree_id != S2BT(session)->id)
+    /* Not found if we cross the tree boundary. */
+    if (hs_btree_id != S2BT(session)->id) {
+        ret = WT_NOTFOUND;
         goto done;
+    }
 
     /*
      * Keys are sorted in an order, skip the ones before the desired key, and bail out if we have
      * crossed over the desired key and not found the record we are looking for.
      */
     WT_ERR(__wt_compare(session, NULL, hs_key, key, &cmp));
-    if (cmp != 0)
+    if (cmp != 0) {
+        ret = WT_NOTFOUND;
         goto done;
+    }
 
     /*
      * As part of the history store search, we never get an exact match based on our search criteria
@@ -925,9 +929,11 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
           true);
 
         if (ret == 0)
-            WT_ERR(__txn_append_hs_record(session, hs_cursor, &op->u.op_row.key, cbt->ref->page,
-              upd, commit, &fix_upd, &upd_appended));
-        else if (ret == WT_NOTFOUND && !commit) {
+            /* Not found if we cross the tree or key boundary. */
+            WT_ERR_NOTFOUND_OK(__txn_append_hs_record(session, hs_cursor, &op->u.op_row.key,
+                                 cbt->ref->page, upd, commit, &fix_upd, &upd_appended),
+              true);
+        if (ret == WT_NOTFOUND && !commit) {
             /*
              * Allocate a tombstone so that when we reconcile the update chain we don't copy the
              * prepared cell, which is now associated with a rolled back prepare, and instead write
