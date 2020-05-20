@@ -65,8 +65,8 @@ if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
     IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {y: 1});
 
     // Wait for build to start on the secondary.
-    jsTestLog("waiting for index build to start on secondary");
-    IndexBuildTest.waitForIndexBuildToStart(secondDB);
+    jsTestLog("waiting for all index builds to start on secondary");
+    IndexBuildTest.waitForIndexBuildToStart(secondDB, coll.getName(), "y_1");
 } else {
     assert.commandWorked(secondDB.adminCommand(
         {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'alwaysOn'}));
