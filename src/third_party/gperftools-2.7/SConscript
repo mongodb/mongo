@@ -120,7 +120,7 @@ env.Library(
     source=[
         env.Dir('dist').File(f) for f in files
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
 
     ],

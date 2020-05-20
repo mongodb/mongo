@@ -60,27 +60,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
     ],
 )
 
-debuggerEnv = env.Clone()
-if has_option("gdbserver"):
-    debuggerEnv.Append(CPPDEFINES=["USE_GDBSERVER"])
-elif has_option("lldb-server"):
-    debuggerEnv.Append(CPPDEFINES=["USE_LLDB_SERVER"])
-
-debuggerEnv.Library(
-    target='debugger',
-    source=[
-        'debugger.cpp',
-        ],
-    LIBDEPS=[
-        # NOTE: You *must not* add any library dependencies to the debugger library
-    ],
-    LIBDEPS_TAGS=[
-        'init-no-global-side-effects',
-    ]
-)
 
 env.Library(
     target='summation',
@@ -141,6 +124,9 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_pcrecpp',
     ],
 )
 
@@ -357,25 +343,6 @@ env.Library(
     ],
 )
 
-quick_exit_env = env.Clone()
-if has_option('gcov'):
-    quick_exit_env.Append(
-        CPPDEFINES=[
-            'MONGO_GCOV',
-        ],
-    )
-
-quick_exit_env.Library(
-    target='quick_exit',
-    source=[
-        'quick_exit.cpp',
-    ],
-    LIBDEPS=[
-        # NOTE: You *must not* add any other library dependencies to
-        # the quick_exit library
-        "$BUILD_DIR/third_party/shim_allocator",
-    ]
-)
 env.Library(
     target="secure_compare_memory",
     source=[

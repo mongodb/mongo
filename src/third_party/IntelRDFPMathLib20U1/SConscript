@@ -347,7 +347,40 @@ if env.ToolchainIs('msvc'):
 else:
     env.Append(CCFLAGS='-w')
 
-env.Library(
+
+libenv = env.Clone()
+
+# On windows and macos we don't have this problem, but on other
+# platforms we do, where the system ligbcc may duplicate symbols that
+# exist in the intel library. We use a version script to force our
+# verion of the symbols into a version namespace that we control,
+# avoiding the conflict. It also allows us to restrict the set of
+# visibile symbols in the library to just those used in
+# platform/decimal128.cpp. We still use an exported_symbol_list on
+# macOS too though, so that we can catch the case where we have a
+# symbolic dependency on a symbol that isn't exported. We will catch
+# that on macOS, whereas we might not on libgcc platforms where we
+# could end up binding to the shadow version.
+def export_file_generator(target, source, env, for_signature):
+    if env.ToolchainIs('msvc'):
+        return
+    elif env.TargetOSIs('darwin'):
+        script = env.File(env.subst("${TARGET.base}.exported_symbols_list", target=target))
+        return script.get_csig() if for_signature else "-Wl,-exported_symbols_list," + str(script)
+    elif env.TargetOSIs('posix'):
+        script = env.File(env.subst("${TARGET.base}.version_script", target=target))
+        return script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
+    else:
+        pass
+
+libenv['EXPORT_FILE_SHLINKFLAGS'] = export_file_generator
+libenv.AppendUnique(
+    SHLINKFLAGS=[
+        '$EXPORT_FILE_SHLINKFLAGS'
+    ],
+)
+
+libenv.Library(
     target='intel_decimal128',
     source=source_files,
     LIBS=libs,
@@ -359,7 +392,17 @@ env.Library(
 if env["BUILDERS"].get("Ninja", None) is not None:
     Return()
 
-readtest = env.Program(
+readtestEnv = env.Clone()
+
+# Since the readtest program is fully C, smartlink was trying to link
+# it with the C compiler driver. That is fine for dynamic builds, but
+# in static builds falls afoul of
+# https://github.com/SCons/scons/issues/3673 if the allocator library
+# needs the C++ runtime.
+if env["LINK"] == "$SMARTLINK" and get_option("link-model") != "dynamic":
+    readtestEnv["LINK"] = "$CXX"
+
+readtest = readtestEnv.Program(
     target='intel_decimal128_readtest',
     source=[
         'TESTS/readtest.c',
@@ -372,7 +415,7 @@ readtest = env.Program(
     AIB_COMPONENTS_EXTRA=[
         "unittests",
         "tests",
-    ]
+    ],
 )
 
 if get_option("install-mode") == "hygienic":

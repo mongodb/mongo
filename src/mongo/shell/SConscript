@@ -17,7 +17,10 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/scripting/bson_template_evaluator',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_pcrecpp',
+    ],
 )
 
 generateJSErrorCodes = env.Command(

@@ -201,7 +201,6 @@ wtlib = env.Library(
     source=wtsources,
     LIBDEPS_PRIVATE=[
         'wiredtiger_checksum',
-        '$BUILD_DIR/third_party/shim_allocator',
         '$BUILD_DIR/third_party/shim_snappy',
         '$BUILD_DIR/third_party/shim_zlib',
         '$BUILD_DIR/third_party/shim_zstd',
@@ -220,14 +219,18 @@ if wtbinEnv.TargetOSIs("windows"):
     # conformant name: _strdup. See online help for details.
     wtbinEnv.Append(CFLAGS=["/wd4996"])
 
+# SCons's smart_link() decides to try and link as C because all of the
+# file extensions are .c; however, we must link with snappy, etc. as
+# C++ if we are not in dynamic mode. The smart_link() function isn't
+# used by default on Windows, so we leave the value unchanged on other
+# platforms. See # https://github.com/SCons/scons/issues/3673.
+if wtbinEnv["LINK"] == "$SMARTLINK" and get_option("link-model") != "dynamic":
+    wtbinEnv["LINK"] = "$CXX"
+
 wtbin = wtbinEnv.Program(
     target="wt",
     source=Glob("src/utilities/*.c"),
     LIBDEPS=["wiredtiger"],
-    # SCons's smart_link() decides to try and link as C because all of the file extensions are .c;
-    # however, we must link with snappy, etc. as C++. The smart_link() function isn't used by
-    # default on Windows, so we leave the value unchanged on other platforms.
-    LINK="$CXX" if wtbinEnv["LINK"] == "$SMARTLINK" else wtbinEnv["LINK"],
     AIB_COMPONENT="dist-test",
 )
 

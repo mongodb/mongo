@@ -59,7 +59,32 @@ baseEnv = env.Clone()
 if use_libunwind == True:
     baseEnv.InjectThirdParty('unwind')
 
-stacktrace_impl_cpp = [ File('util/stacktrace_${TARGET_OS_FAMILY}.cpp') ]
+quick_exit_env = baseEnv.Clone()
+if has_option('gcov'):
+    quick_exit_env.Append(
+        CPPDEFINES=[
+            'MONGO_GCOV',
+        ],
+    )
+quick_exit_obj = baseEnv.LibraryObject(
+    target='quick_exit',
+    source=[
+        'util/quick_exit.cpp',
+    ],
+)[0]
+
+debugger_env = baseEnv.Clone()
+if has_option("gdbserver"):
+    debugger_env.Append(CPPDEFINES=["USE_GDBSERVER"])
+elif has_option("lldb-server"):
+    debugger_env.Append(CPPDEFINES=["USE_LLDB_SERVER"])
+
+debugger_obj = debugger_env.LibraryObject(
+    target='debugger',
+    source=[
+        'util/debugger.cpp',
+    ],
+)[0]
 
 baseEnv.Library(
     target='base',
@@ -119,9 +144,9 @@ baseEnv.Library(
         'logv2/log_tag.cpp',
         'logv2/log_util.cpp',
         'logv2/plain_formatter.cpp',
-        'logv2/shared_access_fstream.cpp',
         'logv2/ramlog.cpp',
         'logv2/redaction.cpp',
+        'logv2/shared_access_fstream.cpp',
         'logv2/text_formatter.cpp',
         'platform/decimal128.cpp',
         'platform/mutex.cpp',
@@ -141,7 +166,6 @@ baseEnv.Library(
         'util/concurrency/idle_thread_block.cpp',
         'util/concurrency/thread_name.cpp',
         'util/duration.cpp',
-        'util/str_escape.cpp',
         'util/errno_util.cpp',
         'util/exception_filter_win32.cpp',
         'util/exit.cpp',
@@ -156,33 +180,33 @@ baseEnv.Library(
         'util/stacktrace_somap.cpp',
         'util/stacktrace_threads.cpp',
         'util/str.cpp',
+        'util/str_escape.cpp',
         'util/system_clock_source.cpp',
         'util/system_tick_source.cpp',
-        'util/text.cpp',
         'util/testing_proctor.cpp',
+        'util/text.cpp',
         'util/thread_safety_context.cpp',
         'util/time_support.cpp',
         'util/timer.cpp',
         'util/uuid.cpp',
         'util/version.cpp',
+        debugger_obj,
+        quick_exit_obj,
     ],
     # NOTE: This library *must not* depend on any libraries than
     # the ones declared here. Do not add to this list.
     LIBDEPS=[
         '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
         '$BUILD_DIR/third_party/shim_abseil',
-        '$BUILD_DIR/third_party/shim_allocator',
         '$BUILD_DIR/third_party/shim_boost',
         '$BUILD_DIR/third_party/shim_fmt',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_intel_decimal128',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
         'boost_assert_shim',
         'stdx/stdx',
-        'util/quick_exit',
-    ],
-    LIBDEPS_PRIVATE=[
-        'util/debugger',
     ],
     AIB_COMPONENT='platform',
 )
@@ -363,7 +387,6 @@ mongod = env.Program(
         # mongod_initializers.
         'base',
         'mongod_main',
-        'util/quick_exit',
     ],
     AIB_COMPONENT="mongod",
     AIB_COMPONENTS_EXTRA=[
@@ -640,7 +663,6 @@ mongos = env.Program(
         # mongos_initializers.
         'base',
         'mongos_main',
-        'util/quick_exit'
     ],
     AIB_COMPONENT="mongos",
     AIB_COMPONENTS_EXTRA=[
@@ -875,6 +897,7 @@ if not has_option('noshell') and usemozjs:
             # library to inject a static or mongo initializer to mongo,
             # please add that library as a private libdep of
             # mongo_initializers.
+            "$BUILD_DIR/third_party/shim_pcrecpp",
             "mongo_initializers",
             "shell/linenoise",
             "shell/shell_utils",
