@@ -8,6 +8,7 @@
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+load("jstests/libs/curop_helpers.js");    // For waitForCurOpByFailPoint.
 
 const st = new ShardingTest({shards: 2});
 const testDB = st.s.getDB(jsTestName());
@@ -33,10 +34,11 @@ setupShardColl(shardedColl1);
 setupShardColl(shardedColl2);
 assert.commandWorked(unshardedColl.insert({x: 1, _id: 1}));
 
+const kFailPointName = "waitAfterCommandFinishesExecution";
 function setPostCommandFailpointOnShards({mode, options}) {
     FixtureHelpers.runCommandOnEachPrimary({
         db: testDB.getSiblingDB("admin"),
-        cmdObj: {configureFailPoint: "waitAfterCommandFinishesExecution", data: options, mode: mode}
+        cmdObj: {configureFailPoint: kFailPointName, data: options, mode: mode}
     });
 }
 
@@ -60,18 +62,15 @@ function runTest({command, expectedRunningOps, collToPause}) {
     // Run the 'command' in a parallel shell.
     let unionShell = startParallelShell(parallelFunction, st.s.port);
 
+    const filter = {"command.aggregate": collToPause.getName(), "command.comment": commentObj};
+    const deepestUnion = expectedRunningOps[expectedRunningOps.length - 1];
     // Wait for the parallel shell to hit the failpoint and verify that the 'comment' field is
     // present in $currentOp.
-    const filter = {'command.aggregate': collToPause.getName(), "command.comment": commentObj};
-
-    const deepestUnion = expectedRunningOps[expectedRunningOps.length - 1];
-    assert.soon(() => testDB.getSiblingDB("admin")
-                          .aggregate([{$currentOp: {localOps: false}}, {$match: filter}])
-                          .toArray()
-                          .length == deepestUnion.count,
-                () => tojson(testDB.getSiblingDB("admin")
-                                 .aggregate([{$currentOp: {localOps: false}}, {$match: filter}])
-                                 .toArray()));
+    assert.soon(() => {
+        const results =
+            waitForCurOpByFailPoint(testDB, collToPause.getFullName(), kFailPointName, filter);
+        return results.length == deepestUnion.count;
+    });
 
     // Verify that MongoS has an operation running for the base aggregation.
     filter['command.aggregate'] = expectedRunningOps[0].coll.getName();
