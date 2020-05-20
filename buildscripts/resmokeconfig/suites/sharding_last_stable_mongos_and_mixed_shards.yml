@@ -30,7 +30,6 @@ selector:
   - jstests/sharding/test_stacked_migration_cleanup.js
   - jstests/sharding/kill_pinned_cursor.js
   - jstests/sharding/killop.js
-  - jstests/sharding/verify_sessions_expiration_sharded.js
   # Enable when 4.6 becomes last stable
   - jstests/sharding/mongos_dataSize.js
   # Enable when SERVER-44733 is backported
@@ -41,6 +40,9 @@ selector:
   - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
   # TODO SERVER-46040: Enable when SERVER-46040 is backported
   - jstests/sharding/drop_indexes_with_stale_config_error.js
+  # Enable when SERVER-43614 is backported.
+  - jstests/sharding/query/unionWith_current_op.js
+  - jstests/sharding/verify_sessions_expiration_sharded.js
 
 executor:
   config:
