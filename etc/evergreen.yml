@@ -12044,7 +12044,7 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions:
-    test_flags: --storageEngine=biggie --excludeWithAnyTags=SERVER-38379,requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
+    test_flags: --storageEngine=biggie --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
     compile_flags: MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     scons_cache_scope: shared
   tasks:
