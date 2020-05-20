@@ -64,8 +64,8 @@ IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {x: 1});
 IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {y: 1});
 
 // Wait for build to start on the secondary.
-jsTestLog("waiting for index build to start on secondary");
-IndexBuildTest.waitForIndexBuildToStart(secondDB);
+jsTestLog("waiting for all index builds to start on secondary");
+IndexBuildTest.waitForIndexBuildToStart(secondDB, coll.getName(), "y_1");
 
 MongoRunner.stopMongod(second);
 
