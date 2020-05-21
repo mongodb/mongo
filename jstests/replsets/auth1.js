@@ -72,6 +72,8 @@ assert.eq(result, 1, "login failed");
 print("Initializing replSet with config: " + tojson(rs.getReplSetConfig()));
 result = m.getDB("admin").runCommand({replSetInitiate: rs.getReplSetConfig()});
 assert.eq(result.ok, 1, "couldn't initiate: " + tojson(result));
+rs.awaitNodesAgreeOnPrimaryNoAuth();
+
 m.getDB('admin').logout();  // In case this node doesn't become primary, make sure its not auth'd
 
 var master = rs.getPrimary();
