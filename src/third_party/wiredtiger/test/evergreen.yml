@@ -297,7 +297,14 @@ functions:
           done
 
           for t in $(seq ${no_of_procs|1}); do
-            wait -n || exit $?
+            ret=0
+            wait -n || ret=$?
+            if [ $ret -ne 0 ]; then
+              # Skip the below lines from nohup output file because they are very verbose and
+              # print only the errors to evergreen log file.
+              grep -v "Finished verifying" nohup.out.* | grep -v "Finished a checkpoint" | grep -v "thread starting"
+            fi
+            exit $ret
           done
         done
 

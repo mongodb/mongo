@@ -27,7 +27,6 @@ typedef struct {
     ((vs)->dump_address || (vs)->dump_blocks || (vs)->dump_layout || (vs)->dump_pages)
     bool dump_address; /* Configure: dump special */
     bool dump_blocks;
-    bool dump_history;
     bool dump_layout;
     bool dump_pages;
 
@@ -65,9 +64,6 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
     WT_RET(__wt_config_gets(session, cfg, "dump_blocks", &cval));
     vs->dump_blocks = cval.val != 0;
 
-    WT_RET(__wt_config_gets(session, cfg, "dump_history", &cval));
-    vs->dump_history = cval.val != 0;
-
     WT_RET(__wt_config_gets(session, cfg, "dump_layout", &cval));
     vs->dump_layout = cval.val != 0;
 
@@ -84,7 +80,7 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
     }
 
 #if !defined(HAVE_DIAGNOSTIC)
-    if (vs->dump_blocks || vs->dump_pages || vs->dump_history)
+    if (vs->dump_blocks || vs->dump_pages)
         WT_RET_MSG(session, ENOTSUP, "the WiredTiger library was not built in diagnostic mode");
 #endif
 
@@ -807,12 +803,6 @@ __verify_key_hs(
         if (cmp != 0)
             break;
 
-#ifdef HAVE_DIAGNOSTIC
-        /* Optionally dump historical time windows and values in debug mode. */
-        if (vs->dump_history)
-            WT_RET(__wt_debug_cursor_hs(session, hs_cursor));
-#endif
-
         /* Verify the newer record's start is later than the older record's stop. */
         if (newer_start_ts < older_stop_ts) {
             WT_RET_MSG(session, WT_ERROR,
@@ -996,11 +986,6 @@ __verify_page_content_leaf(
 
             WT_RET(__wt_row_leaf_key(session, page, rip++, vs->tmp1, false));
             WT_RET(__verify_key_hs(session, vs->tmp1, tw->start_ts, vs));
-
-#ifdef HAVE_DIAGNOSTIC
-            if (vs->dump_history)
-                WT_RET(__wt_debug_key_value(session, vs->tmp1, WT_RECNO_OOB, 0, &unpack));
-#endif
         } else if (page->type == WT_PAGE_COL_VAR) {
             rle = __wt_cell_rle(&unpack);
             p = vs->tmp1->mem;
@@ -1008,10 +993,6 @@ __verify_page_content_leaf(
             vs->tmp1->size = WT_PTRDIFF(p, vs->tmp1->mem);
             WT_RET(__verify_key_hs(session, vs->tmp1, tw->start_ts, vs));
 
-#ifdef HAVE_DIAGNOSTIC
-            if (vs->dump_history)
-                WT_RET(__wt_debug_key_value(session, NULL, recno, rle, &unpack));
-#endif
             recno += rle;
             vs->records_so_far += rle;
         }

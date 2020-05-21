@@ -969,7 +969,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
     /*
      * After positioning our cursor, we're stepping backwards to find the correct update. Since the
      * timestamp is part of the key, our cursor needs to go from the newest record (further in the
-     * las) to the oldest (earlier in the las) for a given key.
+     * history store) to the oldest (earlier in the history store) for a given key.
      */
     read_timestamp = allow_prepare ? txn->prepare_timestamp : txn_shared->read_timestamp;
     WT_ERR_NOTFOUND_OK(
