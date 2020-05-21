@@ -296,15 +296,23 @@ public:
                                 fmt::memory_buffer& buffer,
                                 size_t writeLimit = 0) const;
 
-    /** note: addFields always adds _id even if not specified */
-    int addFields(BSONObj& from, std::set<std::string>& fields); /* returns n added */
-
     /**
      * Add specific field to the end of the object if it did not exist, otherwise replace it
      * preserving original field order. Returns newly built object. Returns copy of this for empty
      * field.
      */
     BSONObj addField(const BSONElement& field) const;
+
+    /**
+     * Merges the specified 'fields' from the 'from' object into the current BSON and returns the
+     * merged object. If the 'fields' is not specified, all the fields from the 'from' object are
+     * merged.
+     *
+     * Note that if the original object already has a particular field, then the field will be
+     * replaced.
+     */
+    BSONObj addFields(const BSONObj& from,
+                      const boost::optional<std::set<std::string>>& fields = boost::none) const;
 
     /** remove specified field and return a new object with the remaining fields.
         slowish as builds a full new object

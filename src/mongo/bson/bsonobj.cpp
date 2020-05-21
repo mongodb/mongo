@@ -403,42 +403,6 @@ BSONElement BSONObj::getFieldUsingIndexNames(StringData fieldName, const BSONObj
     return BSONElement();
 }
 
-/* note: addFields always adds _id even if not specified
-   returns n added not counting _id unless requested.
-*/
-int BSONObj::addFields(BSONObj& from, std::set<std::string>& fields) {
-    verify(isEmpty() && !isOwned()); /* partial implementation for now... */
-
-    BSONObjBuilder b;
-
-    int N = fields.size();
-    int n = 0;
-    BSONObjIterator i(from);
-    bool gotId = false;
-    while (i.moreWithEOO()) {
-        BSONElement e = i.next();
-        const char* fname = e.fieldName();
-        if (fields.count(fname)) {
-            b.append(e);
-            ++n;
-            gotId = gotId || strcmp(fname, "_id") == 0;
-            if (n == N && gotId)
-                break;
-        } else if (strcmp(fname, "_id") == 0) {
-            b.append(e);
-            gotId = true;
-            if (n == N && gotId)
-                break;
-        }
-    }
-
-    if (n) {
-        *this = b.obj();
-    }
-
-    return n;
-}
-
 bool BSONObj::couldBeArray() const {
     BSONObjIterator i(*this);
     int index = 0;
@@ -653,6 +617,29 @@ BSONObj BSONObj::addField(const BSONElement& field) const {
     if (!added)
         b.append(field);
     return b.obj();
+}
+
+BSONObj BSONObj::addFields(const BSONObj& from,
+                           const boost::optional<std::set<std::string>>& fields) const {
+    BSONObjBuilder bob;
+    for (auto&& originalField : *this) {
+        auto commonField = from[originalField.fieldNameStringData()];
+        // If there is a common field, add the value from 'from' object.
+        if (commonField && (!fields || fields->count(originalField.fieldName()))) {
+            bob.append(commonField);
+        } else {
+            bob.append(originalField);
+        }
+    }
+
+    for (auto&& fromField : from) {
+        // Ignore the common fields as they are already added earlier.
+        if (!hasField(fromField.fieldNameStringData()) &&
+            (!fields || fields->count(fromField.fieldName()))) {
+            bob.append(fromField);
+        }
+    }
+    return bob.obj();
 }
 
 BSONObj BSONObj::removeField(StringData name) const {
