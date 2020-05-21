@@ -2221,6 +2221,9 @@ var ReplSetTest = function(opts) {
             var combinedDBs = new Set(primary.getDBNames());
             const replSetConfig = rst.getReplSetConfigFromNode();
 
+            print("checkDBHashesForReplSet waiting for secondaries to be ready: " + tojson(slaves));
+            this.awaitSecondaryNodes(self.kDefaultTimeoutMS, slaves);
+
             print("checkDBHashesForReplSet checking data hashes against primary: " + primary.host);
 
             slaves.forEach(node => {
@@ -2667,6 +2670,10 @@ var ReplSetTest = function(opts) {
         }
 
         function checkCollectionCountsForReplSet(rst) {
+            print("checkCollectionCountsForReplSet waiting for secondaries to be ready: " +
+                  tojson(rst.nodes));
+            this.awaitSecondaryNodes();
+
             rst.nodes.forEach(node => {
                 // Arbiters have no replicated collections.
                 if (isNodeArbiter(node)) {
