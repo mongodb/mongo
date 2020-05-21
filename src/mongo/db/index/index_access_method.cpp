@@ -530,8 +530,8 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
                     LOGV2_DEBUG(20684,
                                 1,
                                 "Recording suppressed key generation error to retry later: "
-                                "{status} on {loc}: {obj}",
-                                "status"_attr = status,
+                                "{error} on {loc}: {obj}",
+                                "error"_attr = status,
                                 "loc"_attr = loc,
                                 "obj"_attr = redact(obj));
                     interceptor->getSkippedRecordTracker()->record(opCtx, loc);
@@ -701,8 +701,8 @@ IndexAccessMethod::OnSuppressedErrorFn IndexAccessMethod::kNoopOnSuppressedError
         LOGV2_DEBUG(
             20686,
             1,
-            "Suppressed key generation error: {status} when getting index keys for {loc}: {obj}",
-            "status"_attr = redact(status),
+            "Suppressed key generation error: {error} when getting index keys for {loc}: {obj}",
+            "error"_attr = redact(status),
             "loc"_attr = loc,
             "obj"_attr = redact(obj));
     };

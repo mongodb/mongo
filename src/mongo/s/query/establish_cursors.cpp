@@ -75,7 +75,7 @@ void killOpOnShards(std::shared_ptr<executor::TaskExecutor> executor,
                 if (!args.response.isOK()) {
                     LOGV2_DEBUG(4625504,
                                 2,
-                                "killOperations for {remote} failed with {status}",
+                                "killOperations for {remote} failed with {error}",
                                 "remote"_attr = host.toString(),
                                 "error"_attr = args.response);
                     return;
@@ -220,8 +220,9 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
             }
 
             LOGV2(4625501,
-                  "ARS failed with {status}, attempting to clean up {nRemotes} remote operations",
-                  "status"_attr = ex.toStatus(),
+                  "ARS failed with {error}, attempting to clean up {nRemotes} remote operations",
+                  "ARS failed. Attempting to clean up remote operations",
+                  "error"_attr = ex.toStatus(),
                   "nRemotes"_attr = remotesToClean.size());
 
             // Check whether we have any remote operations to kill.
@@ -240,8 +241,9 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                             invariant(0);
                             uasserted(ErrorCodes::CallbackCanceled, "YOOO");
                             LOGV2_WARNING(48038,
-                                          "Failed to schedule remote cursor cleanup: {status}",
-                                          "status"_attr = args.status);
+                                          "Failed to schedule remote cursor cleanup: {error}",
+                                          "Failed to schedule remote cursor cleanup",
+                                          "error"_attr = args.status);
                             return;
                         }
                         killOpOnShards(

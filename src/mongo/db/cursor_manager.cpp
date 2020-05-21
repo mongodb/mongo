@@ -221,10 +221,10 @@ void CursorManager::unpin(OperationContext* opCtx,
     // will see the reason the cursor was killed when asking for the next batch.
     if (interruptStatus == ErrorCodes::Interrupted || interruptStatus == ErrorCodes::CursorKilled) {
         LOGV2(20530,
-              "removing cursor {cursor_cursorid} after completing batch: {status}",
+              "removing cursor {cursor_cursorid} after completing batch: {error}",
               "Removing cursor after completing batch",
               "cursorId"_attr = cursor->cursorid(),
-              "status"_attr = interruptStatus);
+              "error"_attr = interruptStatus);
         return deregisterAndDestroyCursor(std::move(partition), opCtx, std::move(cursor));
     } else if (!interruptStatus.isOK()) {
         cursor->markAsKilled(interruptStatus);

@@ -811,7 +811,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     // out-of-date privilege data.
                     LOGV2_WARNING(20247,
                                   "Could not fetch updated user privilege information for {user}; "
-                                  "continuing to use old information. Reason is {status}",
+                                  "continuing to use old information. Reason is {error}",
                                   "Could not fetch updated user privilege information, continuing "
                                   "to use old information"
                                   "user"_attr = name,

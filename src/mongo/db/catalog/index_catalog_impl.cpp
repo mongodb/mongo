@@ -1550,7 +1550,7 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
 
     if (!status.isOK()) {
         LOGV2(20362,
-              "Couldn't unindex record {obj} from collection {collection_ns}. Status: {status}",
+              "Couldn't unindex record {obj} from collection {namespace}: {error}",
               "Couldn't unindex record",
               "record"_attr = redact(obj),
               "namespace"_attr = _collection->ns(),

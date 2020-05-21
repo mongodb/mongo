@@ -52,7 +52,7 @@ public:
             if (!status.isOK()) {
                 LOGV2(4664806,
                       "Failed to kill the cursor ",
-                      "status"_attr = redact(status.toString()));
+                      "error"_attr = redact(status.toString()));
             } else {
                 LOGV2(4664807, "Killed cursor", "cursorId"_attr = cursorId);
             }

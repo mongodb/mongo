@@ -593,12 +593,12 @@ Status renameBetweenDBs(OperationContext* opCtx,
             // the rename operation has already failed for another reason.
             LOGV2(20399,
                   "Unable to drop temporary collection {tmpName} while renaming from {source} to "
-                  "{target}: {status}",
+                  "{target}: {error}",
                   "Unable to drop temporary collection while renaming",
                   "tempCollection"_attr = tmpName,
                   "source"_attr = source,
                   "target"_attr = target,
-                  "reason"_attr = status);
+                  "error"_attr = status);
         }
     });
 

@@ -1393,9 +1393,9 @@ int SSLManagerOpenSSL::password_cb(char* buf, int num, int rwflag, void* userdat
     auto swPassword = pwFetcher->fetchPassword();
     if (!swPassword.isOK()) {
         LOGV2_ERROR(23239,
-                    "Unable to fetch password: {status}",
+                    "Unable to fetch password: {error}",
                     "Unable to fetch password",
-                    "status"_attr = swPassword.getStatus());
+                    "error"_attr = swPassword.getStatus());
         return -1;
     }
     StringData password = std::move(swPassword.getValue());

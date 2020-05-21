@@ -1810,8 +1810,11 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
             ((status == ErrorCodes::IndexOptionsConflict ||
               status == ErrorCodes::IndexKeySpecsConflict) &&
              options.indexConstraints == IndexBuildsManager::IndexConstraints::kRelax)) {
-            LOGV2_DEBUG(
-                20662, 1, "Ignoring indexing error: {status}", "status"_attr = redact(status));
+            LOGV2_DEBUG(20662,
+                        1,
+                        "Ignoring indexing error: {error}",
+                        "Ignoring indexing error",
+                        "error"_attr = redact(status));
             return PostSetupAction::kCompleteIndexBuildEarly;
         }
 

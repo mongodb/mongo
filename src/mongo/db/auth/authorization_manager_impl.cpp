@@ -581,7 +581,7 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
                     LOGV2_WARNING(20239,
                                   "Unable to fetch pinned user",
                                   "user"_attr = userName.toString(),
-                                  "status"_attr = status);
+                                  "error"_attr = status);
                 } else {
                     LOGV2_DEBUG(20233, 2, "Pinned user not found", "user"_attr = userName);
                 }

@@ -85,7 +85,7 @@ RemoveSaver::~RemoveSaver() {
         Status status = _protector->finalize(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
             LOGV2_FATAL(34350,
-                        "Unable to finalize DataProtector while closing RemoveSaver: {status}",
+                        "Unable to finalize DataProtector while closing RemoveSaver: {error}",
                         "Unable to finalize DataProtector while closing RemoveSaver",
                         "error"_attr = redact(status));
         }

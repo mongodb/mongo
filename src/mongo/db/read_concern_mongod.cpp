@@ -216,9 +216,9 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
     if (!status.isOK()) {
         LOGV2_DEBUG(20989,
                     1,
-                    "Reached clusterTime {lastAppliedOpTime} but failed noop write due to {status}",
+                    "Reached clusterTime {lastAppliedOpTime} but failed noop write due to {error}",
                     "lastAppliedOpTime"_attr = lastAppliedOpTime.toString(),
-                    "status"_attr = status.toString());
+                    "error"_attr = status.toString());
     }
     return Status::OK();
 }
@@ -347,7 +347,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime);
             if (!status.isOK()) {
                 LOGV2(20990,
-                      "Failed noop write at clusterTime: {targetClusterTime} due to {status}",
+                      "Failed noop write at clusterTime: {targetClusterTime} due to {error}",
                       "Failed noop write",
                       "targetClusterTime"_attr = targetClusterTime,
                       "error"_attr = status);

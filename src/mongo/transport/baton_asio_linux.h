@@ -87,12 +87,13 @@ class TransportLayerASIO::BatonASIO : public NetworkingBaton {
     struct EventFDHolder {
         EventFDHolder() : fd(::eventfd(0, EFD_CLOEXEC)) {
             if (fd < 0) {
-                auto e = errno;
+                auto savedErrno = errno;
                 std::string reason = str::stream()
-                    << "error in creating eventfd: " << errnoWithDescription(e);
+                    << "error in creating eventfd: " << errnoWithDescription(savedErrno);
 
-                auto code = (e == EMFILE || e == ENFILE) ? ErrorCodes::TooManyFilesOpen
-                                                         : ErrorCodes::UnknownError;
+                auto code = (savedErrno == EMFILE || savedErrno == ENFILE)
+                    ? ErrorCodes::TooManyFilesOpen
+                    : ErrorCodes::UnknownError;
 
                 uasserted(code, reason);
             }
@@ -348,14 +349,16 @@ public:
             rval = ::poll(_pollSet.data(),
                           _pollSet.size(),
                           deadline ? Milliseconds(*deadline - now).count() : -1);
+            auto savedErrno = errno;
             lk.lock();
             _inPoll = false;
 
             // If poll failed, it better be in EINTR
-            if (rval < 0 && errno != EINTR) {
+            if (rval < 0 && savedErrno != EINTR) {
                 LOGV2_FATAL(50834,
-                            "error in poll: {errnoWithDescription_errno}",
-                            "errnoWithDescription_errno"_attr = errnoWithDescription(errno));
+                            "error in poll: {error}",
+                            "error in poll",
+                            "error"_attr = errnoWithDescription(savedErrno));
             }
         }
 

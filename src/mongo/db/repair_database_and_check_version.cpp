@@ -237,7 +237,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                 auto status = buildMissingIdIndex(opCtx, coll);
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
-                                "could not build an _id index on collection {coll_ns}: {status}",
+                                "could not build an _id index on collection {coll_ns}: {error}",
                                 "Could not build an _id index on collection",
                                 logAttrs(*coll),
                                 "error"_attr = status);
