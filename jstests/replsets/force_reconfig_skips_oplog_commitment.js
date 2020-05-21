@@ -40,6 +40,14 @@ C1.members = C1.members.slice(0, 1);  // Remove the second node.
 C1.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: C1}));
 
+// Make sure we can connect to the secondary after it was REMOVED.
+assert.soonNoExcept(function() {
+    let res = secondary.adminCommand({replSetGetStatus: 1});
+    assert.commandFailedWithCode(res, ErrorCodes.InvalidReplicaSetConfig);
+    return true;
+}, () => tojson(secondary.adminCommand({replSetGetStatus: 1})));
+reconnect(secondary);
+
 jsTestLog("Test that force reconfig skips oplog commitment.");
 let C2 = Object.assign({}, origConfig);
 
@@ -55,8 +63,6 @@ const C3 = primary.getDB("local").system.replset.findOne();
 // Run another force reconfig to verify the pre-condition check is also skipped
 assert.commandWorked(primary.adminCommand({replSetReconfig: C3, force: true}));
 
-// Make sure we can connect to the secondary after it was REMOVED.
-reconnect(secondary);
 restartServerReplication(secondary);
 rst.awaitNodesAgreeOnConfigVersion();
 
