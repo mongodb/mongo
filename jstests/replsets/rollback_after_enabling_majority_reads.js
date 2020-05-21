@@ -66,7 +66,7 @@
 
     // Ensure that the secondary has completed rollback by waiting for its last optime to equal the
     // primary's.
-    replTest.awaitReplication(null /* timeout */, null /* secondaryOpTimeType */, rollbackNode);
+    replTest.awaitReplication(null /* timeout */, null /* secondaryOpTimeType */, [rollbackNode]);
 
     // Fix counts for "local.startup_log", since they are corrupted by this rollback.
     // transitionToSteadyStateOperations() checks collection counts.
