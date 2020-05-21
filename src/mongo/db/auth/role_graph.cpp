@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
@@ -412,10 +413,10 @@ Status RoleGraph::recomputePrivilegeData() {
      */
 
     stdx::unordered_set<RoleName> visitedRoles;
-    for (EdgeSet::const_iterator it = _roleToSubordinates.begin(); it != _roleToSubordinates.end();
-         ++it) {
-        Status status = _recomputePrivilegeDataHelper(it->first, visitedRoles);
+    for (const auto& it : _roleToSubordinates) {
+        Status status = _recomputePrivilegeDataHelper(it.first, visitedRoles);
         if (!status.isOK()) {
+            fassert(4823400, !roleGraphInvalidationIsFatal);
             return status;
         }
     }

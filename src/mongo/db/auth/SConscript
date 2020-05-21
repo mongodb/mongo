@@ -79,6 +79,7 @@ env.Library(
     ],
     LIBDEPS=[
         'auth',
+        'auth_options',
         'authprivilege',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -101,13 +102,23 @@ env.Library(
 )
 
 env.Library(
+    target='auth_options',
+    source=[
+        env.Idlc("auth_options.idl")[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ],
+)
+
+env.Library(
     target='role_graph_update',
     source=[
         'role_graph_update.cpp',
-        env.Idlc("auth_options.idl")[0],
     ],
     LIBDEPS=[
         'auth',
+        'auth_options',
         'role_graph',
         '$BUILD_DIR/mongo/db/update/update_driver',
     ],

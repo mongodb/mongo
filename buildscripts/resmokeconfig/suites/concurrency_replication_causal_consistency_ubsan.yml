@@ -64,5 +64,6 @@ executor:
         # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
         # an oplog yet because it has not conducted its own initial sync yet.
         numInitialSyncAttempts: 10000000
+        roleGraphInvalidationIsFatal: 1
     num_nodes: 5
     linear_chain: true

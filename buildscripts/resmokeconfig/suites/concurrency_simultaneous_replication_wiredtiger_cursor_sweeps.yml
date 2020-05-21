@@ -106,4 +106,5 @@ executor:
         # Lower the number of files open before WiredTiger starts looking for cursors to close. At
         # least 1 file should always be open, so cursor sweeps will always run when scheduled.
         wiredTigerFileHandleCloseMinimum: 1
+        roleGraphInvalidationIsFatal: 1
     num_nodes: 3
