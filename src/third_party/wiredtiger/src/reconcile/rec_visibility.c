@@ -314,11 +314,11 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             continue;
         }
 
-        /* Ignore prepared updates if it is not eviction. */
+        /* Ignore prepared updates if it is checkpoint. */
         if (upd->prepare_state == WT_PREPARE_LOCKED ||
           upd->prepare_state == WT_PREPARE_INPROGRESS) {
             WT_ASSERT(session, upd_select->upd == NULL || upd_select->upd->txnid == upd->txnid);
-            if (!F_ISSET(r, WT_REC_EVICT)) {
+            if (F_ISSET(r, WT_REC_CHECKPOINT)) {
                 has_newer_updates = true;
                 if (upd->start_ts > max_ts)
                     max_ts = upd->start_ts;
@@ -330,8 +330,18 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
                 if (upd->start_ts < r->min_skipped_ts)
                     r->min_skipped_ts = upd->start_ts;
                 continue;
-            } else
+            } else {
+                /*
+                 * For prepared updates written to the date store in salvage, we write the same
+                 * prepared value to the date store. If there is still content for that key left in
+                 * the history store, rollback to stable will bring it back to the data store.
+                 * Otherwise, it removes the key.
+                 */
+                WT_ASSERT(session, F_ISSET(r, WT_REC_EVICT) ||
+                    (F_ISSET(r, WT_REC_VISIBILITY_ERR) &&
+                                     F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK)));
                 WT_ASSERT(session, upd->prepare_state == WT_PREPARE_INPROGRESS);
+            }
         }
 
         /* Track the first update with non-zero timestamp. */

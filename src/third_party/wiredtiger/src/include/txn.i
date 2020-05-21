@@ -881,7 +881,8 @@ __wt_txn_read_upd_list(
                  * Save the prepared update to help us detect if we race with prepared commit or
                  * rollback.
                  */
-                if (prepare_updp != NULL && *prepare_updp == NULL)
+                if (prepare_updp != NULL && *prepare_updp == NULL &&
+                  F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK))
                     *prepare_updp = upd;
                 continue;
             }
@@ -920,7 +921,6 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
 {
     WT_TIME_WINDOW tw;
     WT_UPDATE *prepare_upd;
-    uint8_t prepare_state;
 
     prepare_upd = NULL;
 
@@ -999,12 +999,17 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
           cbt->upd_value, false, &cbt->upd_value->buf));
 
     /*
-     * Retry if we race with prepared commit or rollback as the reader may have read changed history
-     * store content.
+     * Retry if we race with prepared commit or rollback. If we race with prepared rollback, the
+     * value the reader should read may have been removed from the history store and appended to the
+     * data store. If we race with prepared commit, imagine a case we read with timestamp 50 and we
+     * have a prepared update with timestamp 30 and a history store record with timestamp 20,
+     * committing the prepared update will cause the stop timestamp of the history store record
+     * being updated to 30 and the reader not seeing it.
      */
     if (prepare_upd != NULL) {
-        WT_ORDERED_READ(prepare_state, prepare_upd->prepare_state);
-        if (prepare_upd->txnid == WT_TXN_ABORTED || prepare_state == WT_PREPARE_RESOLVED)
+        WT_ASSERT(session, F_ISSET(prepare_upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK));
+        if (prepare_upd->txnid == WT_TXN_ABORTED ||
+          prepare_upd->prepare_state == WT_PREPARE_RESOLVED)
             return (WT_RESTART);
     }
 

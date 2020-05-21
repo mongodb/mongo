@@ -1386,11 +1386,6 @@ methods = {
         Display the contents of on-disk blocks as they are verified,
         using the application's message handler, intended for debugging''',
         type='boolean'),
-    Config('dump_history', 'false', r'''
-        Display a key's values along with its time window as
-        they are verified against the history store, using the application's
-        message handler, intended for debugging''',
-        type='boolean'),
     Config('dump_layout', 'false', r'''
         Display the layout of the files as they are verified, using the
         application's message handler, intended for debugging; requires

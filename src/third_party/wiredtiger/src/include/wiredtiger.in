@@ -1711,9 +1711,6 @@ struct __wt_session {
 	 * @config{dump_blocks, Display the contents of on-disk blocks as they are verified\, using
 	 * the application's message handler\, intended for debugging., a boolean flag; default \c
 	 * false.}
-	 * @config{dump_history, Display a key's values along with its time window as they are
-	 * verified against the history store\, using the application's message handler\, intended
-	 * for debugging., a boolean flag; default \c false.}
 	 * @config{dump_layout, Display the layout of the files as they are verified\, using the
 	 * application's message handler\, intended for debugging; requires optional support from
 	 * the block manager., a boolean flag; default \c false.}

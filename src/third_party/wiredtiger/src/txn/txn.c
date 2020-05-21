@@ -1503,11 +1503,9 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
          * Logged table updates should never be prepared. As these updates are immediately durable,
          * it is not possible to roll them back if the prepared transaction is rolled back.
          */
-        if (!F_ISSET(op->btree, WT_BTREE_NO_LOGGING) &&
-          (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
-            F_ISSET(S2C(session), WT_CONN_IN_MEMORY)))
+        if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
+          !F_ISSET(op->btree, WT_BTREE_NO_LOGGING))
             WT_RET_MSG(session, EINVAL, "transaction prepare is not supported with logged tables");
-
         switch (op->type) {
         case WT_TXN_OP_NONE:
             break;
