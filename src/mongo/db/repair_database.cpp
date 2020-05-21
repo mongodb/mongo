@@ -163,13 +163,14 @@ Status repairCollections(OperationContext* opCtx,
         ValidateResults validateResults;
         BSONObjBuilder output;
 
-        // Set options to exclude FullRecordStoreValidation because we have already validated the
-        // underlying record store in the call to repairRecordStore above.
-        auto options = CollectionValidation::ValidateOptions::kFullIndexValidation;
-
-        const bool background = false;
+        // Exclude full record store validation because we have already validated the underlying
+        // record store in the call to repairRecordStore above.
         status = CollectionValidation::validate(
-            opCtx, nss, options, background, &validateResults, &output);
+            opCtx,
+            nss,
+            CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
+            &validateResults,
+            &output);
         if (!status.isOK()) {
             return status;
         }

@@ -521,8 +521,15 @@ var Cluster = function(options) {
                     return;
                 }
 
+                const validateOptions = {full: true, enforceFastCount: true};
+                // TODO (SERVER-24266): Once fast counts are tolerant to unclean shutdowns, remove
+                // the check for TestData.allowUncleanShutdowns.
+                if (TestData.skipEnforceFastCountOnValidate || TestData.allowUncleanShutdowns) {
+                    validateOptions.enforceFastCount = false;
+                }
+
                 assert.commandWorked(
-                    validateCollections(db.getSiblingDB(dbInfo.name), {full: true}),
+                    validateCollections(db.getSiblingDB(dbInfo.name), validateOptions),
                     phase + ' collection validation failed');
             });
         };

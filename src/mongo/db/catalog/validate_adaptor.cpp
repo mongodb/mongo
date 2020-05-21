@@ -380,6 +380,16 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         }
     }
 
+    const auto fastCount = _validateState->getCollection()->numRecords(opCtx);
+    if (_validateState->shouldEnforceFastCount() &&
+        fastCount != static_cast<uint64_t>(_numRecords)) {
+        results->errors.push_back(str::stream() << "fast count (" << fastCount
+                                                << ") does not match number of records ("
+                                                << _numRecords << ") for collection '"
+                                                << _validateState->getCollection()->ns() << "'");
+        results->valid = false;
+    }
+
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
     if (results->valid && !_validateState->isBackground()) {

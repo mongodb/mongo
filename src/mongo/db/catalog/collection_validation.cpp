@@ -422,18 +422,15 @@ void _validateCatalogEntry(OperationContext* opCtx,
 
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
-                ValidateOptions options,
-                bool background,
+                ValidateMode mode,
                 ValidateResults* results,
                 BSONObjBuilder* output,
                 bool turnOnExtraLoggingForTest) {
     invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
-    // Background validation does not support any type of full validation.
-    invariant(!(background && (options != ValidateOptions::kNoFullValidation)));
 
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
-    ValidateState validateState(opCtx, nss, background, options, turnOnExtraLoggingForTest);
+    ValidateState validateState(opCtx, nss, mode, turnOnExtraLoggingForTest);
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // Check whether we are allowed to read from this node after acquiring our locks. If we are
@@ -448,14 +445,14 @@ Status validate(OperationContext* opCtx,
 
         // Full record store validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.
-        if (options & ValidateOptions::kFullRecordStoreValidation) {
+        if (validateState.isFullValidation()) {
             invariant(opCtx->lockState()->isCollectionLockedForMode(validateState.nss(), MODE_X));
 
             // For full record store validation we use the storage engine's validation
             // functionality.
             validateState.getCollection()->getRecordStore()->validate(opCtx, results, output);
         }
-        if (options & ValidateOptions::kFullIndexValidation) {
+        if (validateState.isFullIndexValidation()) {
             invariant(opCtx->lockState()->isCollectionLockedForMode(validateState.nss(), MODE_X));
             // For full index validation, we validate the internal structure of each index and save
             // the number of keys in the index to compare against _validateIndexes()'s count
@@ -590,7 +587,7 @@ Status validate(OperationContext* opCtx,
 
         output->append("ns", validateState.nss().ns());
     } catch (ExceptionFor<ErrorCodes::CursorNotFound>&) {
-        invariant(background);
+        invariant(validateState.isBackground());
         string warning = str::stream()
             << "Collection validation with {background: true} validates"
             << " the latest checkpoint (data in a snapshot written to disk in a consistent"

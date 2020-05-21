@@ -61,8 +61,7 @@ public:
      */
     ValidateState(OperationContext* opCtx,
                   const NamespaceString& nss,
-                  bool background,
-                  ValidateOptions options,
+                  ValidateMode mode,
                   bool turnOnExtraLoggingForTest = false);
 
     const NamespaceString& nss() const {
@@ -70,15 +69,20 @@ public:
     }
 
     bool isBackground() const {
-        return _background;
+        return _mode == ValidateMode::kBackground;
     }
 
-    bool isFullCollectionValidation() const {
-        return (_options & ValidateOptions::kFullRecordStoreValidation);
+    bool shouldEnforceFastCount() const {
+        return _mode == ValidateMode::kForegroundFullEnforceFastCount;
+    }
+
+    bool isFullValidation() const {
+        return _mode == ValidateMode::kForegroundFull ||
+            _mode == ValidateMode::kForegroundFullEnforceFastCount;
     }
 
     bool isFullIndexValidation() const {
-        return (_options & ValidateOptions::kFullIndexValidation);
+        return isFullValidation() || _mode == ValidateMode::kForegroundFullIndexOnly;
     }
 
     const UUID uuid() const {
@@ -155,7 +159,7 @@ private:
 
     /**
      * Re-locks the database and collection with the appropriate locks for background validation.
-     * This should only be called when '_background' is set to true.
+     * This should only be called when '_mode' is set to 'kBackground'.
      */
     void _relockDatabaseAndCollection(OperationContext* opCtx);
 
@@ -186,8 +190,7 @@ private:
     void _yieldCursors(OperationContext* opCtx);
 
     NamespaceString _nss;
-    bool _background;
-    ValidateOptions _options;
+    ValidateMode _mode;
     OptionalCollectionUUID _uuid;
 
     boost::optional<Lock::GlobalLock> _globalLock;
