@@ -630,7 +630,34 @@ assert = (function() {
         if (isWriteConcernTimeout) {
             print("Running hang analyzer for writeConcern timeout " + tojson(res));
             MongoRunner.runHangAnalyzer();
+            return true;
         }
+        return false;
+    }
+
+    function _runHangAnalyzerIfNonTransientLockTimeoutError(res) {
+        // Concurrency suites see a lot of LockTimeouts when running concurrent transactions.
+        // However, they will also abort transactions and continue running rather than fail the
+        // test, so we don't want to run the hang analyzer when the error has a
+        // TransientTransactionError error label.
+        const isTransientTxnError = res.hasOwnProperty("errorLabels") &&
+            res.errorLabels.includes("TransientTransactionError");
+        const isLockTimeout = res.hasOwnProperty("code") && ErrorCodes.LockTimeout === res.code;
+        if (isLockTimeout && !isTransientTxnError) {
+            print("Running hang analyzer for lock timeout " + tojson(res));
+            MongoRunner.runHangAnalyzer();
+            return true;
+        }
+        return false;
+    }
+
+    function _runHangAnalyzerForSpecificFailureTypes(res) {
+        // If the hang analyzer is run, then we shouldn't try to run it again.
+        if (_runHangAnalyzerIfWriteConcernTimedOut(res)) {
+            return;
+        }
+
+        _runHangAnalyzerIfNonTransientLockTimeoutError(res);
     }
 
     function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernErrors}) {
@@ -659,7 +686,7 @@ assert = (function() {
                     ignoreWriteErrors: ignoreWriteErrors,
                     ignoreWriteConcernErrors: ignoreWriteConcernErrors
                 })) {
-                _runHangAnalyzerIfWriteConcernTimedOut(res);
+                _runHangAnalyzerForSpecificFailureTypes(res);
                 doassert(makeFailMsg(), res);
             }
         } else if (res.hasOwnProperty("acknowledged")) {
@@ -712,7 +739,6 @@ assert = (function() {
             // Handle raw command responses or cases like MapReduceResult which extend command
             // response.
             if (_rawReplyOkAndNoWriteErrors(res)) {
-                _runHangAnalyzerIfWriteConcernTimedOut(res);
                 doassert(makeFailMsg(), res);
             }
 
@@ -727,7 +753,7 @@ assert = (function() {
                 }
 
                 if (!foundCode) {
-                    _runHangAnalyzerIfWriteConcernTimedOut(res);
+                    _runHangAnalyzerForSpecificFailureTypes(res);
                     doassert(makeFailCodeMsg(), res);
                 }
             }
@@ -803,7 +829,7 @@ assert = (function() {
         }
 
         if (errMsg) {
-            _runHangAnalyzerIfWriteConcernTimedOut(res);
+            _runHangAnalyzerForSpecificFailureTypes(res);
             doassert(_buildAssertionMessage(msg, errMsg), res);
         }
 
@@ -865,7 +891,7 @@ assert = (function() {
         }
 
         if (errMsg) {
-            _runHangAnalyzerIfWriteConcernTimedOut(res);
+            _runHangAnalyzerForSpecificFailureTypes(res);
             doassert(_buildAssertionMessage(msg, errMsg));
         }
 
