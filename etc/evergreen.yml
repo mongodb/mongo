@@ -1237,7 +1237,9 @@ functions:
           # Windows path separator
           toolchain_txt="$pip_dir/toolchain-requirements.txt"
           ${activate_virtualenv}
-          python -m pip install -r "$toolchain_txt" -q
+          # GRPC requires a more recent version of pip.
+          python -m pip install --upgrade pip
+          python -m pip install -r "$toolchain_txt"
           python -m pip freeze > pip-requirements.txt
 
   "upload pip requirements": &upload_pip_requirements
