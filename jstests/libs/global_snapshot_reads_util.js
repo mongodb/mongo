@@ -274,4 +274,190 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
             }
         }
     };
+
+    this.lookupAndUnionWithTest = function({testScenarioName, coll1, coll2, isColl2Sharded}) {
+        const docs = [...Array(10).keys()].map((i) => ({_id: i, x: i}));
+        const lookupExpected =
+            [...Array(10).keys()].map((i) => ({_id: i, x: i, y: [{_id: i, x: i}]}));
+        const unionWithExpected = [...Array(10).keys()].reduce((acc, i) => {
+            return acc.concat([{_id: i, x: i}, {_id: i, x: i}]);
+        }, []);
+
+        for (let [db, readPreferenceMode] of [[primaryDB, "primary"], [secondaryDB, "secondary"]]) {
+            jsTestLog(
+                `Testing "$lookup" and "$unionWith" with the ${testScenarioName} scenario ` +
+                `on collections ${coll1} and ${coll2} with read preference ${readPreferenceMode} `);
+
+            let res;
+            assert.commandWorked(primaryDB.runCommand({insert: coll1, documents: docs}));
+            res = assert.commandWorked(primaryDB.runCommand({insert: coll2, documents: docs}));
+            const atClusterTimeReadConcern = {level: "snapshot", atClusterTime: res.operationTime};
+            jsTestLog(`Inserted 10 documents on each collection at timestamp ${res.operationTime}`);
+            awaitCommittedFn(db, res.operationTime);
+
+            const lookup = (readConcern) => {
+                return {
+                    aggregate: coll1,
+                    pipeline: [
+                        {$lookup: {from: coll2, localField: "x", foreignField: "x", as: "y"}},
+                        {$sort: {_id: 1}}
+                    ],
+                    cursor: {},
+                    readConcern: readConcern,
+                    $readPreference: {mode: readPreferenceMode}
+                };
+            };
+
+            const unionWith = (readConcern) => {
+                return {
+                    aggregate: coll1,
+                    pipeline: [{$unionWith: coll2}, {$sort: {_id: 1}}],
+                    cursor: {},
+                    readConcern: readConcern,
+                    $readPreference: {mode: readPreferenceMode}
+                };
+            };
+
+            let lookupSnapshot;
+            // The "from" collection cannot be sharded for $lookup.
+            if (!isColl2Sharded) {
+                jsTestLog("Test aggregate $lookup with snapshot");
+                lookupSnapshot = assert.commandWorked(db.runCommand(lookup({level: "snapshot"})))
+                                     .cursor.firstBatch;
+                assert.eq(lookupExpected, lookupSnapshot, () => {
+                    return "Expected lookup results: " + tojson(lookupExpected) +
+                        " Got: " + tojson(lookupSnapshot);
+                });
+            }
+
+            jsTestLog("Test aggregate $unionWith with snapshot");
+            const unionWithSnapshot =
+                assert.commandWorked(db.runCommand(unionWith({level: "snapshot"})))
+                    .cursor.firstBatch;
+            assert.eq(unionWithExpected, unionWithSnapshot, () => {
+                return "Expected unionWith results: " + tojson(unionWithExpected) +
+                    " Got: " + tojson(unionWithSnapshot);
+            });
+
+            assert.commandWorked(primaryDB.runCommand(
+                {update: coll1, updates: [{q: {}, u: {$inc: {x: 10}}, multi: true}]}));
+            res = assert.commandWorked(primaryDB.runCommand(
+                {update: coll2, updates: [{q: {}, u: {$inc: {x: 10}}, multi: true}]}));
+            jsTestLog(`Updated both collections at timestamp ${res.operationTime}`);
+            awaitCommittedFn(db, res.operationTime);
+
+            // The "from" collection cannot be sharded for $lookup.
+            if (!isColl2Sharded) {
+                jsTestLog("Test aggregate $lookup with atClusterTime");
+                const lookupAtClusterTime =
+                    assert.commandWorked(db.runCommand(lookup(atClusterTimeReadConcern)))
+                        .cursor.firstBatch;
+                assert.eq(lookupExpected, lookupAtClusterTime, () => {
+                    return "Expected lookup results: " + tojson(lookupExpected) +
+                        " Got: " + tojson(lookupAtClusterTime);
+                });
+            }
+
+            jsTestLog("Test aggregate $unionWith with atClusterTime");
+            const unionWithAtClusterTime =
+                assert.commandWorked(db.runCommand(unionWith(atClusterTimeReadConcern)))
+                    .cursor.firstBatch;
+            assert.eq(unionWithExpected, unionWithAtClusterTime, () => {
+                return "Expected unionWith results: " + tojson(unionWithExpected) +
+                    " Got: " + tojson(unionWithAtClusterTime);
+            });
+
+            // Reset for the next run.
+            assert.commandWorked(primaryDB[coll1].remove({}, {writeConcern: {w: "majority"}}));
+            assert.commandWorked(primaryDB[coll2].remove({}, {writeConcern: {w: "majority"}}));
+        }
+    };
+
+    this.outAndMergeTest = function({testScenarioName, coll, outColl, isOutCollSharded}) {
+        const docs = [...Array(10).keys()].map((i) => ({_id: i, x: i}));
+
+        for (let [db, readPreferenceMode] of [[primaryDB, "primary"], [secondaryDB, "secondary"]]) {
+            jsTestLog(`Testing "$out" and "$merge" with the ${testScenarioName} scenario on` +
+                      ` collection ${coll} with read preference ${readPreferenceMode} ` +
+                      `and output collection ${outColl}`);
+
+            let res = assert.commandWorked(primaryDB.runCommand({insert: coll, documents: docs}));
+            const atClusterTimeReadConcern = {level: "snapshot", atClusterTime: res.operationTime};
+            jsTestLog(`Inserted 10 documents at timestamp ${res.operationTime}`);
+            awaitCommittedFn(db, res.operationTime);
+
+            const out = (readConcern) => {
+                return {
+                    aggregate: coll,
+                    pipeline: [{$out: outColl}],
+                    cursor: {},
+                    readConcern: readConcern,
+                    $readPreference: {mode: readPreferenceMode}
+                };
+            };
+
+            const merge = (readConcern) => {
+                return {
+                    aggregate: coll,
+                    pipeline: [{$merge: outColl}],
+                    cursor: {},
+                    readConcern: readConcern,
+                    $readPreference: {mode: readPreferenceMode}
+                };
+            };
+
+            // The "out" collection cannot be sharded for $out.
+            if (!isOutCollSharded) {
+                jsTestLog("Test aggregate $out with snapshot");
+                assert.commandWorked(
+                    primaryDB[outColl].remove({}, {writeConcern: {w: "majority"}}));
+                res = assert.commandWorked(db.runCommand(out({level: "snapshot"})));
+                awaitCommittedFn(db, res.operationTime);
+                res = db[outColl].find().sort({_id: 1}).toArray();
+                assert.eq(docs, res, () => {
+                    return "Expected out results: " + tojson(docs) + " Got: " + tojson(res);
+                });
+            }
+
+            jsTestLog("Test aggregate $merge with snapshot");
+            assert.commandWorked(primaryDB[outColl].remove({}, {writeConcern: {w: "majority"}}));
+            res = assert.commandWorked(db.runCommand(merge({level: "snapshot"})));
+            awaitCommittedFn(db, res.operationTime);
+            res = db[outColl].find().sort({_id: 1}).toArray();
+            assert.eq(docs, res, () => {
+                return "Expected merge results: " + tojson(docs) + " Got: " + tojson(res);
+            });
+
+            res = assert.commandWorked(primaryDB.runCommand(
+                {update: coll, updates: [{q: {}, u: {$inc: {x: 10}}, multi: true}]}));
+            jsTestLog(`Updated collection "${coll}" at timestamp ${res.operationTime}`);
+            awaitCommittedFn(db, res.operationTime);
+
+            // The "out" collection cannot be sharded for $out.
+            if (!isOutCollSharded) {
+                jsTestLog("Test aggregate $out with atClusterTime");
+                assert.commandWorked(
+                    primaryDB[outColl].remove({}, {writeConcern: {w: "majority"}}));
+                res = assert.commandWorked(db.runCommand(out(atClusterTimeReadConcern)));
+                awaitCommittedFn(db, res.operationTime);
+                res = db[outColl].find().sort({_id: 1}).toArray();
+                assert.eq(docs, res, () => {
+                    return "Expected out results: " + tojson(docs) + " Got: " + tojson(res);
+                });
+            }
+
+            jsTestLog("Test aggregate $merge with atClusterTime");
+            assert.commandWorked(primaryDB[outColl].remove({}, {writeConcern: {w: "majority"}}));
+            res = assert.commandWorked(db.runCommand(merge(atClusterTimeReadConcern)));
+            awaitCommittedFn(db, res.operationTime);
+            res = db[outColl].find().sort({_id: 1}).toArray();
+            assert.eq(docs, res, () => {
+                return "Expected merge results: " + tojson(docs) + " Got: " + tojson(res);
+            });
+
+            // Reset for the next run.
+            assert.commandWorked(primaryDB[coll].remove({}, {writeConcern: {w: "majority"}}));
+            assert.commandWorked(primaryDB[outColl].remove({}, {writeConcern: {w: "majority"}}));
+        }
+    };
 }
