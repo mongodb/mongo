@@ -1,10 +1,8 @@
 // Test that new collection creation fails in a cross-shard write transaction, but succeeds in a
 // single-shard write transaction.
 //
-// TODO (SERVER-48341): Remove requires_fcv_46 after backporting SERVER-48307 to 4.4.
 // @tags: [
 //   requires_find_command,
-//   requires_fcv_46,
 //   requires_sharding,
 //   uses_multi_shard_transaction,
 //   uses_transactions,

@@ -6,8 +6,7 @@
  * no failures, a participant having failed over, a participant being unable to satisfy the client's
  * writeConcern, and an invalid client writeConcern.
  *
- * TODO (SERVER-48341): Remove requires_fcv_46 after backporting SERVER-48307 to 4.4.
- * @tags: [requires_fcv_46, uses_transactions, uses_multi_shard_transaction]
+ * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
 (function() {
