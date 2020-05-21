@@ -1413,7 +1413,13 @@ void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
     });
     uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx, collection, buildUUID));
 
-    uassertStatusOK(_indexBuildsManager.retrySkippedRecords(opCtx, buildUUID, collection));
+    // Retry indexing records that failed key generation, but only if we are primary. Secondaries
+    // rely on the primary's decision to commit as assurance that it has checked all key generation
+    // errors on its behalf.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->canAcceptWritesFor(opCtx, nss)) {
+        uassertStatusOK(_indexBuildsManager.retrySkippedRecords(opCtx, buildUUID, collection));
+    }
     uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(opCtx, buildUUID));
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
