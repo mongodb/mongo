@@ -245,7 +245,8 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                RecordId catalogId,
                                UUID uuid,
                                std::unique_ptr<RecordStore> recordStore)
-    : _ns(nss),
+    : _sharedDecorations(std::make_shared<SharedCollectionDecorations>()),
+      _ns(nss),
       _catalogId(catalogId),
       _uuid(uuid),
       _recordStore(std::move(recordStore)),
@@ -277,6 +278,10 @@ std::unique_ptr<Collection> CollectionImpl::FactoryImpl::make(
     CollectionUUID uuid,
     std::unique_ptr<RecordStore> rs) const {
     return std::make_unique<CollectionImpl>(opCtx, nss, catalogId, uuid, std::move(rs));
+}
+
+SharedCollectionDecorations* CollectionImpl::getSharedDecorations() const {
+    return _sharedDecorations.get();
 }
 
 void CollectionImpl::init(OperationContext* opCtx) {

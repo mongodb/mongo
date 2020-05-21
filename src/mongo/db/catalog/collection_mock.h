@@ -48,6 +48,10 @@ public:
         : _ns(ns), _catalogId(catalogId) {}
     ~CollectionMock() = default;
 
+    SharedCollectionDecorations* getSharedDecorations() const {
+        return nullptr;
+    }
+
     void init(OperationContext* opCtx) {
         std::abort();
     }
