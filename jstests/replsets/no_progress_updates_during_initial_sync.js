@@ -85,11 +85,6 @@ const writeResW2 = primaryDb.runCommand({
 assert.commandWorkedIgnoringWriteConcernErrors(writeResW2);
 checkWriteConcernTimedOut(writeResW2);
 
-// The lastCommitted opTime should not advance on the secondary.
-const opTimesAfterW2 = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1})).optimes;
-assert.docEq(opTimesAfterW2.lastCommittedOpTime, nullOpTime, () => tojson(opTimesAfterW2));
-assert.eq(nullWallTime, opTimesAfterW2.lastCommittedWallTime, () => tojson(opTimesAfterW2));
-
 const writeResWMaj = primaryDb.runCommand({
     insert: "test",
     documents: [{"writeConcernMajority": "shouldfail"}],
@@ -98,14 +93,9 @@ const writeResWMaj = primaryDb.runCommand({
 assert.commandWorkedIgnoringWriteConcernErrors(writeResWMaj);
 checkWriteConcernTimedOut(writeResWMaj);
 
-// The lastCommitted opTime should not advance on the secondary.
-const statusAfterWMaj = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-const opTimesAfterWMaj = statusAfterWMaj.optimes;
-assert.docEq(opTimesAfterWMaj.lastCommittedOpTime, nullOpTime, () => tojson(opTimesAfterWMaj));
-assert.eq(nullWallTime, opTimesAfterWMaj.lastCommittedWallTime, () => tojson(opTimesAfterWMaj));
-
 // 3. Make sure that even though the lastApplied and lastDurable have advanced on the secondary...
-const secondaryOpTimes = opTimesAfterWMaj;
+const statusAfterWMaj = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+const secondaryOpTimes = statusAfterWMaj.optimes;
 assert.gte(
     bsonWoCompare(secondaryOpTimes.appliedOpTime, nullOpTime), 0, () => tojson(secondaryOpTimes));
 assert.gte(
