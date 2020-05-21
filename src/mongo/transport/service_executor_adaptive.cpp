@@ -79,9 +79,11 @@ struct ServerParameterOptions : public ServiceExecutorAdaptive::Options {
             value = ProcessInfo::getNumAvailableCores() / 2;
             value = std::max(value, 2);
             adaptiveServiceExecutorReservedThreads.store(value);
-            LOGV2(22951,
-                  "No thread count configured for executor. Using number of cores / 2: {value}",
-                  "value"_attr = value);
+            LOGV2(
+                22951,
+                "No thread count configured for executor. Using number of cores / 2: {threadCount}",
+                "No thread count configured for executor. Using number of cores / 2",
+                "threadCount"_attr = value);
         }
         return value;
     }
@@ -103,11 +105,13 @@ struct ServerParameterOptions : public ServiceExecutorAdaptive::Options {
         Microseconds value{adaptiveServiceExecutorMaxQueueLatencyMicros.load()};
         if (value < minTimerResolution) {
             LOGV2(22952,
-                  "Target MaxQueueLatencyMicros ({value}) is less than minimum timer resolution of "
-                  "OS ({minTimerResolution}). Using {minTimerResolution2}",
-                  "value"_attr = value,
-                  "minTimerResolution"_attr = minTimerResolution,
-                  "minTimerResolution2"_attr = minTimerResolution);
+                  "Target MaxQueueLatencyMicros ({targetMaxQueLatencyMicros}) is less than minimum "
+                  "timer resolution of "
+                  "OS ({OSMinTimerResolution}). Using {OSMinTimerResolution}",
+                  "Target MaxQueueLatencyMicros is less than the OS minimum timer resolution. "
+                  "Using the OS minimum",
+                  "targetMaxQueLatencyMicros"_attr = value,
+                  "OSMinTimerResolution"_attr = minTimerResolution);
             value = duration_cast<Microseconds>(minTimerResolution) + Microseconds{1};
             adaptiveServiceExecutorMaxQueueLatencyMicros.store(value.count());
         }
@@ -355,8 +359,10 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
                 stuckThreadTimeout /= 2;
                 stuckThreadTimeout = std::max(Milliseconds{10}, stuckThreadTimeout);
                 LOGV2(22953,
-                      "Detected blocked worker threads, starting new thread to unblock service "
+                      "Detected blocked worker threads. starting new thread to unblock service "
                       "executor. Stuck thread timeout now: {stuckThreadTimeout}",
+                      "Detected blocked worker threads. starting new thread to unblock service "
+                      "executor",
                       "stuckThreadTimeout"_attr = stuckThreadTimeout);
                 _startWorkerThread(ThreadCreationReason::kStuckDetection);
 
@@ -373,6 +379,7 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
                 LOGV2_DEBUG(22954,
                             1,
                             "Increasing stuck thread timeout to {newStuckThreadTimeout}",
+                            "Increasing stuck thread timeout",
                             "newStuckThreadTimeout"_attr = newStuckThreadTimeout);
                 stuckThreadTimeout = newStuckThreadTimeout;
             }
@@ -381,10 +388,9 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
         auto threadsRunning = _threadsRunning.load();
         if (threadsRunning < _config->reservedThreads()) {
             LOGV2(22955,
-                  "Starting {config_reservedThreads_threadsRunning} to replenish reserved worker "
-                  "threads",
-                  "config_reservedThreads_threadsRunning"_attr =
-                      _config->reservedThreads() - threadsRunning);
+                  "Starting {numThreads} to replenish reserved worker",
+                  "Starting threads to replenish reserved worker",
+                  "numThreads"_attr = _config->reservedThreads() - threadsRunning);
             while (_threadsRunning.load() < _config->reservedThreads()) {
                 _startWorkerThread(ThreadCreationReason::kReserveMinimum);
             }
@@ -454,8 +460,9 @@ void ServiceExecutorAdaptive::_startWorkerThread(ThreadCreationReason reason) {
 
     if (!launchResult.isOK()) {
         LOGV2_WARNING(22959,
-                      "Failed to launch new worker thread: {launchResult}",
-                      "launchResult"_attr = launchResult);
+                      "Failed to launch new worker thread: {error}",
+                      "Failed to launch new worker thread",
+                      "error"_attr = launchResult);
         lk.lock();
         _threadsPending.subtractAndFetch(1);
         _threadsRunning.subtractAndFetch(1);
@@ -541,7 +548,10 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
         setThreadName(threadName);
     }
 
-    LOGV2(22957, "Started new database worker thread {threadId}", "threadId"_attr = threadId);
+    LOGV2(22957,
+          "Started new database worker thread {id}",
+          "Started new database worker thread",
+          "id"_attr = threadId);
 
     bool guardThreadsRunning = true;
     const auto guard = makeGuard([this, &guardThreadsRunning, state] {
@@ -619,10 +629,12 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
                  !_threadsRunning.compareAndSwap(&runningThreads, runningThreads - 1));
         if (terminateThread) {
             LOGV2(22958,
-                  "Thread was only executing tasks {pctExecuting}% over the last {runTime}. "
-                  "Exiting thread.",
-                  "pctExecuting"_attr = pctExecuting,
-                  "runTime"_attr = runTime);
+                  "Thread exiting because utiliaztion {utilizationPct}% was under the idle "
+                  "threshold in the runtime window {runtimeWindow}",
+                  "Thread exiting because utiliaztion was under the idle threshold in the runtime "
+                  "window",
+                  "unilizationPercent"_attr = pctExecuting,
+                  "runtimeWindow"_attr = runTime);
 
             // Because we've already modified _threadsRunning, make sure the thread guard also
             // doesn't do it.

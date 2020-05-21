@@ -140,7 +140,11 @@ private:
             armTimer();
             return _timer->async_wait(UseFuture{}).tapError([timer = _timer](const Status& status) {
                 if (status != ErrorCodes::CallbackCanceled) {
-                    LOGV2_DEBUG(23011, 2, "Timer received error: {status}", "status"_attr = status);
+                    LOGV2_DEBUG(23011,
+                                2,
+                                "Timer received error: {error}",
+                                "Timer received error",
+                                "error"_attr = status);
                 }
             });
 
@@ -634,10 +638,10 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
                 Date_t timeAfter = Date_t::now();
                 if (timeAfter - timeBefore > kSlowOperationThreshold) {
                     LOGV2_WARNING(23019,
-                                  "DNS resolution while connecting to {connector_peer} took "
-                                  "{timeAfter_timeBefore}",
-                                  "connector_peer"_attr = connector->peer,
-                                  "timeAfter_timeBefore"_attr = timeAfter - timeBefore);
+                                  "DNS resolution while connecting to {peer} took {duration}",
+                                  "DNS resolution while connecting to peer was slow",
+                                  "peer"_attr = connector->peer,
+                                  "duration"_attr = timeAfter - timeBefore);
                     networkCounter.incrementNumSlowDNSOperations();
                 }
 
@@ -894,8 +898,9 @@ Status TransportLayerASIO::setup() {
             resolver.resolve(HostAndPort(ip, _listenerPort), _listenerOptions.enableIPv6);
         if (!swAddrs.isOK()) {
             LOGV2_WARNING(23021,
-                          "Found no addresses for {swAddrs_getStatus}",
-                          "swAddrs_getStatus"_attr = swAddrs.getStatus());
+                          "Found no addresses for {peer}",
+                          "Found no addresses for peer",
+                          "peer"_attr = swAddrs.getStatus());
             continue;
         }
         auto& addrs = swAddrs.getValue();
@@ -906,11 +911,11 @@ Status TransportLayerASIO::setup() {
 #ifndef _WIN32
         if (addr.family() == AF_UNIX) {
             if (::unlink(addr.toString().c_str()) == -1 && errno != ENOENT) {
-                LOGV2_ERROR(
-                    23024,
-                    "Failed to unlink socket file {addr_c_str} {errnoWithDescription_errno}",
-                    "addr_c_str"_attr = addr.toString().c_str(),
-                    "errnoWithDescription_errno"_attr = errnoWithDescription(errno));
+                LOGV2_ERROR(23024,
+                            "Failed to unlink socket file {path} {error}",
+                            "Failed to unlink socket file",
+                            "path"_attr = addr.toString().c_str(),
+                            "error"_attr = errnoWithDescription(errno));
                 fassertFailedNoTrace(40486);
             }
         }
@@ -952,9 +957,10 @@ Status TransportLayerASIO::setup() {
         if (addr.family() == AF_UNIX) {
             if (::chmod(addr.toString().c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
                 LOGV2_ERROR(23026,
-                            "Failed to chmod socket file {addr_c_str} {errnoWithDescription_errno}",
-                            "addr_c_str"_attr = addr.toString().c_str(),
-                            "errnoWithDescription_errno"_attr = errnoWithDescription(errno));
+                            "Failed to chmod socket file {path} {error}",
+                            "Failed to chmod socket file",
+                            "path"_attr = addr.toString().c_str(),
+                            "error"_attr = errnoWithDescription(errno));
                 fassertFailedNoTrace(40487);
             }
         }
@@ -1030,9 +1036,10 @@ void TransportLayerASIO::_runListener() noexcept {
         acceptor.second.listen(serverGlobalParams.listenBacklog, ec);
         if (ec) {
             LOGV2_FATAL(31339,
-                        "Error listening for new connections on {acceptor_first}: {ec_message}",
-                        "acceptor_first"_attr = acceptor.first,
-                        "ec_message"_attr = ec.message());
+                        "Error listening for new connections on {listenAddress}: {error}",
+                        "Error listening for new connections on listen address",
+                        "listenAddrs"_attr = acceptor.first,
+                        "error"_attr = ec.message());
         }
 
         _acceptConnection(acceptor.second);
@@ -1067,13 +1074,15 @@ void TransportLayerASIO::_runListener() noexcept {
         auto& addr = acceptor.first;
         if (addr.getType() == AF_UNIX && !addr.isAnonymousUNIXSocket()) {
             auto path = addr.getAddr();
-            LOGV2(23017, "removing socket file: {path}", "path"_attr = path);
+            LOGV2(
+                23017, "removing socket file: {path}", "removing socket file", "path"_attr = path);
             if (::unlink(path.c_str()) != 0) {
                 const auto ewd = errnoWithDescription();
                 LOGV2_WARNING(23022,
-                              "Unable to remove UNIX socket {path}: {ewd}",
+                              "Unable to remove UNIX socket {path}: {error}",
+                              "Unable to remove UNIX socket",
                               "path"_attr = path,
-                              "ewd"_attr = ewd);
+                              "error"_attr = ewd);
             }
         }
     }
@@ -1147,11 +1156,10 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
 
         if (ec) {
             LOGV2(23018,
-                  "Error accepting new connection on "
-                  "{endpointToHostAndPort_acceptor_local_endpoint}: {ec_message}",
-                  "endpointToHostAndPort_acceptor_local_endpoint"_attr =
-                      endpointToHostAndPort(acceptor.local_endpoint()),
-                  "ec_message"_attr = ec.message());
+                  "Error accepting new connection on {localEndpoint}: {error}",
+                  "Error accepting new connection on local endpoint",
+                  "localEndpoint"_attr = endpointToHostAndPort(acceptor.local_endpoint()),
+                  "error"_attr = ec.message());
             _acceptConnection(acceptor);
             return;
         }
@@ -1170,7 +1178,10 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
                 new ASIOSession(this, std::move(peerSocket), true));
             _sep->startSession(std::move(session));
         } catch (const DBException& e) {
-            LOGV2_WARNING(23023, "Error accepting new connection {e}", "e"_attr = e);
+            LOGV2_WARNING(23023,
+                          "Error accepting new connection: {error}",
+                          "Error accepting new connection",
+                          "error"_attr = e);
         }
 
         _acceptConnection(acceptor);

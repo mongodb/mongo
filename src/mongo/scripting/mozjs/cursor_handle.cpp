@@ -78,9 +78,10 @@ void CursorHandleInfo::finalize(js::FreeOp* fop, JSObject* obj) {
 
                 try {
                     LOGV2_INFO(22782,
-                               "Failed to kill cursor {cursorId} due to {status}",
+                               "Failed to kill cursor {cursorId} due to {error}",
+                               "Failed to kill cursor",
                                "cursorId"_attr = cursorId,
-                               "status"_attr = status);
+                               "error"_attr = status);
                 } catch (...) {
                     // This is here in case logging fails.
                 }

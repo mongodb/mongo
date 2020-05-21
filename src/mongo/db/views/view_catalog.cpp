@@ -141,9 +141,10 @@ Status ViewCatalog::_reload(WithLock,
     } catch (const DBException& ex) {
         auto status = ex.toStatus();
         LOGV2(22547,
-              "could not load view catalog for database {durable_getName}: {status}",
-              "durable_getName"_attr = _durable->getName(),
-              "status"_attr = status);
+              "could not load view catalog for database {dbName}: {error}",
+              "could not load view catalog for database",
+              "dbName"_attr = _durable->getName(),
+              "error"_attr = status);
         return status;
     }
 
