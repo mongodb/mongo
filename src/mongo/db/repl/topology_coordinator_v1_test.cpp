@@ -4127,13 +4127,16 @@ public:
         changeSyncSourceThresholdMillis.store(5LL);
 
         // Receive an up heartbeat from both sync sources. This will allow 'isEligibleSyncSource()'
-        // to pass if the node reaches that check.
-        HeartbeatResponseAction nextAction = receiveUpHeartbeat(
-            HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
-        ASSERT_NO_ACTION(nextAction.getAction());
-        nextAction = receiveUpHeartbeat(
-            HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
-        ASSERT_NO_ACTION(nextAction.getAction());
+        // to pass if the node reaches that check. We repeat this 5 times to satisfy that we have
+        // received at least 5N heartbeats before re-evaluating our sync source.
+        for (auto i = 0; i < 5; i++) {
+            HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+                HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+            ASSERT_NO_ACTION(nextAction.getAction());
+            nextAction = receiveUpHeartbeat(
+                HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+            ASSERT_NO_ACTION(nextAction.getAction());
+        }
     }
 
     const OpTime election = OpTime(Timestamp(1, 0), 0);
@@ -4459,6 +4462,47 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenHaveNotChangedTooManyTimesRecently) {
                                                                    lastOpTimeFetched,
                                                                    now(),
                                                                    ReadPreference::Nearest));
+}
+
+TEST_F(TopoCoordTest, DontChangeWhenNodeRequiresMorePings) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "term" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))
+                      << "protocolVersion" << 1),
+                 0);
+    // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
+    // should change sync sources due to ping time.
+    changeSyncSourceThresholdMillis.store(5LL);
+
+    auto election = OpTime(Timestamp(1, 0), 0);
+    auto syncSourceOpTime = OpTime(Timestamp(4, 0), 0);
+    // Set lastOpTimeFetched to be before the sync source's OpTime.
+    auto lastFetched = OpTime(Timestamp(3, 0), 0);
+
+    // Send fewer heartbeats than the required number to do a re-eval due to ping time.
+    for (auto i = 0; i < 3; i++) {
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+            HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveUpHeartbeat(
+            HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+        ASSERT_NO_ACTION(nextAction.getAction());
+    }
+
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), Milliseconds(10));
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), Milliseconds(1));
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                    MemberState::RS_SECONDARY,
+                                                                    lastFetched,
+                                                                    now(),
+                                                                    ReadPreference::Nearest));
 }
 
 class HeartbeatResponseReconfigTestV1 : public TopoCoordTest {

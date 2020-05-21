@@ -553,15 +553,15 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
     }
 
     // wait for 2N pings (not counting ourselves) before choosing a sync target
-    int needMorePings = (_memberData.size() - 1) * 2 - pingsInConfig;
+    int numPingsNeeded = (_memberData.size() - 1) * 2 - pingsInConfig;
 
-    if (needMorePings > 0) {
+    if (numPingsNeeded > 0) {
         static Occasionally sampler;
         if (sampler.tick()) {
             LOGV2(21783,
                   "waiting for {pingsNeeded} pings from other members before syncing",
                   "Waiting for pings from other members before syncing",
-                  "pingsNeeded"_attr = needMorePings);
+                  "pingsNeeded"_attr = numPingsNeeded);
         }
         return HostAndPort();
     }
@@ -3072,6 +3072,14 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     if (changeSyncSourceThreshold == 0LL) {
         return false;
     }
+
+    // If we have not yet received 5N pings (not counting ourselves), do not re-evaluate our sync
+    // source.
+    int numPingsNeeded = (_memberData.size() - 1) * 5 - pingsInConfig;
+    if (numPingsNeeded > 0) {
+        return false;
+    }
+
 
     if (_pings.count(currentSource) == 0) {
         // Ping data for our current sync source could not be found.
