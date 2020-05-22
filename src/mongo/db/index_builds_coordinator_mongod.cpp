@@ -540,7 +540,8 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     // or abort. This way, we can make sure majority of nodes will never stop voting and wait for
     // commit or abort signal until they have received commit or abort signal.
     while (needToVote()) {
-        // check for any interrupts before starting the voting process.
+        // Check for any interrupts, including shutdown-related ones, before starting the voting
+        // process.
         opCtx->checkForInterrupt();
 
         // Don't hammer the network.
@@ -569,11 +570,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
             voteCmdResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
                 opCtx, "admin", voteCmdRequest, onRemoteCmdScheduled, onRemoteCmdComplete);
         } catch (DBException& ex) {
-            if (ex.isA<ErrorCategory::ShutdownError>()) {
-                throw;
-            }
-
-            // All other errors including CallbackCanceled and network errors should be retried.
+            // All errors, including CallbackCanceled and network errors, should be retried.
             // If ErrorCodes::CallbackCanceled is due to shutdown, then checkForInterrupt() at the
             // beginning of this loop will catch it and throw an error to the caller. Or, if we
             // received the CallbackCanceled error because the index build was signaled with abort
