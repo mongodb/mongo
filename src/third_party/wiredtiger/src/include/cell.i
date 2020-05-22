@@ -10,18 +10,21 @@
  * __cell_check_value_validity --
  *     Check the value's validity window for sanity.
  */
-static inline void
-__cell_check_value_validity(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
+static inline int
+__cell_check_value_validity(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool expected_error)
 {
 #ifdef HAVE_DIAGNOSTIC
     WT_DECL_RET;
 
     if ((ret = __wt_time_value_validate(session, tw, NULL, false)) != 0)
-        WT_IGNORE_RET(__wt_panic(session, ret, "value timestamp window failed validation"));
+        return (expected_error ? WT_ERROR : __wt_panic(session, ret,
+                                              "value timestamp window failed validation"));
 #else
     WT_UNUSED(session);
     WT_UNUSED(tw);
+    WT_UNUSED(expected_error);
 #endif
+    return (0);
 }
 
 /*
@@ -40,7 +43,7 @@ __cell_pack_value_validity(
         return;
     }
 
-    __cell_check_value_validity(session, tw);
+    WT_IGNORE_RET(__cell_check_value_validity(session, tw, false));
 
     **pp |= WT_CELL_SECOND_DESC;
     ++*pp;
@@ -98,18 +101,21 @@ __cell_pack_value_validity(
  * __wt_check_addr_validity --
  *     Check the address' validity window for sanity.
  */
-static inline void
-__wt_check_addr_validity(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta)
+static inline int
+__wt_check_addr_validity(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, bool expected_error)
 {
 #ifdef HAVE_DIAGNOSTIC
     WT_DECL_RET;
 
     if ((ret = __wt_time_aggregate_validate(session, ta, NULL, false)) != 0)
-        WT_IGNORE_RET(__wt_panic(session, ret, "illegal address timestamp window"));
+        return (expected_error ? WT_ERROR : __wt_panic(session, ret,
+                                              "address timestamp window failed validation"));
 #else
     WT_UNUSED(session);
     WT_UNUSED(ta);
+    WT_UNUSED(expected_error);
 #endif
+    return (0);
 }
 
 /*
@@ -127,7 +133,7 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, WT_TIME_AGGREG
         return;
     }
 
-    __wt_check_addr_validity(session, ta);
+    WT_IGNORE_RET(__wt_check_addr_validity(session, ta, false));
 
     **pp |= WT_CELL_SECOND_DESC;
     ++*pp;
@@ -762,13 +768,9 @@ copy_cell_restart:
     case WT_CELL_ADDR_INT:
     case WT_CELL_ADDR_LEAF:
     case WT_CELL_ADDR_LEAF_NO:
-        /*
-         * Skip if we know we're not unpacking a cell of this type. This is all inlined code, and
-         * ideally checking allows the compiler to discard big chunks of it.
-         */
-        WT_ASSERT(session, unpack_value == NULL);
-        if (unpack_value != NULL)
-            break;
+        /* Return an error if we're not unpacking a cell of this type. */
+        if (unpack_addr == NULL)
+            return (WT_ERROR);
 
         if ((cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0)
             break;
@@ -803,20 +805,16 @@ copy_cell_restart:
               &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ta->newest_stop_durable_ts));
             ta->newest_stop_durable_ts += ta->newest_stop_ts;
         }
-        __wt_check_addr_validity(session, ta);
+        WT_RET(__wt_check_addr_validity(session, ta, end != NULL));
         break;
     case WT_CELL_DEL:
     case WT_CELL_VALUE:
     case WT_CELL_VALUE_COPY:
     case WT_CELL_VALUE_OVFL:
     case WT_CELL_VALUE_OVFL_RM:
-        /*
-         * Skip if we know we're not unpacking a cell of this type. This is all inlined code, and
-         * ideally checking allows the compiler to discard big chunks of it.
-         */
-        WT_ASSERT(session, unpack_addr == NULL);
-        if (unpack_addr != NULL)
-            break;
+        /* Return an error if we're not unpacking a cell of this type. */
+        if (unpack_value == NULL)
+            return (WT_ERROR);
 
         if ((cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0)
             break;
@@ -852,7 +850,7 @@ copy_cell_restart:
         else
             tw->durable_stop_ts = WT_TS_NONE;
 
-        __cell_check_value_validity(session, tw);
+        WT_RET(__cell_check_value_validity(session, tw, end != NULL));
         break;
     }
 
@@ -869,13 +867,9 @@ copy_cell_restart:
      */
     switch (unpack->raw) {
     case WT_CELL_VALUE_COPY:
-        /*
-         * Skip if we know we're not unpacking a cell of this type. This is all inlined code, and
-         * ideally checking allows the compiler to discard big chunks of it.
-         */
-        WT_ASSERT(session, unpack_addr == NULL);
-        if (unpack_addr != NULL)
-            break;
+        /* Return an error if we're not unpacking a cell of this type. */
+        if (unpack_value == NULL)
+            return (WT_ERROR);
 
         copy_cell = true;
 
