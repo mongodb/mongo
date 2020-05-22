@@ -23,10 +23,14 @@ var $config = (function() {
             // Create two indexes to force plan caching: The {a: 1} index is
             // cached by the query planner because we query on a single value
             // of 'a' and a range of 'b' values.
-            assertAlways.commandWorkedOrFailedWithCode(coll.ensureIndex({a: 1}),
-                                                       [ErrorCodes.IndexBuildAborted]);
-            assertAlways.commandWorkedOrFailedWithCode(coll.ensureIndex({b: 1}),
-                                                       [ErrorCodes.IndexBuildAborted]);
+            assertAlways.commandWorkedOrFailedWithCode(coll.createIndex({a: 1}), [
+                ErrorCodes.IndexBuildAborted,
+                ErrorCodes.NoMatchingDocument,
+            ]);
+            assertAlways.commandWorkedOrFailedWithCode(coll.createIndex({b: 1}), [
+                ErrorCodes.IndexBuildAborted,
+                ErrorCodes.NoMatchingDocument,
+            ]);
         } catch (ex) {
             assert.eq(true, ex instanceof BulkWriteError, tojson(ex));
             assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending, tojson(ex));
