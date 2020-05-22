@@ -61,14 +61,18 @@ var $config = (function() {
             // Recreate the index that was dropped. (See populateIndexes() for why we ignore the
             // CannotImplicitlyCreateCollection error.)
             let res = db[this.collName].createIndex(indexSpec);
-            assertWorkedOrFailedHandleTxnErrors(
-                res,
-                [
-                    ErrorCodes.CannotImplicitlyCreateCollection,
-                    ErrorCodes.IndexBuildAborted,
-                    ErrorCodes.IndexBuildAlreadyInProgress
-                ],
-                [ErrorCodes.CannotImplicitlyCreateCollection, ErrorCodes.IndexBuildAborted]);
+            assertWorkedOrFailedHandleTxnErrors(res,
+                                                [
+                                                    ErrorCodes.CannotImplicitlyCreateCollection,
+                                                    ErrorCodes.IndexBuildAborted,
+                                                    ErrorCodes.IndexBuildAlreadyInProgress,
+                                                    ErrorCodes.NoMatchingDocument,
+                                                ],
+                                                [
+                                                    ErrorCodes.CannotImplicitlyCreateCollection,
+                                                    ErrorCodes.IndexBuildAborted,
+                                                    ErrorCodes.NoMatchingDocument,
+                                                ]);
         }
     };
 
@@ -89,9 +93,13 @@ var $config = (function() {
             assertWorkedOrFailedHandleTxnErrors(coll.createIndex(indexSpec),
                                                 [
                                                     ErrorCodes.CannotImplicitlyCreateCollection,
-                                                    ErrorCodes.IndexBuildAlreadyInProgress
+                                                    ErrorCodes.IndexBuildAlreadyInProgress,
+                                                    ErrorCodes.NoMatchingDocument,
                                                 ],
-                                                ErrorCodes.CannotImplicitlyCreateCollection);
+                                                [
+                                                    ErrorCodes.CannotImplicitlyCreateCollection,
+                                                    ErrorCodes.NoMatchingDocument,
+                                                ]);
         });
     }
 
