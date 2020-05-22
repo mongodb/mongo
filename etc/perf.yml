@@ -95,7 +95,6 @@ functions:
           set -e
           set -o verbose
           mkdir -p ./dbdata
-          chmod 600 jstests/libs/authTestsKey
           ${mongod_exec_wrapper} ./bin/mongod --dbpath ./dbdata ${mongod_flags} --logpath "${workdir}/mongod.log"
     - command: shell.exec
       params:
@@ -653,7 +652,6 @@ buildvariants:
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: >-
       --auth
-      --keyFile jstests/libs/authTestsKey
       --fork
       --inMemoryEngineConfigString 'eviction=(threads_min=1),'
       --inMemorySizeGB 60
