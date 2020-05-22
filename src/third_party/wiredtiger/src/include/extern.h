@@ -1877,6 +1877,8 @@ static inline int __wt_cell_pack_value_match(WT_CELL *page_cell, WT_CELL *val_ce
 static inline int __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk,
   WT_CELL *cell, WT_CELL_UNPACK_ADDR *unpack_addr, WT_CELL_UNPACK_KV *unpack_value, const void *end)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline int __wt_check_addr_validity(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta,
+  bool expected_error) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
   WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT **new_insp, size_t new_ins_size,
   uint64_t *recnop, u_int skipdepth, bool exclusive)
@@ -2150,7 +2152,6 @@ static inline void __wt_cell_unpack_addr(WT_SESSION_IMPL *session, const WT_PAGE
   WT_CELL *cell, WT_CELL_UNPACK_ADDR *unpack_addr);
 static inline void __wt_cell_unpack_kv(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk,
   WT_CELL *cell, WT_CELL_UNPACK_KV *unpack_value);
-static inline void __wt_check_addr_validity(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta);
 static inline void __wt_cond_wait(
   WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool (*run_func)(WT_SESSION_IMPL *));
 static inline void __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session);

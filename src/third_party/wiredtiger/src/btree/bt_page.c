@@ -532,8 +532,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK_KV unpack;
+    WT_DECL_ITEM(value);
     WT_DECL_RET;
-    WT_ITEM buf;
     WT_ROW *rip;
     WT_UPDATE *tombstone, **upd_array, *upd;
     size_t size, total_size;
@@ -543,7 +543,6 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
     btree = S2BT(session);
     tombstone = upd = NULL;
     prepare = false;
-    WT_CLEAR(buf);
 
     instantiate_prepared = F_ISSET(session, WT_SESSION_INSTANTIATE_PREPARE);
 
@@ -610,9 +609,11 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
             __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
             if (unpack.tw.prepare) {
                 /* Take the value from the original page cell. */
-                WT_RET(__wt_page_cell_data_ref(session, page, &unpack, &buf));
+                if (value == NULL)
+                    WT_ERR(__wt_scr_alloc(session, 0, &value));
+                WT_ERR(__wt_page_cell_data_ref(session, page, &unpack, value));
 
-                WT_RET(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, &size));
+                WT_ERR(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, &size));
                 upd->durable_ts = unpack.tw.durable_start_ts;
                 upd->start_ts = unpack.tw.start_ts;
                 upd->txnid = unpack.tw.start_txn;
@@ -638,6 +639,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
                 }
 
                 upd_array[WT_ROW_SLOT(page, rip)] = tombstone;
+                tombstone = upd = NULL;
                 total_size += size;
             }
         }
@@ -645,10 +647,10 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
         __wt_cache_page_inmem_incr(session, page, total_size);
     }
 
-    if (0) {
 err:
-        __wt_free(session, upd);
-    }
+    __wt_free(session, tombstone);
+    __wt_free(session, upd);
+    __wt_scr_free(session, &value);
 
     return (ret);
 }
