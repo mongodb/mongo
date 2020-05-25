@@ -830,7 +830,7 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
           " isolation");
 
     /* Read timestamps can't change once set. */
-    if (F_ISSET(txn, WT_TXN_HAS_TS_READ))
+    if (F_ISSET(txn, WT_TXN_SHARED_TS_READ))
         WT_RET_MSG(session, EINVAL,
           "a read_timestamp"
           " may only be set once per transaction");
@@ -1152,7 +1152,7 @@ __wt_txn_publish_read_timestamp(WT_SESSION_IMPL *session)
     ++txn_global->read_timestampq_len;
     WT_STAT_CONN_INCR(session, txn_read_queue_inserts);
     txn_shared->clear_read_q = false;
-    F_SET(txn, WT_TXN_HAS_TS_READ | WT_TXN_SHARED_TS_READ);
+    F_SET(txn, WT_TXN_SHARED_TS_READ);
     __wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
 }
 

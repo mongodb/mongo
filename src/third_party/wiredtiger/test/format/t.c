@@ -279,7 +279,7 @@ main(int argc, char *argv[])
         if (g.reopen)
             wts_reopen(); /* Reopen existing database. */
         else {
-            wts_open(g.home, true, &g.wts_conn);
+            wts_open(g.home, true, &g.wts_conn, true);
             wts_init();
             TIMED_MAJOR_OP(wts_load()); /* Load and verify initial records */
             TIMED_MAJOR_OP(wts_verify("post-bulk verify"));
