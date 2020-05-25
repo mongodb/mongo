@@ -428,7 +428,7 @@ __wt_txn_ts_log(WT_SESSION_IMPL *session)
         durable = txn->durable_timestamp;
     if (F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
         prepare = txn->prepare_timestamp;
-    if (F_ISSET(txn, WT_TXN_HAS_TS_READ))
+    if (F_ISSET(txn, WT_TXN_SHARED_TS_READ))
         read = txn_shared->read_timestamp;
 
     __wt_epoch(session, &t);

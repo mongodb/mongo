@@ -45,7 +45,7 @@ check_copy(void)
     path = dmalloc(len);
     testutil_check(__wt_snprintf(path, len, "%s/BACKUP", g.home));
 
-    wts_open(path, false, &conn);
+    wts_open(path, false, &conn, true);
 
     testutil_checkfmt(conn->open_session(conn, NULL, NULL, &session), "%s", path);
 

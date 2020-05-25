@@ -176,7 +176,7 @@ static WT_EVENT_HANDLER event_handler = {
  *     Open a connection to a WiredTiger database.
  */
 void
-wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
+wts_open(const char *home, bool set_api, WT_CONNECTION **connp, bool allow_verify)
 {
     WT_CONNECTION *conn;
     size_t max;
@@ -282,8 +282,10 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     CONFIG_APPEND(p, "]");
 
 #if WIREDTIGER_VERSION_MAJOR >= 10
-    if (g.c_verify)
+    if (g.c_verify && allow_verify)
         CONFIG_APPEND(p, ",verify_metadata=true");
+    else if (!allow_verify)
+        CONFIG_APPEND(p, ",verify_metadata=false");
 #endif
 
     /* Extensions. */

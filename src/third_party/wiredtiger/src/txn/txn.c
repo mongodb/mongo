@@ -889,14 +889,15 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      * Aborted updates can exist in the update chain of our transaction. Generally this will occur
      * due to a reserved update. As such we should skip over these updates.
      */
-    for (; upd->txnid == WT_TXN_ABORTED; upd = upd->next)
+    for (; upd != NULL && upd->txnid == WT_TXN_ABORTED; upd = upd->next)
         ;
 
     /*
      * The head of the update chain is not a prepared update, which means all the prepared updates
-     * of the key are resolved.
+     * of the key are resolved. The head of the update chain can also be null in the scenario that
+     * we rolled back all associated updates in the previous iteration of this function.
      */
-    if (upd->prepare_state != WT_PREPARE_INPROGRESS)
+    if (upd == NULL || upd->prepare_state != WT_PREPARE_INPROGRESS)
         return (0);
 
     /*

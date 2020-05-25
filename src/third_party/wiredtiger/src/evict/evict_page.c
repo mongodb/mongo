@@ -200,7 +200,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
 
     /*
      * Track the largest page size seen at eviction, it tells us something about our ability to
-     * force pages out before they're larger than the cache.
+     * force pages out before they're larger than the cache. We don't care about races, it's just a
+     * statistic.
      */
     if (page->memory_footprint > conn->cache->evict_max_page_size)
         conn->cache->evict_max_page_size = page->memory_footprint;

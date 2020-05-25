@@ -144,6 +144,30 @@ struct __wt_reconcile {
     size_t min_space_avail; /* Remaining space in this chunk to put a minimum size boundary */
 
     /*
+     * Counters tracking how much time information is included in reconciliation for each page that
+     * is written to disk. The number of entries on a page is limited to a 32 bit number so these
+     * counters can be too.
+     */
+    uint32_t count_durable_start_ts;
+    uint32_t count_start_ts;
+    uint32_t count_start_txn;
+    uint32_t count_durable_stop_ts;
+    uint32_t count_stop_ts;
+    uint32_t count_stop_txn;
+    uint32_t count_prepare;
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_REC_TIME_NEWEST_START_DURABLE_TS 0x01u
+#define WT_REC_TIME_NEWEST_STOP_DURABLE_TS 0x02u
+#define WT_REC_TIME_NEWEST_STOP_TS 0x04u
+#define WT_REC_TIME_NEWEST_STOP_TXN 0x08u
+#define WT_REC_TIME_OLDEST_START_TS 0x10u
+#define WT_REC_TIME_OLDEST_START_TXN 0x20u
+#define WT_REC_TIME_PREPARE 0x40u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint16_t ts_usage_flags;
+
+    /*
      * Saved update list, supporting WT_REC_HS configurations. While reviewing updates for each
      * page, we save WT_UPDATE lists here, and then move them to per-block areas as the blocks are
      * defined.

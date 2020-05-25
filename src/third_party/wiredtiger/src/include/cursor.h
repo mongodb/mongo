@@ -502,4 +502,7 @@ struct __wt_cursor_table {
 
 #define WT_CURSOR_RECNO(cursor) WT_STREQ((cursor)->key_format, "r")
 
+#define WT_CURSOR_IS_DUMP(cursor) \
+    F_ISSET(cursor, (WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_DUMP_JSON))
+
 #define WT_CURSOR_RAW_OK (WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW)

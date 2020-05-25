@@ -1021,7 +1021,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
          * visibility checks when reading in order to construct the modify chain, so we can create
          * the value we expect.
          */
-        F_SET(session, WT_SESSION_RESOLVING_MODIFY);
+        F_SET(session, WT_SESSION_HS_IGNORE_VISIBILITY);
         while (upd_type == WT_UPDATE_MODIFY) {
             WT_ERR(__wt_upd_alloc(session, hs_value, upd_type, &mod_upd, NULL));
             WT_ERR(__wt_modify_vector_push(&modifies, mod_upd));
@@ -1064,7 +1064,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
               &upd_type_full, hs_value));
             upd_type = (uint8_t)upd_type_full;
         }
-        F_CLR(session, WT_SESSION_RESOLVING_MODIFY);
+        F_CLR(session, WT_SESSION_HS_IGNORE_VISIBILITY);
         WT_ASSERT(session, upd_type == WT_UPDATE_STANDARD);
         while (modifies.size > 0) {
             __wt_modify_vector_pop(&modifies, &mod_upd);
@@ -1088,7 +1088,7 @@ skip_buf:
 
 done:
 err:
-    F_CLR(session, WT_SESSION_RESOLVING_MODIFY);
+    F_CLR(session, WT_SESSION_HS_IGNORE_VISIBILITY);
 
     if (orig_hs_value_buf != NULL)
         __wt_scr_free(session, &orig_hs_value_buf);
@@ -1207,14 +1207,16 @@ __wt_hs_delete_key_from_ts(
 
     /*
      * In order to delete a key range, we need to be able to inspect all history store records
-     * regardless of their stop time points.
+     * regardless of their stop time points and the visibility of their values.
      */
     F_SET(session->hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+    F_SET(session, WT_SESSION_HS_IGNORE_VISIBILITY);
 
     /* The tree structure can change while we try to insert the mod list, retry if that happens. */
     while ((ret = __hs_delete_key_from_ts_int(session, btree_id, key, ts)) == WT_RESTART)
         ;
 
+    F_CLR(session, WT_SESSION_HS_IGNORE_VISIBILITY);
     F_CLR(session->hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
 
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));

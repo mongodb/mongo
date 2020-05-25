@@ -715,7 +715,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp
         return (true);
 
     /* Timestamp check. */
-    if (!F_ISSET(txn, WT_TXN_HAS_TS_READ) || timestamp == WT_TS_NONE)
+    if (!F_ISSET(txn, WT_TXN_SHARED_TS_READ) || timestamp == WT_TS_NONE)
         return (true);
 
     return (timestamp <= txn_shared->read_timestamp);
@@ -737,7 +737,7 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
         if (prepare_state == WT_PREPARE_LOCKED)
             continue;
 
-        if (F_ISSET(session, WT_SESSION_RESOLVING_MODIFY) && upd->txnid != WT_TXN_ABORTED &&
+        if (F_ISSET(session, WT_SESSION_HS_IGNORE_VISIBILITY) && upd->txnid != WT_TXN_ABORTED &&
           upd->type == WT_UPDATE_STANDARD) {
             /* If we are resolving a modify then the btree must be the history store. */
             WT_ASSERT(session, WT_IS_HS(S2BT(session)));
@@ -955,7 +955,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
     if (__wt_txn_tw_stop_visible(session, &tw) &&
       ((!F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&
          (!WT_IS_HS(S2BT(session)) || !F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))) ||
-          __wt_txn_tw_stop_visible_all(session, &tw))) {
+          (__wt_txn_tw_stop_visible_all(session, &tw) && !WT_CURSOR_IS_DUMP(&cbt->iface)))) {
         cbt->upd_value->buf.data = NULL;
         cbt->upd_value->buf.size = 0;
         cbt->upd_value->tw.durable_stop_ts = tw.durable_stop_ts;
@@ -975,11 +975,12 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
     }
 
     /* If the start time point is visible then we need to return the ondisk value. */
-    if (F_ISSET(session, WT_SESSION_RESOLVING_MODIFY) || __wt_txn_tw_start_visible(session, &tw)) {
+    if (F_ISSET(session, WT_SESSION_HS_IGNORE_VISIBILITY) ||
+      __wt_txn_tw_start_visible(session, &tw)) {
         /* If we are resolving a modify then the btree must be the history store. */
         WT_ASSERT(
-          session, (F_ISSET(session, WT_SESSION_RESOLVING_MODIFY) && WT_IS_HS(S2BT(session))) ||
-            !F_ISSET(session, WT_SESSION_RESOLVING_MODIFY));
+          session, (F_ISSET(session, WT_SESSION_HS_IGNORE_VISIBILITY) && WT_IS_HS(S2BT(session))) ||
+            !F_ISSET(session, WT_SESSION_HS_IGNORE_VISIBILITY));
 
         if (cbt->upd_value->skip_buf) {
             cbt->upd_value->buf.data = NULL;

@@ -205,8 +205,11 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     val = &r->v;
     WT_RET(__rec_cell_build_leaf_key(session, r, /* Build key cell */
       cursor->key.data, cursor->key.size, &ovfl_key));
-    WT_RET(__wt_rec_cell_build_val(session, r, cursor->value.data, /* Build value cell */
-      cursor->value.size, &tw, 0));
+    if (cursor->value.size == 0)
+        val->len = 0;
+    else
+        WT_RET(__wt_rec_cell_build_val(session, r, cursor->value.data, /* Build value cell */
+          cursor->value.size, &tw, 0));
 
     /* Boundary: split or write the page. */
     if (WT_CROSSING_SPLIT_BND(r, key->len + val->len)) {
@@ -582,8 +585,11 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
               session, r, cbt->iface.value.data, cbt->iface.value.size, &tw, 0));
             break;
         case WT_UPDATE_STANDARD:
-            /* Take the value from the update. */
-            WT_RET(__wt_rec_cell_build_val(session, r, upd->data, upd->size, &tw, 0));
+            if (upd->size == 0 && WT_TIME_WINDOW_IS_EMPTY(&tw))
+                val->len = 0;
+            else
+                /* Take the value from the update. */
+                WT_RET(__wt_rec_cell_build_val(session, r, upd->data, upd->size, &tw, 0));
             break;
         case WT_UPDATE_TOMBSTONE:
             continue;

@@ -397,7 +397,7 @@ void wts_create(void);
 void wts_dump(const char *, bool);
 void wts_init(void);
 void wts_load(void);
-void wts_open(const char *, bool, WT_CONNECTION **);
+void wts_open(const char *, bool, WT_CONNECTION **, bool);
 void wts_read_scan(void);
 void wts_rebalance(void);
 void wts_reopen(void);
