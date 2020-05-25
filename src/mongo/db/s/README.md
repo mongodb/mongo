@@ -759,6 +759,101 @@ to disk and [updates](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/
 
 ## Transactions
 
+Cross-shard transactions provide ACID guarantees for multi-statement operations that involve documents on
+multiple shards in a cluster. Similar to [transactions on a single replica set](https://github.com/mongodb/mongo/blob/r4.4.0-rc7/src/mongo/db/repl/README.md#transactions), cross-shard transactions are only supported in logical
+sessions. They have a configurable lifetime limit, and are automatically aborted when they are expired
+or when the session is killed.
+
+To run a cross-shard transaction, a client sends all statements, including the `commitTransaction` and
+`abortTransaction` command, to a single mongos with common `lsid` and `txnNumber` attached. The first
+statement is sent with `startTransaction: true` to indicate the start of a transaction. Once a transaction
+is started, it remains active until it is explicitly committed or aborted by the client, or unilaterally
+aborted by a participant shard, or overwritten by a transaction with a higher `txnNumber`.
+
+When a mongos executes a transaction, it is responsible for keeping track of all participant shards, and
+choosing a coordinator shard and a recovery shard for the transaction. In addition, if the transaction
+uses read concern `"snapshot"`, the mongos is also responsible for choosing a global read timestamp (i.e.
+`atClusterTime`) at the start of the transaction. The mongos will, by design, always choose the first participant
+shard as the coordinator shard, and the first shard that the transaction writes to as the recovery shard.
+Similarly, the global read timestamp will always be the logical clock time on the mongos when it receives
+the first statement for the transaction. If a participant shard cannot provide a snapshot at the chosen
+read timestamp, it will throw a snapshot error, which will trigger a client level retry of the transaction.
+The mongos will only keep this information in memory as it relies on the participant shards to persist their
+respective transaction states in their local `config.transactions` collection.
+
+The execution of a statement inside a cross-shard transaction works very similarly to that of a statement
+outside a transaction. One difference is that mongos attaches the transaction information (e.g. `lsid`,
+`txnNumber` and `coordinator`) in every statement it forwards to targeted shards. Additionally, the first
+statement to a participant shard is sent with `startTransaction: true` and `readConcern`, which contains
+the `atClusterTime` if the transaction uses read concern `"snapshot"`. When a participant shard receives
+a transaction statement with `coordinator: true` for the first time, it will infer that it has been chosen
+as the transaction coordinator and will set up in-memory state immediately to prepare for coordinating
+transaction commit. One other difference is that the response from each participant shard includes an
+additional `readOnly` flag which is set to true if the statement does not do a write on the shard. Mongos
+uses this to determine how a transaction should be committed or aborted, and to choose the recovery shard
+as described above. The id of the recovery shard is included in the `recoveryToken` in the response to
+the client.
+
+### Committing a Transaction
+
+The commit procedure begins when a client sends a `commitTransaction` command to the mongos that the
+transaction runs on. The command is retryable as long as no new transaction has been started on the session
+and the session is still alive. The number of participant shards and the number of write shards determine
+the commit path for the transaction.
+
+* If the number of participant shards is zero, the mongos skips the commit and returns immediately.
+* If the number of participant shards is one, the mongos forwards `commitTransaction` directly to that shard.
+* If the number of pariticipant shards is greater than one:
+   * If the number of write shards is zero, the mongos forwards `commitTransaction` to each shard individually.
+   * Otherwise, the mongos sends `coordinateCommitTransaction` with the participant list to the coordinator shard to
+   initiate two-phase commit.
+
+To recover the commit decision after the original mongos has become unreachable, the client can send `commitTransaction`
+along with the `recoveryToken` to a different mongos. This will not initiate committing the transaction, instead
+the mongos will send `coordinateCommitTransaction` with an empty participant list to the recovery shard to try to
+join the progress of the existing coordinator if any, and to retrieve the commit outcome for the transaction.
+
+#### Two-phase Commit Protocol
+
+The two-phase commit protocol consists of the prepare phase and the commit phase. To support recovery from
+failovers, a coordinator keeps a document inside the `config.transaction_coordinators` collection that contains
+information about the transaction it is trying commit. This document is deleted when the commit procedure finishes.
+
+Below are the steps in the two-phase commit protocol.
+
+* Prepare Phase
+  1. The coordinator writes the participant list to the `config.transaction_coordinators` document for the
+transaction, and waits for it to be majority committed.
+  1. The coordinator sends [`prepareTransaction`](https://github.com/mongodb/mongo/blob/r4.4.0-rc7/src/mongo/db/repl/README.md#lifetime-of-a-prepared-transaction) to the participants, and waits for vote reponses. Each participant
+shard responds with a vote, marks the transaction as prepared, and updates the `config.transactions`
+document for the transaction.
+  1. The coordinator writes the decision to the `config.transaction_coordinators` document and waits for it to
+be majority committed. If the `coordinateCommitTransactionReturnImmediatelyAfterPersistingDecision` server parameter is
+true  (default), the  `coordinateCommitTransaction` command returns immediately after waiting for client's write concern
+(i.e. let the remaining work continue in the background).
+
+* Commit Phase
+  1. If the decision is 'commit', the coordinator sends `commitTransaction` to the participant shards, and waits
+for responses. If the decision is 'abort', it sends `abortTransaction` instead. Each participant shard marks
+the transaction as committed or aborted, and updates the `config.transactions` document.
+  1. The coordinator deletes the coordinator document with write concern `{w: 1}`.
+
+The prepare phase is skipped if the coordinator already has the participant list and the commit decision persisted.
+This can be the case if the coordinator was created as part of step-up recovery.
+
+### Aborting a Transaction
+
+Mongos will implicitly abort a transaction on any error except the view resolution error from a participant shard
+if a two phase commit has not been initiated. To explicitly abort a transaction, a client must send an `abortTransaction`
+command to the mongos that the transaction runs on. The command is also retryable as long as no new transaction has
+been started on the session and the session is still alive. In both cases, the mongos simply sends `abortTransaction`
+to all participant shards.
+
+#### Code references
+* [**TransactioRouter class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/transaction_router.h)
+* [**TransactioCoordinatorService class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/transaction_coordinator_service.h)
+* [**TransactioCoordinator class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/transaction_coordinator.h)
+
 ---
 
 # Node startup and shutdown
