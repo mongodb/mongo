@@ -136,15 +136,10 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
 
     // Should the modifiers validate their embedded docs via storage_validation::storageValid()?
     // Only user updates should be checked. Any system or replication stuff should pass through.
-    // Config db docs also do not get checked.
     const auto request = _params.request;
-    _enforceOkForStorage = !(request->isFromOplogApplication() || request->isFromMigration());
 
-    // We should only check for an update to the shard key if the update is coming from a user and
-    // the request is versioned.
-    _shouldCheckForShardKeyUpdate =
-        !(request->isFromOplogApplication() || request->isFromMigration()) &&
-        OperationShardingState::isOperationVersioned(expCtx->opCtx);
+    _isUserInitiatedWrite = opCtx()->writesAreReplicated() &&
+        !(request->isFromOplogApplication() || request->isFromMigration());
 
     _specificStats.isModUpdate = params.driver->type() == UpdateDriver::UpdateType::kOperator;
 }
@@ -173,14 +168,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     bool docWasModified = false;
 
     Status status = Status::OK();
-    // A user-initiated write is one which is not caused by oplog application and
-    // is not part of a chunk migration. The resulting document should be validated for storage.
-    // It is safe to access the CollectionShardingState in this write context and
-    // to throw SSV if the sharding metadata has not been initialized.
-    const bool isUserInitiatedWrite = opCtx()->writesAreReplicated() && _enforceOkForStorage;
     const bool isInsert = false;
     FieldRefSet immutablePaths;
-    if (isUserInitiatedWrite) {
+
+    if (_isUserInitiatedWrite) {
+        // Documents coming directly from users should be validated for storage. It is safe to
+        // access the CollectionShardingState in this write context and to throw SSV if the sharding
+        // metadata has not been initialized.
         const auto collDesc = CollectionShardingState::get(opCtx(), collection()->ns())
                                   ->getCollectionDescription(opCtx());
         if (collDesc.isSharded() && !OperationShardingState::isOperationVersioned(opCtx())) {
@@ -192,7 +186,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         // If we don't need match details, avoid doing the rematch
         status = driver->update(StringData(),
                                 &_doc,
-                                isUserInitiatedWrite,
+                                _isUserInitiatedWrite,
                                 immutablePaths,
                                 isInsert,
                                 &logObj,
@@ -211,7 +205,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
         status = driver->update(matchedField,
                                 &_doc,
-                                isUserInitiatedWrite,
+                                _isUserInitiatedWrite,
                                 immutablePaths,
                                 isInsert,
                                 &logObj,
@@ -253,7 +247,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (!request->explain()) {
             args.stmtId = request->getStmtId();
             args.update = logObj;
-            if (isUserInitiatedWrite) {
+            if (_isUserInitiatedWrite) {
                 args.criteria = CollectionShardingState::get(opCtx(), collection()->ns())
                                     ->getCollectionDescription(opCtx())
                                     .extractDocumentKey(newObj);
@@ -278,7 +272,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
-                if (_shouldCheckForShardKeyUpdate && checkUpdateChangesShardKeyFields(oldObj) &&
+                if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(oldObj) &&
                     !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
                 }
@@ -303,7 +297,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     newObj.objsize() <= BSONObjMaxUserSize);
 
             if (!request->explain()) {
-                if (_shouldCheckForShardKeyUpdate && checkUpdateChangesShardKeyFields(oldObj) &&
+                if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(oldObj) &&
                     !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
                 }
