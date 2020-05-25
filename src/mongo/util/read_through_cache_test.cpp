@@ -37,6 +37,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/read_through_cache.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -305,6 +306,13 @@ TEST_F(ReadThroughCacheAsyncTest, SuccessfulInProgressLookupForNotCausallyConsis
         return Cache::LookupResult(CachedValue(500));
     });
 
+    // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
+    // are completed before the cache resources are released.
+    ON_BLOCK_EXIT([&] {
+        threadPool.shutdown();
+        threadPool.join();
+    });
+
     Cache::InProgressLookup inProgress(cache, "TestKey");
     auto future = inProgress.addWaiter(WithLock::withoutLock(), CacheNotCausallyConsistent());
     ASSERT(!future.isReady());
@@ -333,6 +341,13 @@ TEST_F(ReadThroughCacheAsyncTest, FailedInProgressLookupForNotCausallyConsistent
                     uasserted(ErrorCodes::InternalError, "Test error");
                 });
 
+    // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
+    // are completed before the cache resources are released.
+    ON_BLOCK_EXIT([&] {
+        threadPool.shutdown();
+        threadPool.join();
+    });
+
     Cache::InProgressLookup inProgress(cache, "TestKey");
     auto future = inProgress.addWaiter(WithLock::withoutLock(), CacheNotCausallyConsistent());
     ASSERT(!future.isReady());
@@ -358,6 +373,13 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireObservesOperationContextDeadline) {
         lookupStartedBarrier.countDownAndWait();
         completeLookupBarrier.countDownAndWait();
         return Cache::LookupResult(CachedValue(5));
+    });
+
+    // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
+    // are completed before the cache resources are released.
+    ON_BLOCK_EXIT([&] {
+        threadPool.shutdown();
+        threadPool.join();
     });
 
     {
@@ -409,6 +431,13 @@ TEST_F(ReadThroughCacheAsyncTest, InvalidateReissuesLookup) {
         lookupStartedBarriers[idx].countDownAndWait();
         completeLookupBarriers[idx].countDownAndWait();
         return Cache::LookupResult(CachedValue(idx));
+    });
+
+    // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
+    // are completed before the cache resources are released.
+    ON_BLOCK_EXIT([&] {
+        threadPool.shutdown();
+        threadPool.join();
     });
 
     // Kick off the first lookup, which will block
