@@ -58,6 +58,10 @@ Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       ChunkVersion shardVersionReceived) noexcept;
 
+void onShardVersionMismatch(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            boost::optional<ChunkVersion> shardVersionReceived);
+
 /**
  * Unconditionally causes the shard's filtering metadata to be refreshed from the config server and
  * returns the resulting shard version (which might not have changed), or throws.

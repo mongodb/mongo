@@ -138,7 +138,7 @@ public:
                             "Forcing remote routing table refresh for {namespace}",
                             "Forcing remote routing table refresh",
                             "namespace"_attr = ns());
-                forceShardFilteringMetadataRefresh(opCtx, ns());
+                onShardVersionMismatch(opCtx, ns(), boost::none);
             }
 
             CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, ns());

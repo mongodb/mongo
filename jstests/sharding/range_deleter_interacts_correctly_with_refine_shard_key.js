@@ -186,7 +186,7 @@ function test(st, description, testBody) {
                  configureFailPoint(st.rs0.getPrimary(), "hangBeforeMakingCommitDecisionDurable");
              const parallelMoveChunk = startParallelShell(
                  funWithArgs(function(ns, shardKeyValueInChunk, toShardName) {
-                     assert.commandFailedWithCode(
+                     assert.commandWorkedOrFailedWithCode(
                          db.adminCommand(
                              {moveChunk: ns, find: shardKeyValueInChunk, to: toShardName}),
                          ErrorCodes.InterruptedDueToReplStateChange);
@@ -200,16 +200,14 @@ function test(st, description, testBody) {
              // before it can load the latest metadata.
              jsTestLog("Stepping up a new primary");
              const newPrimary = st.rs0.getSecondary();
-             let hangInMigrationRecoveryFailpoint =
-                 configureFailPoint(newPrimary, "hangBeforeFilteringMetadataRefresh");
              st.rs0.stepUp(newPrimary);
              st.rs0.waitForState(newPrimary, ReplSetTest.State.PRIMARY);
 
-             jsTestLog("Waiting for the new primary to hang in migration recovery");
-             hangInMigrationRecoveryFailpoint.wait();
-
              // Clean up the failpoint on the old primary.
              hangBeforeWritingDecisionFailpoint.off();
+
+             // join the moveChunk command in the parallel shell
+             parallelMoveChunk();
 
              // Wait for relevant nodes to detect the new primary, which may take some time using
              // the RSM protocols other than streamable.
@@ -223,12 +221,10 @@ function test(st, description, testBody) {
              assert.commandWorked(
                  st.s.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1, z: 1}}));
 
-             // Allow the recovery to continue by disabling the failpoint and verify that despite
-             // the recovered migration having fewer fields in its bounds than in the current shard
-             // key, the decision should be recovered successfully and orphans should be removed
-             // from the donor.
+             // Verify that despite the recovered migration has fewer fields in its bounds than in
+             // the current shard key, the decision should be recovered successfully and orphans
+             // should be removed from the donor.
              jsTestLog("Waiting for orphans to be removed from shard 0");
-             hangInMigrationRecoveryFailpoint.off();
              assert.soon(() => {
                  return st.rs0.getPrimary().getCollection(ns).find().itcount() == 0;
              });
@@ -288,9 +284,13 @@ function test(st, description, testBody) {
                  return st.rs0.getPrimary().getCollection(ns).find().itcount() == 0;
              });
 
-             // Wait for the donor to learn about the new primary on the recipient.
-             awaitRSClientHosts(
-                 st.rs1.getPrimary(), st.rs0.getPrimary(), {ok: true, ismaster: true});
+             jsTestLog("Waiting for relevant nodes to see new rs0 primary");
+             // Wait for relevant nodes to detect the new primary, which may take some time using
+             // the RSM protocols other than streamable.
+             let newPrimary = st.rs0.getPrimary();
+             awaitRSClientHosts(st.s, newPrimary, {ok: true, ismaster: true});
+             awaitRSClientHosts(st.rs1.getPrimary(), newPrimary, {ok: true, ismaster: true});
+             awaitRSClientHosts(st.configRS.getPrimary(), newPrimary, {ok: true, ismaster: true});
 
              // We should be able to move the chunk back to shard 0 now that orphans are gone.
              assert.commandWorked(st.s.adminCommand({

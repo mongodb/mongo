@@ -221,5 +221,11 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
  */
 void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
 
+/**
+ * Drive each unfished migration coordination in the given namespace to completion.
+ * Assumes the caller to have entered CollectionCriticalSection.
+ */
+void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss);
+
 }  // namespace migrationutil
 }  // namespace mongo

@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -54,6 +55,35 @@ MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
 
 namespace {
+void onDbVersionMismatch(OperationContext* opCtx,
+                         const StringData dbName,
+                         const DatabaseVersion& clientDbVersion,
+                         const boost::optional<DatabaseVersion>& serverDbVersion) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->getClient()->isInDirectClient());
+
+    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+
+    if (serverDbVersion && serverDbVersion->getUuid() == clientDbVersion.getUuid() &&
+        serverDbVersion->getLastMod() >= clientDbVersion.getLastMod()) {
+        // The client was stale; do not trigger server-side refresh.
+        return;
+    }
+
+    // Ensure any ongoing movePrimary's have completed before trying to do the refresh. This wait is
+    // just an optimization so that mongos does not exhaust its maximum number of
+    // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
+    OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
+
+    if (MONGO_unlikely(skipDatabaseVersionMetadataRefresh.shouldFail())) {
+        return;
+    }
+
+    forceDatabaseRefresh(opCtx, dbName);
+}
+
+}  // namespace
+
 void onShardVersionMismatch(OperationContext* opCtx,
                             const NamespaceString& nss,
                             boost::optional<ChunkVersion> shardVersionReceived) {
@@ -68,7 +98,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 "Metadata refresh requested for {namespace} at shard version "
                 "{shardVersionReceived}",
                 "Metadata refresh requested for collection",
-                "namespace"_attr = nss.ns(),
+                "namespace"_attr = nss,
                 "shardVersionReceived"_attr = shardVersionReceived);
 
     bool runRecover;
@@ -126,42 +156,16 @@ void onShardVersionMismatch(OperationContext* opCtx,
         }
     });
 
+
     if (runRecover) {
-        // TODO (SERVER-47985): Invoke recovery of the shardVersion after a (possible) failed
-        // migration
+        auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (replCoord->isReplEnabled() && !replCoord->getMemberState().secondary()) {
+            migrationutil::recoverMigrationCoordinations(opCtx, nss);
+        }
     }
 
     forceShardFilteringMetadataRefresh(opCtx, nss, !shardVersionReceived);
 }
-
-void onDbVersionMismatch(OperationContext* opCtx,
-                         const StringData dbName,
-                         const DatabaseVersion& clientDbVersion,
-                         const boost::optional<DatabaseVersion>& serverDbVersion) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-
-    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
-
-    if (serverDbVersion && serverDbVersion->getUuid() == clientDbVersion.getUuid() &&
-        serverDbVersion->getLastMod() >= clientDbVersion.getLastMod()) {
-        // The client was stale; do not trigger server-side refresh.
-        return;
-    }
-
-    // Ensure any ongoing movePrimary's have completed before trying to do the refresh. This wait is
-    // just an optimization so that mongos does not exhaust its maximum number of
-    // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
-    OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
-
-    if (MONGO_unlikely(skipDatabaseVersionMetadataRefresh.shouldFail())) {
-        return;
-    }
-
-    forceDatabaseRefresh(opCtx, dbName);
-}
-
-}  // namespace
 
 ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationContext* opCtx,
                                                                      NamespaceString nss)
@@ -193,8 +197,10 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
         critSecSignal->get(_opCtx);
     }
 
-    // TODO (SERVER-47985): Invoke recovery of the shardVersion after a (possible) failed migration
-
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->isReplEnabled() && !replCoord->getMemberState().secondary()) {
+        migrationutil::recoverMigrationCoordinations(_opCtx, _nss);
+    }
     forceShardFilteringMetadataRefresh(_opCtx, _nss, true);
 }
 
@@ -216,15 +222,6 @@ void ScopedShardVersionCriticalSection::enterCommitPhase() {
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
     csr->enterCriticalSectionCommitPhase(_opCtx, csrLock);
 }
-
-CatalogCacheLoader& getCatalogCacheLoaderForFiltering(ServiceContext* serviceContext) {
-    return CatalogCacheLoader::get(serviceContext);
-}
-
-CatalogCacheLoader& getCatalogCacheLoaderForFiltering(OperationContext* opCtx) {
-    return getCatalogCacheLoaderForFiltering(opCtx->getServiceContext());
-}
-
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
                                       const NamespaceString& nss,

@@ -218,6 +218,11 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
 void CollectionShardingRuntime::clearFilteringMetadata() {
     stdx::lock_guard lk(_metadataManagerLock);
     if (!isNamespaceAlwaysUnsharded(_nss)) {
+        LOGV2_DEBUG(47985030,
+                    1,
+                    "Clearing metadata for collection {namespace}",
+                    "Clearing collection metadata",
+                    "namespace"_attr = _nss);
         _metadataType = MetadataType::kUnknown;
         _metadataManager.reset();
     }
