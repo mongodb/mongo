@@ -46,7 +46,6 @@ namespace {
 
 auto findTeeTag(StringData teeName) {
     static constexpr std::pair<StringData, logv2::LogTag::Value> kTees[] = {
-        {"rs"_sd, logv2::LogTag::kRS},
         {"startupWarnings"_sd, logv2::LogTag::kStartupWarnings},
     };
     if (teeName.empty())
