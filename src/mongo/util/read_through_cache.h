@@ -242,18 +242,16 @@ public:
         if (auto cachedValue = _cache.get(key, causalConsistency))
             return {std::move(cachedValue)};
 
-        Time minTime = _cache.getTimeInStore(key);
-
         // Join an in-progress lookup if one has already been scheduled
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            return it->second->addWaiter(ul, minTime);
+            return it->second->addWaiter(ul);
 
         // Schedule an asynchronous lookup for the key
-        auto [it, emplaced] =
-            _inProgressLookups.emplace(key, std::make_unique<InProgressLookup>(*this, key));
+        auto [it, emplaced] = _inProgressLookups.emplace(
+            key, std::make_unique<InProgressLookup>(*this, key, _cache.getTimeInStore(key)));
         invariant(emplaced);
         auto& inProgressLookup = *it->second;
-        auto sharedFutureToReturn = inProgressLookup.addWaiter(ul, minTime);
+        auto sharedFutureToReturn = inProgressLookup.addWaiter(ul);
 
         ul.unlock();
 
@@ -296,6 +294,8 @@ public:
      */
     void advanceTimeInStore(const Key& key, const Time& newTime) {
         stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->advanceTimeInStore(lg, newTime);
         _cache.advanceTimeInStore(key, newTime);
     }
 
@@ -406,13 +406,26 @@ private:
             // signal (those which are waiting for time < time at the store).
             auto& result = sw.getValue();
             auto promisesToSet = inProgressLookup.getPromisesLessThanTime(ul, result.t);
-            return std::make_tuple(
-                std::move(promisesToSet),
-                StatusWith<ValueHandle>(result.v
-                                            ? ValueHandle(_cache.insertOrAssignAndGet(
-                                                  key, {std::move(*result.v), _now()}, result.t))
-                                            : ValueHandle()),
-                !inProgressLookup.empty(ul));
+
+            auto valueHandleToSet = [&] {
+                if (result.v) {
+                    ValueHandle valueHandle(
+                        _cache.insertOrAssignAndGet(key, {std::move(*result.v), _now()}, result.t));
+                    // In the case that 'key' was not present in the store up to this lookup's
+                    // completion, it is possible that concurrent callers advanced the time in store
+                    // further than what was returned by the lookup. Because of this, the time in
+                    // the cache must be synchronised with that of the InProgressLookup.
+                    _cache.advanceTimeInStore(key, inProgressLookup.minTimeInStore(ul));
+                    return valueHandle;
+                }
+
+                _cache.invalidate(key);
+                return ValueHandle();
+            }();
+
+            return std::make_tuple(std::move(promisesToSet),
+                                   StatusWith<ValueHandle>(std::move(valueHandleToSet)),
+                                   !inProgressLookup.empty(ul));
         }();
 
         if (!mustDoAnotherLoop)
@@ -485,7 +498,8 @@ private:
 template <typename Key, typename Value, typename Time>
 class ReadThroughCache<Key, Value, Time>::InProgressLookup {
 public:
-    InProgressLookup(ReadThroughCache& cache, Key key) : _cache(cache), _key(std::move(key)) {}
+    InProgressLookup(ReadThroughCache& cache, Key key, Time minTimeInStore)
+        : _cache(cache), _key(std::move(key)), _minTimeInStore(std::move(minTimeInStore)) {}
 
     Future<LookupResult> asyncLookupRound() {
         auto [promise, future] = makePromiseFuture<LookupResult>();
@@ -503,10 +517,14 @@ public:
         return std::move(future);
     }
 
-    SharedSemiFuture<ValueHandle> addWaiter(WithLock, Time time) {
-        auto [it, unusedEmplaced] =
-            _outstanding.try_emplace(time, std::make_unique<SharedPromise<ValueHandle>>());
+    SharedSemiFuture<ValueHandle> addWaiter(WithLock) {
+        auto [it, unusedEmplaced] = _outstanding.try_emplace(
+            _minTimeInStore, std::make_unique<SharedPromise<ValueHandle>>());
         return it->second->getFuture();
+    }
+
+    Time minTimeInStore(WithLock) const {
+        return _minTimeInStore;
     }
 
     bool valid(WithLock) const {
@@ -541,6 +559,11 @@ public:
         return _outstanding.empty();
     }
 
+    void advanceTimeInStore(WithLock, const Time& newTime) {
+        if (newTime > _minTimeInStore)
+            _minTimeInStore = newTime;
+    }
+
     void invalidateAndCancelCurrentLookupRound(WithLock) {
         _valid = false;
         if (_cancelToken)
@@ -556,6 +579,8 @@ private:
 
     bool _valid{false};
     boost::optional<CancelToken> _cancelToken;
+
+    Time _minTimeInStore;
 
     using TimeAndPromiseMap = std::map<Time, std::unique_ptr<SharedPromise<ValueHandle>>>;
     TimeAndPromiseMap _outstanding;

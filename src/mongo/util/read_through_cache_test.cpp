@@ -284,8 +284,8 @@ TEST_F(ReadThroughCacheAsyncTest, SuccessfulInProgressLookupForNotCausallyConsis
         threadPool.join();
     });
 
-    Cache::InProgressLookup inProgress(cache, "TestKey");
-    auto future = inProgress.addWaiter(WithLock::withoutLock(), CacheNotCausallyConsistent());
+    Cache::InProgressLookup inProgress(cache, "TestKey", CacheNotCausallyConsistent());
+    auto future = inProgress.addWaiter(WithLock::withoutLock());
     ASSERT(!future.isReady());
 
     auto res = inProgress.asyncLookupRound().get();
@@ -319,8 +319,8 @@ TEST_F(ReadThroughCacheAsyncTest, FailedInProgressLookupForNotCausallyConsistent
         threadPool.join();
     });
 
-    Cache::InProgressLookup inProgress(cache, "TestKey");
-    auto future = inProgress.addWaiter(WithLock::withoutLock(), CacheNotCausallyConsistent());
+    Cache::InProgressLookup inProgress(cache, "TestKey", CacheNotCausallyConsistent());
+    auto future = inProgress.addWaiter(WithLock::withoutLock());
     ASSERT(!future.isReady());
 
     auto asyncLookupResult = inProgress.asyncLookupRound().getNoThrow();
@@ -477,6 +477,62 @@ public:
 private:
     Task _mostRecentTask;
 };
+
+TEST_F(ReadThroughCacheAsyncTest, AdvanceTimeDuringLookupOfUnCachedKey) {
+    MockThreadPool threadPool;
+    boost::optional<CausallyConsistentCache::LookupResult> nextToReturn;
+    CausallyConsistentCache cache(
+        getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
+            return std::move(*nextToReturn);
+        });
+
+    auto futureAtTS100 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
+    ASSERT(!futureAtTS100.isReady());
+
+    cache.advanceTimeInStore("TestKey", Timestamp(200));
+    auto futureAtTS200 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
+    ASSERT(!futureAtTS200.isReady());
+
+    nextToReturn.emplace(CachedValue(100), Timestamp(100));
+    threadPool.runMostRecentTask();
+    ASSERT_EQ(100, futureAtTS100.get()->counter);
+    ASSERT(!futureAtTS100.get().isValid());
+    ASSERT(!futureAtTS200.isReady());
+
+    nextToReturn.emplace(CachedValue(200), Timestamp(200));
+    threadPool.runMostRecentTask();
+    ASSERT_EQ(200, futureAtTS200.get()->counter);
+    ASSERT(futureAtTS200.get().isValid());
+}
+
+TEST_F(ReadThroughCacheAsyncTest, KeyDeletedAfterAdvanceTimeInStore) {
+    MockThreadPool threadPool;
+    boost::optional<CausallyConsistentCache::LookupResult> nextToReturn;
+    CausallyConsistentCache cache(
+        getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
+            return std::move(*nextToReturn);
+        });
+
+    auto futureAtTS100 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
+    nextToReturn.emplace(CachedValue(100), Timestamp(100));
+    threadPool.runMostRecentTask();
+    ASSERT_EQ(100, futureAtTS100.get()->counter);
+    ASSERT(futureAtTS100.get().isValid());
+
+    cache.advanceTimeInStore("TestKey", Timestamp(200));
+    auto futureAtTS200 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
+
+    nextToReturn.emplace(boost::none, Timestamp(200));
+    threadPool.runMostRecentTask();
+    ASSERT(!futureAtTS100.get().isValid());
+    ASSERT(!futureAtTS200.get());
+
+    auto futureAtTS300 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestCached);
+
+    nextToReturn.emplace(boost::none, Timestamp(300));
+    threadPool.runMostRecentTask();
+    ASSERT(!futureAtTS300.get());
+}
 
 TEST_F(ReadThroughCacheAsyncTest, AcquireAsyncAndAdvanceTimeInterleave) {
     MockThreadPool threadPool;
