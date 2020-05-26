@@ -42,7 +42,7 @@ const impls = {
         const command = (typeof (testObj.command) === "function")
             ? testObj.command(state, testCase.commandArgs)
             : testObj.command;
-        command['comment'] = "comment";
+        command['comment'] = {comment: true};
         const res = runOnDb.runCommand(command);
         assert(res.ok == 1 || testCase.expectFail || res.code == ErrorCodes.CommandNotSupported,
                tojson(res));
