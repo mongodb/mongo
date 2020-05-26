@@ -38,6 +38,7 @@ from SCons.Action import _string_from_cmd_list, get_default_ENV
 from SCons.Util import is_List, flatten_sequence
 from SCons.Script import COMMAND_LINE_TARGETS
 
+NINJA_STATE = None
 NINJA_SYNTAX = "NINJA_SYNTAX"
 NINJA_RULES = "__NINJA_CUSTOM_RULES"
 NINJA_POOLS = "__NINJA_CUSTOM_POOLS"
@@ -62,6 +63,24 @@ def _install_action_function(_env, node):
         "rule": "INSTALL",
         "inputs": [get_path(src_file(s)) for s in node.sources],
         "implicit": get_dependencies(node),
+    }
+
+
+def _mkdir_action_function(env, node):
+    return {
+        "outputs": get_outputs(node),
+        "rule": "CMD",
+        # implicit explicitly omitted, we translate these so they can be
+        # used by anything that depends on these but commonly this is
+        # hit with a node that will depend on all of the fake
+        # srcnode's that SCons will never give us a rule for leading
+        # to an invalid ninja file.
+        "variables": {
+            # On Windows mkdir "-p" is always on
+            "cmd": "{mkdir} $out".format(
+                mkdir="mkdir" if env["PLATFORM"] == "win32" else "mkdir -p",
+            ),
+        },
     }
 
 
@@ -95,7 +114,13 @@ def is_valid_dependent_node(node):
     check because some nodes (like src files) won't have builders but
     are valid implicit dependencies.
     """
-    return not isinstance(node, SCons.Node.Alias.Alias) or node.children()
+    if isinstance(node, SCons.Node.Alias.Alias):
+        return node.children()
+
+    if not node.env:
+        return True
+
+    return not node.env.get("NINJA_SKIP")
 
 
 def alias_to_ninja_build(node):
@@ -104,7 +129,7 @@ def alias_to_ninja_build(node):
         "outputs": get_outputs(node),
         "rule": "phony",
         "implicit": [
-            get_path(n) for n in node.children() if is_valid_dependent_node(n)
+            get_path(src_file(n)) for n in node.children() if is_valid_dependent_node(n)
         ],
     }
 
@@ -116,8 +141,14 @@ def get_order_only(node):
     return [get_path(src_file(prereq)) for prereq in node.prerequisites]
 
 
-def get_dependencies(node):
+def get_dependencies(node, skip_sources=False):
     """Return a list of dependencies for node."""
+    if skip_sources:
+        return [
+            get_path(src_file(child))
+            for child in node.children()
+            if child not in node.sources
+        ]
     return [get_path(src_file(child)) for child in node.children()]
 
 
@@ -145,6 +176,7 @@ def get_outputs(node):
             outputs = [node]
 
     outputs = [get_path(o) for o in outputs]
+
     return outputs
 
 
@@ -162,19 +194,27 @@ class SConsToNinjaTranslator:
             "SharedFlagChecker": ninja_noop,
             # The install builder is implemented as a function action.
             "installFunc": _install_action_function,
+            "MkdirFunc": _mkdir_action_function,
             "LibSymlinksActionFunction": _lib_symlink_action_function,
         }
 
-        self.func_handlers.update(self.env[NINJA_CUSTOM_HANDLERS])
+        self.loaded_custom = False
 
     # pylint: disable=too-many-return-statements
     def action_to_ninja_build(self, node, action=None):
         """Generate build arguments dictionary for node."""
+        if not self.loaded_custom:
+            self.func_handlers.update(self.env[NINJA_CUSTOM_HANDLERS])
+            self.loaded_custom = True
+
         if node.builder is None:
             return None
 
         if action is None:
             action = node.builder.action
+
+        if node.env and node.env.get("NINJA_SKIP"):
+            return None
 
         build = {}
 
@@ -199,19 +239,23 @@ class SConsToNinjaTranslator:
 
         if build is not None:
             build["order_only"] = get_order_only(node)
-        return build
 
+        return build
 
     def handle_func_action(self, node, action):
         """Determine how to handle the function action."""
         name = action.function_name()
         # This is the name given by the Subst/Textfile builders. So return the
-        # node to indicate that SCons is required
+        # node to indicate that SCons is required. We skip sources here because
+        # dependencies don't really matter when we're going to shove these to
+        # the bottom of ninja's DAG anyway and Textfile builders can have text
+        # content as their source which doesn't work as an implicit dep in
+        # ninja.
         if name == "_action":
             return {
                 "rule": "TEMPLATE",
                 "outputs": get_outputs(node),
-                "implicit": get_dependencies(node),
+                "implicit": get_dependencies(node, skip_sources=True),
             }
 
         handler = self.func_handlers.get(name, None)
@@ -320,7 +364,7 @@ class NinjaState:
         self.generated_suffixes = env.get("NINJA_GENERATED_SOURCE_SUFFIXES", [])
 
         # List of generated builds that will be written at a later stage
-        self.builds = list()
+        self.builds = dict()
 
         # List of targets for which we have generated a build. This
         # allows us to take multiple Alias nodes as sources and to not
@@ -468,50 +512,25 @@ class NinjaState:
                 self.rules[rule]["deps"] = "gcc"
                 self.rules[rule]["depfile"] = "$out.d"
 
-        self.rules.update(env.get(NINJA_RULES, {}))
-        self.pools.update(env.get(NINJA_POOLS, {}))
+    def add_build(self, node):
+        if not node.has_builder():
+            return False
 
-    def generate_builds(self, node):
-        """Generate a ninja build rule for node and it's children."""
-        # Filter out nodes with no builder. They are likely source files
-        # and so no work needs to be done, it will be used in the
-        # generation for some real target.
-        #
-        # Note that all nodes have a builder attribute but it is sometimes
-        # set to None. So we cannot use a simpler hasattr check here.
-        if getattr(node, "builder", None) is None:
-            return
+        if isinstance(node, SCons.Node.Alias.Alias):
+            build = alias_to_ninja_build(node)
+        else:
+            build = self.translator.action_to_ninja_build(node)
 
-        stack = [[node]]
-        while stack:
-            frame = stack.pop()
-            for child in frame:
-                outputs = set(get_outputs(child))
-                # Check if all the outputs are in self.built, if they
-                # are we've already seen this node and it's children.
-                if not outputs.isdisjoint(self.built):
-                    continue
+        # Some things are unbuild-able or need not be built in Ninja
+        if build is None:
+            return False
 
-                self.built = self.built.union(outputs)
-                stack.append(child.children())
-                if child.prerequisites is not None:
-                    stack.append(child.prerequisites)
-
-                if isinstance(child, SCons.Node.Alias.Alias):
-                    build = alias_to_ninja_build(child)
-                elif node.builder is not None:
-                    # Use False since None is a valid value for this attribute
-                    build = getattr(child.attributes, NINJA_BUILD, False)
-                    if build is False:
-                        build = self.translator.action_to_ninja_build(child)
-                else:
-                    build = None
-
-                # Some things are unbuild-able or need not be built in Ninja
-                if build is None or build == 0:
-                    continue
-
-                self.builds.append(build)
+        node_string = str(node)
+        if node_string in self.builds:
+            raise Exception("Node {} added to ninja build state more than once".format(node_string))
+        self.builds[node_string] = build
+        self.built.update(build["outputs"])
+        return True
 
     def is_generated_source(self, output):
         """Check if output ends with a known generated suffix."""
@@ -528,7 +547,7 @@ class NinjaState:
         return False
 
     # pylint: disable=too-many-branches,too-many-locals
-    def generate(self, ninja_file, fallback_default_target=None):
+    def generate(self, ninja_file):
         """
         Generate the build.ninja.
 
@@ -536,6 +555,9 @@ class NinjaState:
         """
         if self.__generated:
             return
+
+        self.rules.update(self.env.get(NINJA_RULES, {}))
+        self.pools.update(self.env.get(NINJA_POOLS, {}))
 
         content = io.StringIO()
         ninja = self.writer_class(content, width=100)
@@ -551,10 +573,10 @@ class NinjaState:
         for rule, kwargs in self.rules.items():
             ninja.rule(rule, **kwargs)
 
-        generated_source_files = {
+        generated_source_files = sorted({
             output
             # First find builds which have header files in their outputs.
-            for build in self.builds
+            for build in self.builds.values()
             if self.has_generated_sources(build["outputs"])
             for output in build["outputs"]
             # Collect only the header files from the builds with them
@@ -563,25 +585,24 @@ class NinjaState:
             # here we need to filter so we only have the headers and
             # not the other outputs.
             if self.is_generated_source(output)
-        }
+        })
 
         if generated_source_files:
             ninja.build(
                 outputs="_generated_sources",
                 rule="phony",
-                implicit=list(generated_source_files),
+                implicit=generated_source_files
             )
 
         template_builders = []
 
-        for build in self.builds:
+        for build in [self.builds[key] for key in sorted(self.builds.keys())]:
             if build["rule"] == "TEMPLATE":
                 template_builders.append(build)
                 continue
 
-            implicit = build.get("implicit", [])
-            implicit.append(ninja_file)
-            build["implicit"] = implicit
+            if "implicit" in build:
+                build["implicit"].sort()
 
             # Don't make generated sources depend on each other. We
             # have to check that none of the outputs are generated
@@ -592,7 +613,7 @@ class NinjaState:
                 generated_source_files
                 and not build["rule"] == "INSTALL"
                 and set(build["outputs"]).isdisjoint(generated_source_files)
-                and set(implicit).isdisjoint(generated_source_files)
+                and set(build.get("implicit", [])).isdisjoint(generated_source_files)
             ):
 
                 # Make all non-generated source targets depend on
@@ -604,6 +625,8 @@ class NinjaState:
                 order_only = build.get("order_only", [])
                 order_only.append("_generated_sources")
                 build["order_only"] = order_only
+            if "order_only" in build:
+                build["order_only"].sort()
 
             # When using a depfile Ninja can only have a single output
             # but SCons will usually have emitted an output for every
@@ -627,6 +650,16 @@ class NinjaState:
             # use for the "real" builder and multiple phony targets that
             # match the file names of the remaining outputs. This way any
             # build can depend on any output from any build.
+            #
+            # We assume that the first listed output is the 'key'
+            # output and is stably presented to us by SCons. For
+            # instance if -gsplit-dwarf is in play and we are
+            # producing foo.o and foo.dwo, we expect that outputs[0]
+            # from SCons will be the foo.o file and not the dwo
+            # file. If instead we just sorted the whole outputs array,
+            # we would find that the dwo file becomes the
+            # first_output, and this breaks, for instance, header
+            # dependency scanning.
             if rule is not None and (rule.get("deps") or rule.get("rspfile")):
                 first_output, remaining_outputs = (
                     build["outputs"][0],
@@ -635,10 +668,13 @@ class NinjaState:
 
                 if remaining_outputs:
                     ninja.build(
-                        outputs=remaining_outputs, rule="phony", implicit=first_output,
+                        outputs=sorted(remaining_outputs), rule="phony", implicit=first_output,
                     )
 
                 build["outputs"] = first_output
+
+            if "inputs" in build:
+                build["inputs"].sort()
 
             ninja.build(**build)
 
@@ -677,20 +713,13 @@ class NinjaState:
         # jstests/SConscript and being specific to the MongoDB
         # repository layout.
         ninja.build(
-            ninja_file,
+            self.env.File(ninja_file).path,
             rule="REGENERATE",
             implicit=[
-                self.env.File("#SConstruct").get_abspath(),
-                os.path.abspath(__file__),
+                self.env.File("#SConstruct").path,
+                __file__,
             ]
-            + glob("src/**/SConscript", recursive=True),
-        )
-
-        ninja.build(
-            "scons-invocation",
-            rule="CMD",
-            pool="console",
-            variables={"cmd": "echo $SCONS_INVOCATION_W_TARGETS"},
+            + sorted(glob("src/**/SConscript", recursive=True)),
         )
 
         # If we ever change the name/s of the rules that include
@@ -700,6 +729,7 @@ class NinjaState:
             "compile_commands.json",
             rule="CMD",
             pool="console",
+            implicit=[ninja_file],
             variables={
                 "cmd": "ninja -f {} -t compdb CC CXX > compile_commands.json".format(
                     ninja_file
@@ -724,11 +754,6 @@ class NinjaState:
         # those as ninja's default as well.
         if scons_default_targets:
             ninja.default(" ".join(scons_default_targets))
-
-        # If not then set the default to the fallback_default_target we were given.
-        # Otherwise we won't create a default ninja target.
-        elif fallback_default_target is not None:
-            ninja.default(fallback_default_target)
 
         with open(ninja_file, "w") as build_ninja:
             build_ninja.write(content.getvalue())
@@ -996,30 +1021,8 @@ def ninja_builder(env, target, source):
     # here.
     print("Generating:", str(target[0]))
 
-    # The environment variable NINJA_SYNTAX points to the
-    # ninja_syntax.py module from the ninja sources found here:
-    # https://github.com/ninja-build/ninja/blob/master/misc/ninja_syntax.py
-    #
-    # This should be vendored into the build sources and it's location
-    # set in NINJA_SYNTAX. This code block loads the location from
-    # that variable, gets the absolute path to the vendored file, gets
-    # it's parent directory then uses importlib to import the module
-    # dynamically.
-    ninja_syntax_file = env[NINJA_SYNTAX]
-    if isinstance(ninja_syntax_file, str):
-        ninja_syntax_file = env.File(ninja_syntax_file).get_abspath()
-    ninja_syntax_mod_dir = os.path.dirname(ninja_syntax_file)
-    sys.path.append(ninja_syntax_mod_dir)
-    ninja_syntax_mod_name = os.path.basename(ninja_syntax_file)
-    ninja_syntax = importlib.import_module(ninja_syntax_mod_name.replace(".py", ""))
-
     generated_build_ninja = target[0].get_abspath()
-    ninja_state = NinjaState(env, ninja_syntax.Writer)
-
-    for src in source:
-        ninja_state.generate_builds(src)
-
-    ninja_state.generate(generated_build_ninja, str(source[0]))
+    NINJA_STATE.generate(generated_build_ninja)
 
     return 0
 
@@ -1031,25 +1034,6 @@ class AlwaysExecAction(SCons.Action.FunctionAction):
     def __call__(self, *args, **kwargs):
         kwargs["execute"] = 1
         return super().__call__(*args, **kwargs)
-
-
-def ninja_print(_cmd, target, _source, env):
-    """Tag targets with the commands to build them."""
-    if target:
-        for tgt in target:
-            if (
-                tgt.has_builder()
-                # Use 'is False' because not would still trigger on
-                # None's which we don't want to regenerate
-                and getattr(tgt.attributes, NINJA_BUILD, False) is False
-                and isinstance(tgt.builder.action, COMMAND_TYPES)
-            ):
-                ninja_action = get_command(env, tgt, tgt.builder.action)
-                setattr(tgt.attributes, NINJA_BUILD, ninja_action)
-                # Preload the attributes dependencies while we're still running
-                # multithreaded
-                get_dependencies(tgt)
-    return 0
 
 
 def register_custom_handler(env, name, handler):
@@ -1214,6 +1198,15 @@ def generate(env):
     ninja_builder_obj = SCons.Builder.Builder(action=always_exec_ninja_action)
     env.Append(BUILDERS={"Ninja": ninja_builder_obj})
 
+    env["NINJA_PREFIX"] = env.get("NINJA_PREFIX", "build")
+    env["NINJA_SUFFIX"] = env.get("NINJA_SUFFIX", "ninja")
+    env["NINJA_ALIAS_NAME"] = env.get("NINJA_ALIAS_NAME", "generate-ninja")
+
+    ninja_file_name = env.subst("${NINJA_PREFIX}.${NINJA_SUFFIX}")
+    ninja_file = env.Ninja(target=ninja_file_name, source=[])
+    env.AlwaysBuild(ninja_file)
+    env.Alias("$NINJA_ALIAS_NAME", ninja_file)
+
     # This adds the required flags such that the generated compile
     # commands will create depfiles as appropriate in the Ninja file.
     if env["PLATFORM"] == "win32":
@@ -1257,8 +1250,12 @@ def generate(env):
         from SCons.Tool.mslink import compositeLinkAction
 
         if env["LINKCOM"] == compositeLinkAction:
-            env["LINKCOM"] = '${TEMPFILE("$LINK $LINKFLAGS /OUT:$TARGET.windows $_LIBDIRFLAGS $_LIBFLAGS $_PDB $SOURCES.windows", "$LINKCOMSTR")}'
-            env["SHLINKCOM"] = '${TEMPFILE("$SHLINK $SHLINKFLAGS $_SHLINK_TARGETS $_LIBDIRFLAGS $_LIBFLAGS $_PDB $_SHLINK_SOURCES", "$SHLINKCOMSTR")}'
+            env[
+                "LINKCOM"
+            ] = '${TEMPFILE("$LINK $LINKFLAGS /OUT:$TARGET.windows $_LIBDIRFLAGS $_LIBFLAGS $_PDB $SOURCES.windows", "$LINKCOMSTR")}'
+            env[
+                "SHLINKCOM"
+            ] = '${TEMPFILE("$SHLINK $SHLINKFLAGS $_SHLINK_TARGETS $_LIBDIRFLAGS $_LIBFLAGS $_PDB $_SHLINK_SOURCES", "$SHLINKCOMSTR")}'
 
     # Normally in SCons actions for the Program and *Library builders
     # will return "${*COM}" as their pre-subst'd command line. However
@@ -1327,7 +1324,9 @@ def generate(env):
     SCons.Node.FS.File.prepare = ninja_noop
     SCons.Node.FS.File.push_to_cache = ninja_noop
     SCons.Executor.Executor.prepare = ninja_noop
+    SCons.Taskmaster.Task.prepare = ninja_noop
     SCons.Node.FS.File.built = ninja_noop
+    SCons.Node.Node.visited = ninja_noop
 
     # We make lstat a no-op because it is only used for SONAME
     # symlinks which we're not producing.
@@ -1359,20 +1358,18 @@ def generate(env):
     SCons.Node.FS.Dir.get_csig = ninja_csig(SCons.Node.FS.Dir.get_csig)
     SCons.Node.Alias.Alias.get_csig = ninja_csig(SCons.Node.Alias.Alias.get_csig)
 
-    # Replace false Compiling* messages with a more accurate output
-    #
-    # We also use this to tag all Nodes with Builders using
-    # CommandActions with the final command that was used to compile
-    # it for passing to Ninja. If we don't inject this behavior at
-    # this stage in the build too much state is lost to generate the
-    # command at the actual ninja_builder execution time for most
-    # commands.
-    #
-    # We do attempt command generation again in ninja_builder if it
-    # hasn't been tagged and it seems to work for anything that
-    # doesn't represent as a non-FunctionAction during the print_func
-    # call.
-    env["PRINT_CMD_LINE_FUNC"] = ninja_print
+    # Ignore CHANGED_SOURCES and CHANGED_TARGETS. We don't want those
+    # to have effect in a generation pass because the generator
+    # shouldn't generate differently depending on the current local
+    # state. Without this, when generating on Windows, if you already
+    # had a foo.obj, you would omit foo.cpp from the response file. Do the same for UNCHANGED.
+    SCons.Executor.Executor._get_changed_sources = SCons.Executor.Executor._get_sources
+    SCons.Executor.Executor._get_changed_targets = SCons.Executor.Executor._get_targets
+    SCons.Executor.Executor._get_unchanged_sources = SCons.Executor.Executor._get_sources
+    SCons.Executor.Executor._get_unchanged_targets = SCons.Executor.Executor._get_targets
+
+    # Replace false action messages with nothing.
+    env["PRINT_CMD_LINE_FUNC"] = ninja_noop
 
     # This reduces unnecessary subst_list calls to add the compiler to
     # the implicit dependencies of targets. Since we encode full paths
@@ -1380,11 +1377,6 @@ def generate(env):
     # as executing the command will fail if the file is not found
     # where we expect it.
     env["IMPLICIT_COMMAND_DEPENDENCIES"] = False
-
-    # Set build to no_exec, our sublcass of FunctionAction will force
-    # an execution for ninja_builder so this simply effects all other
-    # Builders.
-    env.SetOption("no_exec", True)
 
     # This makes SCons more aggressively cache MD5 signatures in the
     # SConsign file.
@@ -1394,6 +1386,80 @@ def generate(env):
     # than the Parallel job class for generating Ninja files. So we
     # monkey the Jobs constructor to only use the Serial Job class.
     SCons.Job.Jobs.__init__ = ninja_always_serial
+
+    # The environment variable NINJA_SYNTAX points to the
+    # ninja_syntax.py module from the ninja sources found here:
+    # https://github.com/ninja-build/ninja/blob/master/misc/ninja_syntax.py
+    #
+    # This should be vendored into the build sources and it's location
+    # set in NINJA_SYNTAX. This code block loads the location from
+    # that variable, gets the absolute path to the vendored file, gets
+    # it's parent directory then uses importlib to import the module
+    # dynamically.
+    ninja_syntax_file = env[NINJA_SYNTAX]
+    if isinstance(ninja_syntax_file, str):
+        ninja_syntax_file = env.File(ninja_syntax_file).get_abspath()
+    ninja_syntax_mod_dir = os.path.dirname(ninja_syntax_file)
+    sys.path.append(ninja_syntax_mod_dir)
+    ninja_syntax_mod_name = os.path.basename(ninja_syntax_file)
+    ninja_syntax = importlib.import_module(ninja_syntax_mod_name.replace(".py", ""))
+
+    global NINJA_STATE
+    NINJA_STATE = NinjaState(env, ninja_syntax.Writer)
+
+    # Here we will force every builder to use an emitter which makes the ninja
+    # file depend on it's target. This forces the ninja file to the bottom of
+    # the DAG which is required so that we walk every target, and therefore add
+    # it to the global NINJA_STATE, before we try to write the ninja file.
+    def ninja_file_depends_on_all(target, source, env):
+        if not any("conftest" in str(t) for t in target):
+            env.Depends(ninja_file, target)
+        return target, source
+
+    # The "Alias Builder" isn't in the BUILDERS map so we have to
+    # modify it directly.
+    SCons.Environment.AliasBuilder.emitter = ninja_file_depends_on_all
+
+    for _, builder in env["BUILDERS"].items():
+        try:
+            emitter = builder.emitter
+            if emitter is not None:
+                builder.emitter = SCons.Builder.ListEmitter(
+                    [emitter, ninja_file_depends_on_all]
+                )
+            else:
+                builder.emitter = ninja_file_depends_on_all
+        # Users can inject whatever they want into the BUILDERS
+        # dictionary so if the thing doesn't have an emitter we'll
+        # just ignore it.
+        except AttributeError:
+            pass
+
+    # Here we monkey patch the Task.execute method to not do a bunch of
+    # unnecessary work. If a build is a regular builder (i.e not a conftest and
+    # not our own Ninja builder) then we add it to the NINJA_STATE. Otherwise we
+    # build it like normal. This skips all of the caching work that this method
+    # would normally do since we aren't pulling any of these targets from the
+    # cache.
+    #
+    # In the future we may be able to use this to actually cache the build.ninja
+    # file once we have the upstream support for referencing SConscripts as File
+    # nodes.
+    def ninja_execute(self):
+        global NINJA_STATE
+
+        target = self.targets[0]
+        target_name = str(target)
+        if target_name != ninja_file_name and "conftest" not in target_name:
+            NINJA_STATE.add_build(target)
+        else:
+            target.build()
+
+    SCons.Taskmaster.Task.execute = ninja_execute
+
+    # Make needs_execute always return true instead of determining out of
+    # date-ness.
+    SCons.Script.Main.BuildTask.needs_execute = lambda x: True
 
     # We will eventually need to overwrite TempFileMunge to make it
     # handle persistent tempfiles or get an upstreamed change to add
@@ -1409,11 +1475,3 @@ def generate(env):
         env.Execute(SCons.Defaults.Mkdir(os.environ["TMPDIR"]))
 
     env["TEMPFILE"] = NinjaNoResponseFiles
-
-    # Force the SConsign to be written, we benefit from SCons caching of
-    # implicit dependencies and conftests. Unfortunately, we have to do this
-    # using an atexit handler because SCons will not write the file when in a
-    # no_exec build.
-    import atexit
-
-    atexit.register(SCons.SConsign.write)
