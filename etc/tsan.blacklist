@@ -1,0 +1,4 @@
+# WT is known to use a non-standard thread model that is incompatible with TSAN
+# and causes false positives.
+src:src/third_party/wiredtiger/*
+
