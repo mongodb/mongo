@@ -273,24 +273,6 @@ void execCommandClient(OperationContext* opCtx,
             return;
         }
 
-        auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
-            !TransactionRouter::get(opCtx) && !readConcernArgs.getArgsAtClusterTime()) {
-            // Select the latest known clusterTime as the atClusterTime for snapshot reads outside
-            // of transactions.
-            auto atClusterTime = [&] {
-                auto latestKnownClusterTime = LogicalClock::get(opCtx)->getClusterTime();
-                // If the user passed afterClusterTime, the chosen time must be greater than or
-                // equal to it.
-                auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
-                if (afterClusterTime && *afterClusterTime > latestKnownClusterTime) {
-                    return afterClusterTime->asTimestamp();
-                }
-                return latestKnownClusterTime.asTimestamp();
-            }();
-            readConcernArgs.setArgsAtClusterTimeForSnapshot(atClusterTime);
-        }
-
         // attach tracking
         rpc::TrackingMetadata trackingMetadata;
         trackingMetadata.initWithOperName(c->getName());
@@ -675,6 +657,24 @@ void runCommand(OperationContext* opCtx,
                 invocation = command->parse(opCtx, request);
                 invariant(invocation->ns().toString() == ns,
                           "unexpected change of namespace when retrying");
+            }
+
+            // On each try, select the latest known clusterTime as the atClusterTime for snapshot
+            // reads outside of transactions.
+            if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
+                !TransactionRouter::get(opCtx) &&
+                (!readConcernArgs.getArgsAtClusterTime() ||
+                 readConcernArgs.wasAtClusterTimeSelected())) {
+                auto atClusterTime = [&] {
+                    auto latestKnownClusterTime = LogicalClock::get(opCtx)->getClusterTime();
+                    // Choose a time after the user-supplied afterClusterTime.
+                    auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
+                    if (afterClusterTime && *afterClusterTime > latestKnownClusterTime) {
+                        return afterClusterTime->asTimestamp();
+                    }
+                    return latestKnownClusterTime.asTimestamp();
+                }();
+                readConcernArgs.setArgsAtClusterTimeForSnapshot(atClusterTime);
             }
 
             replyBuilder->reset();
