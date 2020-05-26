@@ -488,12 +488,17 @@ private:
                 localBuffer = asio::mutable_buffer(buffers.data(), 1);
             }
 
-            size = asio::read(stream, localBuffer, ec);
+            do {
+                size = asio::read(stream, localBuffer, ec);
+            } while (ec == asio::error::interrupted);  // retry syscall EINTR
+
             if (!ec && buffers.size() > 1) {
                 ec = asio::error::would_block;
             }
         } else {
-            size = asio::read(stream, buffers, ec);
+            do {
+                size = asio::read(stream, buffers, ec);
+            } while (ec == asio::error::interrupted);  // retry syscall EINTR
         }
 
         if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
@@ -581,12 +586,16 @@ private:
                 localBuffer = asio::const_buffer(buffers.data(), 1);
             }
 
-            size = asio::write(stream, localBuffer, ec);
+            do {
+                size = asio::write(stream, localBuffer, ec);
+            } while (ec == asio::error::interrupted);  // retry syscall EINTR
             if (!ec && buffers.size() > 1) {
                 ec = asio::error::would_block;
             }
         } else {
-            size = asio::write(stream, buffers, ec);
+            do {
+                size = asio::write(stream, buffers, ec);
+            } while (ec == asio::error::interrupted);  // retry syscall EINTR
         }
 
         if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
