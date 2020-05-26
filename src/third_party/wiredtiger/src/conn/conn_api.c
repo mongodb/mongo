@@ -1016,10 +1016,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
     CONNECTION_API_CALL(conn, session, close, config, cfg);
 err:
 
-    WT_TRET(__wt_config_gets(session, cfg, "leak_memory", &cval));
-    if (cval.val != 0)
-        F_SET(conn, WT_CONN_LEAK_MEMORY);
-
     /*
      * Ramp the eviction dirty target down to encourage eviction threads to clear dirty content out
      * of cache.
@@ -1085,6 +1081,16 @@ err:
         __wt_err(session, ret, "failure during close, disabling further writes");
         F_SET(conn, WT_CONN_PANIC);
     }
+
+    /*
+     * Now that the final checkpoint is complete, the shutdown process should not allocate a
+     * significant amount of new memory. If a user configured leaking memory on shutdown, we will
+     * avoid freeing memory at this time. This allows for faster shutdown as freeing all the content
+     * of the cache can be slow.
+     */
+    WT_TRET(__wt_config_gets(session, cfg, "leak_memory", &cval));
+    if (cval.val != 0)
+        F_SET(conn, WT_CONN_LEAK_MEMORY);
 
     WT_TRET(__wt_connection_close(conn));
 

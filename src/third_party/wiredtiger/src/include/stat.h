@@ -396,10 +396,12 @@ struct __wt_connection_stats {
     int64_t cache_hazard_checks;
     int64_t cache_hazard_walks;
     int64_t cache_hazard_max;
+    int64_t cache_hs_key_truncate_mix_ts_restart;
     int64_t cache_hs_key_truncate_mix_ts;
     int64_t cache_hs_key_truncate_onpage_removal;
     int64_t cache_hs_score;
     int64_t cache_hs_insert;
+    int64_t cache_hs_insert_restart;
     int64_t cache_hs_ondisk_max;
     int64_t cache_hs_ondisk;
     int64_t cache_hs_read;
