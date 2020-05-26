@@ -51,7 +51,3 @@ commands:
                 description: "Optional collation for the command."
                 type: object
                 optional: true
-            comment:
-                description: "Optional comment."
-                type: string
-                optional: true
