@@ -1656,6 +1656,7 @@ functions:
       params:
         target: generate_tasks_config.tgz
         source_dir: src/generated_resmoke_config
+        optional: true
         include:
           - "*"
 
@@ -2110,14 +2111,6 @@ functions:
           ${activate_virtualenv}
           $python buildscripts/evergreen_gen_multiversion_tests.py run --expansion-file expansions.yml
 
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${activate_virtualenv}
           $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-files --suite=${task_name} --task-path-suffix=${task_path_suffix} --is-generated-suite=true
 
     - command: archive.targz_pack
@@ -2137,9 +2130,13 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         display_name: Generated Task Config - Execution ${execution}
+        optional: true
 
     - command: generate.tasks
       params:
+        # Optional b/c reruns of this task will produce no JSON files to avoid
+        # generate.tasks failing
+        optional: true
         files:
           - src/generated_resmoke_config/*.json
 
