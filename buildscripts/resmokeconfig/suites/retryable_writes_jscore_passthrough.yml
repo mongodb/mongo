@@ -27,7 +27,6 @@ selector:
   - jstests/core/invalidated_legacy_cursors.js
   - jstests/core/validate_cmd_ns.js
 
-  # TODO SERVER-31249: getLastError should not be affected by no-op retries.
   - jstests/core/bulk_legacy_enforce_gle.js
 
   # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
