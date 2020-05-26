@@ -104,7 +104,7 @@ checkLog.containsJson(secondary, 21184);
 function checkForIndexes(indexes) {
     for (let i = 0; i < indexes.length; i++) {
         checkLog.containsJson(secondary, 20384, {
-            "descriptor": function(obj) {
+            "properties": function(obj) {
                 return obj.name === indexes[i];
             }
         });

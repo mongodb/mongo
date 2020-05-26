@@ -38,7 +38,7 @@ const dropDB = rst.getPrimary().getDB("drop");
 
     checkLog.contains(
         dropDB.getMongo(),
-        "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop enabled. Blocking until fail point is disabled.");
+        "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop enabled. Blocking until fail point is disabled");
 
     let sleepCommand = startParallelShell(() => {
         // Make dropDatabase timeout.

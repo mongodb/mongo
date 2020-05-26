@@ -114,7 +114,7 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
                 // Simply get a timestamp to write with here; we can't write to the oplog.
                 repl::UnreplicatedWritesBlock uwb(opCtx);
                 if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
-                    LOGV2(20382, "Did not timestamp index abort write.");
+                    LOGV2(20382, "Did not timestamp index abort write");
                 }
             }
 
@@ -130,14 +130,16 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
                 continue;
             LOGV2_ERROR(20393,
                         "Caught exception while cleaning up partially built indexes: {e}",
-                        "e"_attr = redact(e));
+                        "Caught exception while cleaning up partially built indexes",
+                        "error"_attr = redact(e));
         } catch (const std::exception& e) {
             LOGV2_ERROR(20394,
                         "Caught exception while cleaning up partially built indexes: {e_what}",
-                        "e_what"_attr = e.what());
+                        "Caught exception while cleaning up partially built indexes",
+                        "error"_attr = e.what());
         } catch (...) {
             LOGV2_ERROR(20395,
-                        "Caught unknown exception while cleaning up partially built indexes.");
+                        "Caught unknown exception while cleaning up partially built indexes");
         }
         fassertFailed(18644);
     }
@@ -209,7 +211,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                 if (info["background"].isBoolean() && !info["background"].Bool()) {
                     LOGV2(
                         20383,
-                        "ignoring obselete {{ background: false }} index build option because all "
+                        "ignoring obsolete {{ background: false }} index build option because all "
+                        "indexes are built in the background with the hybrid method",
+                        "Ignoring obsolete { background: false } index build option because all "
                         "indexes are built in the background with the hybrid method");
                 }
                 continue;
@@ -287,17 +291,20 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             index.options.dupsAllowed = true;
             index.options.fromIndexBuilder = true;
 
-            LOGV2(20384,
-                  "index build: starting on {ns} properties: {descriptor} using method: {method}",
-                  "ns"_attr = ns,
-                  "descriptor"_attr = *descriptor,
-                  "method"_attr = _method);
+            logv2::DynamicAttributes attrs;
+            attrs.add("namespace", ns);
+            attrs.add("properties", *descriptor);
+            attrs.add("method", _method);
             if (index.bulk)
-                LOGV2(20385,
-                      "build may temporarily use up to "
-                      "{eachIndexBuildMaxMemoryUsageBytes_1024_1024} megabytes of RAM",
-                      "eachIndexBuildMaxMemoryUsageBytes_1024_1024"_attr =
+                attrs.add("maxTemporaryMemoryUsageMB",
                           eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024);
+
+            LOGV2(20384,
+                  "index build: starting on {namespace} properties: {properties} using method: "
+                  "{method}",
+                  "index build: starting",
+                  attrs);
+
 
             index.filterExpression = index.block->getEntry()->getFilterExpression();
 
@@ -505,7 +512,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {
         LOGV2(20389,
               "Index build interrupted due to 'leaveIndexBuildUnfinishedForShutdown' failpoint. "
-              "Mimicking shutdown error code.");
+              "Mimicking shutdown error code");
         return Status(
             ErrorCodes::InterruptedAtShutdown,
             "background index build interrupted due to failpoint. returning a shutdown error.");
