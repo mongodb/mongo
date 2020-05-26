@@ -200,6 +200,12 @@ void Balancer::onStepDown() {
     interruptBalancer();
 }
 
+void Balancer::onBecomeArbiter() {
+    // The Balancer is only active on config servers, and arbiters are not permitted in config
+    // server replica sets.
+    MONGO_UNREACHABLE;
+}
+
 void Balancer::initiateBalancer(OperationContext* opCtx) {
     stdx::lock_guard<Latch> scopedLock(_mutex);
     invariant(_state == kStopped);

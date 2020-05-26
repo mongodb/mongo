@@ -754,6 +754,10 @@ void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
     _stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
 }
 
+void ReplicationCoordinatorExternalStateImpl::onBecomeArbiterHook() {
+    ReplicaSetAwareServiceRegistry::get(_service).onBecomeArbiter();
+}
+
 void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepDown();

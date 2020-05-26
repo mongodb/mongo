@@ -651,6 +651,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             lastOpTimeAndWallTime = lastOpTimeAndWallTimeStatus.getValue();
         }
     } else {
+        _externalState->onBecomeArbiterHook();
+        // TODO SERVER-47914: move these actions into VectorClockMongoD::onBecomeArbiter().
         // The node is an arbiter hence will not need logical clock for external operations.
         LogicalClock::get(getServiceContext())->disable();
         if (auto validator = LogicalTimeValidator::get(getServiceContext())) {

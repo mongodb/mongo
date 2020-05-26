@@ -228,6 +228,11 @@ public:
     virtual void onStepDownHook() = 0;
 
     /**
+     * Called after this node has become an arbiter.
+     */
+    virtual void onBecomeArbiterHook() = 0;
+
+    /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.
      */
     virtual void signalApplierToChooseNewSyncSource() = 0;

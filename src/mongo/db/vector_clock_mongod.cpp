@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/vector_clock_mutable.h"
 
@@ -64,11 +65,13 @@ private:
         StepUpBegin,
         StepUpComplete,
         StepDown,
+        Arbiter,
     };
 
     void onStepUpBegin(OperationContext* opCtx) override;
     void onStepUpComplete(OperationContext* opCtx) override;
     void onStepDown() override;
+    void onBecomeArbiter() override;
 
     ReplState _replState{ReplState::Unset};
 };
@@ -105,6 +108,13 @@ void VectorClockMongoD::onStepUpComplete(OperationContext* opCtx) {
 
 void VectorClockMongoD::onStepDown() {
     _replState = ReplState::StepDown;
+}
+
+void VectorClockMongoD::onBecomeArbiter() {
+    _replState = ReplState::Arbiter;
+
+    // The node has become an arbiter, hence will not need logical clock for external operations.
+    disable();
 }
 
 void VectorClockMongoD::_gossipOutInternal(BSONObjBuilder* out) const {

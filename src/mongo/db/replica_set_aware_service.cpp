@@ -68,6 +68,12 @@ void ReplicaSetAwareServiceRegistry::onStepDown() {
     });
 }
 
+void ReplicaSetAwareServiceRegistry::onBecomeArbiter() {
+    std::for_each(_services.begin(), _services.end(), [](ReplicaSetAwareInterface* service) {
+        service->onBecomeArbiter();
+    });
+}
+
 void ReplicaSetAwareServiceRegistry::_registerService(ReplicaSetAwareInterface* service) {
     _services.push_back(service);
 }

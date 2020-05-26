@@ -681,6 +681,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
 
         if (isArbiter) {
+            _externalState->onBecomeArbiterHook();
+            // TODO SERVER-47914: move these actions into VectorClockMongoD::onBecomeArbiter().
             LogicalClock::get(getGlobalServiceContext())->disable();
             if (auto validator = LogicalTimeValidator::get(getGlobalServiceContext())) {
                 validator->stopKeyManager();

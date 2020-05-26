@@ -235,6 +235,8 @@ void ReplicationCoordinatorExternalStateMock::closeConnections() {
 
 void ReplicationCoordinatorExternalStateMock::onStepDownHook() {}
 
+void ReplicationCoordinatorExternalStateMock::onBecomeArbiterHook() {}
+
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
 void ReplicationCoordinatorExternalStateMock::stopProducer() {}
