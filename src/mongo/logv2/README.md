@@ -107,7 +107,7 @@ Logging is performed using function style macros:
 
 `LOGV2(ID, format-string, message-string, "name0"_attr = var0, ..., "nameN"_attr = varN);`
 
-The ID is a signed 32bit integer in the same number space as the error code numbers. It is used to uniquely identify a log statement. If changing existing code, using a new ID is strongly advised to avoid any parsing ambiguity. 
+The ID is a signed 32bit integer in the same number space as the error code numbers. It is used to uniquely identify a log statement. If changing existing code, using a new ID is strongly advised to avoid any parsing ambiguity. When selecting ID during work on JIRA ticket `SERVER-ABCDE` you can use the JIRA ticket number to avoid ID collisions with other engineers by taking ID from the range `ABCDE00` - `ABCDE99`.
 
 The format string contains the description of the log event with libfmt style replacement fields optionally embedded within it. The format string must comply with the [format syntax](https://fmt.dev/6.1.1/syntax.html#formatspec) from libfmt. The purpose of embedding the replacement fields is to be able to create a human readable message used by the text output format or a tool that converts JSON logs to a human readable format.
 
