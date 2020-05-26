@@ -95,7 +95,11 @@ functions:
           set -e
           set -o verbose
           mkdir -p ./dbdata
-          ${mongod_exec_wrapper} ./bin/mongod --dbpath ./dbdata ${mongod_flags} --logpath "${workdir}/mongod.log"
+          echo -e "my secret key" > "${workdir}/key"
+          chmod 600 "${workdir}/key"
+          # We provide the key file for mongod here, rather than in mongod_flags next to the --auth
+          # option, because the path to key file requires expanding the {workdir} variable.
+          ${mongod_exec_wrapper} ./bin/mongod --dbpath ./dbdata ${mongod_flags} --keyFile "${workdir}/key" --logpath "${workdir}/mongod.log"
     - command: shell.exec
       params:
         working_dir: src
