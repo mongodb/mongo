@@ -649,7 +649,7 @@ void initialize(int signal) {
     memset(&sa, 0, sizeof(sa));
     sigemptyset(&sa.sa_mask);
     sa.sa_sigaction = [](int, siginfo_t* si, void*) { stateSingleton->action(si); };
-    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
     if (sigaction(signal, &sa, nullptr) != 0) {
         int savedErr = errno;
         LOGV2_FATAL(31376,
