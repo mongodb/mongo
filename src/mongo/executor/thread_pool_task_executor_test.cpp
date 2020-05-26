@@ -87,6 +87,9 @@ TEST_F(ThreadPoolExecutorTest, Schedule) {
     });
     barrier.countDownAndWait();
     ASSERT_OK(status1);
+    // Wait for the executor to stop to ensure the scheduled job does not outlive current scope.
+    executor.shutdown();
+    executor.join();
 }
 
 TEST_F(ThreadPoolExecutorTest, ScheduleAfterShutdown) {
@@ -113,6 +116,9 @@ TEST_F(ThreadPoolExecutorTest, OnEvent) {
     executor.signalEvent(event);
     barrier.countDownAndWait();
     ASSERT_OK(status1);
+    // Wait for the executor to stop to ensure the scheduled job does not outlive current scope.
+    executor.shutdown();
+    executor.join();
 }
 
 TEST_F(ThreadPoolExecutorTest, OnEventAfterShutdown) {
