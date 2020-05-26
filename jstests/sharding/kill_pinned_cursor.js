@@ -2,8 +2,9 @@
  * Run a query on a sharded cluster where one of the shards hangs. Running killCursors on the mongos
  * should always succeed.
  *
- * Uses getMore to pin an open cursor.
- * @tags: [requires_getmore]
+ * Uses getMore to pin an open cursor. Relies on FCV 4.4 since the 'comment' field is used
+ * in current op output from a find command.
+ * @tags: [requires_getmore, requires_fcv_44]
  */
 
 (function() {
@@ -16,6 +17,7 @@ const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
 const kFailpointOptions = {
     shouldCheckForInterrupt: true
 };
+const kCommandCommentString = "kill_pinned_cursor_js_test";
 
 const st = new ShardingTest({shards: 2});
 const kDBName = "test";
@@ -92,7 +94,7 @@ function testShardedKillPinned(
             {configureFailPoint: kFailPointName, mode: "alwaysOn", data: kFailpointOptions}));
 
         // Run a find against mongos. This should open cursors on both of the shards.
-        let findCmd = {find: coll.getName(), batchSize: 2};
+        let findCmd = {find: coll.getName(), batchSize: 2, comment: kCommandCommentString};
 
         if (useSession) {
             // Manually start a session so it can be continued from inside a parallel shell.
@@ -180,11 +182,18 @@ for (let useSession of [true, false]) {
         // This function ignores the mongos cursor id, since it instead uses currentOp to
         // obtain an op id to kill.
         killFunc: function() {
-            let currentGetMoresArray =
-                shard0DB.getSiblingDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {"command.getMore": {$exists: true}}}])
-                    .toArray();
-            assert.eq(1, currentGetMoresArray.length);
+            let currentGetMoresArray = shard0DB.getSiblingDB("admin")
+                                           .aggregate([
+                                               {$currentOp: {}},
+                                               {
+                                                   $match: {
+                                                       "command.getMore": {$exists: true},
+                                                       "command.comment": kCommandCommentString
+                                                   }
+                                               }
+                                           ])
+                                           .toArray();
+            assert.eq(1, currentGetMoresArray.length, currentGetMoresArray);
             let currentGetMore = currentGetMoresArray[0];
             let killOpResult = shard0DB.killOp(currentGetMore.opid);
             assert.commandWorked(killOpResult);
@@ -199,11 +208,18 @@ for (let useSession of [true, false]) {
         // This function ignores the mongos cursor id, since it instead uses currentOp to
         // obtain the cursor id of one of the shard cursors.
         killFunc: function() {
-            let currentGetMoresArray =
-                shard0DB.getSiblingDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {"command.getMore": {$exists: true}}}])
-                    .toArray();
-            assert.eq(1, currentGetMoresArray.length);
+            let currentGetMoresArray = shard0DB.getSiblingDB("admin")
+                                           .aggregate([
+                                               {$currentOp: {}},
+                                               {
+                                                   $match: {
+                                                       "command.getMore": {$exists: true},
+                                                       "command.comment": kCommandCommentString
+                                                   }
+                                               }
+                                           ])
+                                           .toArray();
+            assert.eq(1, currentGetMoresArray.length, currentGetMoresArray);
             let currentGetMore = currentGetMoresArray[0];
             let shardCursorId = currentGetMore.command.getMore;
             let cmdRes =
