@@ -2148,6 +2148,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
                        0,
                        "Rolling back to the stable timestamp. StableTimestamp: {stableTimestamp} "
                        "Initial Data Timestamp: {initialDataTimestamp}",
+                       "Rolling back to the stable timestamp",
                        "stableTimestamp"_attr = stableTimestamp,
                        "initialDataTimestamp"_attr = initialDataTimestamp);
     int ret = _conn->rollback_to_stable(_conn, nullptr);

@@ -1009,7 +1009,7 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 // killed, it's fine to give up on future notifications.
                 LOGV2(22263,
                       "Timestamp monitor is stopping. {reason}",
-                      "Timestamp monitor is stopping"
+                      "Timestamp monitor is stopping",
                       "error"_attr = ex.reason());
                 return;
             }

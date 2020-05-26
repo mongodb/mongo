@@ -285,34 +285,40 @@ void logFailure(Status status,
  */
 void forEachIndexBuild(
     const std::vector<std::shared_ptr<ReplIndexBuildState>>& indexBuilds,
-    StringData logPrefix,
+    StringData context,
     std::function<void(std::shared_ptr<ReplIndexBuildState> replState)> onIndexBuild) {
     if (indexBuilds.empty()) {
         return;
     }
 
+    auto indexBuildLogger = [](const auto& indexBuild) {
+        BSONObjBuilder builder;
+        builder.append("buildUUID"_sd, indexBuild->buildUUID.toBSON());
+        builder.append("collectionUUID"_sd, indexBuild->collectionUUID.toBSON());
+
+        BSONArrayBuilder names;
+        for (const auto& indexName : indexBuild->indexNames) {
+            names.append(indexName);
+        }
+        builder.append("indexNames"_sd, names.arr());
+        builder.append("protocol"_sd,
+                       indexBuild->protocol == IndexBuildProtocol::kTwoPhase ? "two phase"_sd
+                                                                             : "single phase"_sd);
+
+        return builder.obj();
+    };
+    auto begin = boost::make_transform_iterator(indexBuilds.begin(), indexBuildLogger);
+    auto end = boost::make_transform_iterator(indexBuilds.end(), indexBuildLogger);
+
     LOGV2(20650,
-          "{logPrefix}active index builds: {indexBuilds_size}",
-          "logPrefix"_attr = logPrefix,
-          "indexBuilds_size"_attr = indexBuilds.size());
+          "Active index builds",
+          "context"_attr = context,
+          "builds"_attr = logv2::seqLog(begin, end));
 
-    for (auto replState : indexBuilds) {
-        std::string indexNamesStr;
-        str::joinStringDelim(replState->indexNames, &indexNamesStr, ',');
-        LOGV2(20651,
-              "{logPrefix}{replState_buildUUID}: collection: {replState_collectionUUID}; indexes: "
-              "{replState_indexNames_size} [{indexNamesStr}]; method: "
-              "{IndexBuildProtocol_kTwoPhase_replState_protocol_two_phase_single_phase}",
-              "logPrefix"_attr = logPrefix,
-              "replState_buildUUID"_attr = replState->buildUUID,
-              "replState_collectionUUID"_attr = replState->collectionUUID,
-              "replState_indexNames_size"_attr = replState->indexNames.size(),
-              "indexNamesStr"_attr = indexNamesStr,
-              "IndexBuildProtocol_kTwoPhase_replState_protocol_two_phase_single_phase"_attr =
-                  (IndexBuildProtocol::kTwoPhase == replState->protocol ? "two phase"
-                                                                        : "single phase"));
-
-        onIndexBuild(replState);
+    if (onIndexBuild) {
+        for (const auto& indexBuild : indexBuilds) {
+            onIndexBuild(indexBuild);
+        }
     }
 }
 
@@ -802,7 +808,7 @@ boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNames(
     std::string reason) {
     boost::optional<UUID> buildUUID;
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [&](std::shared_ptr<ReplIndexBuildState> replState) {
+    auto onIndexBuild = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
         if (replState->collectionUUID != collectionUUID) {
             return;
         }
@@ -829,7 +835,7 @@ boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNames(
         }
     };
     forEachIndexBuild(
-        indexBuilds, "IndexBuildsCoordinator::abortIndexBuildByIndexNames - "_sd, onIndexBuild);
+        indexBuilds, "IndexBuildsCoordinator::abortIndexBuildByIndexNames"_sd, onIndexBuild);
     return buildUUID;
 }
 
@@ -839,7 +845,7 @@ bool IndexBuildsCoordinator::hasIndexBuilder(OperationContext* opCtx,
     bool foundIndexBuilder = false;
     boost::optional<UUID> buildUUID;
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [&](std::shared_ptr<ReplIndexBuildState> replState) {
+    auto onIndexBuild = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
         if (replState->collectionUUID != collectionUUID) {
             return;
         }
@@ -854,7 +860,7 @@ bool IndexBuildsCoordinator::hasIndexBuilder(OperationContext* opCtx,
 
         foundIndexBuilder = true;
     };
-    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::hasIndexBuilder - "_sd, onIndexBuild);
+    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::hasIndexBuilder"_sd, onIndexBuild);
     return foundIndexBuilder;
 }
 
@@ -1034,7 +1040,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
                 4656011,
                 "Failed to abort index build after partially tearing-down index build state",
                 "buildUUID"_attr = replState->buildUUID,
-                "reason"_attr = e.toString());
+                "error"_attr = e);
         }
 
         // Wait for the builder thread to receive the signal before unregistering. Don't release the
@@ -1192,8 +1198,7 @@ std::size_t IndexBuildsCoordinator::getActiveIndexBuildCount(OperationContext* o
     auto indexBuilds = _getIndexBuilds();
     // We use forEachIndexBuild() to log basic details on the current index builds and don't intend
     // to modify any of the index builds, hence the no-op.
-    auto onIndexBuild = [](std::shared_ptr<ReplIndexBuildState> replState) {};
-    forEachIndexBuild(indexBuilds, "index build still running: "_sd, onIndexBuild);
+    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::getActiveIndexBuildCount"_sd, nullptr);
 
     return indexBuilds.size();
 }
@@ -1206,7 +1211,7 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     indexbuildentryhelpers::ensureIndexBuildEntriesNamespaceExists(opCtx);
 
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [this, opCtx](std::shared_ptr<ReplIndexBuildState> replState) {
+    auto onIndexBuild = [this, opCtx](const std::shared_ptr<ReplIndexBuildState>& replState) {
         if (IndexBuildProtocol::kTwoPhase != replState->protocol) {
             return;
         }
@@ -1220,7 +1225,7 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
             }
         }
     };
-    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onStepUp - "_sd, onIndexBuild);
+    forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onStepUp"_sd, onIndexBuild);
 }
 
 IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext* opCtx) {
@@ -1229,7 +1234,7 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
     IndexBuilds buildsStopped;
 
     auto indexBuilds = _getIndexBuilds();
-    auto onIndexBuild = [&](std::shared_ptr<ReplIndexBuildState> replState) {
+    auto onIndexBuild = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
         if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
             LOGV2(20659,
                   "Not stopping single phase index build",
@@ -1254,7 +1259,7 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
             opCtx, replState->buildUUID, IndexBuildAction::kRollbackAbort, reason);
     };
     forEachIndexBuild(
-        indexBuilds, "IndexBuildsCoordinator::stopIndexBuildsForRollback - "_sd, onIndexBuild);
+        indexBuilds, "IndexBuildsCoordinator::stopIndexBuildsForRollback"_sd, onIndexBuild);
 
     return buildsStopped;
 }
@@ -2307,7 +2312,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                         "buildUUID"_attr = replState->buildUUID,
                         "collectionUUID"_attr = replState->collectionUUID,
                         "db"_attr = replState->dbName,
-                        "reason"_attr = status);
+                        "error"_attr = status);
         }
 
         // This index build failed due to an indexing error in normal circumstances. Abort while
