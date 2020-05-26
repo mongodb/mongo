@@ -89,17 +89,15 @@ boost::optional<ChunkVersion> getOperationReceivedVersion(OperationContext* opCt
 }  // namespace
 
 CollectionShardingRuntime::CollectionShardingRuntime(
-    ServiceContext* sc,
+    ServiceContext* service,
     NamespaceString nss,
     std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor)
-    : _nss(std::move(nss)),
-      _rangeDeleterExecutor(rangeDeleterExecutor),
-      _stateChangeMutex(nss.toString()),
-      _serviceContext(sc) {
-    if (isNamespaceAlwaysUnsharded(_nss)) {
-        _metadataType = MetadataType::kUnsharded;
-    }
-}
+    : _serviceContext(service),
+      _nss(std::move(nss)),
+      _rangeDeleterExecutor(std::move(rangeDeleterExecutor)),
+      _stateChangeMutex(_nss.toString()),
+      _metadataType(isNamespaceAlwaysUnsharded(_nss) ? MetadataType::kUnsharded
+                                                     : MetadataType::kUnknown) {}
 
 CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
@@ -421,8 +419,8 @@ size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
     return 0;
 }
 
-CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns)
-    : _nss(std::move(ns)), _opCtx(opCtx) {
+CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString nss)
+    : _opCtx(opCtx), _nss(std::move(nss)) {
     AutoGetCollection autoColl(_opCtx,
                                _nss,
                                MODE_X,
