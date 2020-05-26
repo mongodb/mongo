@@ -1911,14 +1911,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
             continue;
         }
 
-        /*
-         * Pages that are empty or from dead trees are fast-tracked.
-         *
-         * Also evict the history store table pages without further filtering: the cache is under
-         * pressure by definition and we want to free space.
-         */
-        if (__wt_page_is_empty(page) || F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
-          WT_IS_HS(btree))
+        /* Pages that are empty or from dead trees are fast-tracked. */
+        if (__wt_page_is_empty(page) || F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
             goto fast;
 
         /*

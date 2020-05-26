@@ -970,15 +970,18 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
      *
      * This is how the stop time point should be interpreted for each type of delete:
      * -
-     *                  Timestamp delete  Non-timestamp delete  No delete
-     * Current startup  txnid=x, ts=y       txnid=x, ts=WT_TS_NONE           txnid=MAX, ts=MAX
-     * Previous startup txnid=0, ts=y       txnid=0, ts=WT_TS_NONE           txnid=MAX, ts=MAX
+     *                        Current startup               Previous startup
+     * Timestamp delete       txnid=x, ts=y,                txnid=0, ts=y,
+     *                        durable_ts=z                  durable_ts=z
+     * Non-timestamp delete   txnid=x, ts=NONE,             txnid=0, ts=NONE,
+     *                        durable_ts=NONE               durable_ts=NONE
+     * No delete              txnid=MAX, ts=MAX,            txnid=MAX, ts=MAX,
+     *                        durable_ts=NONE               durable_ts=NONE
      */
     if (dsk->write_gen == 0 || dsk->write_gen > S2C(session)->base_write_gen)
         return;
 
     /* Tell reconciliation we cleared the transaction ids and the cell needs to be rebuilt. */
-    /* FIXME-WT-6124: deal with durable timestamps. */
     if (unpack_addr != NULL) {
         ta = &unpack_addr->ta;
         if (ta->oldest_start_txn != WT_TXN_NONE) {
@@ -988,8 +991,17 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
         if (ta->newest_stop_txn != WT_TXN_MAX) {
             ta->newest_stop_txn = WT_TXN_NONE;
             F_SET(unpack_addr, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
-            if (ta->newest_stop_ts == WT_TS_MAX)
+
+            /*
+             * The combination of newest stop timestamp being WT_TS_MAX while the newest stop
+             * transaction not being WT_TXN_MAX is possible only for the non-timestamped tables. In
+             * this scenario there shouldn't be any timestamp value as part of durable stop
+             * timestamp other than the default value WT_TS_NONE.
+             */
+            if (ta->newest_stop_ts == WT_TS_MAX) {
                 ta->newest_stop_ts = WT_TS_NONE;
+                WT_ASSERT(session, ta->newest_stop_durable_ts == WT_TS_NONE);
+            }
         } else
             WT_ASSERT(session, ta->newest_stop_ts == WT_TS_MAX);
     }
@@ -1002,8 +1014,17 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
         if (tw->stop_txn != WT_TXN_MAX) {
             tw->stop_txn = WT_TXN_NONE;
             F_SET(unpack_kv, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
-            if (tw->stop_ts == WT_TS_MAX)
+
+            /*
+             * The combination of stop timestamp being WT_TS_MAX while the stop transaction not
+             * being WT_TXN_MAX is possible only for the non-timestamped tables. In this scenario
+             * there shouldn't be any timestamp value as part of durable stop timestamp other than
+             * the default value WT_TS_NONE.
+             */
+            if (tw->stop_ts == WT_TS_MAX) {
                 tw->stop_ts = WT_TS_NONE;
+                WT_ASSERT(session, tw->durable_stop_ts == WT_TS_NONE);
+            }
         } else
             WT_ASSERT(session, tw->stop_ts == WT_TS_MAX);
     }
