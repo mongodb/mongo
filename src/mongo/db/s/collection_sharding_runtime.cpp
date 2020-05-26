@@ -166,15 +166,13 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
     (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, this);
+void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
+                                                                 const CSRLock&) {
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCommitPhase(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, this);
+void CollectionShardingRuntime::enterCriticalSectionCommitPhase(OperationContext* opCtx,
+                                                                const CSRLock&) {
     _critSec.enterCriticalSectionCommitPhase();
 }
 
@@ -428,7 +426,8 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, Na
                                opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-    csr->enterCriticalSectionCatchUpPhase(_opCtx);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+    csr->enterCriticalSectionCatchUpPhase(_opCtx, csrLock);
 }
 
 CollectionCriticalSection::~CollectionCriticalSection() {
@@ -446,7 +445,8 @@ void CollectionCriticalSection::enterCommitPhase() {
                                _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-    csr->enterCriticalSectionCommitPhase(_opCtx);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+    csr->enterCriticalSectionCommitPhase(_opCtx, csrLock);
 }
 
 }  // namespace mongo

@@ -48,7 +48,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/scoped_shard_version_critical_section.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_logging.h"

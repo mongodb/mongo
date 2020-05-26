@@ -239,10 +239,16 @@ public:
 
         // Step 6
 
-        // Note: The forceRefresh flag controls whether we make sure to do our
-        // own refresh or if we're okay with joining another thread
-        const auto status = onShardVersionMismatchNoExcept(
-            opCtx, nss, requestedVersion, forceRefresh /*forceRefreshFromThisThread*/);
+        // Note: The forceRefresh flag controls whether we make sure to do our own refresh or if
+        // we're okay with joining another thread
+        const auto status = [&] {
+            try {
+                forceShardFilteringMetadataRefresh(opCtx, nss, forceRefresh);
+                return Status::OK();
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+        }();
 
         {
             // Avoid using AutoGetCollection() as it returns the InvalidViewDefinition error code
