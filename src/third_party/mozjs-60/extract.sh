@@ -219,3 +219,4 @@ __XARGS_RM__
 patch -p4 < patches/big-endian-fixes.patch
 patch -p4 < patches/windows-Time.cpp-GetModuleHandle.patch
 patch -p4 < patches/JSGCConfig.patch
+patch -p4 < patches/struct-hasher.patch

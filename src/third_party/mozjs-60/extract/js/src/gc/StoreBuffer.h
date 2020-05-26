@@ -341,7 +341,7 @@ class StoreBuffer
 
         explicit operator bool() const { return objectAndKind_ != 0; }
 
-        typedef struct {
+        typedef struct Hasher {
             typedef SlotsEdge Lookup;
             static HashNumber hash(const Lookup& l) {
                 return mozilla::HashGeneric(l.objectAndKind_, l.start_, l.count_);
