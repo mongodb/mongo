@@ -343,20 +343,26 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
-            str::stream ss;
             if (!status.isOK() && validatedSize != static_cast<size_t>(dataSize)) {
-                ss << "Reasons: (1) " << status << "; (2) Validated size of " << validatedSize
-                   << " bytes does not equal the record size of " << dataSize << " bytes";
+                LOGV2(4835000,
+                      "Document corruption details - Multiple causes for document validation "
+                      "failure; error status and size mismatch",
+                      "recordId"_attr = record->id,
+                      "validatedBytes"_attr = validatedSize,
+                      "recordBytes"_attr = dataSize,
+                      "error"_attr = status);
             } else if (!status.isOK()) {
-                ss << "Reason: " << status;
+                LOGV2(4835001,
+                      "Document corruption details - Document validation failed with error",
+                      "recordId"_attr = record->id,
+                      "error"_attr = status);
             } else {
-                ss << "Reason: Validated size of " << validatedSize
-                   << " bytes does not equal the record size of " << dataSize << " bytes";
+                LOGV2(4835002,
+                      "Document corruption details - Document validation failure; size mismatch",
+                      "recordId"_attr = record->id,
+                      "validatedBytes"_attr = validatedSize,
+                      "recordBytes"_attr = dataSize);
             }
-            LOGV2(20404,
-                  "Document corruption details",
-                  "recordId"_attr = record->id,
-                  "reasons"_attr = std::string(ss));
 
             // Only log once
             if (results->valid) {

@@ -182,7 +182,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                     }
                     LOGV2_WARNING(20348,
                                   "Invalid BSON detected at {id}: {validStatus}. Deleting.",
-                                  "Invalid BSON detected; deleting.",
+                                  "Invalid BSON detected; deleting",
                                   "id"_attr = id,
                                   "error"_attr = redact(validStatus));
                     rs->deleteRecord(opCtx, id);

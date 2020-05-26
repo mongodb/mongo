@@ -1080,13 +1080,12 @@ void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx, const string
          * This is ok, as we may be partially through index creation.
          */
     } else if (!status.isOK()) {
-        LOGV2_WARNING(
-            20364,
-            "couldn't drop index {indexName} on collection: {collection_ns} because of {status}",
-            "couldn't drop index",
-            "index"_attr = indexName,
-            "namespace"_attr = _collection->ns(),
-            "reason"_attr = redact(status));
+        LOGV2_WARNING(20364,
+                      "couldn't drop index {index} on collection: {namespace} because of {error}",
+                      "Couldn't drop index",
+                      "index"_attr = indexName,
+                      "namespace"_attr = _collection->ns(),
+                      "error"_attr = redact(status));
     }
 }
 
@@ -1171,7 +1170,7 @@ int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
                 LOGV2(20360, "collection catalog reports", "index"_attr = i);
             }
 
-            LOGV2(20361, "uuid", "collection_uuid"_attr = _collection->uuid());
+            LOGV2(20361, "uuid", "uuid"_attr = _collection->uuid());
 
             invariant(itIndexes.size() == completedIndexes.size(),
                       "The number of ready indexes reported in the collection metadata catalog did "
@@ -1555,7 +1554,7 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
               "Couldn't unindex record",
               "record"_attr = redact(obj),
               "namespace"_attr = _collection->ns(),
-              "reason"_attr = redact(status));
+              "error"_attr = redact(status));
     }
 
     if (keysDeletedOut) {
@@ -1693,7 +1692,10 @@ Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) {
                     "entry_descriptor"_attr = *(entry->descriptor()));
         Status status = entry->accessMethod()->compact(opCtx);
         if (!status.isOK()) {
-            LOGV2_ERROR(20377, "failed to compact index", "index"_attr = *(entry->descriptor()));
+            LOGV2_ERROR(20377,
+                        "Failed to compact index",
+                        "index"_attr = *(entry->descriptor()),
+                        "error"_attr = redact(status));
             return status;
         }
     }

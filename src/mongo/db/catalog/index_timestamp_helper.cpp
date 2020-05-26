@@ -130,7 +130,7 @@ bool IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(OperationConte
         setGhostTimestamp(opCtx, LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
     if (status.code() == ErrorCodes::BadValue) {
         LOGV2(20381,
-              "Temporarily could not timestamp the index build commit, retrying.",
+              "Temporarily could not timestamp the index build commit, retrying",
               "reason"_attr = status.reason());
         throw WriteConflictException();
     }

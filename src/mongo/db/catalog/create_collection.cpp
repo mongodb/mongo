@@ -274,12 +274,12 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
 
                 if (currentName && currentName->isDropPendingNamespace()) {
                     LOGV2(20308,
-                          "CMD: create {newCollName} - existing collection with conflicting UUID "
-                          "{uuid} is in a drop-pending state: {currentName}",
+                          "CMD: create {newCollection} - existing collection with conflicting UUID "
+                          "{conflictingUUID} is in a drop-pending state: {existingCollection}",
                           "CMD: create -- existing collection with conflicting UUID "
                           "is in a drop-pending state",
                           "newCollection"_attr = newCollName,
-                          "conflictingUuid"_attr = uuid,
+                          "conflictingUUID"_attr = uuid,
                           "existingCollection"_attr = *currentName);
                     return Result(Status(ErrorCodes::NamespaceExists,
                                          str::stream()
@@ -323,12 +323,12 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
 
                     // It is ok to log this because this doesn't happen very frequently.
                     LOGV2(20309,
-                          "CMD: create {newCollName} - renaming existing collection with "
-                          "conflicting UUID {uuid} to temporary collection {tmpName}",
+                          "CMD: create {newCollection} - renaming existing collection with "
+                          "conflicting UUID {conflictingUUID} to temporary collection {tempName}",
                           "CMD: create -- renaming existing collection with "
                           "conflicting UUID to temporary collection",
                           "newCollection"_attr = newCollName,
-                          "conflictingUuid"_attr = uuid,
+                          "conflictingUUID"_attr = uuid,
                           "tempName"_attr = tmpName);
                     Status status = db->renameCollection(opCtx, newCollName, tmpName, stayTemp);
                     if (!status.isOK())

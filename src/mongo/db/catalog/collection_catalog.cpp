@@ -455,7 +455,7 @@ void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<
     if (_collections.find(ns) != _collections.end()) {
         LOGV2(20279,
               "Conflicted creating a collection. ns: {coll_ns} ({coll_uuid}).",
-              "Conflicted creating a collection.",
+              "Conflicted creating a collection",
               "namespace"_attr = (*coll)->ns(),
               "uuid"_attr = (*coll)->uuid());
         throw WriteConflictException();

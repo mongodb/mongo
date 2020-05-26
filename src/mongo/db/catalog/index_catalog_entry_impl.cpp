@@ -288,7 +288,7 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
                     opCtx->recoveryUnit()->setTimestamp(recoveryPrepareOpTime.getTimestamp());
                 if (status.code() == ErrorCodes::BadValue) {
                     LOGV2(20352,
-                          "Temporarily could not timestamp the multikey catalog write, retrying.",
+                          "Temporarily could not timestamp the multikey catalog write, retrying",
                           "reason"_attr = status.reason());
                     throw WriteConflictException();
                 }

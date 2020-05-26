@@ -197,16 +197,15 @@ void AbstractIndexAccessMethod::removeOneKey(OperationContext* opCtx,
     try {
         _newInterface->unindex(opCtx, keyString, dupsAllowed);
     } catch (AssertionException& e) {
-        LOGV2(20682,
-              "Assertion failure: _unindex failed on: {descriptor_parentNS} for index: "
-              "{descriptor_indexName}",
-              "descriptor_parentNS"_attr = _descriptor->parentNS(),
-              "descriptor_indexName"_attr = _descriptor->indexName());
         LOGV2(20683,
-              "Assertion failure: _unindex failed: {e}  KeyString:{keyString}  dl:{loc}",
-              "e"_attr = redact(e),
+              "Assertion failure: _unindex failed on: {descriptorParentNamespace} for index: "
+              "{descriptorIndexName}. {error}  KeyString:{keyString}  dl:{recordId}",
+              "Assertion failure: _unindex failed",
+              "error"_attr = redact(e),
               "keyString"_attr = keyString,
-              "loc"_attr = loc);
+              "recordId"_attr = loc,
+              "descriptorParentNamespace"_attr = _descriptor->parentNS(),
+              "descriptorIndexName"_attr = _descriptor->indexName());
         printStackTrace();
     }
 }
@@ -601,7 +600,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
 
-    static const char* message = "Index Build: inserting keys from external sorter into index";
+    static constexpr char message[] = "Index Build: inserting keys from external sorter into index";
     ProgressMeterHolder pm;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
@@ -683,8 +682,9 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     LOGV2(20685,
           "index build: inserted {bulk_getKeysInserted} keys from external sorter into index in "
           "{timer_seconds} seconds",
-          "bulk_getKeysInserted"_attr = bulk->getKeysInserted(),
-          "timer_seconds"_attr = timer.seconds());
+          message,
+          "keysInserted"_attr = bulk->getKeysInserted(),
+          "duration"_attr = Milliseconds(Seconds(timer.seconds())));
 
     WriteUnitOfWork wunit(opCtx);
     builder->commit(true);

@@ -253,10 +253,12 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
             if (!renameOpTime.isNull()) {
                 LOGV2_FATAL(
                     40616,
-                    "renameCollection: {source} to {target} (with dropTarget=true) - unexpected "
+                    "renameCollection: {from} to {to} (with dropTarget=true) - unexpected "
                     "renameCollection oplog entry written to the oplog with optime {renameOpTime}",
-                    "source"_attr = source,
-                    "target"_attr = target,
+                    "renameCollection (with dropTarget=true): unexpected renameCollection oplog "
+                    "entry written to the oplog",
+                    "from"_attr = source,
+                    "to"_attr = target,
                     "renameOpTime"_attr = renameOpTime);
             }
             renameOpTime = renameOpTimeFromApplyOps;

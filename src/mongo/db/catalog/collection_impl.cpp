@@ -114,7 +114,10 @@ Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSON
             const std::string msg = str::stream()
                 << "Failpoint (failCollectionInserts) has been enabled (" << data
                 << "), so rejecting insert (first doc): " << firstDoc;
-            LOGV2(20287, "{msg}", "msg"_attr = msg);
+            LOGV2(20287,
+                  "Failpoint (failCollectionInserts) has been enabled, so rejecting insert",
+                  "data"_attr = data,
+                  "document"_attr = firstDoc);
             s = {ErrorCodes::FailPointEnabled, msg};
         },
         [&](const BSONObj& data) {
@@ -517,7 +520,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
             LOGV2(20289,
                   "hangAfterCollectionInserts fail point enabled. Blocking "
                   "until fail point is disabled.",
-                  "ns"_attr = _ns,
+                  "namespace"_attr = _ns,
                   "whenFirst"_attr = whenFirst);
             hangAfterCollectionInserts.pauseWhileSet(opCtx);
         },
@@ -572,8 +575,8 @@ Status CollectionImpl::insertDocumentForBulkLoader(OperationContext* opCtx,
     if (MONGO_unlikely(failAfterBulkLoadDocInsert.shouldFail())) {
         LOGV2(20290,
               "Failpoint failAfterBulkLoadDocInsert enabled. Throwing "
-              "WriteConflictException.",
-              "ns_ns"_attr = _ns.ns());
+              "WriteConflictException",
+              "namespace"_attr = _ns);
         throw WriteConflictException();
     }
 

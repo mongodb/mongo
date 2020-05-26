@@ -639,9 +639,10 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
     if (keysToAdd.size() > params.maxKeysPerInsert) {
         LOGV2_WARNING(23755,
                       "Insert of geo object generated a high number of keys. num keys: "
-                      "{keysToAdd_size} obj inserted: {obj}",
-                      "keysToAdd_size"_attr = keysToAdd.size(),
-                      "obj"_attr = redact(obj));
+                      "{numKeys} obj inserted: {obj}",
+                      "Insert of geo object generated a large number of keys",
+                      "obj"_attr = redact(obj),
+                      "numKeys"_attr = keysToAdd.size());
     }
 
     invariant(keys->empty());

@@ -459,7 +459,7 @@ Status _collModInternal(OperationContext* opCtx,
                 oldExpireSecs, newExpireSecs, oldHidden, newHidden, result));
 
             if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
-                LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled.");
+                LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled");
                 uasserted(50970, "trigger rollback after the index update");
             }
         }

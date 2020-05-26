@@ -353,13 +353,16 @@ bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
     if (!record) {
         auto writesRecorded = _sideWritesCounter->load();
         if (writesRecorded != _numApplied) {
-            const std::string message = str::stream()
-                << "The number of side writes recorded does not match the number "
-                   "applied, despite the table appearing empty. Writes recorded: "
-                << writesRecorded << ", applied: " << _numApplied;
-
-            dassert(writesRecorded == _numApplied, message);
-            LOGV2_WARNING(20692, "{message}", "message"_attr = message);
+            dassert(writesRecorded == _numApplied,
+                    (str::stream()
+                     << "The number of side writes recorded does not match the number "
+                        "applied, despite the table appearing empty. Writes recorded: "
+                     << writesRecorded << ", applied: " << _numApplied));
+            LOGV2_WARNING(20692,
+                          "The number of side writes recorded does not match the number applied, "
+                          "despite the table appearing empty",
+                          "writesRecorded"_attr = writesRecorded,
+                          "applied"_attr = _numApplied);
         }
         return true;
     }
