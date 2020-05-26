@@ -415,7 +415,6 @@ mongod = env.Program(
         'db/repl/repl_set_commands',
         'db/repl/repl_settings',
         'db/repl/rs_rollback',
-        'db/repl/rslog',
         'db/repl/serveronly_repl',
         'db/repl/storage_interface_impl',
         'db/repl/topology_coordinator',

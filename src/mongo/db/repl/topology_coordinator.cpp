@@ -56,7 +56,6 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -341,7 +340,7 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
         // Only log when we had a valid sync source before
         static constexpr char message[] = "Could not find member to sync from";
         if (!_syncSource.empty()) {
-            LOGV2_OPTIONS(21798, {logv2::LogTag::kRS}, message);
+            LOGV2(21798, message);
         }
         setMyHeartbeatMessage(now, message);
 

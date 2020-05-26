@@ -71,7 +71,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback_source.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -1223,11 +1222,10 @@ Status _syncRollback(OperationContext* opCtx,
 
     FixUpInfo how;
     how.localTopOfOplog = replCoord->getMyLastAppliedOpTime();
-    LOGV2_OPTIONS(21681,
-                  {logv2::LogTag::kRS},
-                  "Starting rollback. Sync source: {syncSource}",
-                  "Starting rollback",
-                  "syncSource"_attr = rollbackSource.getSource());
+    LOGV2(21681,
+          "Starting rollback. Sync source: {syncSource}",
+          "Starting rollback",
+          "syncSource"_attr = rollbackSource.getSource());
     how.rbid = rollbackSource.getRollbackId();
     uassert(
         40506, "Upstream node rolled back. Need to retry our rollback.", how.rbid == requiredRBID);
@@ -2059,13 +2057,11 @@ Status syncRollback(OperationContext* opCtx,
                                   replCoord,
                                   replicationProcess);
 
-    LOGV2_OPTIONS(21722,
-                  {logv2::LogTag::kRS},
-                  "Rollback finished. The final minValid is: "
-                  "{minValid}",
-                  "Rollback finished",
-                  "minValid"_attr =
-                      replicationProcess->getConsistencyMarkers()->getMinValid(opCtx));
+    LOGV2(21722,
+          "Rollback finished. The final minValid is: "
+          "{minValid}",
+          "Rollback finished",
+          "minValid"_attr = replicationProcess->getConsistencyMarkers()->getMinValid(opCtx));
 
     return status;
 }

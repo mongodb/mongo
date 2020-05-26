@@ -152,12 +152,6 @@ env.Library(
     ],
 )
 
-env.Library('rslog',
-            'rslog.cpp',
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-            ])
-
 env.Library(
     target='abstract_async_component',
     source=[
@@ -401,7 +395,6 @@ env.Library(
         'replication_process',
         'roll_back_local_operations',
         'rollback_impl',
-        'rslog',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
@@ -665,7 +658,6 @@ env.Library('topology_coordinator',
                 'member_data',
                 'replica_set_messages',
                 'repl_settings',
-                'rslog',
                 'repl_coordinator_interface',
             ],
             LIBDEPS_PRIVATE=[
@@ -708,7 +700,6 @@ env.Library(
         'replica_set_messages',
         'replication_process',
         'reporter',
-        'rslog',
         'scatter_gather',
         'topology_coordinator',
     ],

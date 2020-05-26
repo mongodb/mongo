@@ -83,7 +83,6 @@
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -1243,9 +1242,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
     _updateMemberStateFromTopologyCoordinator(lk);
 
-    LOGV2_OPTIONS(21331,
-                  {logv2::LogTag::kRS},
-                  "Transition to primary complete; database writes are now permitted");
+    LOGV2(21331, "Transition to primary complete; database writes are now permitted");
     _drainFinishedCond.notify_all();
     _externalState->startNoopWriter(_getMyLastAppliedOpTime_inlock());
 }
@@ -3105,25 +3102,22 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
 
     int curMaintenanceCalls = _topCoord->getMaintenanceCount();
     if (activate) {
-        LOGV2_OPTIONS(21350,
-                      {logv2::LogTag::kRS},
-                      "going into maintenance mode with {otherMaintenanceModeTasksInProgress} "
-                      "other maintenance mode tasks in progress",
-                      "Going into maintenance mode",
-                      "otherMaintenanceModeTasksInProgress"_attr = curMaintenanceCalls);
+        LOGV2(21350,
+              "going into maintenance mode with {otherMaintenanceModeTasksInProgress} "
+              "other maintenance mode tasks in progress",
+              "Going into maintenance mode",
+              "otherMaintenanceModeTasksInProgress"_attr = curMaintenanceCalls);
         _topCoord->adjustMaintenanceCountBy(1);
     } else if (curMaintenanceCalls > 0) {
         invariant(_topCoord->getRole() == TopologyCoordinator::Role::kFollower);
 
         _topCoord->adjustMaintenanceCountBy(-1);
 
-        LOGV2_OPTIONS(
-            21351,
-            {logv2::LogTag::kRS},
-            "leaving maintenance mode ({otherMaintenanceModeTasksOngoing} other maintenance mode "
-            "tasks ongoing)",
-            "Leaving maintenance mode",
-            "otherMaintenanceModeTasksOngoing"_attr = curMaintenanceCalls - 1);
+        LOGV2(21351,
+              "leaving maintenance mode ({otherMaintenanceModeTasksOngoing} other maintenance mode "
+              "tasks ongoing)",
+              "Leaving maintenance mode",
+              "otherMaintenanceModeTasksOngoing"_attr = curMaintenanceCalls - 1);
     } else {
         LOGV2_WARNING(21411, "Attempted to leave maintenance mode but it is not currently active");
         return Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
@@ -4081,12 +4075,11 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _cancelPriorityTakeover_inlock();
     }
 
-    LOGV2_OPTIONS(21358,
-                  {logv2::LogTag::kRS},
-                  "transition to {newState} from {oldState}",
-                  "Replica set state transition",
-                  "newState"_attr = newState,
-                  "oldState"_attr = _memberState);
+    LOGV2(21358,
+          "transition to {newState} from {oldState}",
+          "Replica set state transition",
+          "newState"_attr = newState,
+          "oldState"_attr = _memberState);
     _memberState = newState;
 
     _cancelAndRescheduleElectionTimeout_inlock();
@@ -4436,11 +4429,10 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     // If the SplitHorizon has changed, reply to all waiting isMasters with an error.
     _errorOnPromisesIfHorizonChanged(lk, opCtx, oldConfig, newConfig, _selfIndex, myIndex);
 
-    LOGV2_OPTIONS(21392,
-                  {logv2::LogTag::kRS},
-                  "New replica set config in use: {config}",
-                  "New replica set config in use",
-                  "config"_attr = _rsConfig.toBSON());
+    LOGV2(21392,
+          "New replica set config in use: {config}",
+          "New replica set config in use",
+          "config"_attr = _rsConfig.toBSON());
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
         LOGV2(21393,
