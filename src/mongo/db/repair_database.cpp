@@ -40,7 +40,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_validation.h"
@@ -197,7 +196,6 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
 
     LOGV2(21029, "repairDatabase", "db"_attr = dbName);
 
-    BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
     opCtx->checkForInterrupt();
 

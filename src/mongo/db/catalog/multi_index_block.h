@@ -40,7 +40,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -289,8 +288,6 @@ private:
     boost::optional<UUID> _collectionUUID;
 
     std::vector<IndexToBuild> _indexes;
-
-    std::unique_ptr<BackgroundOperation> _backgroundOperation;
 
     IndexBuildMethod _method = IndexBuildMethod::kHybrid;
 

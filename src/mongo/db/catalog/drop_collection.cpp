@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/drop_collection.h"
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/client.h"
@@ -256,7 +255,6 @@ Status _dropCollection(OperationContext* opCtx,
     WriteUnitOfWork wunit(opCtx);
 
     int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
-    BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     status =
         systemCollectionMode == DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops

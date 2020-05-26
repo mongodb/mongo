@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"

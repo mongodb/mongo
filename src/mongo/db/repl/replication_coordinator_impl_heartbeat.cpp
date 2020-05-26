@@ -842,9 +842,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-
-    // Inform the index builds coordinator of the replica set reconfig.
-    IndexBuildsCoordinator::get(opCtx.get())->onReplicaSetReconfig();
 }
 
 void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(

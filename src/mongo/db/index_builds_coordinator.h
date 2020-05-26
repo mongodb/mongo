@@ -303,11 +303,6 @@ public:
                                    const CommitQuorumOptions& newCommitQuorum) = 0;
 
     /**
-     * TODO: This is not yet implemented.
-     */
-    void recoverIndexBuilds();
-
-    /**
      * Returns the number of index builds that are running on the specified database.
      */
     int numInProgForDb(StringData db) const;
@@ -359,13 +354,10 @@ public:
     void awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db);
 
     /**
-     * Called by the replication coordinator when a replica set reconfig occurs, which could affect
-     * any index build to make their commit quorum unachievable.
-     *
-     * Checks if the commit quorum is still satisfiable for each index build, if it is no longer
-     * satisfiable, then those index builds are aborted.
+     * Waits until an index build completes. If there are no index builds in progress, returns
+     * immediately.
      */
-    void onReplicaSetReconfig();
+    void waitUntilAnIndexBuildFinishes(OperationContext* opCtx);
 
     //
     // Helper functions for creating indexes that do not have to be managed by the
@@ -734,6 +726,7 @@ protected:
     void _awaitNoBgOpInProgForDb(stdx::unique_lock<Latch>& lk,
                                  OperationContext* opCtx,
                                  StringData db);
+
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");
 
@@ -742,6 +735,10 @@ protected:
 
     // Waiters are notified whenever one of the three maps above has something added or removed.
     stdx::condition_variable _indexBuildsCondVar;
+
+    // Generation counter of completed index builds. Used in conjuction with the condition variable
+    // to receive notifications when an index build completes.
+    uint32_t _indexBuildsCompletedGen;
 
     // Handles actually building the indexes.
     IndexBuildsManager _indexBuildsManager;

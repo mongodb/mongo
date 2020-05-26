@@ -36,7 +36,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
@@ -463,12 +462,8 @@ BSONObj runCreateIndexesOnNewCollection(OperationContext* opCtx,
 bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj,
-                                     std::string& errmsg,
                                      BSONObjBuilder& result) {
     const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
-
-    // Disallows drops and renames on this namespace.
-    BackgroundOperation backgroundOp(ns.ns());
 
     uassertStatusOK(userAllowedWriteNS(ns));
 
@@ -726,7 +721,7 @@ public:
         bool shouldLogMessageOnAlreadyBuildingError = true;
         while (true) {
             try {
-                return runCreateIndexesWithCoordinator(opCtx, dbname, cmdObj, errmsg, result);
+                return runCreateIndexesWithCoordinator(opCtx, dbname, cmdObj, result);
             } catch (const DBException& ex) {
                 hangAfterIndexBuildAbort.pauseWhileSet();
                 // We can only wait for an existing index build to finish if we are able to release
@@ -760,7 +755,7 @@ public:
                 // This is a bit racy since we are not holding a lock across discovering an
                 // in-progress build and starting to listen for completion. It is good enough,
                 // however: we can only wait longer than needed, not less.
-                BackgroundOperation::waitUntilAnIndexBuildFinishes(opCtx, nss.ns());
+                IndexBuildsCoordinator::get(opCtx)->waitUntilAnIndexBuildFinishes(opCtx);
             }
         }
     }

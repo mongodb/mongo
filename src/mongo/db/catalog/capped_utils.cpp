@@ -34,7 +34,6 @@
 #include "mongo/db/catalog/capped_utils.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -92,7 +91,6 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
                           << "Cannot truncate a live oplog while replicating: " << collectionName);
     }
 
-    BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collection->uuid());
 
     WriteUnitOfWork wuow(opCtx);
@@ -252,7 +250,6 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
     uassert(
         ErrorCodes::NamespaceNotFound, str::stream() << "database " << dbname << " not found", db);
 
-    BackgroundOperation::assertNoBgOpInProgForNs(ns);
     if (Collection* coll = autoColl.getCollection()) {
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }

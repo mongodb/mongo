@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/rename_collection.h"
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -121,7 +120,6 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream() << "Source collection " << source.ns() << " does not exist");
     }
 
-    BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
     Collection* targetColl =
@@ -241,7 +239,6 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
             invariant(renameOpTimeFromApplyOps.isNull());
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(targetColl->ns().ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             targetColl->uuid());
 
@@ -509,7 +506,6 @@ Status renameBetweenDBs(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "Cannot rename collections between a replicated and an unreplicated database"};
 
-    BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
     auto targetDB = DatabaseHolder::get(opCtx)->getDb(opCtx, target.db());

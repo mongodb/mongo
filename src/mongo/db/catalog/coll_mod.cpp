@@ -37,7 +37,6 @@
 #include <memory>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
@@ -327,7 +326,6 @@ Status _collModInternal(OperationContext* opCtx,
 
     // This can kill all cursors so don't allow running it while a background operation is in
     // progress.
-    BackgroundOperation::assertNoBgOpInProgForNs(nss);
     if (coll) {
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }

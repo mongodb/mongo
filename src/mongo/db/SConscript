@@ -836,17 +836,6 @@ env.Library(
 )
 
 env.Library(
-    target="background",
-    source=[
-        "background.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
-)
-
-env.Library(
     target="index_builds_coordinator_mongod",
     source=[
         "index_builds_coordinator_mongod.cpp",
@@ -1026,7 +1015,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection',
         'rw_concern_d',
-        'background',
         'logical_clock',
     ],
     LIBDEPS_PRIVATE=[
@@ -1134,7 +1122,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/elapsed_tracker',
         '$BUILD_DIR/third_party/s2/s2',
         'audit',
-        'background',
         'bson/dotted_path_support',
         'catalog/collection',
         'catalog/collection_query_info',

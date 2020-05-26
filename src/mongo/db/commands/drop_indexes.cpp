@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_indexes.h"
@@ -150,7 +149,6 @@ public:
                 uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNss.ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             collection->uuid());
 

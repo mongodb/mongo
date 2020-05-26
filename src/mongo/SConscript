@@ -360,7 +360,6 @@ mongod = env.Program(
         'base',
         'db/auth/auth_op_observer',
         'db/auth/authmongod',
-        'db/background',
         'db/bson/dotted_path_support',
         'db/catalog/catalog_impl',
         'db/catalog/collection_options',

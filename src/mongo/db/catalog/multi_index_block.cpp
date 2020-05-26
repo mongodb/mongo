@@ -284,9 +284,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             _indexes.push_back(std::move(index));
         }
 
-        if (isBackgroundBuilding())
-            _backgroundOperation.reset(new BackgroundOperation(ns));
-
         Status status = onInit(indexInfoObjs);
         if (!status.isOK()) {
             return status;
@@ -351,7 +348,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     }
 
     if (MONGO_unlikely(hangAfterSettingUpIndexBuild.shouldFail())) {
-        // Hang the build after the BackgroundOperation and curOP info is set up.
+        // Hang the build after the curOP info is set up.
         LOGV2(20387, "Hanging index build due to failpoint 'hangAfterSettingUpIndexBuild'");
         hangAfterSettingUpIndexBuild.pauseWhileSet();
     }

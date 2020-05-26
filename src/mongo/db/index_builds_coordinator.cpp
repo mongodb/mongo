@@ -1380,8 +1380,14 @@ void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(OperationContext* opCtx, Str
     _awaitNoBgOpInProgForDb(lk, opCtx, db);
 }
 
-void IndexBuildsCoordinator::onReplicaSetReconfig() {
-    // TODO: not yet implemented.
+void IndexBuildsCoordinator::waitUntilAnIndexBuildFinishes(OperationContext* opCtx) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    if (_allIndexBuilds.empty()) {
+        return;
+    }
+    const auto generation = _indexBuildsCompletedGen;
+    opCtx->waitForConditionOrInterrupt(
+        _indexBuildsCondVar, lk, [&] { return _indexBuildsCompletedGen != generation; });
 }
 
 void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
@@ -1568,6 +1574,7 @@ void IndexBuildsCoordinator::_unregisterIndexBuild(
 
     LOGV2(4656004, "Unregistering index build", "buildUUID"_attr = replIndexBuildState->buildUUID);
     _indexBuildsManager.unregisterIndexBuild(replIndexBuildState->buildUUID);
+    _indexBuildsCompletedGen++;
     _indexBuildsCondVar.notify_all();
 }
 

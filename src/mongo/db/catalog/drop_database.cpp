@@ -35,7 +35,6 @@
 
 #include <algorithm>
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -97,7 +96,6 @@ void _finishDropDatabase(OperationContext* opCtx,
     auto dropPendingGuard = makeGuard([db, opCtx] { db->setDropPending(opCtx, false); });
 
     if (!abortIndexBuilds) {
-        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
         IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
     }
 
@@ -269,7 +267,6 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
             }
 
             if (!abortIndexBuilds) {
-                BackgroundOperation::assertNoBgOpInProgForNs(nss.ns());
                 IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
                     CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)->uuid());
             }

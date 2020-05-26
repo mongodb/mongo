@@ -45,7 +45,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
@@ -1573,7 +1572,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 Lock::TempRelease release(opCtx->lockState());
 
-                BackgroundOperation::awaitNoBgOpInProgForDb(nss.db());
                 IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, nss.db());
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
@@ -1617,7 +1615,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                 "command"_attr = redact(o),
                                 "namespace"_attr = ns);
                 }
-                BackgroundOperation::awaitNoBgOpInProgForNs(ns);
                 IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
                     opCtx, swUUID.get());
 

@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/drop_indexes.h"
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -429,7 +428,6 @@ Status dropIndexes(OperationContext* opCtx,
     } else {
         // The index catalog requires that no active index builders are running when dropping
         // indexes.
-        BackgroundOperation::assertNoBgOpInProgForNs(collection->ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
     }
 
@@ -477,7 +475,6 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                   "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(nss);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             collection->uuid());
 
