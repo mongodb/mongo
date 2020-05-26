@@ -166,12 +166,11 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         self._resmoke_logger.info("verbatim resmoke.py invocation: %s",
                                   " ".join([shlex.quote(arg) for arg in sys.argv]))
 
-        # TODO: SERVER-47611
-        # if config.EVERGREEN_TASK_ID:
-        #     local_args = parser.to_local_args()
-        #     self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
-        #                               os.path.join("buildscripts", "resmoke.py"),
-        #                               " ".join(local_args))
+        if config.EVERGREEN_TASK_ID:
+            local_args = to_local_args()
+            self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
+                                      os.path.join("buildscripts", "resmoke.py"),
+                                      " ".join(local_args))
 
         suites = None
         try:
