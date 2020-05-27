@@ -490,4 +490,4 @@ NAMED_SUITES = None
 LOGGER_DIR = None
 
 # Generated logging config for the current invocation.
-LOGGING_CONFIG = None
+LOGGING_CONFIG: dict = {}

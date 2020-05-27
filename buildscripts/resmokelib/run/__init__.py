@@ -56,10 +56,10 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         self._exit_code = 0
 
     def _setup_logging(self):
-        logging.loggers.configure_loggers(config.LOGGING_CONFIG)
+        logging.loggers.configure_loggers()
         logging.flush.start_thread()
         self._exec_logger = logging.loggers.EXECUTOR_LOGGER
-        self._resmoke_logger = self._exec_logger.new_resmoke_logger()
+        self._resmoke_logger = logging.loggers.new_resmoke_logger()
 
     def _exit_logging(self):
         if self._interrupted:
