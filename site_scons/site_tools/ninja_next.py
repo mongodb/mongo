@@ -1358,6 +1358,16 @@ def generate(env):
     SCons.Node.FS.Dir.get_csig = ninja_csig(SCons.Node.FS.Dir.get_csig)
     SCons.Node.Alias.Alias.get_csig = ninja_csig(SCons.Node.Alias.Alias.get_csig)
 
+    # Ignore CHANGED_SOURCES and CHANGED_TARGETS. We don't want those
+    # to have effect in a generation pass because the generator
+    # shouldn't generate differently depending on the current local
+    # state. Without this, when generating on Windows, if you already
+    # had a foo.obj, you would omit foo.cpp from the response file. Do the same for UNCHANGED.
+    SCons.Executor.Executor._get_changed_sources = SCons.Executor.Executor._get_sources
+    SCons.Executor.Executor._get_changed_targets = SCons.Executor.Executor._get_targets
+    SCons.Executor.Executor._get_unchanged_sources = SCons.Executor.Executor._get_sources
+    SCons.Executor.Executor._get_unchanged_targets = SCons.Executor.Executor._get_targets
+
     # Replace false action messages with nothing.
     env["PRINT_CMD_LINE_FUNC"] = ninja_noop
 
