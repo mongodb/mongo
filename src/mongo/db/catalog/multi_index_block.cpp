@@ -569,7 +569,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
         auto trackDups = !_ignoreUnique ? IndexBuildInterceptor::TrackDuplicates::kTrack
                                         : IndexBuildInterceptor::TrackDuplicates::kNoTrack;
         auto status = interceptor->drainWritesIntoIndex(
-            opCtx, _indexes[i].options, trackDups, readSource, drainYieldPolicy);
+            opCtx, _indexes[i].options, trackDups, drainYieldPolicy);
         if (!status.isOK()) {
             return status;
         }

@@ -114,19 +114,10 @@ public:
      *
      * This is resumable, so subsequent calls will start the scan at the record immediately
      * following the last inserted record from a previous call to drainWritesIntoIndex.
-     *
-     * TODO (SERVER-40894): Implement draining while reading at a timestamp. The following comment
-     * does not apply.
-     * When 'readSource' is not kUnset, perform the drain by reading at the timestamp described by
-     * the ReadSource. This will always reset the ReadSource to its original value before returning.
-     * The drain otherwise reads at the pre-existing ReadSource on the RecoveryUnit. This may be
-     * necessary by callers that can only guarantee consistency of data up to a certain point in
-     * time.
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
                                 const InsertDeleteOptions& options,
                                 TrackDuplicates trackDups,
-                                RecoveryUnit::ReadSource readSource,
                                 DrainYieldPolicy drainYieldPolicy);
 
     SkippedRecordTracker* getSkippedRecordTracker() {

@@ -112,11 +112,8 @@ Status IndexBuildInterceptor::checkDuplicateKeyConstraints(OperationContext* opC
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    const InsertDeleteOptions& options,
                                                    TrackDuplicates trackDuplicates,
-                                                   RecoveryUnit::ReadSource readSource,
                                                    DrainYieldPolicy drainYieldPolicy) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-    // Reading at a timestamp during hybrid index builds is not supported.
-    invariant(readSource == RecoveryUnit::ReadSource::kUnset);
 
     // These are used for logging only.
     int64_t totalDeleted = 0;
