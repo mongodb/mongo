@@ -86,7 +86,7 @@ public:
         if (!swSaslPassword.isOK()) {
             LOGV2_ERROR(20256,
                         "Could not prep security key file for SCRAM-SHA-256",
-                        "status"_attr = swSaslPassword.getStatus());
+                        "error"_attr = swSaslPassword.getStatus());
             return boost::none;
         }
         const auto passwordDigest = mongo::createPasswordDigest(
@@ -138,7 +138,7 @@ using std::string;
 bool setUpSecurityKey(const string& filename) {
     auto swKeyStrings = mongo::readSecurityFile(filename);
     if (!swKeyStrings.isOK()) {
-        LOGV2(20254, "Read security file failed", "status"_attr = swKeyStrings.getStatus());
+        LOGV2(20254, "Read security file failed", "error"_attr = swKeyStrings.getStatus());
         return false;
     }
 
@@ -146,9 +146,10 @@ bool setUpSecurityKey(const string& filename) {
 
     if (keyStrings.size() > 2) {
         LOGV2_ERROR(20258,
-                    "Only two keys are supported in the security key file, {size} are "
+                    "Only two keys are supported in the security key file, {numKeys} are "
                     "specified in {filename}",
-                    "size"_attr = keyStrings.size(),
+                    "Only two keys are supported in the security key file",
+                    "numKeys"_attr = keyStrings.size(),
                     "filename"_attr = filename);
         return false;
     }

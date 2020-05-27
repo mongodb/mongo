@@ -276,7 +276,7 @@ FTDCFileManager::recoverInterimFile() {
         LOGV2(20630,
               "Unclean full-time diagnostic data capture shutdown detected, found interim file,  "
               "but failed to open it, some metrics may have been lost",
-              "status"_attr = s);
+              "error"_attr = s);
 
         // Note: We ignore any actual errors as reading from the interim files is a best-effort
         return docs;
@@ -294,7 +294,7 @@ FTDCFileManager::recoverInterimFile() {
         LOGV2(20631,
               "Unclean full-time diagnostic data capture shutdown detected, found interim file, "
               "some metrics may have been lost",
-              "status"_attr = m.getStatus());
+              "error"_attr = m.getStatus());
     }
 
     // Note: We ignore any actual errors as reading from the interim files is a best-effort

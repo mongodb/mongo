@@ -183,7 +183,7 @@ void FTDCController::stop() {
         if (!s.isOK()) {
             LOGV2(20627,
                   "Failed to close full-time diagnostic data capture file manager",
-                  "status"_attr = s);
+                  "error"_attr = s);
         }
     }
 }
