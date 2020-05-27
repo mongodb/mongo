@@ -114,7 +114,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                                           nullptr,  // mongoProcessInterface
                                           StringMap<ExpressionContext::ResolvedNamespace>{},
                                           boost::none,                             // uuid
-                                          boost::none,                             // let
+                                          queryRequest.getLetParameters(),         // let
                                           CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
         );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
