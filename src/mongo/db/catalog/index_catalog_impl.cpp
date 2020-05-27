@@ -873,12 +873,10 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
         return Status(ErrorCodes::CannotCreateIndex, s);
     }
 
-    // Refuse to build text index for user connections if another text index exists or is in
-    // progress. This constraint is not based on technical limitations of the storage or execution
-    // layers, and thus we allow internal connections to temporarily build multiple text indexes for
-    // idempotency reasons.
+    // Refuse to build text index if another text index exists or is in progress.
+    // Collections should only have one text index.
     string pluginName = IndexNames::findPluginName(key);
-    if (pluginName == IndexNames::TEXT && opCtx->getClient()->isFromUserConnection()) {
+    if (pluginName == IndexNames::TEXT) {
         vector<const IndexDescriptor*> textIndexes;
         findIndexByType(opCtx, IndexNames::TEXT, textIndexes, includeUnfinishedIndexes);
         if (textIndexes.size() > 0) {
