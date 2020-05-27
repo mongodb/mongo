@@ -174,7 +174,7 @@ Status createCollection(OperationContext* opCtx,
     BSONElement firstElt = it.next();
     invariant(firstElt.fieldNameStringData() == "create");
 
-    Status status = userAllowedCreateNS(nss.db(), nss.coll());
+    Status status = userAllowedCreateNS(nss);
     if (!status.isOK()) {
         return status;
     }

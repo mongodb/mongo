@@ -172,95 +172,51 @@ StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj&
     return StatusWith<BSONObj>(b.obj());
 }
 
-Status userAllowedWriteNS(StringData ns) {
-    return userAllowedWriteNS(nsToDatabaseSubstring(ns), nsToCollectionSubstring(ns));
-}
-
 Status userAllowedWriteNS(const NamespaceString& ns) {
-    return userAllowedWriteNS(ns.db(), ns.coll());
+    if (ns.isSystemDotProfile()) {
+        return Status(ErrorCodes::InvalidNamespace, str::stream() << "cannot write to " << ns);
+    }
+    return userAllowedCreateNS(ns);
 }
 
-Status userAllowedWriteNS(StringData db, StringData coll) {
-    if (coll == "system.profile") {
-        return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "cannot write to '" << db << ".system.profile'");
-    }
-    return userAllowedCreateNS(db, coll);
-}
-
-Status userAllowedCreateNS(StringData db, StringData coll) {
-    // validity checking
-
-    if (db.size() == 0)
-        return Status(ErrorCodes::InvalidNamespace, "db cannot be blank");
-
-    if (!NamespaceString::validDBName(db, NamespaceString::DollarInDbNameBehavior::Allow))
-        return Status(ErrorCodes::InvalidNamespace, "invalid db name");
-
-    if (coll.size() == 0)
-        return Status(ErrorCodes::InvalidNamespace, "collection cannot be blank");
-
-    if (!NamespaceString::validCollectionName(coll))
-        return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
-
-    // check special areas
-
-    if (db == "system")
-        return Status(ErrorCodes::InvalidNamespace, "cannot use 'system' database");
-
-    if (coll.startsWith("system.")) {
-        if (coll == "system.js")
-            return Status::OK();
-        if (coll == "system.profile")
-            return Status::OK();
-        if (coll == "system.users")
-            return Status::OK();
-        if (coll == DurableViewCatalog::viewsCollectionName())
-            return Status::OK();
-        if (db == "admin") {
-            if (coll == "system.version")
-                return Status::OK();
-            if (coll == "system.roles")
-                return Status::OK();
-            if (coll == "system.new_users")
-                return Status::OK();
-            if (coll == "system.backup_users")
-                return Status::OK();
-            if (coll == "system.keys")
-                return Status::OK();
-        }
-        if (db == "config") {
-            if (coll == "system.sessions")
-                return Status::OK();
-            if (coll == "system.indexBuilds")
-                return Status::OK();
-        }
-        if (db == "local") {
-            if (coll == "system.replset")
-                return Status::OK();
-            if (coll == "system.healthlog")
-                return Status::OK();
-        }
-        return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "cannot write to '" << db << "." << coll << "'");
+Status userAllowedCreateNS(const NamespaceString& ns) {
+    if (!ns.isValid(NamespaceString::DollarInDbNameBehavior::Disallow)) {
+        return Status(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace: " << ns);
     }
 
-    // some special rules
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer && !ns.isOnInternalDb()) {
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream()
+                          << "Can't create user databases on a --configsvr instance " << ns);
+    }
 
-    if (coll.find(".system.") != string::npos) {
+    if (ns.isSystemDotProfile()) {
+        return Status::OK();
+    }
+
+    if (ns.isSystem() && !ns.isLegalClientSystemNS()) {
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "Invalid system namespace: " << ns);
+    }
+
+    if (ns.isNormalCollection() && ns.size() > NamespaceString::MaxNsCollectionLen) {
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "Fully qualified namespace is too long. Namespace: " << ns
+                                    << " Max: " << NamespaceString::MaxNsCollectionLen);
+    }
+
+    if (ns.coll().find(".system.") != std::string::npos) {
         // Writes are permitted to the persisted chunk metadata collections. These collections are
         // named based on the name of the sharded collection, e.g.
         // 'config.cache.chunks.dbname.collname'. Since there is a sharded collection
         // 'config.system.sessions', there will be a corresponding persisted chunk metadata
         // collection 'config.cache.chunks.config.system.sessions'. We wish to allow writes to this
         // collection.
-        if (coll.find(".system.sessions") != string::npos) {
+        if (ns.coll().find(".system.sessions") != std::string::npos) {
             return Status::OK();
         }
 
-        // this matches old (2.4 and older) behavior, but I'm not sure its a good idea
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "cannot write to '" << db << "." << coll << "'");
+        return Status(ErrorCodes::BadValue, str::stream() << "Invalid namespace: " << ns);
     }
 
     return Status::OK();

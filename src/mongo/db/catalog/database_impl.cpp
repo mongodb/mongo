@@ -548,28 +548,11 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
         throw WriteConflictException();
     }
 
-
-    uassert(17320,
-            str::stream() << "cannot do createCollection on namespace with a $ in it: " << nss,
-            nss.ns().find('$') == std::string::npos);
-    uassert(14037,
-            "can't create user databases on a --configsvr instance",
-            serverGlobalParams.clusterRole != ClusterRole::ConfigServer || nss.isOnInternalDb());
-
-    uassert(17316,
-            str::stream() << "cannot create a collection with an empty name on db: " << nss.db(),
-            !nss.coll().empty());
-
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
     uassert(ErrorCodes::DatabaseDropPending,
             str::stream() << "Cannot create collection " << nss
                           << " - database is in the process of being dropped.",
             !_dropPending.load());
-
-    uassert(17381,
-            str::stream() << "Fully qualified namespace is too long. Namespace: " << nss.ns()
-                          << " Max: " << NamespaceString::MaxNsCollectionLen,
-            !nss.isNormalCollection() || nss.size() <= NamespaceString::MaxNsCollectionLen);
 }
 
 Status DatabaseImpl::createView(OperationContext* opCtx,

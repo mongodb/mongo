@@ -219,7 +219,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
         if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
                 opCtx,
                 ns)) {  // someone else may have beat us to it.
-            uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));
+            uassertStatusOK(userAllowedCreateNS(ns));
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
             uassertStatusOK(db.getDb()->userCreateNS(opCtx, ns, defaultCollectionOptions));

@@ -364,7 +364,7 @@ Status Cloner::_createCollectionsForDb(
 
         const NamespaceString nss(dbName, params.collectionName);
 
-        uassertStatusOK(userAllowedCreateNS(dbName, params.collectionName));
+        uassertStatusOK(userAllowedCreateNS(nss));
         Status status = writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);

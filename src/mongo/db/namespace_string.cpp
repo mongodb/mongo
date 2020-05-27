@@ -94,32 +94,33 @@ bool NamespaceString::isCollectionlessAggregateNS() const {
 }
 
 bool NamespaceString::isLegalClientSystemNS() const {
-    if (db() == "admin") {
-        if (ns() == "admin.system.roles")
+    if (db() == kAdminDb) {
+        if (coll() == "system.roles")
             return true;
-        if (ns() == kServerConfigurationNamespace.ns())
+        if (coll() == kServerConfigurationNamespace.coll())
             return true;
-        if (ns() == kSystemKeysNamespace.ns())
+        if (coll() == kSystemKeysNamespace.coll())
             return true;
-        if (ns() == "admin.system.new_users")
+        if (coll() == "system.new_users")
             return true;
-        if (ns() == "admin.system.backup_users")
+        if (coll() == "system.backup_users")
             return true;
-    } else if (db() == "config") {
-        if (ns() == "config.system.sessions")
+    } else if (db() == kConfigDb) {
+        if (coll() == "system.sessions")
             return true;
-        if (ns() == kIndexBuildEntryNamespace.ns())
+        if (coll() == kIndexBuildEntryNamespace.coll())
+            return true;
+    } else if (db() == kLocalDb) {
+        if (coll() == kSystemReplSetNamespace.coll())
+            return true;
+        if (coll() == "system.healthlog")
             return true;
     }
-
-    if (ns() == "local.system.replset")
-        return true;
 
     if (coll() == "system.users")
         return true;
     if (coll() == "system.js")
         return true;
-
     if (coll() == kSystemDotViewsCollectionName)
         return true;
 

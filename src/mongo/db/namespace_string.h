@@ -317,8 +317,8 @@ public:
      * Returns true if the namespace is valid. Special namespaces for internal use are considered as
      * valid.
      */
-    bool isValid() const {
-        return validDBName(db(), DollarInDbNameBehavior::Allow) && !coll().empty();
+    bool isValid(DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) const {
+        return validDBName(db(), behavior) && !coll().empty();
     }
 
     /**

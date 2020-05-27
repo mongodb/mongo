@@ -530,7 +530,7 @@ public:
 
             // If someone else beat us to creating the collection, do nothing
             if (!collection) {
-                uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
+                uassertStatusOK(userAllowedCreateNS(nsString));
                 WriteUnitOfWork wuow(opCtx);
                 CollectionOptions defaultCollectionOptions;
                 uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));

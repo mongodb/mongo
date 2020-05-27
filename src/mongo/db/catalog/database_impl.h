@@ -122,7 +122,8 @@ public:
 
 private:
     /**
-     * Throws if there is a reason 'ns' cannot be created as a user collection.
+     * Throws if there is a reason 'ns' cannot be created as a user collection. Namespace pattern
+     * matching checks should be added to userAllowedCreateNS().
      */
     void _checkCanCreateCollection(OperationContext* opCtx,
                                    const NamespaceString& nss,
