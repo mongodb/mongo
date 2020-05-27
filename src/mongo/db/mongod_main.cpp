@@ -1060,6 +1060,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         const auto forceShutdown = true;
         auto stepDownStartTime = opCtx->getServiceContext()->getPreciseClockSource()->now();
         // stepDown should never return an error during force shutdown.
+        LOGV2_OPTIONS(4784900,
+                      {LogComponent::kReplication},
+                      "Stepping down the ReplicationCoordinator for shutdown",
+                      "waitTime"_attr = shutdownTimeout);
         invariantStatusOK(stepDownForShutdown(opCtx, shutdownTimeout, forceShutdown));
         shutdownTimeout = std::max(
             Milliseconds::zero(),
@@ -1076,26 +1080,36 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             opCtx = uniqueOpCtx.get();
         }
         if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {
-            LOGV2(4695101, "hangDuringQuiesceMode failpoint enabled");
+            LOGV2_OPTIONS(
+                4695101, {LogComponent::kReplication}, "hangDuringQuiesceMode failpoint enabled");
             hangDuringQuiesceMode.pauseWhileSet(opCtx);
         }
 
-        LOGV2(4695102, "Entering quiesce mode for shutdown", "quiesceTime"_attr = shutdownTimeout);
+        LOGV2_OPTIONS(4695102,
+                      {LogComponent::kReplication},
+                      "Entering quiesce mode for shutdown",
+                      "quiesceTime"_attr = shutdownTimeout);
         opCtx->sleepFor(shutdownTimeout);
-        LOGV2(4695103, "Exiting quiesce mode for shutdown");
+        LOGV2_OPTIONS(4695103, {LogComponent::kReplication}, "Exiting quiesce mode for shutdown");
     }
 
+    LOGV2_OPTIONS(4784901, {LogComponent::kCommand}, "Shutting down the MirrorMaestro");
     MirrorMaestro::shutdown(serviceContext);
 
+    LOGV2_OPTIONS(4784902, {LogComponent::kSharding}, "Shutting down the WaitForMajorityService");
     WaitForMajorityService::get(serviceContext).shutDown();
 
     // Join the logical session cache before the transport layer.
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {
+        LOGV2_OPTIONS(4784903, {LogComponent::kControl}, "Shutting down the LogicalSessionCache");
         lsc->joinOnShutDown();
     }
 
     // Terminate the index consistency check.
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        LOGV2_OPTIONS(4784904,
+                      {LogComponent::kSharding},
+                      "Shutting down the PeriodicShardedIndexConsistencyChecker");
         PeriodicShardedIndexConsistencyChecker::get(serviceContext).onShutDown();
     }
 
@@ -1107,21 +1121,26 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     // Shut down the global dbclient pool so callers stop waiting for connections.
+    LOGV2_OPTIONS(4784905, {LogComponent::kNetwork}, "Shutting down the global connection pool");
     globalConnPool.shutdown();
 
     // Inform Flow Control to stop gating writes on ticket admission. This must be done before the
     // Periodic Runner is shut down (see SERVER-41751).
     if (auto flowControlTicketholder = FlowControlTicketholder::get(serviceContext)) {
+        LOGV2(4784906, "Shutting down the FlowControlTicketholder");
         flowControlTicketholder->setInShutdown();
     }
 
     if (auto exec = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)) {
+        LOGV2_OPTIONS(
+            4784907, {LogComponent::kReplication}, "Shutting down the replica set node executor");
         exec->shutdown();
         exec->join();
     }
 
     if (auto storageEngine = serviceContext->getStorageEngine()) {
         if (storageEngine->supportsReadConcernSnapshot()) {
+            LOGV2(4784908, "Shutting down the PeriodicThreadToAbortExpiredTransactions");
             PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
         }
 
@@ -1135,29 +1154,43 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
         // This can wait a long time while we drain the secondary's apply queue, especially if
         // it is building an index.
+        LOGV2_OPTIONS(
+            4784909, {LogComponent::kReplication}, "Shutting down the ReplicationCoordinator");
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
 
+        LOGV2_OPTIONS(
+            4784910, {LogComponent::kSharding}, "Shutting down the ShardingInitializationMongoD");
         ShardingInitializationMongoD::get(serviceContext)->shutDown(opCtx);
 
         // Acquire the RSTL in mode X. First we enqueue the lock request, then kill all operations,
         // destroy all stashed transaction resources in order to release locks, and finally wait
         // until the lock request is granted.
+        LOGV2_OPTIONS(4784911,
+                      {LogComponent::kReplication},
+                      "Enqueuing the ReplicationStateTransitionLock for shutdown");
         repl::ReplicationStateTransitionLockGuard rstl(
             opCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
 
         // Kill all operations. And, makes all newly created opCtx to be immediately interrupted.
         // After this point, the opCtx will have been marked as killed and will not be usable other
         // than to kill all transactions directly below.
+        LOGV2_OPTIONS(4784912, {LogComponent::kDefault}, "Killing all operations for shutdown");
         serviceContext->setKillAllOperations();
 
         if (MONGO_unlikely(pauseWhileKillingOperationsAtShutdown.shouldFail())) {
-            LOGV2(4701700, "pauseWhileKillingOperationsAtShutdown failpoint enabled");
+            LOGV2_OPTIONS(4701700,
+                          {LogComponent::kDefault},
+                          "pauseWhileKillingOperationsAtShutdown failpoint enabled");
             sleepsecs(1);
         }
 
         // Destroy all stashed transaction resources, in order to release locks.
+        LOGV2_OPTIONS(4784913, {LogComponent::kCommand}, "Shutting down all open transactions");
         killSessionsLocalShutdownAllTransactions(opCtx);
 
+        LOGV2_OPTIONS(4784914,
+                      {LogComponent::kReplication},
+                      "Acquiring the ReplicationStateTransitionLock for shutdown");
         rstl.waitForLockUntil(Date_t::max());
 
         // Release the rstl before waiting for the index build threads to join as index build
@@ -1166,11 +1199,15 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
         // Shuts down the thread pool and waits for index builds to finish.
         // Depends on setKillAllOperations() above to interrupt the index build operations.
+        LOGV2_OPTIONS(4784915, {LogComponent::kIndex}, "Shutting down the IndexBuildsCoordinator");
         IndexBuildsCoordinator::get(serviceContext)->shutdown(opCtx);
 
         // No new readers can come in after the releasing the RSTL, as previously before releasing
         // the RSTL, we made sure that all new operations will be immediately interrupted by setting
         // ServiceContext::_globalKill to true. Reacquires RSTL in mode X.
+        LOGV2_OPTIONS(4784916,
+                      {LogComponent::kReplication},
+                      "Reacquiring the ReplicationStateTransitionLock for shutdown");
         rstl.reacquire();
 
         // We are expected to have no active readers while performing
@@ -1179,28 +1216,35 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // 1) Acquiring RSTL in mode X as all readers (except single phase hybrid index builds on
         //    secondaries) are expected to hold RSTL in mode IX.
         // 2) By waiting for all index build to finish.
+        LOGV2_OPTIONS(4784917, {LogComponent::kReplication}, "Attempting to mark clean shutdown");
         repl::ReplicationCoordinator::get(serviceContext)->markAsCleanShutdownIfPossible(opCtx);
     }
 
+    LOGV2_OPTIONS(4784918, {LogComponent::kNetwork}, "Shutting down the ReplicaSetMonitor");
     ReplicaSetMonitor::shutdown();
 
     if (auto sr = Grid::get(serviceContext)->shardRegistry()) {
+        LOGV2_OPTIONS(4784919, {LogComponent::kSharding}, "Shutting down the shard registry");
         sr->shutdown();
     }
 
     // Validator shutdown must be called after setKillAllOperations is called. Otherwise, this can
     // deadlock.
     if (auto validator = LogicalTimeValidator::get(serviceContext)) {
+        LOGV2_OPTIONS(
+            4784920, {LogComponent::kReplication}, "Shutting down the LogicalTimeValidator");
         validator->shutDown();
     }
 
     // The migrationutil executor must be shut down before shutting down the CatalogCacheLoader.
     // Otherwise, it may try to schedule work on the CatalogCacheLoader and fail.
+    LOGV2_OPTIONS(4784921, {LogComponent::kSharding}, "Shutting down the MigrationUtilExecutor");
     auto migrationUtilExecutor = migrationutil::getMigrationUtilExecutor();
     migrationUtilExecutor->shutdown();
     migrationUtilExecutor->join();
 
     if (ShardingState::get(serviceContext)->enabled()) {
+        LOGV2_OPTIONS(4784922, {LogComponent::kSharding}, "Shutting down the CatalogCacheLoader");
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
@@ -1211,6 +1255,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
     if (auto sep = serviceContext->getServiceEntryPoint()) {
+        LOGV2_OPTIONS(4784923, {LogComponent::kCommand}, "Shutting down the ServiceEntryPoint");
         if (!sep->shutdown(Seconds(10))) {
             LOGV2_OPTIONS(20563,
                           {LogComponent::kNetwork},
@@ -1220,6 +1265,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     // Shutdown and wait for the service executor to exit
     if (auto svcExec = serviceContext->getServiceExecutor()) {
+        LOGV2_OPTIONS(4784924, {LogComponent::kExecutor}, "Shutting down the service executor");
         Status status = svcExec->shutdown(Seconds(10));
         if (!status.isOK()) {
             LOGV2_OPTIONS(20564,
@@ -1229,12 +1275,18 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         }
     }
 #endif
+
+    LOGV2_OPTIONS(4784925, {LogComponent::kControl}, "Shutting down free monitoring");
     stopFreeMonitoring();
 
     // Shutdown Full-Time Data Capture
+    LOGV2_OPTIONS(4784926, {LogComponent::kFTDC}, "Shutting down full-time data capture");
     stopMongoDFTDC();
 
+    LOGV2(4784927, "Shutting down the HealthLog");
     HealthLog::get(serviceContext).shutdown();
+
+    LOGV2(4784928, "Shutting down the TTL monitor");
     shutdownTTLMonitor(serviceContext);
 
     // We should always be able to acquire the global lock at shutdown.
@@ -1242,17 +1294,20 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
     // of this function to prevent any operations from running that need a lock.
     //
+    LOGV2(4784929, "Acquiring the global lock for shutdown");
     LockerImpl* globalLocker = new LockerImpl();
     globalLocker->lockGlobal(MODE_X);
 
     // Global storage engine may not be started in all cases before we exit
     if (serviceContext->getStorageEngine()) {
+        LOGV2(4784930, "Shutting down the storage engine");
         shutdownGlobalStorageEngineCleanly(serviceContext);
     }
 
     // We drop the scope cache because leak sanitizer can't see across the
     // thread we use for proxying MozJS requests. Dropping the cache cleans up
     // the memory and makes leak sanitizer happy.
+    LOGV2_OPTIONS(4784931, {LogComponent::kDefault}, "Dropping the scope cache for shutdown");
     ScriptEngine::dropScopeCache();
 
     LOGV2_OPTIONS(20565, {LogComponent::kControl}, "Now exiting");
