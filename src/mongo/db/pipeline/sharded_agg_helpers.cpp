@@ -131,14 +131,15 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     }
 
     cmdForShards[AggregationRequest::kFromMongosName] = Value(expCtx->inMongos);
+
+    if (!collationObj.isEmpty()) {
+        cmdForShards[AggregationRequest::kCollationName] = Value(collationObj);
+    }
+
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
     if (explainVerbosity) {
         cmdForShards.reset(wrapAggAsExplain(cmdForShards.freeze(), *explainVerbosity));
-    }
-
-    if (!collationObj.isEmpty()) {
-        cmdForShards[AggregationRequest::kCollationName] = Value(collationObj);
     }
 
     if (expCtx->opCtx->getTxnNumber()) {
