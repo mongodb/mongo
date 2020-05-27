@@ -1,1 +1,4 @@
-#
+# Death test signal reports cause test failures because the report can't be
+# parsed as JSON. Suppress those messages specifically.
+signal:src/mongo/unittest/death_test.cpp
+
