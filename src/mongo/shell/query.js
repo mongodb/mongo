@@ -58,6 +58,7 @@ DBQuery.prototype.help = function() {
     print(
         "\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)");
     print("\t.itcount() - iterates through documents and counts them");
+    print("\t.getClusterTime() - returns the read timestamp for snapshot reads");
     print("\t.pretty() - pretty print each document, possibly over multiple lines");
 };
 
@@ -470,8 +471,9 @@ DBQuery.prototype.maxTimeMS = function(maxTimeMS) {
     return this._addSpecial("$maxTimeMS", maxTimeMS);
 };
 
-DBQuery.prototype.readConcern = function(level) {
-    var readConcernObj = {level: level};
+DBQuery.prototype.readConcern = function(level, atClusterTime = undefined) {
+    var readConcernObj =
+        atClusterTime ? {level: level, atClusterTime: atClusterTime} : {level: level};
 
     return this._addSpecial("readConcern", readConcernObj);
 };
@@ -675,6 +677,12 @@ DBQuery.prototype.isExhausted = function() {
     return this._cursor.isClosed() && this._cursor.objsLeftInBatch() === 0;
 };
 
+DBQuery.prototype.getClusterTime = function() {
+    // Return the read timestamp for snapshot reads, or undefined for other readConcern levels.
+    this._exec();
+    return this._cursor.getClusterTime();
+};
+
 DBQuery.shellBatchSize = 20;
 
 /**
@@ -704,6 +712,12 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
     }
 
     this._batch = cmdResult.cursor.firstBatch.reverse();  // modifies input to allow popping
+
+    // If the command result represents a snapshot read cursor, update our atClusterTime. And this
+    // atClusterTime should not change over the lifetime of the cursor.
+    if (cmdResult.cursor.atClusterTime) {
+        this._atClusterTime = cmdResult.cursor.atClusterTime;
+    }
 
     // If the command result represents a change stream cursor, update our postBatchResumeToken.
     this._updatePostBatchResumeToken(cmdResult.cursor);
@@ -826,6 +840,12 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
 
     // Successfully retrieved the next batch.
     this._batch = cmdRes.cursor.nextBatch.reverse();
+
+    // The read timestamp of a snapshot read cursor should not change over the lifetime of the
+    // cursor.
+    if (cmdRes.cursor.atClusterTime) {
+        assert.eq(this._atClusterTime, cmdRes.cursor.atClusterTime);
+    }
 };
 
 DBCommandCursor.prototype._hasNextUsingCommands = function() {
@@ -893,6 +913,11 @@ DBCommandCursor.prototype.getResumeToken = function() {
     return this._resumeToken;
 };
 
+DBCommandCursor.prototype.getClusterTime = function() {
+    // Return the read timestamp for snapshot reads, or undefined for other readConcern levels.
+    return this._atClusterTime;
+};
+
 DBCommandCursor.prototype.help = function() {
     // This is the same as the "Cursor Methods" section of DBQuery.help().
     print("\nCursor methods");
@@ -906,6 +931,7 @@ DBCommandCursor.prototype.help = function() {
     print("\t.itcount() - iterates through documents and counts them");
     print(
         "\t.getResumeToken() - for a change stream cursor, obtains the most recent valid resume token, if it exists.");
+    print("\t.getClusterTime() - returns the read timestamp for snapshot reads.");
     print("\t.pretty() - pretty print each document, possibly over multiple lines");
     print("\t.close()");
 };
