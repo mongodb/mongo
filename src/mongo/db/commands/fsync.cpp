@@ -323,14 +323,12 @@ public:
             // If we're still locked then lock count is not zero.
             invariant(lockCount > 0);
             lockCount = fsyncCmd.getLockCount_inLock();
-            LOGV2(20466,
-                  "fsyncUnlock completed. Lock count is now {lockCount}",
-                  "lockCount"_attr = lockCount);
         } else {
             invariant(fsyncCmd.getLockCount() == 0);
             lockCount = 0;
-            LOGV2(20467, "fsyncUnlock completed. mongod is now unlocked and free to accept writes");
         }
+
+        LOGV2(20466, "fsyncUnlock complete", "lockCount"_attr = lockCount);
 
         result.append("info", str::stream() << "fsyncUnlock completed");
         result.append("lockCount", lockCount);
