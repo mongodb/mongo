@@ -558,7 +558,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     LOGV2(20438,
           "Registering index build",
           "buildUUID"_attr = buildUUID,
-          "ns"_attr = ns,
+          "namespace"_attr = ns,
           "collectionUUID"_attr = *collectionUUID,
           "indexes"_attr = specs.size(),
           "firstIndex"_attr = specs[0][IndexDescriptor::kIndexNameFieldName]);
@@ -652,7 +652,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             LOGV2(20448,
                   "Index build failed: collection dropped",
                   "buildUUID"_attr = buildUUID,
-                  "ns"_attr = ns,
+                  "namespace"_attr = ns,
                   "collectionUUID"_attr = *collectionUUID,
                   "exception"_attr = ex);
             return true;
