@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/idl/config_option_no_init_test_gen.h"

@@ -58,12 +58,12 @@ Status AuthzManagerExternalStateLocal::initialize(OperationContext* opCtx) {
             LOGV2_ERROR(23750,
                         "Cycle detected in admin.system.roles; role inheritance disabled. "
                         "Remove the listed cycle and any others to re-enable role inheritance",
-                        "status"_attr = redact(status));
+                        "error"_attr = redact(status));
         } else {
             LOGV2_ERROR(23751,
                         "Could not generate role graph from admin.system.roles; "
                         "only system roles available",
-                        "status"_attr = redact(status));
+                        "error"_attr = redact(status));
         }
     }
 
@@ -472,7 +472,7 @@ void addRoleFromDocumentOrWarn(RoleGraph* roleGraph, const BSONObj& doc) {
         LOGV2_WARNING(23747,
                       "Skipping invalid admin.system.roles document while calculating privileges"
                       " for user-defined roles",
-                      "status"_attr = redact(status),
+                      "error"_attr = redact(status),
                       "doc"_attr = redact(doc));
     }
 }
@@ -503,7 +503,7 @@ Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* op
         LOGV2_ERROR(23752,
                     "Inconsistent role graph during authorization manager initialization. Only "
                     "direct privileges available.",
-                    "status"_attr = redact(status));
+                    "error"_attr = redact(status));
         newState = roleGraphStateHasCycle;
         status = Status::OK();
     } else if (status.isOK()) {
@@ -588,14 +588,14 @@ private:
             LOGV2_ERROR(23753,
                         "Unsupported modification to roles collection in oplog; "
                         "restart this process to reenable user-defined roles",
-                        "status"_attr = redact(status),
+                        "error"_attr = redact(status),
                         "entry"_attr = redact(oplogEntryBuilder.done()));
             // If a setParameter is enabled, this condition is fatal.
             fassert(51152, !roleGraphInvalidationIsFatal);
         } else if (!status.isOK()) {
             LOGV2_WARNING(23748,
                           "Skipping bad update to roles collection in oplog",
-                          "status"_attr = redact(status),
+                          "error"_attr = redact(status),
                           "op"_attr = redact(_op));
         }
         status = _externalState->_roleGraph.recomputePrivilegeData();
@@ -604,7 +604,7 @@ private:
             LOGV2_ERROR(23754,
                         "Inconsistent role graph during authorization manager initialization. "
                         "Only direct privileges available after applying oplog entry",
-                        "status"_attr = redact(status),
+                        "error"_attr = redact(status),
                         "op"_attr = redact(_op));
         } else {
             fassert(17183, status);
