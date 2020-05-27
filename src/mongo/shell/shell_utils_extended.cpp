@@ -178,7 +178,9 @@ BSONObj cat(const BSONObj& args, void* data) {
 
     stringstream ss;
     ifstream f(filePath.valuestrsafe(), mode);
-    uassert(CANT_OPEN_FILE, "couldn't open file", f.is_open());
+    uassert(CANT_OPEN_FILE,
+            str::stream() << "couldn't open file " << filePath.valuestrsafe(),
+            f.is_open());
     std::streamsize fileSize = 0;
     // will throw on filesystem error
     fileSize = boost::filesystem::file_size(filePath.valuestrsafe());
@@ -198,7 +200,7 @@ BSONObj md5sumFile(const BSONObj& args, void* data) {
     BSONElement e = singleArg(args);
     stringstream ss;
     FILE* f = fopen(e.valuestrsafe(), "rb");
-    uassert(CANT_OPEN_FILE, "couldn't open file", f);
+    uassert(CANT_OPEN_FILE, str::stream() << "couldn't open file " << e.valuestrsafe(), f);
     ON_BLOCK_EXIT([&] { fclose(f); });
 
     md5digest d;
