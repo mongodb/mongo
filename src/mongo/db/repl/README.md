@@ -59,19 +59,50 @@ A secondary keeps its data synchronized with its sync source by fetching oplog e
 source. This is done via the
 [`OplogFetcher`](https://github.com/mongodb/mongo/blob/929cd5af6623bb72f05d3364942e84d053ddea0d/src/mongo/db/repl/oplog_fetcher.h).
 
-The `OplogFetcher` first creates a connection to the sync source. Through this connection, it will
-establish an **exhaust cursor** to fetch oplog entries. This means that after the initial `find` and
-`getMore` are sent, the sync source will keep sending all subsequent batches without needing the
-fetching node to run any additional `getMore`s.
+The `OplogFetcher` does not directly apply the operations it retrieves from the sync source.
+Rather, it puts them into a buffer (the **`OplogBuffer`**) and another thread is in charge of
+taking the operations off the buffer and applying them. That buffer uses an in-memory blocking
+queue for steady state replication; there is a similar collection-backed buffer used for initial
+sync.
+
+#### Oplog Fetcher Lifecycle
+
+The `OplogFetcher` is owned by the
+[`BackgroundSync`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/bgsync.h) thread.
+The `BackgroundSync` thread runs continuously while a node is in `SECONDARY` state.
+`BackgroundSync` sits in a loop, where each iteration it first chooses a sync source with the
+`SyncSourceResolver` and then starts up the `OplogFetcher`.
+
+In steady state, the `OplogFetcher` continuously receives and processes batches of oplog entries
+from its sync source.
+
+The `OplogFetcher` could terminate because the first batch implies that a rollback is required, it
+could receive an error from the sync source, or it could just be shut down by its owner, such as
+when `BackgroundSync` itself is shut down. In addition, after every batch, the `OplogFetcher` runs
+validation checks on the documents in that batch. It then decides if it should continue syncing
+from the current sync source. If validation fails, or if the node decides to stop syncing, the
+`OplogFetcher` will shut down.
+
+When the `OplogFetcher` terminates, `BackgroundSync` restarts sync source selection, exits, or goes
+into ROLLBACK depending on the return status.
+
+#### Oplog Fetcher Implementation Details
 
 Let’s refer to the sync source as node A and the fetching node as node B.
 
+After starting up, the `OplogFetcher` first creates a connection to sync source A. Through this
+connection, it will establish an **exhaust cursor** to fetch oplog entries. This means that after
+the initial `find` and `getMore` are sent, A will keep sending all subsequent batches without
+needing B to run any additional `getMore`s.
+
 The `find` command that B’s `OplogFetcher` first sends to sync source A has a greater than or equal
 predicate on the timestamp of the last oplog entry it has fetched. The original `find` command
-should always return at least 1 document due to the greater than or equal predicate. If it does not,
-that means that the A’s oplog is behind B's and thus A should not be B’s sync source. If it does
+should always return at least 1 document due to the greater than or equal predicate. If it does
+not, that means that A’s oplog is behind B's and thus A should not be B’s sync source. If it does
 return a non-empty batch, but the first document returned does not match the last entry in B’s
-oplog, that means that B's oplog has diverged from A's and it should go into
+oplog, there are two possibilities. If the oldest entry in A's oplog is newer than B's latest
+entry, that means that B is too stale to sync from A. As a result, B blacklists A as a sync source
+candidate. Otherwise, B's oplog has diverged from A's and it should go into
 [**ROLLBACK**](https://docs.mongodb.com/manual/core/replica-set-rollbacks/).
 
 After getting the original `find` response, secondaries check the metadata that accompanies the
@@ -80,8 +111,8 @@ not rolled back since it was chosen and that it is still ahead of them.
 
 The `OplogFetcher` specifies `awaitData: true, tailable: true` on the cursor so that subsequent
 batches block until their `maxTimeMS` expires waiting for more data instead of returning
-immediately. If there is no data to return at the end of `maxTimeMS`, the `OplogFetcher` receives an
-empty batch and will wait on the next batch.
+immediately. If there is no data to return at the end of `maxTimeMS`, the `OplogFetcher` receives
+an empty batch and will wait on the next batch.
 
 If the `OplogFetcher` encounters any errors while trying to connect to the sync source or get a
 batch, it will use `OplogFetcherRestartDecision` to check that it has enough retries left to create
@@ -91,20 +122,28 @@ errors enough times in a row to exhaust its retries, that might be an indication
 something wrong with the connection or the sync source. In that case, the `OplogFetcher` will shut
 down with an error status.
 
-The `OplogFetcher` is owned by the
-[`BackgroundSync`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/bgsync.h) thread.
-The `BackgroundSync` thread runs continuously while a node is in `SECONDARY` state. `BackgroundSync`
-sits in a loop, where each iteration it first chooses a sync source with the `SyncSourceResolver`
-and then starts up the `OplogFetcher`. When the `OplogFetcher` terminates, `BackgroundSync` restarts
-sync source selection, exits, or goes into ROLLBACK depending on the return status. The
-`OplogFetcher` could terminate because the first batch implies that a rollback is required, it could
-receive an error from the sync source, or it could just be shut down by its owner, such as when
-`BackgroundSync` itself is shut down.
+The `OplogFetcher` may shut down for a variety of other reasons as well. After each successful
+batch, the `OplogFetcher` decides if it should continue syncing from the current sync source. If
+the `OplogFetcher` decides to continue, it will wait for the next batch to arrive and repeat. If
+not, the `OplogFetcher` will terminate, which will lead to `BackgroundSync` choosing a new sync
+source. Reasons for changing sync sources include:
 
-The `OplogFetcher` does not directly apply the operations it retrieves from the sync source. Rather,
-it puts them into a buffer (the **`OplogBuffer`**) and another thread is in charge of taking the
-operations off the buffer and applying them. That buffer uses an in-memory blocking queue for steady
-state replication; there is a similar collection-backed buffer used for initial sync.
+* If the node is no longer in the replica set configuration.
+* If the current sync source is no longer in the replica set configuration.
+* If the user has requested another sync source via the `replSetSyncFrom` command.
+* If chaining is disabled and the node is not currently syncing from the primary.
+* If the sync source is not the primary, does not have its own sync source, and is not ahead of
+  the node. This indicates that the sync source will not receive writes in a timely manner. As a
+  result, continuing to sync from it will likely cause the node to be lagged.
+* If the most recent OpTime of the sync source is more than `maxSyncSourceLagSecs` seconds behind
+  another member's latest oplog entry. This ensures that the sync source is not too far behind
+  other nodes in the set. `maxSyncSourceLagSecs` is a server parameter and has a default value of
+  30 seconds.
+* If the node has discovered another eligible sync source that is significantly closer. A
+  significantly closer node has a ping time that is at least `changeSyncSourceThresholdMillis`
+  lower than our current sync source. This minimizes the number of nodes that have sync sources
+  located far away.`changeSyncSourceThresholdMillis` is a server parameter and has a default value
+  of 5 ms.
 
 ### Sync Source Selection
 
