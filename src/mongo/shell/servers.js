@@ -995,7 +995,7 @@ MongoRunner.stopMongod = function(conn, signal, opts, waitpid) {
     opts = opts || {};
     waitpid = (waitpid === undefined) ? true : waitpid;
 
-    if (signal !== MongoRunner.EXIT_CLEAN) {
+    if (signal !== MongoRunner.EXIT_CLEAN && typeof TestData !== 'undefined') {
         TestData.allowUncleanShutdowns = true;
     }
 
