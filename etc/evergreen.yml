@@ -7276,6 +7276,17 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 15
 
+- name: causally_consistent_read_concern_snapshot_passthrough_gen
+  tags: ["causally_consistent", "read_write_concern"]
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 15
+
 - name: sharded_causally_consistent_jscore_passthrough_gen
   tags: ["causally_consistent"]
   depends_on:
@@ -10539,7 +10550,7 @@ buildvariants:
   - name: audit
   - name: .auth !.multiversion
   - name: buildscripts_test
-  - name: .causally_consistent !.txns
+  - name: .causally_consistent !.txns !.read_write_concern
   - name: causally_consistent_jscore_txns_passthrough
   - name: .change_streams
   - name: .misc_js !.non_read_maj
@@ -10703,9 +10714,10 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   - name: multiversion_gen
-  - name: .read_write_concern !.aggregation
+  - name: .read_write_concern !.large !.aggregation
+  - name: .read_write_concern .large !.aggregation
     distros:
-      - rhel62-large
+    - rhel62-large
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel62-large

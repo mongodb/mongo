@@ -187,6 +187,7 @@ CREATE_TEST_MEMBERSHIP_MAP = {
         "logical_session_cache_standalone_1sec_refresh_jscore_passthrough",
         "logical_session_cache_standalone_default_refresh_jscore_passthrough",
         "read_concern_linearizable_passthrough", "read_concern_majority_passthrough",
+        "causally_consistent_read_concern_snapshot_passthrough",
         "replica_sets_initsync_jscore_passthrough",
         "replica_sets_initsync_static_jscore_passthrough", "replica_sets_jscore_passthrough",
         "replica_sets_kill_primary_jscore_passthrough",

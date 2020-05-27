@@ -53,6 +53,10 @@ function runCommandWithReadAndWriteConcerns(
     }
 
     let shouldForceReadConcern = kCommandsSupportingReadConcern.has(commandName);
+    if (kDefaultReadConcern.level === "snapshot" && !kCommandsSupportingSnapshot.has(commandName)) {
+        shouldForceReadConcern = false;
+    }
+
     let shouldForceWriteConcern = kCommandsSupportingWriteConcern.has(commandName);
 
     // All commands in a multi-document transaction have the autocommit property.
@@ -96,7 +100,8 @@ function runCommandWithReadAndWriteConcerns(
         shouldForceWriteConcern = false;
     }
 
-    if (kCommandsOnlySupportingReadConcernSnapshot.has(commandName) &&
+    if (commandObj.hasOwnProperty("autocommit") &&
+        kWriteCommandsSupportingSnapshotInTransaction.has(commandName) &&
         kDefaultReadConcern.level === "snapshot") {
         shouldForceReadConcern = true;
     }
