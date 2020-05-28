@@ -1519,34 +1519,65 @@ rs.reconfig = function(cfg, options) {
     return this._runCmd(cmd);
 };
 rs.add = function(hostport, arb) {
-    var cfg = hostport;
+    let res;
+    let self = this;
 
-    var local = db.getSisterDB("local");
-    assert(local.system.replset.count() <= 1,
-           "error: local.system.replset has unexpected contents");
-    var c = local.system.replset.findOne();
-    assert(c, "no config object retrievable from local.system.replset");
+    assert.soon(function() {
+        var cfg = hostport;
 
-    c.version++;
+        var local = db.getSisterDB("local");
+        assert(local.system.replset.count() <= 1,
+               "error: local.system.replset has unexpected contents");
+        var c = local.system.replset.findOne();
+        assert(c, "no config object retrievable from local.system.replset");
 
-    var max = 0;
-    for (var i in c.members)
-        if (c.members[i]._id > max)
-            max = c.members[i]._id;
-    if (isString(hostport)) {
-        cfg = {_id: max + 1, host: hostport};
-        if (arb)
-            cfg.arbiterOnly = true;
-    } else if (arb == true) {
-        throw Error("Expected first parameter to be a host-and-port string of arbiter, but got " +
-                    tojson(hostport));
-    }
+        const attemptedVersion = c.version++;
 
-    if (cfg._id == null) {
-        cfg._id = max + 1;
-    }
-    c.members.push(cfg);
-    return this._runCmd({replSetReconfig: c});
+        var max = 0;
+        for (var i in c.members) {
+            // Omit 'newlyAdded' field if it exists in the config.
+            delete c.members[i].newlyAdded;
+            if (c.members[i]._id > max)
+                max = c.members[i]._id;
+        }
+        if (isString(hostport)) {
+            cfg = {_id: max + 1, host: hostport};
+            if (arb)
+                cfg.arbiterOnly = true;
+        } else if (arb == true) {
+            throw Error(
+                "Expected first parameter to be a host-and-port string of arbiter, but got " +
+                tojson(hostport));
+        }
+
+        if (cfg._id == null) {
+            cfg._id = max + 1;
+        }
+        c.members.push(cfg);
+
+        res = self._runCmd({replSetReconfig: c});
+        if (res === "") {
+            // _runCmd caught an exception.
+            return true;
+        }
+        if (res.ok) {
+            return true;
+        }
+        if (res.code === ErrorCodes.ConfigurationInProgress) {
+            return false;  // keep retrying
+        }
+        if (res.code === ErrorCodes.NewReplicaSetConfigurationIncompatible) {
+            // We will retry only if this error was due to our config version being too low.
+            const cfgState = local.system.replset.findOne();
+            if (cfgState.version >= attemptedVersion) {
+                return false;  // keep retrying
+            }
+        }
+        // Take no action on other errors.
+        return true;
+    }, () => tojson(res), 10 * 60 * 1000 /* timeout */, 200 /* interval */);
+
+    return res;
 };
 rs.syncFrom = function(host) {
     return db._adminCommand({replSetSyncFrom: host});

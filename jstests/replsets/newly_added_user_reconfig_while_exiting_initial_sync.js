@@ -72,15 +72,9 @@ const userReconfigFn = function() {
     const sleepAmount = Math.floor(Math.random() * 3000);  // 0-3000 ms
     print("Sleeping for " + sleepAmount + " milliseconds");
     sleep(sleepAmount);
-
-    let config;
-    assert.soonNoExcept(function() {
-        config = assert.commandWorked(db.adminCommand({replSetGetConfig: 1})).config;
-        config.settings.electionTimeoutMillis++;
-        config.version++;
-        assert.commandWorked(db.adminCommand({replSetReconfig: config}));
-        return true;
-    }, () => tojson(config));
+    const res = rs.add({priority: 0, votes: 0, host: "abcde:12345"});
+    assert.neq("", res);
+    assert.commandWorked(res);
 };
 const waitForUserReconfig = startParallelShell(userReconfigFn, primary.port);
 
@@ -96,14 +90,15 @@ assertVoteCount(primary, {
     majorityVoteCount: 2,
     writableVotingMembersCount: 2,
     writeMajorityCount: 2,
-    totalMembersCount: 2,
+    totalMembersCount: 3,
 });
 
 jsTestLog("Making sure we can see the results of the user reconfig");
 const modifiedConfig = rst.getReplSetConfigFromNode();
-const baseETMillis = baseConfig.settings.electionTimeoutMillis;
-const modifiedETMillis = modifiedConfig.settings.electionTimeoutMillis;
-assert.eq(baseETMillis + 1, modifiedETMillis, () => [tojson(baseConfig), tojson(modifiedConfig)]);
+assert.eq(3, modifiedConfig.members.length, () => [tojson(baseConfig), tojson(modifiedConfig)]);
+assert.eq("abcde:12345",
+          modifiedConfig.members[2].host,
+          () => [tojson(baseConfig), tojson(modifiedConfig)]);
 
 jsTestLog("Making sure set can accept w:2 writes");
 assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 2}}));
