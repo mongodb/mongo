@@ -43,7 +43,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_writes_tracker.h"
-#include "mongo/s/mongos_server_parameters_gen.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
 
 namespace mongo {

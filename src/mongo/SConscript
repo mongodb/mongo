@@ -688,6 +688,7 @@ env.Library(
         's/coreshard',
         's/is_mongos',
         's/mongos_topology_coordinator',
+        's/mongos_server_parameters',
         's/query/cluster_cursor_cleanup_job',
         's/sessions_collection_sharded',
         's/sharding_egress_metadata_hook_for_mongos',

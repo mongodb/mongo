@@ -93,6 +93,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        'common_s',
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/idl/server_parameter",
@@ -157,6 +158,7 @@ env.Library(
         env.Idlc('catalog/type_shard_collection.idl')[0],
         env.Idlc('chunk_version.idl')[0],
         env.Idlc('database_version.idl')[0],
+        env.Idlc('mongod_and_mongos_server_parameters.idl')[0],
         env.Idlc('request_types/balancer_collection_status.idl')[0],
         env.Idlc('request_types/clone_catalog_data.idl')[0],
         env.Idlc('request_types/clear_jumbo_flag.idl')[0],
@@ -178,7 +180,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        'mongos_server_parameters',
     ]
 )
 

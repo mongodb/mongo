@@ -36,29 +36,36 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 server_parameters:
-  readHedgingMode:
+  loadRoutingTableOnStartup:
     description: >-
-        Enables hedged reads.
-    set_at: [ startup, runtime ]
-    cpp_class:
-      name: HedgingModeServerParameter
+        Enables precaching of the mongos routing table on startup.
+    set_at: [ startup ]
+    cpp_vartype: bool
+    cpp_varname: "gLoadRoutingTableOnStartup"
+    default: true
 
-  maxTimeMSForHedgedReads:
+  warmMinConnectionsInShardingTaskExecutorPoolOnStartup:
     description: >-
-        The maxTimeMS to set on hedged reads.
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "gMaxTimeMSForHedgedReads"
-    validator:
-        gte: 0
-    default: 150
+        Enables prewarming of the connection pool.
+    set_at: [ startup ]
+    cpp_vartype: bool
+    cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup"
+    default: true
 
-  mongosShutdownTimeoutMillisForSignaledShutdown:
+  warmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS:
     description: >-
-        The time taken for quiesce mode at shutdown in response to SIGTERM.
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "mongosShutdownTimeoutMillisForSignaledShutdown"
-    default: 15000
+        How long to wait for all hosts to have at least one connection.
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS"
+    default: 2000 # 2secs
     validator:
-        gte: 0
+      gte: 0
+
+  enableFinerGrainedCatalogCacheRefresh:
+    description: >-
+        Enables the finer grained catalog cache refresh behavior.
+    set_at: [ startup ]
+    cpp_vartype: bool
+    cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
+    default: true
