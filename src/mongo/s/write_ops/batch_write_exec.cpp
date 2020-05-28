@@ -437,8 +437,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             // It's okay if we can't refresh, we'll just record errors for the ops if
             // needed.
             LOGV2_WARNING(22911,
-                          "could not refresh targeter{causedBy_refreshStatus_reason}",
-                          "causedBy_refreshStatus_reason"_attr = causedBy(refreshStatus.reason()));
+                          "Could not refresh targeter due to {error}",
+                          "Could not refresh targeter",
+                          "error"_attr = redact(refreshStatus.reason()));
         }
 
         //

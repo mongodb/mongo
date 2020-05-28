@@ -1183,6 +1183,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             23887,
             "ensureChunkVersionIsGreaterThan bumped the version of the chunk with minKey {minKey}, "
             "maxKey {maxKey}, and epoch {epoch}. Chunk is now {newChunk}",
+            "ensureChunkVersionIsGreaterThan bumped the the chunk version",
             "minKey"_attr = minKey,
             "maxKey"_attr = maxKey,
             "epoch"_attr = version.epoch(),
