@@ -114,12 +114,15 @@ var $config = extendWorkload($config, function($config, $super) {
         const partitionSizeHalf = Math.floor(this.partitionSize / 2);
         const partitionMedian = partitionSizeHalf + this.partition.lower;
 
-        // If moveAcrossChunks is true, move the randomly generated shardKey to the other
-        // half of the partition, which will be on the other chunk owned by this thread.
-        let newShardKey = this.partition.lower + Math.floor(Math.random() * partitionSizeHalf);
+        let newShardKey = currentShardKey;
+        while (newShardKey == currentShardKey) {
+            // If moveAcrossChunks is true, move the randomly generated shardKey to the other
+            // half of the partition, which will be on the other chunk owned by this thread.
+            newShardKey = this.partition.lower + Math.floor(Math.random() * partitionSizeHalf);
 
-        if (moveAcrossChunks || currentShardKey >= partitionMedian) {
-            newShardKey += partitionSizeHalf;
+            if (moveAcrossChunks || currentShardKey >= partitionMedian) {
+                newShardKey += partitionSizeHalf;
+            }
         }
 
         return {
