@@ -1736,6 +1736,11 @@ void WiredTigerRecordStore::validate(OperationContext* opCtx,
         return;
     }
 
+    if (_isOplog) {
+        results->warnings.push_back("Skipping verification of the WiredTiger table for the oplog.");
+        return;
+    }
+
     int err = WiredTigerUtil::verifyTable(opCtx, _uri, &results->errors);
     if (!err) {
         return;
