@@ -127,7 +127,10 @@ DEFAULTS = {
     "benchmark_repetitions": None,
 
     # Config Dir
-    "config_dir": "buildscripts/resmokeconfig"
+    "config_dir": "buildscripts/resmokeconfig",
+
+    # UndoDB options
+    "undo_recorder_path": None
 }
 
 _SuiteOptions = collections.namedtuple("_SuiteOptions", [
@@ -455,6 +458,9 @@ BENCHMARK_FILTER = None
 BENCHMARK_LIST_TESTS = None
 BENCHMARK_MIN_TIME = None
 BENCHMARK_REPETITIONS = None
+
+# UndoDB options
+UNDO_RECORDER_PATH = None
 
 ##
 # Internally used configuration options that aren't exposed to the user

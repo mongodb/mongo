@@ -635,6 +635,11 @@ class RunPlugin(PluginInterface):
         parser.add_argument("-n", action="store_const", const="tests", dest="dry_run",
                             help="Outputs the tests that would be run.")
 
+        parser.add_argument(
+            "--recordWith", dest="undo_recorder_path", metavar="PATH",
+            help="Record execution of mongo, mongod and mongos processes;"
+            "specify the path to UndoDB's 'live-record' binary")
+
         # TODO: add support for --dryRun=commands
         parser.add_argument(
             "--dryRun", action="store", dest="dry_run", choices=("off", "tests"), metavar="MODE",

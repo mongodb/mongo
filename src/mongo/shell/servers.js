@@ -980,7 +980,7 @@ MongoRunner.validateCollectionsCallback = function(port) {};
  * Note: The auth option is required in a authenticated mongod running in Windows since
  *  it uses the shutdown command, which requires admin credentials.
  */
-MongoRunner.stopMongod = function(conn, signal, opts, waitpid) {
+var stopMongoProgram = function(conn, signal, opts, waitpid) {
     if (!conn.pid) {
         throw new Error("first arg must have a `pid` property; " +
                         "it is usually the object returned from MongoRunner.runMongod/s");
@@ -1031,6 +1031,16 @@ MongoRunner.stopMongod = function(conn, signal, opts, waitpid) {
         returnCode = _stopMongoProgram(port, signal, opts, waitpid);
     }
 
+    if (conn.undoLiveRecordPid) {
+        print("Saving the UndoDB recording; it may take a few minutes...");
+        returnCode = waitProgram(conn.undoLiveRecordPid);
+        if (returnCode !== 0) {
+            throw new Error(
+                "Undo live-record failed to terminate correctly. This is likely a bug in Undo. " +
+                "Please record any logs and send them to the #server-tig Slack channel");
+        }
+    }
+
     // If we are not waiting for shutdown, then there is no exit code to check.
     if (!waitpid) {
         return 0;
@@ -1045,7 +1055,8 @@ MongoRunner.stopMongod = function(conn, signal, opts, waitpid) {
     return returnCode;
 };
 
-MongoRunner.stopMongos = MongoRunner.stopMongod;
+MongoRunner.stopMongod = stopMongoProgram;
+MongoRunner.stopMongos = stopMongoProgram;
 
 // Given a test name figures out a directory for that test to use for dump files and makes sure
 // that directory exists and is empty.
@@ -1320,20 +1331,22 @@ function appendSetParameterArgs(argArray) {
 /**
  * Continuously tries to establish a connection to the server on the specified port.
  *
- * If a connection cannot be established within a time limit, an exception will be thrown. If the
- * process for the given 'pid' is found to no longer be running, this function will terminate and
- * return null.
+ * If a connection cannot be established within a time limit, an exception will be thrown. If
+ * the process for the given 'pid' is found to no longer be running, this function will
+ * terminate and return null.
  *
  * @param {int} [pid] the process id of the node to connect to.
  * @param {int} [port] the port of the node to connect to.
+ * @param {int} [undoLiveRecordPid=null] the process id of the `live-record` process.
  * @returns a new Mongo connection object, or null if the process is not running.
  */
-MongoRunner.awaitConnection = function(pid, port) {
+MongoRunner.awaitConnection = function({pid, port, undoLiveRecordPid = null} = {}) {
     var conn = null;
     assert.soon(function() {
         try {
             conn = new Mongo("127.0.0.1:" + port);
             conn.pid = pid;
+            conn.undoLiveRecordPid = undoLiveRecordPid;
             return true;
         } catch (e) {
             var res = checkProgram(pid);
@@ -1347,6 +1360,11 @@ MongoRunner.awaitConnection = function(pid, port) {
         return false;
     }, "unable to connect to mongo program on port " + port, 600 * 1000);
     return conn;
+};
+
+var _runUndoLiveRecord = function(pid) {
+    var argArray = [jsTestOptions().undoRecorderPath, "--thread-fuzzing", "-p", pid];
+    return _startMongoProgram.apply(null, argArray);
 };
 
 /**
@@ -1368,16 +1386,22 @@ MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
         pid = _startMongoProgram({args: argArray, env: env});
     }
 
+    let undoLiveRecordPid = null;
+    if (jsTestOptions().undoRecorderPath) {
+        undoLiveRecordPid = _runUndoLiveRecord(pid);
+    }
+
     delete serverExitCodeMap[port];
     if (!waitForConnect) {
         print("Skip waiting to connect to node with pid=" + pid + ", port=" + port);
         return {
             pid: pid,
             port: port,
+            undoLiveRecordPid: undoLiveRecordPid,
         };
     }
 
-    return MongoRunner.awaitConnection(pid, port);
+    return MongoRunner.awaitConnection({pid, port, undoLiveRecordPid});
 };
 
 /**

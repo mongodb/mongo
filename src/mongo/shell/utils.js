@@ -360,6 +360,8 @@ jsTestOptions = function() {
             skipCheckOrphans: TestData.skipCheckOrphans || false,
             isAsanBuild: TestData.isAsanBuild,
             inEvergreen: TestData.inEvergreen || false,
+
+            undoRecorderPath: TestData.undoRecorderPath,
         });
     }
     return _jsTestOptions;

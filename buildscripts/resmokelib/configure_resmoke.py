@@ -197,6 +197,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     # Config Dir options.
     _config.CONFIG_DIR = config.pop("config_dir")
 
+    _config.UNDO_RECORDER_PATH = config.pop("undo_recorder_path")
+
     # Populate the named suites by scanning config_dir/suites
     named_suites = {}
 

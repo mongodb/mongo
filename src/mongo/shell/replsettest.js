@@ -2705,7 +2705,7 @@ var ReplSetTest = function(opts) {
         let node = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
         let pid = node.pid;
         let port = node.port;
-        let conn = MongoRunner.awaitConnection(pid, port);
+        let conn = MongoRunner.awaitConnection({pid, port});
         if (!conn) {
             throw new Error("Failed to connect to node " + n);
         }
