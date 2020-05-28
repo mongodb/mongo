@@ -3450,6 +3450,11 @@ functions:
 
         set -eou pipefail
 
+        # Only run on unit test tasks so we don't target mongod binaries from cores.
+        if [ "${task_name}" != "unittests" ] && [ "${task_name}" != "dbtest" ]; then
+            exit 0
+        fi
+
         mkdir unittest_binaries || true
         # Find all core files
         core_files=$(/usr/bin/find -H . \( -name "dump_*.core" -o -name "*.mdmp" \) 2> /dev/null)
