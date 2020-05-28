@@ -40,7 +40,7 @@ a notice will be included in
 | [ocspresponder]            | Apache-2.0        | 0.5.0            | 0.5.0             |                      |                                 |
 | [Pcre]                     | BSD-3-Clause      | 8.44             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
-| [SafeInt]                  | MIT               | 3.23             | 3.0.20p           |                      |                                 |
+| [SafeInt]                  | MIT               | 3.23             | 3.23              |                      |                                 |
 | [scons]                    | MIT               | 3.1.2            | 3.1.2             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.8            | 1.1.7             |          ✗           |                ✗                |
 | [timelib]                  | MIT               | 2018.01          | 2018.01           |                      |                ✗                |
