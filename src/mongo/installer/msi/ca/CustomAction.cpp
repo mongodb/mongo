@@ -332,6 +332,9 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
         if (!WriteFile(hFile, str.c_str(), str.length(), &written, NULL)) {
             CHECKGLE_AND_LOG("Failed to write yaml file");
         }
+        if (!SetEndOfFile(hFile)) {
+            CHECKGLE_AND_LOG("Failed to truncate yaml file");
+        }
     } catch (const std::exception& e) {
         CHECKHR_AND_LOG(E_FAIL, "Caught C++ exception %s", e.what());
     } catch (...) {
