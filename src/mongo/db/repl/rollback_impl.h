@@ -485,7 +485,7 @@ private:
     stdx::unordered_map<UUID, long long, UUID::Hash> _countDiffs;  // (N)
 
     // Maintains counts and namespaces of drop-pending collections.
-    struct PendingDropInfo {
+    using PendingDropInfo = struct {
         long long count = 0;
         NamespaceString nss;
     };
