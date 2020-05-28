@@ -306,6 +306,11 @@ func (dump *MongoDump) NewIntentFromOptions(dbName string, ci *db.CollectionInfo
 			// if archive mode, then the output should be written using an output
 			// muxer.
 			intent.BSONFile = &archive.MuxIn{Intent: intent, Mux: dump.archive.Mux}
+			if dump.OutputOptions.Archive == "-" {
+				intent.Location = "archive on stdout"
+			} else {
+				intent.Location = fmt.Sprintf("archive '%v'", dump.OutputOptions.Archive)
+			}
 		} else if dump.OutputOptions.ViewsAsCollections || !ci.IsView() {
 			// otherwise, if it's either not a view or we're treating views as collections
 			// then create a standard filesystem path for this collection.
@@ -317,6 +322,7 @@ func (dump *MongoDump) NewIntentFromOptions(dbName string, ci *db.CollectionInfo
 
 			path := nameGz(dump.OutputOptions.Gzip, dump.outputPath(dbName, ci.Name)+".bson")
 			intent.BSONFile = &realBSONFile{path: path, intent: intent}
+			intent.Location = path
 		} else {
 			// otherwise, it's a view and the options specify not dumping a view
 			// so don't dump it.

@@ -51,11 +51,16 @@ func (restore *MongoRestore) RestoreOplog() error {
 		fileNeedsIOBuffer.TakeIOBuffer(make([]byte, db.MaxBSONSize))
 	}
 	defer intent.BSONFile.Close()
+
 	// NewBufferlessBSONSource reads each bson document into its own buffer
 	// because bson.Unmarshal currently can't unmarshal binary types without
-	// them referencing the source buffer
-	bsonSource := db.NewDecodedBSONSource(db.NewBufferlessBSONSource(intent.BSONFile))
-	defer bsonSource.Close()
+	// them referencing the source buffer.
+	// We also increase the max BSON size by 16 KiB to accommodate the maximum
+	// document size of 16 MiB plus any additional oplog-specific data.
+	bsonSource := db.NewBufferlessBSONSource(intent.BSONFile)
+	bsonSource.SetMaxBSONSize(db.MaxBSONSize + 16*1024)
+	decodedBsonSource := db.NewDecodedBSONSource(bsonSource)
+	defer decodedBsonSource.Close()
 
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
@@ -75,7 +80,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	}
 
 	for {
-		rawOplogEntry := bsonSource.LoadNext()
+		rawOplogEntry := decodedBsonSource.LoadNext()
 		if rawOplogEntry == nil {
 			break
 		}
@@ -123,7 +128,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	}
 
 	log.Logvf(log.Always, "applied %v oplog entries", oplogCtx.totalOps)
-	if err := bsonSource.Err(); err != nil {
+	if err := decodedBsonSource.Err(); err != nil {
 		return fmt.Errorf("error reading oplog bson input: %v", err)
 	}
 	return nil

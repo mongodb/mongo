@@ -2,5 +2,5 @@
     "vendor": "tools",
     "github": "mongodb/mongo-tools.git",
     "branch": "v4.2",
-    "commit": "11f19a0e14d9c2e08e36876f1b3513c1fcc4bc26"
+    "commit": "1ca852c2d74d0bcdb4b79824716bf38b94f75302"
 }
