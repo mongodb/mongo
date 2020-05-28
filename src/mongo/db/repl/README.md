@@ -221,7 +221,10 @@ The external state also manages and owns all of the replication threads.
 
 The `TopologyCoordinator` is in charge of maintaining state about the topology of the cluster. On
 significant changes (anything that affects the response to isMaster), the TopologyCoordinator updates
-its TopologyVersion. The [`isMaster`](https://github.com/mongodb/mongo/blob/r4.3.3/src/mongo/db/repl/replication_info.cpp#L258) command awaits changes in the TopologyVersion before returning.
+its TopologyVersion. The [`isMaster`](https://github.com/mongodb/mongo/blob/r4.3.3/src/mongo/db/repl/replication_info.cpp#L258) command awaits changes in the TopologyVersion before returning. On
+shutdown, if the server is a secondary, it enters quiesce mode: we increment the TopologyVersion and
+start responding to `isMaster` commands with a `ShutdownInProgress` error, so that clients cease
+routing new operations to the node.
 
 The `TopologyCoordinator` is non-blocking and does a large amount of a node's decision making
 surrounding replication. Most replication command requests and responses are filled in here.
