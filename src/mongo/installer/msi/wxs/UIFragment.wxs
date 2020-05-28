@@ -104,9 +104,10 @@
                     <Text>&amp;Next &gt;</Text>
                     <Publish Event="AddLocal" Value="ServerNoService">NOT MONGO_SERVICE_INSTALL</Publish>
                     <Publish Event="AddLocal" Value="ServerService">MONGO_SERVICE_INSTALL</Publish>
-                    <Publish Event="DoAction" Value="ValidateServiceLogon" Order="1"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Publish>
-                    <Publish Event="SpawnDialog" Value="InvalidServiceAccount" Order="2">MONGO_SERVICE_ACCOUNT_VALID = "0"</Publish>
-                    <Publish Event="NewDialog" Value="CompassDlg" Order="2">NOT MONGO_SERVICE_INSTALL OR (MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork" OR MONGO_SERVICE_ACCOUNT_VALID)</Publish>
+                    <Publish Property="MONGO_SERVICE_ACCOUNT_VALID" Value="1" Order="1"><![CDATA[MONGO_SERVICE_ACCOUNT_TYPE ~= "ServiceLocalNetwork"]]></Publish>
+                    <Publish Event="DoAction" Value="ValidateServiceLogon" Order="2"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Publish>
+                    <Publish Event="SpawnDialog" Value="InvalidServiceAccount" Order="3">MONGO_SERVICE_ACCOUNT_VALID = "0"</Publish>
+                    <Publish Event="NewDialog" Value="CompassDlg" Order="3">NOT MONGO_SERVICE_INSTALL OR (MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork" OR MONGO_SERVICE_ACCOUNT_VALID)</Publish>
                 </Control>
                 <Control Id="Cancel" Type="PushButton" X="309" Y="244" Width="56" Height="17" TabSkip="no">
                     <Text>Cancel</Text>
