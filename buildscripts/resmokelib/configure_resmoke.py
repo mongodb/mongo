@@ -66,15 +66,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     config = _config.DEFAULTS.copy()
 
-    # Use RSK_ prefixed environment variables to indicate resmoke-specific values.
-    # The list of configuration is detailed in config.py
-    resmoke_env_prefix = 'RSK_'
-    for key in os.environ.keys():
-        if key.startswith(resmoke_env_prefix):
-            # Windows env vars are case-insensitive, we use lowercase to be consistent
-            # with existing resmoke options.
-            config[key[len(resmoke_env_prefix):].lower()] = os.environ[key]
-
     # Override `config` with values from command line arguments.
     cmdline_vars = vars(values)
     for cmdline_key in cmdline_vars:
@@ -92,7 +83,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             config.update(user_config)
 
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
-    _config.IS_ASAN_BUILD = config.pop("is_asan_build")
     _config.BASE_PORT = int(config.pop("base_port"))
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))

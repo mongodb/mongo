@@ -133,11 +133,6 @@ function runHangAnalyzer(pids) {
         return;
     }
 
-    if (TestData.isAsanBuild) {
-        print('Skipping runHangAnalyzer: ASAN build');
-        return;
-    }
-
     if (typeof pids === 'undefined') {
         pids = getPids();
     }
@@ -149,8 +144,16 @@ function runHangAnalyzer(pids) {
     // add 0 to convert to Number.
     pids = pids.map(p => p + 0).join(',');
     print(`Running hang analyzer for pids [${pids}]`);
+
     const scriptPath = pathJoin('.', 'buildscripts', 'resmoke.py');
-    return runProgram('python', scriptPath, 'hang-analyzer', '-c', '-d', pids);
+    const args = ['python', scriptPath, 'hang-analyzer', '-d', pids];
+
+    // Enable core dumps if not an ASAN build.
+    if (!_isAddressSanitizerActive()) {
+        args.push('-c');
+    }
+
+    return runProgram(...args);
 }
 
 MongoRunner.runHangAnalyzer = runHangAnalyzer;

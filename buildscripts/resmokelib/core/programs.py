@@ -365,8 +365,6 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     test_data["setParameters"] = mongod_set_parameters
     test_data["setParametersMongos"] = mongos_set_parameters
 
-    test_data["isAsanBuild"] = config.IS_ASAN_BUILD
-
     test_data["undoRecorderPath"] = config.UNDO_RECORDER_PATH
 
     # There's a periodic background thread that checks for and aborts expired transactions.

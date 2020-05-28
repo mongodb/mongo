@@ -46,7 +46,6 @@ DEFAULT_GENNY_EXECUTABLE = os.path.normpath("genny/build/src/driver/genny")
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
     "always_use_log_files": False,
-    "is_asan_build": False,
     "archive_limit_mb": 5000,
     "archive_limit_tests": 10,
     "base_port": 20000,
@@ -236,9 +235,6 @@ ARCHIVE_LIMIT_MB = None
 
 # The limit number of tests to archive for an Evergreen task.
 ARCHIVE_LIMIT_TESTS = None
-
-# True if resmoke is running against and ASAN build.
-IS_ASAN_BUILD = None
 
 # The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
 # mongo shell.

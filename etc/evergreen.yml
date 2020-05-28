@@ -1463,7 +1463,6 @@ functions:
         set +o errexit
         PATH="$path_value"                                \
             AWS_PROFILE=${aws_profile_remote}             \
-            RSK_is_asan_build=${is_asan_build|""}         \
             ${gcov_environment}                           \
             ${lang_environment}                           \
             ${san_options}                                \
@@ -3571,7 +3570,7 @@ functions:
 
         hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test}"
 
-        if [ ${is_asan_build|false} = false ]; then
+        if [ ${hang_analyzer_dump_core|true} = true ]; then
           hang_analyzer_option="-c $hang_analyzer_option"
         fi
 
@@ -12309,7 +12308,7 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    is_asan_build: true
+    hang_analyzer_dump_core: false
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory
   tasks:
@@ -12376,7 +12375,7 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    is_asan_build: true
+    hang_analyzer_dump_core: false
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory
   tasks:
@@ -12466,7 +12465,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    is_asan_build: true
+    hang_analyzer_dump_core: false
     scons_cache_scope: shared
     max_sub_suites: 100
   tasks:
@@ -12494,7 +12493,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    is_asan_build: true
+    hang_analyzer_dump_core: false
     scons_cache_scope: shared
   display_tasks:
   - *libfuzzertests
