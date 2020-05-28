@@ -347,10 +347,12 @@ void OpObserverImpl::onStartIndexBuildSinglePhase(OperationContext* opCtx,
     // 4. All other cases, we generate a timestamp by writing a no-op oplog entry.  This is
     // better than using a ghost timestamp.  Writing an oplog entry ensures this node is
     // primary.
-    auto msg = BSON("msg"
-                    << "Creating indexes"
-                    << "coll" << nss.ns());
-    onOpMessage(opCtx, msg);
+    onInternalOpMessage(
+        opCtx,
+        {},
+        boost::none,
+        BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << nss)),
+        boost::none);
 }
 
 void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
