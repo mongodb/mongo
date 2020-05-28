@@ -12437,8 +12437,6 @@ buildvariants:
     max_sub_suites: 100
   tasks:
   - name: compile_all_run_unittests_TG
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
   - name: jsCore
   - name: jsCore_txns
 
