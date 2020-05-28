@@ -51,7 +51,7 @@ public:
 
     void enterTerminalShutdown() final;
 
-    bool enterQuiesceModeIfSecondary() final;
+    bool enterQuiesceModeIfSecondary(Milliseconds quiesceTime) final;
 
     bool inQuiesceMode() const final;
 

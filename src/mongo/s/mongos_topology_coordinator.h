@@ -88,6 +88,11 @@ private:
         SharedPromise<std::shared_ptr<const MongosIsMasterResponse>>;
 
     /**
+     * Calculates the time (in millis) left in quiesce mode and converts the value to int64.
+     */
+    long long _calculateRemainingQuiesceTimeMillis() const;
+
+    /**
      * Helper for constructing a MongosIsMasterResponse.
      **/
     std::shared_ptr<MongosIsMasterResponse> _makeIsMasterResponse(WithLock) const;
@@ -106,6 +111,9 @@ private:
 
     // True if we're in quiesce mode.  If true, we'll respond to isMaster requests with ok:0.
     bool _inQuiesceMode;  // (M)
+
+    // The deadline until which quiesce mode will last.
+    Date_t _quiesceDeadline;  // (M)
 
     // The promise waited on by awaitable isMaster requests on mongos.
     std::shared_ptr<SharedPromiseOfMongosIsMasterResponse> _promise;  // (M)

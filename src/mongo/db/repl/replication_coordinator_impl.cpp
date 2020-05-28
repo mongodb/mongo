@@ -86,6 +86,7 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -221,8 +222,8 @@ StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
     }
 }
 
-const Status kQuiesceModeShutdownStatus =
-    Status(ErrorCodes::ShutdownInProgress, "The server is in quiesce mode and will shut down");
+constexpr StringData kQuiesceModeShutdownMessage =
+    "The server is in quiesce mode and will shut down"_sd;
 
 }  // namespace
 
@@ -928,7 +929,7 @@ void ReplicationCoordinatorImpl::enterTerminalShutdown() {
     _inTerminalShutdown = true;
 }
 
-bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary() {
+bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary(Milliseconds quiesceTime) {
     LOGV2_INFO(4794602, "Attempting to enter quiesce mode");
 
     stdx::lock_guard lk(_mutex);
@@ -938,6 +939,7 @@ bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary() {
     }
 
     _inQuiesceMode = true;
+    _quiesceDeadline = _replExecutor->now() + quiesceTime;
 
     // Increment the topology version and respond to all waiting isMaster requests with an error.
     _fulfillTopologyChangePromise(lk);
@@ -2149,10 +2151,20 @@ void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
           "metrics"_attr = bob.obj());
 }
 
+long long ReplicationCoordinatorImpl::_calculateRemainingQuiesceTimeMillis() const {
+    auto remainingQuiesceTimeMillis =
+        std::max(Milliseconds::zero(), _quiesceDeadline - _replExecutor->now());
+    // Turn remainingQuiesceTimeMillis into an int64 so that it's a supported BSONElement.
+    long long remainingQuiesceTimeLong = durationCount<Milliseconds>(remainingQuiesceTimeMillis);
+    return remainingQuiesceTimeLong;
+}
+
 std::shared_ptr<IsMasterResponse> ReplicationCoordinatorImpl::_makeIsMasterResponse(
     boost::optional<StringData> horizonString, WithLock lock, const bool hasValidConfig) const {
-    uassert(
-        kQuiesceModeShutdownStatus.code(), kQuiesceModeShutdownStatus.reason(), !_inQuiesceMode);
+
+    uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
+            kQuiesceModeShutdownMessage,
+            !_inQuiesceMode);
 
     if (!hasValidConfig) {
         auto response = std::make_shared<IsMasterResponse>();
@@ -2195,8 +2207,9 @@ ReplicationCoordinatorImpl::_getIsMasterResponseFuture(
     boost::optional<StringData> horizonString,
     boost::optional<TopologyVersion> clientTopologyVersion) {
 
-    uassert(
-        kQuiesceModeShutdownStatus.code(), kQuiesceModeShutdownStatus.reason(), !_inQuiesceMode);
+    uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
+            kQuiesceModeShutdownMessage,
+            !_inQuiesceMode);
 
     const bool hasValidConfig = horizonString != boost::none;
 
@@ -3986,7 +3999,9 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
          iter != _horizonToTopologyChangePromiseMap.end();
          iter++) {
         if (_inQuiesceMode) {
-            iter->second->setError(kQuiesceModeShutdownStatus);
+            iter->second->setError(
+                Status(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
+                       kQuiesceModeShutdownMessage));
         } else {
             StringData horizonString = iter->first;
             auto response = _makeIsMasterResponse(horizonString, lock, hasValidConfig);

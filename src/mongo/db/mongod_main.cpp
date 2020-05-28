@@ -1083,7 +1083,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
-        replCoord && replCoord->enterQuiesceModeIfSecondary()) {
+        replCoord && replCoord->enterQuiesceModeIfSecondary(shutdownTimeout)) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;
         OperationContext* opCtx = client->getOperationContext();
         if (!opCtx) {

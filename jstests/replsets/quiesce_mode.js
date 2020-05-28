@@ -31,6 +31,10 @@ function checkTopologyVersion(res, topologyVersionField) {
     assert.eq(res.topologyVersion.counter, topologyVersionField.counter + 1);
 }
 
+function checkRemainingQuiesceTime(res) {
+    assert(res.hasOwnProperty("remainingQuiesceTimeMillis"), res);
+}
+
 function runAwaitableIsMaster(topologyVersionField) {
     let res = assert.commandFailedWithCode(db.runCommand({
         isMaster: 1,
@@ -39,6 +43,7 @@ function runAwaitableIsMaster(topologyVersionField) {
     }),
                                            ErrorCodes.ShutdownInProgress);
     assert(res.hasOwnProperty("topologyVersion"), res);
+    assert(res.hasOwnProperty("remainingQuiesceTimeMillis"), res);
     assert.eq(res.topologyVersion.counter, topologyVersionField.counter + 1);
 }
 
@@ -83,16 +88,20 @@ assert.commandFailedWithCode(secondaryDB.adminCommand({serverStatus: 1}),
                              ErrorCodes.ShutdownInProgress);
 
 jsTestLog("New isMaster commands return a ShutdownInProgress error.");
-checkTopologyVersion(assert.commandFailedWithCode(secondary.adminCommand({isMaster: 1}),
-                                                  ErrorCodes.ShutdownInProgress),
-                     topologyVersionField);
-checkTopologyVersion(assert.commandFailedWithCode(secondary.adminCommand({
+res = assert.commandFailedWithCode(secondary.adminCommand({isMaster: 1}),
+                                   ErrorCodes.ShutdownInProgress);
+checkTopologyVersion(res, topologyVersionField);
+checkRemainingQuiesceTime(res);
+
+res = assert.commandFailedWithCode(secondary.adminCommand({
     isMaster: 1,
     topologyVersion: topologyVersionField,
     maxAwaitTimeMS: 99999999,
 }),
-                                                  ErrorCodes.ShutdownInProgress),
-                     topologyVersionField);
+                                   ErrorCodes.ShutdownInProgress);
+
+checkTopologyVersion(res, topologyVersionField);
+checkRemainingQuiesceTime(res);
 
 // Test operation behavior during quiesce mode.
 jsTestLog("The running operation is allowed to finish.");
@@ -166,16 +175,20 @@ assert.commandFailedWithCode(primaryDB.adminCommand({serverStatus: 1}),
                              ErrorCodes.ShutdownInProgress);
 
 jsTestLog("New isMaster commands return a ShutdownInProgress error.");
-checkTopologyVersion(assert.commandFailedWithCode(primary.adminCommand({isMaster: 1}),
-                                                  ErrorCodes.ShutdownInProgress),
-                     topologyVersionField);
-checkTopologyVersion(assert.commandFailedWithCode(primary.adminCommand({
+res = assert.commandFailedWithCode(primary.adminCommand({isMaster: 1}),
+                                   ErrorCodes.ShutdownInProgress);
+checkTopologyVersion(res, topologyVersionField);
+checkRemainingQuiesceTime(res);
+
+res = assert.commandFailedWithCode(primary.adminCommand({
     isMaster: 1,
     topologyVersion: topologyVersionField,
     maxAwaitTimeMS: 99999999,
 }),
-                                                  ErrorCodes.ShutdownInProgress),
-                     topologyVersionField);
+                                   ErrorCodes.ShutdownInProgress);
+
+checkTopologyVersion(res, topologyVersionField);
+checkRemainingQuiesceTime(res);
 
 // Test operation behavior during quiesce mode.
 jsTestLog("The running operation is allowed to finish.");

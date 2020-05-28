@@ -356,6 +356,7 @@ env.Library(
         'mongos_topology_coordinator.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/rpc/metadata',

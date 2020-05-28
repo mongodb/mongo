@@ -897,6 +897,14 @@ Status OplogFetcher::_checkTooStaleToSyncFromSource(const OpTime lastFetched,
 
 bool OplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(OplogFetcher* fetcher,
                                                                       Status status) {
+    // If we try to sync from a node that is shutting down, do not attempt to reconnect.
+    // We should choose a new sync source.
+    if (status.code() == ErrorCodes::ShutdownInProgress) {
+        LOGV2(4696202,
+              "Not recreating cursor for oplog fetcher because sync source is shutting down",
+              "error"_attr = redact(status));
+        return false;
+    }
     if (_numRestarts == _maxRestarts) {
         LOGV2(21274,
               "Error returned from oplog query (no more query restarts left): {error}",

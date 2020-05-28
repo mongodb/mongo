@@ -142,6 +142,14 @@ DEATH_TEST(OperationContextTest, CallingSetDeadlineWithExtraInfoCrashes, "invari
     opCtx->setDeadlineByDate(Date_t::now(), ErrorCodes::ForTestingErrorExtraInfo);
 }
 
+TEST(OperationContextTest, CallingMarkKillWithOptionalExtraInfoSucceeds) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->markKilled(ErrorCodes::ForTestingOptionalErrorExtraInfo);
+}
+
 TEST(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group1;
     ASSERT_TRUE(group1.isEmpty());

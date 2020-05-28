@@ -41,7 +41,7 @@ void ReplicationCoordinatorNoOp::startup(OperationContext* opCtx) {}
 
 void ReplicationCoordinatorNoOp::enterTerminalShutdown() {}
 
-bool ReplicationCoordinatorNoOp::enterQuiesceModeIfSecondary() {
+bool ReplicationCoordinatorNoOp::enterQuiesceModeIfSecondary(Milliseconds quiesceTime) {
     MONGO_UNREACHABLE;
 }
 

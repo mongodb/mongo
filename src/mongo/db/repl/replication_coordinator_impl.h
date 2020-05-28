@@ -106,7 +106,7 @@ public:
 
     virtual void enterTerminalShutdown() override;
 
-    virtual bool enterQuiesceModeIfSecondary() override;
+    virtual bool enterQuiesceModeIfSecondary(Milliseconds quiesceTime) override;
 
     virtual bool inQuiesceMode() const override;
 
@@ -1180,6 +1180,11 @@ private:
                                   StatusWith<int> myIndex);
 
     /**
+     * Calculates the time (in millis) left in quiesce mode and converts the value to int64.
+     */
+    long long _calculateRemainingQuiesceTimeMillis() const;
+
+    /**
      * Fills an IsMasterResponse with the appropriate replication related fields. horizonString
      * should be passed in if hasValidConfig is true.
      */
@@ -1650,6 +1655,9 @@ private:
 
     // If we're in quiesce mode.  If true, we'll respond to isMaster requests with ok:0.
     bool _inQuiesceMode = false;  // (M)
+
+    // The deadline until which quiesce mode will last.
+    Date_t _quiesceDeadline;  // (M)
 
     // The cached value of the 'counter' field in the server's TopologyVersion.
     AtomicWord<int64_t> _cachedTopologyVersionCounter;  // (S)

@@ -132,8 +132,11 @@ public:
      * with ShutdownInProgress. This function causes us to increment the topologyVersion and start
      * failing isMaster requests with ShutdownInProgress. Returns true if the server entered quiesce
      * mode.
+     *
+     * We take in quiesceTime only for reporting purposes. The waiting during quiesce mode happens
+     * external to the ReplicationCoordinator.
      */
-    virtual bool enterQuiesceModeIfSecondary() = 0;
+    virtual bool enterQuiesceModeIfSecondary(Milliseconds quiesceTime) = 0;
 
     /**
      * Returns whether the server is in quiesce mode.

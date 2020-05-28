@@ -60,7 +60,18 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/write_concern_options',
+        'shutdown_in_progress_quiesce_info',
     ]
+)
+
+env.Library(
+    target='shutdown_in_progress_quiesce_info',
+    source= [
+        'shutdown_in_progress_quiesce_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
 )
 
 env.Library(

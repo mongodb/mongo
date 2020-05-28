@@ -81,7 +81,7 @@ void ReplicationCoordinatorMock::enterTerminalShutdown() {
     // TODO
 }
 
-bool ReplicationCoordinatorMock::enterQuiesceModeIfSecondary() {
+bool ReplicationCoordinatorMock::enterQuiesceModeIfSecondary(Milliseconds quiesceTime) {
     // TODO
     return true;
 }

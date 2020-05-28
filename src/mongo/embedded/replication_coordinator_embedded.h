@@ -49,7 +49,7 @@ public:
 
     void enterTerminalShutdown() override;
 
-    bool enterQuiesceModeIfSecondary() override;
+    bool enterQuiesceModeIfSecondary(Milliseconds quiesceTime) override;
 
     bool inQuiesceMode() const override;
 

@@ -117,7 +117,10 @@ error_codes:
     - {code: 88,name: SplitFailed_OBSOLETE}
     - {code: 89,name: NetworkTimeout,categories: [NetworkError,RetriableError,NetworkTimeoutError]}
     - {code: 90,name: CallbackCanceled,categories: [CancelationError]}
-    - {code: 91,name: ShutdownInProgress,categories: [ShutdownError,CancelationError,RetriableError]}
+    - {code: 91,name: ShutdownInProgress,
+                       extra: ShutdownInProgressQuiesceInfo,
+                       categories: [ShutdownError,CancelationError,RetriableError],
+                       extraIsOptional: True}
     - {code: 92,name: SecondaryAheadOfPrimary}
     - {code: 93,name: InvalidReplicaSetConfig}
     - {code: 94,name: NotYetInitialized}

@@ -220,7 +220,7 @@ TEST_F(TopologyVersionObserverTest, HandleQuiesceMode) {
         // Enter quiesce mode in the replication coordinator to make shutdown errors come from
         // awaitIsMasterResponseFuture()/getIsMasterResponseFuture().
         auto opCtx = makeOperationContext();
-        getReplCoord()->enterQuiesceModeIfSecondary();
+        getReplCoord()->enterQuiesceModeIfSecondary(Milliseconds(0));
 
         getNet()->enterNetwork();
         getNet()->advanceTime(getNet()->now() + sleepTime);

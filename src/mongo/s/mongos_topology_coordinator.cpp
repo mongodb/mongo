@@ -33,6 +33,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/util/fail_point.h"
 
@@ -75,11 +76,11 @@ StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
 }
 
 /**
- * ShutdownInProgress error
+ * ShutdownInProgress error message
  */
 
-const Status kQuiesceModeShutdownStatus =
-    Status(ErrorCodes::ShutdownInProgress, "Mongos is in quiesce mode and will shut down");
+constexpr StringData kQuiesceModeShutdownMessage =
+    "Mongos is in quiesce mode and will shut down"_sd;
 
 }  // namespace
 
@@ -93,13 +94,23 @@ MongosTopologyCoordinator::MongosTopologyCoordinator()
       _inQuiesceMode(false),
       _promise(std::make_shared<SharedPromise<std::shared_ptr<const MongosIsMasterResponse>>>()) {}
 
+long long MongosTopologyCoordinator::_calculateRemainingQuiesceTimeMillis() const {
+    auto preciseClock = getGlobalServiceContext()->getPreciseClockSource();
+    auto remainingQuiesceTimeMillis =
+        std::max(Milliseconds::zero(), _quiesceDeadline - preciseClock->now());
+    // Turn remainingQuiesceTimeMillis into an int64 so that it's a supported BSONElement.
+    long long remainingQuiesceTimeLong = durationCount<Milliseconds>(remainingQuiesceTimeMillis);
+    return remainingQuiesceTimeLong;
+}
+
 std::shared_ptr<MongosIsMasterResponse> MongosTopologyCoordinator::_makeIsMasterResponse(
     WithLock lock) const {
     // It's possible for us to transition to Quiesce Mode after an isMaster request timed out.
     // Check that we are not in Quiesce Mode before returning a response to avoid responding with
     // a higher topology version, but no indication that we are shutting down.
-    uassert(
-        kQuiesceModeShutdownStatus.code(), kQuiesceModeShutdownStatus.reason(), !_inQuiesceMode);
+    uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
+            kQuiesceModeShutdownMessage,
+            !_inQuiesceMode);
 
     auto response = std::make_shared<MongosIsMasterResponse>(_topologyVersion);
     return response;
@@ -113,8 +124,9 @@ std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIs
 
     // Fail all new isMaster requests with ShutdownInProgress if we've transitioned to Quiesce
     // Mode.
-    uassert(
-        kQuiesceModeShutdownStatus.code(), kQuiesceModeShutdownStatus.reason(), !_inQuiesceMode);
+    uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
+            kQuiesceModeShutdownMessage,
+            !_inQuiesceMode);
 
     // Respond immediately if:
     // (1) There is no clientTopologyVersion, which indicates that the client is not using
@@ -182,12 +194,14 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
     {
         stdx::lock_guard lk(_mutex);
         _inQuiesceMode = true;
+        _quiesceDeadline = getGlobalServiceContext()->getPreciseClockSource()->now() + quiesceTime;
 
         // Increment the topology version and respond to any waiting isMaster request with an error.
         auto counter = _topologyVersion.getCounter();
         _topologyVersion.setCounter(counter + 1);
         _promise->setError(
-            {ErrorCodes::ShutdownInProgress, "Mongos is in quiesce mode and will shut down"});
+            Status(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
+                   kQuiesceModeShutdownMessage));
 
         // Reset counter to 0 since we will respond to all waiting isMaster requests with an error.
         // All new isMaster requests will immediately fail with ShutdownInProgress.
@@ -200,7 +214,7 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
     }
 
     LOGV2(4695701, "Entering quiesce mode for mongos shutdown", "quiesceTime"_attr = quiesceTime);
-    opCtx->sleepFor(quiesceTime);
+    opCtx->sleepUntil(_quiesceDeadline);
     LOGV2(4695702, "Exiting quiesce mode for mongos shutdown");
 }
 

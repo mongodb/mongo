@@ -51,7 +51,7 @@ void ReplicationCoordinatorEmbedded::startup(OperationContext* opCtx) {}
 
 void ReplicationCoordinatorEmbedded::enterTerminalShutdown() {}
 
-bool ReplicationCoordinatorEmbedded::enterQuiesceModeIfSecondary() {
+bool ReplicationCoordinatorEmbedded::enterQuiesceModeIfSecondary(Milliseconds quiesceTime) {
     return true;
 }
 

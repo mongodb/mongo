@@ -26,6 +26,10 @@ function checkTopologyVersion(res, topologyVersionField) {
     assert.eq(res.topologyVersion.counter, topologyVersionField.counter + 1);
 }
 
+function checkRemainingQuiesceTime(res) {
+    assert(res.hasOwnProperty("remainingQuiesceTimeMillis"), res);
+}
+
 function runAwaitableIsMaster(topologyVersionField) {
     let res = assert.commandFailedWithCode(db.runCommand({
         isMaster: 1,
@@ -83,9 +87,11 @@ jsTestLog("The waiting isMaster returns a ShutdownInProgress error.");
 isMaster();
 
 jsTestLog("New isMaster command returns a ShutdownInProgress error.");
-checkTopologyVersion(
-    assert.commandFailedWithCode(mongos.adminCommand({isMaster: 1}), ErrorCodes.ShutdownInProgress),
-    topologyVersionField);
+res =
+    assert.commandFailedWithCode(mongos.adminCommand({isMaster: 1}), ErrorCodes.ShutdownInProgress);
+
+checkTopologyVersion(res, topologyVersionField);
+checkRemainingQuiesceTime(res);
 
 // Test operation behavior during quiesce mode.
 jsTestLog("The running read operation is allowed to finish.");

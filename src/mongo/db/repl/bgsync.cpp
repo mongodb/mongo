@@ -57,6 +57,7 @@
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
+#include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -560,7 +561,7 @@ void BackgroundSync::_produce() {
         return;
     }
 
-    Seconds blacklistDuration(60);
+    Milliseconds blacklistDuration(60000);
     if (fetcherReturnStatus.code() == ErrorCodes::OplogOutOfOrder) {
         // This is bad because it means that our source
         // has not returned oplog entries in ascending ts order, and they need to be.
@@ -599,6 +600,17 @@ void BackgroundSync::_produce() {
             "syncSource"_attr = source,
             "blacklistDuration"_attr = blacklistDuration);
         _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
+    } else if (fetcherReturnStatus.code() == ErrorCodes::ShutdownInProgress) {
+        if (auto quiesceInfo = fetcherReturnStatus.extraInfo<ShutdownInProgressQuiesceInfo>()) {
+            blacklistDuration = Milliseconds(quiesceInfo->getRemainingQuiesceTimeMillis());
+            LOGV2_WARNING(
+                4696201,
+                "Sync source was in quiesce mode while we were querying its oplog. Blacklisting "
+                "sync source",
+                "syncSource"_attr = source,
+                "blacklistDuration"_attr = blacklistDuration);
+            _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
+        }
     } else if (!fetcherReturnStatus.isOK()) {
         LOGV2_WARNING(21122,
                       "Oplog fetcher stopped querying remote oplog with error: {error}",
