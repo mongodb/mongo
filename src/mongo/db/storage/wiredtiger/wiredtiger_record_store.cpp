@@ -878,6 +878,9 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
 void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& id) {
     dassert(opCtx->lockState()->isWriteLocked());
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
+    // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
+    // reuse record ids, which can be problematic for the _mdb_catalog.
+    _initNextIdIfNeeded(opCtx);
 
     // Deletes should never occur on a capped collection because truncation uses
     // WT_SESSION::truncate().
