@@ -53,7 +53,7 @@ const planExecFP = configureFailPoint(newPrimary, "planExecutorHangWhileYieldedI
 
 jsTestLog("Stepping up new primary");
 assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
-assert.eq(newPrimary, rst.getPrimary());
+rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, nodes, rst.getNodeId(newPrimary));
 
 const createCollFP = configureFailPoint(newPrimary, "hangBeforeLoggingCreateCollection");
 const createShell = startParallelShell(() => {
