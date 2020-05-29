@@ -18,8 +18,8 @@ load("jstests/libs/fail_point_util.js");
 const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
     nodeOptions: {
-        // Turn up the syncdelay (in seconds) to effectively disable background checkpoints.
-        syncdelay: 600,
+        // Disable background checkpoints: a zero value disables checkpointing.
+        syncdelay: 0,
         setParameter: {logComponentVerbosity: tojson({storage: 2})}
     },
     useBridge: true

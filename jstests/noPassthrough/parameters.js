@@ -36,7 +36,7 @@ setAndCheckParameter(dbConn, "traceExceptions", 0, false);
 setAndCheckParameter(dbConn, "traceExceptions", "foo", true);
 setAndCheckParameter(dbConn, "traceExceptions", "", true);
 setAndCheckParameter(dbConn, "syncdelay", 0);
-setAndCheckParameter(dbConn, "syncdelay", 8000);
+setAndCheckParameter(dbConn, "syncdelay", 3000);
 
 function ensureSetParameterFailure(dbConn, parameterName, newValue, reason) {
     jsTest.log("Test setting parameter: " + parameterName + " to invalid value: " + newValue);

@@ -266,25 +266,42 @@ public:
 
     virtual void run() {
         ThreadClient tc(name(), getGlobalServiceContext());
-        LOGV2_DEBUG(22307, 1, "starting {name} thread", "name"_attr = name());
+        LOGV2_DEBUG(22307, 1, "Starting thread", "threadName"_attr = name());
 
-        while (!_shuttingDown.load()) {
+        while (true) {
             auto opCtx = tc->makeOperationContext();
 
             {
                 stdx::unique_lock<Latch> lock(_mutex);
                 MONGO_IDLE_THREAD_BLOCK;
+
+                // Wait for 'wiredTigerGlobalOptions.checkpointDelaySecs' seconds; or until either
+                // shutdown is signaled or a checkpoint is triggered.
                 _condvar.wait_for(lock,
                                   stdx::chrono::seconds(static_cast<std::int64_t>(
-                                      wiredTigerGlobalOptions.checkpointDelaySecs)));
+                                      wiredTigerGlobalOptions.checkpointDelaySecs)),
+                                  [&] { return _shuttingDown || _triggerCheckpoint; });
+
+                // If the checkpointDelaySecs is set to 0, that means we should skip checkpointing.
+                // However, checkpointDelaySecs is adjustable by a runtime server parameter, so we
+                // need to wake up to check periodically. The wakeup to check period is arbitrary.
+                while (wiredTigerGlobalOptions.checkpointDelaySecs == 0 && !_shuttingDown &&
+                       !_triggerCheckpoint) {
+                    _condvar.wait_for(lock,
+                                      stdx::chrono::seconds(static_cast<std::int64_t>(3)),
+                                      [&] { return _shuttingDown || _triggerCheckpoint; });
+                }
+
+                if (_shuttingDown) {
+                    LOGV2_DEBUG(22309, 1, "Stopping thread", "threadName"_attr = name());
+                    return;
+                }
+
+                // Clear the trigger so we do not immediately checkpoint again after this.
+                _triggerCheckpoint = false;
             }
 
             pauseCheckpointThread.pauseWhileSet();
-
-            // Might have been awakened by another thread shutting us down.
-            if (_shuttingDown.load()) {
-                break;
-            }
 
             const Date_t startTime = Date_t::now();
 
@@ -372,13 +389,13 @@ public:
                 invariant(ErrorCodes::isShutdownError(exc.code()), exc.what());
             }
         }
-        LOGV2_DEBUG(22309, 1, "stopping {name} thread", "name"_attr = name());
     }
 
     /**
      * Returns true if we have already triggered taking the first checkpoint.
      */
     bool hasTriggeredFirstStableCheckpoint() {
+        stdx::unique_lock<Latch> lock(_mutex);
         return _hasTriggeredFirstStableCheckpoint;
     }
 
@@ -395,9 +412,9 @@ public:
     void triggerFirstStableCheckpoint(Timestamp prevStable,
                                       Timestamp initialData,
                                       Timestamp currStable) {
+        stdx::unique_lock<Latch> lock(_mutex);
         invariant(!_hasTriggeredFirstStableCheckpoint);
         if (prevStable < initialData && currStable >= initialData) {
-            _hasTriggeredFirstStableCheckpoint = true;
             LOGV2(22310,
                   "Triggering the first stable checkpoint. Initial Data: {initialData} PrevStable: "
                   "{prevStable} CurrStable: {currStable}",
@@ -405,7 +422,8 @@ public:
                   "initialData"_attr = initialData,
                   "prevStable"_attr = prevStable,
                   "currStable"_attr = currStable);
-            stdx::unique_lock<Latch> lock(_mutex);
+            _hasTriggeredFirstStableCheckpoint = true;
+            _triggerCheckpoint = true;
             _condvar.notify_one();
         }
     }
@@ -424,9 +442,9 @@ public:
     }
 
     void shutdown() {
-        _shuttingDown.store(true);
         {
             stdx::unique_lock<Latch> lock(_mutex);
+            _shuttingDown = true;
             // Wake up the checkpoint thread early, to take a final checkpoint before shutting
             // down, if one has not coincidentally just been taken.
             _condvar.notify_one();
@@ -438,19 +456,25 @@ private:
     WiredTigerKVEngine* _wiredTigerKVEngine;
     WiredTigerSessionCache* _sessionCache;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("WiredTigerCheckpointThread::_mutex");
-    ;  // protects _condvar
-    // The checkpoint thread idles on this condition variable for a particular time duration between
-    // taking checkpoints. It can be triggered early to expediate immediate checkpointing.
-    stdx::condition_variable _condvar;
-
-    AtomicWord<bool> _shuttingDown{false};
-
-    bool _hasTriggeredFirstStableCheckpoint = false;
-
     Mutex _oplogNeededForCrashRecoveryMutex =
         MONGO_MAKE_LATCH("WiredTigerCheckpointThread::_oplogNeededForCrashRecoveryMutex");
     AtomicWord<std::uint64_t> _oplogNeededForCrashRecovery;
+
+    // Protects the state below.
+    Mutex _mutex = MONGO_MAKE_LATCH("WiredTigerCheckpointThread::_mutex");
+
+    // The checkpoint thread idles on this condition variable for a particular time duration between
+    // taking checkpoints. It can be triggered early to expedite either: immediate checkpointing if
+    // _triggerCheckpoint is set; or shutdown cleanup if _shuttingDown is set.
+    stdx::condition_variable _condvar;
+
+    bool _shuttingDown = false;
+
+    // This flag ensures the first stable checkpoint is only triggered once.
+    bool _hasTriggeredFirstStableCheckpoint = false;
+
+    // This flag allows the checkpoint thread to wake up early when _condvar is signaled.
+    bool _triggerCheckpoint = false;
 };
 
 namespace {
