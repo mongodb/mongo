@@ -283,10 +283,12 @@ public:
 
         KVEngine* _engine;
         bool _running;
-        PeriodicJobAnchor _job;
 
         // The set of timestamps that were last reported to the listeners by the monitor.
         MonitoredTimestamps _currentTimestamps;
+
+        // Periodic runner that the timestamp monitor schedules its job on.
+        PeriodicRunner* _periodicRunner;
 
         // Protects access to _listeners below.
         Mutex _monitorMutex = MONGO_MAKE_LATCH("TimestampMonitor::_monitorMutex");
@@ -297,7 +299,7 @@ public:
         // when the class instance is being deconstructed. This causes the PeriodicJobAnchor to stop
         // the PeriodicJob, preventing us from accessing any destructed variables if this were to
         // run during the destruction of this class instance.
-        PeriodicRunner* _periodicRunner;
+        PeriodicJobAnchor _job;
     };
 
     StorageEngine* getStorageEngine() override {
