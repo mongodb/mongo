@@ -13,7 +13,7 @@ function waitForCurOpByFilter(db, filter) {
 }
 
 // Wait until the current operation reaches the fail point "failPoint" for the given
-// namespace "nss".
+// namespace "nss". Accepts an optional filter to apply alongside the "failpointMsg".
 function waitForCurOpByFailPoint(db, nss, failPoint) {
     let filter = {$and: [{"ns": nss}, {"msg": failPoint}]};
     waitForCurOpByFilter(db, filter);
