@@ -4,6 +4,18 @@
 (function() {
 'use strict';
 
+// If the server has been compiled with the code coverage flag, then the splitChunk command can take
+// significantly longer than the 8-second interval for the continuous stepdown thread. This causes
+// the test to fail because retrying the interrupted splitChunk command won't ever succeed. To check
+// whether the server has been compiled with the code coverage flag, we assume the compiler flags
+// used to build the mongo shell are the same as the ones used to build the server.
+const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
+const isStepdownSuite = typeof ContinuousStepdown !== 'undefined';
+if (isStepdownSuite && isCodeCoverageEnabled) {
+    print('Skipping test during stepdown suite because splitChunk command would take too long');
+    return;
+}
+
 const st = new ShardingTest({shards: 2, mongos: 1});
 const dbName = "test";
 const collName = "foo";
