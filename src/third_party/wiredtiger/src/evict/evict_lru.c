@@ -1915,20 +1915,6 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         if (__wt_page_is_empty(page) || F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
             goto fast;
 
-        /*
-         * If application threads are blocked on eviction of clean pages, and the only thing
-         * preventing a clean leaf page from being evicted is it contains historical data, mark it
-         * dirty so we can do history store eviction. We also mark the tree dirty to avoid an
-         * assertion that we don't discard dirty pages from a clean tree.
-         */
-        if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD) && F_ISSET(ref, WT_REF_FLAG_LEAF) &&
-          !modified && page->modify != NULL &&
-          !__wt_txn_visible_all(
-              session, page->modify->rec_max_txn, page->modify->rec_max_timestamp)) {
-            __wt_page_modify_set(session, page);
-            goto fast;
-        }
-
         /* Skip clean pages if appropriate. */
         if (!modified && !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
             continue;

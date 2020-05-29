@@ -43,7 +43,8 @@ Barack
 BerkeleyDB
 Bitfield
 Bitwise
-BlqRr
+BlqR
+BqRt
 Brueckner
 Bsearch
 Btree
@@ -951,7 +952,9 @@ localkey
 localtime
 localvalue
 logf
+logfile
 logmgr
+logmsg
 lognum
 logop
 logpath
@@ -963,7 +966,6 @@ lookaside
 lookup
 lookups
 lossy
-lqRrt
 lr
 lrt
 lru
@@ -1024,6 +1026,7 @@ multithreaded
 munmap
 mutex
 mutexes
+mx
 mytable
 mytxn
 namespace
@@ -1147,6 +1150,7 @@ pv
 pvA
 pwrite
 py
+qRrT
 qdown
 qqq
 qrrSS

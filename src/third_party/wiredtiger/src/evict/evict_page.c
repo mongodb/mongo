@@ -336,15 +336,6 @@ __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     WT_DECL_RET;
 
     /*
-     * Before discarding a page, assert that all updates are globally visible unless the tree is
-     * closing or dead.
-     */
-    WT_ASSERT(session, LF_ISSET(WT_EVICT_CALL_CLOSING) || ref->page->modify == NULL ||
-        F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
-        __wt_txn_visible_all(session, ref->page->modify->rec_max_txn,
-                         ref->page->modify->rec_max_timestamp));
-
-    /*
      * Discard the page and update the reference structure. A page with a disk address is an on-disk
      * page, and a page without a disk address is a re-instantiated deleted page (for example, by
      * searching), that was never subsequently written.

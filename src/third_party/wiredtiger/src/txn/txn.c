@@ -704,7 +704,7 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
      * Set the flag to indicate that this update has been restored from history store for the
      * rollback of a prepared transaction.
      */
-    F_SET(upd, WT_UPDATE_RESTORED_FOR_ROLLBACK);
+    F_SET(upd, WT_UPDATE_RESTORED_FROM_HS);
 
     /* Walk to the end of the chain and we can only have prepared updates on the update chain. */
     for (;; chain = chain->next) {
@@ -909,7 +909,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      *
      * For prepared delete, we don't need to fix the history store.
      */
-    if (F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK) && upd->type != WT_UPDATE_TOMBSTONE) {
+    if (F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS) && upd->type != WT_UPDATE_TOMBSTONE) {
         cbt = (WT_CURSOR_BTREE *)(*cursorp);
         hs_btree_id = S2BT(session)->id;
         /* Open a history store table cursor. */
@@ -922,9 +922,12 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
          * Scan the history store for the given btree and key with maximum start timestamp to let
          * the search point to the last version of the key. We must ignore tombstone in the history
          * store while retrieving the update from the history store to replace the update in the
-         * data store.
+         * data store. We also need to ignore visibility of the updates as we have already released
+         * our snapshot in prepare. Otherwise, we can't see updates with non-globally visible
+         * transaction ids.
          */
         F_SET(hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+        F_SET(session, WT_SESSION_HS_IGNORE_VISIBILITY);
         WT_ERR_NOTFOUND_OK(
           __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, &op->u.op_row.key, WT_TS_MAX),
           true);
@@ -1009,6 +1012,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
 err:
     if (hs_cursor != NULL) {
+        F_CLR(session, WT_SESSION_HS_IGNORE_VISIBILITY);
         F_CLR(hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
         ret = __wt_hs_cursor_close(session, session_flags, is_owner);
     }
@@ -1035,7 +1039,6 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 
     txn = session->txn;
     cursor = NULL;
-    durable_op_timestamp = prev_op_timestamp = WT_TS_NONE;
 
     /*
      * Debugging checks on timestamps, if user requested them.
@@ -1095,25 +1098,32 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
           (upd->txnid == WT_TXN_ABORTED || upd->txnid == WT_TXN_NONE || upd->txnid == txn->id))
             upd = upd->next;
 
+        if (upd == NULL)
+            continue;
+
         /*
          * Check the timestamp on this update with the first valid update in the chain. They're in
          * most recent order.
          */
-        if (upd != NULL) {
-            prev_op_timestamp = upd->start_ts;
-            durable_op_timestamp = upd->durable_ts;
-        }
+        prev_op_timestamp = upd->start_ts;
+        durable_op_timestamp = upd->durable_ts;
 
-        if (upd == NULL)
-            continue;
         /*
          * Check for consistent per-key timestamp usage. If timestamps are or are not used
          * originally then they should be used the same way always. For this transaction, timestamps
          * are in use anytime the commit timestamp is set. Check timestamps are used in order.
+         *
+         * We may see an update restored from the data store or the history store with 0 timestamp
+         * if that update is behind the oldest timestamp when the page is reconciled. If the update
+         * is restored from the history store, it is either appended by the prepared rollback or
+         * rollback to stable. If the update is restored from the data store, it is either
+         * instantiated along with the prepared stop when the page is read into memory or appended
+         * by a failed eviction which attempted to write a prepared update to the data store.
          */
         op_zero_ts = !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT);
         upd_zero_ts = prev_op_timestamp == WT_TS_NONE;
-        if (op_zero_ts != upd_zero_ts) {
+        if (op_zero_ts != upd_zero_ts &&
+          !F_ISSET(upd, WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_RESTORED_FROM_DS)) {
             WT_ERR(__wt_verbose_dump_update(session, upd));
             WT_ERR(__wt_verbose_dump_txn_one(session, session, EINVAL,
               "per-key timestamps used inconsistently, dumping relevant information"));

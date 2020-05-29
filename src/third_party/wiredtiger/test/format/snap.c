@@ -245,7 +245,7 @@ snap_verify(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap)
 #if WIREDTIGER_VERSION_MAJOR >= 10
     testutil_check(__wt_debug_cursor_tree_hs(cursor, g.home_hsdump));
 #endif
-    if (g.logging)
+    if (g.c_logging)
         testutil_check(cursor->session->log_flush(cursor->session, "sync=off"));
 #endif
 
@@ -503,7 +503,7 @@ snap_repeat_single(WT_CURSOR *cursor, TINFO *tinfo)
 
     ret = session->timestamp_transaction(session, buf);
     if (ret == 0) {
-        logop(session, "%-10s%" PRIu64 " ts=%" PRIu64 " {%.*s}", "repeat", snap->keyno, snap->ts,
+        traceop(tinfo, "%-10s%" PRIu64 " ts=%" PRIu64 " {%.*s}", "repeat", snap->keyno, snap->ts,
           (int)snap->vsize, (char *)snap->vdata);
 
         /* The only expected error is rollback. */

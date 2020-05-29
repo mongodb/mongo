@@ -386,18 +386,28 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
      * backup or the checkpoint LSN. Otherwise we want the minimum of the last log file written to
      * disk and the checkpoint LSN.
      */
-    if (backup_file != 0)
-        min_lognum = WT_MIN(log->ckpt_lsn.l.file, backup_file);
-    else {
+    min_lognum = backup_file == 0 ? WT_MIN(log->ckpt_lsn.l.file, log->sync_lsn.l.file) :
+                                    WT_MIN(log->ckpt_lsn.l.file, backup_file);
+
+    /* Adjust the number of log files to retain based on debugging options. */
+    if (conn->debug_ckpt_cnt != 0)
+        min_lognum = WT_MIN(conn->debug_ckpt[conn->debug_ckpt_cnt - 1].l.file, min_lognum);
+    if (conn->debug_log_cnt != 0) {
         /*
-         * Figure out the minimum log file to archive. Use the LSN in the debugging array if
-         * necessary.
+         * If we're performing checkpoints, apply the retain value as a minimum, increasing the
+         * number the log files we keep. If not performing checkpoints, it's an absolute number of
+         * log files to keep. This means we can potentially remove log files required for recovery
+         * if the number of log files exceeds the configured value and the system has yet to be
+         * checkpointed.
+         *
+         * Check for N+1, that is, we retain N full log files, and one partial.
          */
-        if (conn->debug_ckpt_cnt == 0)
-            min_lognum = WT_MIN(log->ckpt_lsn.l.file, log->sync_lsn.l.file);
+        if ((conn->debug_log_cnt + 1) >= log->fileid)
+            return (0);
+        if (log->ckpt_lsn.l.file == 1 && log->ckpt_lsn.l.offset == 0)
+            min_lognum = log->fileid - (conn->debug_log_cnt + 1);
         else
-            min_lognum =
-              WT_MIN(conn->debug_ckpt[conn->debug_ckpt_cnt - 1].l.file, log->sync_lsn.l.file);
+            min_lognum = WT_MIN(log->fileid - (conn->debug_log_cnt + 1), min_lognum);
     }
     __wt_verbose(session, WT_VERB_LOG, "log_archive: archive to log number %" PRIu32, min_lognum);
 

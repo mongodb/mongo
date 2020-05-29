@@ -325,7 +325,7 @@ Display the database log.
 The \c printlog command outputs the database log.
 
 @subsection util_printlog_synopsis Synopsis
-<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] printlog [-x] [-f output]</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] printlog [-mx] [-f output]</code>
 
 @subsection util_printlog_options Options
 The following are command-specific options for the \c printlog command:
@@ -333,6 +333,9 @@ The following are command-specific options for the \c printlog command:
 @par <code>-f</code>
 By default, the \c printlog command output is written to the standard
 output; the \c -f option re-directs the output to the specified file.
+
+@par <code>-m</code>
+Print only message-type log records.
 
 @par <code>-x</code>
 Keys and value items in the log are printed in hex format in addition

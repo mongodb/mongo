@@ -101,6 +101,20 @@ __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
+ * __wt_page_dirty_and_evict_soon --
+ *     Mark a page dirty and set it to be evicted as soon as possible.
+ */
+static inline int
+__wt_page_dirty_and_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+    WT_RET(__wt_page_modify_init(session, ref->page));
+    __wt_page_modify_set(session, ref->page);
+    __wt_page_evict_soon(session, ref);
+
+    return (0);
+}
+
+/*
  * __wt_cache_pages_inuse --
  *     Return the number of pages in use.
  */

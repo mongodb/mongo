@@ -256,8 +256,8 @@ struct __wt_reconcile {
     WT_CURSOR_BTREE update_modify_cbt;
 
     /*
-     * Variables to track reconciled pages containing cells with time window values and prepared
-     * transactions.
+     * Variables to track reconciliation calls for pages containing cells with time window values
+     * and prepared transactions.
      */
     bool rec_page_cell_with_ts;
     bool rec_page_cell_with_txn_id;

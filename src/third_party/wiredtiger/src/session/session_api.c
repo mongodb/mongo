@@ -813,7 +813,7 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
     va_list ap;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(session, log_printf);
+    SESSION_API_CALL_PREPARE_ALLOWED_NOCONF(session, log_printf);
 
     va_start(ap, fmt);
     ret = __wt_log_vprintf(session, fmt, ap);

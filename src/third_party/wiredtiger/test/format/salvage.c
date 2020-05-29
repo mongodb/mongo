@@ -29,24 +29,6 @@
 #include "format.h"
 
 /*
- * salvage --
- *     A single salvage.
- */
-static void
-salvage(void)
-{
-    WT_CONNECTION *conn;
-    WT_SESSION *session;
-
-    conn = g.wts_conn;
-    track("salvage", 0ULL, NULL);
-
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    testutil_check(session->salvage(session, g.uri, "force=true"));
-    testutil_check(session->close(session, NULL));
-}
-
-/*
  * corrupt --
  *     Corrupt the file in a random way.
  */
@@ -135,12 +117,16 @@ found:
 void
 wts_salvage(void)
 {
+    WT_CONNECTION *conn;
     WT_DECL_RET;
+    WT_SESSION *session;
     size_t len;
     char *cmd;
 
     if (g.c_salvage == 0)
         return;
+
+    track("salvage", 0ULL, NULL);
 
     /* Save a copy of the interesting files so we can replay the salvage step as necessary. */
     len = strlen(g.home) + strlen(SALVAGE_COPY_CMD) + 1;
@@ -151,17 +137,18 @@ wts_salvage(void)
     free(cmd);
 
     /* Salvage, then verify. */
-    wts_open(g.home, true, &g.wts_conn, true);
-    salvage();
+    wts_open(g.home, &conn, &session, true);
+    testutil_check(session->salvage(session, g.uri, "force=true"));
+
 #if 0
     wts_verify("post-salvage verify");
 #endif
-    wts_close();
+    wts_close(&conn, &session);
 
     /* Corrupt the file randomly, salvage, then verify. */
     if (corrupt()) {
-        wts_open(g.home, true, &g.wts_conn, false);
-        salvage();
-        wts_close();
+        wts_open(g.home, &conn, &session, false);
+        testutil_check(session->salvage(session, g.uri, "force=true"));
+        wts_close(&conn, &session);
     }
 }

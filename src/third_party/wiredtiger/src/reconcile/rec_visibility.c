@@ -69,11 +69,8 @@ __rec_append_orig_value(
 
     /* Review the current update list, checking conditions that mean no work is needed. */
     for (;; upd = upd->next) {
-        /*
-         * Done if the update was restored from the history store for the rollback to stable
-         * operation.
-         */
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FOR_ROLLBACK))
+        /* Done if the update was restored from the history store. */
+        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_HS))
             return (0);
 
         /*
@@ -155,6 +152,7 @@ __rec_append_orig_value(
             tombstone->txnid = unpack->tw.stop_txn;
             tombstone->start_ts = unpack->tw.stop_ts;
             tombstone->durable_ts = unpack->tw.durable_stop_ts;
+            F_SET(tombstone, WT_UPDATE_RESTORED_FROM_DS);
         } else {
             /*
              * Once the prepared update is resolved, the in-memory update and on-disk written copy
@@ -182,6 +180,7 @@ __rec_append_orig_value(
         append->txnid = unpack->tw.start_txn;
         append->start_ts = unpack->tw.start_ts;
         append->durable_ts = unpack->tw.durable_start_ts;
+        F_SET(append, WT_UPDATE_RESTORED_FROM_DS);
     }
 
     if (tombstone != NULL) {
@@ -337,9 +336,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
                  * the history store, rollback to stable will bring it back to the data store.
                  * Otherwise, it removes the key.
                  */
-                WT_ASSERT(session, F_ISSET(r, WT_REC_EVICT) ||
-                    (F_ISSET(r, WT_REC_VISIBILITY_ERR) &&
-                                     F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK)));
+                WT_ASSERT(session,
+                  F_ISSET(r, WT_REC_EVICT) || (F_ISSET(r, WT_REC_VISIBILITY_ERR) &&
+                                                F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS)));
                 WT_ASSERT(session, upd->prepare_state == WT_PREPARE_INPROGRESS);
             }
         }

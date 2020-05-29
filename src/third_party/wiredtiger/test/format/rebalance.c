@@ -50,23 +50,17 @@ wts_rebalance(void)
     testutil_check(__wt_snprintf(cmd, len, REBALANCE_COPY_CMD, g.home, g.home, "orig", g.uri));
     testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
-    /* Rebalance, then verify the object. */
-    wts_reopen();
-    conn = g.wts_conn;
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    logop(session, "%s", "=============== rebalance start");
+    /* Open the database, rebalance and verify the object, then close the database. */
+    wts_open(g.home, &conn, &session, true);
+    testutil_check(session->rebalance(session, g.uri, NULL));
+    testutil_check(session->verify(session, g.uri, "strict"));
+    wts_close(&conn, &session);
 
-    testutil_checkfmt(session->rebalance(session, g.uri, NULL), "%s", g.uri);
-
-    logop(session, "%s", "=============== rebalance stop");
-    testutil_check(session->close(session, NULL));
-
-    wts_verify("post-rebalance verify");
-    wts_close();
+    /* Dump the rebalanced object. */
     testutil_check(__wt_snprintf(cmd, len, REBALANCE_COPY_CMD, g.home, g.home, "new", g.uri));
     testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
-    /* Compare the old/new versions of the object. */
+    /* Compare the old/new dumps of the object. */
     testutil_check(__wt_snprintf(cmd, len, REBALANCE_CMP_CMD, g.home, g.home));
     testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
