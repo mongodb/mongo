@@ -645,6 +645,12 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
 }
 
 TEST_F(NetworkInterfaceTest, StartCommandOnAny) {
+    // The echo command below uses hedging so after a response is returned, we will issue
+    // a _killOperations command to kill the pending operation. As a result, the number of
+    // successful commands can sometimes be 2 (echo and _killOperations) instead 1 when the
+    // num ops assertion below runs.
+    FailPointEnableBlock fpb("networkInterfaceShouldNotKillPendingRequests");
+
     auto commandRequest = makeEchoCmdObj();
     auto request = [&] {
         auto cs = fixture();
