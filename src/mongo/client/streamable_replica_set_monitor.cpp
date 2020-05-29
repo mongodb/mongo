@@ -576,7 +576,7 @@ void StreamableReplicaSetMonitor::_setConfirmedNotifierState(
 
 void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
     TopologyDescriptionPtr previousDescription, TopologyDescriptionPtr newDescription) {
-    stdx::lock_guard lock(_mutex);
+    stdx::unique_lock<Latch> lock(_mutex);
     if (_isDropped.load())
         return;
 
@@ -593,6 +593,7 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
         if (maybePrimary) {
             _setConfirmedNotifierState(lock, *maybePrimary);
 
+            lock.unlock();
             ReplicaSetMonitorManager::get()->getNotifier().onConfirmedSet(
                 _confirmedNotifierState->connectionString,
                 _confirmedNotifierState->primaryAddress,
@@ -600,6 +601,7 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
         } else {
             if (_confirmedNotifierState) {
                 const auto& connectionString = _confirmedNotifierState->connectionString;
+                lock.unlock();
                 ReplicaSetMonitorManager::get()->getNotifier().onPossibleSet(connectionString);
             } else {
                 // No confirmed hosts yet, just send list of hosts that are routable base on type.
@@ -616,6 +618,8 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
 
                 const auto connectionString = ConnectionString::forReplicaSet(
                     getName(), _extractHosts(primaryAndSecondaries));
+
+                lock.unlock();
                 ReplicaSetMonitorManager::get()->getNotifier().onPossibleSet(connectionString);
             }
         }
