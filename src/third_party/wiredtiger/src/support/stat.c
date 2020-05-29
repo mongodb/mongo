@@ -83,8 +83,10 @@ static const char *const __stats_dsrc_desc[] = {
   "cursor: update calls", "cursor: update key and value bytes", "cursor: update value size change",
   "history: history pages added for eviction during garbage collection",
   "history: history pages removed for garbage collection",
-  "history: history pages visited for garbage collection", "reconciliation: dictionary matches",
-  "reconciliation: fast-path pages deleted",
+  "history: history pages visited for garbage collection",
+  "reconciliation: approximate byte size of timestamps in pages written",
+  "reconciliation: approximate byte size of transaction IDs in pages written",
+  "reconciliation: dictionary matches", "reconciliation: fast-path pages deleted",
   "reconciliation: internal page key bytes discarded using suffix compression",
   "reconciliation: internal page multi-block writes", "reconciliation: internal-page overflow keys",
   "reconciliation: leaf page key bytes discarded using prefix compression",
@@ -287,6 +289,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->hs_gc_pages_evict = 0;
     stats->hs_gc_pages_removed = 0;
     stats->hs_gc_pages_visited = 0;
+    stats->rec_time_window_bytes_ts = 0;
+    stats->rec_time_window_bytes_txn = 0;
     stats->rec_dictionary = 0;
     stats->rec_page_delete_fast = 0;
     stats->rec_suffix_compression = 0;
@@ -483,6 +487,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->hs_gc_pages_evict += from->hs_gc_pages_evict;
     to->hs_gc_pages_removed += from->hs_gc_pages_removed;
     to->hs_gc_pages_visited += from->hs_gc_pages_visited;
+    to->rec_time_window_bytes_ts += from->rec_time_window_bytes_ts;
+    to->rec_time_window_bytes_txn += from->rec_time_window_bytes_txn;
     to->rec_dictionary += from->rec_dictionary;
     to->rec_page_delete_fast += from->rec_page_delete_fast;
     to->rec_suffix_compression += from->rec_suffix_compression;
@@ -677,6 +683,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->hs_gc_pages_evict += WT_STAT_READ(from, hs_gc_pages_evict);
     to->hs_gc_pages_removed += WT_STAT_READ(from, hs_gc_pages_removed);
     to->hs_gc_pages_visited += WT_STAT_READ(from, hs_gc_pages_visited);
+    to->rec_time_window_bytes_ts += WT_STAT_READ(from, rec_time_window_bytes_ts);
+    to->rec_time_window_bytes_txn += WT_STAT_READ(from, rec_time_window_bytes_txn);
     to->rec_dictionary += WT_STAT_READ(from, rec_dictionary);
     to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
     to->rec_suffix_compression += WT_STAT_READ(from, rec_suffix_compression);
@@ -829,8 +837,6 @@ static const char *const __stats_connection_desc[] = {
   "cache: pages selected for eviction unable to be evicted because of active children on an "
   "internal page",
   "cache: pages selected for eviction unable to be evicted because of failure in reconciliation",
-  "cache: pages selected for eviction unable to be evicted due to newer modifications on a clean "
-  "page",
   "cache: pages walked for eviction", "cache: pages written from cache",
   "cache: pages written requiring in-memory restoration", "cache: percentage overhead",
   "cache: tracked bytes belonging to internal pages in the cache",
@@ -942,6 +948,8 @@ static const char *const __stats_connection_desc[] = {
   "perf: operation write latency histogram (bucket 3) - 500-999us",
   "perf: operation write latency histogram (bucket 4) - 1000-9999us",
   "perf: operation write latency histogram (bucket 5) - 10000us+",
+  "reconciliation: approximate byte size of timestamps in pages written",
+  "reconciliation: approximate byte size of transaction IDs in pages written",
   "reconciliation: fast-path pages deleted",
   "reconciliation: maximum seconds spent in a reconciliation call",
   "reconciliation: page reconciliation calls",
@@ -1234,7 +1242,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_fail_parent_has_overflow_items = 0;
     stats->cache_eviction_fail_active_children_on_an_internal_page = 0;
     stats->cache_eviction_fail_in_reconciliation = 0;
-    stats->cache_eviction_fail_with_newer_modifications_on_a_clean_page = 0;
     stats->cache_eviction_walk = 0;
     stats->cache_write = 0;
     stats->cache_write_restore = 0;
@@ -1408,6 +1415,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->perf_hist_opwrite_latency_lt1000 = 0;
     stats->perf_hist_opwrite_latency_lt10000 = 0;
     stats->perf_hist_opwrite_latency_gt10000 = 0;
+    stats->rec_time_window_bytes_ts = 0;
+    stats->rec_time_window_bytes_txn = 0;
     stats->rec_page_delete_fast = 0;
     /* not clearing rec_maximum_seconds */
     stats->rec_pages = 0;
@@ -1721,8 +1730,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_READ(from, cache_eviction_fail_active_children_on_an_internal_page);
     to->cache_eviction_fail_in_reconciliation +=
       WT_STAT_READ(from, cache_eviction_fail_in_reconciliation);
-    to->cache_eviction_fail_with_newer_modifications_on_a_clean_page +=
-      WT_STAT_READ(from, cache_eviction_fail_with_newer_modifications_on_a_clean_page);
     to->cache_eviction_walk += WT_STAT_READ(from, cache_eviction_walk);
     to->cache_write += WT_STAT_READ(from, cache_write);
     to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
@@ -1900,6 +1907,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->perf_hist_opwrite_latency_lt1000 += WT_STAT_READ(from, perf_hist_opwrite_latency_lt1000);
     to->perf_hist_opwrite_latency_lt10000 += WT_STAT_READ(from, perf_hist_opwrite_latency_lt10000);
     to->perf_hist_opwrite_latency_gt10000 += WT_STAT_READ(from, perf_hist_opwrite_latency_gt10000);
+    to->rec_time_window_bytes_ts += WT_STAT_READ(from, rec_time_window_bytes_ts);
+    to->rec_time_window_bytes_txn += WT_STAT_READ(from, rec_time_window_bytes_txn);
     to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
     to->rec_maximum_seconds += WT_STAT_READ(from, rec_maximum_seconds);
     to->rec_pages += WT_STAT_READ(from, rec_pages);

@@ -397,6 +397,7 @@ struct __wt_txn_printlog_args {
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_TXN_PRINTLOG_HEX 0x1u /* Add hex output */
+#define WT_TXN_PRINTLOG_MSG 0x2u /* Messages only */
                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };

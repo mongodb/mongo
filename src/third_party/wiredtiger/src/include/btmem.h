@@ -1073,10 +1073,11 @@ struct __wt_update {
     volatile uint8_t prepare_state; /* prepare state */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_UPDATE_HS 0x1u                         /* Update has been written to history store. */
-#define WT_UPDATE_PREPARE_RESTORED_FROM_DISK 0x2u /* Prepared update restored from disk. */
-#define WT_UPDATE_RESTORED_FOR_ROLLBACK 0x4u      /* Update restored for rollback to stable. */
-                                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_UPDATE_HS 0x1u                       /* Update has been written to history store. */
+#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x2u /* Prepared update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_DS 0x4u         /* Update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_HS 0x8u         /* Update restored from history store. */
+                                                /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 
     /*

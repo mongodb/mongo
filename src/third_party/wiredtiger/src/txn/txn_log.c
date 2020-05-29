@@ -660,6 +660,17 @@ __txn_printlog(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *
     /* First, peek at the log record type. */
     WT_RET(__wt_logrec_read(session, &p, end, &rectype));
 
+    /*
+     * When printing just the message records, display the message by itself without the usual log
+     * header information.
+     */
+    if (F_ISSET(args, WT_TXN_PRINTLOG_MSG)) {
+        if (rectype != WT_LOGREC_MESSAGE)
+            return (0);
+        WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p), WT_UNCHECKED_STRING(S), &msg));
+        return (__wt_fprintf(session, args->fs, "%s\n", msg));
+    }
+
     if (!firstrecord)
         WT_RET(__wt_fprintf(session, args->fs, ",\n"));
 
@@ -734,11 +745,13 @@ __wt_txn_printlog(WT_SESSION *wt_session, const char *ofile, uint32_t flags)
         WT_RET(
           __wt_fopen(session, ofile, WT_FS_OPEN_CREATE | WT_FS_OPEN_FIXED, WT_STREAM_WRITE, &fs));
 
-    WT_ERR(__wt_fprintf(session, fs, "[\n"));
+    if (!LF_ISSET(WT_TXN_PRINTLOG_MSG))
+        WT_ERR(__wt_fprintf(session, fs, "[\n"));
     args.fs = fs;
     args.flags = flags;
     WT_ERR(__wt_log_scan(session, NULL, WT_LOGSCAN_FIRST, __txn_printlog, &args));
-    ret = __wt_fprintf(session, fs, "\n]\n");
+    if (!LF_ISSET(WT_TXN_PRINTLOG_MSG))
+        ret = __wt_fprintf(session, fs, "\n]\n");
 
 err:
     if (ofile != NULL)

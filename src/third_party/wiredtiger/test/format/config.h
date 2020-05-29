@@ -227,6 +227,10 @@ static CONFIG c[] = {
   /* 10% */
   {"ops.compaction", "if compaction is running", C_BOOL, 10, 0, 0, &g.c_compact, NULL},
 
+  /* 50% */
+  {"ops.history_store", "if history store cursor reads configured", C_BOOL, 50, 0, 0,
+    &g.c_hs_cursor, NULL},
+
   {"ops.pct.delete", "percent operations that are deletes", C_IGNORE, 0, 0, 100, &g.c_delete_pct,
     NULL},
 

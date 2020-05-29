@@ -171,6 +171,8 @@
 #define SESSION_API_CALL_PREPARE_ALLOWED(s, n, config, cfg) \
     API_CALL(s, WT_SESSION, n, NULL, config, cfg)
 
+#define SESSION_API_CALL_PREPARE_ALLOWED_NOCONF(s, n) API_CALL_NOCONF(s, WT_SESSION, n, NULL)
+
 #define SESSION_API_CALL_PREPARE_NOT_ALLOWED(s, n, config, cfg) \
     SESSION_API_PREPARE_CHECK(s, WT_SESSION, n);                \
     API_CALL(s, WT_SESSION, n, NULL, config, cfg)

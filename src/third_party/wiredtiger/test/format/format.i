@@ -97,12 +97,7 @@ rng(WT_RAND_STATE *rnd)
     if (rnd == NULL)
         rnd = &g.rnd;
 
-    /*
-     * Multithreaded runs log/replay until they get to the operations phase, then turn off logging
-     * and replay because threaded operation order can't be replayed. Do that check inline so it's a
-     * cheap call once thread performance starts to matter.
-     */
-    return (g.randfp == NULL || g.rand_log_stop ? __wt_random(rnd) : rng_slow(rnd));
+    return (__wt_random(rnd));
 }
 
 /*
@@ -236,3 +231,25 @@ lock_writeunlock(WT_SESSION *session, RWLOCK *lock)
         testutil_check(pthread_rwlock_unlock(&lock->l.pthread));
     }
 }
+#define tracemsg(fmt, ...)                                                                         \
+    do {                                                                                           \
+        if (g.trace) {                                                                             \
+            struct timespec __ts;                                                                  \
+            WT_SESSION *__s = g.trace_session;                                                     \
+            __wt_epoch((WT_SESSION_IMPL *)__s, &__ts);                                             \
+            testutil_check(                                                                        \
+              __s->log_printf(__s, "[%" PRIuMAX ":%" PRIuMAX "][%s] " fmt, (uintmax_t)__ts.tv_sec, \
+                (uintmax_t)__ts.tv_nsec / WT_THOUSAND, g.tidbuf, __VA_ARGS__));                    \
+        }                                                                                          \
+    } while (0)
+#define traceop(tinfo, fmt, ...)                                                                   \
+    do {                                                                                           \
+        if (g.trace) {                                                                             \
+            struct timespec __ts;                                                                  \
+            WT_SESSION *__s = (tinfo)->trace;                                                      \
+            __wt_epoch((WT_SESSION_IMPL *)__s, &__ts);                                             \
+            testutil_check(                                                                        \
+              __s->log_printf(__s, "[%" PRIuMAX ":%" PRIuMAX "][%s] " fmt, (uintmax_t)__ts.tv_sec, \
+                (uintmax_t)__ts.tv_nsec / WT_THOUSAND, tinfo->tidbuf, __VA_ARGS__));               \
+        }                                                                                          \
+    } while (0)

@@ -535,7 +535,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_DECL_ITEM(value);
     WT_DECL_RET;
     WT_ROW *rip;
-    WT_UPDATE *tombstone, **upd_array, *upd;
+    WT_UPDATE *tombstone, *upd, **upd_array;
     size_t size, total_size;
     uint32_t i;
     bool instantiate_prepared, prepare;
@@ -599,7 +599,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 
         /* Allocate the per-page update array if one doesn't already exist. */
         if (page->entries != 0 && page->modify->mod_row_update == NULL)
-            WT_RET(__wt_calloc_def(session, page->entries, &page->modify->mod_row_update));
+            WT_PAGE_ALLOC_AND_SWAP(
+              session, page, page->modify->mod_row_update, upd_array, page->entries);
 
         /* For each entry in the page */
         size = total_size = 0;
@@ -614,6 +615,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
                 WT_ERR(__wt_page_cell_data_ref(session, page, &unpack, value));
 
                 WT_ERR(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, &size));
+                total_size += size;
                 upd->durable_ts = unpack.tw.durable_start_ts;
                 upd->start_ts = unpack.tw.start_ts;
                 upd->txnid = unpack.tw.start_txn;
@@ -625,22 +627,23 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
                  */
                 if (WT_TIME_WINDOW_HAS_STOP(&unpack.tw)) {
                     WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &size));
+                    total_size += size;
                     tombstone->durable_ts = WT_TS_NONE;
                     tombstone->start_ts = unpack.tw.stop_ts;
                     tombstone->txnid = unpack.tw.stop_txn;
                     tombstone->prepare_state = WT_PREPARE_INPROGRESS;
-                    F_SET(tombstone, WT_UPDATE_PREPARE_RESTORED_FROM_DISK);
+                    F_SET(tombstone, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+                    F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
                     tombstone->next = upd;
                 } else {
                     upd->durable_ts = WT_TS_NONE;
                     upd->prepare_state = WT_PREPARE_INPROGRESS;
-                    F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK);
+                    F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
                     tombstone = upd;
                 }
 
                 upd_array[WT_ROW_SLOT(page, rip)] = tombstone;
                 tombstone = upd = NULL;
-                total_size += size;
             }
         }
 

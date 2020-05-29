@@ -882,7 +882,7 @@ __wt_txn_read_upd_list(
                  * rollback.
                  */
                 if (prepare_updp != NULL && *prepare_updp == NULL &&
-                  F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK))
+                  F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS))
                     *prepare_updp = upd;
                 continue;
             }
@@ -948,9 +948,9 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
 
     /*
      * If the stop time point is set, that means that there is a tombstone at that time. If it is
-     * not prepared and the it is visible to our txn then that means we've just spotted a tombstone
-     * and should return "not found", except for history store scan during rollback to stable and
-     * when we are told to ignore non-globally visible tombstones.
+     * not prepared and it is visible to our txn it means we've just spotted a tombstone and should
+     * return "not found", except scanning the history store during rollback to stable and when we
+     * are told to ignore non-globally visible tombstones.
      */
     if (__wt_txn_tw_stop_visible(session, &tw) &&
       ((!F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&
@@ -1008,7 +1008,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
      * being updated to 30 and the reader not seeing it.
      */
     if (prepare_upd != NULL) {
-        WT_ASSERT(session, F_ISSET(prepare_upd, WT_UPDATE_PREPARE_RESTORED_FROM_DISK));
+        WT_ASSERT(session, F_ISSET(prepare_upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS));
         if (prepare_upd->txnid == WT_TXN_ABORTED ||
           prepare_upd->prepare_state == WT_PREPARE_RESOLVED)
             return (WT_RESTART);

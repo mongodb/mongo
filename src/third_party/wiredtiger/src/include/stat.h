@@ -441,7 +441,6 @@ struct __wt_connection_stats {
     int64_t cache_eviction_fail_parent_has_overflow_items;
     int64_t cache_eviction_fail_active_children_on_an_internal_page;
     int64_t cache_eviction_fail_in_reconciliation;
-    int64_t cache_eviction_fail_with_newer_modifications_on_a_clean_page;
     int64_t cache_eviction_walk;
     int64_t cache_write;
     int64_t cache_write_restore;
@@ -615,6 +614,8 @@ struct __wt_connection_stats {
     int64_t perf_hist_opwrite_latency_lt1000;
     int64_t perf_hist_opwrite_latency_lt10000;
     int64_t perf_hist_opwrite_latency_gt10000;
+    int64_t rec_time_window_bytes_ts;
+    int64_t rec_time_window_bytes_txn;
     int64_t rec_page_delete_fast;
     int64_t rec_maximum_seconds;
     int64_t rec_pages;
@@ -887,6 +888,8 @@ struct __wt_dsrc_stats {
     int64_t hs_gc_pages_evict;
     int64_t hs_gc_pages_removed;
     int64_t hs_gc_pages_visited;
+    int64_t rec_time_window_bytes_ts;
+    int64_t rec_time_window_bytes_txn;
     int64_t rec_dictionary;
     int64_t rec_page_delete_fast;
     int64_t rec_suffix_compression;

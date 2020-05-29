@@ -1514,6 +1514,17 @@ tasks:
             ulimit -c unlimited
             largescale/run-million-collection-test.sh .
 
+  - name: compatibility-test-for-releases-full
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/evergreen/compatibility_test_for_releases.sh -l
+
   - name: compatibility-test-for-releases
     commands:
       - func: "get project"
@@ -2345,9 +2356,16 @@ buildvariants:
   tasks:
     - name: million-collection-test
 
+- name: compatibility-tests-full
+  display_name: Compatibility tests full
+  batchtime: 10080 # 7 days
+  run_on:
+  - ubuntu1804-test
+  tasks:
+    - name: compatibility-test-for-releases-full
+
 - name: compatibility-tests
   display_name: Compatibility tests
-  batchtime: 10080 # 7 days
   run_on:
   - ubuntu1804-test
   tasks:
