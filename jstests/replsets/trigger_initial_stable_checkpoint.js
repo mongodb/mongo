@@ -8,8 +8,8 @@
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
-        // Turn up the syncdelay (in seconds) to effectively disable background checkpoints.
-        syncdelay: 600,
+        // Disable background checkpoints: a zero value disables checkpointing.
+        syncdelay: 0,
         setParameter: {logComponentVerbosity: tojson({storage: 2})}
     }
 });

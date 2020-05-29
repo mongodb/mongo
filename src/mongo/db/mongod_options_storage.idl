@@ -84,7 +84,7 @@ configs:
         hidden: true
 
     'storage.syncPeriodSecs':
-        description: 'Seconds between disk syncs (0=never, but not recommended)'
+        description: 'Seconds between disk syncs'
         short_name: syncdelay
         arg_vartype: Double
         default: 60.0
