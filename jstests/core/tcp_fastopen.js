@@ -4,6 +4,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/netstat.js");
+
 // Does it make sense to expect TFO support?
 try {
     // Both client and server bits must be set to run this test.
@@ -21,7 +23,15 @@ try {
 const initial = db.serverStatus().network.tcpFastOpen;
 printjson(initial);
 print("/proc/net/netstat:");
-print(cat("/proc/net/netstat"));
+const initialObj = getNetStatObj();
+printjson(initialObj);
+
+// If TCPFastOpenBlackhole is 0 or not present, try to run the test. Otherwise,
+// we've seen an event, and should skip the test.
+if (initialObj.TcpExt.TCPFastOpenBlackhole) {
+    print("==Skipping test, host OS has observed a TCPFastOpenBlackhole event");
+    return;
+}
 
 if (!initial.serverSupported || !initial.clientSupported) {
     print("==Skipping test, one or both setsockopt() calls failed");
