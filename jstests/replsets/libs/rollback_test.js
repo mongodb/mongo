@@ -440,7 +440,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
         try {
             // The stepdown freeze period is short because the node is disconnected from
             // the rest of the replica set, so it physically can't become the primary.
-            curPrimary.adminCommand({replSetStepDown: 1, force: true});
+            assert.soon(() => {
+                const res = curPrimary.adminCommand({replSetStepDown: 1, force: true});
+                return (res.ok || res.code === ErrorCodes.NotMaster);
+            });
         } catch (e) {
             // Stepdown may fail if the node has already started stepping down.
             print('Caught exception from replSetStepDown: ' + e);
