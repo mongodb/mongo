@@ -48,11 +48,13 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     // prematurely time out.
     const maxTimeMS = 1000 * 2;
 
-    // Enable a failPoint so that the write will hang.
+    // Enable a failPoint so that the write will hang. 'shouldCheckForInterrupt' is set to true
+    // so that maxTimeMS expiration can occur while the $merge operation's thread is hanging on
+    // this failpoiint.
     const failpointCommand = {
         configureFailPoint: failPointName,
         mode: "alwaysOn",
-        data: {nss: kDBName + "." + kDestCollName}
+        data: {nss: kDBName + "." + kDestCollName, shouldCheckForInterrupt: true}
     };
 
     assert.commandWorked(failPointConn.getDB("admin").runCommand(failpointCommand));
