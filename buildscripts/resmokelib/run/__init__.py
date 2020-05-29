@@ -300,8 +300,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
     # pylint: disable=too-many-instance-attributes,too-many-statements,too-many-locals
     def _setup_jasper(self):
         """Start up the jasper process manager."""
-        root_dir = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         proto_file = os.path.join(root_dir, "buildscripts", "resmokelib", "core", "jasper.proto")
         try:
             well_known_protos_include = pkg_resources.resource_filename("grpc_tools", "_proto")
@@ -337,7 +336,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         if ret != 0:
             raise RuntimeError("Failed to generated gRPC files from the jasper.proto file")
 
-        sys.path.extend([os.path.dirname(proto_out), proto_out])
+        sys.path.append(os.path.dirname(proto_out))
 
         from jasper import jasper_pb2
         from jasper import jasper_pb2_grpc
@@ -348,7 +347,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         curator_path = "build/curator"
         if sys.platform == "win32":
             curator_path += ".exe"
-        git_hash = "038d473062a378d688ff485d353fbc891621c1e9"
+        git_hash = "d846f0c875716e9377044ab2a50542724369662a"
         curator_exists = os.path.isfile(curator_path)
         curator_same_version = False
         if curator_exists:
@@ -381,10 +380,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         jasper_port = config.BASE_PORT - 1
         jasper_conn_str = "localhost:%d" % jasper_port
         jasper_process.Process.connection_str = jasper_conn_str
-        jasper_command = [
-            curator_path, "jasper", "service", "run", "rpc", "--port",
-            str(jasper_port)
-        ]
+        jasper_command = [curator_path, "jasper", "grpc", "--port", str(jasper_port)]
         self._jasper_server = process.Process(self._resmoke_logger, jasper_command)
         self._jasper_server.start()
 

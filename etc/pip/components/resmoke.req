@@ -6,7 +6,3 @@ shrub.py == 1.1.0
 ocspresponder == 0.5.0
 flask == 1.1.1
 ocspbuilder == 0.10.2
-grpcio == 1.28.1
-grpcio-tools == 1.28.1
-googleapis-common-protos == 1.51.0
-
