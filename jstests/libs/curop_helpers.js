@@ -13,10 +13,10 @@ function waitForCurOpByFilter(db, filter) {
 }
 
 // Wait until the current operation reaches the fail point "failPoint" for the given
-// namespace "nss".
-function waitForCurOpByFailPoint(db, nss, failPoint) {
-    let filter = {$and: [{"ns": nss}, {"failpointMsg": failPoint}]};
-    waitForCurOpByFilter(db, filter);
+// namespace "nss". Accepts an optional filter to apply alongside the "failpointMsg".
+function waitForCurOpByFailPoint(db, nss, failPoint, filter = {}) {
+    let adjustedFilter = {$and: [{"ns": nss}, Object.extend(filter, {"failpointMsg": failPoint})]};
+    waitForCurOpByFilter(db, adjustedFilter);
 }
 
 // Wait until the current operation reaches the fail point "failPoint" with no namespace.

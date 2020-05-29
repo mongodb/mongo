@@ -55,6 +55,8 @@ sharded_collections_jscore_multiversion_passthrough:
 
 sharding_multiversion:
 - ticket: SERVER-43614
+  test_file: jstests/sharding/kill_pinned_cursor.js
+- ticket: SERVER-43614
   test_file: jstests/sharding/killop.js
 - ticket: SERVER-43614
   test_file: jstests/sharding/verify_sessions_expiration_sharded.js

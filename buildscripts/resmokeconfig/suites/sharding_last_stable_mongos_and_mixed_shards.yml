@@ -28,6 +28,7 @@ selector:
   - jstests/sharding/migration_coordinator_killop_in_critical_section.js
   - jstests/sharding/migration_coordinator_shutdown_in_critical_section.js
   - jstests/sharding/test_stacked_migration_cleanup.js
+  - jstests/sharding/kill_pinned_cursor.js
   - jstests/sharding/killop.js
   - jstests/sharding/verify_sessions_expiration_sharded.js
   # Enable when 4.6 becomes last stable
