@@ -42,6 +42,7 @@ load("jstests/free_mon/libs/free_mon.js");
 
     WaitForFreeMonServerStatusState(rst.getPrimary(), 'enabled');
     WaitForFreeMonServerStatusState(rst.getSecondary(), 'enabled');
+    ValidateFreeMonReplicaSet(rst);
 
     mock_web.waitRegisters(2);
     mock_web_sec.waitRegisters(2);
