@@ -152,6 +152,8 @@ public:
      *
      * Note that if you pass a baton to startCommand and that baton refuses work, then your onFinish
      * function will not run.
+     *
+     * These methods may throw.
      */
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequestOnAny& request,

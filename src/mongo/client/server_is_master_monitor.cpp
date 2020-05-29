@@ -193,6 +193,7 @@ void SingleServerIsMasterMonitor::_scheduleNextIsMaster(WithLock, Milliseconds d
             if (!cbData.status.isOK()) {
                 return;
             }
+
             self->_doRemoteCommand();
         });
 
@@ -210,10 +211,14 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
         return;
 
     StatusWith<executor::TaskExecutor::CallbackHandle> swCbHandle = [&]() {
-        if (exhaustEnabled(_topologyVersion)) {
-            return _scheduleStreamableIsMaster();
+        try {
+            if (exhaustEnabled(_topologyVersion)) {
+                return _scheduleStreamableIsMaster();
+            }
+            return _scheduleSingleIsMaster();
+        } catch (ExceptionFor<ErrorCodes::NetworkInterfaceExceededTimeLimit>& ex) {
+            return StatusWith<executor::TaskExecutor::CallbackHandle>(ex.toStatus());
         }
-        return _scheduleSingleIsMaster();
     }();
 
     if (!swCbHandle.isOK()) {
