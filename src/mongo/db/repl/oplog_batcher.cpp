@@ -133,19 +133,16 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
  */
 bool mustProcessIndividually(const OplogEntry& entry) {
     if (entry.isCommand()) {
-        if (entry.getCommandType() != OplogEntry::CommandType::kApplyOps || entry.shouldPrepare() ||
-            entry.isSingleOplogEntryTransactionWithCommand() || entry.isEndOfLargeTransaction()) {
-            return true;
-        } else {
-            // This branch covers unprepared CRUD applyOps and unprepared CRUD commits.
-            return false;
-        }
-    } else if (entry.getNss().isSystemDotViews()) {
-        return true;
-    } else if (entry.getNss().isServerConfigurationCollection()) {
-        return true;
+        // If none of the following cases is true, we'll return false to
+        // cover unprepared CRUD applyOps and unprepared CRUD commits.
+        return (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
+            entry.shouldPrepare() || entry.isSingleOplogEntryTransactionWithCommand() ||
+            entry.isEndOfLargeTransaction();
     }
-    return false;
+
+    const auto nss = entry.getNss();
+    return nss.isSystemDotViews() || nss.isServerConfigurationCollection() ||
+        nss.isPrivilegeCollection();
 }
 
 /**

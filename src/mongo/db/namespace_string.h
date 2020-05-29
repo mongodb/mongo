@@ -65,6 +65,10 @@ public:
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
+    // Names of privilege document collections
+    static constexpr StringData kSystemUsers = "system.users"_sd;
+    static constexpr StringData kSystemRoles = "system.roles"_sd;
+
     // Prefix for orphan collections
     static constexpr StringData kOrphanCollectionPrefix = "orphan."_sd;
     static constexpr StringData kOrphanCollectionDb = "local"_sd;
@@ -233,6 +237,12 @@ public:
     }
     bool isServerConfigurationCollection() const {
         return (db() == kAdminDb) && (coll() == "system.version");
+    }
+    bool isPrivilegeCollection() const {
+        if (!isAdminDB()) {
+            return false;
+        }
+        return (coll() == kSystemUsers) || (coll() == kSystemRoles);
     }
     bool isConfigDB() const {
         return db() == kConfigDb;
