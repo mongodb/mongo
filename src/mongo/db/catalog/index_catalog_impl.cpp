@@ -465,10 +465,10 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
                                                                    BSONObj spec) {
     UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
                                                                                _collection->ns());
-    invariant(_collection->numRecords(opCtx) == 0,
+    invariant(_collection->isEmpty(opCtx),
               str::stream() << "Collection must be empty. Collection: " << _collection->ns()
                             << " UUID: " << _collection->uuid()
-                            << " Count: " << _collection->numRecords(opCtx));
+                            << " Count (from size storer): " << _collection->numRecords(opCtx));
 
     StatusWith<BSONObj> statusWithSpec = prepareSpecForCreate(opCtx, spec);
     Status status = statusWithSpec.getStatus();
