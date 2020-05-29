@@ -67,6 +67,14 @@ public:
     T generate() {
         return this->generateByIncrementing();
     }
+
+    auto generateMultiple(size_t num) {
+        std::vector<T> idVector(num);
+        for (T& id : idVector) {
+            id = generate();
+        }
+        return idVector;
+    }
 };
 
 using SlotIdGenerator = IdGenerator<value::SlotId>;

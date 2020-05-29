@@ -107,9 +107,12 @@ private:
     std::unique_ptr<sbe::PlanStage> buildProjectionDefault(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildOr(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildText(const QuerySolutionNode* root);
+    std::unique_ptr<sbe::PlanStage> buildReturnKey(const QuerySolutionNode* root);
 
-    std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                                                         sbe::value::SlotId recordIdKeySlot);
+    std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(
+        std::unique_ptr<sbe::PlanStage> inputStage,
+        sbe::value::SlotId recordIdKeySlot,
+        const sbe::value::SlotVector& slotsToForward = {});
 
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
@@ -119,6 +122,10 @@ private:
     // combine these two stages into one. So, while processing the LIMIT stage we will save the
     // limit value in this member and will handle it while processing the SKIP stage.
     boost::optional<long long> _limit;
+
+    // A slot here indicates that the plan has a ReturnKeyStage at its root and that any index scans
+    // should inflate each index entry into an object and bind it to this slot.
+    boost::optional<sbe::value::SlotId> _returnKeySlot;
 
     PlanYieldPolicySBE* const _yieldPolicy;
 

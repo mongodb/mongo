@@ -86,7 +86,7 @@ static constexpr auto kSyntax = R"(
 
                 IXSCAN <- 'ixscan' IDENT? # optional variable name of the root object (record) delivered by the scan
                                    IDENT? # optional variable name of the record id delivered by the scan
-                                   IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
+                                   IX_KEY_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                    IDENT # collection name
                                    IDENT # index name to scan
                                    FORWARD_FLAG # forward scan or not
@@ -95,7 +95,7 @@ static constexpr auto kSyntax = R"(
                                    IDENT # variable name of the high key
                                    IDENT? # optional variable name of the root object (record) delivered by the scan
                                    IDENT? # optional variable name of the record id delivered by the scan
-                                   IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
+                                   IX_KEY_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                    IDENT # collection name
                                    IDENT # index name to scan
                                    FORWARD_FLAG # forward scan or not
@@ -207,6 +207,9 @@ static constexpr auto kSyntax = R"(
                 IDENT_LIST_WITH_RENAMES <- '[' (IDENT_WITH_RENAME (',' IDENT_WITH_RENAME)*)? ']'
                 IDENT_WITH_RENAME <- IDENT ('=' IDENT)?
 
+                IX_KEY_LIST_WITH_RENAMES <- '[' (IX_KEY_WITH_RENAME (',' IX_KEY_WITH_RENAME)*)? ']'
+                IX_KEY_WITH_RENAME <- IDENT '=' NUMBER
+
                 IDENT_LIST <- '[' (IDENT (',' IDENT)*)? ']'
                 IDENT <- RAW_IDENT/ESC_IDENT
 
@@ -222,6 +225,30 @@ static constexpr auto kSyntax = R"(
                 %whitespace  <-  ([ \t\r\n]* ('#' (!'\n' .)* '\n' [ \t\r\n]*)*)
                 %word        <-  [a-z]+
         )";
+
+std::pair<IndexKeysInclusionSet, sbe::value::SlotVector> Parser::lookupIndexKeyRenames(
+    const std::vector<std::string>& renames, const std::vector<size_t>& indexKeys) {
+    IndexKeysInclusionSet indexKeysInclusion;
+
+    // Each indexKey is associated with the parallel remap from the 'renames' vector. This
+    // map explicitly binds each indexKey with its remap and sorts them by 'indexKey' order.
+    stdx::unordered_map<int, sbe::value::SlotId> slotsByKeyIndex;
+    invariant(renames.size() == indexKeys.size());
+    for (size_t idx = 0; idx < renames.size(); idx++) {
+        uassert(4872100,
+                str::stream() << "Cannot project index key at position " << indexKeys[idx],
+                indexKeys[idx] < indexKeysInclusion.size());
+        slotsByKeyIndex[indexKeys[idx]] = lookupSlotStrict(renames[idx]);
+    }
+
+    sbe::value::SlotVector slots;
+    for (auto&& [indexKey, slot] : slotsByKeyIndex) {
+        indexKeysInclusion.set(indexKey);
+        slots.push_back(slot);
+    }
+
+    return {indexKeysInclusion, std::move(slots)};
+}
 
 void Parser::walkChildren(AstQuery& ast) {
     for (const auto& node : ast.nodes) {
@@ -267,6 +294,24 @@ void Parser::walkIdentListWithRename(AstQuery& ast) {
 
     for (auto& node : ast.nodes) {
         ast.identifiers.emplace_back(std::move(node->identifier));
+        ast.renames.emplace_back(std::move(node->rename));
+    }
+}
+
+void Parser::walkIxKeyWithRename(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.rename = ast.nodes[0]->identifier;
+
+    // This token cannot be negative, because the parser does not accept a "-" prefix.
+    ast.indexKey = static_cast<size_t>(std::stoi(ast.nodes[1]->token));
+}
+
+void Parser::walkIxKeyListWithRename(AstQuery& ast) {
+    walkChildren(ast);
+
+    for (auto& node : ast.nodes) {
+        ast.indexKeys.emplace_back(std::move(node->indexKey));
         ast.renames.emplace_back(std::move(node->rename));
     }
 }
@@ -625,13 +670,16 @@ void Parser::walkIndexScan(AstQuery& ast) {
         collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
 
+    auto [indexKeysInclusion, vars] =
+        lookupIndexKeyRenames(ast.nodes[projectsPos]->renames, ast.nodes[projectsPos]->indexKeys);
+
     ast.stage = makeS<IndexScanStage>(name,
                                       indexName,
                                       forward,
                                       lookupSlot(recordName),
                                       lookupSlot(recordIdName),
-                                      ast.nodes[projectsPos]->identifiers,
-                                      lookupSlots(ast.nodes[projectsPos]->renames),
+                                      indexKeysInclusion,
+                                      vars,
                                       boost::none,
                                       boost::none,
                                       nullptr,
@@ -678,13 +726,16 @@ void Parser::walkIndexSeek(AstQuery& ast) {
         collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
 
+    auto [indexKeysInclusion, vars] =
+        lookupIndexKeyRenames(ast.nodes[projectsPos]->renames, ast.nodes[projectsPos]->indexKeys);
+
     ast.stage = makeS<IndexScanStage>(name,
                                       indexName,
                                       forward,
                                       lookupSlot(recordName),
                                       lookupSlot(recordIdName),
-                                      ast.nodes[projectsPos]->identifiers,
-                                      lookupSlots(ast.nodes[projectsPos]->renames),
+                                      indexKeysInclusion,
+                                      vars,
                                       lookupSlot(ast.nodes[0]->identifier),
                                       lookupSlot(ast.nodes[1]->identifier),
                                       nullptr,
@@ -1338,6 +1389,12 @@ void Parser::walk(AstQuery& ast) {
             break;
         case "IDENT_LIST_WITH_RENAMES"_:
             walkIdentListWithRename(ast);
+            break;
+        case "IX_KEY_WITH_RENAME"_:
+            walkIxKeyWithRename(ast);
+            break;
+        case "IX_KEY_LIST_WITH_RENAMES"_:
+            walkIxKeyListWithRename(ast);
             break;
         case "PROJECT_LIST"_:
             walkProjectList(ast);

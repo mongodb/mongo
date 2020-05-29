@@ -33,6 +33,7 @@
 #include <third_party/peglib/peglib.h>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/id_generators.h"
@@ -42,8 +43,10 @@ namespace mongo {
 namespace sbe {
 struct ParsedQueryTree {
     std::string identifier;
+    size_t indexKey;
     std::string rename;
     std::vector<std::string> identifiers;
+    std::vector<size_t> indexKeys;
     std::vector<std::string> renames;
 
     std::unique_ptr<PlanStage> stage;
@@ -153,6 +156,9 @@ private:
         return result;
     }
 
+    std::pair<IndexKeysInclusionSet, sbe::value::SlotVector> lookupIndexKeyRenames(
+        const std::vector<std::string>& renames, const std::vector<size_t>& indexKeys);
+
     SpoolId lookupSpoolBuffer(const std::string& name) {
         if (_spoolBuffersLookupTable.find(name) == _spoolBuffersLookupTable.end()) {
             _spoolBuffersLookupTable[name] = _spoolIdGenerator.generate();
@@ -165,6 +171,8 @@ private:
     void walkIdentList(AstQuery& ast);
     void walkIdentWithRename(AstQuery& ast);
     void walkIdentListWithRename(AstQuery& ast);
+    void walkIxKeyWithRename(AstQuery& ast);
+    void walkIxKeyListWithRename(AstQuery& ast);
 
     void walkProjectList(AstQuery& ast);
     void walkAssign(AstQuery& ast);

@@ -251,7 +251,7 @@ makeIntervalsFromIndexBounds(const IndexBounds& bounds,
  *                  limit 1
  *                  coscan
  *               right
- *                  ixseek lowKeySlot highKeySlot recordIdSlot [] @coll @index
+ *                  ixseek lowKeySlot highKeySlot keyStringSlot recordIdSlot [] @coll @index
  *
  * This subtree is similar to the single-interval subtree with the only difference that instead
  * of projecting a single pair of the low/high keys, we project an array of such pairs and then
@@ -264,6 +264,8 @@ generateOptimizedMultiIntervalIndexScan(
     bool forward,
     std::vector<std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>
         intervals,
+    sbe::IndexKeysInclusionSet indexKeysToInclude,
+    sbe::value::SlotVector vars,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     TrialRunProgressTracker* tracker) {
@@ -320,10 +322,10 @@ generateOptimizedMultiIntervalIndexScan(
         NamespaceStringOrUUID{collection->ns().db().toString(), collection->uuid()},
         indexName,
         forward,
-        boost::none,
+        boost::none,  // recordSlot
         recordIdSlot,
-        std::vector<std::string>{},
-        sbe::makeSV(),
+        indexKeysToInclude,
+        std::move(vars),
         lowKeySlot,
         highKeySlot,
         yieldPolicy,
@@ -339,19 +341,27 @@ generateOptimizedMultiIntervalIndexScan(
 }
 
 /**
- * Builds an anchor sub-tree of the recusrive index scan CTE to seed the result set with the initial
+ * Builds an anchor sub-tree of the recursive index scan CTE to seed the result set with the initial
  * 'startKey' for the index scan.
  */
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> makeAnchorBranchForGenericIndexScan(
-    std::unique_ptr<KeyString::Value> startKey, sbe::value::SlotIdGenerator* slotIdGenerator) {
-    // Just project out the 'startKey'.
+    std::unique_ptr<KeyString::Value> startKey,
+    const sbe::value::SlotVector& unusedVarSlots,
+    sbe::value::SlotIdGenerator* slotIdGenerator) {
+    // Just project out the 'startKey' KeyString. We must bind a slot for each field requested from
+    // index keys, but we don't expect these values to ever get used, so we bind them to Nothing.
     auto startKeySlot = slotIdGenerator->generate();
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+    projects.insert({startKeySlot,
+                     sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::ksValue,
+                                                sbe::value::bitcastFrom(startKey.release()))});
+    for (auto&& unusedSlot : unusedVarSlots) {
+        projects.insert({unusedSlot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)});
+    }
     return {startKeySlot,
-            sbe::makeProjectStage(
+            sbe::makeS<sbe::ProjectStage>(
                 sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), 1, boost::none),
-                startKeySlot,
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::ksValue,
-                                           sbe::value::bitcastFrom(startKey.release())))};
+                std::move(projects))};
 }
 
 /**
@@ -363,6 +373,8 @@ makeRecursiveBranchForGenericIndexScan(const Collection* collection,
                                        const std::string& indexName,
                                        const sbe::CheckBoundsParams& params,
                                        sbe::SpoolId spoolId,
+                                       sbe::IndexKeysInclusionSet indexKeysToInclude,
+                                       sbe::value::SlotVector savedVars,
                                        sbe::value::SlotIdGenerator* slotIdGenerator,
                                        PlanYieldPolicy* yieldPolicy,
                                        TrialRunProgressTracker* tracker) {
@@ -386,8 +398,8 @@ makeRecursiveBranchForGenericIndexScan(const Collection* collection,
         params.direction == 1,
         resultSlot,
         recordIdSlot,
-        std::vector<std::string>{},
-        sbe::makeSV(),
+        indexKeysToInclude,
+        std::move(savedVars),
         lowKeySlot,
         boost::none,
         yieldPolicy,
@@ -421,13 +433,13 @@ makeRecursiveBranchForGenericIndexScan(const Collection* collection,
  * stage in conjunction with the stack spool:
  *
  *         filter {isNumber(resultSlot)}
- *         lspool [resultSlot] {!isNumber(resultSlot)}
- *         union [resultSlot]
- *            [anchorSlot]
- *                project [startKeySlot = KS(...)]
+ *         lspool [resultSlot, varSlots...] {!isNumber(resultSlot)}
+ *         union [resultSlot, varSlots...]
+ *            [anchorSlot, unusedVarSlots]
+ *                project [startKeySlot = KS(...), unusedVarSlot0 = Nothing, ...]
  *                limit 1
  *                coscan
- *            [checkBoundsSlot]
+ *            [checkBoundsSlot, savedVarSlots...]
  *                 nlj [] [seekKeySlot]
  *                     left
  *                         sspool [seekKeySlot]
@@ -439,7 +451,8 @@ makeRecursiveBranchForGenericIndexScan(const Collection* collection,
  *                                 limit 1
  *                                 coscan
  *                             right
- *                                 ixseek lowKeySlot resultSlot recordIdSlot [] @coll @index
+ *                                 ixseek lowKeySlot resultSlot recordIdSlot savedVarSlots [] @coll
+ *                                        @index
  *
  *   - The anchor union branch is the starting point of the recursive subtree. It pushes the
  *     starting index into the lspool stage. The lspool has a filter predicate to ensure that
@@ -477,6 +490,8 @@ generateGenericMultiIntervalIndexScan(const Collection* collection,
                                       const IndexScanNode* ixn,
                                       KeyString::Version version,
                                       Ordering ordering,
+                                      sbe::IndexKeysInclusionSet indexKeysToInclude,
+                                      sbe::value::SlotVector vars,
                                       sbe::value::SlotIdGenerator* slotIdGenerator,
                                       sbe::value::SpoolIdGenerator* spoolIdGenerator,
                                       PlanYieldPolicy* yieldPolicy,
@@ -506,29 +521,42 @@ generateGenericMultiIntervalIndexScan(const Collection* collection,
     }
 
     // Build the anchor branch of the union.
+    auto unusedVarSlots = slotIdGenerator->generateMultiple(vars.size());
     auto [anchorSlot, anchorBranch] = makeAnchorBranchForGenericIndexScan(
         std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
             seekPoint, version, ordering, ixn->direction == 1)),
+        unusedVarSlots,
         slotIdGenerator);
 
     auto spoolId = spoolIdGenerator->generate();
 
     // Build the recursive branch of the union.
+    auto savedVarSlots = slotIdGenerator->generateMultiple(vars.size());
     auto [recursiveSlot, recursiveBranch] = makeRecursiveBranchForGenericIndexScan(
         collection,
         ixn->index.identifier.catalogName,
         {ixn->bounds, ixn->index.keyPattern, ixn->direction, version, ordering},
         spoolId,
+        indexKeysToInclude,
+        savedVarSlots,
         slotIdGenerator,
         yieldPolicy,
         tracker);
 
     // Construct a union stage from the two branches.
+    auto makeSVWithVars = [](sbe::value::SlotId headSlot, const sbe::value::SlotVector& varSlots) {
+        sbe::value::SlotVector sv;
+        sv.reserve(1 + varSlots.size());
+        sv.push_back(headSlot);
+        sv.insert(sv.end(), varSlots.begin(), varSlots.end());
+        return sv;
+    };
     auto unionStage = sbe::makeS<sbe::UnionStage>(
         make_vector<std::unique_ptr<sbe::PlanStage>>(std::move(anchorBranch),
                                                      std::move(recursiveBranch)),
-        std::vector<sbe::value::SlotVector>{sbe::makeSV(anchorSlot), sbe::makeSV(recursiveSlot)},
-        sbe::makeSV(resultSlot));
+        std::vector<sbe::value::SlotVector>{makeSVWithVars(anchorSlot, unusedVarSlots),
+                                            makeSVWithVars(recursiveSlot, savedVarSlots)},
+        makeSVWithVars(resultSlot, vars));
 
     // Stick in a lazy producer spool on top. The specified predicate will ensure that we will only
     // store the seek key values in the spool (that is, if the value type is not a number, or not
@@ -536,7 +564,7 @@ generateGenericMultiIntervalIndexScan(const Collection* collection,
     auto spool = sbe::makeS<sbe::SpoolLazyProducerStage>(
         std::move(unionStage),
         spoolId,
-        sbe::makeSV(resultSlot),
+        makeSVWithVars(resultSlot, std::move(vars)),
         sbe::makeE<sbe::EPrimUnary>(
             sbe::EPrimUnary::logicNot,
             sbe::makeE<sbe::EFunction>("isNumber"sv,
@@ -557,6 +585,8 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     bool forward,
     std::unique_ptr<KeyString::Value> lowKey,
     std::unique_ptr<KeyString::Value> highKey,
+    sbe::IndexKeysInclusionSet indexKeysToInclude,
+    sbe::value::SlotVector vars,
     boost::optional<sbe::value::SlotId> recordSlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
@@ -585,8 +615,8 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
         forward,
         recordSlot,
         recordIdSlot,
-        std::vector<std::string>{},
-        sbe::makeSV(),
+        indexKeysToInclude,
+        std::move(vars),
         lowKeySlot,
         highKeySlot,
         yieldPolicy,
@@ -606,12 +636,12 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan
     OperationContext* opCtx,
     const Collection* collection,
     const IndexScanNode* ixn,
+    boost::optional<sbe::value::SlotId> returnKeySlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::SpoolIdGenerator* spoolIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     TrialRunProgressTracker* tracker) {
-    uassert(
-        4822863, "Index scans with key metadata are not supported in SBE", !ixn->addKeyMetadata);
+    invariant(returnKeySlot || !ixn->addKeyMetadata);
     uassert(4822864, "Index scans with a filter are not supported in SBE", !ixn->filter);
 
     auto descriptor =
@@ -623,7 +653,40 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan
                                      accessMethod->getSortedDataInterface()->getKeyStringVersion(),
                                      accessMethod->getSortedDataInterface()->getOrdering());
 
-    auto [slot, stage] = [&]() {
+
+    auto [returnKeyExpr, vars, indexKeysToInclude] =
+        [&]() -> std::tuple<std::unique_ptr<sbe::EExpression>,
+                            sbe::value::SlotVector,
+                            sbe::IndexKeysInclusionSet> {
+        std::unique_ptr<sbe::EExpression> returnKeyExpr;
+        sbe::value::SlotVector vars;
+        sbe::IndexKeysInclusionSet indexKeysToInclude;
+
+        if (returnKeySlot) {
+            std::vector<std::unique_ptr<sbe::EExpression>> mkObjArgs;
+            for (auto&& elem : ixn->index.keyPattern) {
+                auto fieldName = elem.fieldNameStringData();
+                auto slot = slotIdGenerator->generate();
+
+                vars.emplace_back(slot);
+
+                mkObjArgs.emplace_back(sbe::makeE<sbe::EConstant>(
+                    std::string_view{fieldName.rawData(), fieldName.size()}));
+                mkObjArgs.emplace_back(sbe::makeE<sbe::EVariable>(slot));
+            }
+
+            returnKeyExpr = sbe::makeE<sbe::EFunction>("newObj", std::move(mkObjArgs));
+
+            for (size_t i = 0; i < vars.size(); ++i) {
+                indexKeysToInclude.set(i);
+            }
+        }
+
+        return {std::move(returnKeyExpr), std::move(vars), indexKeysToInclude};
+    }();
+
+    auto [slot,
+          stage] = [&, vars = std::ref(vars), indexKeysToInclude = std::ref(indexKeysToInclude)]() {
         if (intervals.size() == 1) {
             // If we have just a single interval, we can construct a simplified sub-tree.
             auto&& [lowKey, highKey] = intervals[0];
@@ -632,7 +695,9 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan
                                                    ixn->direction == 1,
                                                    std::move(lowKey),
                                                    std::move(highKey),
-                                                   boost::none,
+                                                   indexKeysToInclude,
+                                                   vars,
+                                                   boost::none,  // recordSlot
                                                    slotIdGenerator,
                                                    yieldPolicy,
                                                    tracker);
@@ -644,6 +709,8 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan
                                                            ixn->index.identifier.catalogName,
                                                            ixn->direction == 1,
                                                            std::move(intervals),
+                                                           indexKeysToInclude,
+                                                           vars,
                                                            slotIdGenerator,
                                                            yieldPolicy,
                                                            tracker);
@@ -654,6 +721,8 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan
                 ixn,
                 accessMethod->getSortedDataInterface()->getKeyStringVersion(),
                 accessMethod->getSortedDataInterface()->getOrdering(),
+                indexKeysToInclude,
+                vars,
                 slotIdGenerator,
                 spoolIdGenerator,
                 yieldPolicy,
@@ -662,7 +731,19 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan
     }();
 
     if (ixn->shouldDedup) {
-        stage = sbe::makeS<sbe::HashAggStage>(std::move(stage), sbe::makeSV(slot), sbe::makeEM());
+        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> forwardedVarSlots;
+        for (auto varSlot : vars) {
+            forwardedVarSlots.insert(
+                {varSlot,
+                 sbe::makeE<sbe::EFunction>("first",
+                                            sbe::makeEs(sbe::makeE<sbe::EVariable>(varSlot)))});
+        }
+        stage = sbe::makeS<sbe::HashAggStage>(
+            std::move(stage), sbe::makeSV(slot), std::move(forwardedVarSlots));
+    }
+
+    if (returnKeyExpr) {
+        stage = sbe::makeProjectStage(std::move(stage), *returnKeySlot, std::move(returnKeyExpr));
     }
 
     return {slot, std::move(stage)};

@@ -69,6 +69,13 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildCollScan(
     _data.oplogTsSlot = oplogTsSlot;
     _data.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
     _data.shouldTrackResumeToken = csn->requestResumeToken;
+
+    if (_returnKeySlot) {
+        // Assign the '_returnKeySlot' to be the empty object.
+        stage = sbe::makeProjectStage(
+            std::move(stage), *_returnKeySlot, sbe::makeE<sbe::EFunction>("newObj", sbe::makeEs()));
+    }
+
     return std::move(stage);
 }
 
@@ -78,6 +85,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildIndexScan(
     auto [slot, stage] = generateIndexScan(_opCtx,
                                            _collection,
                                            ixn,
+                                           _returnKeySlot,
                                            &_slotIdGenerator,
                                            &_spoolIdGenerator,
                                            _yieldPolicy,
@@ -87,7 +95,9 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildIndexScan(
 }
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeLoopJoinForFetch(
-    std::unique_ptr<sbe::PlanStage> inputStage, sbe::value::SlotId recordIdKeySlot) {
+    std::unique_ptr<sbe::PlanStage> inputStage,
+    sbe::value::SlotId recordIdKeySlot,
+    const sbe::value::SlotVector& slotsToForward) {
     _data.resultSlot = _slotIdGenerator.generate();
     _data.recordIdSlot = _slotIdGenerator.generate();
 
@@ -108,7 +118,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeLoopJoinForFetch(
     return sbe::makeS<sbe::LoopJoinStage>(
         std::move(inputStage),
         sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none),
-        sbe::makeSV(),
+        std::move(slotsToForward),
         sbe::makeSV(recordIdKeySlot),
         nullptr);
 }
@@ -119,7 +129,10 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildFetch(const QuerySol
 
     uassert(4822880, "RecordId slot is not defined", _data.recordIdSlot);
 
-    auto stage = makeLoopJoinForFetch(std::move(inputStage), *_data.recordIdSlot);
+    auto stage =
+        makeLoopJoinForFetch(std::move(inputStage),
+                             *_data.recordIdSlot,
+                             _returnKeySlot ? sbe::makeSV(*_returnKeySlot) : sbe::makeSV());
 
     if (fn->filter) {
         stage = generateFilter(
@@ -232,6 +245,11 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolu
     // it visible at the root stage.
     if (_data.oplogTsSlot) {
         values.push_back(*_data.oplogTsSlot);
+    }
+
+    // The '_returnKeySlot' likewise needs to be visible at the root stage.
+    if (_returnKeySlot) {
+        values.push_back(*_returnKeySlot);
     }
 
     return sbe::makeS<sbe::SortStage>(std::move(inputStage),
@@ -375,6 +393,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildText(const QuerySolu
                                             forward,
                                             makeKeyString(startKeyBson),
                                             makeKeyString(endKeyBson),
+                                            sbe::IndexKeysInclusionSet{},
+                                            sbe::makeSV(),
                                             recordSlot,
                                             &_slotIdGenerator,
                                             _yieldPolicy,
@@ -407,8 +427,35 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildText(const QuerySolu
         std::move(nljStage), ftsQuery, ftsSpec, *_data.resultSlot, textMatchResultSlot);
 
     // Filter based on the contents of the slot filled out by the TextMatchStage.
-    return sbe::makeS<sbe::FilterStage<false>>(std::move(textMatchStage),
-                                               sbe::makeE<sbe::EVariable>(textMatchResultSlot));
+    auto filteredStage = sbe::makeS<sbe::FilterStage<false>>(
+        std::move(textMatchStage), sbe::makeE<sbe::EVariable>(textMatchResultSlot));
+
+    if (_returnKeySlot) {
+        // Assign the '_returnKeySlot' to be the empty object.
+        return sbe::makeProjectStage(std::move(filteredStage),
+                                     *_returnKeySlot,
+                                     sbe::makeE<sbe::EFunction>("newObj", sbe::makeEs()));
+    } else {
+        return filteredStage;
+    }
+}
+
+std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildReturnKey(
+    const QuerySolutionNode* root) {
+    // TODO SERVER-48721: If the projection includes {$meta: "sortKey"}, the result of this stage
+    // should also include the sort key. Everything else in the projection is ignored.
+    auto returnKeyNode = static_cast<const ReturnKeyNode*>(root);
+
+    auto resultSlot = _slotIdGenerator.generate();
+    invariant(!_data.resultSlot);
+    _data.resultSlot = resultSlot;
+
+    invariant(!_returnKeySlot);
+    _returnKeySlot = _slotIdGenerator.generate();
+
+    auto stage = build(returnKeyNode->children[0]);
+    _data.resultSlot = *_returnKeySlot;
+    return stage;
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
@@ -429,7 +476,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
             {STAGE_PROJECTION_SIMPLE, std::mem_fn(&SlotBasedStageBuilder::buildProjectionSimple)},
             {STAGE_PROJECTION_DEFAULT, std::mem_fn(&SlotBasedStageBuilder::buildProjectionDefault)},
             {STAGE_OR, &SlotBasedStageBuilder::buildOr},
-            {STAGE_TEXT, &SlotBasedStageBuilder::buildText}};
+            {STAGE_TEXT, &SlotBasedStageBuilder::buildText},
+            {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey}};
 
     uassert(4822884,
             str::stream() << "Can't build exec tree for node: " << root->toString(),

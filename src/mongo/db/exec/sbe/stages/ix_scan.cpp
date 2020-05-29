@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/index/index_access_method.h"
 
 namespace mongo::sbe {
@@ -41,7 +42,7 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
                                bool forward,
                                boost::optional<value::SlotId> recordSlot,
                                boost::optional<value::SlotId> recordIdSlot,
-                               std::vector<std::string> fields,
+                               IndexKeysInclusionSet indexKeysToInclude,
                                value::SlotVector vars,
                                boost::optional<value::SlotId> seekKeySlotLow,
                                boost::optional<value::SlotId> seekKeySlotHi,
@@ -53,15 +54,16 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
       _forward(forward),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
-      _fields(std::move(fields)),
+      _indexKeysToInclude(indexKeysToInclude),
       _vars(std::move(vars)),
       _seekKeySlotLow(seekKeySlotLow),
       _seekKeySlotHi(seekKeySlotHi),
       _tracker(tracker) {
-    invariant(_fields.size() == _vars.size());
     // The valid state is when both boundaries, or none is set, or only low key is set.
     invariant((_seekKeySlotLow && _seekKeySlotHi) || (!_seekKeySlotLow && !_seekKeySlotHi) ||
               (_seekKeySlotLow && !_seekKeySlotHi));
+
+    invariant(_indexKeysToInclude.count() == _vars.size());
 }
 
 std::unique_ptr<PlanStage> IndexScanStage::clone() const {
@@ -70,7 +72,7 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _forward,
                                             _recordSlot,
                                             _recordIdSlot,
-                                            _fields,
+                                            _indexKeysToInclude,
                                             _vars,
                                             _seekKeySlotLow,
                                             _seekKeySlotHi,
@@ -87,12 +89,10 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
         _recordIdAccessor = std::make_unique<value::ViewOfValueAccessor>();
     }
 
-    for (size_t idx = 0; idx < _fields.size(); ++idx) {
-        auto [it, inserted] =
-            _fieldAccessors.emplace(_fields[idx], std::make_unique<value::ViewOfValueAccessor>());
-        uassert(4822821, str::stream() << "duplicate field: " << _fields[idx], inserted);
-        auto [itRename, insertedRename] = _varAccessors.emplace(_vars[idx], it->second.get());
-        uassert(4822822, str::stream() << "duplicate field: " << _vars[idx], insertedRename);
+    _accessors.resize(_vars.size());
+    for (size_t idx = 0; idx < _accessors.size(); ++idx) {
+        auto [it, inserted] = _accessorMap.emplace(_vars[idx], &_accessors[idx]);
+        uassert(4822821, str::stream() << "duplicate slot: " << _vars[idx], inserted);
     }
 
     if (_seekKeySlotLow) {
@@ -112,7 +112,7 @@ value::SlotAccessor* IndexScanStage::getAccessor(CompileCtx& ctx, value::SlotId 
         return _recordIdAccessor.get();
     }
 
-    if (auto it = _varAccessors.find(slot); it != _varAccessors.end()) {
+    if (auto it = _accessorMap.find(slot); it != _accessorMap.end()) {
         return it->second;
     }
 
@@ -206,6 +206,10 @@ void IndexScanStage::open(bool reOpen) {
                 _seekKeyLow = &_startPoint;
                 _seekKeyHi = nullptr;
             }
+
+            // TODO SERVER-49385: When the 'prepare()' phase takes the collection lock, it will be
+            // possible to intialize '_ordering' there instead of here.
+            _ordering = entry->ordering();
         } else {
             _cursor.reset();
         }
@@ -254,6 +258,12 @@ PlanState IndexScanStage::getNext() {
     if (_recordIdAccessor) {
         _recordIdAccessor->reset(value::TypeTags::NumberInt64,
                                  value::bitcastFrom<int64_t>(_nextRecord->loc.repr()));
+    }
+
+    if (_accessors.size()) {
+        _valuesBuffer.reset();
+        readKeyStringValueIntoAccessors(
+            _nextRecord->keyString, *_ordering, &_valuesBuffer, &_accessors, _indexKeysToInclude);
     }
 
     if (_tracker && _tracker->trackProgress<TrialRunProgressTracker::kNumReads>(1)) {
@@ -308,14 +318,18 @@ std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));
-    for (size_t idx = 0; idx < _fields.size(); ++idx) {
-        if (idx) {
+    size_t varIndex = 0;
+    for (size_t keyIndex = 0; keyIndex < _indexKeysToInclude.size(); ++keyIndex) {
+        if (!_indexKeysToInclude[keyIndex]) {
+            continue;
+        }
+        if (varIndex) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
-
-        DebugPrinter::addIdentifier(ret, _vars[idx]);
+        invariant(varIndex < _vars.size());
+        DebugPrinter::addIdentifier(ret, _vars[varIndex++]);
         ret.emplace_back("=");
-        DebugPrinter::addIdentifier(ret, _fields[idx]);
+        ret.emplace_back(std::to_string(keyIndex));
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 

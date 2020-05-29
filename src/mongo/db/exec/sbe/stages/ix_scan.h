@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/ordering.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/trial_run_progress_tracker.h"
@@ -36,6 +37,27 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo::sbe {
+
+/**
+ * A stage that iterates the entries of a collection index, starting from a bound specified by the
+ * value in 'seekKeySlotLow' and ending (via IS_EOF) with the 'seekKeySlotHi' bound. (An unspecified
+ * 'seekKeySlowHi' scans to the end of the index. Leaving both bounds unspecified scans the index
+ * from beginning to end.)
+ *
+ * The input 'seekKeySlotLow' and 'seekKeySlotHi' slots get read as part of the open (or re-open)
+ * call. A common use case for an IndexScanStage is to place it as the inner child of LoopJoinStage.
+ * The outer side of the LoopJoinStage determines the bounds, and the inner IndexScanStage iterates
+ * through all the entries within those bounds.
+ *
+ * The "output" slots are
+ *   - 'recordSlot': the "KeyString" representing the index entry,
+ *   - 'recordIdSlot': a reference that can be used to fetch the entire document, and
+ *   - 'vars': one slot for each value in the index key that should be "projected" out of the entry.
+ *
+ * The 'indexKeysToInclude' bitset determines which values are included in the projection based
+ * on their order in the index pattern. The number of bits set in 'indexKeysToInclude' must be
+ * the same as the number of slots in the 'vars' SlotVector.
+ */
 class IndexScanStage final : public PlanStage {
 public:
     IndexScanStage(const NamespaceStringOrUUID& name,
@@ -43,7 +65,7 @@ public:
                    bool forward,
                    boost::optional<value::SlotId> recordSlot,
                    boost::optional<value::SlotId> recordIdSlot,
-                   std::vector<std::string> fields,
+                   IndexKeysInclusionSet indexKeysToInclude,
                    value::SlotVector vars,
                    boost::optional<value::SlotId> seekKeySlotLow,
                    boost::optional<value::SlotId> seekKeySlotHi,
@@ -74,7 +96,7 @@ private:
     const bool _forward;
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
-    const std::vector<std::string> _fields;
+    const IndexKeysInclusionSet _indexKeysToInclude;
     const value::SlotVector _vars;
     const boost::optional<value::SlotId> _seekKeySlotLow;
     const boost::optional<value::SlotId> _seekKeySlotHi;
@@ -82,8 +104,10 @@ private:
     std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
     std::unique_ptr<value::ViewOfValueAccessor> _recordIdAccessor;
 
-    value::FieldAccessorMap _fieldAccessors;
-    value::SlotAccessorMap _varAccessors;
+    // One accessor and slot for each key component that this stage will bind from an index entry's
+    // KeyString. The accessors are in the same order as the key components they bind to.
+    std::vector<value::ViewOfValueAccessor> _accessors;
+    value::SlotAccessorMap _accessorMap;
 
     value::SlotAccessor* _seekKeyLowAccessor{nullptr};
     value::SlotAccessor* _seekKeyHiAccessor{nullptr};
@@ -94,8 +118,13 @@ private:
 
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
+    boost::optional<Ordering> _ordering{boost::none};
     boost::optional<AutoGetCollectionForRead> _coll;
     boost::optional<KeyStringEntry> _nextRecord;
+
+    // This buffer stores values that are projected out of the index entry. Values in the
+    // '_accessors' list that are pointers point to data in this buffer.
+    BufBuilder _valuesBuffer;
 
     bool _open{false};
     bool _firstGetNext{true};
