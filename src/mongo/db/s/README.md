@@ -559,4 +559,8 @@ active sessions are killed, and the in-memory transaction state is marked as inv
 
 ---
 
-# Sharding component hierarchy
+# Node startup and shutdown
+
+## Sharding component initialization and shutdown
+
+## Quiesce mode on shutdown
