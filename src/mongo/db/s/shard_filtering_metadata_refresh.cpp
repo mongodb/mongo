@@ -119,7 +119,8 @@ void onShardVersionMismatch(OperationContext* opCtx,
     ON_BLOCK_EXIT([&] {
         if (runRecover) {
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+            // Avoid using AutoGetDB since it can throw exceptions in ON_BLOCK_EXIT's destructor
+            Lock::DBLock autoDb(opCtx, nss.db(), MODE_IX);
             Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
             CollectionShardingRuntime::get(opCtx, nss)->exitCriticalSection(opCtx);
         }
