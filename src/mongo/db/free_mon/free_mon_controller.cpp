@@ -84,7 +84,7 @@ void FreeMonController::registerServerStartup(RegistrationType registrationType,
 }
 
 boost::optional<Status> FreeMonController::registerServerCommand(Milliseconds timeout) {
-    auto msg = FreeMonRegisterCommandMessage::createNow(std::vector<std::string>());
+    auto msg = FreeMonRegisterCommandMessage::createNow({std::vector<std::string>(), boost::none});
     _enqueue(msg);
 
     if (timeout > Milliseconds::min()) {
