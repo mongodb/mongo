@@ -42,6 +42,7 @@ MONGO_FAIL_POINT_DEFINE(networkInterfaceSendRequestsToTargetHostsInAlphabeticalO
 MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsBeforeAcquireConn);
 MONGO_FAIL_POINT_DEFINE(networkInterfaceHangCommandsAfterAcquireConn);
 MONGO_FAIL_POINT_DEFINE(networkInterfaceCommandsFailedWithErrorCode);
+MONGO_FAIL_POINT_DEFINE(networkInterfaceShouldNotKillPendingRequests);
 
 }  // namespace executor
 }  // namespace mongo

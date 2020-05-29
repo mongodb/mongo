@@ -397,7 +397,8 @@ void NetworkInterfaceTL::CommandStateBase::tryFinish(Status status) noexcept {
     }
 
     invariant(requestManager);
-    if (operationKey) {
+    if (operationKey &&
+        !MONGO_unlikely(networkInterfaceShouldNotKillPendingRequests.shouldFail())) {
         // Kill operations for requests that we didn't use to fulfill the promise.
         requestManager->killOperationsForPendingRequests();
     }
