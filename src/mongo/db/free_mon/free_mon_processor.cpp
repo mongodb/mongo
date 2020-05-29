@@ -327,7 +327,7 @@ void FreeMonProcessor::doServerRegister(
     // If we are asked to register now, then kick off a registration request
     const auto regType = msg->getPayload().first;
     if (regType == RegistrationType::RegisterOnStart) {
-        enqueue(FreeMonRegisterCommandMessage::createNow(msg->getPayload().second));
+        enqueue(FreeMonRegisterCommandMessage::createNow({msg->getPayload().second, boost::none}));
     } else {
         invariant((regType == RegistrationType::RegisterAfterOnTransitionToPrimary) ||
                   (regType == RegistrationType::RegisterAfterOnTransitionToPrimaryIfEnabled));
@@ -352,7 +352,8 @@ void FreeMonProcessor::doServerRegister(
             // We are standalone or secondary, if we have a registration id, then send a
             // registration notification, else wait for the user to register us.
             if (state.get().getState() == StorageStateEnum::enabled) {
-                enqueue(FreeMonRegisterCommandMessage::createNow(msg->getPayload().second));
+                enqueue(FreeMonRegisterCommandMessage::createNow(
+                    {msg->getPayload().second, boost::none}));
             }
         }
 
@@ -415,22 +416,26 @@ void FreeMonProcessor::doCommandRegister(Client* client,
 
     FreeMonRegistrationRequest req;
 
-    auto regid = _state->getRegistrationId();
-    if (!regid.empty()) {
-        req.setId(regid);
+    if (msg->getPayload().second) {
+        req.setId(StringData(msg->getPayload().second.get()));
+    } else {
+        auto regid = _state->getRegistrationId();
+        if (!regid.empty()) {
+            req.setId(regid);
+        }
     }
 
     req.setVersion(kMaxProtocolVersion);
 
     req.setLocalTime(client->getServiceContext()->getPreciseClockSource()->now());
 
-    if (!msg->getPayload().empty()) {
+    if (!msg->getPayload().first.empty()) {
         // Cache the tags for subsequent retries
-        _tags = msg->getPayload();
+        _tags = msg->getPayload().first;
     }
 
     if (!_tags.empty()) {
-        req.setTags(transformVector(msg->getPayload()));
+        req.setTags(transformVector(msg->getPayload().first));
     }
 
     // Collect the data
@@ -675,7 +680,7 @@ void FreeMonProcessor::doAsyncRegisterFail(
 
     // Enqueue a register retry
     enqueue(FreeMonRegisterCommandMessage::createWithDeadline(
-        _tags, _registrationRetry->getNextDeadline(client)));
+        {_tags, boost::none}, _registrationRetry->getNextDeadline(client)));
 }
 
 void FreeMonProcessor::doCommandUnregister(
@@ -838,7 +843,7 @@ void FreeMonProcessor::doAsyncMetricsComplete(
     _metricsRetry->reset();
 
     if (resp.getResendRegistration().is_initialized() && resp.getResendRegistration()) {
-        enqueue(FreeMonRegisterCommandMessage::createNow(_tags));
+        enqueue(FreeMonRegisterCommandMessage::createNow({_tags, boost::none}));
     } else {
         // Enqueue next metrics upload
         enqueue(FreeMonMessage::createWithDeadline(FreeMonMessageType::MetricsSend,
@@ -894,13 +899,15 @@ void FreeMonProcessor::getStatus(OperationContext* opCtx,
 
 void FreeMonProcessor::doOnTransitionToPrimary(Client* client) {
     if (_registerOnTransitionToPrimary == RegistrationType::RegisterAfterOnTransitionToPrimary) {
-        enqueue(FreeMonRegisterCommandMessage::createNow(std::vector<std::string>()));
+        enqueue(
+            FreeMonRegisterCommandMessage::createNow({std::vector<std::string>(), boost::none}));
 
     } else if (_registerOnTransitionToPrimary ==
                RegistrationType::RegisterAfterOnTransitionToPrimaryIfEnabled) {
         readState(client);
         if (_state->getState() == StorageStateEnum::enabled) {
-            enqueue(FreeMonRegisterCommandMessage::createNow(std::vector<std::string>()));
+            enqueue(FreeMonRegisterCommandMessage::createNow(
+                {std::vector<std::string>(), boost::none}));
         }
     }
 
@@ -916,7 +923,8 @@ void FreeMonProcessor::processInMemoryStateChange(const FreeMonStorageState& ori
             newState.getState() == StorageStateEnum::enabled) {
 
             // Secondary needs to start registration
-            enqueue(FreeMonRegisterCommandMessage::createNow(std::vector<std::string>()));
+            enqueue(FreeMonRegisterCommandMessage::createNow(
+                {std::vector<std::string>(), newState.getRegistrationId().toString()}));
         }
     }
 }

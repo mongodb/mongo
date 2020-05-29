@@ -125,15 +125,19 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
                 'reportingInterval': bson.int64.Int64(1),
             })
         else:
+            reg_id = 'mock123_' + str(stats.register_calls)
+            if 'id' in decoded_doc:
+                reg_id = decoded_doc['id']
+
             data = bson.BSON.encode({
                 'version':
                     bson.int64.Int64(1),
                 'haltMetricsUploading':
                     False,
                 'id':
-                    'mock123',
+                    reg_id,
                 'informationalURL':
-                    'http://www.example.com/123',
+                    'http://www.example.com/' + reg_id,
                 'message':
                     'Welcome to the Mock Free Monitoring Endpoint',
                 'reportingInterval':
