@@ -64,11 +64,6 @@ def build_cpp_libfuzzer_test(env, target, source, **kwargs):
     myenv.RegisterTest("$LIBFUZZER_TEST_LIST", result[0])
     myenv.Alias("$LIBFUZZER_TEST_ALIAS", result)
 
-    # TODO: remove when hygienic is default
-    hygienic = myenv.GetOption("install-mode") == "hygienic"
-    if not hygienic:
-        myenv.Install("#/build/libfuzzer_tests/", result[0])
-
     return result
 
 

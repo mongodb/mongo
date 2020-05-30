@@ -31,6 +31,3 @@ mongobridge = env.Program(
     ],
     AIB_COMPONENT='dist-test',
 )
-
-if get_option("install-mode") != "hygienic":
-    env.Install("#/", mongobridge)

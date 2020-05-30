@@ -50,13 +50,12 @@ stitchSupportTargets = stitchSupportEnv.Library(
     AIB_COMPONENT='stitch-support',
 )
 
-if get_option('install-mode') == 'hygienic':
-    env.AutoInstall(
-        '$PREFIX_INCLUDEDIR/stitch_support/v1/stitch_support',
-        source=['stitch_support.h'],
-        AIB_COMPONENT='stitch-support',
-        AIB_ROLE='dev',
-    )
+env.AutoInstall(
+    '$PREFIX_INCLUDEDIR/stitch_support/v1/stitch_support',
+    source=['stitch_support.h'],
+    AIB_COMPONENT='stitch-support',
+    AIB_ROLE='dev',
+)
 
 if get_option('link-model') != 'dynamic-sdk':
     stitchSupportTestEnv = env.Clone()

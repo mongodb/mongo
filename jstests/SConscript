@@ -12,9 +12,6 @@ Return()
 
 env = env.Clone()
 
-if not get_option("install-mode") == "hygienic":
-    Return()
-
 jstests = env.Glob("**/*.js")
 
 # Group by directory to avoid making a million calls to AutoInstall

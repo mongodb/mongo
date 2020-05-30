@@ -613,11 +613,6 @@ env.Library(
     ],
 )
 
-hygienic = get_option('install-mode') == 'hygienic'
-
-if not hygienic:
-    env.Default(env.Install('#/', mongod))
-
 if env.TargetOSIs('windows'):
     generatedServerManifest = env.Substfile(
         's/mongos.manifest.in',
@@ -645,9 +640,6 @@ mongotrafficreader = env.Program(
         'util/signal_handlers'
     ],
 )
-
-if not hygienic:
-    env.Install('#/', mongotrafficreader)
 
 # mongos
 mongos = env.Program(
@@ -790,9 +782,6 @@ env.Library(
 )
 
 
-if not hygienic:
-    env.Install('#/', mongos)
-
 # --- shell ---
 
 if not has_option('noshell') and usemozjs:
@@ -911,113 +900,30 @@ if not has_option('noshell') and usemozjs:
         ],
     )
 
-    if not hygienic:
-        shellEnv.Install( '#/', mongo_shell )
 else:
     shellEnv = None
 
 #  ----  INSTALL -------
 
-# binaries
-
-distBinaries = []
-distDebugSymbols = []
-
-def add_exe( v ):
-    return "${PROGPREFIX}%s${PROGSUFFIX}" % v
-
-def failMissingObjCopy(env, target, source):
-    env.FatalError("Generating debug symbols requires objcopy, please set the OBJCOPY variable.")
-
-def installBinary( e, name ):
-
-    if hygienic:
-        return
-
-    debug_sym_name = name
-    name = add_exe( name )
-
-    debug_sym_cmd = None
-    if e.TargetOSIs('linux', 'solaris'):
-        if 'OBJCOPY' not in e:
-            debug_sym_cmd = failMissingObjCopy
-        else:
-            debug_sym_cmd = '${OBJCOPY} --only-keep-debug ${SOURCE} ${TARGET}'
-        debug_sym_name += '.debug'
-    elif e.TargetOSIs('darwin'):
-        debug_sym_name += '.dSYM'
-        debug_sym_cmd = 'dsymutil -num-threads=1 -o ${TARGET} ${SOURCE}'
-    elif e.ToolchainIs('msvc'):
-        debug_sym_name += '.pdb'
-        distBinaries.append(debug_sym_name)
-        distDebugSymbols.append(debug_sym_name)
-
-    if debug_sym_cmd:
-        debug_sym = e.Command(
-            debug_sym_name,
-            name,
-            debug_sym_cmd
-        )
-        e.NoCache(debug_sym)
-        e.Install("#/", debug_sym)
-        e.Alias('debugsymbols', debug_sym)
-        distDebugSymbols.append(debug_sym)
-
-    if env.TargetOSIs('linux', 'solaris') and (not has_option("nostrip")):
-        stripped_name = 'stripped/%s' % name
-        strip_cmd = e.Command(
-            stripped_name,
-            [name, debug_sym],
-            '${OBJCOPY} --strip-debug --add-gnu-debuglink ${SOURCES[1]} ${SOURCES[0]} $TARGET'
-        )
-        e.NoCache(stripped_name)
-        distBinaries.append(stripped_name)
-    else:
-        distBinaries.append(name)
-
-    inst = e.Install( "$DESTDIR/bin", name )
-
-    if env.TargetOSIs('posix'):
-        e.AddPostAction( inst, 'chmod 755 $TARGET' )
-
-# legacy tools
-if not hygienic:
-    env.Alias("tools", "#/" + add_exe("mongobridge"))
-
-installBinary( env, "mongod" )
-installBinary( env, "mongos" )
-
-if shellEnv is not None:
-    installBinary( shellEnv, "mongo" )
-    if not hygienic:
-        env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ) ] ] )
-
-if not hygienic:
-    env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongod" ), add_exe( "mongos" ) ] ] )
-
 # Stage the top-level mongodb banners
 distsrc = env.Dir('#distsrc')
-if hygienic:
-    env.AutoInstall(
-        target='$PREFIX',
-        source=[
-            distsrc.File('README'),
-            # TODO: we need figure out what to do when we use a different
-            # THIRD-PARTY-NOTICES for example, with Embedded
-            distsrc.File('THIRD-PARTY-NOTICES'),
-            distsrc.File('MPL-2'),
-        ],
-        AIB_COMPONENT='common',
-        AIB_ROLE='base',
-    )
-else:
-    env.Append(MODULE_BANNERS = [distsrc.File('README'),
-                                 distsrc.File('THIRD-PARTY-NOTICES'),
-                                 distsrc.File('MPL-2')])
+
+
+env.AutoInstall(
+    target='$PREFIX',
+    source=[
+        distsrc.File('README'),
+        # TODO: we need figure out what to do when we use a different
+        # THIRD-PARTY-NOTICES for example, with Embedded
+        distsrc.File('THIRD-PARTY-NOTICES'),
+        distsrc.File('MPL-2'),
+    ],
+    AIB_COMPONENT='common',
+    AIB_ROLE='base',
+)
 
 # If no module has introduced a file named LICENSE-Enterprise.txt then this
 # is a Community build, so inject the AGPL and the Community license
-
 enterprise_license = [banner for banner in env["MODULE_BANNERS"] if banner.name ==  "LICENSE-Enterprise.txt"]
 if not enterprise_license:
     env.Append(MODULE_BANNERS = [distsrc.File('LICENSE-Community.txt')])
@@ -1029,30 +935,13 @@ if not len(module_banner_filenames) == len(env['MODULE_BANNERS']):
     # TODO: Be nice and identify conflicts in error.
     env.FatalError("ERROR: Filename conflicts exist in module banners.")
 
-if hygienic:
-    env.AutoInstall(
-        target='$PREFIX',
-        source=env.get('MODULE_BANNERS', []),
-        AIB_COMPONENT='common',
-        AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
-        AIB_ROLE='base',
-    )
-
-# Build a set of directories containing module banners, and use that
-# to build a --transform option for each directory so that the files
-# are tar'ed up to the proper location.
-module_banner_dirs = set([Dir('#').rel_path(f.get_dir()) for f in env['MODULE_BANNERS']])
-module_banner_transforms = ["--transform %s=$SERVER_DIST_BASENAME" % d for d in module_banner_dirs]
-
-# Allow modules to map original file name directories to subdirectories
-# within the archive (e.g. { "src/mongo/db/modules/enterprise/docs": "snmp"})
-archive_addition_transforms = []
-for full_dir, archive_dir in list(env["ARCHIVE_ADDITION_DIR_MAP"].items()):
-  archive_addition_transforms.append("--transform \"%s=$SERVER_DIST_BASENAME/%s\"" %
-                                     (full_dir, archive_dir))
-
-for target in env["DIST_BINARIES"]:
-    installBinary(env, "db/modules/" + target)
+env.AutoInstall(
+    target='$PREFIX',
+    source=env.get('MODULE_BANNERS', []),
+    AIB_COMPONENT='common',
+    AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
+    AIB_ROLE='base',
+)
 
 # Set the download url to the right place
 compass_type = 'compass-community'
@@ -1076,64 +965,11 @@ compass_installer = env.Substfile(
   ],
 )
 
-distBinaries.append(compass_installer)
-
-if not hygienic:
-    compass_script_installer = env.Install("$DESTDIR/bin", compass_installer)
-else:
-    compass_script_installer = env.AutoInstall(
-        target='$PREFIX_BINDIR',
-        source=[
-            compass_installer,
-        ],
-        AIB_COMPONENT='dist',
-        AIB_ROLE='runtime',
-    )
-
-if env.TargetOSIs('posix'):
-    env.AddPostAction( compass_script_installer, 'chmod 755 $TARGET' )
-    env.AddPostAction( compass_installer, 'chmod 755 $TARGET' )
-
-if not hygienic:
-    server_archive = env.Command(
-        target='#/${SERVER_ARCHIVE}',
-        source=['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] + distBinaries,
-        action=' '.join(
-            ['$PYTHON ${SOURCES[0]} -o $TARGET'] +
-            archive_addition_transforms +
-            module_banner_transforms +
-            [
-                '--transform $BUILD_DIR/mongo/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
-                '--transform $BUILD_DIR/mongo/stripped/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
-                '--transform $BUILD_DIR/mongo/stripped=$SERVER_DIST_BASENAME/bin',
-                '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME/bin',
-                '--transform src/mongo/installer/compass=$SERVER_DIST_BASENAME/bin',
-                '${TEMPFILE(SOURCES[1:])}'
-            ],
-        ),
-        BUILD_DIR=env.Dir('$BUILD_DIR').path
-    )
-
-    env.Alias("dist", server_archive)
-    env.NoCache(server_archive)
-
-    debug_symbols_dist = env.Command(
-        target='#/${SERVER_DIST_BASENAME}-debugsymbols${DIST_ARCHIVE_SUFFIX}',
-        source=['#buildscripts/make_archive.py'] + distDebugSymbols,
-        action=' '.join(
-            [
-                '$PYTHON ${SOURCES[0]} -o $TARGET',
-                '--transform $BUILD_DIR/mongo/db/modules/enterprise=$SERVER_DIST_BASENAME',
-                '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME',
-                '${TEMPFILE(SOURCES[1:])}',
-            ]
-        ),
-        BUILD_DIR=env.Dir('$BUILD_DIR').path
-    )
-
-    env.Alias('dist-debugsymbols', debug_symbols_dist)
-    env.NoCache(debug_symbols_dist)
-
-#final alias
-if not hygienic:
-    env.Alias( "install", "$DESTDIR" )
+compass_script_installer = env.AutoInstall(
+    target='$PREFIX_BINDIR',
+    source=[
+        compass_installer,
+    ],
+    AIB_COMPONENT='dist',
+    AIB_ROLE='runtime',
+)

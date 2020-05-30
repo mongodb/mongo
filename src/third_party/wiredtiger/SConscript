@@ -233,8 +233,3 @@ wtbin = wtbinEnv.Program(
     LIBDEPS=["wiredtiger"],
     AIB_COMPONENT="dist-test",
 )
-
-hygienic = get_option('install-mode') == 'hygienic'
-if not hygienic:
-    wtbin_install = wtbinEnv.Install("#/", wtbin)
-    wtbinEnv.Alias("tools", wtbin_install)

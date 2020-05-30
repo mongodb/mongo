@@ -331,7 +331,7 @@ tasks:
           set -o verbose
 
           source "${workdir}/compile_venv/bin/activate"
-          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --install-mode=hygienic install-mongo{,d} DESTDIR=$(pwd)/mongodb
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} install-mongo{,d} DESTDIR=$(pwd)/mongodb
           tar czf mongodb${compile-variant|}.tar.gz -C mongodb .
     - command: s3.put
       params:

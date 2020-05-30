@@ -113,10 +113,6 @@ add_option('ninja',
     help='Enable the build.ninja generator tool stable or canary version',
 )
 
-add_option('prefix',
-    help='installation prefix (conficts with DESTDIR, PREFIX, and --install-mode=hygienic)',
-)
-
 add_option('legacy-tarball',
     choices=['true', 'false'],
     default='false',
@@ -134,7 +130,7 @@ add_option('lint-scope',
 )
 
 add_option('install-mode',
-    choices=['legacy', 'hygienic'],
+    choices=['hygienic'],
     default='hygienic',
     help='select type of installation',
     nargs=1,
@@ -147,11 +143,6 @@ add_option('install-action',
     help='select mechanism to use to install files (advanced option to reduce disk IO and utilization)',
     nargs=1,
     type='choice',
-)
-
-add_option('nostrip',
-    help='do not strip installed binaries',
-    nargs=0,
 )
 
 add_option('build-dir',
@@ -243,7 +234,7 @@ add_option('separate-debug',
     choices=['on', 'off'],
     const='on',
     default='off',
-    help='Produce separate debug files (only effective in --install-mode=hygienic)',
+    help='Produce separate debug files',
     nargs='?',
     type='choice',
 )
@@ -278,11 +269,6 @@ add_option('sanitize-coverage',
 add_option('llvm-symbolizer',
     default='llvm-symbolizer',
     help='name of (or path to) the LLVM symbolizer',
-)
-
-add_option('durableDefaultOn',
-    help='have durable default to on',
-    nargs=0,
 )
 
 add_option('allocator',
@@ -653,27 +639,6 @@ for vf in variables_files:
     else:
         print("IGNORING missing variable customization file {}".format(vf))
 
-# Attempt to prevent confusion between the different ways of
-# specifying file placement between hygienic and non-hygienic
-# modes. Re-interpret a value provided for the legacy '--prefix' flag
-# as setting `DESTDIR` instead. Note that we can't validate things
-# passed in via variables_files, so this is imperfect. However, it is
-# also temporary.
-if get_option('install-mode') == 'hygienic':
-    if has_option('prefix'):
-        print("Cannot use the '--prefix' option with '--install-mode=hygienic'. Use the DESTDIR and PREFIX Variables instead")
-        Exit(1)
-else:
-    if 'PREFIX' in ARGUMENTS:
-        print("Cannot use the 'PREFIX' Variable without '--install-mode=hygienic'")
-        Exit(1)
-    if 'DESTDIR' in ARGUMENTS:
-        print("Cannot use the 'DESTDIR' Variable without '--install-mode=hygienic', use the '--prefix' flag instead")
-        Exit(1)
-
-    if has_option('prefix'):
-        ARGUMENTS['DESTDIR'] = get_option('prefix')
-
 env_vars = Variables(
     files=variables_files,
     args=ARGUMENTS
@@ -738,7 +703,7 @@ env_vars.Add('CXXFLAGS',
     converter=variable_shlex_converter)
 
 env_vars.Add('DESTDIR',
-    help='Where hygienic builds will install files',
+    help='Where builds will install files',
     default='$BUILD_ROOT/install')
 
 env_vars.Add('DSYMUTIL',
@@ -1077,11 +1042,8 @@ if not serverJs and not usemozjs:
 envDict = dict(BUILD_ROOT=buildDir,
                BUILD_DIR=make_variant_dir_generator(),
                DIST_ARCHIVE_SUFFIX='.tgz',
-               DIST_BINARIES=[],
                MODULE_BANNERS=[],
                MODULE_INJECTORS=dict(),
-               ARCHIVE_ADDITION_DIR_MAP={},
-               ARCHIVE_ADDITIONS=[],
                PYTHON="$( {} $)".format(sys.executable),
                SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
                UNITTEST_ALIAS='install-unittests',
@@ -1099,13 +1061,6 @@ envDict = dict(BUILD_ROOT=buildDir,
                CONFIG_HEADER_DEFINES={},
                LIBDEPS_TAG_EXPANSIONS=[],
                )
-
-# TODO: Remove these when hygienic builds are default.
-if get_option('install-mode') != 'hygienic':
-    envDict["UNITTEST_ALIAS"] = "unittests"
-    envDict["INTEGRATION_TEST_ALIAS"] = "integration_tests"
-    envDict["LIBFUZZER_TEST_ALIAS"] = "libfuzzer_tests"
-    envDict["BENCHMARK_ALIAS"] = "benchmarks"
 
 env = Environment(variables=env_vars, **envDict)
 
@@ -1415,7 +1370,7 @@ if has_option("cache"):
 
 # Normalize the link model. If it is auto, then for now both developer and release builds
 # use the "static" mode. Somday later, we probably want to make the developer build default
-# dynamic, but that will require the hygienic builds project.
+# dynamic.
 link_model = get_option('link-model')
 if link_model == "auto":
     link_model = "static"
@@ -1453,7 +1408,7 @@ if use_libunwind == True:
 
 
 # Windows can't currently support anything other than 'object' or 'static', until
-# we have both hygienic builds and have annotated functions for export.
+# we have annotated functions for export.
 if env.TargetOSIs('windows') and link_model not in ['object', 'static', 'dynamic-sdk']:
     env.FatalError("Windows builds must use the 'object', 'dynamic-sdk', or 'static' link models")
 
@@ -3973,223 +3928,216 @@ if get_option('ninja') != 'disabled':
     env.NinjaRegisterFunctionHandler("test_list_builder_action", ninja_test_list_builder)
 
 
-# TODO: Later, this should live somewhere more graceful.
-if get_option('install-mode') == 'hygienic':
+if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
 
-    if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
+    # The current ninja builder can't handle --separate-debug on non-Windows platforms
+    # like linux or macOS, because they depend on adding extra actions to the link step,
+    # which cannot be translated into the ninja bulider.
+    if not env.TargetOSIs("windows") and get_option('ninja') != 'disabled':
+        env.FatalError("Cannot use --separate-debug with Ninja on non-Windows platforms.")
 
-        # The current ninja builder can't handle --separate-debug on non-Windows platforms
-        # like linux or macOS, because they depend on adding extra actions to the link step,
-        # which cannot be translated into the ninja bulider.
-        if not env.TargetOSIs("windows") and get_option('ninja') != 'disabled':
-            env.FatalError("Cannot use --separate-debug with Ninja on non-Windows platforms.")
+    separate_debug = Tool('separate_debug')
+    if not separate_debug.exists(env):
+        env.FatalError('Cannot honor --separate-debug because the separate_debug.py Tool reported as nonexistent')
+    separate_debug(env)
 
-        separate_debug = Tool('separate_debug')
-        if not separate_debug.exists(env):
-            env.FatalError('Cannot honor --separate-debug because the separate_debug.py Tool reported as nonexistent')
-        separate_debug(env)
+env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = "tgz"
 
-    env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = "tgz"
+env["AIB_META_COMPONENT"] = "all"
+env["AIB_BASE_COMPONENT"] = "common"
+env["AIB_DEFAULT_COMPONENT"] = "mongodb"
 
-    env["AIB_META_COMPONENT"] = "all"
-    env["AIB_BASE_COMPONENT"] = "common"
-    env["AIB_DEFAULT_COMPONENT"] = "mongodb"
+env.Tool('auto_install_binaries')
+env.Tool('auto_archive')
 
-    env.Tool('auto_install_binaries')
-    env.Tool('auto_archive')
+env.DeclareRoles(
+    roles=[
 
-    env.DeclareRoles(
-        roles=[
+        env.Role(
+            name="base",
+        ),
 
-            env.Role(
-                name="base",
-            ),
+        env.Role(
+            name="debug",
+        ),
 
-            env.Role(
-                name="debug",
-            ),
+        env.Role(
+            name="dev",
+            dependencies=[
+                "runtime"
+            ],
+        ),
 
-            env.Role(
-                name="dev",
-                dependencies=[
-                    "runtime"
-                ],
-            ),
+        env.Role(
+            name="meta",
+        ),
 
-            env.Role(
-                name="meta",
-            ),
+        env.Role(
+            name="runtime",
+            dependencies=[
+                # On windows, we want the runtime role to depend
+                # on the debug role so that PDBs end in the
+                # runtime package.
+                "debug" if env.TargetOSIs('windows') else None,
+            ],
+            silent=True,
+        ),
+    ],
+    base_role="base",
+    meta_role="meta",
+)
 
-            env.Role(
-                name="runtime",
-                dependencies=[
-                    # On windows, we want the runtime role to depend
-                    # on the debug role so that PDBs end in the
-                    # runtime package.
-                    "debug" if env.TargetOSIs('windows') else None,
-                ],
-                silent=True,
-            ),
+def _aib_debugdir(source, target, env, for_signature):
+    for s in source:
+        origin = getattr(s.attributes, "debug_file_for", None)
+        oentry = env.Entry(origin)
+        osuf = oentry.get_suffix()
+        map_entry = env["AIB_SUFFIX_MAP"].get(osuf)
+        if map_entry:
+            return map_entry[0]
+    env.FatalError("Unable to find debuginfo file in _aib_debugdir: (source='{}')".format(str(source)))
+
+env["PREFIX_DEBUGDIR"] = _aib_debugdir
+
+env.AddSuffixMapping({
+    "$PROGSUFFIX": env.SuffixMap(
+        directory="$PREFIX_BINDIR",
+        default_role="runtime",
+    ),
+
+    "$SHLIBSUFFIX": env.SuffixMap(
+        directory="$PREFIX_BINDIR" \
+        if mongo_platform.get_running_os_name() == "windows" \
+        else "$PREFIX_LIBDIR",
+        default_role="runtime",
+    ),
+
+    ".debug": env.SuffixMap(
+        directory="$PREFIX_DEBUGDIR",
+        default_role="debug",
+    ),
+
+    ".dSYM": env.SuffixMap(
+        directory="$PREFIX_DEBUGDIR",
+        default_role="debug",
+    ),
+
+    ".pdb": env.SuffixMap(
+        directory="$PREFIX_DEBUGDIR",
+        default_role="debug",
+    ),
+})
+
+env.AddPackageNameAlias(
+    component="dist",
+    role="runtime",
+    name="mongodb-dist",
+)
+
+env.AddPackageNameAlias(
+    component="dist",
+    role="debug",
+    name="mongodb-dist-debugsymbols",
+)
+
+env.AddPackageNameAlias(
+    component="dist-test",
+    role="runtime",
+    name="mongodb-binaries",
+)
+
+env.AddPackageNameAlias(
+    component="dist-test",
+    role="debug",
+    name="mongo-debugsymbols",
+)
+
+env.AddPackageNameAlias(
+    component="dbtest",
+    role="runtime",
+    name="dbtest-binary",
+)
+
+env.AddPackageNameAlias(
+    component="dbtest",
+    role="debug",
+    name="dbtest-debugsymbols",
+)
+
+env.AddPackageNameAlias(
+    component="shell",
+    role="runtime",
+    name="mongodb-shell",
+)
+
+env.AddPackageNameAlias(
+    component="shell",
+    role="debug",
+    name="mongodb-shell-debugsymbols",
+)
+
+env.AddPackageNameAlias(
+    component="mongocryptd",
+    role="runtime",
+    name="mongodb-cryptd",
+)
+
+env.AddPackageNameAlias(
+    component="mongocryptd",
+    role="debug",
+    name="mongodb-cryptd-debugsymbols",
+)
+
+env.AddPackageNameAlias(
+    component="mh",
+    role="runtime",
+    # TODO: we should be able to move this to where the mqlrun binary is
+    # defined when AIB correctly uses environments instead of hooking into
+    # the first environment used.
+    name="mh-binaries",
+)
+
+env.AddPackageNameAlias(
+    component="mh",
+    role="debug",
+    # TODO: we should be able to move this to where the mqlrun binary is
+    # defined when AIB correctly uses environments instead of hooking into
+    # the first environment used.
+    name="mh-debugsymbols",
+)
+
+if env['PLATFORM'] == 'posix':
+    env.AppendUnique(
+        RPATH=[
+            # In the future when we want to improve dynamic builds
+            # we should set this to $PREFIX ideally
+             env.Literal('\\$$ORIGIN/../lib'),
         ],
-        base_role="base",
-        meta_role="meta",
+        LINKFLAGS=[
+            # Most systems *require* -z,origin to make origin work, but android
+            # blows up at runtime if it finds DF_ORIGIN_1 in DT_FLAGS_1.
+            # https://android.googlesource.com/platform/bionic/+/cbc80ba9d839675a0c4891e2ab33f39ba51b04b2/linker/linker.h#68
+            # https://android.googlesource.com/platform/bionic/+/cbc80ba9d839675a0c4891e2ab33f39ba51b04b2/libc/include/elf.h#215
+            '-Wl,-z,origin' if not env.TargetOSIs('android') else [],
+            '-Wl,--enable-new-dtags',
+        ],
+        SHLINKFLAGS=[
+            # -h works for both the sun linker and the gnu linker.
+            "-Wl,-h,${TARGET.file}",
+        ]
+    )
+elif env['PLATFORM'] == 'darwin':
+    env.AppendUnique(
+        LINKFLAGS=[
+            '-Wl,-rpath,@loader_path/../lib',
+            '-Wl,-rpath,@loader_path/../Frameworks'
+        ],
+        SHLINKFLAGS=[
+            "-Wl,-install_name,@rpath/${TARGET.file}",
+        ],
     )
 
-    def _aib_debugdir(source, target, env, for_signature):
-        for s in source:
-            origin = getattr(s.attributes, "debug_file_for", None)
-            oentry = env.Entry(origin)
-            osuf = oentry.get_suffix()
-            map_entry = env["AIB_SUFFIX_MAP"].get(osuf)
-            if map_entry:
-                return map_entry[0]
-        env.FatalError("Unable to find debuginfo file in _aib_debugdir: (source='{}')".format(str(source)))
-
-    env["PREFIX_DEBUGDIR"] = _aib_debugdir
-
-    env.AddSuffixMapping({
-        "$PROGSUFFIX": env.SuffixMap(
-            directory="$PREFIX_BINDIR",
-            default_role="runtime",
-        ),
-
-        "$SHLIBSUFFIX": env.SuffixMap(
-            directory="$PREFIX_BINDIR" \
-            if mongo_platform.get_running_os_name() == "windows" \
-            else "$PREFIX_LIBDIR",
-            default_role="runtime",
-        ),
-
-        ".debug": env.SuffixMap(
-            directory="$PREFIX_DEBUGDIR",
-            default_role="debug",
-        ),
-
-        ".dSYM": env.SuffixMap(
-            directory="$PREFIX_DEBUGDIR",
-            default_role="debug",
-        ),
-
-        ".pdb": env.SuffixMap(
-            directory="$PREFIX_DEBUGDIR",
-            default_role="debug",
-        ),
-    })
-
-    env.AddPackageNameAlias(
-        component="dist",
-        role="runtime",
-        name="mongodb-dist",
-    )
-
-    env.AddPackageNameAlias(
-        component="dist",
-        role="debug",
-        name="mongodb-dist-debugsymbols",
-    )
-
-    env.AddPackageNameAlias(
-        component="dist-test",
-        role="runtime",
-        name="mongodb-binaries",
-    )
-
-    env.AddPackageNameAlias(
-        component="dist-test",
-        role="debug",
-        name="mongo-debugsymbols",
-    )
-
-    env.AddPackageNameAlias(
-        component="dbtest",
-        role="runtime",
-        name="dbtest-binary",
-    )
-
-    env.AddPackageNameAlias(
-        component="dbtest",
-        role="debug",
-        name="dbtest-debugsymbols",
-    )
-
-    env.AddPackageNameAlias(
-        component="shell",
-        role="runtime",
-        name="mongodb-shell",
-    )
-
-    env.AddPackageNameAlias(
-        component="shell",
-        role="debug",
-        name="mongodb-shell-debugsymbols",
-    )
-
-    env.AddPackageNameAlias(
-        component="mongocryptd",
-        role="runtime",
-        name="mongodb-cryptd",
-    )
-
-    env.AddPackageNameAlias(
-        component="mongocryptd",
-        role="debug",
-        name="mongodb-cryptd-debugsymbols",
-    )
-
-    env.AddPackageNameAlias(
-        component="mh",
-        role="runtime",
-        # TODO: we should be able to move this to where the mqlrun binary is
-        # defined when AIB correctly uses environments instead of hooking into
-        # the first environment used.
-        name="mh-binaries",
-    )
-
-    env.AddPackageNameAlias(
-        component="mh",
-        role="debug",
-        # TODO: we should be able to move this to where the mqlrun binary is
-        # defined when AIB correctly uses environments instead of hooking into
-        # the first environment used.
-        name="mh-debugsymbols",
-    )
-
-    if env['PLATFORM'] == 'posix':
-        env.AppendUnique(
-            RPATH=[
-                # In the future when we want to improve dynamic builds
-                # we should set this to $PREFIX ideally
-                 env.Literal('\\$$ORIGIN/../lib'),
-            ],
-            LINKFLAGS=[
-                # Most systems *require* -z,origin to make origin work, but android
-                # blows up at runtime if it finds DF_ORIGIN_1 in DT_FLAGS_1.
-                # https://android.googlesource.com/platform/bionic/+/cbc80ba9d839675a0c4891e2ab33f39ba51b04b2/linker/linker.h#68
-                # https://android.googlesource.com/platform/bionic/+/cbc80ba9d839675a0c4891e2ab33f39ba51b04b2/libc/include/elf.h#215
-                '-Wl,-z,origin' if not env.TargetOSIs('android') else [],
-                '-Wl,--enable-new-dtags',
-            ],
-            SHLINKFLAGS=[
-                # -h works for both the sun linker and the gnu linker.
-                "-Wl,-h,${TARGET.file}",
-            ]
-        )
-    elif env['PLATFORM'] == 'darwin':
-        env.AppendUnique(
-            LINKFLAGS=[
-                '-Wl,-rpath,@loader_path/../lib',
-                '-Wl,-rpath,@loader_path/../Frameworks'
-            ],
-            SHLINKFLAGS=[
-                "-Wl,-install_name,@rpath/${TARGET.file}",
-            ],
-        )
-
-    env.Default(env.Alias("install-default"))
-
-elif get_option('separate-debug') == "on":
-    env.FatalError('Cannot use --separate-debug without --install-mode=hygienic')
-
+env.Default(env.Alias("install-default"))
 
 # If the flags in the environment are configured for -gsplit-dwarf,
 # inject the necessary emitter.
@@ -4415,7 +4363,7 @@ if get_option("ninja") == "disabled":
         r"$PYTHON buildscripts\make_vcxproj.py " + msvc_version + "mongodb")
     vcxproj = env.Alias("vcxproj", vcxprojFile)
 
-# TODO: maybe make these work like the other archive- hygienic aliases
+# TODO: maybe make these work like the other archive- aliases
 # even though they aren't piped through AIB?
 distSrc = env.DistSrc("distsrc.tar", NINJA_SKIP=True)
 env.NoCache(distSrc)
@@ -4509,7 +4457,7 @@ if has_option("cache"):
 # We need to be explicit about including $DESTDIR here, unlike most
 # other places. Normally, auto_install_binaries will take care of
 # injecting DESTDIR for us, but we aren't using that now.
-resmoke_install_dir = env.subst("$DESTDIR/$PREFIX_BINDIR") if get_option("install-mode") == "hygienic" else env.Dir("#").abspath
+resmoke_install_dir = env.subst("$DESTDIR/$PREFIX_BINDIR")
 resmoke_install_dir = os.path.normpath(resmoke_install_dir).replace("\\", r"\\")
 
 # Much blood sweat and tears were shed getting to this point. Any version of
@@ -4546,18 +4494,10 @@ env.SConscript(
     ],
 )
 
-if get_option("install-mode") != "hygienic":
-    allTargets = ['core', 'tools', 'unittests', 'integration_tests', 'libfuzzer_tests', 'benchmarks']
-
-    if not has_option('noshell') and usemozjs:
-        allTargets.extend(['dbtest'])
-
-    env.Alias('all', allTargets)
-
 # run the Dagger tool if it's installed
 if should_dagger:
     dagger = env.Dagger('library_dependency_graph.json')
-    env.Depends(dagger, env.Alias("install-all") if get_option("install-mode") == "hygienic" else "all")
+    env.Depends(dagger, env.Alias("install-all"))
     dependencyDb = env.Alias("dagger", dagger)
 
 # Declare the cache prune target
@@ -4572,8 +4512,10 @@ cachePrune = env.Command(
 
 env.AlwaysBuild(cachePrune)
 
-if get_option('install-mode') == 'hygienic':
-    env.FinalizeInstallDependencies()
+
+# We have finished all SConscripts and targets, so we can ask
+# auto_install_binaries to finalize the installation setup.
+env.FinalizeInstallDependencies()
 
 
 # We don't want installing files to cause them to flow into the cache,

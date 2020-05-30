@@ -24,17 +24,6 @@
 from SCons.Script import Action
 
 
-def register_unit_test(env, test):
-    """
-    Kept around for compatibility with non-hygienic builds. The only callers of
-    this should be the intel_readtest_wrapper SConscript. All original callers
-    have been updated to use UNITTEST_HAS_CUSTOM_MAINLINE.
-    """
-    env.RegisterTest("$UNITTEST_LIST", test)
-    if not env.get("AUTO_INSTALL_ENABLED", False):
-        env.Alias("$UNITTEST_ALIAS", test)
-
-
 def exists(env):
     return True
 
@@ -72,5 +61,4 @@ def build_cpp_unit_test(env, target, source, **kwargs):
 def generate(env):
     env.TestList("$UNITTEST_LIST", source=[])
     env.AddMethod(build_cpp_unit_test, "CppUnitTest")
-    env.AddMethod(register_unit_test, "RegisterUnitTest")
     env.Alias("$UNITTEST_ALIAS", "$UNITTEST_LIST")

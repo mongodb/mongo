@@ -7,17 +7,15 @@ Import("get_option")
 
 env = env.Clone()
 
-
-if get_option('install-mode') == 'hygienic':
-    env.AutoInstall(
-        '$PREFIX_DOCDIR/mongo_embedded',
-        source=[
-            '#/LICENSE-Community.txt',
-            '../LICENSE-Embedded.txt',
-        ],
-        AIB_COMPONENT='embedded',
-        AIB_ROLE='base',
-    )
+env.AutoInstall(
+    '$PREFIX_DOCDIR/mongo_embedded',
+    source=[
+        '#/LICENSE-Community.txt',
+        '../LICENSE-Embedded.txt',
+    ],
+    AIB_COMPONENT='embedded',
+    AIB_ROLE='base',
+)
 
 mongoEmbeddedEnv = env.Clone()
 mongoEmbeddedEnv.AppendUnique(
@@ -74,13 +72,12 @@ mongoEmbeddedTargets = mongoEmbeddedEnv.Library(
     AIB_COMPONENT='embedded',
 )
 
-if get_option('install-mode') == 'hygienic':
-    env.AutoInstall(
-        '$PREFIX_INCLUDEDIR/mongo_embedded/v1/mongo_embedded',
-        source=['mongo_embedded.h'],
-        AIB_COMPONENT='embedded',
-        AIB_ROLE='dev',
-    )
+env.AutoInstall(
+    '$PREFIX_INCLUDEDIR/mongo_embedded/v1/mongo_embedded',
+    source=['mongo_embedded.h'],
+    AIB_COMPONENT='embedded',
+    AIB_ROLE='dev',
+)
 
 yamlEnv = env.Clone()
 yamlEnv.InjectThirdParty(libraries=['yaml'])
