@@ -213,7 +213,7 @@ public:
             return false;
         }
 
-        forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
+        onShardVersionMismatch(opCtx, nss, boost::none);
 
         CleanupResult cleanupResult = cleanupOrphanedData(opCtx, nss, startingFromKey, &errmsg);
 

@@ -76,7 +76,7 @@ public:
     /**
      * Reports all collections which have filtering information associated.
      */
-    static void report(OperationContext* opCtx, BSONObjBuilder* builder);
+    static void appendInfoForShardingStateCommand(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
      * Attaches info for server status.

@@ -72,7 +72,7 @@ public:
         return *it->second;
     }
 
-    void report(BSONObjBuilder* builder) {
+    void appendInfoForShardingStateCommand(BSONObjBuilder* builder) {
         BSONObjBuilder versionB(builder->subobjStart("versions"));
 
         {
@@ -130,9 +130,10 @@ CollectionShardingState* CollectionShardingState::get_UNSAFE(ServiceContext* svc
     return &collectionsMap->getOrCreate(nss);
 }
 
-void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
+void CollectionShardingState::appendInfoForShardingStateCommand(OperationContext* opCtx,
+                                                                BSONObjBuilder* builder) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
-    collectionsMap->report(builder);
+    collectionsMap->appendInfoForShardingStateCommand(builder);
 }
 
 void CollectionShardingState::appendInfoForServerStatus(OperationContext* opCtx,

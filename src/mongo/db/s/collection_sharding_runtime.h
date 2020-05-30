@@ -36,12 +36,9 @@
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_state_lock.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
-
-extern AtomicWord<int> migrationLockAcquisitionMaxWaitMS;
 
 /**
  * See the comments for CollectionShardingState for more information on how this class fits in the
@@ -49,13 +46,13 @@ extern AtomicWord<int> migrationLockAcquisitionMaxWaitMS;
  */
 class CollectionShardingRuntime final : public CollectionShardingState,
                                         public Decorable<CollectionShardingRuntime> {
+    CollectionShardingRuntime(const CollectionShardingRuntime&) = delete;
+    CollectionShardingRuntime& operator=(const CollectionShardingRuntime&) = delete;
+
 public:
     CollectionShardingRuntime(ServiceContext* service,
                               NamespaceString nss,
                               std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor);
-
-    CollectionShardingRuntime(const CollectionShardingRuntime&) = delete;
-    CollectionShardingRuntime& operator=(const CollectionShardingRuntime&) = delete;
 
     using CSRLock = ShardingStateLock<CollectionShardingRuntime>;
 
@@ -74,15 +71,6 @@ public:
      */
     static CollectionShardingRuntime* get_UNSAFE(ServiceContext* svcCtx,
                                                  const NamespaceString& nss);
-
-    /**
-     * Waits for all ranges deletion tasks with UUID 'collectionUuid' overlapping range
-     * 'orphanRange' to be processed, even if the collection does not exist in the storage catalog.
-     */
-    static Status waitForClean(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const UUID& collectionUuid,
-                               ChunkRange orphanRange);
 
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
                                               OrphanCleanupPolicy orphanCleanupPolicy) override;
@@ -128,40 +116,6 @@ public:
     void clearFilteringMetadata();
 
     /**
-     * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
-     * on them, and adds the range to the list of ranges being received.
-     *
-     * Returns a future that will be resolved when the deletion has completed or failed.
-     */
-    SharedSemiFuture<void> beginReceive(ChunkRange const& range);
-
-    /*
-     * Removes `range` from the list of ranges being received, and schedules any documents in the
-     * range for immediate cleanup. Does not block.
-     */
-    void forgetReceive(const ChunkRange& range);
-
-    /**
-     * Schedules documents in `range` for cleanup after any running queries that may depend on them
-     * have terminated. Does not block. Fails if range overlaps any current local shard chunk.
-     * Passed kDelayed, an additional delay (configured via server parameter orphanCleanupDelaySecs)
-     * is added to permit (most) dependent queries on secondaries to complete, too.
-     *
-     * Returns a future that will be resolved when the deletion completes or fails. If that
-     * succeeds, waitForClean can be called to ensure no other deletions are pending for the range.
-     */
-    enum CleanWhen { kNow, kDelayed };
-    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range,
-                                        boost::optional<UUID> migrationId,
-                                        CleanWhen when);
-
-    /**
-     * Returns a range _not_ owned by this shard that starts no lower than the specified
-     * startingFrom key value, if any, or boost::none if there is no such range.
-     */
-    boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
-
-    /**
      * Methods to control the collection's critical section. Methods listed below must be called
      * with both the collection lock and CSRLock held in exclusive mode.
      *
@@ -188,16 +142,59 @@ public:
         OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op);
 
     /**
-     * Appends information about any chunks for which incoming migration has been requested, but the
-     * shard hasn't yet synchronised with the config server on whether that migration actually
-     * committed.
+     * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
+     * on them, and adds the range to the list of ranges being received.
+     *
+     * Returns a future that will be resolved when the deletion has completed or failed.
      */
-    void appendPendingReceiveChunks(BSONArrayBuilder* builder);
+    SharedSemiFuture<void> beginReceive(ChunkRange const& range);
+
+    /*
+     * Removes `range` from the list of ranges being received, and schedules any documents in the
+     * range for immediate cleanup. Does not block.
+     */
+    void forgetReceive(const ChunkRange& range);
 
     /**
      * Clears the list of chunks that are being received as a part of an incoming migration.
      */
     void clearReceivingChunks();
+
+    /**
+     * Returns a range _not_ owned by this shard that starts no lower than the specified
+     * startingFrom key value, if any, or boost::none if there is no such range.
+     */
+    boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
+
+    /**
+     * Schedules documents in `range` for cleanup after any running queries that may depend on them
+     * have terminated. Does not block. Fails if range overlaps any current local shard chunk.
+     * Passed kDelayed, an additional delay (configured via server parameter orphanCleanupDelaySecs)
+     * is added to permit (most) dependent queries on secondaries to complete, too.
+     *
+     * Returns a future that will be resolved when the deletion completes or fails. If that
+     * succeeds, waitForClean can be called to ensure no other deletions are pending for the range.
+     */
+    enum CleanWhen { kNow, kDelayed };
+    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range,
+                                        boost::optional<UUID> migrationId,
+                                        CleanWhen when);
+
+    /**
+     * Waits for all ranges deletion tasks with UUID 'collectionUuid' overlapping range
+     * 'orphanRange' to be processed, even if the collection does not exist in the storage catalog.
+     */
+    static Status waitForClean(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const UUID& collectionUuid,
+                               ChunkRange orphanRange);
+
+    /**
+     * Appends information about any chunks for which incoming migration has been requested, but the
+     * shard hasn't yet synchronised with the config server on whether that migration actually
+     * committed.
+     */
+    void appendPendingReceiveChunks(BSONArrayBuilder* builder);
 
     std::uint64_t getNumMetadataManagerChanges_forTest() {
         return _numMetadataManagerChanges;

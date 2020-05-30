@@ -33,8 +33,6 @@
 
 #include "mongo/db/s/migration_source_manager.h"
 
-#include <memory>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -51,6 +49,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -66,14 +65,10 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using namespace shardmetadatautil;
-
 namespace {
 
 const auto msmForCsr = CollectionShardingRuntime::declareDecoration<MigrationSourceManager*>();
@@ -345,7 +340,7 @@ Status MigrationSourceManager::enterCriticalSection() {
     // time inclusive of the migration config commit update from accessing secondary data.
     // Note: this write must occur after the critSec flag is set, to ensure the secondary refresh
     // will stall behind the flag.
-    Status signalStatus = updateShardCollectionsEntry(
+    Status signalStatus = shardmetadatautil::updateShardCollectionsEntry(
         _opCtx,
         BSON(ShardCollectionType::kNssFieldName << getNss().ns()),
         BSONObj(),
