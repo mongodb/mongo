@@ -515,7 +515,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // will return the index to be rebuilt.
             if (indexMetaData.isBackgroundSecondaryBuild && (!foundIdent || !indexMetaData.ready)) {
                 LOGV2(22255,
-                      "Expected background index build did not complete, rebuilding",
+                      "Expected background index build did not complete, rebuilding in foreground "
+                      "- see SERVER-43097",
                       "namespace"_attr = coll,
                       "index"_attr = indexName);
                 ret.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
