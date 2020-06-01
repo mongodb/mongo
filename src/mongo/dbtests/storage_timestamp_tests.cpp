@@ -87,6 +87,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
@@ -2762,10 +2763,26 @@ public:
             auto startBuildOpTime = repl::OpTime(startBuildTs, presentTerm);
             UUID indexBuildUUID = UUID::gen();
 
-            auto start = repl::makeStartIndexBuildOplogEntry(
-                startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
-            ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
-                _opCtx, &start, repl::OplogApplication::Mode::kSecondary));
+            // Wait for the index build thread to start the collection scan before proceeding with
+            // checking the catalog and applying the commitIndexBuild oplog entry.
+            // There is a potential race between applying the commitIndexBuild oplog entry and the
+            // transitioning the index build thread's ReplIndexBuildState from kSetup to
+            // kInProgress. This is due to the commit retry logic using the ClockSourceMock, rather
+            // than an actual  system clock that advances automatically, through OperationContext's
+            // waitFor() function.
+            {
+                FailPointEnableBlock fpb("hangAfterStartingIndexBuild");
+
+                auto start = repl::makeStartIndexBuildOplogEntry(
+                    startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
+                ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
+                    _opCtx, &start, repl::OplogApplication::Mode::kSecondary));
+
+                // We cannot use the OperationContext to wait for the thread to reach the fail point
+                // because it also uses the ClockSourceMock.
+                fpb->waitForTimesEntered(Interruptible::notInterruptible(),
+                                         fpb.initialTimesEntered() + 1);
+            }
 
             {
                 AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
