@@ -1,6 +1,6 @@
 // Tests that commands like find, aggregate and update accepts a 'let' parameter which defines
 // variables for use in expressions within the command.
-// TODO SERVER-46707: move this back to core after let params work in sharded aggreggate.
+// TODO SERVER-46707: move this back to core after let params work in sharded commands is complete.
 // @tags: [assumes_against_mongod_not_mongos, requires_fcv46]
 
 (function() {
