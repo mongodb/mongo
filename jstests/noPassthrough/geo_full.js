@@ -30,13 +30,7 @@ const db = conn.getDB("test");
 var randEnvironment = function() {
     // Normal earth environment
     if (Random.rand() < 0.5) {
-        return {
-            max: 180,
-            min: -180,
-            bits: Math.floor(Random.rand() * 32) + 1,
-            earth: true,
-            bucketSize: 360 / (4 * 1024 * 1024 * 1024)
-        };
+        return {max: 180, min: -180, bits: Math.floor(Random.rand() * 32) + 1, earth: true};
     }
 
     var scales = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000];
@@ -46,11 +40,8 @@ var randEnvironment = function() {
     var max = Random.rand() * scale + offset;
     var min = -Random.rand() * scale + offset;
     var bits = Math.floor(Random.rand() * 32) + 1;
-    var bits = Math.floor(Random.rand() * 32) + 1;
-    var range = max - min;
-    var bucketSize = range / (4 * 1024 * 1024 * 1024);
 
-    return {max: max, min: min, bits: bits, earth: false, bucketSize: bucketSize};
+    return {max: max, min: min, bits: bits, earth: false};
 };
 
 var randPoint = function(env, query) {
