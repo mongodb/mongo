@@ -87,6 +87,16 @@ void doLogUnpacked(int32_t id,
     doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), dynamicAttrs);
 }
 
+template <typename S, size_t N>
+void doLogUnpacked(int32_t id,
+                   LogSeverity const& severity,
+                   LogOptions const& options,
+                   const S&,  // formatMsg not used
+                   const char (&msg)[N],
+                   const DynamicAttributes& dynamicAttrs) {
+    doLogUnpacked(id, severity, options, msg, dynamicAttrs);
+}
+
 // Args may be raw attributes or CombinedAttr's here. We need to flatten any combined attributes
 // into just raw attributes for doLogUnpacked. We do this building flat tuples for every argument,
 // concatenating them into a single tuple that we can expand again using apply.
