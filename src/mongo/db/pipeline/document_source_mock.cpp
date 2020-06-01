@@ -61,6 +61,10 @@ const char* DocumentSourceMock::getSourceName() const {
     return "mock";
 }
 
+const size_t DocumentSourceMock::size() const {
+    return _queue.size();
+}
+
 intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(Document doc) {
     return new DocumentSourceMock({std::move(doc)});
 }

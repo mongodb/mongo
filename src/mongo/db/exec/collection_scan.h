@@ -100,6 +100,11 @@ private:
      */
     Status setLatestOplogEntryTimestamp(const Record& record);
 
+    /**
+     * Asserts that the 'minTs' specified in the query filter has not already fallen off the oplog.
+     */
+    void assertMinTsHasNotFallenOffOplog(const Record& record);
+
     // WorkingSet is not owned by us.
     WorkingSet* _workingSet;
 

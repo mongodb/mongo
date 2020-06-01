@@ -66,6 +66,9 @@ struct CollectionScanParams {
     // Do we want the scan to be 'tailable'?  Only meaningful if the collection is capped.
     bool tailable = false;
 
+    // Should we assert that the specified minTS has not fallen off the oplog?
+    bool assertMinTsHasNotFallenOffOplog = false;
+
     // Should we keep track of the timestamp of the latest oplog entry we've seen? This information
     // is needed to merge cursors from the oplog in order of operation time when reading the oplog
     // across a sharded cluster.

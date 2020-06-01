@@ -98,6 +98,10 @@ struct QueryPlannerParams {
         // consumed downstream.
         PRESERVE_RECORD_ID = 1 << 10,
 
+        // Set this on an oplog scan to uassert that the oplog has not already rolled over the
+        // minimum 'ts' timestamp specified in the query.
+        ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG = 1 << 11,
+
         // Instruct the plan enumerator to enumerate contained $ors in a special order. $or
         // enumeration can generate an exponential number of plans, and is therefore limited at some
         // arbitrary cutoff controlled by a parameter. When this limit is hit, the order of
@@ -113,7 +117,7 @@ struct QueryPlannerParams {
         // order, we would get assignments [a_b, a_b], [a_c, a_c], [a_c, a_b], then [a_b, a_c]. This
         // is thought to be helpful in general, but particularly in cases where all children of the
         // $or use the same fields and have the same indexes available, as in this example.
-        ENUMERATE_OR_CHILDREN_LOCKSTEP = 1 << 11,
+        ENUMERATE_OR_CHILDREN_LOCKSTEP = 1 << 12,
     };
 
     // See Options enum above.

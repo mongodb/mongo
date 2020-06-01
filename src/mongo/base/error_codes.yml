@@ -368,6 +368,8 @@ error_codes:
 
     - {code: 319,name: MovePrimaryInProgress}
 
+    - {code: 326, name: OplogQueryMinTsMissing}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
