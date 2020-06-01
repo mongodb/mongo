@@ -212,6 +212,7 @@ void abortInProgressTransactions(OperationContext* opCtx) {
                     "sessionId"_attr = txnRecord.getSessionId().toBSON(),
                     "txnNumber"_attr = txnRecord.getTxnNum());
         txnParticipant.abortTransaction(opCtx);
+        opCtx->resetMultiDocumentTransactionState();
     }
 }
 }  // namespace

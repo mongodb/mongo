@@ -407,6 +407,19 @@ public:
     }
 
     /**
+     * Clears metadata associated with a multi-document transaction.
+     */
+    void resetMultiDocumentTransactionState() {
+        invariant(_inMultiDocumentTransaction);
+        invariant(!_writeUnitOfWork);
+        invariant(_ruState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        _inMultiDocumentTransaction = false;
+        _isStartingMultiDocumentTransaction = false;
+        _lsid = boost::none;
+        _txnNumber = boost::none;
+    }
+
+    /**
      * Returns whether this operation is starting a multi-document transaction.
      */
     bool isStartingMultiDocumentTransaction() const {
