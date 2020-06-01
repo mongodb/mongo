@@ -59,7 +59,8 @@ void registerMongoDCollectors(FTDCController* controller) {
                                                                  "local.oplog.rs.stats",
                                                                  "local",
                                                                  BSON("collStats"
-                                                                      << "oplog.rs")));
+                                                                      << "oplog.rs"
+                                                                      << "waitForLock" << false)));
         if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
             // GetDefaultRWConcern
             controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(

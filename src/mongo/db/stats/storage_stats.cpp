@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
@@ -34,6 +36,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/logv2/log.h"
 
 #include "mongo/db/stats/storage_stats.h"
 
@@ -54,10 +57,21 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     }
 
     bool verbose = param["verbose"].trueValue();
+    bool waitForLock = !param.hasField("waitForLock") || param["waitForLock"].trueValue();
 
-    AutoGetCollectionForReadCommand ctx(opCtx, nss);
-    Collection* collection = ctx.getCollection();  // Will be set if present
-    if (!ctx.getDb() || !collection) {
+    boost::optional<AutoGetCollectionForReadCommand> autoColl;
+    try {
+        autoColl.emplace(opCtx,
+                         nss,
+                         AutoGetCollection::ViewMode::kViewsForbidden,
+                         waitForLock ? Date_t::max() : Date_t::now());
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        LOGV2_DEBUG(3088801, 2, "Failed to retrieve storage statistics", logAttrs(nss));
+        return Status::OK();
+    }
+
+    Collection* collection = autoColl->getCollection();  // Will be set if present
+    if (!autoColl->getDb() || !collection) {
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
         result->appendNumber("storageSize", 0);
@@ -67,8 +81,9 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         result->append("indexDetails", BSONObj());
         result->append("indexSizes", BSONObj());
         result->append("scaleFactor", scale);
-        std::string errmsg = !(ctx.getDb()) ? "Database [" + nss.db().toString() + "] not found."
-                                            : "Collection [" + nss.toString() + "] not found.";
+        std::string errmsg = !autoColl->getDb()
+            ? "Database [" + nss.db().toString() + "] not found."
+            : "Collection [" + nss.toString() + "] not found.";
         return {ErrorCodes::NamespaceNotFound, errmsg};
     }
 
