@@ -73,11 +73,11 @@ TEST_F(ClusterDeleteTest, NoErrors) {
 }
 
 TEST_F(ClusterDeleteTest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    testAttachesAtClusterTimeForSnapshotReadConcern(kDeleteCmdTargeted, kDeleteCmdScatterGather);
+    testAttachesAtClusterTimeForTxnSnapshotReadConcern(kDeleteCmdTargeted, kDeleteCmdScatterGather);
 }
 
 TEST_F(ClusterDeleteTest, SnapshotReadConcernWithAfterClusterTime) {
-    testSnapshotReadConcernWithAfterClusterTime(kDeleteCmdTargeted, kDeleteCmdScatterGather);
+    testTxnSnapshotReadConcernWithAfterClusterTime(kDeleteCmdTargeted, kDeleteCmdScatterGather);
 }
 
 }  // namespace
