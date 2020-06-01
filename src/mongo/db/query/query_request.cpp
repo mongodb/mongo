@@ -367,12 +367,6 @@ StatusWith<std::unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(
             if (!status.isOK()) {
                 return status;
             }
-        } else if (isMongocryptdArgument(fieldName)) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream()
-                              << "Failed to parse: " << cmdObj.toString()
-                              << ". Unrecognized field '" << fieldName
-                              << "'. This command may be meant for a mongocryptd process.");
 
             // TODO SERVER-47065: A 4.6 node still has to accept the '_use44SortKeys' field, since
             // it could be included in a command sent from a 4.4 mongos. In 4.7 development, this

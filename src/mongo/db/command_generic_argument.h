@@ -53,10 +53,4 @@ bool isRequestStripArgument(StringData arg);
  */
 bool isReplyStripArgument(StringData arg);
 
-/**
- * Returns true if the provided argument is one that should be handled by a mongocryptd process.
- */
-bool isMongocryptdArgument(StringData arg);
-
-
 }  // namespace mongo

@@ -183,14 +183,6 @@ void IDLParserErrorContext::throwMissingField(StringData fieldName) const {
 
 void IDLParserErrorContext::throwUnknownField(StringData fieldName) const {
     std::string path = getElementPath(fieldName);
-    if (isMongocryptdArgument(fieldName)) {
-        uasserted(
-            4662500,
-            str::stream()
-                << "BSON field '" << path
-                << "' is an unknown field. This command may be meant for a mongocryptd process.");
-    }
-
     uasserted(40415, str::stream() << "BSON field '" << path << "' is an unknown field.");
 }
 
