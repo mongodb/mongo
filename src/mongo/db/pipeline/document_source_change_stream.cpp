@@ -385,7 +385,7 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(
         // to a specific event; we thus only need to check (1), similar to 'startAtOperationTime'.
         startFrom = tokenData.clusterTime;
         if (expCtx->needsMerge || ResumeToken::isHighWaterMarkToken(tokenData)) {
-            resumeStage = DocumentSourceShardCheckResumability::create(expCtx, tokenData);
+            resumeStage = DocumentSourceCheckResumability::create(expCtx, tokenData);
         } else {
             resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, tokenData);
         }
@@ -417,7 +417,7 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(
                     << " in a $changeStream stage.",
                 !resumeAfterClusterTime);
         startFrom = *startAtOperationTime;
-        resumeStage = DocumentSourceShardCheckResumability::create(expCtx, *startFrom);
+        resumeStage = DocumentSourceCheckResumability::create(expCtx, *startFrom);
     }
 
     // There might not be a starting point if we're on mongos, otherwise we should either have a

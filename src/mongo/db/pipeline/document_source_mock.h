@@ -78,6 +78,8 @@ public:
     static boost::intrusive_ptr<DocumentSourceMock> create(
         const std::initializer_list<const char*>& jsons);
 
+    const size_t size() const;
+
     void reattachToOperationContext(OperationContext* opCtx) {
         isDetachedFromOpCtx = false;
     }

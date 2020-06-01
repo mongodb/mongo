@@ -40,6 +40,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
@@ -71,6 +72,12 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
     _specificStats.direction = params.direction;
     _specificStats.maxTs = params.maxTs;
     invariant(!_params.shouldTrackLatestOplogTimestamp || _params.collection->ns().isOplog());
+
+    // We should never see 'assertMinTsHasNotFallenOffOplog' if 'minTS' is not present.
+    if (params.assertMinTsHasNotFallenOffOplog) {
+        invariant(params.shouldTrackLatestOplogTimestamp);
+        invariant(params.minTs);
+    }
 
     if (params.maxTs) {
         _endConditionBSON = BSON("$gte" << *(params.maxTs));
@@ -172,19 +179,20 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     }
 
     if (!record) {
-        // We just hit EOF. If we are tailable and have already returned data, leave us in a
-        // state to pick up where we left off on the next call to work(). Otherwise EOF is
-        // permanent.
+        // We hit EOF. If we are tailable and have already seen data, leave us in a state to pick up
+        // where we left off on the next call to work(). Otherwise, the EOF is permanent.
         if (_params.tailable && !_lastSeenId.isNull()) {
             _cursor.reset();
         } else {
             _commonStats.isEOF = true;
         }
-
         return PlanStage::IS_EOF;
     }
 
     _lastSeenId = record->id;
+    if (_params.assertMinTsHasNotFallenOffOplog) {
+        assertMinTsHasNotFallenOffOplog(*record);
+    }
     if (_params.shouldTrackLatestOplogTimestamp) {
         auto status = setLatestOplogEntryTimestamp(*record);
         if (!status.isOK()) {
@@ -213,6 +221,25 @@ Status CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
     }
     _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, tsElem.timestamp());
     return Status::OK();
+}
+
+void CollectionScan::assertMinTsHasNotFallenOffOplog(const Record& record) {
+    // If the first entry we see in the oplog is the replset initialization, then it doesn't matter
+    // if its timestamp is later than the specified minTs; no events earlier than the minTs can have
+    // fallen off this oplog. Otherwise, verify that the timestamp of the first observed oplog entry
+    // is earlier than or equal to the minTs time.
+    auto swOplogEntry = repl::OplogEntry::parse(record.data.toBson());
+    invariant(_specificStats.docsTested == 0);
+    invariant(swOplogEntry.isOK());
+    auto oplogEntry = std::move(swOplogEntry.getValue());
+    const bool isNewRS =
+        oplogEntry.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
+        oplogEntry.getOpType() == repl::OpTypeEnum::kNoop;
+    uassert(ErrorCodes::OplogQueryMinTsMissing,
+            "Specified minTs has already fallen off the oplog",
+            isNewRS || oplogEntry.getTimestamp() <= *_params.minTs);
+    // We don't need to check this assertion again after we've confirmed the first oplog event.
+    _params.assertMinTsHasNotFallenOffOplog = false;
 }
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,

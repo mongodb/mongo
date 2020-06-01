@@ -39,30 +39,42 @@
 
 namespace mongo {
 /**
- * This checks for resumability on a single shard in the sharded case. The rules are
+ * This stage checks whether or not the oplog has enough history to resume the stream, and consumes
+ * all events up to the given resume point. It is deployed on all shards when resuming a stream on
+ * a sharded cluster, and is also used in the single-replicaset case when a stream is opened with
+ * startAtOperationTime or with a high-water-mark resume token. It defers to the COLLSCAN to check
+ * whether the first event (matching or non-matching) encountered in the oplog has a timestamp equal
+ * to or earlier than the minTs in the change stream filter. If not, the COLLSCAN will throw an
+ * assertion, which this stage catches and converts into a more comprehensible $changeStream
+ * specific exception. The rules are:
  *
- * - If the first document in the pipeline for this shard has a matching timestamp, we can
- *   always resume.
- * - If the oplog is empty, we can resume.  An empty oplog is rare and can only occur
- *   on a secondary that has just started up from a primary that has not taken a write.
- *   In particular, an empty oplog cannot be the result of oplog truncation.
- * - If neither of the above is true, the least-recent document in the oplog must precede the resume
- *   timestamp. If we do this check after seeing the first document in the pipeline in the shard, or
- *   after seeing that there are no documents in the pipeline after the resume token in the shard,
- *   we're guaranteed not to miss any documents.
+ * - If the first event seen in the oplog has the same timestamp as the requested resume token or
+ *   startAtOperationTime, we can resume.
+ * - If the timestamp of the first event seen in the oplog is earlier than the requested resume
+ *   token or startAtOperationTime, we can resume.
+ * - If the first entry in the oplog is a replica set initialization, then we can resume even if the
+ *   token timestamp is earlier, since no events can have fallen off this oplog yet. This can happen
+ *   in a sharded cluster when a new shard is added.
  *
- * - Otherwise we cannot resume, as we do not know if this shard lost documents between the resume
- *   token and the first matching document in the pipeline.
- *
- * This source need only run on a sharded collection.  For unsharded collections,
- * DocumentSourceEnsureResumeTokenPresent is sufficient.
+ * - Otherwise we cannot resume, as we do not know if there were any events between the resume token
+ *   and the first matching document in the oplog.
  */
-class DocumentSourceShardCheckResumability final : public DocumentSource {
+class DocumentSourceCheckResumability : public DocumentSource {
 public:
-    GetNextResult getNext() final;
-    const char* getSourceName() const final;
+    static constexpr StringData kStageName = "$_internalCheckResumability"_sd;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    // Used to record the results of comparing the token data extracted from documents in the
+    // resumed stream against the client's resume token.
+    enum class ResumeStatus {
+        kFoundToken,      // The stream produced a document satisfying the client resume token.
+        kSurpassedToken,  // The stream's latest document is more recent than the resume token.
+        kCheckNextDoc     // The next document produced by the stream may contain the resume token.
+    };
+
+    GetNextResult getNext() override;
+    const char* getSourceName() const override;
+
+    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kAnyShard,
@@ -74,42 +86,33 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
-    static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
+    static boost::intrusive_ptr<DocumentSourceCheckResumability> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts);
 
-    static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
+    static boost::intrusive_ptr<DocumentSourceCheckResumability> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
-private:
+protected:
     /**
-     * Use the create static method to create a DocumentSourceShardCheckResumability.
+     * Use the create static method to create a DocumentSourceCheckResumability.
      */
-    DocumentSourceShardCheckResumability(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         ResumeTokenData token);
+    DocumentSourceCheckResumability(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    ResumeTokenData token);
 
-    void _assertOplogHasEnoughHistory(const GetNextResult& nextInput);
-
-    ResumeTokenData _tokenFromClient;
-    bool _verifiedOplogHasEnoughHistory = false;
-    bool _surpassedResumeToken = false;
+    ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
+    const ResumeTokenData _tokenFromClient;
 };
 
 /**
  * This stage is used internally for change streams to ensure that the resume token is in the
  * stream.  It is not intended to be created by the user.
  */
-class DocumentSourceEnsureResumeTokenPresent final : public DocumentSource,
+class DocumentSourceEnsureResumeTokenPresent final : public DocumentSourceCheckResumability,
                                                      public NeedsMergerDocumentSource {
 public:
-    // Used to record the results of comparing the token data extracted from documents in the
-    // resumed stream against the client's resume token.
-    enum class ResumeStatus {
-        kFoundToken,      // The stream produced a document satisfying the client resume token.
-        kSurpassedToken,  // The stream's latest document is more recent than the resume token.
-        kCheckNextDoc     // The next document produced by the stream may contain the resume token.
-    };
+    static constexpr StringData kStageName = "$_internalEnsureResumeTokenPresent"_sd;
 
-    GetNextResult getNext() final;
+    GetNextResult getNext() override;
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -127,11 +130,11 @@ public:
 
     /**
      * NeedsMergerDocumentSource methods; this has to run on the merger, since the resume point
-     * could be at any shard. Also add a DocumentSourceShardCheckResumability stage on the shards
+     * could be at any shard. Also add a DocumentSourceCheckResumability stage on the shards
      * pipeline to ensure that each shard has enough oplog history to resume the change stream.
      */
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return DocumentSourceShardCheckResumability::create(pExpCtx, _tokenFromClient);
+        return DocumentSourceCheckResumability::create(pExpCtx, _tokenFromClient);
     };
 
     std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
@@ -149,8 +152,6 @@ public:
         return {sortMergingPresorted, this};
     };
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
     static boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
@@ -160,9 +161,6 @@ private:
      */
     DocumentSourceEnsureResumeTokenPresent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            ResumeTokenData token);
-
-    ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
-    ResumeTokenData _tokenFromClient;
 };
 
 }  // namespace mongo

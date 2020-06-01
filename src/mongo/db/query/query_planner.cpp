@@ -138,6 +138,9 @@ string optionString(size_t options) {
             case QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE:
                 ss << "OPLOG_SCAN_WAIT_FOR_VISIBLE ";
                 break;
+            case QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG:
+                ss << "ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG ";
+                break;
             case QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP:
                 ss << "ENUMERATE_OR_CHILDREN_LOCKSTEP ";
                 break;

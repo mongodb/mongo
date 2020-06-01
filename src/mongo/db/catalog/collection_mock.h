@@ -38,8 +38,8 @@ namespace mongo {
  * This class comprises a mock Collection for use by UUIDCatalog unit tests.
  */
 class CollectionMock : virtual public Collection::Impl,
-                       virtual CappedCallback,
-                       virtual UpdateNotifier {
+                       virtual public CappedCallback,
+                       virtual public UpdateNotifier {
 public:
     CollectionMock(const NamespaceString& ns) : _ns(ns) {}
     ~CollectionMock() = default;

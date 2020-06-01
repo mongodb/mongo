@@ -319,6 +319,9 @@ struct CollectionScanNode : public QuerySolutionNode {
     // across a sharded cluster.
     bool shouldTrackLatestOplogTimestamp = false;
 
+    // Should we assert that the specified minTS has not fallen off the oplog?
+    bool assertMinTsHasNotFallenOffOplog = false;
+
     int direction;
 
     // maxScan option to .find() limits how many docs we look at.

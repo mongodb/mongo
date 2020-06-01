@@ -40,6 +40,11 @@ namespace mongo {
 namespace repl {
 
 /**
+ * The first oplog entry is a no-op with this message in its "msg" field.
+ */
+constexpr auto kInitiatingSetMsg = "initiating set"_sd;
+
+/**
  * A parsed oplog entry that inherits from the OplogEntryBase parsed by the IDL.
  * This class is immutable.
  */

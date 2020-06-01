@@ -267,6 +267,9 @@ error_code("DataModifiedByRepair", 269);
 error_code("RepairedReplicaSetNode", 270);
 error_code("AlarmAlreadyFulfilled", 277)
 error_code("ChangeStreamFatalError", 280)
+
+error_code("OplogQueryMinTsMissing", 326)
+
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)

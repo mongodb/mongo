@@ -106,4 +106,8 @@ DocumentSource::GetNextResult DocumentSourceMock::getNext() {
     queue.pop_front();
     return next;
 }
+
+const size_t DocumentSourceMock::size() const {
+    return queue.size();
 }
+}  // namespace mongo

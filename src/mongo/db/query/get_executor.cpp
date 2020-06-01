@@ -650,11 +650,14 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
     if (startLoc) {
         params.start = *startLoc;
     }
+    params.minTs = minTs;
     params.maxTs = maxTs;
     params.direction = CollectionScanParams::FORWARD;
     params.tailable = cq->getQueryRequest().isTailable();
     params.shouldTrackLatestOplogTimestamp =
         plannerOptions & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
+    params.assertMinTsHasNotFallenOffOplog =
+        plannerOptions & QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG;
     params.shouldWaitForOplogVisibility =
         shouldWaitForOplogVisibility(opCtx, collection, params.tailable);
 
