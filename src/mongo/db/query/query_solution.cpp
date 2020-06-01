@@ -212,6 +212,7 @@ QuerySolutionNode* CollectionScanNode::clone() const {
     copy->tailable = this->tailable;
     copy->direction = this->direction;
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
+    copy->assertMinTsHasNotFallenOffOplog = this->assertMinTsHasNotFallenOffOplog;
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;
 
     return copy;

@@ -76,6 +76,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             CollectionScanParams params;
             params.tailable = csn->tailable;
             params.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
+            params.assertMinTsHasNotFallenOffOplog = csn->assertMinTsHasNotFallenOffOplog;
             params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
                                                      : CollectionScanParams::BACKWARD;
             params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;

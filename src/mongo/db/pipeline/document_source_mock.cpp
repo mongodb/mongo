@@ -55,6 +55,10 @@ const char* DocumentSourceMock::getSourceName() const {
     return "mock";
 }
 
+const size_t DocumentSourceMock::size() const {
+    return _queue.size();
+}
+
 boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
     Document doc, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new DocumentSourceMock({std::move(doc)}, expCtx);

@@ -97,6 +97,10 @@ struct QueryPlannerParams {
         // ids. In some cases, record ids can be discarded as an optimization when they will not be
         // consumed downstream.
         PRESERVE_RECORD_ID = 1 << 10,
+
+        // Set this on an oplog scan to uassert that the oplog has not already rolled over the
+        // minimum 'ts' timestamp specified in the query.
+        ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG = 1 << 11,
     };
 
     // See Options enum above.

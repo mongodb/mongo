@@ -395,6 +395,7 @@ error_codes:
 
     - {code: 325, name: TenantMigrationAborted}
 
+    - {code: 326, name: OplogQueryMinTsMissing}
 
     # Error codes 4000-8999 are reserved.
 
