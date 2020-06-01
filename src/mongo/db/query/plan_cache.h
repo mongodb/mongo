@@ -365,9 +365,6 @@ public:
     // Information that went into picking the winning plan and also why the other plans lost.
     const std::unique_ptr<const PlanRankingDecision> decision;
 
-    // Scores from uses of this cache entry.
-    std::vector<double> feedback;
-
     // Whether or not the cache entry is active. Inactive cache entries should not be used for
     // planning.
     bool isActive = false;
@@ -396,7 +393,6 @@ private:
                    uint32_t queryHash,
                    uint32_t planCacheKey,
                    std::unique_ptr<const PlanRankingDecision> decision,
-                   std::vector<double> feedback,
                    bool isActive,
                    size_t works);
 
@@ -515,21 +511,6 @@ public:
      * inactive, log a message and return a nullptr. If no cache entry exists, return a nullptr.
      */
     std::unique_ptr<CachedSolution> getCacheEntryIfActive(const PlanCacheKey& key) const;
-
-
-    /**
-     * When the CachedPlanStage runs a plan out of the cache, we want to record data about the
-     * plan's performance. The CachedPlanStage calls feedback(...) after executing the cached
-     * plan for a trial period in order to do this. Currently, the only feedback metric recorded is
-     * the score associated with the cached plan trial period.
-     *
-     * If the entry corresponding to 'cq' isn't in the cache anymore, the feedback is ignored
-     * and an error Status is returned.
-     *
-     * If the entry corresponding to 'cq' still exists, 'feedback' is added to the run
-     * statistics about the plan.  Status::OK() is returned.
-     */
-    Status feedback(const CanonicalQuery& cq, double score);
 
     /**
      * Remove the entry corresponding to 'ck' from the cache.  Returns Status::OK() if the plan

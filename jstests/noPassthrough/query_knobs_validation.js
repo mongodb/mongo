@@ -15,7 +15,6 @@ const expectedParamDefaults = {
     internalQueryPlanEvaluationCollFraction: 0.3,
     internalQueryPlanEvaluationMaxResults: 101,
     internalQueryCacheSize: 5000,
-    internalQueryCacheFeedbacksStored: 20,
     internalQueryCacheEvictionRatio: 10.0,
     internalQueryCacheWorksGrowthCoefficient: 2.0,
     internalQueryCacheDisableInactiveEntries: false,
@@ -89,10 +88,6 @@ assertSetParameterFails("internalQueryPlanEvaluationMaxResults", -1);
 assertSetParameterSucceeds("internalQueryCacheSize", 1);
 assertSetParameterSucceeds("internalQueryCacheSize", 0);
 assertSetParameterFails("internalQueryCacheSize", -1);
-
-assertSetParameterSucceeds("internalQueryCacheFeedbacksStored", 1);
-assertSetParameterSucceeds("internalQueryCacheFeedbacksStored", 0);
-assertSetParameterFails("internalQueryCacheFeedbacksStored", -1);
 
 assertSetParameterSucceeds("internalQueryCacheEvictionRatio", 1.0);
 assertSetParameterSucceeds("internalQueryCacheEvictionRatio", 0.0);
