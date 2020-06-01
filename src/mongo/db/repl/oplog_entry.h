@@ -40,6 +40,11 @@ namespace mongo {
 namespace repl {
 
 /**
+ * The first oplog entry is a no-op with this message in its "msg" field.
+ */
+constexpr auto kInitiatingSetMsg = "initiating set"_sd;
+
+/**
  * A parsed DurableReplOperation along with information about the operation that should only exist
  * in-memory.
  *

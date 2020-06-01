@@ -294,6 +294,7 @@ error_code("WaitForMajorityServiceEarlierOpTimeAvailable", 289)
 error_code("NoQueryExecutionPlans", 291)
 error_code("HierarchicalAcquisitionLevelViolation", 297)
 error_code("PeriodicJobIsStopped", 310)
+error_code("OplogQueryMinTsMissing", 326)
 
 # Error codes 4000-8999 are reserved.
 

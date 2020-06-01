@@ -45,6 +45,10 @@ struct CollectionScanParams {
     // The RecordId to which we should seek to as the first document of the scan.
     RecordId start;
 
+    // If present, the collection scan will seek directly to the RecordId of an oplog entry as
+    // close to 'minTs' as possible without going higher. Must only be set on forward oplog scans.
+    boost::optional<Timestamp> minTs;
+
     // If present, the collection scan will stop and return EOF the first time it sees a document
     // that does not pass the filter and has 'ts' greater than 'maxTs'.
     boost::optional<Timestamp> maxTs;
@@ -53,6 +57,9 @@ struct CollectionScanParams {
 
     // Do we want the scan to be 'tailable'?  Only meaningful if the collection is capped.
     bool tailable = false;
+
+    // Should we assert that the specified minTS has not fallen off the oplog?
+    bool assertMinTsHasNotFallenOffOplog = false;
 
     // Should we keep track of the timestamp of the latest oplog entry we've seen? This information
     // is needed to merge cursors from the oplog in order of operation time when reading the oplog

@@ -124,14 +124,14 @@ function testResume(mongosColl, collToWatch) {
         db: mongosDB,
         collName: collToWatch,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard1}}],
-        expectedCode: ErrorCodes.ChangeStreamFatalError
+        expectedCode: ErrorCodes.ChangeStreamHistoryLost
     });
 
     ChangeStreamTest.assertChangeStreamThrowsCode({
         db: mongosDB,
         collName: collToWatch,
         pipeline: [{$changeStream: {startAtOperationTime: resumeTimeFirstUpdate}}],
-        expectedCode: ErrorCodes.ChangeStreamFatalError
+        expectedCode: ErrorCodes.ChangeStreamHistoryLost
     });
 
     // Test that the change stream can't resume if the resume token *is* present in the oplog,
@@ -143,7 +143,7 @@ function testResume(mongosColl, collToWatch) {
         db: mongosDB,
         collName: collToWatch,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard0}}],
-        expectedCode: ErrorCodes.ChangeStreamFatalError
+        expectedCode: ErrorCodes.ChangeStreamHistoryLost
     });
 
     // Drop the collection.

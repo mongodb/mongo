@@ -71,6 +71,8 @@ public:
 
     const char* getSourceName() const override;
 
+    const size_t size() const;
+
     void reattachToOperationContext(OperationContext* opCtx) {
         isDetachedFromOpCtx = false;
     }
