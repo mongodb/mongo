@@ -43,7 +43,6 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -112,15 +111,11 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             _results.push(id);
 
             if (_results.size() >= numResults) {
-                // Once a plan returns enough results, stop working. Update cache with stats
-                // from this run and return.
-                updatePlanCache();
+                // Once a plan returns enough results, stop working. There is no need to replan.
                 return Status::OK();
             }
         } else if (PlanStage::IS_EOF == state) {
-            // Cached plan hit EOF quickly enough. No need to replan. Update cache with stats
-            // from this run and return.
-            updatePlanCache();
+            // Cached plan hit EOF quickly enough. No need to replan.
             return Status::OK();
         } else if (PlanStage::NEED_YIELD == state) {
             invariant(id == WorkingSet::INVALID_ID);
@@ -313,28 +308,6 @@ std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {
 
 const SpecificStats* CachedPlanStage::getSpecificStats() const {
     return &_specificStats;
-}
-
-void CachedPlanStage::updatePlanCache() {
-    const double score = PlanRanker::scoreTree(getStats()->children[0].get());
-
-    PlanCache* cache = CollectionQueryInfo::get(collection()).getPlanCache();
-    Status fbs = cache->feedback(*_canonicalQuery, score);
-    if (!fbs.isOK()) {
-        LOGV2_DEBUG(
-            20583,
-            5,
-            "{canonicalQuery_ns}: Failed to update cache with feedback: {fbs} - (query: "
-            "{canonicalQuery_getQueryObj}; sort: {canonicalQuery_getQueryRequest_getSort}; "
-            "projection: {canonicalQuery_getQueryRequest_getProj}) is no longer in plan cache.",
-            "canonicalQuery_ns"_attr = _canonicalQuery->ns(),
-            "fbs"_attr = redact(fbs),
-            "canonicalQuery_getQueryObj"_attr = redact(_canonicalQuery->getQueryObj()),
-            "canonicalQuery_getQueryRequest_getSort"_attr =
-                _canonicalQuery->getQueryRequest().getSort(),
-            "canonicalQuery_getQueryRequest_getProj"_attr =
-                _canonicalQuery->getQueryRequest().getProj());
-    }
 }
 
 }  // namespace mongo

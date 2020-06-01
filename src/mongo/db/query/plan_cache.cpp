@@ -240,7 +240,6 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::create(
         queryHash,
         planCacheKey,
         std::move(decision),
-        {},
         isActive,
         works));
 }
@@ -254,7 +253,6 @@ PlanCacheEntry::PlanCacheEntry(std::vector<std::unique_ptr<const SolutionCacheDa
                                const uint32_t queryHash,
                                const uint32_t planCacheKey,
                                std::unique_ptr<const PlanRankingDecision> decision,
-                               std::vector<double> feedback,
                                const bool isActive,
                                const size_t works)
     : plannerData(std::move(plannerData)),
@@ -266,7 +264,6 @@ PlanCacheEntry::PlanCacheEntry(std::vector<std::unique_ptr<const SolutionCacheDa
       queryHash(queryHash),
       planCacheKey(planCacheKey),
       decision(std::move(decision)),
-      feedback(std::move(feedback)),
       isActive(isActive),
       works(works),
       _entireObjectSize(_estimateObjectSizeInBytes()) {
@@ -296,7 +293,6 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::clone() const {
                                                               queryHash,
                                                               planCacheKey,
                                                               std::move(decisionPtr),
-                                                              feedback,
                                                               isActive,
                                                               works));
 }
@@ -307,8 +303,6 @@ uint64_t PlanCacheEntry::_estimateObjectSizeInBytes() const {
             plannerData,
             [](const auto& cacheData) { return cacheData->estimateObjectSizeInBytes(); },
             true) +
-        // Add size of each entry in '_feedback' vector.
-        container_size_helper::estimateObjectSizeInBytes(feedback) +
         // Add the entire size of 'decision' object.
         (decision ? decision->estimateObjectSizeInBytes() : 0) +
         // Add the size of all the owned BSON objects.
@@ -677,25 +671,6 @@ PlanCache::GetResult PlanCache::get(const PlanCacheKey& key) const {
     auto state =
         entry->isActive ? CacheEntryState::kPresentActive : CacheEntryState::kPresentInactive;
     return {state, std::make_unique<CachedSolution>(key, *entry)};
-}
-
-Status PlanCache::feedback(const CanonicalQuery& cq, double score) {
-    PlanCacheKey ck = computeKey(cq);
-
-    stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-    PlanCacheEntry* entry;
-    Status cacheStatus = _cache.get(ck, &entry);
-    if (!cacheStatus.isOK()) {
-        return cacheStatus;
-    }
-    invariant(entry);
-
-    // We store up to a constant number of feedback entries.
-    if (entry->feedback.size() < static_cast<size_t>(internalQueryCacheFeedbacksStored.load())) {
-        entry->feedback.push_back(score);
-    }
-
-    return Status::OK();
 }
 
 Status PlanCache::remove(const CanonicalQuery& canonicalQuery) {
