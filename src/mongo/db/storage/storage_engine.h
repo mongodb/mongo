@@ -430,6 +430,8 @@ public:
      */
     virtual bool supportsPendingDrops() const = 0;
 
+    virtual bool supportsResumableIndexBuilds() const = 0;
+
     /**
      * Returns a set of drop pending idents inside the storage engine.
      */

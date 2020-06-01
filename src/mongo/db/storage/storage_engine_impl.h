@@ -157,6 +157,8 @@ public:
 
     bool supportsPendingDrops() const final;
 
+    bool supportsResumableIndexBuilds() const final;
+
     void clearDropPendingState() final;
 
     SnapshotManager* getSnapshotManager() const final;

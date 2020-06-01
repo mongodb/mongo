@@ -69,7 +69,9 @@ public:
                            << "supportsSnapshotReadConcern" << engine->supportsReadConcernSnapshot()
                            << "readOnly" << storageGlobalParams.readOnly << "persistent"
                            << !engine->isEphemeral() << "backupCursorOpen"
-                           << backupCursorHooks->isBackupCursorOpen());
+                           << backupCursorHooks->isBackupCursorOpen()
+                           << "supportsResumableIndexBuilds"
+                           << engine->supportsResumableIndexBuilds());
     }
 
 } storageSSS;
