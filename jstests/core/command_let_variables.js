@@ -7,10 +7,11 @@
 
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
 
-const coll = db.command_let_variables;
-const targetColl = db.command_let_variables_target;
+const testDB = db.getSiblingDB("command_let_variables");
+const coll = testDB.command_let_variables;
+const targetColl = testDB.command_let_variables_target;
 
-coll.drop();
+assert.commandWorked(testDB.dropDatabase());
 
 const testDocs = [
     {
@@ -80,7 +81,7 @@ expectedResults = [
 assert.eq(coll.aggregate(pipeline, {let : {target_trend: "weak decline"}}).toArray(),
           expectedResults);
 
-if (!FixtureHelpers.isMongos(db)) {
+if (!FixtureHelpers.isMongos(testDB)) {
     // Test that if runtimeConstants and let are both specified, both will coexist.
     // Runtime constants are not allowed on mongos passthroughs.
     let constants = {
@@ -94,7 +95,7 @@ if (!FixtureHelpers.isMongos(db)) {
               expectedResults);
 
     // Test that undefined let params in the pipeline fail gracefully.
-    assert.commandFailedWithCode(db.runCommand({
+    assert.commandFailedWithCode(testDB.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline,
         runtimeConstants: constants,
@@ -112,7 +113,7 @@ if (!FixtureHelpers.isMongos(db)) {
     assert.eq(coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}}).toArray(),
               expectedResults);
 
-    assert.commandFailedWithCode(db.runCommand({
+    assert.commandFailedWithCode(testDB.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline_no_lets,
         runtimeConstants: constants,
@@ -123,111 +124,119 @@ if (!FixtureHelpers.isMongos(db)) {
 }
 
 // Test that $project stage can use 'let' variables
-assert.eq(db.runCommand({
-                aggregate: coll.getName(),
-                pipeline: [
-                    {
-                        $project: {
-                            "var": {
-                                $let: {
-                                    vars: {variable: "INNER"},
-                                    "in": {
-                                        $cond: {
-                                            "if": {$eq: [{$substr: ["$Species", 0, 1]}, "B"]},
-                                            then: "$$variable",
-                                            "else": "---"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    {$match: {$expr: {$eq: ["$var", "INNER"]}}}
-                ],
-                cursor: {}
-            }).cursor.firstBatch.length,
+assert.eq(testDB
+              .runCommand({
+                  aggregate: coll.getName(),
+                  pipeline: [
+                      {
+                          $project: {
+                              "var": {
+                                  $let: {
+                                      vars: {variable: "INNER"},
+                                      "in": {
+                                          $cond: {
+                                              "if": {$eq: [{$substr: ["$Species", 0, 1]}, "B"]},
+                                              then: "$$variable",
+                                              "else": "---"
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      },
+                      {$match: {$expr: {$eq: ["$var", "INNER"]}}}
+                  ],
+                  cursor: {}
+              })
+              .cursor.firstBatch.length,
           2);
 
 // Test that $project stage can access command-level 'let' variables.
-assert.eq(db.runCommand({
-                aggregate: coll.getName(),
-                pipeline: [
-                    {
-                        $project: {
-                            "var": {
-                                $cond: {
-                                    "if": {$eq: [{$substr: ["$Species", 0, 1]}, "B"]},
-                                    then: "$$variable",
-                                    "else": "---"
-                                }
-                            }
-                        }
-                    },
-                    {$match: {$expr: {$eq: ["$var", "OUTER"]}}}
-                ],
-                cursor: {},
-                "let": {variable: "OUTER"}
-            }).cursor.firstBatch.length,
+assert.eq(testDB
+              .runCommand({
+                  aggregate: coll.getName(),
+                  pipeline: [
+                      {
+                          $project: {
+                              "var": {
+                                  $cond: {
+                                      "if": {$eq: [{$substr: ["$Species", 0, 1]}, "B"]},
+                                      then: "$$variable",
+                                      "else": "---"
+                                  }
+                              }
+                          }
+                      },
+                      {$match: {$expr: {$eq: ["$var", "OUTER"]}}}
+                  ],
+                  cursor: {},
+                  "let": {variable: "OUTER"}
+              })
+              .cursor.firstBatch.length,
           2);
 
 // Test that $project stage can use stage-level and command-level 'let' variables in same command.
-assert.eq(db.runCommand({
-                aggregate: coll.getName(),
-                pipeline: [
-                    {
-                        $project: {
-                            "var": {
-                                $let: {
-                                    vars: {innerVar: "INNER"},
-                                    "in": {
-                                        $cond: {
-                                            "if": {$eq: [{$substr: ["$Species", 0, 1]}, "B"]},
-                                            then: {$concat: ["$$innerVar", "$$outerVar"]},
-                                            "else": "---"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    {$match: {$expr: {$eq: ["$var", "INNEROUTER"]}}}
-                ],
-                cursor: {},
-                "let": {outerVar: "OUTER"}
-            }).cursor.firstBatch.length,
+assert.eq(testDB
+              .runCommand({
+                  aggregate: coll.getName(),
+                  pipeline: [
+                      {
+                          $project: {
+                              "var": {
+                                  $let: {
+                                      vars: {innerVar: "INNER"},
+                                      "in": {
+                                          $cond: {
+                                              "if": {$eq: [{$substr: ["$Species", 0, 1]}, "B"]},
+                                              then: {$concat: ["$$innerVar", "$$outerVar"]},
+                                              "else": "---"
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      },
+                      {$match: {$expr: {$eq: ["$var", "INNEROUTER"]}}}
+                  ],
+                  cursor: {},
+                  "let": {outerVar: "OUTER"}
+              })
+              .cursor.firstBatch.length,
           2);
 
 // Test that $project stage follows variable scoping rules with stage-level and command-level 'let'
 // variables.
-assert.eq(db.runCommand({
-                aggregate: coll.getName(),
-                pipeline: [
-                    {
-                        $project: {
-                            "var": {
-                                $let: {
-                                    vars: {variable: "INNER"},
-                                    "in": {
-                                        $cond: {
-                                            "if": {$eq: [{$substr: ["$Species", 0, 1]}, "B"]},
-                                            then: "$$variable",
-                                            "else": "---"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    {$match: {$expr: {$eq: ["$var", "INNER"]}}}
-                ],
-                cursor: {},
-                "let": {variable: "OUTER"}
-            }).cursor.firstBatch.length,
+assert.eq(testDB
+              .runCommand({
+                  aggregate: coll.getName(),
+                  pipeline: [
+                      {
+                          $project: {
+                              "var": {
+                                  $let: {
+                                      vars: {variable: "INNER"},
+                                      "in": {
+                                          $cond: {
+                                              "if": {$eq: [{$substr: ["$Species", 0, 1]}, "B"]},
+                                              then: "$$variable",
+                                              "else": "---"
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      },
+                      {$match: {$expr: {$eq: ["$var", "INNER"]}}}
+                  ],
+                  cursor: {},
+                  "let": {variable: "OUTER"}
+              })
+              .cursor.firstBatch.length,
           2);
 
 // Test that the find command works correctly with a let parameter argument.
 let result = assert
-                 .commandWorked(db.runCommand({
+                 .commandWorked(testDB.runCommand({
                      find: coll.getName(),
                      let : {target_species: "Song Thrush (Turdus philomelos)"},
                      filter: {$expr: {$eq: ["$Species", "$$target_species"]}},
@@ -247,13 +256,56 @@ assert.eq(expectedResults, result[0]);
 // Delete tests with let params will delete a record, assert that a point-wise find yields an empty
 // result, and then restore the collection state for further tests down the line. We can't exercise
 // a multi-delete here (limit: 0) because of failures in sharded txn passthrough tests.
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDB.runCommand({
     delete: coll.getName(),
     let : {target_species: "Song Thrush (Turdus philomelos)"},
     deletes: [{q: {$and: [{_id: 4}, {$expr: {$eq: ["$Species", "$$target_species"]}}]}, limit: 1}]
 }));
 
-assert.eq(db.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}})
+assert.eq(testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}})
               .cursor.firstBatch.length,
           0);
+
+// Test that reserved names are not allowed as let variable names.
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {Reserved: "failure"}}),
+    16867);
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {NOW: "failure"}}),
+    16867);
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {CLUSTER_TIME: "failure"}}),
+    16867);
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {IS_MR: "failure"}}),
+    16867);
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {JS_SCOPE: "failure"}}),
+    16867);
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {ROOT: "failure"}}),
+    16867);
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {REMOVE: "failure"}}),
+    16867);
+
+// Test that let variables can be used within views.
+assert.commandWorked(testDB.runCommand({
+    create: "core-viewColl",
+    viewOn: coll.getName(),
+    pipeline: [{$match: {Species: "Song Thrush (Turdus philomelos)"}}]
+}));
+assert.commandWorked(testDB.runCommand({
+    aggregate: "core-viewColl",
+    pipeline: [{$addFields: {var : "$$variable"}}],
+    let : {variable: "Song Thrush"},
+    cursor: {}
+}));
 }());
