@@ -19,18 +19,30 @@ function verifyServerStatusElectionReasonCounterValue(electionMetrics, fieldName
 /**
  * Verifies that the given election reason counter is incremented in the way we expect in the
  * 'electionMetrics' serverStatus section.
+ *
+ * The 'expectedNumSuccessful' field should be passed in when we need to distinguish between how
+ * many times an election was called and how many times an election was successful.
  */
-function verifyServerStatusElectionReasonCounterChange(
-    initialElectionMetrics, newElectionMetrics, fieldName, expectedIncrement) {
+function verifyServerStatusElectionReasonCounterChange(initialElectionMetrics,
+                                                       newElectionMetrics,
+                                                       fieldName,
+                                                       expectedNumCalled,
+                                                       expectedNumSuccessful = undefined) {
+    // If 'expectedNumSuccessful' is not passed in, we assume that the 'successful' field is equal
+    // to the 'called' field.
+    if (!expectedNumSuccessful) {
+        expectedNumSuccessful = expectedNumCalled;
+    }
+
     const initialField = initialElectionMetrics[fieldName];
     const newField = newElectionMetrics[fieldName];
-    assert.eq(initialField["called"] + expectedIncrement,
+    assert.eq(initialField["called"] + expectedNumCalled,
               newField["called"],
-              `expected the 'called' field of '${fieldName}' to increase by ${expectedIncrement}`);
-    assert.eq(
-        initialField["successful"] + expectedIncrement,
-        newField["successful"],
-        `expected the 'successful' field of '${fieldName}' to increase by ${expectedIncrement}`);
+              `expected the 'called' field of '${fieldName}' to increase by ${expectedNumCalled}`);
+    assert.eq(initialField["successful"] + expectedNumSuccessful,
+              newField["successful"],
+              `expected the 'successful' field of '${fieldName}' to increase by ${
+                  expectedNumSuccessful}`);
 }
 
 /**
