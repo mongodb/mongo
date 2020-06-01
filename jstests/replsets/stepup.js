@@ -55,7 +55,8 @@ load('jstests/replsets/libs/election_metrics.js');
     verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
                                                   newSecondaryStatus.electionMetrics,
                                                   "stepUpCmd",
-                                                  numStepUpCmds);
+                                                  numStepUpCmds, /* expectedNumCalled */
+                                                  1 /* expectedNumSuccessful */);
     verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
                                                   newSecondaryStatus.electionMetrics,
                                                   "priorityTakeover",
