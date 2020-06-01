@@ -52,3 +52,10 @@ server_parameters:
     default: 3
     validator:
       gte: 0
+
+  enableResumableIndexBuilds:
+    description: "Support for using resumable index builds."
+    set_at: startup
+    cpp_vartype: bool
+    cpp_varname: "enableResumableIndexBuilds"
+    default: false

@@ -155,6 +155,8 @@ public:
 
     bool supportsOplogStones() const final;
 
+    bool supportsResumableIndexBuilds() const final;
+
     bool supportsPendingDrops() const final;
 
     void clearDropPendingState() final;

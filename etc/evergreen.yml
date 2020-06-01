@@ -10478,6 +10478,31 @@ buildvariants:
   - name: snmp
   - name: .updatefuzzer
 
+- name: enterprise-rhel-62-64-bit-resumable-index-builds
+  display_name: "Enterprise RHEL 6.2 (resumable index builds)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions: &enterprise-rhel-62-64-bit-resumable-index-builds-expansions
+    test_flags: >-
+      --mongodSetParameters="{enableResumableIndexBuilds: true}"
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --ssl
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      MONGO_DISTMOD=rhel62
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    large_distro_name: rhel62-large
+  tasks:
+  - name: compile_TG
+    distros:
+    - rhel62-large
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
 
 # This build variant is used to run multiversion tests as part of burn_in_tags as these tests are
 # currently only run on our daily builders.

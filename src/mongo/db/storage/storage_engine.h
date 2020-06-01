@@ -423,6 +423,8 @@ public:
      */
     virtual bool supportsOplogStones() const = 0;
 
+    virtual bool supportsResumableIndexBuilds() const = 0;
+
     /**
      * Returns true if the storage engine supports deferring collection drops until the the storage
      * engine determines that the storage layer artifacts for the pending drops are no longer needed

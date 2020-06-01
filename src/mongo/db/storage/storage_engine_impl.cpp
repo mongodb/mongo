@@ -46,6 +46,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/unclean_shutdown.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
@@ -853,6 +854,13 @@ bool StorageEngineImpl::supportsReadConcernMajority() const {
 
 bool StorageEngineImpl::supportsOplogStones() const {
     return _engine->supportsOplogStones();
+}
+
+bool StorageEngineImpl::supportsResumableIndexBuilds() const {
+    return enableResumableIndexBuilds && supportsReadConcernMajority() && !isEphemeral() &&
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46;
 }
 
 bool StorageEngineImpl::supportsPendingDrops() const {
