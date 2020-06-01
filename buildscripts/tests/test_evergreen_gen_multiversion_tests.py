@@ -34,10 +34,23 @@ class TestRun(unittest.TestCase):
         ''' Hijacks the write_file_to_dir function to prevent the configuration
         from being written to disk, and ensure the command fails '''
         under_test.CONFIG_DIR = self._tmpdir.name
-        with NamedTemporaryFile(mode='w') as expansions_file, NamedTemporaryFile() as evg_conf:
+
+        # NamedTemporaryFile doesn't work too well on Windows. We need to
+        # close the fd's so that run_generate_tasks can open the files,
+        # so we override the delete-on-close behaviour on Windows, and manually
+        # handle cleanup later
+        is_windows = os.name == 'nt'
+        with NamedTemporaryFile(mode='w',
+                                delete=not is_windows) as expansions_file, NamedTemporaryFile(
+                                    mode='w', delete=not is_windows) as evg_conf:
             expansions_file.write(EXPANSIONS)
             expansions_file.flush()
             should_tasks_be_generated.return_value = True
+            if is_windows:
+                # on windows we need to close the fd's so that
+                # run_generate_tasks can open the file handle
+                expansions_file.close()
+                evg_conf.close()
 
             runner = CliRunner()
             result = runner.invoke(
@@ -50,17 +63,26 @@ class TestRun(unittest.TestCase):
                 f"Multiversion suite generator unexpectedly yielded no configuration in '{self._tmpdir.name}'"
             )
             self.assertEqual(write_file_to_dir.call_count, 1)
+            if is_windows:
+                # on windows we need to manually delete these files, since
+                # we've disabled the delete-on-close mechanics
+                os.remove(expansions_file.name)
+                os.remove(evg_conf.name)
 
 
 class TestGenerateExcludeFiles(unittest.TestCase):
     def setUp(self):
         self._tmpdir = TemporaryDirectory()
+        under_test.CONFIG_DIR = self._tmpdir.name
 
     def tearDown(self):
-        self._tmpdir.cleanup()
+        if self._tmpdir is not None:
+            self._tmpdir.cleanup()
         under_test.CONFIG_DIR = generate_resmoke.DEFAULT_CONFIG_VALUES["generated_config_dir"]
 
     def test_missing_dir_okay(self):
+        self._tmpdir.cleanup()
+        self._tmpdir = None
         self.assertFalse(os.path.exists(under_test.CONFIG_DIR))
 
         runner = CliRunner()
@@ -70,8 +92,6 @@ class TestGenerateExcludeFiles(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result)
 
     def test_empty_dir_okay(self):
-        under_test.CONFIG_DIR = self._tmpdir.name
-
         runner = CliRunner()
         result = runner.invoke(
             under_test.generate_exclude_yaml,
@@ -83,7 +103,6 @@ class TestGenerateExcludeFiles(unittest.TestCase):
     def test_adds_exclude_file(self, get_exclude_files):
         get_exclude_files.return_value = set()
         get_exclude_files.return_value.add('jstests/core/count_plan_summary.js')
-        under_test.CONFIG_DIR = self._tmpdir.name
         with open(self._tmpdir.name + "/sharding_jscore_passthrough_00.yml", mode='w') as fh:
             fh.write(CONF)
 
