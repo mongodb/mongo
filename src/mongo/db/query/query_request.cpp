@@ -701,7 +701,7 @@ bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     if (mongo::String != metaElt.type()) {
         return false;
     }
-    if (QueryRequest::metaTextScore != metaElt.valuestr()) {
+    if (StringData{metaElt.valuestr()} != QueryRequest::metaTextScore) {
         return false;
     }
     // must have exactly 1 element
