@@ -7,14 +7,15 @@
  *   requires_majority_read_concern,
  * ]
  *
- * - Create a sharded collection.
- * - Insert a document at timestamp insertTS.
- * - Start a snapshot read with no atClusterTime, block it with a failpoint.
- * - Update the document.
- * - After now > insertTS + window + margin, insertTS is expired.
+ * - Create a sharded collection and insert a document.
+ * - Start a snapshot read with no atClusterTime, tne read selects some atClusterTime T.
+ * - Block the read with a failpoint.
+ * - Update the document at timestamp updateTS > T.
+ * - Sleep until updateTS is older than historyWindowSecs.
+ * - Insert a document with w: majority to trigger history cleanup.
  * - Unblock the read.
  * - The read will fail with SnapshotTooOld, mongos should retry and succeed.
- * - Assert the read succeeded and returned the updated (post-insertTS) document.
+ * - Assert the read succeeded and returned the updated (post-updateTS) document.
  */
 (function() {
 "use strict";
@@ -42,9 +43,9 @@ const mongosColl = mongosDB.test;
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
 st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 st.shardColl(mongosColl, {_id: 1}, false);
-let result = mongosDB.runCommand({insert: "test", documents: [{_id: 0}]});
+let result =
+    mongosDB.runCommand({insert: "test", documents: [{_id: 0}], writeConcern: {w: "majority"}});
 const insertTS = assert.commandWorked(result).operationTime;
-const postInsertTime = Date.now();
 jsTestLog(`Inserted document at ${insertTS}`);
 
 assert.commandWorked(primaryAdmin.runCommand({
@@ -59,8 +60,8 @@ function read(insertTS, enableCausal) {
         readConcern.afterClusterTime = insertTS;
     }
 
-    let result = assert.commandWorked(
-        db.runCommand({find: "test", singleBatch: true, readConcern: readConcern}));
+    let result = assert.commandWorked(db.runCommand(
+        {find: "test", filter: {_id: 0}, singleBatch: true, readConcern: readConcern}));
 
     jsTestLog(`find result for enableCausal=${enableCausal}: ${tojson(result)}`);
     assert.gt(result.cursor.atClusterTime, insertTS);
@@ -76,14 +77,23 @@ assert.commandWorked(primaryAdmin.runCommand({
     maxTimeMS: kDefaultWaitForFailPointTimeout
 }));
 
-jsTestLog("Sleep until insertTS is older than historyWindowSecs");
-const testMarginMS = 1000;
-const expirationTime = postInsertTime + historyWindowSecs * 1000;
-sleep(expirationTime + testMarginMS - Date.now());
-
 jsTestLog("Update document");
-assert.commandWorked(mongosDB.test.updateOne(
-    {_id: 0}, {$set: {x: "updatedValue"}}, {writeConcern: {w: "majority"}}));
+result = mongosDB.runCommand({
+    update: "test",
+    updates: [{q: {_id: 0}, u: {$set: {x: "updatedValue"}}}],
+    writeConcern: {w: "majority"}
+});
+
+const updateTS = assert.commandWorked(result).operationTime;
+jsTestLog(`Updated document at updateTS ${updateTS}`);
+
+jsTestLog("Sleep until updateTS is older than historyWindowSecs");
+const testMarginMS = 1000;
+sleep(historyWindowSecs * 1000 + testMarginMS);
+
+jsTestLog("Trigger history cleanup with a w-majority insert");
+assert.commandWorked(
+    mongosDB.runCommand({insert: "test", documents: [{_id: 1}], writeConcern: {w: "majority"}}));
 
 jsTestLog("Disable failpoint");
 assert.commandWorked(
