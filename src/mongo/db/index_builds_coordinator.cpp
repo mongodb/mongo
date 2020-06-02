@@ -71,6 +71,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
 MONGO_FAIL_POINT_DEFINE(hangAfterInitializingIndexBuild);
+MONGO_FAIL_POINT_DEFINE(hangBeforeCompletingAbort);
 MONGO_FAIL_POINT_DEFINE(failIndexBuildOnCommit);
 
 namespace {
@@ -1032,8 +1033,19 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
 
         invariant(TryAbortResult::kContinueAbort == tryAbortResult);
 
+        if (MONGO_unlikely(hangBeforeCompletingAbort.shouldFail())) {
+            LOGV2(4806200, "Hanging before completing index build abort");
+            hangBeforeCompletingAbort.pauseWhileSet();
+        }
+
         // At this point we must continue aborting the index build.
         try {
+            // We are holding the RSTL and an exclusive collection lock, so we will block stepdown
+            // and be targeted for being killed. In addition to writing to the catalog, we need to
+            // acquire an IX lock to write to the config.system.indexBuilds collection. Since
+            // we must perform these final writes, but we expect them not to block, we can safely,
+            // temporarily disable interrupts.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
             _completeAbort(opCtx, replState, signalAction, {ErrorCodes::IndexBuildAborted, reason});
         } catch (const DBException& e) {
             LOGV2_FATAL(
