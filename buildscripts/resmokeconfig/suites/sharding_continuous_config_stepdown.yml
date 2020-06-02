@@ -216,6 +216,9 @@ selector:
   # profiling/logging (on the configsvr primary), so cannot tolerate the configsvr primary changing.
   - jstests/sharding/read_write_concern_defaults_application.js
 
+  # SERVER-48537 addShard is not idempotent for retries
+  - jstests/sharding/conversion_of_replica_set_to_sharded_cluster.js
+
 executor:
   config:
     shell_options:
