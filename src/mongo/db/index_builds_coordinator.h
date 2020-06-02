@@ -446,8 +446,6 @@ public:
         std::shared_ptr<ReplIndexBuildState> replState,
         IndexBuildAction signal) = 0;
 
-    bool supportsResumableIndexBuilds() const;
-
 private:
     /**
      * Registers an index build so that the rest of the system can discover it.

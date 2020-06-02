@@ -207,13 +207,4 @@ var IndexBuildTest = class {
             .commandWorked(conn.adminCommand({getParameter: 1, enableIndexBuildCommitQuorum: 1}))
             .enableIndexBuildCommitQuorum;
     }
-
-    /**
-     * Returns whether resumable index builds are supported.
-     */
-    static resumableIndexBuildsEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, enableResumableIndexBuilds: 1}))
-            .enableResumableIndexBuilds;
-    }
 };
