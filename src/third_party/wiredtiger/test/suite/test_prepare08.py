@@ -37,9 +37,9 @@ def timestamp_str(t):
 # test_prepare07.py
 # Test to ensure prepared tombstones are properly aborted even when they are written
 # to the data store.
-class test_prepare07(wttest.WiredTigerTestCase):
+class test_prepare08(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=1MB'
+    conn_config = 'cache_size=2MB'
 
     def updates(self, ds, uri, nrows, value, ts):
         cursor = self.session.open_cursor(uri)

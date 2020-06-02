@@ -656,6 +656,8 @@ config_in_memory(void)
         return;
     if (config_is_perm("logging"))
         return;
+    if (config_is_perm("ops.hs_cursor"))
+        return;
     if (config_is_perm("ops.rebalance"))
         return;
     if (config_is_perm("ops.salvage"))
@@ -685,6 +687,8 @@ config_in_memory_reset(void)
         config_single("checkpoint=off", false);
     if (!config_is_perm("btree.compression"))
         config_single("btree.compression=none", false);
+    if (!config_is_perm("ops.hs_cursor"))
+        config_single("ops.hs_cursor=off", false);
     if (!config_is_perm("logging"))
         config_single("logging=off", false);
     if (!config_is_perm("ops.rebalance"))

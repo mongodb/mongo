@@ -133,11 +133,12 @@ restart_read:
  *     Return the next variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
+__cursor_var_append_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
 {
     WT_SESSION_IMPL *session;
 
     session = CUR2S(cbt);
+    *skippedp = 0;
 
     /* If restarting after a prepare conflict, jump to the right spot. */
     if (restart)
@@ -158,12 +159,15 @@ new_page:
 restart_read:
         WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd, NULL));
 
-        if (cbt->upd_value->type == WT_UPDATE_INVALID)
+        if (cbt->upd_value->type == WT_UPDATE_INVALID) {
+            ++*skippedp;
             continue;
+        }
         if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
             if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
               __wt_txn_upd_value_visible_all(session, cbt->upd_value))
                 ++cbt->page_deleted_count;
+            ++*skippedp;
             continue;
         }
         return (__wt_value_return(cbt, cbt->upd_value));
@@ -176,7 +180,7 @@ restart_read:
  *     Move to the next, variable-length column-store item.
  */
 static inline int
-__cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
+__cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
 {
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
@@ -190,6 +194,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
     page = cbt->ref->page;
 
     rle_start = 0; /* -Werror=maybe-uninitialized */
+    *skippedp = 0;
 
     /* If restarting after a prepare conflict, jump to the right spot. */
     if (restart)
@@ -233,6 +238,7 @@ restart_read:
                 if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
                   __wt_txn_upd_value_visible_all(session, cbt->upd_value))
                     ++cbt->page_deleted_count;
+                ++*skippedp;
                 continue;
             }
             return (__wt_value_return(cbt, cbt->upd_value));
@@ -247,8 +253,10 @@ restart_read:
             cell = WT_COL_PTR(page, cip);
             __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
             if (unpack.type == WT_CELL_DEL) {
-                if ((rle = __wt_cell_rle(&unpack)) == 1)
+                if ((rle = __wt_cell_rle(&unpack)) == 1) {
+                    ++*skippedp;
                     continue;
+                }
 
                 /*
                  * There can be huge gaps in the variable-length column-store name space appearing
@@ -272,13 +280,17 @@ restart_read:
 
                 /* Adjust for the outer loop increment. */
                 --cbt->recno;
+                ++*skippedp;
                 continue;
             }
 
             WT_RET(__wt_bt_col_var_cursor_walk_txn_read(session, cbt, page, &unpack, cip));
             if (cbt->upd_value->type == WT_UPDATE_INVALID ||
-              cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
+              cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
+                ++*skippedp;
                 continue;
+            }
+
             return (0);
         }
         cbt->iface.value.data = cbt->tmp->data;
@@ -293,7 +305,7 @@ restart_read:
  *     Move to the next row-store item.
  */
 static inline int
-__cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
+__cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
 {
     WT_CELL_UNPACK_KV kpack;
     WT_INSERT *ins;
@@ -306,6 +318,7 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
     session = CUR2S(cbt);
     page = cbt->ref->page;
     key = &cbt->iface.key;
+    *skippedp = 0;
 
     /* If restarting after a prepare conflict, jump to the right spot. */
     if (restart) {
@@ -353,12 +366,15 @@ restart_read_insert:
             key->data = WT_INSERT_KEY(ins);
             key->size = WT_INSERT_KEY_SIZE(ins);
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd, NULL));
-            if (cbt->upd_value->type == WT_UPDATE_INVALID)
+            if (cbt->upd_value->type == WT_UPDATE_INVALID) {
+                ++*skippedp;
                 continue;
+            }
             if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
                 if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
                   __wt_txn_upd_value_visible_all(session, cbt->upd_value))
                     ++cbt->page_deleted_count;
+                ++*skippedp;
                 continue;
             }
             return (__wt_value_return(cbt, cbt->upd_value));
@@ -388,12 +404,15 @@ restart_read_page:
         WT_RET(__cursor_row_slot_key_return(cbt, rip, &kpack, &kpack_used));
         WT_RET(__wt_txn_read(
           session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip), NULL));
-        if (cbt->upd_value->type == WT_UPDATE_INVALID)
+        if (cbt->upd_value->type == WT_UPDATE_INVALID) {
+            ++*skippedp;
             continue;
+        }
         if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
             if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
               __wt_txn_upd_value_visible_all(session, cbt->upd_value))
                 ++cbt->page_deleted_count;
+            ++*skippedp;
             continue;
         }
         return (__wt_value_return(cbt, cbt->upd_value));
@@ -608,11 +627,13 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     WT_DECL_RET;
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
+    size_t total_skipped, skipped;
     uint32_t flags;
     bool newpage, restart;
 
     cursor = &cbt->iface;
     session = CUR2S(cbt);
+    total_skipped = 0;
 
     WT_STAT_CONN_INCR(session, cursor_next);
     WT_STAT_DATA_INCR(session, cursor_next);
@@ -646,7 +667,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
                 ret = __cursor_fix_append_next(cbt, newpage, restart);
                 break;
             case WT_PAGE_COL_VAR:
-                ret = __cursor_var_append_next(cbt, newpage, restart);
+                ret = __cursor_var_append_next(cbt, newpage, restart, &skipped);
+                total_skipped += skipped;
                 break;
             default:
                 WT_ERR(__wt_illegal_value(session, page->type));
@@ -662,10 +684,12 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
                 ret = __cursor_fix_next(cbt, newpage, restart);
                 break;
             case WT_PAGE_COL_VAR:
-                ret = __cursor_var_next(cbt, newpage, restart);
+                ret = __cursor_var_next(cbt, newpage, restart, &skipped);
+                total_skipped += skipped;
                 break;
             case WT_PAGE_ROW_LEAF:
-                ret = __cursor_row_next(cbt, newpage, restart);
+                ret = __cursor_row_next(cbt, newpage, restart, &skipped);
+                total_skipped += skipped;
                 break;
             default:
                 WT_ERR(__wt_illegal_value(session, page->type));
@@ -708,6 +732,17 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     }
 
 err:
+    if (total_skipped < 100) {
+        WT_STAT_CONN_INCR(session, cursor_next_skip_lt_100);
+        WT_STAT_DATA_INCR(session, cursor_next_skip_lt_100);
+    } else {
+        WT_STAT_CONN_INCR(session, cursor_next_skip_ge_100);
+        WT_STAT_DATA_INCR(session, cursor_next_skip_ge_100);
+    }
+
+    WT_STAT_CONN_INCRV(session, cursor_next_skip_total, total_skipped);
+    WT_STAT_DATA_INCRV(session, cursor_next_skip_total, total_skipped);
+
     switch (ret) {
     case 0:
         F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);

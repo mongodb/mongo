@@ -487,16 +487,14 @@ wts_close(WT_CONNECTION **connp, WT_SESSION **sessionp)
 }
 
 void
-wts_verify(const char *tag)
+wts_verify(WT_CONNECTION *conn, const char *tag)
 {
-    WT_CONNECTION *conn;
     WT_DECL_RET;
     WT_SESSION *session;
 
     if (g.c_verify == 0)
         return;
 
-    conn = g.wts_conn;
     track("verify", 0ULL, NULL);
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
