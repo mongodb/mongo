@@ -1,9 +1,5 @@
 /**
  * Tests the interaction of the refineCollectionShardKey command with the range deleter.
- *
- * The test case for recovering a migration begun before a shard key refine will not work in a mixed
- * version cluster until SERVER-48198 is backported to 4.4.
- * @tags: [requires_fcv_46]
  */
 (function() {
 
