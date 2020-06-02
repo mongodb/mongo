@@ -274,7 +274,7 @@ main(int argc, char *argv[])
             trace_init();
 
             TIMED_MAJOR_OP(wts_load()); /* Load and verify initial records */
-            TIMED_MAJOR_OP(wts_verify("post-bulk verify"));
+            TIMED_MAJOR_OP(wts_verify(g.wts_conn, "post-bulk verify"));
         }
 
         TIMED_MAJOR_OP(wts_read_scan());
@@ -292,7 +292,7 @@ main(int argc, char *argv[])
          * Verify the objects. Verify closes the underlying handle and discards the statistics, read
          * them first.
          */
-        TIMED_MAJOR_OP(wts_verify("post-ops verify"));
+        TIMED_MAJOR_OP(wts_verify(g.wts_conn, "post-ops verify"));
 
         track("shutting down", 0ULL, NULL);
         wts_close(&g.wts_conn, NULL);

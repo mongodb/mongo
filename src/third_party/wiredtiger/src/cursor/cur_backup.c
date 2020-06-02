@@ -169,7 +169,7 @@ err:
  * __backup_free --
  *     Free list resources for a backup cursor.
  */
-static void
+static int
 __backup_free(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
     int i;
@@ -181,7 +181,8 @@ __backup_free(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
     }
     if (cb->incr_file != NULL)
         __wt_free(session, cb->incr_file);
-    __wt_curbackup_free_incr(session, cb);
+
+    return (__wt_curbackup_free_incr(session, cb));
 }
 
 /*
@@ -213,7 +214,7 @@ err:
      * cursor is closed), because that cursor will never not be responsible for cleanup.
      */
     if (F_ISSET(cb, WT_CURBACKUP_DUP)) {
-        __backup_free(session, cb);
+        WT_TRET(__backup_free(session, cb));
         /* Make sure the original backup cursor is still open. */
         WT_ASSERT(session, F_ISSET(session, WT_SESSION_BACKUP_CURSOR));
         F_CLR(session, WT_SESSION_BACKUP_DUP);
@@ -760,7 +761,7 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
     WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->hot_backup_list = NULL);
     if (cb->incr_src != NULL)
         F_CLR(cb->incr_src, WT_BLKINCR_INUSE);
-    __backup_free(session, cb);
+    WT_TRET(__backup_free(session, cb));
 
     /* Remove any backup specific file. */
     WT_TRET(__wt_backup_file_remove(session));

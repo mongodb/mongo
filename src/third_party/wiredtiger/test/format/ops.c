@@ -628,7 +628,6 @@ ops(void *arg)
     val_gen_init(tinfo->value);
     tinfo->lastkey = &tinfo->_lastkey;
     key_gen_init(tinfo->lastkey);
-    tinfo->tbuf = &tinfo->_tbuf;
 
     /* Set the first operation where we'll create sessions and cursors. */
     cursor = NULL;
@@ -1008,7 +1007,6 @@ rollback:
     key_gen_teardown(tinfo->key);
     val_gen_teardown(tinfo->value);
     key_gen_teardown(tinfo->lastkey);
-    free(tinfo->tbuf->mem);
 
     tinfo->state = TINFO_COMPLETE;
     return (WT_THREAD_RET_VALUE);
@@ -1249,16 +1247,13 @@ order_error_col:
                 goto order_error_row;
             if (!record_gaps) {
                 /*
-                 * Convert the keys to record numbers and then compare less-than-or-equal. (Not
+                 * Convert the keys to record numbers and then compare less-than-or-equal. (It's not
                  * less-than, row-store inserts new rows in-between rows by appending a new suffix
-                 * to the row's key.)
+                 * to the row's key.) Keys are strings with terminating '/' values, so absent key
+                 * corruption, we can simply do the underlying string conversion on the key string.
                  */
-                testutil_check(__wt_buf_fmt(CUR2S(cursor), tinfo->tbuf, "%.*s",
-                  (int)tinfo->key->size, (char *)tinfo->key->data));
-                keyno_prev = strtoul(tinfo->tbuf->data, NULL, 10);
-                testutil_check(__wt_buf_fmt(
-                  CUR2S(cursor), tinfo->tbuf, "%.*s", (int)key.size, (char *)key.data));
-                keyno = strtoul(tinfo->tbuf->data, NULL, 10);
+                keyno_prev = strtoul(tinfo->key->data, NULL, 10);
+                keyno = strtoul(key.data, NULL, 10);
                 if (incrementing) {
                     if (keyno_prev != keyno && keyno_prev + 1 != keyno)
                         goto order_error_row;

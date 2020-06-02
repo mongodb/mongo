@@ -34,12 +34,12 @@ from wtdataset import SimpleDataSet
 def timestamp_str(t):
     return '%x' % t
 
-# test_prepare07.py
+# test_prepare10.py
 # Test to ensure prepared tombstones are properly aborted even when they are written
 # to the data store.
-class test_prepare07(wttest.WiredTigerTestCase):
+class test_prepare10(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=1MB'
+    conn_config = 'cache_size=2MB'
     session_config = 'isolation=snapshot'
 
     def updates(self, ds, uri, nrows, value, ts):

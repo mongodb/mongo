@@ -340,8 +340,6 @@ typedef struct {
     uint64_t insert_list[256]; /* column-store inserted records */
     u_int insert_list_cnt;
 
-    WT_ITEM *tbuf, _tbuf; /* temporary buffer */
-
 #define TINFO_RUNNING 1  /* Running */
 #define TINFO_COMPLETE 2 /* Finished */
 #define TINFO_JOINED 3   /* Resolved */
@@ -403,6 +401,6 @@ void wts_rebalance(void);
 void wts_reopen(void);
 void wts_salvage(void);
 void wts_stats(void);
-void wts_verify(const char *);
+void wts_verify(WT_CONNECTION *, const char *);
 
 #include "format.i"
