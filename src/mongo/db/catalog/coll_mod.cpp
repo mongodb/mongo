@@ -98,6 +98,16 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             StringData indexName;
             BSONObj keyPattern;
 
+            for (auto&& elem : indexObj) {
+                const auto field = elem.fieldNameStringData();
+                if (field != "name" && field != "keyPattern" && field != "expireAfterSeconds" &&
+                    field != "hidden") {
+                    return {ErrorCodes::InvalidOptions,
+                            str::stream()
+                                << "Unrecognized field '" << field << "' in 'index' option"};
+                }
+            }
+
             BSONElement nameElem = indexObj["name"];
             BSONElement keyPatternElem = indexObj["keyPattern"];
             if (nameElem && keyPatternElem) {
