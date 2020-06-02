@@ -226,8 +226,8 @@ void FeatureCompatibilityVersion::onReplicationRollback(OperationContext* opCtx)
         if (swVersion.isOK() && (swVersion.getValue() != memoryFcv)) {
             auto diskFcv = swVersion.getValue();
             log() << "Setting featureCompatibilityVersion from '"
-                  << FeatureCompatibilityVersionParser::toString(diskFcv) << "' to '"
-                  << FeatureCompatibilityVersionParser::toString(memoryFcv)
+                  << FeatureCompatibilityVersionParser::toString(memoryFcv) << "' to '"
+                  << FeatureCompatibilityVersionParser::toString(diskFcv)
                   << "' as part of rollback.";
             _setVersion(opCtx, diskFcv);
         }
