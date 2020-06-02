@@ -99,6 +99,8 @@ suites:
   replica_sets_jscore_multiversion_passthrough:
 
   replica_sets_multiversion:
+  - ticket: SERVER-47645
+    test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
 
   concurrency_sharded_replication_multiversion:
 

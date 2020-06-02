@@ -71,4 +71,10 @@ void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx);
  */
 void yieldLocksForPreparedTransactions(OperationContext* opCtx);
 
+/**
+ * Invalidates sessions that do not have prepared transactions, since txnNumbers for transactions
+ * that were aborted in-memory may be reused on the new primary.
+ */
+void invalidateSessionsForStepdown(OperationContext* opCtx);
+
 }  // namespace mongo
