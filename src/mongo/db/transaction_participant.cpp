@@ -590,6 +590,9 @@ void TransactionParticipant::Participant::beginOrContinueTransactionUnconditiona
 
     if (o().activeTxnNumber != txnNumber) {
         _beginMultiDocumentTransaction(opCtx, txnNumber);
+    } else {
+        invariant(o().txnState.isInSet(TransactionState::kInProgress | TransactionState::kPrepared),
+                  str::stream() << "Current state: " << o().txnState);
     }
 
     // Assume we need to write an abort if we abort this transaction.  This method is called only
