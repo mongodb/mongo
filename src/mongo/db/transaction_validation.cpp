@@ -48,7 +48,8 @@ const StringMap<int> retryableWriteCommands = {
     {"delete", 1}, {"findandmodify", 1}, {"findAndModify", 1}, {"insert", 1}, {"update", 1}};
 
 // Commands that can be sent with session info but should not check out a session.
-const StringMap<int> skipSessionCheckoutList = {{"coordinateCommitTransaction", 1}};
+const StringMap<int> skipSessionCheckoutList = {{"coordinateCommitTransaction", 1},
+                                                {"replSetStepDown", 1}};
 
 bool isRetryableWriteCommand(StringData cmdName) {
     return retryableWriteCommands.find(cmdName) != retryableWriteCommands.cend();

@@ -2162,6 +2162,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     lk.unlock();
 
     yieldLocksForPreparedTransactions(opCtx);
+    invalidateSessionsForStepdown(opCtx);
 
     lk.lock();
 
@@ -2750,6 +2751,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
             lk.unlock();
 
             yieldLocksForPreparedTransactions(opCtx);
+            invalidateSessionsForStepdown(opCtx);
 
             lk.lock();
 

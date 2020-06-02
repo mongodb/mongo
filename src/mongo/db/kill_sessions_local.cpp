@@ -214,4 +214,24 @@ void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
                        ErrorCodes::InterruptedDueToReplStateChange);
 }
 
+void invalidateSessionsForStepdown(OperationContext* opCtx) {
+    // It is illegal to invalidate the sessions if the operation has a session checked out.
+    invariant(!OperationContextSession::get(opCtx));
+
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    killSessionsAction(opCtx,
+                       matcherAllSessions,
+                       [](const ObservableSession& session) {
+                           return !TransactionParticipant::get(session).transactionIsPrepared();
+                       },
+                       [](OperationContext* killerOpCtx, const SessionToKill& session) {
+                           auto txnParticipant = TransactionParticipant::get(session);
+                           if (!txnParticipant.transactionIsPrepared()) {
+                               txnParticipant.invalidate(killerOpCtx);
+                           }
+                       },
+                       ErrorCodes::InterruptedDueToReplStateChange);
+}
+
 }  // namespace mongo
