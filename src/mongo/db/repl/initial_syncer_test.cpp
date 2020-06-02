@@ -37,6 +37,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/getmore_request.h"
@@ -354,6 +355,7 @@ protected:
 
         // Required by CollectionCloner::listIndexesStage() and IndexBuildsCoordinator.
         service->setStorageEngine(std::make_unique<StorageEngineMock>());
+        IndexBuildsCoordinator::set(service, std::make_unique<IndexBuildsCoordinatorMongod>());
 
         _target = HostAndPort{"localhost:12346"};
         _mockServer = std::make_unique<MockRemoteDBServer>(_target.toString());
