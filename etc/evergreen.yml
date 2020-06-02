@@ -1990,6 +1990,8 @@ functions:
           branch=$(git symbolic-ref --short HEAD)
           commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
           echo "Git branch: $branch, commit: $commit"
+
+          sudo apt-get install leiningen
           lein install
     - command: shell.exec
       params:
@@ -4662,6 +4664,19 @@ tasks:
       <<: *jepsen_config_vars
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_test_name: read-concern-majority
+
+# Smoke test to ensure the Server still works with Jepsen
+- <<: *run_jepsen_template
+  name: jepsen-smoke
+  commands:
+    - func: "do setup"
+    - func: "do jepsen setup"
+    - func: "run jepsen test"
+      vars:
+        <<: *jepsen_config_vars
+        jepsen_storage_engine: --storage-engine wiredTiger
+        jepsen_test_name: read-concern-majority
+        jepsen_time_limit: --time-limit 120
 
 - <<: *run_jepsen_template
   name: jepsen_read-concern-majority_w1
@@ -12459,6 +12474,11 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: jsCore
   - name: jsCore_txns
+  # Note: {A,UB}SAN has a runtime component that is not fed into Jepsen.
+  # We don't actually run jepsen with {A,UB}SAN.  This task is on this BV because
+  # Jepsen uses Java and Leiningen which is available on this distro
+  # and requires a static build, so this is the only suitable build variant for it.
+  - name: jepsen-smoke
 
 - name: ubuntu1804-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
