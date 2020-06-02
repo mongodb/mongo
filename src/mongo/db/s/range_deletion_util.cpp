@@ -213,16 +213,17 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
         PlanExecutor::ExecState state;
         try {
             state = exec->getNext(&deletedObj, nullptr);
-        } catch (...) {
-            LOGV2_WARNING(
-                23776,
-                "Cursor error while trying to delete {min} to {max} in {namespace}, stats: {stats}",
-                "Cursor error while trying to delete range",
-                "min"_attr = redact(min),
-                "max"_attr = redact(max),
-                "namespace"_attr = nss,
-                "stats"_attr = Explain::getWinningPlanStats(exec.get()));
-            break;
+        } catch (const DBException& ex) {
+            LOGV2_WARNING(23776,
+                          "Cursor error while trying to delete {min} to {max} in {namespace}, "
+                          "stats: {stats}, error: {error}",
+                          "Cursor error while trying to delete range",
+                          "min"_attr = redact(min),
+                          "max"_attr = redact(max),
+                          "namespace"_attr = nss,
+                          "stats"_attr = Explain::getWinningPlanStats(exec.get()),
+                          "error"_attr = redact(ex.toStatus()));
+            throw;
         }
 
         if (state == PlanExecutor::IS_EOF) {
