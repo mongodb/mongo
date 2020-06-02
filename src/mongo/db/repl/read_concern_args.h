@@ -182,21 +182,13 @@ public:
      * Set atClusterTime, clear afterClusterTime. The BSON representation becomes
      * {level: "snapshot", atClusterTime: <ts>}.
      */
-    void setArgsAtClusterTime(Timestamp ts) {
+    void setArgsAtClusterTimeForSnapshot(Timestamp ts) {
         invariant(_level && _level == ReadConcernLevel::kSnapshotReadConcern);
         // Only overwrite a server-selected atClusterTime, not user-supplied.
-        invariant(!_clientAtClusterTime);
-        _computedAfterClusterTime = boost::none;
-        _computedAtClusterTime = LogicalTime(ts);
-    }
-
-    /**
-     * If we have selected an atClusterTime for non-transaction snapshot reads, clear it and restore
-     * the atClusterTime and afterClusterTime passed by the client.
-     */
-    void clearArgsAtClusterTime() {
-        _computedAfterClusterTime = _clientAfterClusterTime;
-        _computedAtClusterTime = _clientAtClusterTime;
+        invariant(_atClusterTime.is_initialized() == _atClusterTimeSelected);
+        _afterClusterTime = boost::none;
+        _atClusterTime = LogicalTime(ts);
+        _atClusterTimeSelected = true;
     }
 
     /**
@@ -204,7 +196,7 @@ public:
      * function returns false if the atClusterTime was specified by the client.
      */
     bool wasAtClusterTimeSelected() const {
-        return _computedAtClusterTime && _computedAtClusterTime != _clientAtClusterTime;
+        return _atClusterTimeSelected;
     }
 
 private:
@@ -221,13 +213,11 @@ private:
     /**
      *  Read data after cluster-wide cluster time.
      */
-    boost::optional<LogicalTime> _clientAfterClusterTime;
-    boost::optional<LogicalTime> _computedAfterClusterTime;
+    boost::optional<LogicalTime> _afterClusterTime;
     /**
      * Read data at a particular cluster time.
      */
-    boost::optional<LogicalTime> _clientAtClusterTime;
-    boost::optional<LogicalTime> _computedAtClusterTime;
+    boost::optional<LogicalTime> _atClusterTime;
     boost::optional<ReadConcernLevel> _level;
 
     /**
@@ -243,6 +233,8 @@ private:
     bool _specified;
 
     ReadWriteConcernProvenance _provenance;
+
+    bool _atClusterTimeSelected = false;
 };
 
 }  // namespace repl

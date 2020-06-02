@@ -188,9 +188,8 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     }
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    // mongos selects atClusterTime for multi-shard snapshot reads. For a single-shard read, let the
-    // shard select it.
-    if (readConcernArgs.wasAtClusterTimeSelected() && shardIds.size() > 1) {
+    if (readConcernArgs.wasAtClusterTimeSelected()) {
+        // If mongos selected atClusterTime or received it from client, transmit it to shard.
         qrToForward->setReadConcern(readConcernArgs.toBSONInner());
     }
 
@@ -247,11 +246,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                               query.getQueryRequest().getFilter(),
                                               query.getQueryRequest().getCollation());
 
-    auto readConcern = ReadConcernArgs::get(opCtx);
-
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
-    ClusterClientCursorParams params(query.nss(), readPref, readConcern);
+    ClusterClientCursorParams params(query.nss(), readPref, ReadConcernArgs::get(opCtx));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.batchSize = query.getQueryRequest().getEffectiveBatchSize();
     params.tailableMode = query.getQueryRequest().getTailableMode();
@@ -263,12 +260,6 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     if (TransactionRouter::get(opCtx)) {
         params.isAutoCommit = false;
-    }
-
-    // For single-shard non-transaction snapshot reads, we pass readConcern level "snapshot" to
-    // the shard. It selects "atClusterTime" and replies with it. Store it on the mongos cursor.
-    if (shardIds.size() == 1 && readConcern.wasAtClusterTimeSelected()) {
-        params.readConcern->clearArgsAtClusterTime();
     }
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
@@ -332,20 +323,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         : ClusterCursorManager::CursorType::SingleTarget;
 
     // Only set skip, limit and sort to be applied to on the router for the multi-shard case. For
-    // the single-shard case skip/limit as well as sorts are applied on mongod.
+    // the single-shard case skip/limit as well as sorts are appled on mongod.
     if (cursorType == ClusterCursorManager::CursorType::MultiTarget) {
         const auto qr = query.getQueryRequest();
         params.skipToApplyOnRouter = qr.getSkip();
         params.limit = qr.getLimit();
         params.sortToApplyOnRouter = sortComparatorObj;
         params.compareWholeSortKeyOnRouter = compareWholeSortKeyOnRouter;
-    } else if (!params.remotes.empty()) {
-        // For single-shard non-transaction snapshot reads, we pass readConcern level "snapshot" to
-        // the shard. It selects "atClusterTime" and replies with it. Store it on the mongos cursor.
-        auto clusterTime = params.remotes[0].getCursorResponse().getAtClusterTime();
-        if (clusterTime && !params.readConcern->getArgsAtClusterTime()) {
-            params.readConcern->setArgsAtClusterTime(*clusterTime);
-        }
     }
 
     // Transfer the established cursors to a ClusterClientCursor.
