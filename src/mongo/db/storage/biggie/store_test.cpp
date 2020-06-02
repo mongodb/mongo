@@ -1613,6 +1613,27 @@ TEST_F(RadixStoreTest, MergeSharedSubKey) {
     ASSERT_TRUE(thisStore == expected);
 }
 
+TEST_F(RadixStoreTest, MergeInternalNodeTest) {
+    baseStore.insert({"a", "a"});
+    baseStore.insert({"aaaa", "a"});
+    baseStore.insert({"aaab", "a"});
+
+    otherStore = baseStore;
+    otherStore.insert({"aaa", "a"});
+
+    thisStore = baseStore;
+    thisStore.insert({"aa", "a"});
+
+    thisStore.merge3(baseStore, otherStore);
+
+    expected.insert({"a", "a"});
+    expected.insert({"aa", "a"});
+    expected.insert({"aaa", "a"});
+    expected.insert({"aaaa", "a"});
+    expected.insert({"aaab", "a"});
+    ASSERT_TRUE(thisStore == expected);
+}
+
 TEST_F(RadixStoreTest, MergeBaseKeyNegativeCharTest) {
     baseStore.insert({"aaa\xffq", "q"});
 

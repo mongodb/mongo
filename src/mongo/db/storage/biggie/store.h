@@ -937,7 +937,7 @@ private:
             depth++;
 
             // Return node if entire trieKey matches.
-            if (depth == key.size() &&
+            if (depth == key.size() && _root->_data &&
                 (key.size() - initialDepthOffset) == _root->_trieKey.size()) {
                 return _root.get();
             }
