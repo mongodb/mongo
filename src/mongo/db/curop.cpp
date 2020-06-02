@@ -966,7 +966,7 @@ void OpDebug::report(OperationContext* opCtx,
         if (!errInfo.reason().empty()) {
             pAttrs->add("errMsg", redact(errInfo.reason()));
         }
-        pAttrs->add("errName", errInfo.code());
+        pAttrs->addDeepCopy("errName", errInfo.codeString());
         pAttrs->add("errCode", static_cast<int>(errInfo.code()));
     }
 
