@@ -555,10 +555,10 @@ public:
 
         Node* node = nullptr;
 
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
         size_t depth = prev->_depth + prev->_trieKey.size();
         while (depth < key.size()) {
-            uint8_t c = static_cast<uint8_t>(charKey[depth]);
+            uint8_t c = charKey[depth];
             node = prev->_children[c].get();
             if (node == nullptr) {
                 return false;
@@ -679,13 +679,13 @@ public:
 
     const_iterator lower_bound(const Key& key) const {
         Node* node = _root.get();
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
         std::vector<std::pair<Node*, uint8_t>> context;
         size_t depth = 0;
 
         // Traverse the path given the key to see if the node exists.
         while (depth < key.size()) {
-            uint8_t idx = static_cast<uint8_t>(charKey[depth]);
+            uint8_t idx = charKey[depth];
 
             // When we go back up the tree to search for the lower bound of key, always search to
             // the right of 'idx' so that we never search anything less than what the lower bound
@@ -705,7 +705,7 @@ public:
                 // Check if the current key in the tree is greater than the one we are looking
                 // for since it can't be equal at this point. It can be greater in two ways:
                 // It can be longer or it can have a larger character at the mismatch index.
-                uint8_t mismatchChar = static_cast<uint8_t>(charKey[mismatchIdx + depth]);
+                uint8_t mismatchChar = charKey[mismatchIdx + depth];
                 if (mismatchIdx == key.size() - depth ||
                     node->_trieKey[mismatchIdx] > mismatchChar) {
                     // If the current key is greater and has a value it is the lower bound.
@@ -924,7 +924,7 @@ private:
     }
 
     Node* _findNode(const Key& key) const {
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
 
         unsigned int depth = _root->_depth;
         unsigned int initialDepthOffset = depth;
@@ -944,7 +944,7 @@ private:
         }
 
         depth = _root->_depth + _root->_trieKey.size();
-        uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
+        uint8_t childFirstChar = charKey[depth];
         auto node = _root->_children[childFirstChar];
 
         while (node != nullptr) {
@@ -961,7 +961,7 @@ private:
 
             depth = node->_depth + node->_trieKey.size();
 
-            childFirstChar = static_cast<uint8_t>(charKey[depth]);
+            childFirstChar = charKey[depth];
             node = node->_children[childFirstChar];
         }
 
@@ -1006,10 +1006,10 @@ private:
     std::pair<const_iterator, bool> _upsertWithCopyOnSharedNodes(
         Key key, boost::optional<value_type> value) {
 
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
 
         int depth = _root->_depth + _root->_trieKey.size();
-        uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
+        uint8_t childFirstChar = charKey[depth];
 
         _makeRootUnique();
 
@@ -1081,7 +1081,7 @@ private:
             }
 
             depth = node->_depth + node->_trieKey.size();
-            childFirstChar = static_cast<uint8_t>(charKey[depth]);
+            childFirstChar = charKey[depth];
 
             prev = node.get();
             node = node->_children[childFirstChar];
@@ -1102,10 +1102,10 @@ private:
      * Return a uint8_t vector with the first 'count' characters of
      * 'old'.
      */
-    std::vector<uint8_t> _makeKey(const char* old, size_t count) {
+    std::vector<uint8_t> _makeKey(const uint8_t* old, size_t count) {
         std::vector<uint8_t> key;
         for (size_t i = 0; i < count; ++i) {
-            uint8_t c = static_cast<uint8_t>(old[i]);
+            uint8_t c = old[i];
             key.push_back(c);
         }
         return key;
@@ -1148,11 +1148,11 @@ private:
         std::vector<Node*> context;
         context.push_back(node);
 
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
         size_t depth = node->_depth + node->_trieKey.size();
 
         while (depth < key.size()) {
-            uint8_t c = static_cast<uint8_t>(charKey[depth]);
+            uint8_t c = charKey[depth];
             node = node->_children[c].get();
             context.push_back(node);
             depth = node->_depth + node->_trieKey.size();
@@ -1164,12 +1164,12 @@ private:
      * Return the index at which 'key1' and 'key2' differ.
      * This function will interpret the bytes in 'key2' as unsigned values.
      */
-    size_t _comparePrefix(std::vector<uint8_t> key1, const char* key2, size_t len2) const {
+    size_t _comparePrefix(std::vector<uint8_t> key1, const uint8_t* key2, size_t len2) const {
         size_t smaller = std::min(key1.size(), len2);
 
         size_t i = 0;
         for (; i < smaller; ++i) {
-            uint8_t c = static_cast<uint8_t>(key2[i]);
+            uint8_t c = key2[i];
             if (key1[i] != c) {
                 return i;
             }

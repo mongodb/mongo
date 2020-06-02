@@ -1613,6 +1613,21 @@ TEST_F(RadixStoreTest, MergeSharedSubKey) {
     ASSERT_TRUE(thisStore == expected);
 }
 
+TEST_F(RadixStoreTest, MergeBaseKeyNegativeCharTest) {
+    baseStore.insert({"aaa\xffq", "q"});
+
+    otherStore = baseStore;
+    otherStore.insert({"aab", "b"});
+
+    thisStore = baseStore;
+    thisStore.insert({"aac", "c"});
+
+    thisStore.merge3(baseStore, otherStore);
+    ASSERT_EQ(thisStore.find("aaa\xffq")->second, "q");
+    ASSERT_EQ(thisStore.find("aab")->second, "b");
+    ASSERT_EQ(thisStore.find("aac")->second, "c");
+}
+
 TEST_F(RadixStoreTest, MergeConflictingModifications) {
     value_type value1 = std::make_pair("foo", "1");
     value_type value2 = std::make_pair("foo", "2");
