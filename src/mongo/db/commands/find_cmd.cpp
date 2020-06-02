@@ -354,9 +354,20 @@ public:
                     !qr->getReadAtClusterTime() || storageEngine->supportsDocLocking());
 
             // Validate term before acquiring locks, if provided.
-            if (auto term = qr->getReplicationTerm()) {
+            auto term = qr->getReplicationTerm();
+            if (term) {
                 // Note: updateTerm returns ok if term stayed the same.
                 uassertStatusOK(replCoord->updateTerm(opCtx, *term));
+            }
+
+            // The presence of a term in the request indicates that this is an internal replication
+            // oplog read request.
+            if (term && parsedNss == NamespaceString::kRsOplogNamespace) {
+                // We do not want to take tickets for internal (replication) oplog reads. Stalling
+                // on ticket acquisition can cause complicated deadlocks. Primaries may depend on
+                // data reaching secondaries in order to proceed; and secondaries may get stalled
+                // replicating because of an inability to acquire a read ticket.
+                opCtx->lockState()->skipAcquireTicket();
             }
 
             // We call RecoveryUnit::setTimestampReadSource() before acquiring a lock on the

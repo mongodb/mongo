@@ -263,7 +263,7 @@ public:
     boost::optional<WriteConcernOptions> writeConcern;
 
     // Whether this is an oplog getMore operation for replication oplog fetching.
-    bool isReplOplogFetching{false};
+    bool isReplOplogGetMore{false};
 };
 
 /**

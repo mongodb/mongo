@@ -687,15 +687,24 @@ public:
             auto curOp = CurOp::get(opCtx);
             curOp->debug().cursorid = _request.cursorid;
 
-            // Validate term before acquiring locks, if provided.
+            // The presence of a term in the request indicates that this is an internal replication
+            // oplog read request.
             if (_request.term && _request.nss == NamespaceString::kRsOplogNamespace) {
+                // Validate term before acquiring locks.
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
                 // Note: updateTerm returns ok if term stayed the same.
                 uassertStatusOK(replCoord->updateTerm(opCtx, *_request.term));
+
                 // If the term field is present in an oplog request, it means this is an oplog
                 // getMore for replication oplog fetching because the term field is only allowed for
                 // internal clients (see checkAuthForGetMore).
-                curOp->debug().isReplOplogFetching = true;
+                curOp->debug().isReplOplogGetMore = true;
+
+                // We do not want to take tickets for internal (replication) oplog reads. Stalling
+                // on ticket acquisition can cause complicated deadlocks. Primaries may depend on
+                // data reaching secondaries in order to proceed; and secondaries may get stalled
+                // replicating because of an inability to acquire a read ticket.
+                opCtx->lockState()->skipAcquireTicket();
             }
 
             auto cursorManager = CursorManager::get(opCtx);

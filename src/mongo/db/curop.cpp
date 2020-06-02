@@ -440,7 +440,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 
     const auto executionTimeMillis = _debug.executionTimeMicros / 1000;
 
-    if (_debug.isReplOplogFetching) {
+    if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(executionTimeMillis);
     }
 
