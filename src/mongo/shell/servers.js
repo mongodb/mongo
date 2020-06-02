@@ -442,7 +442,7 @@ MongoRunner.arrOptions = function(binaryName, args) {
 
             fullArgs.push("--" + k);
 
-            if (v != "") {
+            if (v !== "") {
                 fullArgs.push("" + v);
             }
         };
