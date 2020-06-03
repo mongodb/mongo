@@ -125,6 +125,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterWaitingForTopologyChangeTimesOut);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 // Skip sending heartbeats to pre-check that a quorum is available before a reconfig.
 MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
+// Will cause signal drain complete to hang right before acquiring the RSTL.
+MONGO_FAIL_POINT_DEFINE(hangBeforeRSTLOnDrainComplete);
 // Will cause signal drain complete to hang after reconfig
 MONGO_FAIL_POINT_DEFINE(hangAfterReconfigOnDrainComplete);
 MONGO_FAIL_POINT_DEFINE(doNotRemoveNewlyAddedOnHeartbeats);
@@ -1158,6 +1160,11 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     lk.unlock();
 
     _externalState->onDrainComplete(opCtx);
+
+    if (MONGO_unlikely(hangBeforeRSTLOnDrainComplete.shouldFail())) {
+        LOGV2(4712800, "Hanging due to hangBeforeRSTLOnDrainComplete failpoint");
+        hangBeforeRSTLOnDrainComplete.pauseWhileSet(opCtx);
+    }
 
     // Kill all user writes and user reads that encounter a prepare conflict. Also kills select
     // internal operations. Although secondaries cannot accept writes, a step up can kill writes
