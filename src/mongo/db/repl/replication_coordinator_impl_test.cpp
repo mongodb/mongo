@@ -3335,11 +3335,13 @@ TEST_F(ReplCoordTest, IsMasterReturnsErrorOnEnteringQuiesceModeAfterWaitingTimes
     auto maxAwaitTime = Milliseconds(5000);
     auto deadline = getNet()->now() + maxAwaitTime;
 
+    bool isMasterReturned = false;
     stdx::thread getIsMasterThread([&] {
         ASSERT_THROWS_CODE(getReplCoord()->awaitIsMasterResponse(
                                opCtx.get(), {}, currentTopologyVersion, deadline),
                            AssertionException,
                            ErrorCodes::ShutdownInProgress);
+        isMasterReturned = true;
     });
 
     auto failPoint = globalFailPointRegistry().find("hangAfterWaitingForTopologyChangeTimesOut");
@@ -3357,9 +3359,11 @@ TEST_F(ReplCoordTest, IsMasterReturnsErrorOnEnteringQuiesceModeAfterWaitingTimes
     failPoint->setMode(FailPoint::off, 0);
 
     // Advance the clock so that pauseWhileSet() will wake up.
-    getNet()->enterNetwork();
-    getNet()->advanceTime(getNet()->now() + Milliseconds(100));
-    getNet()->exitNetwork();
+    while (!isMasterReturned) {
+        getNet()->enterNetwork();
+        getNet()->advanceTime(getNet()->now() + Milliseconds(100));
+        getNet()->exitNetwork();
+    }
 
     getIsMasterThread.join();
 }
