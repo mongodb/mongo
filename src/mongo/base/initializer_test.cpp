@@ -298,8 +298,7 @@ TEST(InitializerTest, SuccessfulInitializationAndDeinitialization) {
     constructNormalDependencyGraph(&initializer);
     clearCounts();
 
-    ASSERT_OK(initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                              InitializerContext::EnvironmentMap()));
+    ASSERT_OK(initializer.executeInitializers({}));
 
     for (int i = 0; i < 9; ++i)
         ASSERT_EQUALS(INITIALIZED, globalStates[i]);
@@ -333,9 +332,7 @@ TEST(InitializerTest, Init5Misimplemented) {
                                deinitNoop);
     clearCounts();
 
-    ASSERT_EQUALS(ErrorCodes::UnknownError,
-                  initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                                  InitializerContext::EnvironmentMap()));
+    ASSERT_EQUALS(ErrorCodes::UnknownError, initializer.executeInitializers({}));
 
     ASSERT_EQUALS(INITIALIZED, globalStates[0]);
     ASSERT_EQUALS(INITIALIZED, globalStates[1]);
@@ -371,8 +368,7 @@ TEST(InitializerTest, Deinit2Misimplemented) {
                                deinit8);
     clearCounts();
 
-    ASSERT_OK(initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                              InitializerContext::EnvironmentMap()));
+    ASSERT_OK(initializer.executeInitializers({}));
 
     for (int i = 0; i < 9; ++i)
         ASSERT_EQUALS(INITIALIZED, globalStates[i]);
@@ -395,8 +391,7 @@ DEATH_TEST(InitializerTest, CannotAddInitializerAfterInitializing, "!frozen()") 
     constructNormalDependencyGraph(&initializer);
     clearCounts();
 
-    ASSERT_OK(initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                              InitializerContext::EnvironmentMap()));
+    ASSERT_OK(initializer.executeInitializers({}));
 
     for (int i = 0; i < 9; ++i)
         ASSERT_EQUALS(INITIALIZED, globalStates[i]);
@@ -414,16 +409,12 @@ DEATH_TEST(InitializerTest, CannotDoubleInitialize, "invalid initializer state t
     constructNormalDependencyGraph(&initializer);
     clearCounts();
 
-    ASSERT_OK(initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                              InitializerContext::EnvironmentMap()));
+    ASSERT_OK(initializer.executeInitializers({}));
 
     for (int i = 0; i < 9; ++i)
         ASSERT_EQUALS(INITIALIZED, globalStates[i]);
 
-    initializer
-        .executeInitializers(InitializerContext::ArgumentVector(),
-                             InitializerContext::EnvironmentMap())
-        .ignore();
+    initializer.executeInitializers({}).ignore();
 }
 
 DEATH_TEST(InitializerTest,
@@ -441,8 +432,7 @@ DEATH_TEST(InitializerTest, CannotDoubleDeinitialize, "invalid initializer state
     constructNormalDependencyGraph(&initializer);
     clearCounts();
 
-    ASSERT_OK(initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                              InitializerContext::EnvironmentMap()));
+    ASSERT_OK(initializer.executeInitializers({}));
 
     for (int i = 0; i < 9; ++i)
         ASSERT_EQUALS(INITIALIZED, globalStates[i]);

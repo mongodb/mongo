@@ -31,6 +31,6 @@
 
 namespace mongo {
 
-ExitCode mongos_main(int argc, char* argv[], char** envp);
+ExitCode mongos_main(int argc, char* argv[]);
 
 }  // namespace mongo

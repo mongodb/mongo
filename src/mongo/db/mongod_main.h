@@ -29,6 +29,6 @@
 
 namespace mongo {
 
-int mongod_main(int argc, char* argv[], char** envp);
+int mongod_main(int argc, char* argv[]);
 
 }  // namespace mongo

@@ -702,7 +702,7 @@ bool mechanismRequiresPassword(const MongoURI& uri) {
 
 }  // namespace
 
-int mongo_main(int argc, char* argv[], char** envp) {
+int mongo_main(int argc, char* argv[]) {
 
     try {
 
@@ -724,7 +724,7 @@ int mongo_main(int argc, char* argv[], char** envp) {
 
         mongo::shell_utils::RecordMyLocation(argv[0]);
 
-        mongo::runGlobalInitializersOrDie(argc, argv, envp);
+        mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
         setGlobalServiceContext(ServiceContext::make());
         // TODO This should use a TransportLayerManager or TransportLayerFactory
         auto serviceContext = getGlobalServiceContext();

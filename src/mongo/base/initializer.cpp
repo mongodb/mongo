@@ -42,11 +42,7 @@
 
 namespace mongo {
 
-Initializer::Initializer() {}
-Initializer::~Initializer() {}
-
-Status Initializer::executeInitializers(const InitializerContext::ArgumentVector& args,
-                                        const InitializerContext::EnvironmentMap& env) {
+Status Initializer::executeInitializers(const std::vector<std::string>& args) {
     auto oldState = std::exchange(_lifecycleState, State::kInitializing);
     invariant(oldState == State::kUninitialized, "invalid initializer state transition");
 
@@ -57,7 +53,7 @@ Status Initializer::executeInitializers(const InitializerContext::ArgumentVector
     }
     _graph.freeze();
 
-    InitializerContext context(args, env);
+    InitializerContext context(args);
 
     for (const auto& nodeName : _sortedNodes) {
         InitializerDependencyNode* node = _graph.getInitializerNode(nodeName);
@@ -119,36 +115,16 @@ Status Initializer::executeDeinitializers() {
     return Status::OK();
 }
 
-Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
-                             const InitializerContext::EnvironmentMap& env) {
-    return getGlobalInitializer().executeInitializers(args, env);
-}
-
-Status runGlobalInitializers(int argc, const char* const* argv, const char* const* envp) {
-    InitializerContext::ArgumentVector args(argc);
-    std::copy(argv, argv + argc, args.begin());
-
-    InitializerContext::EnvironmentMap env;
-
-    if (envp) {
-        for (; *envp; ++envp) {
-            const char* firstEqualSign = strchr(*envp, '=');
-            if (!firstEqualSign) {
-                return Status(ErrorCodes::BadValue, "malformed environment block");
-            }
-            env[std::string(*envp, firstEqualSign)] = std::string(firstEqualSign + 1);
-        }
-    }
-
-    return runGlobalInitializers(args, env);
+Status runGlobalInitializers(const std::vector<std::string>& argv) {
+    return getGlobalInitializer().executeInitializers(argv);
 }
 
 Status runGlobalDeinitializers() {
     return getGlobalInitializer().executeDeinitializers();
 }
 
-void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp) {
-    Status status = runGlobalInitializers(argc, argv, envp);
+void runGlobalInitializersOrDie(const std::vector<std::string>& argv) {
+    Status status = runGlobalInitializers(argv);
     if (!status.isOK()) {
         std::cerr << "Failed global initialization: " << status << std::endl;
         quickExit(1);

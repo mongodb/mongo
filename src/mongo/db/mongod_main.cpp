@@ -1321,7 +1321,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
 }  // namespace
 
-int mongod_main(int argc, char* argv[], char** envp) {
+int mongod_main(int argc, char* argv[]) {
     ThreadSafetyContext::getThreadSafetyContext()->forbidMultiThreading();
 
     registerShutdownTask(shutdownTask);
@@ -1330,7 +1330,7 @@ int mongod_main(int argc, char* argv[], char** envp) {
 
     srand(static_cast<unsigned>(curTimeMicros64()));
 
-    Status status = mongo::runGlobalInitializers(argc, argv, envp);
+    Status status = mongo::runGlobalInitializers(std::vector<std::string>(argv, argv + argc));
     if (!status.isOK()) {
         LOGV2_FATAL_OPTIONS(
             20574,

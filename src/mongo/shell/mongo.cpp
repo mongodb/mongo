@@ -34,12 +34,11 @@
 #include "mongo/util/text.h"
 
 #ifdef _WIN32
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    mongo::quickExit(mongo::mongo_main(argc, wcl.argv(), wcl.envp()));
+int wmain(int argc, wchar_t* argvW[]) {
+    mongo::quickExit(mongo::mongo_main(argc, mongo::WindowsCommandLine(argc, argvW).argv()));
 }
 #else   // #ifdef _WIN32
-int main(int argc, char* argv[], char** envp) {
-    mongo::quickExit(mongo::mongo_main(argc, argv, envp));
+int main(int argc, char* argv[]) {
+    mongo::quickExit(mongo::mongo_main(argc, argv));
 }
 #endif  // #ifdef _WIN32

@@ -287,55 +287,29 @@ bool writeUtf8ToWindowsConsole(const char* utf8String, unsigned int utf8StringSi
     return true;
 }
 
-WindowsCommandLine::WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envpW[])
-    : _argv(nullptr), _envp(nullptr) {
-    // Construct UTF-8 copy of arguments
-    std::vector<std::string> utf8args;
-    std::vector<size_t> utf8argLength;
-    size_t blockSize = argc * sizeof(char*);
-    size_t blockPtr = blockSize;
-    for (int i = 0; i < argc; ++i) {
-        utf8args.push_back(toUtf8String(argvW[i]));
-        size_t argLength = utf8args[i].length() + 1;
-        utf8argLength.push_back(argLength);
-        blockSize += argLength;
-    }
-    _argv = static_cast<char**>(mongoMalloc(blockSize));
-    for (int i = 0; i < argc; ++i) {
-        _argv[i] = reinterpret_cast<char*>(_argv) + blockPtr;
-        strcpy_s(_argv[i], utf8argLength[i], utf8args[i].c_str());
-        blockPtr += utf8argLength[i];
+
+class WindowsCommandLine::Impl {
+public:
+    Impl(int argc, wchar_t** argvW) : _strs(argc), _argv(argc + 1) {
+        for (int i = 0; i < argc; ++i)
+            _argv[i] = (_strs[i] = toUtf8String(argvW[i])).data();
     }
 
-    // Construct UTF-8 copy of environment strings
-    size_t envCount = 0;
-    wchar_t** envpWptr = &envpW[0];
-    while (*envpWptr++) {
-        ++envCount;
+    char** argv() {
+        return _argv.data();
     }
-    std::vector<std::string> utf8envs;
-    std::vector<size_t> utf8envLength;
-    blockSize = (envCount + 1) * sizeof(char*);
-    blockPtr = blockSize;
-    for (size_t i = 0; i < envCount; ++i) {
-        utf8envs.push_back(toUtf8String(envpW[i]));
-        size_t envLength = utf8envs[i].length() + 1;
-        utf8envLength.push_back(envLength);
-        blockSize += envLength;
-    }
-    _envp = static_cast<char**>(mongoMalloc(blockSize));
-    size_t i;
-    for (i = 0; i < envCount; ++i) {
-        _envp[i] = reinterpret_cast<char*>(_envp) + blockPtr;
-        strcpy_s(_envp[i], utf8envLength[i], utf8envs[i].c_str());
-        blockPtr += utf8envLength[i];
-    }
-    _envp[i] = nullptr;
-}
 
-WindowsCommandLine::~WindowsCommandLine() {
-    free(_argv);
-    free(_envp);
+    std::vector<std::string> _strs;  // utf8 encoded
+    std::vector<char*> _argv;        // [_strs..., nullptr]
+};
+
+WindowsCommandLine::WindowsCommandLine(int argc, wchar_t** argvW)
+    : _impl{std::make_unique<Impl>(argc, argvW)} {}
+
+WindowsCommandLine::~WindowsCommandLine() = default;
+
+char** WindowsCommandLine::argv() const {
+    return _impl->argv();
 }
 
 #endif  // #if defined(_WIN32)

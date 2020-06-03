@@ -39,12 +39,11 @@
 // WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
 // and makes them available through the argv() and envp() members.  This enables mongoSMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    mongo::exitCleanly(mongo::mongos_main(argc, wcl.argv(), wcl.envp()));
+int wmain(int argc, wchar_t* argvW[]) {
+    mongo::exitCleanly(mongo::mongos_main(argc, mongo::WindowsCommandLine(argc, argvW).argv()));
 }
 #else
-int main(int argc, char* argv[], char** envp) {
-    mongo::exitCleanly(mongo::mongos_main(argc, argv, envp));
+int main(int argc, char* argv[]) {
+    mongo::exitCleanly(mongo::mongos_main(argc, argv));
 }
 #endif

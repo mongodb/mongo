@@ -635,8 +635,7 @@ TEST_F(StitchSupportTest, TestUpsertProducesProperStatus) {
 // the Stitch Support Library intializer function that gets tested here.
 int main(const int argc, const char* const* const argv) {
     // See comment by the same code block in mongo_embedded_test.cpp
-    const char* null_argv[1] = {nullptr};
-    auto ret = mongo::runGlobalInitializers(0, null_argv, nullptr);
+    auto ret = mongo::runGlobalInitializers(std::vector<std::string>{});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
         return EXIT_FAILURE;

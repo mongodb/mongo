@@ -49,8 +49,7 @@ GlobalInitializerRegisterer startupOptionsInitializer(
         std::string config = !context->args().empty() ? context->args()[0] : "";
 
         OptionsParser parser;
-        Status ret =
-            parser.runConfigFile(startupOptions, config, context->env(), &startupOptionsParsed);
+        Status ret = parser.runConfigFile(startupOptions, config, &startupOptionsParsed);
         uassertStatusOKWithContext(ret, "Options parsing failed.");
 
         return Status::OK();

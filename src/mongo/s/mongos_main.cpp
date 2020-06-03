@@ -914,7 +914,7 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManage
 
 }  // namespace
 
-ExitCode mongos_main(int argc, char* argv[], char** envp) {
+ExitCode mongos_main(int argc, char* argv[]) {
     setMongos();
 
     if (argc < 1)
@@ -923,7 +923,7 @@ ExitCode mongos_main(int argc, char* argv[], char** envp) {
 
     setupSignalHandlers();
 
-    Status status = runGlobalInitializers(argc, argv, envp);
+    Status status = runGlobalInitializers(std::vector<std::string>(argv, argv + argc));
     if (!status.isOK()) {
         LOGV2_FATAL_OPTIONS(
             22865,
