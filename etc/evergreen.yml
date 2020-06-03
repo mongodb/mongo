@@ -7783,7 +7783,6 @@ tasks:
   stepback: false
   # Same dependencies as "push" below
   depends_on:
-  - name: compile
   - name: package
   - name: jsCore
   - name: dbtest
