@@ -341,13 +341,31 @@ void _setUpOplog(OperationContext* opCtx, StorageInterface* storage, std::vector
 /**
  * Check collection contents. OplogInterface returns documents in reverse natural order.
  */
-void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const std::vector<BSONObj>& docs) {
+void _assertDocumentsInCollectionEqualsOrdered(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               const std::vector<BSONObj>& docs) {
     CollectionReader reader(opCtx, nss);
     for (const auto& doc : docs) {
         ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(reader.next()));
     }
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, reader.next().getStatus());
+}
+
+void _assertDocumentsInCollectionEqualsUnordered(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const SimpleBSONObjSet& docs) {
+    SimpleBSONObjSet actualDocs;
+    CollectionReader reader(opCtx, nss);
+    for (std::size_t i = 0; i < docs.size(); ++i) {
+        actualDocs.insert(unittest::assertGet(reader.next()));
+    }
+    auto docIt = docs.begin();
+    auto docEnd = docs.end();
+    auto actualIt = actualDocs.begin();
+    for (; docIt != docEnd; ++docIt, ++actualIt) {
+        ASSERT_BSONOBJ_EQ(*docIt, *actualIt);
+    }
+
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, reader.next().getStatus());
 }
 
@@ -359,18 +377,19 @@ void _assertDocsInOplog(OperationContext* opCtx, std::vector<int> timestamps) {
     std::transform(timestamps.begin(), timestamps.end(), expectedOplog.begin(), [](int ts) {
         return _makeInsertOplogEntry(ts).obj;
     });
-    _assertDocumentsInCollectionEquals(opCtx, oplogNs, expectedOplog);
+    _assertDocumentsInCollectionEqualsOrdered(opCtx, oplogNs, expectedOplog);
 }
 
 /**
  * Asserts that the documents in the test collection have the given ids.
  */
 void _assertDocsInTestCollection(OperationContext* opCtx, std::vector<int> ids) {
-    std::vector<BSONObj> expectedColl(ids.size());
-    std::transform(ids.begin(), ids.end(), expectedColl.begin(), [](int id) {
-        return _makeInsertDocument(id);
-    });
-    _assertDocumentsInCollectionEquals(opCtx, testNs, expectedColl);
+    SimpleBSONObjSet expectedColl;
+    std::transform(ids.begin(),
+                   ids.end(),
+                   std::inserter(expectedColl, expectedColl.begin()),
+                   [](int id) { return _makeInsertDocument(id); });
+    _assertDocumentsInCollectionEqualsUnordered(opCtx, testNs, expectedColl);
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryWithNoOplogSucceeds) {
@@ -895,8 +914,8 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
-    std::vector<BSONObj> expectedColl{BSON("_id" << 3 << "a" << 7)};
-    _assertDocumentsInCollectionEquals(opCtx, testNs, expectedColl);
+    SimpleBSONObjSet expectedColl{BSON("_id" << 3 << "a" << 7)};
+    _assertDocumentsInCollectionEqualsUnordered(opCtx, testNs, expectedColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(ts, ts), 1));
@@ -954,8 +973,8 @@ TEST_F(ReplicationRecoveryTest, CorrectlyUpdatesConfigTransactions) {
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
-    std::vector<BSONObj> expectedColl{BSON("_id" << 1), BSON("_id" << 2)};
-    _assertDocumentsInCollectionEquals(opCtx, testNs, expectedColl);
+    SimpleBSONObjSet expectedColl{BSON("_id" << 1), BSON("_id" << 2)};
+    _assertDocumentsInCollectionEqualsUnordered(opCtx, testNs, expectedColl);
 
     SessionTxnRecord expectedTxnRecord;
     expectedTxnRecord.setSessionId(*sessionInfo.getSessionId());
@@ -964,7 +983,7 @@ TEST_F(ReplicationRecoveryTest, CorrectlyUpdatesConfigTransactions) {
     expectedTxnRecord.setLastWriteDate(lastDate);
 
     std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
-    _assertDocumentsInCollectionEquals(
+    _assertDocumentsInCollectionEqualsOrdered(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
@@ -1013,7 +1032,7 @@ TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConf
     std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
 
     // Make sure that the transaction table shows that the transaction is prepared.
-    _assertDocumentsInCollectionEquals(
+    _assertDocumentsInCollectionEqualsOrdered(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
@@ -1074,7 +1093,7 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
     std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
 
     // Make sure that the transaction table shows that the transaction is aborted.
-    _assertDocumentsInCollectionEquals(
+    _assertDocumentsInCollectionEqualsOrdered(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
@@ -1175,12 +1194,12 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
     std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
 
     // Make sure that the transaction table shows that the transaction is commited.
-    _assertDocumentsInCollectionEquals(
+    _assertDocumentsInCollectionEqualsOrdered(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     // Make sure the data from the transaction is applied.
     std::vector<BSONObj> expectedColl{BSON("_id" << 1)};
-    _assertDocumentsInCollectionEquals(opCtx, testNs, expectedColl);
+    _assertDocumentsInCollectionEqualsOrdered(opCtx, testNs, expectedColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
@@ -1260,7 +1279,7 @@ TEST_F(ReplicationRecoveryTest,
     std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
 
     // Make sure that the transaction table shows that the transaction is commited.
-    _assertDocumentsInCollectionEquals(
+    _assertDocumentsInCollectionEqualsOrdered(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
