@@ -38,9 +38,16 @@ function testCleanup(conn) {
     jsTestLog("Perform test cleanup");
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: 'off'}));
+
+    // Wait for the new node to be no longer newly added.
+    waitForNewlyAddedRemovalForNodeToBeCommitted(primary, rst.getNodeId(conn));
     rst.waitForState(conn, ReplSetTest.State.SECONDARY);
+
+    // Insert a doc and wait for it to replicate to all nodes.
     assert.commandWorked(primaryColl.insert({x: "somedoc"}));
     rst.awaitReplication();
+
+    // Clear the RAM logs.
     assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 }
 
@@ -175,7 +182,7 @@ assert.commandWorked(
 newNode = addNewVotingNode({});
 
 // Wait until primary removed the 'newlyAdded' field from repl config.
-checkLog.containsJson(primary, 4634504);
+waitForNewlyAddedRemovalForNodeToBeCommitted(primary, rst.getNodeId(newNode));
 
 // Check that 'newlyAdded' field is not set.
 assert(!isMemberNewlyAdded(primary, 3));
