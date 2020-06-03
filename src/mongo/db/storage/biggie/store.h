@@ -1407,9 +1407,13 @@ private:
                     current->_children[key] = other->_children[key];
                 }
             } else if (baseNode && otherNode && baseNode != otherNode) {
-                // If all three are unique and leaf nodes, then it is a merge conflict.
-                if (node->isLeaf() && baseNode->isLeaf() && otherNode->isLeaf())
-                    throw merge_conflict_exception();
+                // If all three are unique and leaf nodes with different data, then it is a merge
+                // conflict.
+                if (node->isLeaf() && baseNode->isLeaf() && otherNode->isLeaf()) {
+                    if (node->_data != baseNode->_data || baseNode->_data != otherNode->_data)
+                        throw merge_conflict_exception();
+                    continue;
+                }
 
                 // If the keys and data are all the exact same, then we can keep recursing.
                 // Otherwise, we manually resolve the differences element by element. The

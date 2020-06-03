@@ -1709,6 +1709,25 @@ TEST_F(RadixStoreTest, MergeConflictingInsertions) {
     ASSERT_THROWS(thisStore.merge3(baseStore, otherStore), merge_conflict_exception);
 }
 
+TEST_F(RadixStoreTest, MergeDifferentLeafNodesSameDataTest) {
+    baseStore.insert({"a", "a"});
+    baseStore.insert({"aa", "a"});
+
+    otherStore = baseStore;
+    otherStore.insert({"aaa", "a"});
+    otherStore.erase("aaa");
+
+    thisStore = baseStore;
+    thisStore.insert({"aab", "b"});
+    thisStore.erase("aab");
+
+    thisStore.merge3(baseStore, otherStore);
+
+    expected.insert({"a", "a"});
+    expected.insert({"aa", "a"});
+    ASSERT_TRUE(thisStore == expected);
+}
+
 TEST_F(RadixStoreTest, UpperBoundTest) {
     value_type value1 = std::make_pair("foo", "1");
     value_type value2 = std::make_pair("bar", "2");
