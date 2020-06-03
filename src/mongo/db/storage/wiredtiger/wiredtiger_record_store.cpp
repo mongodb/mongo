@@ -196,6 +196,7 @@ private:
 
 WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTigerRecordStore* rs)
     : _rs(rs) {
+    stdx::lock_guard<Latch> reclaimLk(_oplogReclaimMutex);
     stdx::lock_guard<Latch> lk(_mutex);
 
     invariant(rs->isCapped());
@@ -226,10 +227,8 @@ bool WiredTigerRecordStore::OplogStones::isDead() {
 }
 
 void WiredTigerRecordStore::OplogStones::kill() {
-    {
-        stdx::lock_guard<Latch> lk(_oplogReclaimMutex);
-        _isDead = true;
-    }
+    stdx::lock_guard<Latch> lk(_oplogReclaimMutex);
+    _isDead = true;
     _oplogReclaimCv.notify_one();
 }
 
@@ -306,10 +305,16 @@ void WiredTigerRecordStore::OplogStones::popOldestStone() {
 void WiredTigerRecordStore::OplogStones::createNewStoneIfNeeded(OperationContext* opCtx,
                                                                 RecordId lastRecord,
                                                                 Date_t wallTime) {
+    // Try to lock both mutexes, if we fail to lock a mutex then someone else is either already
+    // creating a new stone or popping the oldest one. In the latter case, we let the next insert
+    // trigger the new stone's creation.
+    stdx::unique_lock<Latch> reclaimLk(_oplogReclaimMutex, stdx::try_to_lock);
+    if (!reclaimLk) {
+        return;
+    }
+
     stdx::unique_lock<Latch> lk(_mutex, stdx::try_to_lock);
     if (!lk) {
-        // Someone else is either already creating a new stone or popping the oldest one. In the
-        // latter case, we let the next insert trigger the new stone's creation.
         return;
     }
 
@@ -597,6 +602,7 @@ void WiredTigerRecordStore::OplogStones::_pokeReclaimThreadIfNeeded() {
 }
 
 void WiredTigerRecordStore::OplogStones::adjust(int64_t maxSize) {
+    stdx::lock_guard<Latch> reclaimLk(_oplogReclaimMutex);
     stdx::lock_guard<Latch> lk(_mutex);
 
     const unsigned int oplogStoneSize =
