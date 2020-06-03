@@ -335,22 +335,12 @@ void fillCommandResultWithIndexesAlreadyExistInfo(int numIndexes, BSONObjBuilder
 };
 
 /**
- * Before potentially taking an exclusive database or collection lock, check if all indexes
- * already exist while holding an intent lock.
- *
  * Returns true, after filling in the command result, if the index creation can return early.
  */
 bool indexesAlreadyExist(OperationContext* opCtx,
-                         const NamespaceString& ns,
+                         const Collection* collection,
                          const std::vector<BSONObj>& specs,
                          BSONObjBuilder* result) {
-    AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-
-    auto collection = autoColl.getCollection();
-    if (!collection) {
-        return false;
-    }
-
     auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
     if (specsCopy.size() > 0) {
         return false;
@@ -504,11 +494,15 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
-            if (indexesAlreadyExist(opCtx, ns, specs, &result)) {
+            AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+            auto collection = autoColl.getCollection();
+
+            // Before potentially taking an exclusive collection lock, check if all indexes already
+            // exist while holding an intent lock.
+            if (collection && indexesAlreadyExist(opCtx, collection, specs, &result)) {
                 return true;
             }
 
-            auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns);
             if (collection &&
                 !UncommittedCollections::get(opCtx).isUncommittedCollection(opCtx, ns)) {
                 // The collection exists and was not created in the same multi-document transaction
