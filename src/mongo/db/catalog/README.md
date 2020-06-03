@@ -351,6 +351,8 @@ _Code spelunking starting points:_
   * 'durable' confusingly means journaling is enabled.
 * [_Whether WT journals a collection_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L560-L580)
 
+What collections are journaled, and how.
+
 # Flow Control
 What it does (motivation). How does it do it? Ticketing.
 
@@ -462,27 +464,123 @@ Additionally, users can specify that they'd like to perform a `full` validation.
 
 # Oplog Collection
 
-## Purpose
-‘an operations log’, entry for every write op, repl uses it, rollback, recovery, etc.
+The `local.oplog.rs` collection maintains a log of all writes done on a server that should be
+replicated by other members of its replica set. All replicated writes have corresponding oplog
+entries; non-replicated collection writes do not have corresponding oplog entries. On a primary, an
+oplog entry is written in the same storage transaction as the write it logs; a secondary writes the
+oplog entry and then applies the write reflected therein in separate transactions. The oplog
+collection is only created for servers started with the `--replSet` setting. The oplog collection is
+a capped collection and therefore self-deleting per the default oplog size. The oplog can be resized
+by the user via the `replSetResizeOplog` server command.
+
+A write's persistence is guaranteed when its oplog entry reaches disk. The log is periodically
+synced to disk, i.e. [journaled](#journaling). The log can also be immediately synced to disk by an
+explicit request to fulfill the durability requirements of a particular write. For example:
+replication may need to guarantee a write survives server restart before proceeding, for
+correctness; or a user may specify a `j:true` write concern to request the same durability. The data
+write itself is not written out to disk until the next periodic [checkpoint](#checkpoints) is taken.
+The default log syncing frequency is much higher than the checkpoint default frequency because
+syncing the log to disk is cheaper than syncing everything to disk.
+
+The oplog is read by secondaries that then apply the writes therein to themselves. Secondaries can
+'fall off the oplog' if replication is too slow and the oplog capped max size is too small: the sync
+source may delete oplog entries that a secondary still needs to read. The oplog is also used on
+startup recovery to play writes forward from a checkpoint; and it is manipulated -- undone or
+reapplied -- for replication rollback.
 
 ## Oplog Visibility
 
-### Oplog ‘Holes’
-because parallel writes
+MongoDB supports concurrent writes. This means that there are out-of-order commits and 'oplog holes'
+can momentarily exist when one write with a later timestamp commits before a concurrent write with
+an earlier timestamp. Timestamps are assigned prior to storage transaction commit. Out-of-order
+writes are supported because otherwise writes must be serialized, which would harm performance.
 
-### Oplog Read Timestamp
-only used for forward oplog cursors, backwards skips
+Oplog holes must be tracked so that oplog read cursors do not miss data when reading in timestamp
+order. Unlike typical collections, the key for a document in the oplog is the timestamp itself.
+Because collection cursors return data in key order, cursors on the oplog will return documents in
+timestamp order. Oplog readers therefore fetch a timestamp guaranteed not to have holes behind it
+and use that timestamp to open a storage engine transaction that does not return entries with later
+timestamps. The following is a demonstrative example of what this oplog visibility rule prevents:
+
+Suppose there are two concurrent writers **A** and **B**. **Writer A** opens a storage transaction
+first and is assigned a commit timestamp of **T5**; then **Writer** **B** opens a transaction and
+acquires a commit timestamp **T6**. The writers are using different threads so **Writer B** happens
+to commit first. The oplog now has a 'hole' for timestamp **T5**. A reader opening a read
+transaction at this time could now see up to the **T6** write but miss the **T5** write that has not
+committed yet: the cursor would see T1, T2, T3, T4, T6. This would be a serious replica set data
+consistency problem if secondary replica set members querying the oplog of their sync source could
+unknowingly read past these holes and miss the data therein.
+
+| Op       | Action             | Result                                       |
+|----------|--------------------|----------------------------------------------|
+| Writer A | open transaction   | assigned commit timestamp T5                 |
+| Writer B | open transaction   | assigned commit timestamp T6                 |
+| Writer B | commit transation  | T1,T2,T3,T4,T6 are visible to new readers    |
+| Reader X | open transaction   | gets a snapshot of T1-T4 and T6              |
+| Writer A | commit transaction | T1,T2,T3,T4,T5,T6 are visible to new readers |
+| Reader X | close transaction  | returns T1,T2,T3,T4,T6, missing T5           |
+
+The in-memory 'no holes' point of the oplog is tracked in order to avoid data inconsistency across
+replica set members. The 'oplogReadTimestamp' tracks the in-memory no holes point and is continually
+advanced as new oplog writes occur and holes disappear. Forward cursor oplog readers without a
+specified timestamp set at which to read (secondary callers) will automatically use the
+`oplogReadTimestamp` to avoid missing entries due to oplog holes. This is essential for secondary
+replica set members querying the oplog of their sync source so they do not miss any oplog entries:
+subsequent `getMores` will fetch entries as they become visibile without any holes behind them.
+Backward cursor oplog readers bypass the oplog visibility rules to see the latest oplog entries,
+disregarding any oplog holes.
 
 ## Oplog Truncation
-capped collection or WT oplog stones
 
-special timestamps we will not truncate with WT -- for which we delay truncation
+The oplog collection can be truncated both at the front end (most recent entries) and the back end
+(the oldest entries). The capped setting on the oplog collection causes the oldest oplog entries to
+be deleted when new writes increase the collection size past the cap. MongoDB using the WiredTiger
+storage engine with `--replSet` handles oplog collection deletion specially via a purpose built
+[OplogStones](#wiredtiger-oplogstones) mechanism, ignoring the generic capped collection deletion
+mechanism. The front of the oplog may be truncated back to a particular timestamp during replication
+startup recovery or replication rollback.
 
-new min oplog time retention, helps not fall off of the oplog
+### WiredTiger OplogStones
 
-oplog durability considerations across nodes
+The WiredTiger storage engine disregards the regular capped collection deletion mechanism for the
+oplog collection and instead uses `OplogStones` to improve performance by batching deletes. The
+oplog is broken up into a number of stones. Each stone tracks a range of the oplog, the number of
+bytes in that range, and the last (newest) entry's record ID. A new stone is created when existing
+stones fill up; and the oldest stone's oplog is deleted when the oplog size exceeds its cap size
+setting.
+
+### Special Timestamps That Will Not Be Truncated
+
+The WiredTiger integration layer's `OplogStones` implementation will stall deletion waiting for
+certain significant tracked timestamps to move forward past entries in the oldest stone. This is
+done for correctness. Backup pins truncation in order to maintain a consistent view of the oplog;
+and startup recovery after an unclean shutdown and rollback both require oplog history back to
+certain timestamps.
+
+### Min Oplog Retention
+
+WiredTiger `OplogStones` obey an `oplogMinRetentionHours` configurable setting. When
+`oplogMinRetentionHours` is active, the WT `OplogStones` will only truncate the oplog if a stone (a
+sequential range of oplog) is not within the minimum time range required to remain.
+
+### Oplog Hole Truncation
+
+MongoDB maintains an `oplogTruncateAfterPoint` timestamp while in `PRIMARY` and `SECONDARY`
+replication modes to track persisted oplog holes. Replication startup recovery uses the
+`oplogTruncateAfterPoint` timestamp, if one is found to be set, to truncate all oplog entries after
+that point. On clean shutdown, there are no oplog writes and the `oplogTruncateAfterPoint` is
+cleared. On unclean shutdown, however, parallel writes can be active and therefore oplog holes can
+exist. MongoDB allows secondaries to read their sync source's oplog as soon as there are no
+_in-memory_ oplog holes, ensuring data consistency on the secondaries. Primaries, therefore, can
+allow oplog entries to be replicated and then lose that data themselves, in an unclean shutdown,
+before the replicated oplog entries become persisted. Primaries use the `oplogTruncateAfterPoint`
+to continually track oplog holes on disk in order to eliminate them after an unclean shutdown.
+Additionally, secondaries apply batches of oplog entries out of order and similarly must use the
+`oplogTruncateAfterPoint` to track batch boundaries in order to avoid unknown oplog holes after an
+unclean shutdown.
 
 # Glossary
+_put terms here that can either be briefly explained in order to be simply referenced by above sections; or terms with links to sections for complete explanation so topics can be found quickly when not obviously covered by a section_
 
 **ident**: An ident is a unique identifier given to a storage engine resource. Collections and
 indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented
@@ -492,6 +590,15 @@ as tables. For example, collection idents have the form: `collection-<counter>-<
 representation, from lower memory addresses to higher addresses, is the same as the defined ordering
 for that type. For example, ASCII strings are binary comparable, but double precision floating point
 numbers and little-endian integers are not.
+
+**`oplog hole`**: an uncommitted oplog write that can exist with out-of-order writes when a later
+timestamped write happens to commit first. Oplog holes can exist in-memory and persisted on disk.
+
+**`oplogReadTimestamp`**: the timestamp used for WT forward cursor oplog reads in order to avoid
+advancing past oplog holes. Tracks in-memory oplog holes.
+
+**`oplogTruncateAfterPoint`**: the timestamp after which oplog entries will be truncated during
+startup recovery after an unclean shutdown. Tracks persisted oplog holes.
 
 [`BSONObj::woCompare`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonobj.h#L460
 [`BSONElement::compareElements`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonelement.cpp#L285
