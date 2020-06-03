@@ -2291,10 +2291,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
     WT_SESSION *wt_session;
-    WT_SESSION_IMPL *session, *verify_session;
+    WT_SESSION_IMPL *session;
     bool config_base_set, try_salvage, verify_meta;
     const char *enc_cfg[] = {NULL, NULL}, *merge_cfg;
     char version[64];
+
+#if 0
+    /* FIXME-WT-6263: Temporarily disable history store verification. */
+    WT_SESSION_IMPL *verify_session;
+#endif
 
     /* Leave lots of space for optional additional configuration. */
     const char *cfg[] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
@@ -2701,9 +2706,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     /* Start the worker threads and run recovery. */
     WT_ERR(__wt_connection_workers(session, cfg));
 
+#if 0
     /*
      * If the user wants to verify WiredTiger metadata, verify the history store now that the
      * metadata table may have been salvaged and eviction has been started and recovery run.
+     *
+     * FIXME-WT-6263: Temporarily disable history store verification.
      */
     if (verify_meta) {
         WT_ERR(__wt_open_internal_session(conn, "verify hs", false, 0, &verify_session));
@@ -2712,6 +2720,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
         WT_TRET(wt_session->close(wt_session, NULL));
         WT_ERR(ret);
     }
+#endif
 
     /*
      * The default session should not open data handles after this point: since it can be shared

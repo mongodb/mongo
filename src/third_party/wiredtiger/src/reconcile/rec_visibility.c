@@ -140,6 +140,9 @@ __rec_append_orig_value(
              * timestamped globally visible tombstone because even if its timestamp is smaller than
              * the entries in the history store, we can't change the history store entries. This is
              * not correct but we hope we can get away with it.
+             *
+             * FIXME-WT-6171: remove this once we get rid of out of order timestamps and mixed mode
+             * transactions.
              */
             if (unpack->tw.durable_stop_ts != WT_TS_NONE && tombstone_globally_visible)
                 return (0);
@@ -486,6 +489,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
 
         select_tw->durable_start_ts = select_tw->durable_stop_ts;
         select_tw->start_ts = select_tw->stop_ts;
+        select_tw->start_txn = select_tw->stop_txn;
     }
 
     /*
@@ -544,12 +548,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
      * part of the page, and they are physically removed by checkpoint writing this page, that is,
      * the checkpoint doesn't include the overflow blocks so they're removed and future readers of
      * this page won't be able to find them.
-     *
-     * There is no need to append the original value for in memory databases as the onpage value
-     * should be already on the update chain and there is no history store.
      */
-    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && upd_select->upd != NULL && vpack != NULL &&
-      vpack->type != WT_CELL_DEL && (upd_saved || F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)))
+    if (upd_select->upd != NULL && vpack != NULL && vpack->type != WT_CELL_DEL &&
+      (upd_saved || F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)))
         WT_ERR(__rec_append_orig_value(session, page, upd_select->upd, vpack));
 
     __wt_time_window_clear_obsolete(
