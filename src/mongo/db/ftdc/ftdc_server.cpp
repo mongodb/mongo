@@ -213,7 +213,6 @@ public:
 
         BSONObjBuilder commandBuilder;
         commandBuilder.append(kCommand, 1);
-        commandBuilder.append("tcMalloc", true);
         commandBuilder.append("sharding", false);
         commandBuilder.append("timing", false);
         commandBuilder.append("defaultRWConcern", false);
@@ -223,6 +222,10 @@ public:
             BSONObjBuilder subObjBuilder(commandBuilder.subobjStart("opLatencies"));
             subObjBuilder.append("histograms", true);
             subObjBuilder.append("slowBuckets", true);
+        }
+
+        if (gDiagnosticDataCollectionVerboseTCMalloc.load()) {
+            commandBuilder.append("tcmalloc", 2);
         }
 
         commandBuilder.done();

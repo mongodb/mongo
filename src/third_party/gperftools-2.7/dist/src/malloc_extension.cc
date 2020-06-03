@@ -349,7 +349,7 @@ void MallocExtension::Ranges(void* arg, RangeFunction func) {
   // No callbacks by default
 }
 
-void MallocExtension::SizeClasses(void* arg, SizeClassFunction func) {
+void MallocExtension::SizeClasses(void* arg, SizeClassFunction func, PageHeapSizeClassFunction pageFunc) {
   // Do nothing by default
 }
 
@@ -375,8 +375,8 @@ C_SHIM(GetNumericProperty, int,
 C_SHIM(SetNumericProperty, int,
        (const char* property, size_t value), (property, value));
 C_SHIM(SizeClasses, void,
-       (void* arg, void (func)(void*, const base::MallocSizeClass*)),
-       (arg, func));
+       (void* arg, void (func)(void*, const base::MallocSizeClass*), void (pageFunc)(void*, const base::PageHeapSizeClass*)),
+       (arg, func, pageFunc));
  
 C_SHIM(MarkThreadIdle, void, (void), ());
 C_SHIM(MarkThreadBusy, void, (void), ());

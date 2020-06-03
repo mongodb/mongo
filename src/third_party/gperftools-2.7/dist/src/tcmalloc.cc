@@ -1012,11 +1012,14 @@ class TCMallocImplementation : public MallocExtension {
     }
   }
   
-  virtual void SizeClasses(void* arg, SizeClassFunction func) {
+  virtual void SizeClasses(void* arg, SizeClassFunction func, PageHeapSizeClassFunction pageFunc) {
     TCMallocStats global_stats;
     base::MallocSizeClass stats;
     uint64_t class_count[kClassSizesMax];
-    ExtractStats(&global_stats, class_count, NULL, NULL);
+    PageHeap::SmallSpanStats small;
+    PageHeap::LargeSpanStats large;
+
+    ExtractStats(&global_stats, class_count, &small, &large);
 
     for (int cl = 0; cl < Static::num_size_classes(); cl++) {
       uint64_t central_objs = Static::central_cache()[cl].length();
@@ -1035,6 +1038,31 @@ class TCMallocImplementation : public MallocExtension {
 
       func(arg, &stats);
     }
+
+    base::PageHeapSizeClass info;
+
+    for (int s = 1; s <= kMaxPages; s++) {
+      const int n_length = small.normal_length[s - 1];
+      const int r_length = small.returned_length[s - 1];
+
+      if (n_length + r_length > 0) {
+        info.pages = s;
+        info.normal_spans = n_length;
+        info.unmapped_spans = r_length;
+        info.normal_bytes = (s * n_length) << kPageShift;
+        info.unmapped_bytes = (s * r_length) << kPageShift;
+
+        pageFunc(arg, &info);
+      }
+    }
+
+    info.pages = kMaxPages;
+    info.normal_spans = large.spans;
+    info.unmapped_spans = 0;
+    info.normal_bytes = large.normal_pages << kPageShift;
+    info.unmapped_bytes = large.returned_pages << kPageShift;
+
+    pageFunc(arg, &info);
   }
 };
 
