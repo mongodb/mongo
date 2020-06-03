@@ -92,3 +92,9 @@ server_parameters:
     set_at: [startup, runtime]
     cpp_vartype: 'AtomicWord<bool>'
     cpp_varname: gDiagnosticDataCollectionEnableLatencyHistograms
+
+  diagnosticDataCollectionVerboseTCMalloc:
+     description: "Enable the capture of verbose tcmalloc in FTDC."
+     set_at: [startup, runtime]
+     cpp_vartype: 'AtomicWord<bool>'
+     cpp_varname: gDiagnosticDataCollectionVerboseTCMalloc
