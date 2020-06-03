@@ -1752,7 +1752,6 @@ StatusWith<OptionsParser::ConfigExpand> parseConfigExpand(const Environment& cli
  */
 Status OptionsParser::run(const OptionSection& options,
                           const std::vector<std::string>& argvOriginal,
-                          const std::map<std::string, std::string>& env,  // XXX: Currently unused
                           Environment* environment) {
     Environment commandLineEnvironment;
     Environment configEnvironment;
@@ -1855,11 +1854,9 @@ Status OptionsParser::run(const OptionSection& options,
     return Status::OK();
 }
 
-Status OptionsParser::runConfigFile(
-    const OptionSection& options,
-    const std::string& config,
-    const std::map<std::string, std::string>& env,  // Unused, interface consistent with run()
-    Environment* configEnvironment) {
+Status OptionsParser::runConfigFile(const OptionSection& options,
+                                    const std::string& config,
+                                    Environment* configEnvironment) {
     // Add values from the provided config file
     Status ret = parseConfigFile(options, config, configEnvironment, ConfigExpand());
     if (!ret.isOK()) {

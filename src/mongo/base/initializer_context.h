@@ -42,26 +42,15 @@ namespace mongo {
  * See mongo/base/initializer.h and mongo/base/initializer_dependency_graph.h for more details.
  */
 class InitializerContext {
-    InitializerContext(const InitializerContext&) = delete;
-    InitializerContext& operator=(const InitializerContext&) = delete;
-
 public:
-    typedef std::vector<std::string> ArgumentVector;
-    typedef std::map<std::string, std::string> EnvironmentMap;
+    explicit InitializerContext(std::vector<std::string> args) : _args(std::move(args)) {}
 
-    InitializerContext(const ArgumentVector& args, const EnvironmentMap& env)
-        : _args(args), _env(env) {}
-
-    const ArgumentVector& args() const {
+    const std::vector<std::string>& args() const {
         return _args;
-    }
-    const EnvironmentMap& env() const {
-        return _env;
     }
 
 private:
-    ArgumentVector _args;
-    EnvironmentMap _env;
+    std::vector<std::string> _args;
 };
 
 }  // namespace mongo

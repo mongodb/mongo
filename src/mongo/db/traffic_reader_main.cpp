@@ -48,11 +48,11 @@
 
 using namespace mongo;
 
-int main(int argc, char* argv[], char** envp) {
+int main(int argc, char* argv[]) {
 
     setupSignalHandlers();
 
-    Status status = mongo::runGlobalInitializers(argc, argv, envp);
+    Status status = mongo::runGlobalInitializers(std::vector<std::string>(argv, argv + argc));
     if (!status.isOK()) {
         std::cerr << "Failed global initialization: " << status << std::endl;
         return EXIT_FAILURE;

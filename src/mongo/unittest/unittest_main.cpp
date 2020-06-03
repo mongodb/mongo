@@ -50,12 +50,14 @@ using mongo::Status;
 
 namespace moe = ::mongo::optionenvironment;
 
-int main(int argc, char** argv, char** envp) {
+int main(int argc, char** argv) {
+    std::vector<std::string> argVec(argv, argv + argc);
+
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
 
     ::mongo::TestingProctor::instance().setEnabled(true);
-    ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    ::mongo::runGlobalInitializersOrDie(argVec);
     ::mongo::setTestCommandsEnabled(true);
 
     moe::OptionSection options;
@@ -68,9 +70,7 @@ int main(int argc, char** argv, char** envp) {
 
     moe::OptionsParser parser;
     moe::Environment environment;
-    std::map<std::string, std::string> env;
-    std::vector<std::string> argVector(argv, argv + argc);
-    Status ret = parser.run(options, argVector, env, &environment);
+    Status ret = parser.run(options, argVec, &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
         return EXIT_FAILURE;

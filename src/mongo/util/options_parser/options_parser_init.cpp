@@ -44,7 +44,7 @@ namespace {
 
 MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
     OptionsParser parser;
-    Status ret = parser.run(startupOptions, context->args(), context->env(), &startupOptionsParsed);
+    Status ret = parser.run(startupOptions, context->args(), &startupOptionsParsed);
     if (!ret.isOK()) {
         std::cerr << ret.reason() << std::endl;
         // TODO: Figure out if there's a use case for this help message ever being different

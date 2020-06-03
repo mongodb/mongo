@@ -259,12 +259,11 @@ using StatusPtr = std::unique_ptr<mongo_embedded_v1_status, StatusDestroy>;
 // These test functions cannot use the main() defined for unittests because they
 // call runGlobalInitializers(). The embedded C API calls mongoDbMain() which
 // calls runGlobalInitializers().
-int main(int argc, char** argv, char** envp) {
+int main(int argc, char** argv) {
 
     moe::OptionsParser parser;
     moe::Environment environment;
     moe::OptionSection options;
-    std::map<std::string, std::string> env;
 
     auto ret = mongo::embedded::addMongocEmbeddedTestOptions(&options);
     if (!ret.isOK()) {
@@ -272,8 +271,7 @@ int main(int argc, char** argv, char** envp) {
         return EXIT_FAILURE;
     }
 
-    std::vector<std::string> argVector(argv, argv + argc);
-    ret = parser.run(options, argVector, env, &environment);
+    ret = parser.run(options, std::vector<std::string>(argv, argv + argc), &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
         return EXIT_FAILURE;
@@ -287,8 +285,7 @@ int main(int argc, char** argv, char** envp) {
     ::mongo::serverGlobalParams.noUnixSocket = true;
 
     // See comment by the same code block in mongo_embedded_test.cpp
-    const char* null_argv[1] = {nullptr};
-    ret = mongo::runGlobalInitializers(0, null_argv, nullptr);
+    ret = mongo::runGlobalInitializers(std::vector<std::string>{});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
         return EXIT_FAILURE;

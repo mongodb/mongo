@@ -40,11 +40,11 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 
 
-int main(int argc, char** argv, char** envp) {
+int main(int argc, char** argv) {
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
 
-    ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    ::mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     ::mongo::setGlobalServiceContext(::mongo::ServiceContext::make());
 
     // Copied from the BENCHMARK_MAIN macro.

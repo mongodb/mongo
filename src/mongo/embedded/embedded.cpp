@@ -190,11 +190,10 @@ void shutdown(ServiceContext* srvContext) {
 ServiceContext* initialize(const char* yaml_config) {
     srand(static_cast<unsigned>(curTimeMicros64()));
 
-    // yaml_config is passed to the options parser through the argc/argv interface that already
-    // existed. If it is nullptr then use 0 count which will be interpreted as empty string.
-    const char* argv[2] = {yaml_config, nullptr};
-
-    Status status = mongo::runGlobalInitializers(yaml_config ? 1 : 0, argv, nullptr);
+    std::vector<std::string> argv;
+    if (yaml_config)
+        argv.push_back(yaml_config);
+    Status status = mongo::runGlobalInitializers(argv);
     uassertStatusOKWithContext(status, "Global initilization failed");
     auto giGuard = makeGuard([] { mongo::runGlobalDeinitializers().ignore(); });
     setGlobalServiceContext(ServiceContext::make());

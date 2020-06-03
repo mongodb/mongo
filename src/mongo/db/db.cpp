@@ -1313,7 +1313,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 #endif
 }
 
-int mongoDbMain(int argc, char* argv[], char** envp) {
+int mongoDbMain(int argc, char* argv[]) {
     ThreadSafetyContext::getThreadSafetyContext()->forbidMultiThreading();
 
     registerShutdownTask(shutdownTask);
@@ -1322,7 +1322,7 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
 
     srand(static_cast<unsigned>(curTimeMicros64()));
 
-    Status status = mongo::runGlobalInitializers(argc, argv, envp);
+    Status status = mongo::runGlobalInitializers(std::vector<std::string>(argv, argv + argc));
     if (!status.isOK()) {
         LOGV2_FATAL_OPTIONS(
             20574,
@@ -1397,16 +1397,16 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
 // In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
 // as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
 // WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
-// and makes them available through the argv() and envp() members.  This enables mongoDbMain()
-// to process UTF-8 encoded arguments and environment variables without regard to platform.
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    int exitCode = mongo::mongoDbMain(argc, wcl.argv(), wcl.envp());
+// and makes them available through the argv() member.  This enables mongoDbMain() to process UTF-8
+// encoded arguments without regard to platform.
+int wmain(int argc, wchar_t* argvW[]) {
+    mongo::WindowsCommandLine wcl(argc, argvW);
+    int exitCode = mongo::mongoDbMain(argc, wcl.argv());
     mongo::quickExit(exitCode);
 }
 #else
-int main(int argc, char* argv[], char** envp) {
-    int exitCode = mongo::mongoDbMain(argc, argv, envp);
+int main(int argc, char* argv[]) {
+    int exitCode = mongo::mongoDbMain(argc, argv);
     mongo::quickExit(exitCode);
 }
 #endif

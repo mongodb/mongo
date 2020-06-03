@@ -89,10 +89,9 @@ TEST(Registration, EmptySingleName) {
     // This should fail now, because we didn't specify that these options were not valid in the
     // INI config or on the command line
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
     moe::OptionsParser parser;
     moe::Environment environment;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     moe::OptionSection testOptsValid;
     try {
@@ -108,7 +107,7 @@ TEST(Registration, EmptySingleName) {
 
     // This should pass now, because we specified that these options were not valid in the INI
     // config or on the command line
-    ASSERT_OK(parser.run(testOptsValid, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOptsValid, argv, &environment));
 }
 
 TEST(Registration, DuplicateSingleName) {
@@ -372,10 +371,9 @@ TEST(Parsing, Good) {
     argv.push_back("--port");
     argv.push_back("5");
     argv.push_back("--help");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("help"), &value));
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -397,10 +395,9 @@ TEST(Parsing, SubSection) {
     argv.push_back("binaryname");
     argv.push_back("--port");
     argv.push_back("5");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
     ASSERT_OK(value.get(&port));
@@ -421,10 +418,9 @@ TEST(Parsing, StringVector) {
     argv.push_back("val1");
     argv.push_back("--multival");
     argv.push_back("val2");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::vector<std::string> multival;
     std::vector<std::string>::iterator multivalit;
@@ -451,10 +447,9 @@ TEST(Parsing, StringMap) {
     argv.push_back("key2=value2");
     argv.push_back("--multival");
     argv.push_back("key3=");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::map<std::string, std::string> multival;
     std::map<std::string, std::string>::iterator multivalit;
@@ -484,10 +479,9 @@ TEST(Parsing, StringMapDuplicateKey) {
     argv.push_back("key1=value1");
     argv.push_back("--multival");
     argv.push_back("key1=value2");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, Positional) {
@@ -503,10 +497,9 @@ TEST(Parsing, Positional) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("positional");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::string positional;
     ASSERT_OK(value.get(&positional));
@@ -527,10 +520,9 @@ TEST(Parsing, PositionalTooMany) {
     argv.push_back("binaryname");
     argv.push_back("positional");
     argv.push_back("extrapositional");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, PositionalAndFlag) {
@@ -549,10 +541,9 @@ TEST(Parsing, PositionalAndFlag) {
     argv.push_back("positional");
     argv.push_back("--port");
     argv.push_back("5");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::string positional;
     ASSERT_OK(value.get(&positional));
@@ -577,9 +568,8 @@ TEST(Parsing, PositionalMultiple) {
     argv.push_back("binaryname");
     argv.push_back("positional1");
     argv.push_back("positional2");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::vector<std::string> positional;
@@ -605,9 +595,8 @@ TEST(Parsing, PositionalMultipleExtra) {
     argv.push_back("positional1");
     argv.push_back("positional2");
     argv.push_back("positional2");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, PositionalMultipleUnlimited) {
@@ -627,9 +616,8 @@ TEST(Parsing, PositionalMultipleUnlimited) {
     argv.push_back("positional3");
     argv.push_back("positional4");
     argv.push_back("positional5");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::vector<std::string> positional;
@@ -663,9 +651,8 @@ TEST(Parsing, PositionalMultipleAndFlag) {
     argv.push_back("--port");
     argv.push_back("5");
     argv.push_back("positional2");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::vector<std::string> positional;
@@ -692,9 +679,8 @@ TEST(Parsing, NeedArg) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("--port");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, BadArg) {
@@ -710,9 +696,8 @@ TEST(Parsing, BadArg) {
     argv.push_back("binaryname");
     argv.push_back("--port");
     argv.push_back("string");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, ExtraArg) {
@@ -728,9 +713,8 @@ TEST(Parsing, ExtraArg) {
     argv.push_back("binaryname");
     argv.push_back("--help");
     argv.push_back("string");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, DefaultValue) {
@@ -745,9 +729,8 @@ TEST(Parsing, DefaultValue) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -769,9 +752,8 @@ TEST(Parsing, DefaultValueOverride) {
     argv.push_back("binaryname");
     argv.push_back("--port");
     argv.push_back("6");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -795,9 +777,8 @@ TEST(Parsing, DefaultValuesNotInBSON) {
     argv.push_back("binaryname");
     argv.push_back("--val1");
     argv.push_back("6");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
     mongo::BSONObj expected = BSON("val1" << 6);
     ASSERT_BSONOBJ_EQ(expected, environment.toBSON());
@@ -817,9 +798,8 @@ TEST(Parsing, ImplicitValue) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("--port");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -840,9 +820,8 @@ TEST(Parsing, ImplicitValueDefault) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -865,9 +844,8 @@ TEST(Parsing, ImplicitValueOverride) {
     argv.push_back("binaryname");
     argv.push_back("--port");
     argv.push_back("5");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -889,9 +867,8 @@ TEST(Parsing, ImplicitValueOverrideWithEqualsSign) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("--port=5");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -913,10 +890,9 @@ TEST(Parsing, ShortName) {
     argv.push_back("-p");
     argv.push_back("5");
     argv.push_back("-h");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("help"), &value));
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -935,9 +911,8 @@ TEST(Style, NoSticky) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("-oa");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Style, NoGuessing) {
@@ -951,9 +926,8 @@ TEST(Style, NoGuessing) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("--hel");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Style, LongDisguises) {
@@ -967,9 +941,8 @@ TEST(Style, LongDisguises) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("-help");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("help"), &value));
     bool help;
@@ -1007,9 +980,8 @@ TEST(Style, Verbosity) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("-vvvvvv");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
     moe::Value value;
     for (std::string s = "vv"; s.length() <= 12; s.append("v")) {
@@ -1037,11 +1009,10 @@ TEST(INIConfigFile, Basic) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("default.conf");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf", "port=5");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -1061,11 +1032,10 @@ TEST(INIConfigFile, Empty) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("default.conf");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf", "");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(INIConfigFile, Override) {
@@ -1083,11 +1053,10 @@ TEST(INIConfigFile, Override) {
     argv.push_back("default.conf");
     argv.push_back("--port");
     argv.push_back("6");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf", "port=5");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -1109,11 +1078,10 @@ TEST(INIConfigFile, Comments) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("default.conf");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf", "# port=5\nstr=NotCommented");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_NOT_OK(environment.get(moe::Key("port"), &value));
     ASSERT_OK(environment.get(moe::Key("str"), &value));
@@ -1152,11 +1120,10 @@ TEST(INIConfigFile, Switches) {
     argv.push_back("--config");
     argv.push_back("default.conf");
     argv.push_back("--switch1");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf", "switch2=true\nswitch3=false\nswitch5=");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     bool switch1;
     ASSERT_OK(environment.get(moe::Key("switch1"), &switch1));
     ASSERT_TRUE(switch1);
@@ -1190,13 +1157,12 @@ TEST(INIConfigFile, Monkeys) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("default.conf");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf",
                      "\t this = false \n#that = true\n #another = whocares"
                      "\n\n other = monkeys ");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("this"), &value));
     bool thisValue;
@@ -1224,11 +1190,10 @@ TEST(INIConfigFile, DefaultValueOverride) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("default.conf");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf", "port=6");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -1250,12 +1215,11 @@ TEST(INIConfigFile, StringVector) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini", "multival = val1\nmultival = val2");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::vector<std::string> multival;
     std::vector<std::string>::iterator multivalit;
@@ -1280,7 +1244,6 @@ TEST(INIConfigFile, StringMap) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini",
                      "multival = key1=value1\n"
@@ -1288,7 +1251,7 @@ TEST(INIConfigFile, StringMap) {
                      "multival = key3=");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::map<std::string, std::string> multival;
     std::map<std::string, std::string>::iterator multivalit;
@@ -1318,13 +1281,12 @@ TEST(INIConfigFile, StringMapDuplicateKey) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini",
                      "multival = key1=value1\n"
                      "multival = key1=value2");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(JSONConfigFile, Basic) {
@@ -1340,11 +1302,10 @@ TEST(JSONConfigFile, Basic) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ port : 5 }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -1364,11 +1325,10 @@ TEST(JSONConfigFile, Empty) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(JSONConfigFile, EmptyObject) {
@@ -1383,11 +1343,10 @@ TEST(JSONConfigFile, EmptyObject) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{}");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(JSONConfigFile, Override) {
@@ -1405,12 +1364,11 @@ TEST(JSONConfigFile, Override) {
     argv.push_back("config.json");
     argv.push_back("--port");
     argv.push_back("6");
-    std::map<std::string, std::string> env_map;
 
 
     parser.setConfig("config.json", "{ port : 5 }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -1430,11 +1388,10 @@ TEST(JSONConfigFile, UnregisteredOption) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ port : 5 }");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(JSONConfigFile, DuplicateOption) {
@@ -1450,11 +1407,10 @@ TEST(JSONConfigFile, DuplicateOption) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ port : 5, port : 5 }");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(JSONConfigFile, TypeChecking) {
@@ -1497,29 +1453,28 @@ TEST(JSONConfigFile, TypeChecking) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     // Test StringVector type
     std::vector<std::string> stringVectorVal;
 
     parser.setConfig("config.json", "{ stringVectorVal : \"scalar\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ stringVectorVal : \"true\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ stringVectorVal : \"5\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ stringVectorVal : [ [ \"string\" ], true, 1, 1.0 ] }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a string vector type and treat it as an array of strings, even if the
     // elements are not surrounded by quotes
     environment = moe::Environment();
     parser.setConfig("config.json", "{ stringVectorVal : [ \"string\", bare, true, 1, 1.0 ] }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVectorVal"), &value));
     std::vector<std::string>::iterator stringVectorValIt;
     ASSERT_OK(value.get(&stringVectorVal));
@@ -1538,25 +1493,25 @@ TEST(JSONConfigFile, TypeChecking) {
     bool boolVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "{ boolVal : \"lies\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ boolVal : truth }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ boolVal : 1 }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a bool type and try to convert it to a bool, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "{ boolVal : \"true\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("boolVal"), &value));
     ASSERT_OK(value.get(&boolVal));
     ASSERT_EQUALS(boolVal, true);
     environment = moe::Environment();
     parser.setConfig("config.json", "{ boolVal : false }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("boolVal"), &value));
     ASSERT_OK(value.get(&boolVal));
     ASSERT_EQUALS(boolVal, false);
@@ -1565,34 +1520,34 @@ TEST(JSONConfigFile, TypeChecking) {
     double doubleVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "{ doubleVal : \"double the monkeys\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ doubleVal : true }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a double type and try to convert it to a double, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "{ doubleVal : 1.5 }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
     ASSERT_EQUALS(doubleVal, 1.5);
     environment = moe::Environment();
     parser.setConfig("config.json", "{ doubleVal : -1.5 }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
     ASSERT_EQUALS(doubleVal, -1.5);
     environment = moe::Environment();
     parser.setConfig("config.json", "{ doubleVal : \"3.14\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
     ASSERT_EQUALS(doubleVal, 3.14);
     environment = moe::Environment();
     parser.setConfig("config.json", "{ doubleVal : \"-3.14\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
     ASSERT_EQUALS(doubleVal, -3.14);
@@ -1601,29 +1556,29 @@ TEST(JSONConfigFile, TypeChecking) {
     int intVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "{ intVal : \"hungry hippos\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ intVal : 1.5 }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ intVal : 18446744073709551617 }");  // 2^64 + 1
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ intVal : true }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as an int type and try to convert it to a int, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "{ intVal : \"5\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("intVal"), &value));
     ASSERT_OK(value.get(&intVal));
     ASSERT_EQUALS(intVal, 5);
 
     environment = moe::Environment();
     parser.setConfig("config.json", "{ intVal : \"-5\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("intVal"), &value));
     ASSERT_OK(value.get(&intVal));
     ASSERT_EQUALS(intVal, -5);
@@ -1632,29 +1587,29 @@ TEST(JSONConfigFile, TypeChecking) {
     long longVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "{ longVal : \"in an eating race\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ longVal : 1.5 }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ longVal : 18446744073709551617 }");  // 2^64 + 1
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ longVal : true }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a long type and try to convert it to a long, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "{ longVal : \"5\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("longVal"), &value));
     ASSERT_OK(value.get(&longVal));
     ASSERT_EQUALS(longVal, 5);
 
     environment = moe::Environment();
     parser.setConfig("config.json", "{ longVal : \"-5\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("longVal"), &value));
     ASSERT_OK(value.get(&longVal));
     ASSERT_EQUALS(longVal, -5);
@@ -1667,28 +1622,28 @@ TEST(JSONConfigFile, TypeChecking) {
     // surrounded by quotes
     environment = moe::Environment();
     parser.setConfig("config.json", "{ stringVal : }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
     ASSERT_OK(value.get(&stringVal));
     ASSERT_EQUALS(stringVal, "");
 
     environment = moe::Environment();
     parser.setConfig("config.json", "{ stringVal : \"1000\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
     ASSERT_OK(value.get(&stringVal));
     ASSERT_EQUALS(stringVal, "1000");
 
     environment = moe::Environment();
     parser.setConfig("config.json", "{ stringVal : wat man }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
     ASSERT_OK(value.get(&stringVal));
     ASSERT_EQUALS(stringVal, "wat man");
 
     environment = moe::Environment();
     parser.setConfig("config.json", "{ stringVal : true 1 string 1.0 }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
     ASSERT_OK(value.get(&stringVal));
     ASSERT_EQUALS(stringVal, "true 1 string 1.0");
@@ -1697,26 +1652,26 @@ TEST(JSONConfigFile, TypeChecking) {
     unsigned long long unsignedLongLongVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedLongLongVal : \"unsigned hungry hippos\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedLongLongVal : 1.5 }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedLongLongVal : 18446744073709551617 }");  // 2^64 + 1
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedLongLongVal : true }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedLongLongVal : \"-5\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as an unsigned long long type and try to convert it to an unsigned long long,
     // even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedLongLongVal : \"5\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
     ASSERT_OK(value.get(&unsignedLongLongVal));
     ASSERT_EQUALS(unsignedLongLongVal, 5ULL);
@@ -1725,25 +1680,25 @@ TEST(JSONConfigFile, TypeChecking) {
     unsigned unsignedVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedVal : \"unsigned hungry hippos\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedVal : 1.5 }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedVal : 18446744073709551617 }");  // 2^64 + 1
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedVal : true }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedVal : \"-5\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as an unsigned type and try to convert it to an unsigned, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "{ unsignedVal : \"5\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
     ASSERT_OK(value.get(&unsignedVal));
     ASSERT_EQUALS(unsignedVal, 5U);
@@ -1752,25 +1707,25 @@ TEST(JSONConfigFile, TypeChecking) {
     bool switchVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "{ switchVal : \"lies\" }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ switchVal : truth }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "{ switchVal : 1 }");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a switch type and try to convert it to a bool, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "{ switchVal : \"true\" }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("switchVal"), &value));
     ASSERT_OK(value.get(&switchVal));
     ASSERT_EQUALS(switchVal, true);
     environment = moe::Environment();
     parser.setConfig("config.json", "{ switchVal : false }");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("switchVal"), &switchVal));
     ASSERT_FALSE(switchVal);
 }
@@ -1788,11 +1743,10 @@ TEST(JSONConfigFile, Nested) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ nested : { port : 5 } }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("nested.port"), &value));
     int port;
@@ -1813,11 +1767,10 @@ TEST(JSONConfigFile, Dotted) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ \"dotted.port\" : 5 }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("dotted.port"), &value));
     int port;
@@ -1841,11 +1794,10 @@ TEST(JSONConfigFile, DottedAndNested) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ \"dottednested.var1\" : 5, dottednested : { var2 : 6 } }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("dottednested.var1"), &value));
     int var1;
@@ -1871,12 +1823,11 @@ TEST(JSONConfigFile, StringVector) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ multival : [ \"val1\", \"val2\" ] }");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::vector<std::string> multival;
     std::vector<std::string>::iterator multivalit;
@@ -1901,13 +1852,12 @@ TEST(JSONConfigFile, StringMap) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json",
                      "{ multival : { key1 : \"value1\", key2 : \"value2\", key3 : \"\" } }");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::map<std::string, std::string> multival;
     std::map<std::string, std::string>::iterator multivalit;
@@ -1937,11 +1887,10 @@ TEST(JSONConfigFile, StringMapDuplicateKey) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ multival : { key1 : \"value1\", key1 : \"value2\" } }");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(JSONConfigFile, StringVectorNonString) {
@@ -1958,7 +1907,6 @@ TEST(JSONConfigFile, StringVectorNonString) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     // NOTE: The yaml config file just reads things as strings, and it's up to us to decide what
     // the type should be later.  This means that we can't tell the difference between when a
@@ -1966,7 +1914,7 @@ TEST(JSONConfigFile, StringVectorNonString) {
     parser.setConfig("config.json", "{ multival : [ 1, true ] }");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::vector<std::string> multival;
     std::vector<std::string>::iterator multivalit;
@@ -1991,11 +1939,10 @@ TEST(JSONConfigFile, DefaultValueOverride) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ port : 6 }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -2017,11 +1964,10 @@ TEST(Parsing, BadConfigFileOption) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("1");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf", "");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, MapForScalarMismatch) {
@@ -2037,11 +1983,10 @@ TEST(Parsing, MapForScalarMismatch) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", R"cfg({ str: { elem: "val" } })cfg");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, ScalarForMapMismatch) {
@@ -2057,11 +2002,10 @@ TEST(Parsing, ScalarForMapMismatch) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", R"cfg({ str: "val" })cfg");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, ListForScalarMismatch) {
@@ -2077,11 +2021,10 @@ TEST(Parsing, ListForScalarMismatch) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", R"cfg({ str: ["val"] })cfg");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(Parsing, ScalarForListMismatch) {
@@ -2098,11 +2041,10 @@ TEST(Parsing, ScalarForListMismatch) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", R"cfg({ str: "val" })cfg");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ConfigFromFilesystem, JSONGood) {
@@ -2118,10 +2060,9 @@ TEST(ConfigFromFilesystem, JSONGood) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("good.json"));
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
     ASSERT_OK(value.get(&port));
@@ -2141,10 +2082,9 @@ TEST(ConfigFromFilesystem, INIGood) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("good.conf"));
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
     ASSERT_OK(value.get(&port));
@@ -2163,10 +2103,9 @@ TEST(ConfigFromFilesystem, Empty) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("empty.json"));
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ConfigFromFilesystem, Directory) {
@@ -2181,10 +2120,9 @@ TEST(ConfigFromFilesystem, Directory) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH(""));
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ConfigFromFilesystem, NullByte) {
@@ -2201,10 +2139,9 @@ TEST(ConfigFromFilesystem, NullByte) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("nullByte.conf"));
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ConfigFromFilesystem, NullSubDir) {
@@ -2222,10 +2159,9 @@ TEST(ConfigFromFilesystem, NullSubDir) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("dirNullByte.conf"));
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 
@@ -2244,10 +2180,9 @@ TEST(ConfigFromFilesystem, NullTerminated) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("endStringNull.conf"));
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(JSONConfigFile, ComposingStringVector) {
@@ -2275,12 +2210,11 @@ TEST(JSONConfigFile, ComposingStringVector) {
     argv.push_back("val1");
     argv.push_back("--setParameter");
     argv.push_back("val2");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ setParameter : [ \"val3\", \"val4\" ] }");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
     std::vector<std::string> setParameter;
     std::vector<std::string>::iterator setParameterit;
@@ -2321,13 +2255,12 @@ TEST(JSONConfigFile, ComposingStringMap) {
     argv.push_back("key1=value1");
     argv.push_back("--setParameter");
     argv.push_back("key2=value2");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json",
                      "{ setParameter : { key2 : \"overridden_value2\", key3 : \"value3\" } }");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
     std::map<std::string, std::string> setParameter;
     std::map<std::string, std::string>::iterator setParameterIt;
@@ -2369,12 +2302,11 @@ TEST(INIConfigFile, ComposingStringVector) {
     argv.push_back("val1");
     argv.push_back("--setParameter");
     argv.push_back("val2");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("default.conf", "setParameter=val3\nsetParameter=val4");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
     std::vector<std::string> setParameter;
     std::vector<std::string>::iterator setParameterit;
@@ -2415,12 +2347,11 @@ TEST(INIConfigFile, ComposingStringMap) {
     argv.push_back("key1=value1");
     argv.push_back("--setParameter");
     argv.push_back("key2=value2");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini", "setParameter=key2=overridden_value2\nsetParameter=key3=value3");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
     std::map<std::string, std::string> setParameter;
     std::map<std::string, std::string>::iterator setParameterIt;
@@ -2462,12 +2393,11 @@ TEST(YAMLConfigFile, ComposingStringVector) {
     argv.push_back("val1");
     argv.push_back("--setParameter");
     argv.push_back("val2");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "setParameter : \n - \"val3\"\n - \"val4\"");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
     std::vector<std::string> setParameter;
     std::vector<std::string>::iterator setParameterit;
@@ -2508,7 +2438,6 @@ TEST(YAMLConfigFile, ComposingStringMap) {
     argv.push_back("key1=value1");
     argv.push_back("--setParameter");
     argv.push_back("key2=value2");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml",
                      // NOTE: Indentation is used to determine whether an option is in a sub
@@ -2517,7 +2446,7 @@ TEST(YAMLConfigFile, ComposingStringMap) {
                      "setParameter:\n key2: \"overridden_value2\"\n key3: \"value3\"");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
     std::map<std::string, std::string> setParameter;
     std::map<std::string, std::string>::iterator setParameterIt;
@@ -2545,9 +2474,8 @@ TEST(LegacyInterface, Good) {
     argv.push_back("binaryname");
     argv.push_back("--port");
     argv.push_back("5");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_TRUE(environment.count("port"));
     try {
         int port;
@@ -2567,9 +2495,8 @@ TEST(LegacyInterface, NotSpecified) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_FALSE(environment.count("port"));
 }
 
@@ -2584,9 +2511,8 @@ TEST(LegacyInterface, BadType) {
     argv.push_back("binaryname");
     argv.push_back("--port");
     argv.push_back("5");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_TRUE(environment.count("port"));
     std::string port;
     try {
@@ -2831,10 +2757,9 @@ TEST(ChainingInterface, Positional) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("positional");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::string positional;
     ASSERT_OK(value.get(&positional));
@@ -2855,10 +2780,9 @@ TEST(ChainingInterface, PositionalTooMany) {
     argv.push_back("binaryname");
     argv.push_back("positional");
     argv.push_back("extrapositional");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ChainingInterface, PositionalAndFlag) {
@@ -2877,10 +2801,9 @@ TEST(ChainingInterface, PositionalAndFlag) {
     argv.push_back("positional");
     argv.push_back("--port");
     argv.push_back("5");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::string positional;
     ASSERT_OK(value.get(&positional));
@@ -2905,9 +2828,8 @@ TEST(ChainingInterface, PositionalMultiple) {
     argv.push_back("binaryname");
     argv.push_back("positional1");
     argv.push_back("positional2");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::vector<std::string> positional;
@@ -2933,9 +2855,8 @@ TEST(ChainingInterface, PositionalMultipleExtra) {
     argv.push_back("positional1");
     argv.push_back("positional2");
     argv.push_back("positional2");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ChainingInterface, PositionalMultipleUnlimited) {
@@ -2955,9 +2876,8 @@ TEST(ChainingInterface, PositionalMultipleUnlimited) {
     argv.push_back("positional3");
     argv.push_back("positional4");
     argv.push_back("positional5");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::vector<std::string> positional;
@@ -2991,9 +2911,8 @@ TEST(ChainingInterface, PositionalMultipleAndFlag) {
     argv.push_back("--port");
     argv.push_back("5");
     argv.push_back("positional2");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("positional"), &value));
     std::vector<std::string> positional;
@@ -3040,12 +2959,11 @@ TEST(ChainingInterface, PositionalSingleMultipleUnlimitedAndFlag) {
     argv.push_back("positional7");
     argv.push_back("positional8");
     argv.push_back("positional9");
-    std::map<std::string, std::string> env_map;
 
     moe::Value value;
     std::vector<std::string>::iterator positionalit;
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("positional1"), &value));
     std::string positionalSingle;
     ASSERT_OK(value.get(&positionalSingle));
@@ -3098,9 +3016,8 @@ TEST(ChainingInterface, PositionalHoleInRange) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ChainingInterface, PositionalOverlappingRange) {
@@ -3120,9 +3037,8 @@ TEST(ChainingInterface, PositionalOverlappingRange) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ChainingInterface, PositionalOverlappingRangeInfinite) {
@@ -3142,9 +3058,8 @@ TEST(ChainingInterface, PositionalOverlappingRangeInfinite) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(ChainingInterface, PositionalMultipleInfinite) {
@@ -3164,9 +3079,8 @@ TEST(ChainingInterface, PositionalMultipleInfinite) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(OptionSources, SourceCommandLine) {
@@ -3174,7 +3088,6 @@ TEST(OptionSources, SourceCommandLine) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
     std::string parameter;
 
     moe::OptionSection testOpts;
@@ -3190,7 +3103,7 @@ TEST(OptionSources, SourceCommandLine) {
     argv.push_back("--parameter");
     argv.push_back("allowed");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3202,7 +3115,7 @@ TEST(OptionSources, SourceCommandLine) {
 
     parser.setConfig("config.json", "{ parameter : \"disallowed\" }");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv.clear();
     argv.push_back("binaryname");
@@ -3211,7 +3124,7 @@ TEST(OptionSources, SourceCommandLine) {
 
     parser.setConfig("config.ini", "parameter=disallowed");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(OptionSources, SourceINIConfig) {
@@ -3219,7 +3132,6 @@ TEST(OptionSources, SourceINIConfig) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
     std::string parameter;
 
     moe::OptionSection testOpts;
@@ -3235,7 +3147,7 @@ TEST(OptionSources, SourceINIConfig) {
     argv.push_back("--parameter");
     argv.push_back("disallowed");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv.clear();
     argv.push_back("binaryname");
@@ -3244,7 +3156,7 @@ TEST(OptionSources, SourceINIConfig) {
 
     parser.setConfig("config.json", "{ parameter : \"disallowed\" }");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv.clear();
     argv.push_back("binaryname");
@@ -3253,7 +3165,7 @@ TEST(OptionSources, SourceINIConfig) {
 
     parser.setConfig("config.ini", "parameter=allowed");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3264,7 +3176,6 @@ TEST(OptionSources, SourceYAMLConfig) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
     std::string parameter;
 
     moe::OptionSection testOpts;
@@ -3280,7 +3191,7 @@ TEST(OptionSources, SourceYAMLConfig) {
     argv.push_back("--parameter");
     argv.push_back("disallowed");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv.clear();
     argv.push_back("binaryname");
@@ -3289,7 +3200,7 @@ TEST(OptionSources, SourceYAMLConfig) {
 
     parser.setConfig("config.json", "{ parameter : \"allowed\" }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3301,7 +3212,7 @@ TEST(OptionSources, SourceYAMLConfig) {
 
     parser.setConfig("config.ini", "parameter=disallowed");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(OptionSources, SourceAllConfig) {
@@ -3309,7 +3220,6 @@ TEST(OptionSources, SourceAllConfig) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
     std::string parameter;
 
     moe::OptionSection testOpts;
@@ -3325,7 +3235,7 @@ TEST(OptionSources, SourceAllConfig) {
     argv.push_back("--parameter");
     argv.push_back("disallowed");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv.clear();
     argv.push_back("binaryname");
@@ -3334,7 +3244,7 @@ TEST(OptionSources, SourceAllConfig) {
 
     parser.setConfig("config.json", "{ parameter : \"allowed\" }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3346,7 +3256,7 @@ TEST(OptionSources, SourceAllConfig) {
 
     parser.setConfig("config.ini", "parameter=allowed");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3357,7 +3267,6 @@ TEST(OptionSources, SourceAllLegacy) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
     std::string parameter;
 
     moe::OptionSection testOpts;
@@ -3373,7 +3282,7 @@ TEST(OptionSources, SourceAllLegacy) {
     argv.push_back("--parameter");
     argv.push_back("allowed");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3385,7 +3294,7 @@ TEST(OptionSources, SourceAllLegacy) {
 
     parser.setConfig("config.json", "{ parameter : \"disallowed\" }");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv.clear();
     argv.push_back("binaryname");
@@ -3394,7 +3303,7 @@ TEST(OptionSources, SourceAllLegacy) {
 
     parser.setConfig("config.ini", "parameter=allowed");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3405,7 +3314,6 @@ TEST(OptionSources, SourceAll) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
     std::string parameter;
 
     moe::OptionSection testOpts;
@@ -3421,7 +3329,7 @@ TEST(OptionSources, SourceAll) {
     argv.push_back("--parameter");
     argv.push_back("allowed");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3433,7 +3341,7 @@ TEST(OptionSources, SourceAll) {
 
     parser.setConfig("config.json", "{ parameter : \"allowed\" }");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3445,7 +3353,7 @@ TEST(OptionSources, SourceAll) {
 
     parser.setConfig("config.ini", "parameter=allowed");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("parameter"), &value));
     ASSERT_OK(value.get(&parameter));
     ASSERT_EQUALS(parameter, "allowed");
@@ -3456,7 +3364,6 @@ TEST(Constraints, MutuallyExclusiveConstraint) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
 
     moe::OptionSection testOpts;
     testOpts
@@ -3471,7 +3378,7 @@ TEST(Constraints, MutuallyExclusiveConstraint) {
     argv.push_back("--option1");
     argv.push_back("--option2");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_NOT_OK(environment.validate());
 
     environment = moe::Environment();
@@ -3479,7 +3386,7 @@ TEST(Constraints, MutuallyExclusiveConstraint) {
     argv.push_back("binaryname");
     argv.push_back("--option1");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.validate());
     ASSERT_OK(environment.get(moe::Key("option1"), &value));
 
@@ -3488,7 +3395,7 @@ TEST(Constraints, MutuallyExclusiveConstraint) {
     argv.push_back("binaryname");
     argv.push_back("--option2");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.validate());
     ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
 }
@@ -3498,7 +3405,6 @@ TEST(Constraints, RequiresOtherConstraint) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
 
     moe::OptionSection testOpts;
     testOpts
@@ -3512,7 +3418,7 @@ TEST(Constraints, RequiresOtherConstraint) {
     argv.push_back("binaryname");
     argv.push_back("--option1");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_NOT_OK(environment.validate());
 
     environment = moe::Environment();
@@ -3521,7 +3427,7 @@ TEST(Constraints, RequiresOtherConstraint) {
     argv.push_back("--option1");
     argv.push_back("--option2");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.validate());
     ASSERT_OK(environment.get(moe::Key("option1"), &value));
     ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
@@ -3531,7 +3437,7 @@ TEST(Constraints, RequiresOtherConstraint) {
     argv.push_back("binaryname");
     argv.push_back("--option2");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.validate());
     ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
 }
@@ -3549,11 +3455,10 @@ TEST(YAMLConfigFile, Basic) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "port: 5");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -3573,11 +3478,10 @@ TEST(YAMLConfigFile, Empty) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(YAMLConfigFile, Override) {
@@ -3595,12 +3499,11 @@ TEST(YAMLConfigFile, Override) {
     argv.push_back("config.yaml");
     argv.push_back("--port");
     argv.push_back("6");
-    std::map<std::string, std::string> env_map;
 
 
     parser.setConfig("config.yaml", "port: 5");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -3620,11 +3523,10 @@ TEST(YAMLConfigFile, UnregisteredOption) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "port: 5");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(YAMLConfigFile, DuplicateOption) {
@@ -3640,11 +3542,10 @@ TEST(YAMLConfigFile, DuplicateOption) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "port: 5\nport: 5");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(YAMLConfigFile, TypeChecking) {
@@ -3687,29 +3588,28 @@ TEST(YAMLConfigFile, TypeChecking) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     // Test StringVector type
     std::vector<std::string> stringVectorVal;
 
     parser.setConfig("config.json", "stringVectorVal : \"scalar\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "stringVectorVal : \"true\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "stringVectorVal : \"5\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "stringVectorVal : [ [ \"string\" ], true, 1, 1.0 ]");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a string vector type and treat it as an array of strings, even if the
     // elements are not surrounded by quotes
     environment = moe::Environment();
     parser.setConfig("config.json", "stringVectorVal : [ \"string\", bare, true, 1, 1.0 ]");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVectorVal"), &value));
     std::vector<std::string>::iterator stringVectorValIt;
     ASSERT_OK(value.get(&stringVectorVal));
@@ -3728,25 +3628,25 @@ TEST(YAMLConfigFile, TypeChecking) {
     bool boolVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "boolVal : \"lies\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "boolVal : truth");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "boolVal : 1");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a bool type and try to convert it to a bool, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "boolVal : \"true\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("boolVal"), &value));
     ASSERT_OK(value.get(&boolVal));
     ASSERT_EQUALS(boolVal, true);
     environment = moe::Environment();
     parser.setConfig("config.json", "boolVal : false");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("boolVal"), &value));
     ASSERT_OK(value.get(&boolVal));
     ASSERT_EQUALS(boolVal, false);
@@ -3755,34 +3655,34 @@ TEST(YAMLConfigFile, TypeChecking) {
     double doubleVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "doubleVal : \"double the monkeys\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "doubleVal : true");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a double type and try to convert it to a double, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "doubleVal : 1.5");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
     ASSERT_EQUALS(doubleVal, 1.5);
     environment = moe::Environment();
     parser.setConfig("config.json", "doubleVal : -1.5");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
     ASSERT_EQUALS(doubleVal, -1.5);
     environment = moe::Environment();
     parser.setConfig("config.json", "doubleVal : \"3.14\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
     ASSERT_EQUALS(doubleVal, 3.14);
     environment = moe::Environment();
     parser.setConfig("config.json", "doubleVal : \"-3.14\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
     ASSERT_EQUALS(doubleVal, -3.14);
@@ -3791,29 +3691,29 @@ TEST(YAMLConfigFile, TypeChecking) {
     int intVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "intVal : \"hungry hippos\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "intVal : 1.5");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "intVal : 18446744073709551617");  // 2^64 + 1
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "intVal : true");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as an int type and try to convert it to a int, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "intVal : \"5\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("intVal"), &value));
     ASSERT_OK(value.get(&intVal));
     ASSERT_EQUALS(intVal, 5);
 
     environment = moe::Environment();
     parser.setConfig("config.json", "intVal : \"-5\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("intVal"), &value));
     ASSERT_OK(value.get(&intVal));
     ASSERT_EQUALS(intVal, -5);
@@ -3822,29 +3722,29 @@ TEST(YAMLConfigFile, TypeChecking) {
     long longVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "longVal : \"in an eating race\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "longVal : 1.5");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "longVal : 18446744073709551617");  // 2^64 + 1
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "longVal : true");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a long type and try to convert it to a long, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "longVal : \"5\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("longVal"), &value));
     ASSERT_OK(value.get(&longVal));
     ASSERT_EQUALS(longVal, 5);
 
     environment = moe::Environment();
     parser.setConfig("config.json", "longVal : \"-5\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("longVal"), &value));
     ASSERT_OK(value.get(&longVal));
     ASSERT_EQUALS(longVal, -5);
@@ -3857,28 +3757,28 @@ TEST(YAMLConfigFile, TypeChecking) {
     // surrounded by quotes
     environment = moe::Environment();
     parser.setConfig("config.json", "stringVal :");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
     ASSERT_OK(value.get(&stringVal));
     ASSERT_EQUALS(stringVal, "");
 
     environment = moe::Environment();
     parser.setConfig("config.json", "stringVal : \"1000\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
     ASSERT_OK(value.get(&stringVal));
     ASSERT_EQUALS(stringVal, "1000");
 
     environment = moe::Environment();
     parser.setConfig("config.json", "stringVal : wat man");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
     ASSERT_OK(value.get(&stringVal));
     ASSERT_EQUALS(stringVal, "wat man");
 
     environment = moe::Environment();
     parser.setConfig("config.json", "stringVal : true 1 string 1.0");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
     ASSERT_OK(value.get(&stringVal));
     ASSERT_EQUALS(stringVal, "true 1 string 1.0");
@@ -3887,26 +3787,26 @@ TEST(YAMLConfigFile, TypeChecking) {
     unsigned long long unsignedLongLongVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedLongLongVal : \"unsigned hungry hippos\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedLongLongVal : 1.5");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedLongLongVal : 18446744073709551617");  // 2^64 + 1
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedLongLongVal : true");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedLongLongVal : \"-5\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as an unsigned long long type and try to convert it to an unsigned long long,
     // even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedLongLongVal : \"5\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
     ASSERT_OK(value.get(&unsignedLongLongVal));
     ASSERT_EQUALS(unsignedLongLongVal, 5ULL);
@@ -3915,25 +3815,25 @@ TEST(YAMLConfigFile, TypeChecking) {
     unsigned unsignedVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedVal : \"unsigned hungry hippos\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedVal : 1.5");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedVal : 18446744073709551617");  // 2^64 + 1
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedVal : true");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedVal : \"-5\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as an unsigned type and try to convert it to an unsigned, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "unsignedVal : \"5\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
     ASSERT_OK(value.get(&unsignedVal));
     ASSERT_EQUALS(unsignedVal, 5U);
@@ -3942,25 +3842,25 @@ TEST(YAMLConfigFile, TypeChecking) {
     bool switchVal;
     environment = moe::Environment();
     parser.setConfig("config.json", "switchVal : \"lies\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "switchVal : truth");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     environment = moe::Environment();
     parser.setConfig("config.json", "switchVal : 1");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // The YAML parser treats everything as a string, so we just take anything that was
     // specified as a switch type and try to convert it to a bool, even if it was quoted
     environment = moe::Environment();
     parser.setConfig("config.json", "switchVal : \"true\"");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("switchVal"), &value));
     ASSERT_OK(value.get(&switchVal));
     ASSERT_EQUALS(switchVal, true);
     environment = moe::Environment();
     parser.setConfig("config.json", "switchVal : false");
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("switchVal"), &switchVal));
     ASSERT_FALSE(switchVal);
 }
@@ -3978,11 +3878,10 @@ TEST(YAMLConfigFile, Nested) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "nested:\n    port: 5");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("nested.port"), &value));
     int port;
@@ -4003,11 +3902,10 @@ TEST(YAMLConfigFile, Dotted) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "dotted.port: 5");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("dotted.port"), &value));
     int port;
@@ -4031,11 +3929,10 @@ TEST(YAMLConfigFile, DottedAndNested) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "dottednested.var1: 5\ndottednested:\n    var2: 6");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("dottednested.var1"), &value));
     int var1;
@@ -4064,11 +3961,10 @@ TEST(YAMLConfigFile, DeprecatedDottedNameDeprecatedOnly) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "dotted.deprecated: 6");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("dotted.canonical"), &value));
     int var1;
@@ -4144,13 +4040,12 @@ TEST(YAMLConfigFile, DeprecatedDottedNameCanonicalAndDeprecated) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml",
                      "dotted.canonical: 5\n"
                      "dotted.deprecated: 6");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 // An option can have multiple deprecated dotted names.
@@ -4176,13 +4071,12 @@ TEST(YAMLConfigFile, DeprecatedDottedNameMultipleDeprecated) {
          ++i) {
         OptionsParserTester parser;
         moe::Environment environment;
-        std::map<std::string, std::string> env_map;
 
         ::mongo::StringBuilder sb;
         sb << *i << ": 6";
         parser.setConfig("config.yaml", sb.str());
 
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(parser.run(testOpts, argv, &environment));
         moe::Value value;
         ASSERT_OK(environment.get(moe::Key("dotted.canonical"), &value));
         int var1;
@@ -4197,13 +4091,12 @@ TEST(YAMLConfigFile, DeprecatedDottedNameMultipleDeprecated) {
     {
         OptionsParserTester parser;
         moe::Environment environment;
-        std::map<std::string, std::string> env_map;
 
         std::stringstream ss;
         ss << deprecatedDottedNames[0] << ": 6" << std::endl << deprecatedDottedNames[1] << ": 7";
         parser.setConfig("config.yaml", ss.str());
 
-        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     }
 }
 
@@ -4221,12 +4114,11 @@ TEST(YAMLConfigFile, ListBrackets) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "multival: [ \"val1\", \"val2\" ]");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::vector<std::string> multival;
     std::vector<std::string>::iterator multivalit;
@@ -4251,12 +4143,11 @@ TEST(YAMLConfigFile, ListDashes) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "multival:\n - \"val1\"\n - \"val2\"");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::vector<std::string> multival;
     std::vector<std::string>::iterator multivalit;
@@ -4281,11 +4172,10 @@ TEST(YAMLConfigFile, DefaultValueOverride) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", "port: 6");
 
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     moe::Value value;
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
@@ -4307,14 +4197,13 @@ TEST(YAMLConfigFile, Comments) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml",
                      "# comment on port\nport: 5\n"
                      "# comment on host\nhost: localhost\n");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("port"), &value));
     int port;
     ASSERT_OK(value.get(&port));
@@ -4338,11 +4227,10 @@ TEST(YAMLConfigFile, EmptyKey) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml", ":");
 
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(YAMLConfigFile, StringVector) {
@@ -4359,12 +4247,11 @@ TEST(YAMLConfigFile, StringVector) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "multival : [ \"val1\", \"val2\" ]");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::vector<std::string> multival;
     std::vector<std::string>::iterator multivalit;
@@ -4389,7 +4276,6 @@ TEST(YAMLConfigFile, StringMap) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json",
                      // NOTE: Indentation is used to determine whether an option is in a sub
@@ -4398,7 +4284,7 @@ TEST(YAMLConfigFile, StringMap) {
                      "multival : \n key1 : \"value1\"\n key2 : \"value2\"\n key3 : \"\"");
 
     moe::Value value;
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
     ASSERT_OK(environment.get(moe::Key("multival"), &value));
     std::map<std::string, std::string> multival;
     std::map<std::string, std::string>::iterator multivalit;
@@ -4428,7 +4314,6 @@ TEST(YAMLConfigFile, StringMapDuplicateKey) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json",
                      // NOTE: Indentation is used to determine whether an option is in a sub
@@ -4437,7 +4322,7 @@ TEST(YAMLConfigFile, StringMapDuplicateKey) {
                      "multival : \n key1 : \"value1\"\n key1 : \"value2\"");
 
     moe::Value value;
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
 TEST(OptionCount, Basic) {
@@ -4467,7 +4352,6 @@ TEST(NumericalBaseParsing, CommandLine) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
 
     moe::OptionSection testOpts;
     testOpts.addOptionChaining(
@@ -4490,31 +4374,31 @@ TEST(NumericalBaseParsing, CommandLine) {
     argv.push_back("binaryname");
     argv.push_back("--doubleVal");
     argv.push_back("monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv = std::vector<std::string>();
     argv.push_back("binaryname");
     argv.push_back("--intVal");
     argv.push_back("monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv = std::vector<std::string>();
     argv.push_back("binaryname");
     argv.push_back("--longVal");
     argv.push_back("monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv = std::vector<std::string>();
     argv.push_back("binaryname");
     argv.push_back("--unsignedLongLongVal");
     argv.push_back("monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     argv = std::vector<std::string>();
     argv.push_back("binaryname");
     argv.push_back("--unsignedVal");
     argv.push_back("monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // Decimal values
     argv = std::vector<std::string>();
@@ -4530,7 +4414,7 @@ TEST(NumericalBaseParsing, CommandLine) {
     argv.push_back("--unsignedVal");
     argv.push_back("16");
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
     double doubleVal;
     int intVal;
@@ -4572,7 +4456,7 @@ TEST(NumericalBaseParsing, CommandLine) {
     argv.push_back("--unsignedVal");
     argv.push_back("020");
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
@@ -4614,7 +4498,7 @@ TEST(NumericalBaseParsing, CommandLine) {
     argv.push_back("--unsignedVal");
     argv.push_back("0x10");
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
 #if !(defined(_WIN32) || defined(__sun))
     // See SERVER-14131.
@@ -4645,7 +4529,6 @@ TEST(NumericalBaseParsing, INIConfigFile) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
 
     moe::OptionSection testOpts;
     testOpts.addOptionChaining(
@@ -4672,19 +4555,19 @@ TEST(NumericalBaseParsing, INIConfigFile) {
     argv.push_back("config.ini");
 
     parser.setConfig("config.ini", "doubleVal=monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     parser.setConfig("config.ini", "intVal=monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     parser.setConfig("config.ini", "longVal=monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     parser.setConfig("config.ini", "unsignedLongLongVal=monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     parser.setConfig("config.ini", "unsignedVal=monkeys");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // Decimal values
     argv = std::vector<std::string>();
@@ -4695,7 +4578,7 @@ TEST(NumericalBaseParsing, INIConfigFile) {
                      "doubleVal=16.1\nintVal=16\nlongVal=16\n"
                      "unsignedLongLongVal=16\nunsignedVal=16\n");
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
     double doubleVal;
     int intVal;
@@ -4732,7 +4615,7 @@ TEST(NumericalBaseParsing, INIConfigFile) {
                      "doubleVal=020.1\nintVal=020\nlongVal=020\n"
                      "unsignedLongLongVal=020\nunsignedVal=020\n");
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
@@ -4773,7 +4656,7 @@ TEST(NumericalBaseParsing, INIConfigFile) {
                      "unsignedLongLongVal=0x10\nunsignedVal=0x10\n");
 #endif
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
 #if !(defined(_WIN32) || defined(__sun))
     // See SERVER-14131.
@@ -4804,7 +4687,6 @@ TEST(NumericalBaseParsing, YAMLConfigFile) {
     moe::Environment environment;
     moe::Value value;
     std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
 
     moe::OptionSection testOpts;
     testOpts.addOptionChaining(
@@ -4831,19 +4713,19 @@ TEST(NumericalBaseParsing, YAMLConfigFile) {
     argv.push_back("config.yaml");
 
     parser.setConfig("config.yaml", "doubleVal: \"monkeys\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     parser.setConfig("config.yaml", "intVal: \"monkeys\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     parser.setConfig("config.yaml", "longVal: \"monkeys\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     parser.setConfig("config.yaml", "unsignedLongLongVal: \"monkeys\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     parser.setConfig("config.yaml", "unsignedVal: \"monkeys\"");
-    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 
     // Decimal values
     argv = std::vector<std::string>();
@@ -4854,7 +4736,7 @@ TEST(NumericalBaseParsing, YAMLConfigFile) {
                      "doubleVal: 16.1\nintVal: 16\nlongVal: 16\n"
                      "unsignedLongLongVal: 16\nunsignedVal: 16\n");
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
     double doubleVal;
     int intVal;
@@ -4891,7 +4773,7 @@ TEST(NumericalBaseParsing, YAMLConfigFile) {
                      "doubleVal: 020.1\nintVal: 020\nlongVal: 020\n"
                      "unsignedLongLongVal: 020\nunsignedVal: 020\n");
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
     ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
     ASSERT_OK(value.get(&doubleVal));
@@ -4932,7 +4814,7 @@ TEST(NumericalBaseParsing, YAMLConfigFile) {
                      "unsignedLongLongVal: 0x10\nunsignedVal: 0x10\n");
 #endif
     environment = moe::Environment();
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    ASSERT_OK(parser.run(testOpts, argv, &environment));
 
 #if !(defined(_WIN32) || defined(__sun))
     // See SERVER-14131.
@@ -5000,9 +4882,8 @@ TEST(YAMLConfigFile, OutputConfig) {
         "config.yaml",
     };
 
-    std::map<std::string, std::string> env_map;
     moe::Environment env;
-    ASSERT_OK(parser.run(options, argv, env_map, &env));
+    ASSERT_OK(parser.run(options, argv, &env));
     ASSERT_EQ(env.toYAML(),
               "cacheSize: 12345\n"
               "command:\n"
@@ -5046,10 +4927,9 @@ void TestFile(std::vector<unsigned char> contents, bool valid) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back(p.generic_string());
-    std::map<std::string, std::string> env_map;
 
     if (valid) {
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(parser.run(testOpts, argv, &environment));
 
         moe::Value value;
         ASSERT_OK(environment.get(moe::Key("port"), &value));
@@ -5057,7 +4937,7 @@ void TestFile(std::vector<unsigned char> contents, bool valid) {
         ASSERT_OK(value.get(&port));
         ASSERT_EQUALS(port, 1234);
     } else {
-        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
     }
 }
 
@@ -5093,8 +4973,7 @@ TEST(YAMLConfigFile, canonicalize) {
         "binary",
         "--bind_ip_all",
     };
-    std::map<std::string, std::string> env_map;
-    ASSERT_OK(parser.run(opts, argv, env_map, &env));
+    ASSERT_OK(parser.run(opts, argv, &env));
     ASSERT_TRUE(env.count("net.bindIp"));
     ASSERT_FALSE(env.count("net.bindIpAll"));
     ASSERT_EQ(env["net.bindIp"].as<std::string>(), "0.0.0.0");

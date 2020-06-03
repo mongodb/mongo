@@ -93,20 +93,15 @@ inline std::wstring toNativeString(const char* s) {
 #endif
 
 class WindowsCommandLine {
-    WindowsCommandLine(const WindowsCommandLine&) = delete;
-    WindowsCommandLine& operator=(const WindowsCommandLine&) = delete;
-    char** _argv;
-    char** _envp;
-
 public:
-    WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envpW[]);
+    WindowsCommandLine(int argc, wchar_t** argvW);
     ~WindowsCommandLine();
-    char** argv(void) const {
-        return _argv;
-    };
-    char** envp(void) const {
-        return _envp;
-    };
+
+    char** argv() const;
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> _impl;
 };
 
 #endif  // #if defined(_WIN32)

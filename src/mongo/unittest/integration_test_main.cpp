@@ -72,10 +72,10 @@ ConnectionString getFixtureConnectionString() {
 }  // namespace unittest
 }  // namespace mongo
 
-int main(int argc, char** argv, char** envp) {
+int main(int argc, char** argv) {
     setupSynchronousSignalHandlers();
     TestingProctor::instance().setEnabled(true);
-    runGlobalInitializersOrDie(argc, argv, envp);
+    runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     setTestCommandsEnabled(true);
     setGlobalServiceContext(ServiceContext::make());
     quickExit(unittest::Suite::run(std::vector<std::string>(), "", "", 1));

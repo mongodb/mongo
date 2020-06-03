@@ -47,7 +47,7 @@ bool gEnableTestConfigOpt15 = false;
 namespace {
 
 Status parseArgv(const std::vector<std::string>& argv, moe::Environment* parsed) {
-    auto status = moe::OptionsParser().run(moe::startupOptions, argv, {}, parsed);
+    auto status = moe::OptionsParser().run(moe::startupOptions, argv, parsed);
     if (!status.isOK()) {
         return status;
     }
@@ -55,7 +55,7 @@ Status parseArgv(const std::vector<std::string>& argv, moe::Environment* parsed)
 }
 
 Status parseConfig(const std::string& config, moe::Environment* parsed) {
-    auto status = moe::OptionsParser().runConfigFile(moe::startupOptions, config, {}, parsed);
+    auto status = moe::OptionsParser().runConfigFile(moe::startupOptions, config, parsed);
     if (!status.isOK()) {
         return status;
     }
@@ -68,11 +68,11 @@ Status parseMixed(const std::vector<std::string>& argv,
     moe::OptionsParser mixedParser;
 
     moe::Environment conf;
-    uassertStatusOK(mixedParser.runConfigFile(moe::startupOptions, config, {}, &conf));
+    uassertStatusOK(mixedParser.runConfigFile(moe::startupOptions, config, &conf));
     uassertStatusOK(env->setAll(conf));
 
     moe::Environment cli;
-    uassertStatusOK(mixedParser.run(moe::startupOptions, argv, {}, &cli));
+    uassertStatusOK(mixedParser.run(moe::startupOptions, argv, &cli));
     uassertStatusOK(env->setAll(cli));
 
     return env->validate();
@@ -616,7 +616,7 @@ TEST(ConfigOptionNoInit, Opt1) {
         "Hello",
     });
     moe::Environment parsed;
-    ASSERT_OK(moe::OptionsParser().run(options, argv, {}, &parsed));
+    ASSERT_OK(moe::OptionsParser().run(options, argv, &parsed));
     ASSERT_OK(parsed.validate());
     ASSERT_OK(storeIDLTestConfigs(parsed));
 

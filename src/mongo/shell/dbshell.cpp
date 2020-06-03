@@ -704,7 +704,7 @@ bool mechanismRequiresPassword(const MongoURI& uri) {
 }
 }  // namespace
 
-int _main(int argc, char* argv[], char** envp) {
+int _main(int argc, char* argv[]) {
     registerShutdownTask([] {
         // NOTE: This function may be called at any time. It must not
         // depend on the prior execution of mongo initializers or the
@@ -723,7 +723,7 @@ int _main(int argc, char* argv[], char** envp) {
 
     mongo::shell_utils::RecordMyLocation(argv[0]);
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     setGlobalServiceContext(ServiceContext::make());
     // TODO This should use a TransportLayerManager or TransportLayerFactory
     auto serviceContext = getGlobalServiceContext();
@@ -1142,11 +1142,11 @@ int _main(int argc, char* argv[], char** envp) {
 }
 
 #ifdef _WIN32
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
+int wmain(int argc, wchar_t* argvW[]) {
     int returnCode;
     try {
-        WindowsCommandLine wcl(argc, argvW, envpW);
-        returnCode = _main(argc, wcl.argv(), wcl.envp());
+        WindowsCommandLine wcl(argc, argvW);
+        returnCode = _main(argc, wcl.argv());
     } catch (mongo::DBException& e) {
         std::cout << "exception: " << e.what() << std::endl;
         std::cout << "exiting with code " << static_cast<int>(kDBException) << std::endl;
@@ -1155,10 +1155,10 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     quickExit(returnCode);
 }
 #else   // #ifdef _WIN32
-int main(int argc, char* argv[], char** envp) {
+int main(int argc, char* argv[]) {
     int returnCode;
     try {
-        returnCode = _main(argc, argv, envp);
+        returnCode = _main(argc, argv);
     } catch (mongo::DBException& e) {
         std::cout << "exception: " << e.what() << std::endl;
         std::cout << "exiting with code " << static_cast<int>(kDBException) << std::endl;
