@@ -227,7 +227,10 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                           "namespace"_attr = nss,
                           "explainGetWinningPlanStats"_attr =
                               Explain::getWinningPlanStats(exec.get()));
-            break;
+            uasserted(ErrorCodes::OperationFailed,
+                      str::stream() << "Cursor error while trying to delete " << redact(min)
+                                    << " to " << redact(max) << " in " << nss.ns()
+                                    << ", stats: " << Explain::getWinningPlanStats(exec.get()));
         }
 
         invariant(PlanExecutor::ADVANCED == state);
