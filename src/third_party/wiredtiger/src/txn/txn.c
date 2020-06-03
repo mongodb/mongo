@@ -920,14 +920,8 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
         /*
          * Scan the history store for the given btree and key with maximum start timestamp to let
-         * the search point to the last version of the key. We must ignore tombstone in the history
-         * store while retrieving the update from the history store to replace the update in the
-         * data store. We also need to ignore visibility of the updates as we have already released
-         * our snapshot in prepare. Otherwise, we can't see updates with non-globally visible
-         * transaction ids.
+         * the search point to the last version of the key.
          */
-        F_SET(hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
-        F_SET(session, WT_SESSION_HS_IGNORE_VISIBILITY);
         WT_ERR_NOTFOUND_OK(
           __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, &op->u.op_row.key, WT_TS_MAX),
           true);
@@ -1011,11 +1005,8 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         WT_ERR(__txn_fixup_prepared_update(session, hs_cursor, fix_upd, commit));
 
 err:
-    if (hs_cursor != NULL) {
-        F_CLR(session, WT_SESSION_HS_IGNORE_VISIBILITY);
-        F_CLR(hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+    if (hs_cursor != NULL)
         ret = __wt_hs_cursor_close(session, session_flags, is_owner);
-    }
     if (!upd_appended)
         __wt_free(session, fix_upd);
     return (ret);

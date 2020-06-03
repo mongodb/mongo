@@ -32,12 +32,13 @@ def timestamp_str(t):
     return '%x' % t
 
 # test_hs11.py
-# Ensure that mixed mode updates clear the history store records.
+# Ensure that when we delete a key due to a tombstone being globally visible, we delete its
+# associated history store content.
 class test_hs11(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
 
-    def run_test(self, update_type):
+    def test_key_deletion_clears_hs(self):
         uri = 'table:test_hs11'
         create_params = 'key_format=S,value_format=S'
         self.session.create(uri, create_params)
@@ -57,16 +58,14 @@ class test_hs11(wttest.WiredTigerTestCase):
         # Reconcile and flush versions 1-3 to the history store.
         self.session.checkpoint()
 
-        # Apply a mixed mode update.
+        # Apply a non-timestamped tombstone. When the pages get evicted, the keys will get deleted
+        # since the tombstone is globally visible.
         for i in range(1, 10000):
             if i % 2 == 0:
-                if update_type == 'deletion':
-                    cursor.set_key(str(i))
-                    cursor.remove()
-                else:
-                    cursor[str(i)] = value2
+                cursor.set_key(str(i))
+                cursor.remove()
 
-        # Now apply an update at timestamp 10.
+        # Now apply an update at timestamp 10 to recreate each key.
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value2
@@ -77,17 +76,8 @@ class test_hs11(wttest.WiredTigerTestCase):
             self.session.begin_transaction('read_timestamp=' + timestamp_str(ts))
             for i in range(1, 10000):
                 if i % 2 == 0:
-                    if update_type == 'deletion':
-                        cursor.set_key(str(i))
-                        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-                    else:
-                        self.assertEqual(cursor[str(i)], value2)
+                    cursor.set_key(str(i))
+                    self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
                 else:
                     self.assertEqual(cursor[str(i)], value1)
             self.session.rollback_transaction()
-
-    def test_key_deletion_clears_hs(self):
-        self.run_test('deletion')
-
-    def test_key_update_clears_hs(self):
-        self.run_test('update')
