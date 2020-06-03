@@ -69,7 +69,8 @@ MongoRunner.validateCollectionsCallback = function(port) {
                                       [
                                           ErrorCodes.NotMaster,
                                           ErrorCodes.NotYetInitialized,
-                                          ErrorCodes.Unauthorized
+                                          ErrorCodes.Unauthorized,
+                                          ErrorCodes.ConflictingOperationInProgress
                                       ]);
                                   const res = conn.adminCommand({replSetFreeze: kFreezeTimeSecs});
                                   assert.commandWorkedOrFailedWithCode(res, [
