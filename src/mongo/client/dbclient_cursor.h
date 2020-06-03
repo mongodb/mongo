@@ -117,6 +117,10 @@ public:
         return cursorId == 0;
     }
 
+    bool isExhaust() const {
+        return (opts & QueryOption_Exhaust) != 0;
+    }
+
     bool tailable() const {
         return (opts & QueryOption_CursorTailable) != 0;
     }

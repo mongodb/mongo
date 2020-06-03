@@ -2122,4 +2122,158 @@ TEST_F(OplogFetcherTest, HandleLogicalTimeMetaDataAndAdvanceClusterTime) {
     ASSERT_EQ(currentClusterTime, logicalTime);
     ASSERT_NE(oldClusterTime, logicalTime);
 }
+
+TEST_F(OplogFetcherTest, DowngradeFrom44To42) {
+    ShutdownState shutdownState;
+
+    // Start with FCV 4.4.
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
+    // Create an oplog fetcher without any retries, retrying FCV changes does not count towards the
+    // max retries.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+
+    auto conn = oplogFetcher->getDBClientConnection_forTest();
+
+    // Creating the cursor will succeed.
+    processSingleRequestResponse(conn, makeFirstBatch(cursorId, {firstEntry}, metadataObj), true);
+
+    // Empty batch from first getMore.
+    auto m = processSingleRequestResponse(
+        conn, makeSubsequentBatch(cursorId, {}, metadataObj, true /* moreToCome */), true);
+    // Test that an exhaust cursor is used in FCV 4.4.
+    validateGetMoreCommand(m,
+                           cursorId,
+                           durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()),
+                           dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime(),
+                           true /* exhaustSupported */);
+
+    // Skip cleaning up the cursor (otherwise we'd need to use a side connection to clean up the
+    // cursor and this is not supported in unit tests).
+    auto skipKillingCursor = globalFailPointRegistry().find("skipKillingExhaustCursorsOnErrors");
+    skipKillingCursor->setMode(FailPoint::alwaysOn);
+
+    auto beforeRecreatingCursor = globalFailPointRegistry().find("hangBeforeOplogFetcherRetries");
+    auto timesEntered = beforeRecreatingCursor->setMode(FailPoint::alwaysOn);
+
+    // Downgrade to FCV 4.2.
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
+
+    ON_BLOCK_EXIT([&] {
+        serverGlobalParams.featureCompatibility.setVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+        skipKillingCursor->setMode(FailPoint::off);
+        beforeRecreatingCursor->setMode(FailPoint::off);
+    });
+
+    // Simulate an empty batch for the exhaust getMore and this will trigger a retry as FCV has
+    // changed to 4.2.
+    processSingleExhaustResponse(
+        conn, makeSubsequentBatch(cursorId, {}, metadataObj, true /* moreToCome */));
+
+    beforeRecreatingCursor->waitForTimesEntered(timesEntered + 1);
+    // Test that the connection is disconnected because we cannot use the same connection to
+    // recreate cursor as more data is on the way from the server for the exhaust stream.
+    ASSERT_TRUE(conn->isFailed());
+    // Allow retry and autoreconnect.
+    beforeRecreatingCursor->setMode(FailPoint::off);
+
+    // Simulate a response for the find command from the retry.
+    m = processSingleRequestResponse(
+        conn, makeFirstBatch(cursorId, {firstEntry}, metadataObj), true);
+    validateFindCommand(
+        m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest()));
+
+    // Simulate a response for the first getMore command after the retry.
+    m = processSingleRequestResponse(
+        conn, makeSubsequentBatch(cursorId, {}, metadataObj, false /* moreToCome */), true);
+    // Test that a regular cursor is used in FCV 4.2.
+    validateGetMoreCommand(m,
+                           cursorId,
+                           durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()),
+                           dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime(),
+                           false /* exhaustSupported */);
+
+    // Terminating empty batch with cursorId 0.
+    processSingleRequestResponse(
+        conn, makeSubsequentBatch(0LL, {}, metadataObj, false /* moreToCome */), false);
+
+    oplogFetcher->join();
+
+    ASSERT_OK(shutdownState.getStatus());
+}
+
+TEST_F(OplogFetcherTest, UpgradeFrom42To44) {
+    ShutdownState shutdownState;
+
+    // Start with FCV 4.2.
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo42);
+    ON_BLOCK_EXIT([&] {
+        serverGlobalParams.featureCompatibility.setVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+    });
+
+    // Create an oplog fetcher without any retries, retrying FCV changes does not count towards the
+    // max retries.
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    CursorId cursorId = 22LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+
+    auto conn = oplogFetcher->getDBClientConnection_forTest();
+
+    // Creating the cursor will succeed.
+    processSingleRequestResponse(conn, makeFirstBatch(cursorId, {firstEntry}, metadataObj), true);
+
+    // Empty batch from first getMore.
+    auto m = processSingleRequestResponse(
+        conn, makeSubsequentBatch(cursorId, {}, metadataObj, false /* moreToCome */), true);
+    // Test that a regular cursor is used in FCV 4.2.
+    validateGetMoreCommand(m,
+                           cursorId,
+                           durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()),
+                           dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime(),
+                           false /* exhaustSupported */);
+
+    // Upgrade to FCV 4.4.
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
+    // Simulate an empty batch for the second getMore and this will trigger a retry as FCV has
+    // changed to 4.4.
+    processSingleRequestResponse(
+        conn, makeSubsequentBatch(cursorId, {}, metadataObj, false /* moreToCome */), true);
+
+    // Simulate a response for the find command from the retry.
+    m = processSingleRequestResponse(
+        conn, makeFirstBatch(cursorId, {firstEntry}, metadataObj), true);
+    validateFindCommand(
+        m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest()));
+
+    // Simulate a response for the first getMore command after the retry.
+    m = processSingleRequestResponse(
+        conn, makeSubsequentBatch(cursorId, {}, metadataObj, true /* moreToCome */), true);
+    // Test that an exhaust cursor is used in FCV 4.4.
+    validateGetMoreCommand(m,
+                           cursorId,
+                           durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()),
+                           dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime(),
+                           true /* exhaustSupported */);
+
+    // Terminating empty batch from exhaust stream with cursorId 0.
+    processSingleExhaustResponse(
+        conn, makeSubsequentBatch(0LL, {}, metadataObj, false /* moreToCome */), false);
+
+    oplogFetcher->join();
+
+    ASSERT_OK(shutdownState.getStatus());
+}
 }  // namespace
