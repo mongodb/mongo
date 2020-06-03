@@ -344,12 +344,6 @@ StatusWith<std::unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(
                 return status;
             }
             qr->_allowSpeculativeMajorityRead = el.boolean();
-        } else if (fieldName == kInternalReadAtClusterTimeField) {
-            Status status = checkFieldType(el, BSONType::bsonTimestamp);
-            if (!status.isOK()) {
-                return status;
-            }
-            qr->_internalReadAtClusterTime = el.timestamp();
         } else if (fieldName == kResumeAfterField) {
             Status status = checkFieldType(el, Object);
             if (!status.isOK()) {
@@ -548,10 +542,6 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
 
     if (_allowSpeculativeMajorityRead) {
         cmdBuilder->append(kAllowSpeculativeMajorityReadField, true);
-    }
-
-    if (_internalReadAtClusterTime) {
-        cmdBuilder->append(kInternalReadAtClusterTimeField, *_internalReadAtClusterTime);
     }
 
     if (_requestResumeToken) {
@@ -1001,12 +991,6 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (_allowSpeculativeMajorityRead) {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kAllowSpeculativeMajorityReadField
-                              << " not supported in aggregation."};
-    }
-
-    if (_internalReadAtClusterTime) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << kInternalReadAtClusterTimeField
                               << " not supported in aggregation."};
     }
 

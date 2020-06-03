@@ -78,7 +78,6 @@ public:
     static constexpr auto kOptionsField = "options";
     static constexpr auto kReadOnceField = "readOnce";
     static constexpr auto kAllowSpeculativeMajorityReadField = "allowSpeculativeMajorityRead";
-    static constexpr auto kInternalReadAtClusterTimeField = "$_internalReadAtClusterTime";
     static constexpr auto kRequestResumeTokenField = "$_requestResumeToken";
     static constexpr auto kResumeAfterField = "$_resumeAfter";
     static constexpr auto kUse44SortKeys = "_use44SortKeys";
@@ -434,10 +433,6 @@ public:
         return _allowSpeculativeMajorityRead;
     }
 
-    boost::optional<Timestamp> getReadAtClusterTime() const {
-        return _internalReadAtClusterTime;
-    }
-
     bool getRequestResumeToken() const {
         return _requestResumeToken;
     }
@@ -590,10 +585,6 @@ private:
     bool _allowSpeculativeMajorityRead = false;
 
     boost::optional<long long> _replicationTerm;
-
-    // The Timestamp that RecoveryUnit::setTimestampReadSource() should be called with. The optional
-    // should only ever be engaged when testing commands are enabled.
-    boost::optional<Timestamp> _internalReadAtClusterTime;
 };
 
 }  // namespace mongo

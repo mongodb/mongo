@@ -1,7 +1,7 @@
 /**
  * Ensures that performing a write in a prepared transaction, followed by a write outside of a
  * transaction, it is possible to specify either '$_internalReadAtClusterTime' or snapshot read
- * concern with 'atClusterTime' as the timestamp of the second write for 'find' and 'dbHash'. The
+ * concern with 'atClusterTime' as the timestamp of the second write for 'dbHash'. The
  * commands should block until the prepared transaction is committed or aborted.
  *
  * @tags: [uses_transactions, uses_prepare_transaction, requires_fcv_46]
@@ -33,29 +33,6 @@ const runDBHashFn = (host, dbName, clusterTime, useSnapshot) => {
     assert.eq(firstHash.md5, secondHash.md5);
 
     return firstHash;
-};
-
-const runFindFn = (host, dbName, collName, clusterTime, useSnapshot) => {
-    const conn = new Mongo(host);
-    const db = conn.getDB(dbName);
-
-    conn.setSlaveOk();
-    let cmd;
-    if (useSnapshot) {
-        cmd = {
-            find: collName,
-            readConcern: {
-                level: "snapshot",
-                atClusterTime: eval(clusterTime),
-            }
-        };
-    } else {
-        cmd = {
-            find: collName,
-            $_internalReadAtClusterTime: eval(clusterTime),
-        };
-    }
-    assert.commandWorked(db.getSiblingDB(dbName).runCommand(cmd));
 };
 
 const assertOpHasPrepareConflict = (db, commandName, opsObj) => {
@@ -154,40 +131,6 @@ curOpObj = {
 assertOpHasPrepareConflict(testDB, "dbHash", curOpObj);
 assertOpHasPrepareConflict(testDBSecondary, "dbHash", curOpObj);
 
-// Run 'find' with '$_internalReadAtClusterTime' and snapshot read concern specified.
-
-const findInternalClusterTimePrimaryThread =
-    new Thread(runFindFn, primary.host, dbName, collName, tojson(clusterTime), false);
-const findInternalClusterTimeSecondaryThread =
-    new Thread(runFindFn, secondary.host, dbName, collName, tojson(clusterTime), false);
-
-findInternalClusterTimePrimaryThread.start();
-findInternalClusterTimeSecondaryThread.start();
-
-curOpObj = {
-    "command.$_internalReadAtClusterTime": {$exists: true},
-    "command.find": {$exists: true},
-};
-
-assertOpHasPrepareConflict(testDB, "find", curOpObj);
-assertOpHasPrepareConflict(testDBSecondary, "find", curOpObj);
-
-const findClusterTimePrimaryThread =
-    new Thread(runFindFn, primary.host, dbName, collName, tojson(clusterTime), true);
-const findClusterTimeSecondaryThread =
-    new Thread(runFindFn, secondary.host, dbName, collName, tojson(clusterTime), true);
-
-findClusterTimePrimaryThread.start();
-findClusterTimeSecondaryThread.start();
-
-curOpObj = {
-    "command.readConcern.atClusterTime": {$exists: true},
-    "command.find": {$exists: true},
-};
-
-assertOpHasPrepareConflict(testDB, "find", curOpObj);
-assertOpHasPrepareConflict(testDBSecondary, "find", curOpObj);
-
 // Run a series of DDL operations which shouldn't block before committing the prepared
 // transaction.
 const otherDbName = "prepare_transaction_read_at_cluster_time_secondary_other";
@@ -223,12 +166,6 @@ secondaryDBHash = dbHashClusterTimeSecondaryThread.returnData();
 
 assert.eq(primaryDBHash.collections, secondaryDBHash.collections);
 assert.eq(primaryDBHash.md5, secondaryDBHash.md5);
-
-findInternalClusterTimePrimaryThread.join();
-findInternalClusterTimeSecondaryThread.join();
-
-findClusterTimePrimaryThread.join();
-findClusterTimeSecondaryThread.join();
 
 rst.stopSet();
 }());

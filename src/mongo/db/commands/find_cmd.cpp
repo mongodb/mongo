@@ -331,28 +331,6 @@ public:
                     "The 'readOnce' option is not supported within a transaction.",
                     !txnParticipant || !opCtx->inMultiDocumentTransaction() || !qr->isReadOnce());
 
-            uassert(ErrorCodes::InvalidOptions,
-                    "The '$_internalReadAtClusterTime' option is only supported when testing"
-                    " commands are enabled",
-                    !qr->getReadAtClusterTime() || getTestCommandsEnabled());
-
-            uassert(
-                ErrorCodes::OperationNotSupportedInTransaction,
-                "The '$_internalReadAtClusterTime' option is not supported within a transaction.",
-                !txnParticipant || !opCtx->inMultiDocumentTransaction() ||
-                    !qr->getReadAtClusterTime());
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "The '$_internalReadAtClusterTime' option is only supported when replication is"
-                    " enabled",
-                    !qr->getReadAtClusterTime() || replCoord->isReplEnabled());
-
-            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            uassert(ErrorCodes::InvalidOptions,
-                    "The '$_internalReadAtClusterTime' option is only supported by storage engines"
-                    " that support document-level concurrency",
-                    !qr->getReadAtClusterTime() || storageEngine->supportsDocLocking());
-
             // Validate term before acquiring locks, if provided.
             auto term = qr->getReplicationTerm();
             if (term) {
@@ -370,71 +348,6 @@ public:
                 opCtx->lockState()->skipAcquireTicket();
             }
 
-            // We call RecoveryUnit::setTimestampReadSource() before acquiring a lock on the
-            // collection via AutoGetCollectionForRead in order to ensure the comparison to the
-            // collection's minimum visible snapshot is accurate.
-            if (auto targetClusterTime = qr->getReadAtClusterTime()) {
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "$_internalReadAtClusterTime value must not be a null"
-                                         " timestamp.",
-                        !targetClusterTime->isNull());
-
-                // It is contradictory to read at a timestamp before a specified afterClusterTime,
-                // and would break read causality.
-                auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
-                if (afterClusterTime) {
-                    uassert(ErrorCodes::InvalidOptions,
-                            str::stream()
-                                << "$_internalReadAtClusterTime value must not be less than "
-                                   "the provided afterClusterTime value. Requested clusterTime: "
-                                << targetClusterTime->toString()
-                                << "; afterClusterTime: " << afterClusterTime->toString(),
-                            targetClusterTime >= afterClusterTime->asTimestamp());
-                }
-
-                // We aren't holding the global lock in intent mode, so it is possible after
-                // comparing 'targetClusterTime' to 'lastAppliedOpTime' for the last applied opTime
-                // to go backwards or for the term to change due to replication rollback. This isn't
-                // an actual concern because the testing infrastructure won't use the
-                // $_internalReadAtClusterTime option in any test suite where rollback is expected
-                // to occur.
-                auto lastAppliedOpTime = replCoord->getMyLastAppliedOpTime();
-
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "$_internalReadAtClusterTime value must not be greater"
-                                         " than the last applied opTime. Requested clusterTime: "
-                                      << targetClusterTime->toString()
-                                      << "; last applied opTime: " << lastAppliedOpTime.toString(),
-                        lastAppliedOpTime.getTimestamp() >= targetClusterTime);
-
-                // We aren't holding the global lock in intent mode, so it is possible for the
-                // global storage engine to have been destructed already as a result of the server
-                // shutting down. This isn't an actual concern because the testing infrastructure
-                // won't use the $_internalReadAtClusterTime option in any test suite where clean
-                // shutdown is expected to occur concurrently with tests running.
-                auto allDurableTime = storageEngine->getAllDurableTimestamp();
-                invariant(!allDurableTime.isNull());
-
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "$_internalReadAtClusterTime value must not be greater"
-                                         " than the all_durable timestamp. Requested"
-                                         " clusterTime: "
-                                      << targetClusterTime->toString()
-                                      << "; all_durable timestamp: " << allDurableTime.toString(),
-                        allDurableTime >= targetClusterTime);
-
-                // The $_internalReadAtClusterTime option causes any storage-layer cursors created
-                // during plan execution to read from a consistent snapshot of data at the supplied
-                // clusterTime, even across yields.
-                opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                              targetClusterTime);
-
-                // The $_internalReadAtClusterTime option also causes any storage-layer cursors
-                // created during plan execution to block on prepared transactions. Since the find
-                // command ignores prepare conflicts by default, change the behavior.
-                opCtx->recoveryUnit()->setPrepareConflictBehavior(
-                    PrepareConflictBehavior::kEnforce);
-            }
 
             // Acquire locks. If the query is on a view, we release our locks and convert the query
             // request into an aggregation command.

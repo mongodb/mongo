@@ -1961,11 +1961,21 @@ var ReplSetTest = function(opts) {
     } = {}) {
         return sessions.map(session => {
             const commandObj = {dbHash: 1};
+            const db = session.getDatabase(dbName);
+            // If eMRC=false or we are in binary version 4.4, we use the old behavior using
+            // $_internalReadAtClusterTime. Otherwise, we use snapshot read concern for dbhash.
             if (readAtClusterTime !== undefined) {
-                commandObj.$_internalReadAtClusterTime = readAtClusterTime;
+                // TODO (SERVER-48959): Remove 4.4 version check to see which point-in-time read
+                // behavior to use.
+                const version = db.runCommand({buildinfo: 1}).versionArray;
+                if (jsTest.options().enableMajorityReadConcern !== false &&
+                    ((version[0] > 4) || ((version[0] == 4) && (version[1] > 4)))) {
+                    commandObj.readConcern = {level: "snapshot", atClusterTime: readAtClusterTime};
+                } else {
+                    commandObj.$_internalReadAtClusterTime = readAtClusterTime;
+                }
             }
 
-            const db = session.getDatabase(dbName);
             const res = assert.commandWorked(db.runCommand(commandObj));
 
             // The "capped" field in the dbHash command response is new as of MongoDB 4.0.
@@ -1990,7 +2000,7 @@ var ReplSetTest = function(opts) {
     };
 
     this.getCollectionDiffUsingSessions = function(
-        primarySession, secondarySession, dbName, collNameOrUUID, readAtClusterTime) {
+        primarySession, secondarySession, dbName, collNameOrUUID) {
         function PeekableCursor(cursor) {
             let _stashedDoc;
 
@@ -2020,10 +2030,6 @@ var ReplSetTest = function(opts) {
         const secondaryDB = secondarySession.getDatabase(dbName);
 
         const commandObj = {find: collNameOrUUID, sort: {_id: 1}};
-        if (readAtClusterTime !== undefined) {
-            commandObj.$_internalReadAtClusterTime = readAtClusterTime;
-        }
-
         const primaryCursor =
             new PeekableCursor(new DBCommandCursor(primaryDB, primaryDB.runCommand(commandObj)));
 
