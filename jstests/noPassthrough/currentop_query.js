@@ -514,6 +514,9 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
 
         let currentOpFilter;
 
+        // Verify that the currentOp command removes the comment field from the command while
+        // truncating the command. Command {find: <coll>, comment: <comment>, filter: {XYZ}} should
+        // be represented as {$truncated: "{find: <coll>, filter: {XY...", comment: <comment>}.
         currentOpFilter = {
             "command.$truncated": {$regex: truncatedQueryString},
             "command.comment": "currentop_query"
@@ -521,10 +524,31 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
 
         confirmCurrentOpContents({
             test: function(db) {
-                assert.eq(db.currentop_query.find(TestData.queryFilter)
-                              .comment("currentop_query")
-                              .itcount(),
-                          0);
+                // We put the 'comment' field before the large 'filter' in the command object so
+                // that, when the object is truncated in the currentOp output, we can confirm that
+                // the 'comment' field has been removed from the object and promoted to a top-level
+                // field.
+                assert.commandWorked(db.runCommand({
+                    find: "currentop_query",
+                    comment: "currentop_query",
+                    filter: TestData.queryFilter
+                }));
+            },
+            planSummary: "COLLSCAN",
+            currentOpFilter: currentOpFilter
+        });
+
+        // Verify that a command without the "comment" field appears as {$truncated: <string>} when
+        // truncated by currentOp.
+        currentOpFilter = {
+            "command.$truncated": {$regex: truncatedQueryString},
+            "command.comment": {$exists: false}
+        };
+
+        confirmCurrentOpContents({
+            test: function(db) {
+                assert.commandWorked(
+                    db.runCommand({find: "currentop_query", filter: TestData.queryFilter}));
             },
             planSummary: "COLLSCAN",
             currentOpFilter: currentOpFilter
@@ -534,8 +558,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
         // <string>, comment: <string> }.
         const cmdRes = testDB.runCommand({
             find: "currentop_query",
-            filter: TestData.queryFilter,
             comment: "currentop_query",
+            filter: TestData.queryFilter,
             batchSize: 0
         });
         assert.commandWorked(cmdRes);
@@ -572,11 +596,12 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
 
         confirmCurrentOpContents({
             test: function(db) {
-                assert.eq(
-                    db.currentop_query
-                        .aggregate([{$match: TestData.queryFilter}], {comment: "currentop_query"})
-                        .itcount(),
-                    0);
+                assert.commandWorked(db.runCommand({
+                    aggregate: "currentop_query",
+                    comment: "currentop_query",
+                    pipeline: [{$match: TestData.queryFilter}],
+                    cursor: {}
+                }));
             },
             planSummary: "COLLSCAN",
             currentOpFilter: currentOpFilter

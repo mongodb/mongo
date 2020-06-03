@@ -545,9 +545,11 @@ void appendAsObjOrString(StringData name,
     if (!maxSize || static_cast<size_t>(obj.objsize()) <= *maxSize) {
         builder->append(name, obj);
     } else {
-        // Generate an abbreviated serialization for the object, by passing false as the
-        // "full" argument to obj.toString().
-        std::string objToString = obj.toString();
+        // Generate an abbreviated serialization for the object, by passing false as the "full"
+        // argument to obj.toString(). Remove "comment" field from the object, if present, since
+        // this will be promoted to a top-level field in the output.
+        std::string objToString =
+            (obj.hasField("comment") ? obj.removeField("comment") : obj).toString();
         if (objToString.size() > *maxSize) {
             // objToString is still too long, so we append to the builder a truncated form
             // of objToString concatenated with "...".  Instead of creating a new string
