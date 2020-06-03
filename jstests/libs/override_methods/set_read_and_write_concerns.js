@@ -55,6 +55,9 @@ function runCommandWithReadAndWriteConcerns(
     let shouldForceReadConcern = kCommandsSupportingReadConcern.has(commandName);
     if (kDefaultReadConcern.level === "snapshot" && !kCommandsSupportingSnapshot.has(commandName)) {
         shouldForceReadConcern = false;
+    } else if (TestData.disallowSnapshotDistinct && kDefaultReadConcern.level === "snapshot" &&
+               commandName === "distinct") {
+        shouldForceReadConcern = false;
     }
 
     let shouldForceWriteConcern = kCommandsSupportingWriteConcern.has(commandName);

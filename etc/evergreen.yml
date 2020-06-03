@@ -7287,6 +7287,17 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 15
 
+- name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+  tags: ["causally_consistent", "read_write_concern"]
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 15
+
 - name: sharded_causally_consistent_jscore_passthrough_gen
   tags: ["causally_consistent"]
   depends_on:
