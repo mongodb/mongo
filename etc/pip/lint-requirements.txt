@@ -2,4 +2,3 @@
 -r components/core.req
 
 -r components/lint.req
--r components/mypy.req

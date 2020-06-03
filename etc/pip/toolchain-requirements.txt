@@ -6,7 +6,6 @@
 -r components/compile.req
 -r components/evergreen.req
 -r components/lint.req
--r components/mypy.req
 -r components/resmoke.req
 -r components/idl.req
 
