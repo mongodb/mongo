@@ -73,6 +73,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
 MONGO_FAIL_POINT_DEFINE(hangAfterInitializingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCompletingAbort);
 MONGO_FAIL_POINT_DEFINE(failIndexBuildOnCommit);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeAbortCleanUp);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnStepUp);
 
 namespace {
 
@@ -1216,6 +1218,11 @@ std::size_t IndexBuildsCoordinator::getActiveIndexBuildCount(OperationContext* o
 }
 
 void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
+    if (MONGO_unlikely(hangIndexBuildOnStepUp.shouldFail())) {
+        LOGV2(4753600, "Hanging due to hangIndexBuildOnStepUp fail point");
+        hangIndexBuildOnStepUp.pauseWhileSet();
+    }
+
     LOGV2(20657, "IndexBuildsCoordinator::onStepUp - this node is stepping up to primary");
 
     // This would create an empty table even for FCV 4.2 to handle case where a primary node started
@@ -2064,12 +2071,17 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     // If we received an external abort, the caller should have already set our state to kAborted.
     invariant(status.code() != ErrorCodes::IndexBuildAborted);
 
+    if (MONGO_unlikely(hangIndexBuildBeforeAbortCleanUp.shouldFail())) {
+        LOGV2(4753601, "Hanging due to hangIndexBuildBeforeAbortCleanUp fail point");
+        hangIndexBuildBeforeAbortCleanUp.pauseWhileSet();
+    }
+
     // Index builds only check index constraints when committing. If an error occurs at that point,
     // then the build is cleaned up while still holding the appropriate locks. The only errors that
     // we cannot anticipate are user interrupts and shutdown errors.
     invariant(status.isA<ErrorCategory::Interruption>() ||
                   status.isA<ErrorCategory::ShutdownError>(),
-              str::stream() << "Unnexpected error code during index build cleanup: " << status);
+              str::stream() << "Unexpected error code during index build cleanup: " << status);
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         _cleanUpSinglePhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
     } else {
