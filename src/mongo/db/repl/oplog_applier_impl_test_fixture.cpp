@@ -269,11 +269,17 @@ Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
     // its own batch and update oplog visibility after each batch to make sure all previously
     // applied entries are visible to subsequent batches.
     for (auto& op : ops) {
-        auto status = oplogApplier.applyOplogBatch(_opCtx.get(), {op});
-        if (!status.isOK()) {
-            return status.getStatus();
+        auto applyResult = oplogApplier.applyOplogBatch(_opCtx.get(), {op});
+        if (!applyResult.isOK()) {
+            std::vector<BSONObj> docsFromOps;
+            for (const auto& opForContext : ops) {
+                docsFromOps.push_back(opForContext.toBSON());
+            }
+            auto status = applyResult.getStatus();
+            return status.withContext(str::stream() << "failed to apply operation: " << op.toBSON()
+                                                    << ". " << BSON("ops" << docsFromOps));
         }
-        auto lastApplied = status.getValue();
+        auto lastApplied = applyResult.getValue();
         const bool orderedCommit = true;
         // Update oplog visibility by notifying the storage engine of the new oplog entries.
         storageInterface->oplogDiskLocRegister(
