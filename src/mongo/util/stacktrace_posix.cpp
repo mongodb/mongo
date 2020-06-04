@@ -430,7 +430,6 @@ void printStackTraceImpl(const Options& options, StackTraceSink* sink = nullptr)
             *sink << fmt::format(FMT_STRING("Error collecting stack trace: {}"), err);
         }
         LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = err);
-        return;
     }
     stack_trace_detail::logBacktraceObject(bob.done(), sink, options.withHumanReadable);
 }
