@@ -432,6 +432,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, Na
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+    invariant(csr->getCurrentMetadataIfKnown());
     csr->enterCriticalSectionCatchUpPhase(_opCtx, csrLock);
 }
 
@@ -451,6 +452,7 @@ void CollectionCriticalSection::enterCommitPhase() {
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+    invariant(csr->getCurrentMetadataIfKnown());
     csr->enterCriticalSectionCommitPhase(_opCtx, csrLock);
 }
 

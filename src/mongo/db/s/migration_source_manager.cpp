@@ -141,7 +141,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
           "collectionEpoch"_attr = _args.getVersionEpoch());
 
     // Force refresh of the metadata to ensure we have the latest
-    forceShardFilteringMetadataRefresh(_opCtx, getNss());
+    onShardVersionMismatch(_opCtx, getNss(), boost::none);
 
     // Snapshot the committed metadata from the time the migration starts
     const auto collectionMetadataAndUUID = [&] {
