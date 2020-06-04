@@ -225,7 +225,7 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
 
         // Fetch the all_durable timestamp from the storage engine, which is guaranteed not to have
         // any holes behind it in-memory.
-        const uint64_t newTimestamp = fetchAllDurableValue(sessionCache->conn());
+        const uint64_t newTimestamp = sessionCache->getKVEngine()->getAllDurableTimestamp().asULL();
 
         // The newTimestamp may actually go backward during secondary batch application,
         // where we commit data file changes separately from oplog changes, so ignore
@@ -271,24 +271,6 @@ void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimest
                 2,
                 "Updating the oplogReadTimestamp.",
                 "newOplogReadTimestamp"_attr = Timestamp(newTimestamp));
-}
-
-uint64_t WiredTigerOplogManager::fetchAllDurableValue(WT_CONNECTION* conn) {
-    // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
-    // that has no holes (uncommitted transactions with lower timestamps) behind it.
-    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    auto wtstatus = conn->query_timestamp(conn, buf, "get=all_durable");
-    if (wtstatus == WT_NOTFOUND) {
-        // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
-        // (timestamped) data.
-        return StorageEngine::kMinimumTimestamp;
-    } else {
-        invariantWTOK(wtstatus);
-    }
-
-    uint64_t tmp;
-    fassert(38002, NumberParser().base(16)(buf, &tmp));
-    return tmp;
 }
 
 }  // namespace mongo
