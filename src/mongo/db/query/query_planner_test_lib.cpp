@@ -138,8 +138,9 @@ bool bsonObjFieldsAreInSet(BSONObj obj, const std::set<std::string>& allowedFiel
         BSONElement child = i.next();
         if (!allowedFields.count(child.fieldName())) {
             LOGV2_ERROR(23932,
-                        "Did not expect to find {child_fieldName}",
-                        "child_fieldName"_attr = child.fieldName());
+                        "Did not expect to find {field}",
+                        "Unexpected field",
+                        "field"_attr = child.fieldName());
             return false;
         }
     }

@@ -79,7 +79,10 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
         BSONElement elt = geoIt.next();
         if (elt.fieldNameStringData() == "$uniqueDocs") {
             // Deprecated "$uniqueDocs" field
-            LOGV2_WARNING(23847, "deprecated $uniqueDocs option: {obj}", "obj"_attr = redact(obj));
+            LOGV2_WARNING(23847,
+                          "Deprecated $uniqueDocs option: {query}",
+                          "Deprecated $uniqueDocs option",
+                          "query"_attr = redact(obj));
         } else {
             // The element must be a geo specifier. "$box", "$center", "$geometry", etc.
             geoContainer.reset(new GeometryContainer());
@@ -194,7 +197,7 @@ bool GeoNearExpression::parseLegacyQuery(const BSONObj& obj) {
             maxDistance = e.Number();
             uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
         } else if (fieldName == "$uniqueDocs") {
-            LOGV2_WARNING(23848, "ignoring deprecated option $uniqueDocs");
+            LOGV2_WARNING(23848, "Ignoring deprecated option $uniqueDocs");
         } else {
             // In a query document, $near queries can have no non-geo sibling parameters.
             uasserted(34413,

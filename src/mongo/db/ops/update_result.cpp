@@ -53,7 +53,16 @@ UpdateResult::UpdateResult(bool existing_,
     if (!existing && numMatched == 0 && !id.eoo()) {
         upserted = id.wrap(kUpsertedFieldName);
     }
-    LOGV2_DEBUG(20885, 4, "UpdateResult -- {}", ""_attr = redact(toString()));
+    LOGV2_DEBUG(20885,
+                4,
+                "UpdateResult -- upserted: {upserted} modifiers: {modifiers} existing: {existing} "
+                "numDocsModified: {numModified} numMatched: {numMatched}",
+                "UpdateResult",
+                "numMatched"_attr = numMatched,
+                "numModified"_attr = numDocsModified,
+                "upserted"_attr = redact(upserted),
+                "modifiers"_attr = modifiers,
+                "existing"_attr = existing);
 }
 
 std::string UpdateResult::toString() const {

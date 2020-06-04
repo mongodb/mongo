@@ -181,8 +181,9 @@ void CollectionQueryInfo::clearQueryCache() {
     const Collection* coll = get.owner(this);
     LOGV2_DEBUG(20907,
                 1,
-                "{coll_ns}: clearing plan cache - collection info cache reset",
-                "coll_ns"_attr = coll->ns());
+                "{namespace}: clearing plan cache - collection info cache reset",
+                "Clearing plan cache - collection info cache reset",
+                "namespace"_attr = coll->ns());
     if (nullptr != _planCache.get()) {
         _planCache->clear();
     }
