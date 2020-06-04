@@ -338,23 +338,23 @@ class GDBDumper(Dumper):
         mongodb_dump_mutexes = "mongodb-dump-mutexes"
         mongodb_dump_recovery_units = "mongodb-dump-recovery-units"
 
-        if not logger.mongo_process_filename:
-            raw_stacks_commands = []
-        else:
-            base, ext = os.path.splitext(logger.mongo_process_filename)
-            raw_stacks_filename = base + '_raw_stacks' + ext
-            raw_stacks_commands = [
-                'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
-                # This sends output to log file rather than stdout until we turn logging off.
-                'set logging redirect on',
-                'set logging file ' + raw_stacks_filename,
-                'set logging on',
-                'thread apply all bt',
-                'set logging off',
-            ]
-
         cmds = []
         for pid in pinfo.pidv:
+            if not logger.mongo_process_filename:
+                raw_stacks_commands = []
+            else:
+                base, ext = os.path.splitext(logger.mongo_process_filename)
+                raw_stacks_filename = "%s_%d_raw_stacks%s" % (base, pid, ext)
+                raw_stacks_commands = [
+                    'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
+                    # This sends output to log file rather than stdout until we turn logging off.
+                    'set logging redirect on',
+                    'set logging file ' + raw_stacks_filename,
+                    'set logging on',
+                    'thread apply all bt',
+                    'set logging off',
+                ]
+
             dump_command = ""
             if take_dump:
                 # Dump to file, dump_<process name>.<pid>.core
@@ -478,7 +478,7 @@ def _get_process_logger(dbg_output, pname: str, pid: int = None):
 
     if 'file' in dbg_output:
         if pid:
-            filename = "debugger_%s_%s.log" % (os.path.splitext(pname)[0], pid)
+            filename = "debugger_%s_%d.log" % (os.path.splitext(pname)[0], pid)
         else:
             filename = "debugger_%s.log" % (os.path.splitext(pname)[0])
         process_logger.mongo_process_filename = filename

@@ -146,7 +146,7 @@ function runHangAnalyzer(pids) {
     print(`Running hang analyzer for pids [${pids}]`);
 
     const scriptPath = pathJoin('.', 'buildscripts', 'resmoke.py');
-    const args = ['python', scriptPath, 'hang-analyzer', '-d', pids];
+    const args = ['python', scriptPath, 'hang-analyzer', '-o', 'file', '-o', 'stdout', '-d', pids];
 
     // Enable core dumps if not an ASAN build.
     if (!_isAddressSanitizerActive()) {
