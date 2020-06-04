@@ -40,7 +40,7 @@ try {
     const dropPendingCollName = twoPhaseDropTest.prepareDropCollection(collName);
 
     const dropPendingColl = testDB.getCollection(dropPendingCollName);
-    assert.commandWorked(dropPendingColl.dropIndex({a: 1}));
+    assert.commandFailedWithCode(dropPendingColl.dropIndex({a: 1}), ErrorCodes.NamespaceNotFound);
 } finally {
     // COMMIT collection drop.
     twoPhaseDropTest.commitDropCollection(collName);
