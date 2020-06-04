@@ -166,7 +166,10 @@ boost::optional<Milliseconds> SingleServerIsMasterMonitor::calculateExpeditedDel
 }
 
 boost::optional<Milliseconds> SingleServerIsMasterMonitor::_timeSinceLastCheck() const {
-    return (_lastIsMasterAt) ? boost::optional<Milliseconds>(_executor->now() - *_lastIsMasterAt)
+    // Since the system clock is not monotonic, the returned value can be negative. In this case we
+    // choose a conservative estimate of 0ms as the time we last checked.
+    return (_lastIsMasterAt) ? boost::optional<Milliseconds>(
+                                   std::max(Milliseconds(0), _executor->now() - *_lastIsMasterAt))
                              : boost::none;
 }
 
