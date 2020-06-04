@@ -77,12 +77,12 @@ class Dumper(metaclass=ABCMeta):
 
         :param debugger: debugger executable.
         """
-        raise NotImplementedError("dump_info must be implemented in OS-specific subclasses")
+        raise NotImplementedError("_find_debugger must be implemented in OS-specific subclasses")
 
     @abstractmethod
     def _prefix(self):
         """Return the commands to set up a debugger process."""
-        raise NotImplementedError("dump_info must be implemented in OS-specific subclasses")
+        raise NotImplementedError("_prefix must be implemented in OS-specific subclasses")
 
     @abstractmethod
     def _process_specific(self, pinfo: Pinfo, take_dump: bool, logger: logging.Logger = None):
@@ -93,12 +93,12 @@ class Dumper(metaclass=ABCMeta):
         :param take_dump: Whether to take a core dump
         :param logger: Logger to output dump info to
         """
-        raise NotImplementedError("dump_info must be implemented in OS-specific subclasses")
+        raise NotImplementedError("_process_specific must be implemented in OS-specific subclasses")
 
     @abstractmethod
     def _postfix(self):
         """Return the commands to exit the debugger."""
-        raise NotImplementedError("dump_info must be implemented in OS-specific subclasses")
+        raise NotImplementedError("_postfix must be implemented in OS-specific subclasses")
 
 
 class WindowsDumper(Dumper):

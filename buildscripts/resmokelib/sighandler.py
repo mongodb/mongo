@@ -8,8 +8,13 @@ import threading
 import time
 import traceback
 
+import psutil
+
 from buildscripts.resmokelib import reportfile
 from buildscripts.resmokelib import testing
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib.hang_analyzer import hang_analyzer
+from buildscripts.resmokelib import parser
 
 _IS_WINDOWS = (sys.platform == "win32")
 if _IS_WINDOWS:
@@ -59,6 +64,15 @@ def register(logger, suites, start_time):
 
         testing.suite.Suite.log_summaries(logger, suites, time.time() - start_time)
 
+        if 'is_inner_level' not in config.INTERNAL_PARAMS:
+            # Gather and analyze pids of all subprocesses.
+            # Do nothing for child resmoke process started by another resmoke process
+            # (e.g. backup_restore.js) The child processes of the child resmoke will be
+            # analyzed by the signal handler of the top-level resmoke process.
+            # i.e. the next few lines of code.
+            pids_to_analyze = _get_pids()
+            _analyze_pids(logger, pids_to_analyze)
+
     # On Windows spawn a thread to wait on an event object for signal to dump stacks. For Cygwin
     # platforms, we use a signal handler since it supports POSIX signals.
     if _IS_WINDOWS:
@@ -105,3 +119,44 @@ def _dump_stacks(logger, header_msg):
         sb.append("".join(traceback.format_stack(stack)))
 
     logger.info("\n".join(sb))
+
+
+def _get_pids():
+    """Return all PIDs spawned by the current resmoke process and their child PIDs."""
+    pids = []  # Gather fixture PIDs + any PIDs spawned by the fixtures.
+    parent = psutil.Process()  # current process
+    for child in parent.children(recursive=True):
+        # Don't signal python threads. They have already been signalled in the evergreen timeout
+        # section.
+        if 'python' not in child.name().lower():
+            pids.append(child.pid)
+
+    return pids
+
+
+def _analyze_pids(logger, pids):
+    """Analyze the PIDs spawned by the current resmoke process."""
+    # If 'test_analysis' is specified, we will just write the pids out to a file and kill them
+    # Instead of running analysis. This option will only be specified in resmoke selftests.
+    if 'test_analysis' in config.INTERNAL_PARAMS:
+        with open(os.path.join(config.DBPATH_PREFIX, "test_analysis.txt"), "w") as analysis_file:
+            analysis_file.write("\n".join([str(pid) for pid in pids]))
+            for pid in pids:
+                try:
+                    proc = psutil.Process(pid)
+                    logger.info("Killing process pid %d", pid)
+                    proc.kill()
+                except psutil.NoSuchProcess:
+                    # Process has already terminated.
+                    pass
+
+        return
+
+    hang_analyzer_args = [
+        'hang-analyzer', '-o', 'file', '-o', 'stdout', '-k', '-d', ','.join([str(p) for p in pids])
+    ]
+
+    if not os.getenv('ASAN_OPTIONS'):
+        hang_analyzer_args.append('-c')
+    _hang_analyzer = parser.parse_command_line(hang_analyzer_args, logger=logger)
+    _hang_analyzer.execute()
