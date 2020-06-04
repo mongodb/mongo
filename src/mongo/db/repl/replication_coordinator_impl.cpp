@@ -3720,7 +3720,7 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
         // only want to do an automatic reconfig where the base config is the one that specified
         // this memberId.
         if (oldConfig.getConfigVersionAndTerm() != versionAndTerm) {
-            return Status(ErrorCodes::StaleConfig,
+            return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                           str::stream()
                               << "Current config is no longer consistent with heartbeat "
                                  "data. Current config version: "
