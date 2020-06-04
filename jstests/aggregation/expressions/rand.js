@@ -19,19 +19,12 @@ for (i = 0; i < N; i++) {
 assert.commandWorked(bulk.execute());
 
 const randPipeline = [{$project: {r: {$rand: {}}}}, {$group: {_id: 0, avg: {$avg: "$r"}}}];
-
-// Test we have a per-document rand function.
-const explain = coll.explain().aggregate(randPipeline);
-const explainRand = getAggPlanStage(explain, "PROJECTION_DEFAULT");
-assert.neq(null, explainRand, explain);
-assert.eq(false, explainRand.transformBy.r.$rand.const, explain);
-
 const resultArray = coll.aggregate(randPipeline).toArray();
 assert.eq(1, resultArray.length);
 const avg = resultArray[0]["avg"];
 
 print("Average: ", avg);
-// For continuous uniform distribution [0.0, 1.0] the variance is 1/12.
+// For continuous uniform distribution [0.0, 1.0] the variance is 1/12 .
 // Test certainty within 10 standard deviations.
 const err = 10.0 / Math.sqrt(12.0 * N);
 assert.lte(0.5 - err, avg);
@@ -42,14 +35,6 @@ collConst.drop();
 assert.commandWorked(collConst.insert({_id: i, v: 0}));
 
 const randPipelineConst = [{$project: {r: {$rand: {const : true}}}}];
-
-// Test rand is replaced with a constant
-const explainConst = collConst.explain().aggregate(randPipelineConst);
-const explainConstConst = getAggPlanStage(explainConst, "PROJECTION_DEFAULT");
-const c = explainConstConst.transformBy.r.$const;
-assert.lte(0.0, c, explain);
-assert.gte(1.0, c, explain);
-
 let sum = 0.0;
 for (i = 0; i < N; i++) {
     const resultArrayConst = collConst.aggregate(randPipelineConst).toArray();
