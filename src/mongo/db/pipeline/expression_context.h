@@ -219,6 +219,8 @@ public:
 
     OperationContext* opCtx;
 
+    BSONObj hint;
+
     // An interface for accessing information or performing operations that have different
     // implementations on mongod and mongos, or that only make sense on one of the two.
     // Additionally, putting some of this functionality behind an interface prevents aggregation

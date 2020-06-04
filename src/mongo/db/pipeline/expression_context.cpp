@@ -58,6 +58,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     allowDiskUse = request.shouldAllowDiskUse();
     bypassDocumentValidation = request.shouldBypassDocumentValidation();
     ns = request.getNamespaceString();
+    hint = request.getHint();
     mongoProcessInterface = std::move(processInterface);
     collation = request.getCollation();
     _ownedCollator = std::move(collator);
@@ -155,6 +156,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->tempDir = tempDir;
 
     expCtx->opCtx = opCtx;
+    expCtx->hint = hint;
 
     if (collator) {
         expCtx->collation =

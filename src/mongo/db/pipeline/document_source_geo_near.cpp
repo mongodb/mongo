@@ -181,6 +181,11 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
         geoNear.append(kKeyFieldName, keyFieldPath);
     }
 
+    // Append index hint if one was provided to the aggregate command.
+    auto& hint = pExpCtx->hint;
+    if (!hint.isEmpty()) {
+        geoNear.append("hint", hint);
+    }
     return geoNear.obj();
 }
 
