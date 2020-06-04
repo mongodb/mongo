@@ -201,12 +201,12 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
 
             LOGV2_DEBUG(20920,
                         2,
-                        "Multikey path metadata range index scan stats: {{ index: "
-                        "{desc_indexName}, numSeeks: {mkAccessStats_keysExamined}, keysExamined: "
-                        "{mkAccessStats_keysExamined2}}}",
-                        "desc_indexName"_attr = desc->indexName(),
-                        "mkAccessStats_keysExamined"_attr = mkAccessStats.keysExamined,
-                        "mkAccessStats_keysExamined2"_attr = mkAccessStats.keysExamined);
+                        "Multikey path metadata range index scan stats: {{ index: {index}, "
+                        "numSeeks: {numSeeks}, keysExamined: {keysExamined}}}",
+                        "Multikey path metadata range index scan stats",
+                        "index"_attr = desc->indexName(),
+                        "numSeeks"_attr = mkAccessStats.keysExamined,
+                        "keysExamined"_attr = mkAccessStats.keysExamined);
         }
     }
 
@@ -382,9 +382,10 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         const string& ns = canonicalQuery->ns();
         LOGV2_DEBUG(20921,
                     2,
-                    "Collection {ns} does not exist. Using EOF plan: {canonicalQuery_Short}",
-                    "ns"_attr = ns,
-                    "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
+                    "Collection {namespace} does not exist. Using EOF plan: {query}",
+                    "Collection does not exist. Using EOF plan",
+                    "namespace"_attr = ns,
+                    "query"_attr = redact(canonicalQuery->toStringShort()));
         root = std::make_unique<EOFStage>(canonicalQuery->getExpCtxRaw());
         return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
@@ -505,9 +506,9 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     turnIxscanIntoCount(querySolution.get())) {
                     LOGV2_DEBUG(20923,
                                 2,
-                                "Using fast count: {canonicalQuery_Short}",
-                                "canonicalQuery_Short"_attr =
-                                    redact(canonicalQuery->toStringShort()));
+                                "Using fast count: {query}",
+                                "Using fast count",
+                                "query"_attr = redact(canonicalQuery->toStringShort()));
                 }
 
                 auto root =
@@ -536,8 +537,9 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         SubplanStage::canUseSubplanning(*canonicalQuery)) {
         LOGV2_DEBUG(20924,
                     2,
-                    "Running query as sub-queries: {canonicalQuery_Short}",
-                    "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()));
+                    "Running query as sub-queries: {query}",
+                    "Running query as sub-queries",
+                    "query"_attr = redact(canonicalQuery->toStringShort()));
 
         root = std::make_unique<SubplanStage>(
             canonicalQuery->getExpCtxRaw(), collection, ws, plannerParams, canonicalQuery.get());
@@ -564,11 +566,10 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
                 LOGV2_DEBUG(20925,
                             2,
-                            "Using fast count: {canonicalQuery_Short}, planSummary: "
-                            "{Explain_getPlanSummary_root_get}",
-                            "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()),
-                            "Explain_getPlanSummary_root_get"_attr =
-                                Explain::getPlanSummary(root.get()));
+                            "Using fast count: {query}, planSummary: {planSummary}",
+                            "Using fast count",
+                            "query"_attr = redact(canonicalQuery->toStringShort()),
+                            "planSummary"_attr = Explain::getPlanSummary(root.get()));
 
                 return PrepareExecutionResult(
                     std::move(canonicalQuery), std::move(solutions[i]), std::move(root));
@@ -582,10 +583,11 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
         LOGV2_DEBUG(20926,
                     2,
-                    "Only one plan is available; it will be run but will not be cached. "
-                    "{canonicalQuery_Short}, planSummary: {Explain_getPlanSummary_root_get}",
-                    "canonicalQuery_Short"_attr = redact(canonicalQuery->toStringShort()),
-                    "Explain_getPlanSummary_root_get"_attr = Explain::getPlanSummary(root.get()));
+                    "Only one plan is available; it will be run but will not be cached. {query}, "
+                    "planSummary: {planSummary}",
+                    "Only one plan is available; it will be run but will not be cached",
+                    "query"_attr = redact(canonicalQuery->toStringShort()),
+                    "planSummary"_attr = Explain::getPlanSummary(root.get()));
 
         return PrepareExecutionResult(
             std::move(canonicalQuery), std::move(solutions[0]), std::move(root));
@@ -777,9 +779,10 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
         // contains an EOF stage.
         LOGV2_DEBUG(20927,
                     2,
-                    "Collection {nss_ns} does not exist. Using EOF stage: {request_getQuery}",
-                    "nss_ns"_attr = nss.ns(),
-                    "request_getQuery"_attr = redact(request->getQuery()));
+                    "Collection {namespace} does not exist. Using EOF stage: {query}",
+                    "Collection does not exist. Using EOF stage",
+                    "namespace"_attr = nss.ns(),
+                    "query"_attr = redact(request->getQuery()));
         return PlanExecutor::make(
             expCtx, std::move(ws), std::make_unique<EOFStage>(expCtx.get()), nullptr, policy, nss);
     }
@@ -811,8 +814,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
                 request->getProj().isEmpty() && hasCollectionDefaultCollation) {
                 LOGV2_DEBUG(20928,
                             2,
-                            "Using idhack: {unparsedQuery}",
-                            "unparsedQuery"_attr = redact(unparsedQuery));
+                            "Using idhack: {query}",
+                            "Using idhack",
+                            "query"_attr = redact(unparsedQuery));
 
                 auto idHackStage = std::make_unique<IDHackStage>(
                     expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), descriptor);
@@ -948,9 +952,10 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     if (!collection) {
         LOGV2_DEBUG(20929,
                     2,
-                    "Collection {nss_ns} does not exist. Using EOF stage: {request_getQuery}",
-                    "nss_ns"_attr = nss.ns(),
-                    "request_getQuery"_attr = redact(request->getQuery()));
+                    "Collection {namespace} does not exist. Using EOF stage: {query}",
+                    "Collection does not exist. Using EOF stage",
+                    "namespace"_attr = nss.ns(),
+                    "query"_attr = redact(request->getQuery()));
         return PlanExecutor::make(
             expCtx, std::move(ws), std::make_unique<EOFStage>(expCtx.get()), nullptr, policy, nss);
     }
@@ -977,8 +982,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
                 request->getProj().isEmpty() && hasCollectionDefaultCollation) {
                 LOGV2_DEBUG(20930,
                             2,
-                            "Using idhack: {unparsedQuery}",
-                            "unparsedQuery"_attr = redact(unparsedQuery));
+                            "Using idhack: {query}",
+                            "Using idhack",
+                            "query"_attr = redact(unparsedQuery));
 
                 // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
                 // WorkingSet.
@@ -1591,11 +1597,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 
     LOGV2_DEBUG(20931,
                 2,
-                "Using fast distinct: {parsedDistinct_getQuery_Short}, planSummary: "
-                "{Explain_getPlanSummary_root_get}",
-                "parsedDistinct_getQuery_Short"_attr =
-                    redact(parsedDistinct->getQuery()->toStringShort()),
-                "Explain_getPlanSummary_root_get"_attr = Explain::getPlanSummary(root.get()));
+                "Using fast distinct: {query}, planSummary: {planSummary}",
+                "Using fast distinct",
+                "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
+                "planSummary"_attr = Explain::getPlanSummary(root.get()));
 
     return PlanExecutor::make(parsedDistinct->releaseQuery(),
                               std::move(ws),
@@ -1637,12 +1642,10 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
 
             LOGV2_DEBUG(20932,
                         2,
-                        "Using fast distinct: {parsedDistinct_getQuery_Short}, planSummary: "
-                        "{Explain_getPlanSummary_root_get}",
-                        "parsedDistinct_getQuery_Short"_attr =
-                            redact(parsedDistinct->getQuery()->toStringShort()),
-                        "Explain_getPlanSummary_root_get"_attr =
-                            Explain::getPlanSummary(root.get()));
+                        "Using fast distinct: {query}, planSummary: {planSummary}",
+                        "Using fast distinct",
+                        "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
+                        "planSummary"_attr = Explain::getPlanSummary(root.get()));
 
             return PlanExecutor::make(parsedDistinct->releaseQuery(),
                                       std::move(ws),

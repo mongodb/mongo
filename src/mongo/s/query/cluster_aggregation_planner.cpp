@@ -87,7 +87,7 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
                                                           const BSONObj mergeCmdObj,
                                                           const ShardId& mergingShardId) {
     if (MONGO_unlikely(shardedAggregateFailToEstablishMergingShardCursor.shouldFail())) {
-        LOGV2(22834, "shardedAggregateFailToEstablishMergingShardCursor fail point enabled.");
+        LOGV2(22834, "shardedAggregateFailToEstablishMergingShardCursor fail point enabled");
         uasserted(ErrorCodes::FailPointEnabled,
                   "Asserting on establishing merging shard cursor due to failpoint.");
     }
@@ -209,8 +209,9 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
 
     LOGV2_DEBUG(22835,
                 1,
-                "Dispatching merge pipeline {mergeCmdObj} to designated shard",
-                "mergeCmdObj"_attr = redact(mergeCmdObj));
+                "Dispatching merge pipeline {command} to designated shard",
+                "Dispatching merge pipeline to designated shard",
+                "command"_attr = redact(mergeCmdObj));
 
     // Dispatch $mergeCursors to the chosen shard, store the resulting cursor, and return.
     auto mergeResponse =
@@ -358,7 +359,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     auto opCtx = expCtx->opCtx;
 
     if (MONGO_unlikely(shardedAggregateFailToDispatchExchangeConsumerPipeline.shouldFail())) {
-        LOGV2(22836, "shardedAggregateFailToDispatchExchangeConsumerPipeline fail point enabled.");
+        LOGV2(22836, "shardedAggregateFailToDispatchExchangeConsumerPipeline fail point enabled");
         uasserted(ErrorCodes::FailPointEnabled,
                   "Asserting on exhange consumer pipeline dispatch due to failpoint.");
     }

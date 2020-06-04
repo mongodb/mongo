@@ -96,27 +96,28 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> PlanRanker::pickBestPlan(
             LOGV2_DEBUG(
                 20956,
                 5,
-                "Scoring plan "
-                "{i}:\n{candidates_i_solution}Stats:\n{Explain_statsToBSON_statTrees_i_jsonString_"
-                "ExtendedRelaxedV2_0_0_true}",
-                "i"_attr = i,
-                "candidates_i_solution"_attr = redact(candidates[i].solution->toString()),
-                "Explain_statsToBSON_statTrees_i_jsonString_ExtendedRelaxedV2_0_0_true"_attr =
-                    redact(Explain::statsToBSON(*statTrees[i])
-                               .jsonString(ExtendedRelaxedV2_0_0, true)));
+                "Scoring plan {planIndex}:\n{querySolution}Stats:\n{stats}",
+                "Scoring plan",
+                "planIndex"_attr = i,
+                "querySolution"_attr = redact(candidates[i].solution->toString()),
+                "stats"_attr = redact(
+                    Explain::statsToBSON(*statTrees[i]).jsonString(ExtendedRelaxedV2_0_0, true)));
             LOGV2_DEBUG(20957,
                         2,
-                        "Scoring query plan: {Explain_getPlanSummary_candidates_i_root} "
-                        "planHitEOF={statTrees_i_common_isEOF}",
-                        "Explain_getPlanSummary_candidates_i_root"_attr =
-                            Explain::getPlanSummary(candidates[i].root),
-                        "statTrees_i_common_isEOF"_attr = statTrees[i]->common.isEOF);
+                        "Scoring query plan: {planSummary} planHitEOF={planHitEOF}",
+                        "Scoring query plan",
+                        "planSummary"_attr = Explain::getPlanSummary(candidates[i].root),
+                        "planHitEOF"_attr = statTrees[i]->common.isEOF);
 
             double score = scoreTree(statTrees[i].get());
-            LOGV2_DEBUG(20958, 5, "score = {score}", "score"_attr = score);
+            LOGV2_DEBUG(
+                20958, 5, "Basic plan score: {score}", "Basic plan score", "score"_attr = score);
             if (statTrees[i]->common.isEOF) {
-                LOGV2_DEBUG(
-                    20959, 5, "Adding +{eofBonus} EOF bonus to score.", "eofBonus"_attr = eofBonus);
+                LOGV2_DEBUG(20959,
+                            5,
+                            "Adding +{eofBonus} EOF bonus to score",
+                            "Adding EOF bonus to score",
+                            "eofBonus"_attr = eofBonus);
                 score += 1;
             }
 
@@ -125,10 +126,9 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> PlanRanker::pickBestPlan(
             failed.push_back(i);
             LOGV2_DEBUG(20960,
                         2,
-                        "Not scording plan: {Explain_getPlanSummary_candidates_i_root} because the "
-                        "plan failed.",
-                        "Explain_getPlanSummary_candidates_i_root"_attr =
-                            Explain::getPlanSummary(candidates[i].root));
+                        "Not scoring plan: {planSummary} because the plan failed",
+                        "Not scoring a plan because the plan failed",
+                        "planSummary"_attr = Explain::getPlanSummary(candidates[i].root));
         }
     }
 
@@ -273,16 +273,22 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
     double score = baseScore + productivity + tieBreakers;
 
-    StringBuilder sb;
-    sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
-       << str::convertDoubleToString(baseScore) << ")"
-       << " + productivity((" << stats->common.advanced << " advanced)/(" << stats->common.works
-       << " works) = " << str::convertDoubleToString(productivity) << ")"
-       << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus) << " noFetchBonus + "
-       << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
-       << str::convertDoubleToString(noIxisectBonus)
-       << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
-    LOGV2_DEBUG(20961, 2, "{sb_str}", "sb_str"_attr = sb.str());
+    if (shouldLog(logv2::LogSeverity::Debug(2))) {
+        StringBuilder sb;
+        sb << "baseScore(" << str::convertDoubleToString(baseScore) << ")"
+           << " + productivity((" << stats->common.advanced << " advanced)/(" << stats->common.works
+           << " works) = " << str::convertDoubleToString(productivity) << ")"
+           << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus) << " noFetchBonus + "
+           << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
+           << str::convertDoubleToString(noIxisectBonus)
+           << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
+        LOGV2_DEBUG(20961,
+                    2,
+                    "score({score}) = {calculation}",
+                    "Plan score calculation",
+                    "score"_attr = score,
+                    "calculation"_attr = sb.str());
+    }
 
     if (internalQueryForceIntersectionPlans.load()) {
         if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
@@ -291,8 +297,9 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
             score += 3;
             LOGV2_DEBUG(20962,
                         5,
-                        "Score boosted to {score} due to intersection forcing.",
-                        "score"_attr = score);
+                        "Score boosted to {newScore} due to intersection forcing",
+                        "Score boosted due to intersection forcing",
+                        "newScore"_attr = score);
         }
     }
 

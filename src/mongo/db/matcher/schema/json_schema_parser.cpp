@@ -1673,17 +1673,17 @@ StatusWithMatchExpression JSONSchemaParser::parse(
     bool ignoreUnknownKeywords) {
     LOGV2_DEBUG(20728,
                 5,
-                "Parsing JSON Schema: {schema_jsonString_JsonStringFormat_LegacyStrict}",
-                "schema_jsonString_JsonStringFormat_LegacyStrict"_attr =
-                    schema.jsonString(JsonStringFormat::LegacyStrict));
+                "Parsing JSON Schema: {schema}",
+                "Parsing JSON Schema",
+                "schema"_attr = schema.jsonString(JsonStringFormat::LegacyStrict));
     try {
         auto translation = _parse(expCtx, ""_sd, schema, allowedFeatures, ignoreUnknownKeywords);
         if (shouldLog(logv2::LogSeverity::Debug(5)) && translation.isOK()) {
             LOGV2_DEBUG(20729,
                         5,
-                        "Translated schema match expression: {translation_getValue_debugString}",
-                        "translation_getValue_debugString"_attr =
-                            translation.getValue()->debugString());
+                        "Translated schema match expression: {expression}",
+                        "Translated schema match expression",
+                        "expression"_attr = translation.getValue()->debugString());
         }
         return translation;
     } catch (const DBException& ex) {

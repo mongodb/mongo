@@ -543,12 +543,13 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
             LOGV2_DEBUG(22839,
                         1,
-                        "Received error status for query {query_Short} on attempt {retries} of "
-                        "{kMaxRetries}: {ex}",
-                        "query_Short"_attr = redact(query.toStringShort()),
-                        "retries"_attr = retries,
-                        "kMaxRetries"_attr = kMaxRetries,
-                        "ex"_attr = redact(ex));
+                        "Received error status for query {query} on attempt {attemptNumber} of "
+                        "{maxRetries}: {error}",
+                        "Received error status for query",
+                        "query"_attr = redact(query.toStringShort()),
+                        "attemptNumber"_attr = retries,
+                        "maxRetries"_attr = kMaxRetries,
+                        "error"_attr = redact(ex));
 
             Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
                                                                      ex->getVersionReceived());
@@ -584,12 +585,13 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
             LOGV2_DEBUG(22840,
                         1,
-                        "Received error status for query {query_Short} on attempt {retries} of "
-                        "{kMaxRetries}: {ex}",
-                        "query_Short"_attr = redact(query.toStringShort()),
-                        "retries"_attr = retries,
-                        "kMaxRetries"_attr = kMaxRetries,
-                        "ex"_attr = redact(ex));
+                        "Received error status for query {query} on attempt {attemptNumber} of "
+                        "{maxRetries}: {error}",
+                        "Received error status for query",
+                        "query"_attr = redact(query.toStringShort()),
+                        "attemptNumber"_attr = retries,
+                        "maxRetries"_attr = kMaxRetries,
+                        "error"_attr = redact(ex));
 
             if (ex.code() != ErrorCodes::ShardInvalidatedForTargeting) {
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {

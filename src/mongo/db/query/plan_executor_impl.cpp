@@ -481,8 +481,8 @@ void PlanExecutorImpl::_waitForInserts(CappedInsertNotifierData* notifierData) {
         notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
         if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
             LOGV2(4452903,
-                  "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point "
-                  "enabled. Blocking until fail point is disabled");
+                  "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point enabled. "
+                  "Blocking until fail point is disabled");
             planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
         }
     });
@@ -610,7 +610,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                     }))) {
                 LOGV2(20946,
                       "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
-                      "enabled. Blocking until fail point is disabled.");
+                      "enabled. Blocking until fail point is disabled");
                 planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
             }
             if (!_shouldWaitForInserts()) {

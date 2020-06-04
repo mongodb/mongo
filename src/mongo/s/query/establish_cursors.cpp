@@ -75,8 +75,9 @@ void killOpOnShards(std::shared_ptr<executor::TaskExecutor> executor,
                 if (!args.response.isOK()) {
                     LOGV2_DEBUG(4625504,
                                 2,
-                                "killOperations for {remote} failed with {error}",
-                                "remote"_attr = host.toString(),
+                                "killOperations for {remoteHost} failed with {error}",
+                                "killOperations failed",
+                                "remoteHost"_attr = host.toString(),
                                 "error"_attr = args.response);
                     return;
                 }
@@ -86,6 +87,7 @@ void killOpOnShards(std::shared_ptr<executor::TaskExecutor> executor,
         LOGV2_DEBUG(4625503,
                     2,
                     "Failed to cleanup remote operations: {error}",
+                    "Failed to cleanup remote operations",
                     "error"_attr = ex.toStatus());
     }
 }
@@ -115,12 +117,14 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
         requests.emplace_back(remote.first, requestWithOpKey.obj());
     }
 
-    LOGV2_DEBUG(4625502,
-                3,
-                "Establishing cursors on {opId} for {nRemotes} remotes with operation key {opKey}",
-                "opId"_attr = opCtx->getOpID(),
-                "nRemotes"_attr = remotes.size(),
-                "opKey"_attr = opKey);
+    LOGV2_DEBUG(
+        4625502,
+        3,
+        "Establishing cursors on {opId} for {numRemotes} remotes with operation key {opKey}",
+        "Establishing cursors on remotes",
+        "opId"_attr = opCtx->getOpID(),
+        "numRemotes"_attr = remotes.size(),
+        "opKey"_attr = opKey);
 
     // Send the requests
     MultiStatementTransactionRequestsSender ars(

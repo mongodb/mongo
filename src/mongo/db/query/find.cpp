@@ -185,6 +185,7 @@ void generateBatch(int ntoreturn,
     } catch (DBException& exception) {
         LOGV2_ERROR(20918,
                     "getMore executor error, stats: {stats}",
+                    "getMore executor error",
                     "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
         exception.addContext("Executor error during OP_GET_MORE");
         throw;
@@ -218,7 +219,11 @@ Message getMore(OperationContext* opCtx,
                 bool* isCursorAuthorized) {
     invariant(ntoreturn >= 0);
 
-    LOGV2_DEBUG(20909, 5, "Running getMore, cursorid: {cursorid}", "cursorid"_attr = cursorid);
+    LOGV2_DEBUG(20909,
+                5,
+                "Running getMore, cursorid: {cursorId}",
+                "Running getMore",
+                "cursorId"_attr = cursorid);
 
     CurOp& curOp = *CurOp::get(opCtx);
     curOp.ensureStarted();
@@ -510,11 +515,11 @@ Message getMore(OperationContext* opCtx,
         cursorid = 0;
         curOp.debug().cursorExhausted = true;
 
-        LOGV2_DEBUG(
-            20910,
-            5,
-            "getMore NOT saving client cursor, ended with state {PlanExecutor_statestr_state}",
-            "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state));
+        LOGV2_DEBUG(20910,
+                    5,
+                    "getMore NOT saving client cursor, ended with state {planExecutorState}",
+                    "getMore NOT saving client cursor",
+                    "planExecutorState"_attr = PlanExecutor::statestr(state));
     } else {
         cursorFreer.dismiss();
         // Continue caching the ClientCursor.
@@ -524,8 +529,9 @@ Message getMore(OperationContext* opCtx,
         exec->detachFromOperationContext();
         LOGV2_DEBUG(20911,
                     5,
-                    "getMore saving client cursor ended with state {PlanExecutor_statestr_state}",
-                    "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state));
+                    "getMore saving client cursor, ended with state {planExecutorState}",
+                    "getMore saving client cursor",
+                    "planExecutorState"_attr = PlanExecutor::statestr(state));
 
         // Set 'exhaust' if the client requested exhaust and the cursor is not exhausted.
         *exhaust = opCtx->isExhaust();
@@ -558,8 +564,11 @@ Message getMore(OperationContext* opCtx,
     qr.setCursorId(cursorid);
     qr.setStartingFrom(startingResult);
     qr.setNReturned(numResults);
-    LOGV2_DEBUG(
-        20912, 5, "getMore returned {numResults} results\n", "numResults"_attr = numResults);
+    LOGV2_DEBUG(20912,
+                5,
+                "getMore returned {numResults} results",
+                "getMore returned results",
+                "numResults"_attr = numResults);
     return Message(bb.release());
 }
 
@@ -597,9 +606,16 @@ bool runQuery(OperationContext* opCtx,
         "Can't canonicalize query");
     invariant(cq.get());
 
-    LOGV2_DEBUG(20913, 5, "Running query:\n{cq}", "cq"_attr = redact(cq->toString()));
-    LOGV2_DEBUG(
-        20914, 2, "Running query: {cq_Short}", "cq_Short"_attr = redact(cq->toStringShort()));
+    LOGV2_DEBUG(20913,
+                5,
+                "Running query:\n{query}",
+                "Running query",
+                "query"_attr = redact(cq->toString()));
+    LOGV2_DEBUG(20914,
+                2,
+                "Running query: {query}",
+                "Running query",
+                "query"_attr = redact(cq->toStringShort()));
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
     AutoGetCollectionForReadCommand ctx(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden);
@@ -700,10 +716,11 @@ bool runQuery(OperationContext* opCtx,
             if (FindCommon::enoughForFirstBatch(qr, numResults)) {
                 LOGV2_DEBUG(20915,
                             5,
-                            "Enough for first batch, wantMore={qr_wantMore} "
-                            "ntoreturn={qr_getNToReturn_value_or_0} numResults={numResults}",
-                            "qr_wantMore"_attr = qr.wantMore(),
-                            "qr_getNToReturn_value_or_0"_attr = qr.getNToReturn().value_or(0),
+                            "Enough for first batch, wantMore={wantMore} ntoreturn={numToReturn} "
+                            "numResults={numResults}",
+                            "Enough for first batch",
+                            "wantMore"_attr = qr.wantMore(),
+                            "numToReturn"_attr = qr.getNToReturn().value_or(0),
                             "numResults"_attr = numResults);
                 break;
             }
@@ -745,11 +762,13 @@ bool runQuery(OperationContext* opCtx,
             });
         ccId = pinnedCursor.getCursor()->cursorid();
 
-        LOGV2_DEBUG(20916,
-                    5,
-                    "caching executor with cursorid {ccId} after returning {numResults} results",
-                    "ccId"_attr = ccId,
-                    "numResults"_attr = numResults);
+        LOGV2_DEBUG(
+            20916,
+            5,
+            "Caching executor with cursorid {cursorId} after returning {numResults} results",
+            "Caching executor after returning results",
+            "cursorId"_attr = ccId,
+            "numResults"_attr = numResults);
 
         // Set curOp.debug().exhaust if the client requested exhaust and the cursor is not
         // exhausted.
@@ -772,7 +791,8 @@ bool runQuery(OperationContext* opCtx,
     } else {
         LOGV2_DEBUG(20917,
                     5,
-                    "Not caching executor but returning {numResults} results.",
+                    "Not caching executor but returning {numResults} results",
+                    "Not caching executor but returning results",
                     "numResults"_attr = numResults);
         endQueryOp(opCtx, collection, *exec, numResults, ccId);
     }
