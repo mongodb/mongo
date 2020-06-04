@@ -1431,11 +1431,29 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
     // Rest of this function can throw, so ensure the build cleanup occurs.
     ON_BLOCK_EXIT([&] { _indexBuildsManager.unregisterIndexBuild(buildUUID); });
 
-    auto onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection);
-    IndexBuildsManager::SetupOptions options;
-    options.indexConstraints = indexConstraints;
-    uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
-        opCtx, collection, {spec}, buildUUID, onInitFn, options));
+    try {
+        auto onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection);
+        IndexBuildsManager::SetupOptions options;
+        options.indexConstraints = indexConstraints;
+        uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
+            opCtx, collection, {spec}, buildUUID, onInitFn, options));
+    } catch (DBException& ex) {
+        const auto& status = ex.toStatus();
+        if (status == ErrorCodes::IndexAlreadyExists ||
+            ((status == ErrorCodes::IndexOptionsConflict ||
+              status == ErrorCodes::IndexKeySpecsConflict) &&
+             IndexBuildsManager::IndexConstraints::kRelax == indexConstraints)) {
+            LOGV2_DEBUG(4718200,
+                        1,
+                        "Ignoring indexing error",
+                        "error"_attr = redact(status),
+                        "namespace"_attr = nss,
+                        "collectionUUID"_attr = collectionUUID,
+                        "spec"_attr = spec);
+            return;
+        }
+        throw;
+    }
 
     auto abortOnExit = makeGuard([&] {
         _indexBuildsManager.abortIndexBuild(
