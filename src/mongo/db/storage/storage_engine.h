@@ -550,6 +550,10 @@ public:
      * all_durable timestamp are committed. Only storage engines that support document level locking
      * must provide an implementation. Other storage engines may provide a no-op implementation.
      *
+     * The all_durable timestamp is the in-memory no holes point. That does not mean that there are
+     * no holes behind it on disk. The all_durable timestamp also might not correspond with any
+     * oplog entry, but instead have a timestamp value between that of two oplog entries.
+     *
      * The all_durable timestamp only includes non-prepared transactions that have been given a
      * commit_timestamp and prepared transactions that have been given a durable_timestamp.
      * Previously, the deprecated all_committed timestamp would also include prepared transactions

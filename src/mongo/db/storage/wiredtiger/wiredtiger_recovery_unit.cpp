@@ -559,7 +559,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp(WT_SESS
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound);
-    Timestamp txnTimestamp = Timestamp(_oplogManager->fetchAllDurableValue(session->connection));
+    Timestamp txnTimestamp = _sessionCache->getKVEngine()->getAllDurableTimestamp();
     auto status = txnOpen.setReadSnapshot(txnTimestamp);
     fassert(50948, status);
 

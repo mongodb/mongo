@@ -2191,8 +2191,28 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     return {stableTimestamp};
 }
 
+namespace {
+uint64_t _fetchAllDurableValue(WT_CONNECTION* conn) {
+    // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
+    // that has no holes (uncommitted transactions with lower timestamps) behind it.
+    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
+    auto wtstatus = conn->query_timestamp(conn, buf, "get=all_durable");
+    if (wtstatus == WT_NOTFOUND) {
+        // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
+        // (timestamped) data.
+        return StorageEngine::kMinimumTimestamp;
+    } else {
+        invariantWTOK(wtstatus);
+    }
+
+    uint64_t tmp;
+    fassert(38002, NumberParser().base(16)(buf, &tmp));
+    return tmp;
+}
+}  // namespace
+
 Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
-    auto ret = _oplogManager->fetchAllDurableValue(_conn);
+    auto ret = _fetchAllDurableValue(_conn);
 
     stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
     if (ret < _highestSeenDurableTimestamp) {
