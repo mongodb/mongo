@@ -200,15 +200,6 @@ done:
     conn->req_max_minor = max_minor;
     conn->req_min_major = min_major;
     conn->req_min_minor = min_minor;
-    /*
-     * Set up the log manager versions in the connection and verify any logs. We do this at the end
-     * here, but very early in the startup process so that if we're starting from a backup and there
-     * are compatibility errors, we inform the user but leave the directory unchanged.
-     */
-    __wt_logmgr_compat_version(session);
-    if (!reconfig && !F_ISSET(conn, WT_CONN_SALVAGE))
-        WT_ERR(__wt_log_compat_verify(session));
-
 err:
     __wt_free(session, value);
 

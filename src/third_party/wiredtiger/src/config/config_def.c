@@ -135,8 +135,9 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     confchk_WT_CONNECTION_reconfigure_statistics_log_subconfigs, 5},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"checkpoint_slow\","
-    "\"history_store_sweep_race\",\"split_1\",\"split_2\",\"split_3\""
-    ",\"split_4\",\"split_5\",\"split_6\",\"split_7\",\"split_8\"]",
+    "\"history_store_checkpoint_delay\",\"history_store_sweep_race\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\"]",
     NULL, 0},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"checkpoint\","
@@ -310,7 +311,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
   {"append", "boolean", NULL, NULL, NULL, 0}, {"bulk", "string", NULL, NULL, NULL, 0},
   {"checkpoint", "string", NULL, NULL, NULL, 0},
   {"checkpoint_wait", "boolean", NULL, NULL, NULL, 0},
-  {"dump", "string", NULL, "choices=[\"hex\",\"json\",\"print\"]", NULL, 0},
+  {"dump", "string", NULL, "choices=[\"hex\",\"json\",\"pretty\",\"print\"]", NULL, 0},
   {"incremental", "category", NULL, NULL, confchk_WT_SESSION_open_cursor_incremental_subconfigs, 6},
   {"next_random", "boolean", NULL, NULL, NULL, 0},
   {"next_random_sample_size", "string", NULL, NULL, NULL, 0},
@@ -576,8 +577,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
   {"statistics_log", "category", NULL, NULL, confchk_wiredtiger_open_statistics_log_subconfigs, 6},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"checkpoint_slow\","
-    "\"history_store_sweep_race\",\"split_1\",\"split_2\",\"split_3\""
-    ",\"split_4\",\"split_5\",\"split_6\",\"split_7\",\"split_8\"]",
+    "\"history_store_checkpoint_delay\",\"history_store_sweep_race\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -649,8 +651,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
   {"statistics_log", "category", NULL, NULL, confchk_wiredtiger_open_statistics_log_subconfigs, 6},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"checkpoint_slow\","
-    "\"history_store_sweep_race\",\"split_1\",\"split_2\",\"split_3\""
-    ",\"split_4\",\"split_5\",\"split_6\",\"split_7\",\"split_8\"]",
+    "\"history_store_checkpoint_delay\",\"history_store_sweep_race\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -719,8 +722,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
   {"statistics_log", "category", NULL, NULL, confchk_wiredtiger_open_statistics_log_subconfigs, 6},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"checkpoint_slow\","
-    "\"history_store_sweep_race\",\"split_1\",\"split_2\",\"split_3\""
-    ",\"split_4\",\"split_5\",\"split_6\",\"split_7\",\"split_8\"]",
+    "\"history_store_checkpoint_delay\",\"history_store_sweep_race\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -787,8 +791,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
   {"statistics_log", "category", NULL, NULL, confchk_wiredtiger_open_statistics_log_subconfigs, 6},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"checkpoint_slow\","
-    "\"history_store_sweep_race\",\"split_1\",\"split_2\",\"split_3\""
-    ",\"split_4\",\"split_5\",\"split_6\",\"split_7\",\"split_8\"]",
+    "\"history_store_checkpoint_delay\",\"history_store_sweep_race\","
+    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+    "\"split_6\",\"split_7\",\"split_8\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},

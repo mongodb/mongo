@@ -355,14 +355,28 @@ __rollback_abort_row_ondisk_kv(
     WT_DECL_RET;
     WT_ITEM buf;
     WT_UPDATE *upd;
-    char ts_string[4][WT_TS_INT_STRING_SIZE];
+    char ts_string[5][WT_TS_INT_STRING_SIZE];
     bool prepared;
 
     vpack = &_vpack;
     upd = NULL;
     __wt_row_leaf_value_cell(session, page, rip, NULL, vpack);
     prepared = vpack->tw.prepare;
-    if (vpack->tw.durable_start_ts > rollback_timestamp ||
+    if (WT_IS_HS(S2BT(session))) {
+        if (vpack->tw.durable_stop_ts > rollback_timestamp) {
+            __wt_verbose(session, WT_VERB_RTS,
+              "hs update aborted with start durable/commit timestamp: %s, %s, "
+              "stop durable/commit timestamp: %s, %s and stable timestamp: %s",
+              __wt_timestamp_to_string(vpack->tw.durable_start_ts, ts_string[0]),
+              __wt_timestamp_to_string(vpack->tw.start_ts, ts_string[1]),
+              __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[2]),
+              __wt_timestamp_to_string(vpack->tw.stop_ts, ts_string[3]),
+              __wt_timestamp_to_string(rollback_timestamp, ts_string[4]));
+            WT_RET(__wt_upd_alloc_tombstone(session, &upd, NULL));
+            WT_STAT_CONN_INCR(session, txn_rts_sweep_hs_keys);
+        } else
+            return (0);
+    } else if (vpack->tw.durable_start_ts > rollback_timestamp ||
       (vpack->tw.durable_stop_ts == WT_TS_NONE && prepared)) {
         __wt_verbose(session, WT_VERB_RTS,
           "on-disk update aborted with start durable timestamp: %s, commit timestamp: %s, "
@@ -532,14 +546,16 @@ __rollback_abort_row_reconciled_page(
           mod->mod_replace.ta.newest_stop_durable_ts > rollback_timestamp ||
           mod->mod_replace.ta.prepare)) {
         __wt_verbose(session, WT_VERB_RTS,
-          "reconciled replace block page history store update removal On-disk with start "
+          "reconciled replace block page history store update removal on-disk with start "
           "durable timestamp: %s, stop durable timestamp: %s and stable timestamp: %s",
           __wt_timestamp_to_string(mod->mod_replace.ta.newest_start_durable_ts, ts_string[0]),
           __wt_timestamp_to_string(mod->mod_replace.ta.newest_stop_durable_ts, ts_string[1]),
           __wt_timestamp_to_string(rollback_timestamp, ts_string[2]));
 
-        WT_RET(__rollback_abort_row_reconciled_page_internal(session, mod->u1.r.disk_image,
-          mod->u1.r.replace.addr, mod->u1.r.replace.size, rollback_timestamp));
+        /* Remove the history store newer updates. */
+        if (!WT_IS_HS(S2BT(session)))
+            WT_RET(__rollback_abort_row_reconciled_page_internal(session, mod->u1.r.disk_image,
+              mod->u1.r.replace.addr, mod->u1.r.replace.size, rollback_timestamp));
 
         /*
          * As this page has newer aborts that are aborted, make sure to mark the page as dirty to
@@ -561,8 +577,10 @@ __rollback_abort_row_reconciled_page(
                   __wt_timestamp_to_string(multi->addr.ta.newest_stop_durable_ts, ts_string[1]),
                   __wt_timestamp_to_string(rollback_timestamp, ts_string[2]));
 
-                WT_RET(__rollback_abort_row_reconciled_page_internal(session, multi->disk_image,
-                  multi->addr.addr, multi->addr.size, rollback_timestamp));
+                /* Remove the history store newer updates. */
+                if (!WT_IS_HS(S2BT(session)))
+                    WT_RET(__rollback_abort_row_reconciled_page_internal(session, multi->disk_image,
+                      multi->addr.addr, multi->addr.size, rollback_timestamp));
 
                 /*
                  * As this page has newer aborts that are aborted, make sure to mark the page as
@@ -754,7 +772,7 @@ __rollback_abort_newer_updates(
                 WT_RET(__wt_page_in(session, ref, 0));
                 if (ref->page->type == WT_PAGE_ROW_LEAF)
                     __rollback_verify_ondisk_page(session, ref->page, rollback_timestamp);
-                WT_TRET_BUSY_OK(__wt_page_release_evict(session, ref, 0));
+                WT_TRET_BUSY_OK(__wt_page_release_evict(session, ref, WT_READ_NO_SPLIT));
             }
 #endif
             return (0);
@@ -795,7 +813,7 @@ __rollback_abort_newer_updates(
 
 err:
     if (local_read)
-        WT_TRET_BUSY_OK(__wt_page_release_evict(session, ref, 0));
+        WT_TRET_BUSY_OK(__wt_page_release_evict(session, ref, WT_READ_NO_SPLIT));
     return (ret);
 }
 
@@ -999,6 +1017,64 @@ err:
 }
 
 /*
+ * __rollback_to_stable_hs_final_pass --
+ *     Perform rollback to stable on the history store to remove any entries newer than the stable
+ *     timestamp.
+ */
+static int
+__rollback_to_stable_hs_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
+{
+    WT_CONFIG ckptconf;
+    WT_CONFIG_ITEM cval, durableval, key;
+    WT_DECL_RET;
+    wt_timestamp_t max_durable_ts, newest_start_durable_ts, newest_stop_durable_ts;
+    char *config;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
+
+    config = NULL;
+
+    WT_RET(__wt_metadata_search(session, WT_HS_URI, &config));
+
+    /* Find out the max durable timestamp of the object from checkpoint. */
+    newest_start_durable_ts = newest_stop_durable_ts = WT_TS_NONE;
+    WT_ERR(__wt_config_getones(session, config, "checkpoint", &cval));
+    __wt_config_subinit(session, &ckptconf, &cval);
+    for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
+        ret = __wt_config_subgets(session, &cval, "newest_start_durable_ts", &durableval);
+        if (ret == 0)
+            newest_start_durable_ts =
+              WT_MAX(newest_start_durable_ts, (wt_timestamp_t)durableval.val);
+        WT_ERR_NOTFOUND_OK(ret, false);
+        ret = __wt_config_subgets(session, &cval, "newest_stop_durable_ts", &durableval);
+        if (ret == 0)
+            newest_stop_durable_ts = WT_MAX(newest_stop_durable_ts, (wt_timestamp_t)durableval.val);
+        WT_ERR_NOTFOUND_OK(ret, false);
+    }
+    max_durable_ts = WT_MAX(newest_start_durable_ts, newest_stop_durable_ts);
+    WT_ERR(__wt_session_get_dhandle(session, WT_HS_URI, NULL, NULL, 0));
+
+    /*
+     * The rollback operation should be performed on the history store file when the checkpoint
+     * durable start/stop timestamp is greater than the rollback timestamp.
+     */
+    if (max_durable_ts > rollback_timestamp) {
+        __wt_verbose(session, WT_VERB_RTS, "tree rolled back with durable timestamp: %s",
+          __wt_timestamp_to_string(max_durable_ts, ts_string[0]));
+        WT_TRET(__rollback_to_stable_btree(session, rollback_timestamp));
+    } else
+        __wt_verbose(session, WT_VERB_RTS,
+          "tree skipped with durable timestamp: %s and stable timestamp: %s",
+          __wt_timestamp_to_string(max_durable_ts, ts_string[0]),
+          __wt_timestamp_to_string(rollback_timestamp, ts_string[1]));
+
+    WT_TRET(__wt_session_release_dhandle(session));
+
+err:
+    __wt_free(session, config);
+    return (ret);
+}
+
+/*
  * __rollback_to_stable_btree_apply --
  *     Perform rollback to stable to all files listed in the metadata, apart from the metadata and
  *     history store files.
@@ -1117,6 +1193,9 @@ __rollback_to_stable_btree_apply(WT_SESSION_IMPL *session)
         WT_ERR(ret);
     }
     WT_ERR_NOTFOUND_OK(ret, false);
+
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+        WT_ERR(__rollback_to_stable_hs_final_pass(session, rollback_timestamp));
 
 err:
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));

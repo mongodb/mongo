@@ -1982,6 +1982,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
     static const WT_NAME_FLAG stress_types[] = {
       {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
       {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
+      {"history_store_checkpoint_delay", WT_TIMING_STRESS_HS_CHECKPOINT_DELAY},
       {"history_store_sweep_race", WT_TIMING_STRESS_HS_SWEEP},
       {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},
       {"split_3", WT_TIMING_STRESS_SPLIT_3}, {"split_4", WT_TIMING_STRESS_SPLIT_4},
@@ -2266,6 +2267,37 @@ wiredtiger_dummy_session_init(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_
 }
 
 /*
+ * __conn_version_verify --
+ *     Verify the versions before modifying the database.
+ */
+static int
+__conn_version_verify(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    bool exist;
+
+    conn = S2C(session);
+
+    /* Always set the compatibility versions. */
+    __wt_logmgr_compat_version(session);
+    /*
+     * If we're salvaging, don't verify now.
+     */
+    if (F_ISSET(conn, WT_CONN_SALVAGE))
+        return (0);
+
+    /* If we have a turtle file, validate versions. */
+    WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist));
+    if (exist)
+        WT_RET(__wt_turtle_validate_version(session));
+
+    if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_CONFIG_ENABLED))
+        WT_RET(__wt_log_compat_verify(session));
+
+    return (0);
+}
+
+/*
  * wiredtiger_open --
  *     Main library entry point: open a new connection to a WiredTiger database.
  */
@@ -2400,18 +2432,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     /* Make sure no other thread of control already owns this database. */
     WT_ERR(__conn_single(session, cfg));
-
-    /*
-     * Set compatibility versions early so that any subsystem sees it. Call after we own the
-     * database so that we can know if the database is new or not. Compatibility testing needs to
-     * know if salvage has been set, so parse that early.
-     */
-    WT_ERR(__wt_config_gets(session, cfg, "salvage", &cval));
-    if (cval.val) {
-        if (F_ISSET(conn, WT_CONN_READONLY))
-            WT_ERR_MSG(session, EINVAL, "Readonly configuration incompatible with salvage");
-        F_SET(conn, WT_CONN_SALVAGE);
-    }
 
     WT_ERR(__wt_conn_compat_config(session, cfg, false));
 
@@ -2606,6 +2626,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
     conn->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
 
+    WT_ERR(__wt_config_gets(session, cfg, "salvage", &cval));
+    if (cval.val) {
+        if (F_ISSET(conn, WT_CONN_READONLY))
+            WT_ERR_MSG(session, EINVAL, "Readonly configuration incompatible with salvage");
+        F_SET(conn, WT_CONN_SALVAGE);
+    }
+
     WT_ERR(__wt_conn_statistics_config(session, cfg));
     WT_ERR(__wt_lsm_manager_config(session, cfg));
     WT_ERR(__wt_sweep_config(session, cfg));
@@ -2657,6 +2684,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     enc_cfg[0] = encbuf->data;
     WT_ERR(
       __wt_encryptor_config(session, &cval, &keyid, (WT_CONFIG_ARG *)enc_cfg, &conn->kencryptor));
+
+    /*
+     * We need to parse the logging configuration here to verify the compatibility settings because
+     * we may need the log path and encryption and compression settings.
+     */
+    WT_ERR(__wt_logmgr_config(session, cfg, false));
+    WT_ERR(__conn_version_verify(session));
 
     /*
      * Configuration completed; optionally write a base configuration file.

@@ -311,7 +311,7 @@ real_worker(void)
     }
 
 err:
-    if ((t_ret = session->close(session, NULL)) != 0 && ret == 0) {
+    if (session != NULL && (t_ret = session->close(session, NULL)) != 0 && ret == 0) {
         ret = t_ret;
         (void)log_print_err("session.close", ret, 1);
     }

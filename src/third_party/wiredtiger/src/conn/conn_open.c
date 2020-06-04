@@ -205,7 +205,7 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
      * can know if statistics are enabled or not.
      */
     WT_RET(__wt_statlog_create(session, cfg));
-    WT_RET(__wt_logmgr_create(session, cfg));
+    WT_RET(__wt_logmgr_create(session));
 
     /*
      * Run recovery. NOTE: This call will start (and stop) eviction if recovery is required.

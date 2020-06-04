@@ -349,6 +349,13 @@ config_backward_compatible(void)
             testutil_die(EINVAL, "stress.hs_sweep not supported in backward compatibility mode");
         config_single("stress.hs_sweep=off", false);
     }
+
+    if (g.c_timing_stress_hs_checkpoint_delay) {
+        if (config_is_perm("stress.hs_checkpoint_delay"))
+            testutil_die(
+              EINVAL, "stress.hs_checkpoint_delay not supported in backward compatibility mode");
+        config_single("stress.hs_checkpoint_delay=off", false);
+    }
 }
 
 /*
