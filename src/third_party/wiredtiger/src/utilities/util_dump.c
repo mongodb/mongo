@@ -33,7 +33,8 @@ usage(void)
     static const char *options[] = {"-c checkpoint",
       "dump as of the named checkpoint (the default is the most recent version of the data)",
       "-f output", "dump to the specified file (the default is stdout)", "-j",
-      "dump in JSON format", "-r", "dump in reverse order", "-t timestamp",
+      "dump in JSON format", "-p", "dump in human readable format (pretty-print)", "-r",
+      "dump in reverse order", "-t timestamp",
       "dump as of the specified timestamp (the default is the most recent version of the data)",
       "-x",
       "dump all characters in a hexadecimal encoding (by default printable characters are not "
@@ -41,7 +42,7 @@ usage(void)
       NULL, NULL};
 
     util_usage(
-      "dump [-jrx] [-c checkpoint] [-f output-file] [-t timestamp] uri", "options:", options);
+      "dump [-jprx] [-c checkpoint] [-f output-file] [-t timestamp] uri", "options:", options);
     return (1);
 }
 
@@ -55,17 +56,17 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_SESSION_IMPL *session_impl;
-    int ch, i;
+    int ch, format_specifiers, i;
     char *checkpoint, *ofile, *p, *simpleuri, *timestamp, *uri;
-    bool hex, json, reverse;
+    bool hex, json, pretty, reverse;
 
     session_impl = (WT_SESSION_IMPL *)session;
 
     cursor = NULL;
     hs_dump_cursor = NULL;
     checkpoint = ofile = simpleuri = uri = timestamp = NULL;
-    hex = json = reverse = false;
-    while ((ch = __wt_getopt(progname, argc, argv, "c:f:t:jrx")) != EOF)
+    hex = json = pretty = reverse = false;
+    while ((ch = __wt_getopt(progname, argc, argv, "c:f:t:jprx")) != EOF)
         switch (ch) {
         case 'c':
             checkpoint = __wt_optarg;
@@ -75,6 +76,9 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
             break;
         case 'j':
             json = true;
+            break;
+        case 'p':
+            pretty = true;
             break;
         case 'r':
             reverse = true;
@@ -96,9 +100,16 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
     if (argc < 1 || (argc != 1 && !json))
         return (usage());
 
-    /* -j and -x are incompatible. */
-    if (hex && json) {
-        fprintf(stderr, "%s: the -j and -x dump options are incompatible\n", progname);
+    /* -j, -p and -x are incompatible. */
+    format_specifiers = 0;
+    if (json)
+        ++format_specifiers;
+    if (pretty)
+        ++format_specifiers;
+    if (hex)
+        ++format_specifiers;
+    if (format_specifiers > 1) {
+        fprintf(stderr, "%s: the -j, -p and -x dump options are incompatible\n", progname);
         return (usage());
     }
 
@@ -136,8 +147,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         WT_ERR(__wt_buf_set(session_impl, tmp, "", 0));
         if (checkpoint != NULL)
             WT_ERR(__wt_buf_catfmt(session_impl, tmp, "checkpoint=%s,", checkpoint));
-        WT_ERR(
-          __wt_buf_catfmt(session_impl, tmp, "dump=%s", json ? "json" : (hex ? "hex" : "print")));
+        WT_ERR(__wt_buf_catfmt(session_impl, tmp, "dump=%s",
+          json ? "json" : (hex ? "hex" : (pretty ? "pretty" : "print"))));
         if ((ret = session->open_cursor(session, uri, NULL, (char *)tmp->data, &cursor)) != 0) {
             fprintf(stderr, "%s: cursor open(%s) failed: %s\n", progname, uri,
               session->strerror(session, ret));

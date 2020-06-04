@@ -266,11 +266,11 @@ main(int argc, char *argv[])
 
         if (g.reopen) {
             config_final();
-            wts_open(g.home, &g.wts_conn, NULL, true);
+            wts_open(g.home, &g.wts_conn, &g.wts_session, true);
         } else {
             wts_create(g.home);
             config_final();
-            wts_open(g.home, &g.wts_conn, NULL, true);
+            wts_open(g.home, &g.wts_conn, &g.wts_session, true);
             trace_init();
 
             TIMED_MAJOR_OP(wts_load()); /* Load and verify initial records */
@@ -295,7 +295,7 @@ main(int argc, char *argv[])
         TIMED_MAJOR_OP(wts_verify(g.wts_conn, "post-ops verify"));
 
         track("shutting down", 0ULL, NULL);
-        wts_close(&g.wts_conn, NULL);
+        wts_close(&g.wts_conn, &g.wts_session);
 
         /*
          * Rebalance testing.
@@ -334,27 +334,54 @@ main(int argc, char *argv[])
 static void
 format_die(void)
 {
-
     /*
-     * Turn off progress reports and logging so we don't obscure the error message. The lock we're
-     * about to acquire will act as a barrier to flush the writes. This is really a "best effort"
-     * more than a guarantee, there's too much stuff in flight to be sure.
+     * Turn off progress reports so we don't obscure the error message. The lock we're about to
+     * acquire will act as a barrier to schedule the write. This is really a "best effort" more than
+     * a guarantee, there's too much stuff in flight to be sure.
      */
     g.c_quiet = 1;
-    g.trace = false;
 
     /*
      * Single-thread error handling, our caller exits after calling us (we never release the lock).
      */
     (void)pthread_rwlock_wrlock(&g.death_lock);
 
-    trace_teardown();
-
+    /* Write a failure message so format.sh knows we failed. */
     fprintf(stderr, "\n%s: run FAILED\n", progname);
+    fflush(stderr);
+    fflush(stdout);
+
+    /* Flush the logs, they may contain debugging information. */
+    trace_teardown();
+    if (g.c_logging && g.wts_session != NULL)
+        testutil_check(g.wts_session->log_flush(g.wts_session, "sync=off"));
 
     /* Display the configuration that failed. */
     if (g.run_cnt)
         config_print(true);
+
+#ifdef HAVE_DIAGNOSTIC
+    /*
+     * We have a mismatch, optionally dump WiredTiger datastore pages. In doing so, we are calling
+     * into the debug code directly which does not take locks, so it's possible we will simply drop
+     * core. Turn off core dumps, those core files aren't interesting.
+     *
+     * The most important information is the key/value mismatch information. Then try to dump out
+     * additional information. We dump the entire history store table including what is on disk,
+     * which can potentially be very large. If it becomes a problem, this can be modified to just
+     * dump out the page this key is on.
+     */
+    if (g.c_verify_failure_dump && g.page_dump_cursor != NULL) {
+        set_core_off();
+
+        fprintf(stderr, "snapshot-isolation error: Dumping page to %s\n", g.home_pagedump);
+        testutil_check(__wt_debug_cursor_page(g.page_dump_cursor, g.home_pagedump));
+        fprintf(stderr, "snapshot-isolation error: Dumping HS to %s\n", g.home_hsdump);
+#if WIREDTIGER_VERSION_MAJOR >= 10
+        testutil_check(__wt_debug_cursor_tree_hs(g.page_dump_cursor, g.home_hsdump));
+#endif
+    }
+#endif
 }
 
 /*

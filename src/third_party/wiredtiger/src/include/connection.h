@@ -354,16 +354,17 @@ struct __wt_connection_impl {
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_CONN_LOG_ARCHIVE 0x001u         /* Archive is enabled */
-#define WT_CONN_LOG_DEBUG_MODE 0x002u      /* Debug-mode logging enabled */
-#define WT_CONN_LOG_DOWNGRADED 0x004u      /* Running older version */
-#define WT_CONN_LOG_ENABLED 0x008u         /* Logging is enabled */
-#define WT_CONN_LOG_EXISTED 0x010u         /* Log files found */
-#define WT_CONN_LOG_FORCE_DOWNGRADE 0x020u /* Force downgrade */
-#define WT_CONN_LOG_RECOVER_DIRTY 0x040u   /* Recovering unclean */
-#define WT_CONN_LOG_RECOVER_DONE 0x080u    /* Recovery completed */
-#define WT_CONN_LOG_RECOVER_ERR 0x100u     /* Error if recovery required */
-#define WT_CONN_LOG_RECOVER_FAILED 0x200u  /* Recovery failed */
-#define WT_CONN_LOG_ZERO_FILL 0x400u       /* Manually zero files */
+#define WT_CONN_LOG_CONFIG_ENABLED 0x002u  /* Logging is configured */
+#define WT_CONN_LOG_DEBUG_MODE 0x004u      /* Debug-mode logging enabled */
+#define WT_CONN_LOG_DOWNGRADED 0x008u      /* Running older version */
+#define WT_CONN_LOG_ENABLED 0x010u         /* Logging is enabled */
+#define WT_CONN_LOG_EXISTED 0x020u         /* Log files found */
+#define WT_CONN_LOG_FORCE_DOWNGRADE 0x040u /* Force downgrade */
+#define WT_CONN_LOG_RECOVER_DIRTY 0x080u   /* Recovering unclean */
+#define WT_CONN_LOG_RECOVER_DONE 0x100u    /* Recovery completed */
+#define WT_CONN_LOG_RECOVER_ERR 0x200u     /* Error if recovery required */
+#define WT_CONN_LOG_RECOVER_FAILED 0x400u  /* Recovery failed */
+#define WT_CONN_LOG_ZERO_FILL 0x800u       /* Manually zero files */
                                            /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t log_flags;                    /* Global logging configuration */
     WT_CONDVAR *log_cond;                  /* Log server wait mutex */
@@ -495,15 +496,16 @@ struct __wt_connection_impl {
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_TIMING_STRESS_AGGRESSIVE_SWEEP 0x001u
 #define WT_TIMING_STRESS_CHECKPOINT_SLOW 0x002u
-#define WT_TIMING_STRESS_HS_SWEEP 0x004u
-#define WT_TIMING_STRESS_SPLIT_1 0x008u
-#define WT_TIMING_STRESS_SPLIT_2 0x010u
-#define WT_TIMING_STRESS_SPLIT_3 0x020u
-#define WT_TIMING_STRESS_SPLIT_4 0x040u
-#define WT_TIMING_STRESS_SPLIT_5 0x080u
-#define WT_TIMING_STRESS_SPLIT_6 0x100u
-#define WT_TIMING_STRESS_SPLIT_7 0x200u
-#define WT_TIMING_STRESS_SPLIT_8 0x400u
+#define WT_TIMING_STRESS_HS_CHECKPOINT_DELAY 0x004u
+#define WT_TIMING_STRESS_HS_SWEEP 0x008u
+#define WT_TIMING_STRESS_SPLIT_1 0x010u
+#define WT_TIMING_STRESS_SPLIT_2 0x020u
+#define WT_TIMING_STRESS_SPLIT_3 0x040u
+#define WT_TIMING_STRESS_SPLIT_4 0x080u
+#define WT_TIMING_STRESS_SPLIT_5 0x100u
+#define WT_TIMING_STRESS_SPLIT_6 0x200u
+#define WT_TIMING_STRESS_SPLIT_7 0x400u
+#define WT_TIMING_STRESS_SPLIT_8 0x800u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint64_t timing_stress_flags;
 

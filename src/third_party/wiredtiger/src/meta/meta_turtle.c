@@ -145,12 +145,12 @@ err:
 }
 
 /*
- * __turtle_validate_version --
+ * __wt_turtle_validate_version --
  *     Retrieve version numbers from the turtle file and validate them against our WiredTiger
  *     version.
  */
-static int
-__turtle_validate_version(WT_SESSION_IMPL *session)
+int
+__wt_turtle_validate_version(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
     uint32_t major, minor;
@@ -293,7 +293,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
             WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE, false));
             load = true;
         } else if (validate_turtle)
-            WT_RET(__turtle_validate_version(session));
+            WT_RET(__wt_turtle_validate_version(session));
     } else
         load = true;
     if (load) {

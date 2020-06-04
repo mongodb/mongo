@@ -289,6 +289,9 @@ static CONFIG c[] = {
   {"runs.type", "type of store to create (fix | var | row)", C_IGNORE | C_STRING, 0, 0, 0, NULL,
     &g.c_file_type},
 
+  {"runs.verify_failure_dump", "attempt page dump on repeatable read error", C_IGNORE | C_BOOL, 0,
+    0, 1, &g.c_verify_failure_dump, NULL},
+
   /* 20% */
   {"statistics", "maintain statistics", C_BOOL, 20, 0, 0, &g.c_statistics, NULL},
 
@@ -302,6 +305,10 @@ static CONFIG c[] = {
 
   /* 2% */
   {"stress.checkpoint", "stress checkpoints", C_BOOL, 2, 0, 0, &g.c_timing_stress_checkpoint, NULL},
+
+  /* 2% */
+  {"stress.hs_checkpoint_delay", "stress history store checkpoint delay", C_BOOL, 2, 0, 0,
+    &g.c_timing_stress_hs_checkpoint_delay, NULL},
 
   /* 2% */
   {"stress.hs_sweep", "stress history store sweep", C_BOOL, 2, 0, 0, &g.c_timing_stress_hs_sweep,

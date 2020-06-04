@@ -79,6 +79,7 @@ typedef struct {
 
     WT_CONNECTION *wts_conn;
     WT_CONNECTION *wts_conn_inmemory;
+    WT_SESSION *wts_session;
 
     char *uri; /* Object name */
 
@@ -129,6 +130,7 @@ typedef struct {
      * misbehaving.
      */
     pthread_rwlock_t death_lock;
+    WT_CURSOR *page_dump_cursor; /* Snapshot isolation read failed, modifies failure handling. */
 
     uint32_t c_abort; /* Config values */
     uint32_t c_alter;
@@ -207,6 +209,7 @@ typedef struct {
     uint32_t c_timer;
     uint32_t c_timing_stress_aggressive_sweep;
     uint32_t c_timing_stress_checkpoint;
+    uint32_t c_timing_stress_hs_checkpoint_delay;
     uint32_t c_timing_stress_hs_sweep;
     uint32_t c_timing_stress_split_1;
     uint32_t c_timing_stress_split_2;
@@ -222,6 +225,7 @@ typedef struct {
     uint32_t c_value_max;
     uint32_t c_value_min;
     uint32_t c_verify;
+    uint32_t c_verify_failure_dump;
     uint32_t c_write_pct;
     uint32_t c_wt_mutex;
 

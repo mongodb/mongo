@@ -707,9 +707,9 @@ connection_runtime_config = [
         intended for use with internal stress testing of WiredTiger.''',
         type='list', undoc=True,
         choices=[
-        'aggressive_sweep', 'checkpoint_slow', 'history_store_sweep_race',
-        'split_1', 'split_2', 'split_3', 'split_4', 'split_5', 'split_6',
-        'split_7', 'split_8']),
+        'aggressive_sweep', 'checkpoint_slow', 'history_store_checkpoint_delay',
+        'history_store_sweep_race', 'split_1', 'split_2', 'split_3', 'split_4', 'split_5',
+        'split_6', 'split_7', 'split_8']),
     Config('verbose', '', r'''
         enable messages for various events. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -1260,10 +1260,11 @@ methods = {
         configure the cursor for dump format inputs and outputs: "hex"
         selects a simple hexadecimal format, "json" selects a JSON format
         with each record formatted as fields named by column names if
-        available, and "print" selects a format where only non-printing
-        characters are hexadecimal encoded.  These formats are compatible
-        with the @ref util_dump and @ref util_load commands''',
-        choices=['hex', 'json', 'print']),
+        available, "pretty" selects a human-readable format (making it
+        incompatible with the "load") and "print" selects a format where only
+        non-printing characters are hexadecimal encoded.  These formats are
+        compatible with the @ref util_dump and @ref util_load commands''',
+        choices=['hex', 'json', 'pretty', 'print']),
     Config('incremental', '', r'''
         configure the cursor for block incremental backup usage. These formats
         are only compatible with the backup data source; see @ref backup''',
