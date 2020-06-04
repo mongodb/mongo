@@ -37,6 +37,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/exec/projection_executor.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_ixselect.h"
@@ -54,6 +56,7 @@
 namespace mongo {
 
 namespace {
+
 CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
     auto desc = ice.descriptor();
     invariant(desc);
@@ -73,13 +76,11 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
             ice.getCollator(),
             projExec};
 }
+
 }  // namespace
 
 CollectionQueryInfo::CollectionQueryInfo()
-    : _keysComputed(false),
-      _planCache(std::make_unique<PlanCache>()),
-      _querySettings(std::make_unique<QuerySettings>()),
-      _indexUsageTracker(getGlobalServiceContext()->getPreciseClockSource()) {}
+    : _keysComputed(false), _planCache(std::make_unique<PlanCache>()) {}
 
 const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx) const {
     invariant(_keysComputed);
@@ -161,8 +162,12 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, Collection* 
 void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
                                         Collection* coll,
                                         const PlanSummaryStats& summaryStats) {
-    _indexUsageTracker.recordCollectionScans(summaryStats.collectionScans);
-    _indexUsageTracker.recordCollectionScansNonTailable(summaryStats.collectionScansNonTailable);
+    auto& collectionIndexUsageTracker =
+        CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations());
+
+    collectionIndexUsageTracker.recordCollectionScans(summaryStats.collectionScans);
+    collectionIndexUsageTracker.recordCollectionScansNonTailable(
+        summaryStats.collectionScansNonTailable);
 
     const auto& indexesUsed = summaryStats.indexesUsed;
     // Record indexes used to fulfill query.
@@ -172,7 +177,7 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
         invariant(nullptr != coll->getIndexCatalog()->findIndexByName(opCtx, *it),
                   coll->uuid().toString());
 
-        _indexUsageTracker.recordIndexAccess(*it);
+        collectionIndexUsageTracker.recordIndexAccess(*it);
     }
 }
 
@@ -189,10 +194,6 @@ void CollectionQueryInfo::clearQueryCache(const Collection* coll) {
 
 PlanCache* CollectionQueryInfo::getPlanCache() const {
     return _planCache.get();
-}
-
-QuerySettings* CollectionQueryInfo::getQuerySettings() const {
-    return _querySettings.get();
 }
 
 void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx, Collection* coll) {
@@ -212,13 +213,13 @@ void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx, C
 }
 
 void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
-
     const bool includeUnfinishedIndexes = false;
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
         coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
-        _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
+        CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
+            .registerIndex(desc->indexName(), desc->keyPattern());
     }
 
     rebuildIndexData(opCtx, coll);
@@ -230,14 +231,16 @@ void CollectionQueryInfo::addedIndex(OperationContext* opCtx,
     invariant(desc);
 
     rebuildIndexData(opCtx, coll);
-    _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
+    CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
+        .registerIndex(desc->indexName(), desc->keyPattern());
 }
 
 void CollectionQueryInfo::droppedIndex(OperationContext* opCtx,
                                        Collection* coll,
                                        StringData indexName) {
     rebuildIndexData(opCtx, coll);
-    _indexUsageTracker.unregisterIndex(indexName);
+    CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
+        .unregisterIndex(indexName);
 }
 
 void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, Collection* coll) {
@@ -246,15 +249,6 @@ void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, Collection* 
     _keysComputed = false;
     computeIndexKeys(opCtx, coll);
     updatePlanCacheIndexEntries(opCtx, coll);
-}
-
-CollectionIndexUsageMap CollectionQueryInfo::getIndexUsageStats() const {
-    return _indexUsageTracker.getUsageStats();
-}
-
-CollectionIndexUsageTracker::CollectionScanStats CollectionQueryInfo::getCollectionScanStats()
-    const {
-    return _indexUsageTracker.getCollectionScanStats();
 }
 
 }  // namespace mongo

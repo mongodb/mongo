@@ -81,6 +81,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_settings.h"
+#include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/sbe_sub_planner.h"
@@ -251,7 +252,8 @@ void applyIndexFilters(Collection* collection,
                        const CanonicalQuery& canonicalQuery,
                        QueryPlannerParams* plannerParams) {
     if (!isIdHackEligibleQuery(collection, canonicalQuery)) {
-        QuerySettings* querySettings = CollectionQueryInfo::get(collection).getQuerySettings();
+        const QuerySettings* querySettings =
+            QuerySettingsDecoration::get(collection->getSharedDecorations());
         const auto key = canonicalQuery.encodeKey();
 
         // Filter index catalog if index filters are specified for query.

@@ -54,6 +54,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_settings.h"
+#include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/hex.h"
@@ -674,7 +675,7 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     boost::optional<uint32_t> planCacheKeyHash;
     if (collection && exec->getCanonicalQuery()) {
         const QuerySettings* querySettings =
-            CollectionQueryInfo::get(collection).getQuerySettings();
+            QuerySettingsDecoration::get(collection->getSharedDecorations());
         PlanCacheKey planCacheKey = CollectionQueryInfo::get(collection)
                                         .getPlanCache()
                                         ->computeKey(*exec->getCanonicalQuery());

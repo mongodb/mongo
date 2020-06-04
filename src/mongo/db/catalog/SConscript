@@ -442,6 +442,8 @@ env.Library(
     target="collection_query_info",
     source=[
         "$BUILD_DIR/mongo/db/query/collection_query_info.cpp",
+        "$BUILD_DIR/mongo/db/query/collection_index_usage_tracker_decoration.cpp",
+        "$BUILD_DIR/mongo/db/query/query_settings_decoration.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

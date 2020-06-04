@@ -50,6 +50,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -74,7 +75,7 @@ static Status getQuerySettingsAndPlanCache(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue, "no such collection");
     }
 
-    QuerySettings* querySettings = CollectionQueryInfo::get(collection).getQuerySettings();
+    QuerySettings* querySettings = QuerySettingsDecoration::get(collection->getSharedDecorations());
     invariant(querySettings);
 
     *querySettingsOut = querySettings;
