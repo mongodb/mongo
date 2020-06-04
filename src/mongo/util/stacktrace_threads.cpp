@@ -616,6 +616,7 @@ void State::printToEmitter(AbstractEmitter& emitter) {
 }
 
 void State::action(siginfo_t* si) {
+    const auto errnoGuard = makeGuard([e = errno] { errno = e; });
     switch (si->si_code) {
         case SI_USER:
         case SI_QUEUE:
@@ -647,6 +648,9 @@ void initialize(int signal) {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sigemptyset(&sa.sa_mask);
+    // We should never need to add to this lambda because it simply sets up handler
+    // execution. Any changes should either be in State::action or in the signal
+    // handler itself.
     sa.sa_sigaction = [](int, siginfo_t* si, void*) { stateSingleton->action(si); };
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
     if (sigaction(signal, &sa, nullptr) != 0) {
