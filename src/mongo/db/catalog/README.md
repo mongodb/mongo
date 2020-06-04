@@ -216,9 +216,49 @@ explain how datafiles persist a machine’s identity which must be manipulated f
 # Checkpoints
 
 # Journaling
-Durability can be guaranteed by simply flushing the journal to disk, not the writes themselves.
-What we do when journaling is disabled -- take full data checkpoints.
-Periodically flush to ensure minimal loss of data.
+
+MongoDB provides write durability via a persisted change log for replicated writes and persistence
+of non-replicated writes. The replicated change log and non-replicated collections in WiredTiger are
+journaled, i.e. written out to disk. The user writes themselves, however, on a --replSet server, do
+not need to be written out to disk to guarantee persistence on the server.
+
+All replicated server writes have matching change log entries representing the changes done. The
+change log is stored in the `local.oplog.rs` namespace, which is set up as a capped collection so
+that old unneeded log entries are eventually removed. Replication uses the oplog collection to copy
+data from one server to another.
+
+WiredTiger journals any collection or index with `log=(enabled=true)` specified at creation. Such
+collection and index tables are specially logged / journaled to disk when requested. The MongoDB
+change log stored in the oplog collection is journaled, along with most non-replicated `local`
+database collections, when the server instance is started with `--replSet`. In standalone mode,
+however, MongoDB does not create the `local.oplog.rs` collection and all collections are journaled.
+
+Durability of journaled collections and indexes is done by periodic or triggered journal flushes
+that specifically flush only journaled writes to disk. MongoDB can disable journaling, such as in
+standalone mode, so that the periodic journal flushes do not occur. Instead,
+[Checkpoints](#checkpoints), which flush all writes to disk regardless of journal settings, are
+taken whenever durability of a write is requested and journaling is disabled. Syncing only journaled
+collection entries to disk is cheaper than syncing all data writes.
+
+Data durability is essential for recovery after server shutdown. Data must be persisted to disk to
+survive process restart, either in the form of the journal or as the write itself. Server startup
+recovery will open the storage engine at the last-made data checkpoint, and all of the journaled
+writes flushed to disk will also be found even if they occurred after the last checkpoint. The
+replication layer decides what to apply of the change log (oplog collection) past the checkpoint for
+cross replica set data consistency. For example, the storage engine might recover data up to time
+T9, but the journaled oplog recovered could go up to T20, say. It is a replication level decision to
+apply (or not apply) T10 through T20.
+
+_Code spelunking starting points:_
+
+* [_The JournalFlusher class_](https://github.com/mongodb/mongo/blob/767494374cf12d76fc74911d1d0fcc2bbce0cd6b/src/mongo/db/storage/control/journal_flusher.h)
+  * Perioidically and upon request flushes the journal to disk.
+* [_Code that ultimately calls flush journal on WiredTiger_](https://github.com/mongodb/mongo/blob/767494374cf12d76fc74911d1d0fcc2bbce0cd6b/src/mongo/db/storage/wiredtiger/wiredtiger_session_cache.cpp#L241-L362)
+  * Skips flushing if ephemeral mode engine; may do a journal flush or take a checkpoint depending
+    on server settings.
+* [_Control of whether journaling is enabled_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h#L451)
+  * 'durable' confusingly means journaling is enabled.
+* [_Whether WT journals a collection_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L560-L580)
 
 # Flow Control
 What it does (motivation). How does it do it? Ticketing.
