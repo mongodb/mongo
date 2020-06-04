@@ -1414,11 +1414,11 @@ void IndexBuildsCoordinator::waitUntilAnIndexBuildFinishes(OperationContext* opC
         _indexBuildsCondVar, lk, [&] { return _indexBuildsCompletedGen != generation; });
 }
 
-void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
-                                           UUID collectionUUID,
-                                           const std::vector<BSONObj>& specs,
-                                           IndexBuildsManager::IndexConstraints indexConstraints,
-                                           bool fromMigrate) {
+void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
+                                         UUID collectionUUID,
+                                         const BSONObj& spec,
+                                         IndexBuildsManager::IndexConstraints indexConstraints,
+                                         bool fromMigrate) {
     auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
     invariant(collection,
               str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
@@ -1435,7 +1435,7 @@ void IndexBuildsCoordinator::createIndexes(OperationContext* opCtx,
     IndexBuildsManager::SetupOptions options;
     options.indexConstraints = indexConstraints;
     uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
-        opCtx, collection, specs, buildUUID, onInitFn, options));
+        opCtx, collection, {spec}, buildUUID, onInitFn, options));
 
     auto abortOnExit = makeGuard([&] {
         _indexBuildsManager.abortIndexBuild(

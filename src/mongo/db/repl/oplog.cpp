@@ -208,8 +208,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     if (shouldBuildInForeground(opCtx, indexSpec, indexNss, mode)) {
         IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
         auto fromMigrate = false;
-        indexBuildsCoordinator->createIndexes(
-            opCtx, indexCollection->uuid(), {indexSpec}, constraints, fromMigrate);
+        indexBuildsCoordinator->createIndex(
+            opCtx, indexCollection->uuid(), indexSpec, constraints, fromMigrate);
     } else {
         Lock::TempRelease release(opCtx->lockState());
         // TempRelease cannot fail because no recursive locks should be taken.

@@ -365,18 +365,15 @@ public:
     //
 
     /**
-     * Creates indexes in collection.
+     * Creates index in collection.
      * Assumes callers has necessary locks.
-     * For two phase index builds, writes both startIndexBuild and commitIndexBuild oplog entries
-     * on success. No two phase index build oplog entries, including abortIndexBuild, will be
-     * written on failure.
      * Throws exception on error.
      */
-    void createIndexes(OperationContext* opCtx,
-                       UUID collectionUUID,
-                       const std::vector<BSONObj>& specs,
-                       IndexBuildsManager::IndexConstraints indexConstraints,
-                       bool fromMigrate);
+    void createIndex(OperationContext* opCtx,
+                     UUID collectionUUID,
+                     const BSONObj& spec,
+                     IndexBuildsManager::IndexConstraints indexConstraints,
+                     bool fromMigrate);
 
     /**
      * Creates indexes on an empty collection.

@@ -116,8 +116,8 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
 
         auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
         auto fromMigrate = false;
-        IndexBuildsCoordinator::get(opCtx)->createIndexes(
-            opCtx, collectionUUID, {indexSpec}, indexConstraints, fromMigrate);
+        IndexBuildsCoordinator::get(opCtx)->createIndex(
+            opCtx, collectionUUID, indexSpec, indexConstraints, fromMigrate);
     } catch (const DBException& e) {
         LOGV2_FATAL_CONTINUE(22490,
                              "Failed to regenerate index for {namespace}. Exception: {error}",
