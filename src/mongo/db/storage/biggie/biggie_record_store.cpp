@@ -140,6 +140,7 @@ bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, Recor
 }
 
 void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
+    _initHighestIdIfNeeded(opCtx);
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     SizeAdjuster adjuster(opCtx, this);
@@ -172,7 +173,7 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
                 thisRecordId = status.getValue().repr();
                 _visibilityManager->addUncommittedRecord(opCtx, this, RecordId(thisRecordId));
             } else {
-                thisRecordId = _nextRecordId();
+                thisRecordId = _nextRecordId(opCtx);
             }
             workingCopy->insert(
                 StringStore::value_type{createKey(_ident, thisRecordId),
@@ -331,6 +332,37 @@ boost::optional<RecordId> RecordStore::oplogStartHack(OperationContext* opCtx,
         return RecordId();
 
     return rid;
+}
+
+void RecordStore::_initHighestIdIfNeeded(OperationContext* opCtx) {
+    // In the normal case, this will already be initialized, so use a weak load. Since this value
+    // will only change from 0 to a positive integer, the only risk is reading an outdated value, 0,
+    // and having to take the mutex.
+    if (_highestRecordId.loadRelaxed() > 0) {
+        return;
+    }
+
+    // Only one thread needs to do this.
+    stdx::lock_guard<Latch> lk(_initHighestIdMutex);
+    if (_highestRecordId.load() > 0) {
+        return;
+    }
+
+    // Need to start at 1 so we are always higher than RecordId::min()
+    int64_t nextId = 1;
+
+    // Find the largest RecordId currently in use.
+    std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
+    if (auto record = cursor->next()) {
+        nextId = record->id.repr() + 1;
+    }
+
+    _highestRecordId.store(nextId);
+};
+
+int64_t RecordStore::_nextRecordId(OperationContext* opCtx) {
+    _initHighestIdIfNeeded(opCtx);
+    return _highestRecordId.fetchAndAdd(1);
 }
 
 bool RecordStore::_cappedAndNeedDelete(OperationContext* opCtx, StringStore* workingCopy) {
