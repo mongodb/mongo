@@ -623,21 +623,6 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
     }
 }
 
-void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext* opCtx,
-                                                               const std::string& reason) {
-    LOGV2(4833200, "About to abort all index builders running", "reason"_attr = reason);
-
-    auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
-        stdx::unique_lock<Latch> lk(_mutex);
-        auto indexBuildFilter = [](const auto& replState) { return true; };
-        return _filterIndexBuilds_inlock(lk, indexBuildFilter);
-    }();
-    for (auto replState : builds) {
-        abortIndexBuildByBuildUUID(
-            opCtx, replState->buildUUID, IndexBuildAction::kInitialSyncAbort, reason);
-    }
-}
-
 namespace {
 NamespaceString getNsFromUUID(OperationContext* opCtx, const UUID& uuid) {
     auto& catalog = CollectionCatalog::get(opCtx);

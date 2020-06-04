@@ -232,17 +232,6 @@ public:
                                   const std::string& reason);
 
     /**
-     * Signals all of the index builds to abort and then waits until the index builds are no longer
-     * running. The provided 'reason' will be used in the error message that the index builders
-     * return to their callers.
-     *
-     * Does not require holding locks.
-     *
-     * Does not stop new index builds from starting. Caller must make that guarantee.
-     */
-    void abortAllIndexBuildsForInitialSync(OperationContext* opCtx, const std::string& reason);
-
-    /**
      * Aborts an index build by index build UUID. Returns when the index build thread exits.
      *
      * Returns true if the index build was aborted or the index build is already in the process of

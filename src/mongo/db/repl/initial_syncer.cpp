@@ -46,7 +46,6 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/all_database_cloner.h"
@@ -1702,13 +1701,6 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
                 "attemptsLeft"_attr =
                     (_stats.maxFailedInitialSyncAttempts - _stats.failedInitialSyncAttempts),
                 "error"_attr = redact(result.getStatus()));
-
-    {
-        // Abort any index builds started during initial sync.
-        auto opCtx = cc().makeOperationContext();
-        IndexBuildsCoordinator::get(opCtx.get())
-            ->abortAllIndexBuildsForInitialSync(opCtx.get(), "Initial sync attempt failed");
-    }
 
     // Check if need to do more retries.
     if (_stats.failedInitialSyncAttempts >= _stats.maxFailedInitialSyncAttempts) {
