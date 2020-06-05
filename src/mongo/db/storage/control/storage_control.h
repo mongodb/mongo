@@ -63,23 +63,6 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly = fal
  */
 void stopStorageControls(ServiceContext* serviceContext, const Status& reason);
 
-/**
- * Prompts an immediate journal flush and returns without waiting for it.
- */
-void triggerJournalFlush(ServiceContext* serviceContext);
-
-/**
- * Initiates if needed and waits for a complete round of journal flushing to execute.
- *
- * Can throw ShutdownInProgress if the storage engine is being closed.
- */
-void waitForJournalFlush(OperationContext* opCtx);
-
-/**
- * Ensures interruption of the JournalFlusher if it is or will be acquiring a lock.
- */
-void interruptJournalFlusherForReplStateChange(ServiceContext* serviceContext);
-
 }  // namespace StorageControl
 
 }  // namespace mongo

@@ -89,6 +89,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -3484,7 +3485,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
         }
     }
     // Wait for durability of the new config document.
-    opCtx->recoveryUnit()->waitUntilDurable(opCtx);
+    JournalFlusher::get(opCtx)->waitForJournalFlush();
 
     configStateGuard.dismiss();
     _finishReplSetReconfig(opCtx, newConfig, force, myIndex);

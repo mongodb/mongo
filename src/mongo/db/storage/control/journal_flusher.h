@@ -94,8 +94,8 @@ public:
     /**
      * Signals an immediate journal flush and waits for it to complete before returning.
      *
-     * Will throw ShutdownInProgress if the flusher thread is being stopped.
-     * Will throw InterruptedDueToReplStateChange if a flusher round is interrupted by stepdown.
+     * Retries internally on InterruptedDueToReplStateChange errors.
+     * Will throw ErrorCodes::isShutdownError errors.
      */
     void waitForJournalFlush();
 
@@ -106,6 +106,14 @@ public:
     void interruptJournalFlusherForReplStateChange();
 
 private:
+    /**
+     * Signals an immediate journal flush and waits for it to complete before returning.
+     *
+     * Will throw ErrorCodes::isShutdownError if the flusher thread is being stopped.
+     * Will throw InterruptedDueToReplStateChange if a flusher round is interrupted by stepdown.
+     */
+    void _waitForJournalFlushNoRetry();
+
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
     mutable Mutex _opCtxMutex = MONGO_MAKE_LATCH("JournalFlusherOpCtxMutex");
 

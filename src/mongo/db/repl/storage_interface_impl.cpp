@@ -74,6 +74,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
@@ -177,7 +178,7 @@ StatusWith<int> StorageInterfaceImpl::incrementRollbackID(OperationContext* opCt
 
     // We wait until durable so that we are sure the Rollback ID is updated before rollback ends.
     if (status.isOK()) {
-        opCtx->recoveryUnit()->waitUntilDurable(opCtx);
+        JournalFlusher::get(opCtx)->waitForJournalFlush();
         return newRBID;
     }
     return status;

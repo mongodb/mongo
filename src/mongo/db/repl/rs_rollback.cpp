@@ -73,6 +73,7 @@
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction_participant.h"
@@ -2151,7 +2152,7 @@ void rollback(OperationContext* opCtx,
     // so that if we wind up shutting down uncleanly in response to something we rolled back
     // we know that we won't wind up right back in the same situation when we start back up
     // because the rollback wasn't durable.
-    opCtx->recoveryUnit()->waitUntilDurable(opCtx);
+    JournalFlusher::get(opCtx)->waitForJournalFlush();
 
     // If we detected that we rolled back the shardIdentity document as part of this rollback
     // then we must shut down to clear the in-memory ShardingState associated with the

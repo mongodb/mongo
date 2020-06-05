@@ -381,6 +381,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/journal_flusher',
         'storage_file_util',
     ],
 )

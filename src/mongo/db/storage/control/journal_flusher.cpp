@@ -85,9 +85,6 @@ void JournalFlusher::run() {
     // from Flow Control.
     _uniqueCtx->get()->setShouldParticipateInFlowControl(false);
     while (true) {
-
-        pauseJournalFlusherThread.pauseWhileSet(_uniqueCtx->get());
-
         try {
             ON_BLOCK_EXIT([&] {
                 // We do not want to miss an interrupt for the next round. Therefore, the opCtx
@@ -126,7 +123,10 @@ void JournalFlusher::run() {
         stdx::unique_lock<Latch> lk(_stateMutex);
 
         MONGO_IDLE_THREAD_BLOCK;
-        if (_disablePeriodicFlushes) {
+        if (_disablePeriodicFlushes || MONGO_unlikely(pauseJournalFlusherThread.shouldFail())) {
+            // This is not an ideal solution for the failpoint usage because turning the failpoint
+            // off at this point in the code would leave this thread sleeping until explicitly
+            // pinged by an async thread to flush the journal.
             _flushJournalNowCV.wait(lk, [&] { return _flushJournalNow || _shuttingDown; });
         } else {
             _flushJournalNowCV.wait_until(lk, deadline.toSystemTimePoint(), [&] {
@@ -172,16 +172,17 @@ void JournalFlusher::triggerJournalFlush() {
 }
 
 void JournalFlusher::waitForJournalFlush() {
-    auto myFuture = [&]() {
-        stdx::unique_lock<Latch> lk(_stateMutex);
-        if (!_flushJournalNow) {
-            _flushJournalNow = true;
-            _flushJournalNowCV.notify_one();
+    while (true) {
+        try {
+            _waitForJournalFlushNoRetry();
+            break;
+        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
+            // Do nothing and let the while-loop retry the operation.
+            LOGV2_DEBUG(4814901,
+                        3,
+                        "Retrying waiting for durability interrupted by replication state change");
         }
-        return _nextSharedPromise->getFuture();
-    }();
-    // Throws on error if the catalog is closed or the flusher round is interrupted by stepdown.
-    myFuture.get();
+    }
 }
 
 void JournalFlusher::interruptJournalFlusherForReplStateChange() {
@@ -190,6 +191,19 @@ void JournalFlusher::interruptJournalFlusherForReplStateChange() {
         stdx::lock_guard<Client> lk(*_uniqueCtx->get()->getClient());
         _uniqueCtx->get()->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
     }
+}
+
+void JournalFlusher::_waitForJournalFlushNoRetry() {
+    auto myFuture = [&]() {
+        stdx::unique_lock<Latch> lk(_stateMutex);
+        if (!_flushJournalNow) {
+            _flushJournalNow = true;
+            _flushJournalNowCV.notify_one();
+        }
+        return _nextSharedPromise->getFuture();
+    }();
+    // Throws on error if the flusher round is interrupted or the flusher thread is shutdown.
+    myFuture.get();
 }
 
 }  // namespace mongo

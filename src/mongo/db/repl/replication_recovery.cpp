@@ -49,6 +49,7 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
@@ -727,7 +728,7 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
     // Clear the oplogTruncateAfterPoint now that we have removed any holes that might exist in the
     // oplog -- and so that we do not truncate future entries erroneously.
     _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
-    opCtx->recoveryUnit()->waitUntilDurable(opCtx);
+    JournalFlusher::get(opCtx)->waitForJournalFlush();
 }
 
 }  // namespace repl

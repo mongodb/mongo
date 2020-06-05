@@ -47,6 +47,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
@@ -165,7 +166,7 @@ void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCt
     configBuilder.append(repl::ReplSetConfig::kRepairedFieldName, true);
     Helpers::putSingleton(opCtx, kConfigNss.ns().c_str(), configBuilder.obj());
 
-    opCtx->recoveryUnit()->waitUntilDurable(opCtx);
+    JournalFlusher::get(opCtx)->waitForJournalFlush();
 }
 
 }  // namespace mongo
