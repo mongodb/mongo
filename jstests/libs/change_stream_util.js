@@ -435,27 +435,27 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
 }
 
 /**
- * Asserts that the given pipeline will eventually return an error with the provided code,
- * either in the initial aggregate, or a subsequent getMore. Throws an exception if there are
- * any results from running the pipeline, or if it doesn't throw an error within the window of
- * assert.soon().  If 'doNotModifyInPassthroughs' is 'true' and the test is running in a
- * $changeStream upconversion passthrough, then this stream will not be modified and will run as
- * though no passthrough were active.
+ * Asserts that the given pipeline will eventually return an error with the provided code, either in
+ * the initial aggregate, or a subsequent getMore. Throws an exception if there are any results from
+ * running the pipeline, or if it doesn't throw an error within the window of assert.soon(). If
+ * 'doNotModifyInPassthroughs' is 'true' and the test is running in a $changeStream upconversion
+ * passthrough, then this stream will not be modified and will run as though no passthrough were
+ * active.
  */
 ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrowsCode(
     {db, collName, pipeline, expectedCode, doNotModifyInPassthroughs}) {
     try {
+        // Run a passthrough-aware initial 'aggregate' command to open the change stream.
         const res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
             db,
             {aggregate: collName, pipeline: pipeline, cursor: {batchSize: 1}},
             doNotModifyInPassthroughs));
 
-        // Extract the collection name from the cursor since the change stream may be on the whole
-        // database. The 'collName' parameter will be the integer 1 in that case and the getMore
-        // command requires 'collection' to be a string.
-        const getMoreCollName = getCollectionNameFromFullNamespace(res.cursor.ns);
-        assert.commandWorked(
-            db.runCommand({getMore: res.cursor.id, collection: getMoreCollName, batchSize: 1}));
+        // Create a cursor using the command response, and begin issuing getMores. We expect
+        // csCursor.hasNext() to throw the expected code before assert.soon() times out.
+        const csCursor = new DBCommandCursor(db, res, 1);
+        assert.soon(() => csCursor.hasNext());
+        assert(false, `Unexpected result from cursor: ${tojson(csCursor.next())}`);
     } catch (error) {
         assert.eq(error.code, expectedCode, `Caught unexpected error: ${tojson(error)}`);
         return true;
