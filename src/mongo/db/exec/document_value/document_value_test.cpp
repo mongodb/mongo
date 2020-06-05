@@ -2248,13 +2248,10 @@ TEST(ValueIntegral, CorrectlyIdentifiesInvalid64BitIntegralValues) {
     ASSERT_FALSE(Value(kDoubleMinAsDecimal).integral64Bit());
 }
 
-/** TODO SERVER-48410 : fix and re-enable this failing test */
 TEST(ValueOutput, StreamOutputForIllegalDateProducesErrorToken) {
-#if 0
     auto sout = std::ostringstream{};
     sout << mongo::Value{Date_t::min()};
     ASSERT_EQ("illegal date", sout.str());
-#endif
 }
 
 }  // namespace Value
