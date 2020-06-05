@@ -267,6 +267,20 @@ public:
         return _writesAreReplicated;
     }
 
+    /**
+     * Returns true if operations' durations should be added to serverStatus latency metrics.
+     */
+    bool shouldIncrementLatencyStats() const {
+        return _shouldIncrementLatencyStats;
+    }
+
+    /**
+     * Sets the shouldIncrementLatencyStats flag.
+     */
+    void setShouldIncrementLatencyStats(bool shouldIncrementLatencyStats) {
+        _shouldIncrementLatencyStats = shouldIncrementLatencyStats;
+    }
+
     void markKillOnClientDisconnect();
 
     /**
@@ -568,6 +582,7 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
+    bool _shouldIncrementLatencyStats = true;
     bool _shouldParticipateInFlowControl = true;
     bool _inMultiDocumentTransaction = false;
     bool _isStartingMultiDocumentTransaction = false;

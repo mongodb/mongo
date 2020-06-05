@@ -460,6 +460,9 @@ public:
             uassert(31373, "maxAwaitTimeMS must be a non-negative integer", *maxAwaitTimeMS >= 0);
 
             LOGV2_DEBUG(23904, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
+
+            // Awaitable isMaster commands have high latency by design.
+            opCtx->setShouldIncrementLatencyStats(false);
         } else {
             uassert(31368,
                     (topologyVersionElement
