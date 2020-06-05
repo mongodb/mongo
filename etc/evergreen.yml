@@ -4867,7 +4867,7 @@ tasks:
 ## rollback multiversion fuzzer ##
 - <<: *jstestfuzz_template
   name: rollback_multiversion_fuzzer_gen
-# tags: ["multiversion_fuzzer"]
+  tags: ["multiversion_fuzzer"]
   commands:
   - func: "generate fuzzer tasks"
     vars:

@@ -1218,6 +1218,19 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
+            // New mongod-specific option in 4.4.
+            if (!programMajorMinorVersion || programMajorMinorVersion >= 404) {
+                if (jsTest.options().setParameters &&
+                    jsTest.options().setParameters['enableIndexBuildCommitQuorum'] !== undefined) {
+                    if (!argArrayContainsSetParameterValue('enableIndexBuildCommitQuorum=')) {
+                        argArray.push(...['--setParameter',
+                                          "enableIndexBuildCommitQuorum=" +
+                                              jsTest.options()
+                                                  .setParameters['enableIndexBuildCommitQuorum']]);
+                    }
+                }
+            }
+
             // New mongod-specific option in 4.3.x.
             if (!programMajorMinorVersion || programMajorMinorVersion >= 430) {
                 // Allow the parameter to be overridden if set explicitly via TestData.
@@ -1318,6 +1331,11 @@ function appendSetParameterArgs(argArray) {
                         // within the shell.
                         if (paramName === "logComponentVerbosity" &&
                             argArrayContains("logComponentVerbosity")) {
+                            continue;
+                        }
+
+                        if (paramName === 'enableIndexBuildCommitQuorum' &&
+                            argArrayContains("enableIndexBuildCommitQuorum")) {
                             continue;
                         }
 
