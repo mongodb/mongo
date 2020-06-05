@@ -267,11 +267,11 @@ TEST_F(DBRAIITestFixture,
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
     AutoGetCollectionForRead coll(client2.second.get(), NamespaceString("local.system.js"));
-    // Reading from an unreplicated collection does not change the ReadSource to kNoOverlap.
+    // Reading from an unreplicated collection does not change the ReadSource to kLastApplied.
     ASSERT_EQ(client2.second.get()->recoveryUnit()->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kUnset);
 
-    // Reading from a replicated collection will try to switch to kNoOverlap. Because we are
+    // Reading from a replicated collection will try to switch to kLastApplied. Because we are
     // already reading without a timestamp and we can't reacquire the PBWM lock to continue reading
     // without a timestamp, we uassert in this situation.
     ASSERT_THROWS_CODE(AutoGetCollectionForRead(client2.second.get(), nss),
@@ -280,9 +280,9 @@ TEST_F(DBRAIITestFixture,
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
-    // This test simulates a situation where AutoGetCollectionForRead cant read at the no-overlap
-    // point (minimum of all_durable and lastApplied) because it is set to a point earlier than the
-    // catalog change. We expect to read without a timestamp and hold the PBWM lock.
+    // This test simulates a situation where AutoGetCollectionForRead cant read at lastApplied
+    // because it is set to a point earlier than the catalog change. We expect to read without a
+    // timestamp and hold the PBWM lock.
     auto replCoord = repl::ReplicationCoordinator::get(client1.second.get());
     CollectionOptions defaultCollectionOptions;
     ASSERT_OK(
@@ -302,7 +302,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
     snapshotManager->setLastApplied(opTime.getTimestamp());
     AutoGetCollectionForRead coll(client1.second.get(), nss);
 
-    // We can't read from kNoOverlap in this scenario because there is a catalog conflict. Resort
+    // We can't read from kLastApplied in this scenario because there is a catalog conflict. Resort
     // to taking the PBWM lock and reading without a timestamp.
     ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kUnset);
@@ -311,8 +311,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
-    // This test simulates a situation where AutoGetCollectionForRead reads at the no-overlap
-    // point (minimum of all_durable and lastApplied) even though lastApplied is not available.
+    // This test simulates a situation where AutoGetCollectionForRead reads without a timestamp
+    // even though lastApplied is not available.
     auto replCoord = repl::ReplicationCoordinator::get(client1.second.get());
     CollectionOptions defaultCollectionOptions;
     ASSERT_OK(
@@ -320,23 +320,21 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
     // Note that when the collection was created, above, the system chooses a minimum snapshot time
-    // for the collection. Since last-applied isn't available, we default to all_durable, which is
-    // available, and is greater than the collection minimum snapshot.
+    // for the collection. Since last-applied isn't available, we default to read without a
+    // timestamp.
     auto snapshotManager =
         client1.second.get()->getServiceContext()->getStorageEngine()->getSnapshotManager();
     ASSERT_FALSE(snapshotManager->getLastApplied());
     AutoGetCollectionForRead coll(client1.second.get(), nss);
 
-    // Even though lastApplied isn't available, the ReadSource is set to kNoOverlap, which reads
-    // at the all_durable time.
     ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
-              RecoveryUnit::ReadSource::kNoOverlap);
-    ASSERT_TRUE(client1.second.get()->recoveryUnit()->getPointInTimeReadTimestamp());
+              RecoveryUnit::ReadSource::kLastApplied);
+    ASSERT_FALSE(client1.second.get()->recoveryUnit()->getPointInTimeReadTimestamp());
     ASSERT_FALSE(client1.second.get()->lockState()->isLockHeldForMode(
         resourceIdParallelBatchWriterMode, MODE_IS));
 }
 
-TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUsesNoOverlapOnSecondary) {
+TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUsesLastAppliedOnSecondary) {
     auto opCtx = client1.second.get();
 
     // Use a tailable query on a capped collection because we can anticipate it automatically
@@ -358,9 +356,9 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUsesNoOverlapOnSecondary) {
     auto state = exec->getNext(&unused, nullptr);
     ASSERT_EQ(state, PlanExecutor::ExecState::IS_EOF);
 
-    // After restoring, the collection scan should now be reading with kNoOverlap, the default on
+    // After restoring, the collection scan should now be reading with kLastApplied, the default on
     // secondaries.
-    ASSERT_EQ(RecoveryUnit::ReadSource::kNoOverlap,
+    ASSERT_EQ(RecoveryUnit::ReadSource::kLastApplied,
               opCtx->recoveryUnit()->getTimestampReadSource());
     ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&unused, nullptr));
 }
@@ -379,7 +377,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadChangedReadSourceAfterStepUp) 
     auto exec = makeTailableQueryPlan(opCtx, autoColl.getCollection());
 
     // The collection scan should use the default ReadSource on a secondary.
-    ASSERT_EQ(RecoveryUnit::ReadSource::kNoOverlap,
+    ASSERT_EQ(RecoveryUnit::ReadSource::kLastApplied,
               opCtx->recoveryUnit()->getTimestampReadSource());
 
     // When the tailable query recovers from its yield, it should discover that the node is primary

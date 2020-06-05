@@ -456,6 +456,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
         // The following ReadSources can only establish a read timestamp when a transaction is
         // opened.
         case ReadSource::kNoOverlap:
+        case ReadSource::kLastApplied:
         case ReadSource::kAllDurableSnapshot:
             break;
     }
@@ -464,6 +465,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
     getSession();
 
     switch (_timestampReadSource) {
+        case ReadSource::kLastApplied:
         case ReadSource::kNoOverlap:
             // The lastApplied and allDurable timestamps are not always available if the system has
             // not accepted writes, so it is not possible to invariant that it exists as other
@@ -515,6 +517,10 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             _majorityCommittedSnapshot =
                 _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(
                     session, _prepareConflictBehavior, _roundUpPreparedTimestamps);
+            break;
+        }
+        case ReadSource::kLastApplied: {
+            _readAtTimestamp = _beginTransactionAtLastAppliedTimestamp(session);
             break;
         }
         case ReadSource::kNoOverlap: {
@@ -569,6 +575,38 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp(WT_SESS
     auto readTimestamp = _getTransactionReadTimestamp(session);
     txnOpen.done();
     return readTimestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp(WT_SESSION* session) {
+    auto lastApplied = _sessionCache->snapshotManager().getLastApplied();
+    if (!lastApplied) {
+        // When there is not a lastApplied timestamp available, read without a timestamp. Do not
+        // round up the read timestamp to the oldest timestamp.
+
+        // There is a race that allows new transactions to start between the time we check for a
+        // read timestamp and start our transaction, which can temporarily violate the contract of
+        // kLastApplied. That is, writes will be visible that occur after the lastApplied time. This
+        // is only possible for readers that start immediately after an initial sync that did not
+        // replicate any oplog entries. Future transactions will start reading at a timestamp once
+        // timestamped writes have been made.
+        WiredTigerBeginTxnBlock txnOpen(
+            session, _prepareConflictBehavior, _roundUpPreparedTimestamps);
+        LOGV2_DEBUG(4847500, 2, "no read timestamp available for kLastApplied");
+        txnOpen.done();
+        return Timestamp();
+    }
+
+    WiredTigerBeginTxnBlock txnOpen(session,
+                                    _prepareConflictBehavior,
+                                    _roundUpPreparedTimestamps,
+                                    RoundUpReadTimestamp::kRound);
+    auto status = txnOpen.setReadSnapshot(*lastApplied);
+    fassert(4847501, status);
+    txnOpen.done();
+
+    // We might have rounded to oldest between calling getLastApplied and setReadSnapshot. We
+    // need to get the actual read timestamp we used.
+    return _getTransactionReadTimestamp(session);
 }
 
 Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSION* session) {
