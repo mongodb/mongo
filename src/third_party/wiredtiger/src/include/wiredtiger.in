@@ -1086,7 +1086,7 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;granularity,
 	 * this setting manages the granularity of how WiredTiger maintains modification maps
 	 * internally.  The larger the granularity\, the smaller amount of information WiredTiger
-	 * need to maintain., an integer between 1MB and 2GB; default \c 16MB.}
+	 * need to maintain., an integer between 4KB and 2GB; default \c 16MB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;src_id, a string that identifies a previous checkpoint
 	 * backup source as the source of this incremental backup.  This identifier must have
 	 * already been created by use of the 'this_id' configuration in an earlier backup.  A

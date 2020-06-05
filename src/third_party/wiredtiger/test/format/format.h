@@ -138,6 +138,7 @@ typedef struct {
     uint32_t c_assert_read_timestamp;
     uint32_t c_auto_throttle;
     char *c_backup_incremental;
+    uint32_t c_backup_incr_granularity;
     uint32_t c_backups;
     uint32_t c_bitcnt;
     uint32_t c_bloom;
