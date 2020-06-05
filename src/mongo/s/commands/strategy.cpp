@@ -632,7 +632,7 @@ void runCommand(OperationContext* opCtx,
                     }
                     return latestKnownClusterTime.asTimestamp();
                 }();
-                readConcernArgs.setArgsAtClusterTimeForSnapshot(atClusterTime);
+                readConcernArgs.setArgsAtClusterTime(atClusterTime);
             }
 
             replyBuilder->reset();
@@ -822,7 +822,8 @@ void runCommand(OperationContext* opCtx,
 
                     abortGuard.dismiss();
                     continue;
-                } else if (!ReadConcernArgs::get(opCtx).wasAtClusterTimeSelected()) {
+                } else if (auto rc = ReadConcernArgs::get(opCtx);
+                           rc.getArgsAtClusterTime() && !rc.wasAtClusterTimeSelected()) {
                     // Non-transaction snapshot read. The client sent readConcern: {level:
                     // "snapshot", atClusterTime: T}, where T is older than
                     // minSnapshotHistoryWindowInSeconds, retrying won't succeed.

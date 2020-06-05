@@ -73,11 +73,11 @@ TEST_F(ClusterInsertTest, NoErrors) {
 }
 
 TEST_F(ClusterInsertTest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    testAttachesAtClusterTimeForSnapshotReadConcern(kInsertCmdTargeted, kInsertCmdScatterGather);
+    testAttachesAtClusterTimeForTxnSnapshotReadConcern(kInsertCmdTargeted, kInsertCmdScatterGather);
 }
 
 TEST_F(ClusterInsertTest, SnapshotReadConcernWithAfterClusterTime) {
-    testSnapshotReadConcernWithAfterClusterTime(kInsertCmdTargeted, kInsertCmdScatterGather);
+    testTxnSnapshotReadConcernWithAfterClusterTime(kInsertCmdTargeted, kInsertCmdScatterGather);
 }
 
 }  // namespace

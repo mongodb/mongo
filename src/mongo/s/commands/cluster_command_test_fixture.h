@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/cursor_id.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/commands/strategy.h"
 
@@ -46,9 +47,15 @@ protected:
 
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(10, 1));
 
-    const Timestamp kAfterClusterTime = Timestamp(50, 2);
+    static const Timestamp kAfterClusterTime;
+
+    static const Timestamp kShardClusterTime;
+
+    static const CursorId kCursorId;
 
     void setUp() override;
+
+    void tearDown() override;
 
     virtual void expectInspectRequest(int shardIndex, InspectionCallback cb) = 0;
 
@@ -85,17 +92,34 @@ protected:
     void testMaxRetriesSnapshotErrors(BSONObj targetedCmd, BSONObj scatterGatherCmd = BSONObj());
 
     /**
-     * Verifies that atClusterTime is attached to the given commands.
+     * Verifies that atClusterTime is attached to the given commands in a transaction.
      */
-    void testAttachesAtClusterTimeForSnapshotReadConcern(BSONObj targetedCmd,
-                                                         BSONObj scatterGatherCmd = BSONObj());
+    void testAttachesAtClusterTimeForTxnSnapshotReadConcern(BSONObj targetedCmd,
+                                                            BSONObj scatterGatherCmd = BSONObj(),
+                                                            bool createsCursor = false);
 
     /**
      * Verifies that the chosen atClusterTime is greater than or equal to each command's
-     * afterClusterTime.
+     * afterClusterTime in a transaction.
      */
-    void testSnapshotReadConcernWithAfterClusterTime(BSONObj targetedCmd,
-                                                     BSONObj scatterGatherCmd = BSONObj());
+    void testTxnSnapshotReadConcernWithAfterClusterTime(BSONObj targetedCmd,
+                                                        BSONObj scatterGatherCmd = BSONObj(),
+                                                        bool createsCursor = false);
+
+    /**
+     * Verifies that atClusterTime is attached to the given non-transaction snapshot commands.
+     */
+    void testAttachesAtClusterTimeForNonTxnSnapshotReadConcern(BSONObj targetedCmd,
+                                                               BSONObj scatterGatherCmd = BSONObj(),
+                                                               bool createsCursor = false);
+
+    /**
+     * Verifies that the chosen atClusterTime is greater than or equal to each non-transaction
+     * snapshot command's afterClusterTime.
+     */
+    void testNonTxnSnapshotReadConcernWithAfterClusterTime(BSONObj targetedCmd,
+                                                           BSONObj scatterGatherCmd = BSONObj(),
+                                                           bool createsCursor = false);
 
     /**
      * Appends the metadata shards return on responses to transaction statements, such as the
@@ -105,11 +129,36 @@ protected:
 
 private:
     /**
-     * Makes a new command object from the one given by apppending read concern
-     * snapshot and the appropriate transaction options. If includeAfterClusterTime
-     * is true, also appends afterClusterTime to the read concern.
+     * Makes a new command object from the one given by appending read concern snapshot and the
+     * appropriate transaction options. If includeAfterClusterTime is true, also appends
+     * afterClusterTime to the read concern.
      */
-    BSONObj _makeCmd(BSONObj cmdObj, bool includeAfterClusterTime = false);
+    BSONObj _makeTxnCmd(BSONObj cmdObj, bool includeAfterClusterTime = false);
+
+    /**
+     * Makes a new command object from the one given by appending read concern snapshot. If
+     * includeAfterClusterTime is true, also appends afterClusterTime to the read concern.
+     */
+    BSONObj _makeNonTxnCmd(BSONObj cmdObj, bool includeAfterClusterTime = false);
+
+    /**
+     * Helper method.
+     */
+    BSONObj _makeCmd(BSONObj cmdObj, bool startTransaction, bool includeAfterClusterTime);
+
+    /*
+     * Check that the ClusterCursorManager contains an idle cursor with proper readConcern set.
+     */
+    void _assertCursorReadConcern(bool isTargeted,
+                                  boost::optional<Timestamp> expectedAtClusterTime);
+
+    static void _containsSelectedAtClusterTime(const executor::RemoteCommandRequest& request);
+
+    static void _containsAtClusterTimeOnly(const executor::RemoteCommandRequest& request);
+
+    static void _containsAfterClusterTimeOnly(const executor::RemoteCommandRequest& request);
+
+    static void _omitsClusterTime(const executor::RemoteCommandRequest& request);
 
     // Enables the transaction router to retry within a transaction on stale version and snapshot
     // errors for the duration of each test.

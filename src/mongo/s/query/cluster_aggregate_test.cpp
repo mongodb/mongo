@@ -121,12 +121,13 @@ TEST_F(ClusterAggregateTest, MaxRetriesSnapshotErrors) {
 }
 
 TEST_F(ClusterAggregateTest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    testAttachesAtClusterTimeForSnapshotReadConcern(kAggregateCmdTargeted,
-                                                    kAggregateCmdScatterGather);
+    testAttachesAtClusterTimeForTxnSnapshotReadConcern(kAggregateCmdTargeted,
+                                                       kAggregateCmdScatterGather);
 }
 
 TEST_F(ClusterAggregateTest, SnapshotReadConcernWithAfterClusterTime) {
-    testSnapshotReadConcernWithAfterClusterTime(kAggregateCmdTargeted, kAggregateCmdScatterGather);
+    testTxnSnapshotReadConcernWithAfterClusterTime(kAggregateCmdTargeted,
+                                                   kAggregateCmdScatterGather);
 }
 
 TEST_F(ClusterAggregateTest, ShouldFailWhenFromMongosIsTrue) {
