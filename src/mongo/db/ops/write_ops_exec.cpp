@@ -112,9 +112,8 @@ void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
 void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     try {
         curOp->done();
-        long long executionTimeMicros =
-            durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses());
-        curOp->debug().executionTimeMicros = executionTimeMicros;
+        auto executionTimeMicros = duration_cast<Microseconds>(curOp->elapsedTimeExcludingPauses());
+        curOp->debug().executionTime = executionTimeMicros;
 
         recordCurOpMetrics(opCtx);
         Top::get(opCtx->getServiceContext())

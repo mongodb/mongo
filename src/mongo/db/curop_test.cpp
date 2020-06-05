@@ -35,6 +35,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -233,5 +234,33 @@ TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
     // bsonObj should _not_ contain 'failpointMsg' if a fail point is not set.
     ASSERT_FALSE(bsonObj.hasField("failpointMsg"));
 }
+
+TEST(CurOpTest, ElapsedTimeReflectsTickSource) {
+    QueryTestServiceContext serviceContext;
+
+    auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
+    // The tick source is initialized to a non-zero value as CurOp equates a value of 0 with a
+    // not-started timer.
+    tickSourceMock->advance(Milliseconds{100});
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    curop->setTickSource_forTest(tickSourceMock.get());
+
+    ASSERT_FALSE(curop->isStarted());
+
+    curop->ensureStarted();
+    ASSERT_TRUE(curop->isStarted());
+
+    tickSourceMock->advance(Milliseconds{20});
+
+    ASSERT_FALSE(curop->isDone());
+
+    curop->done();
+    ASSERT_TRUE(curop->isDone());
+
+    ASSERT_EQ(Milliseconds{20}, duration_cast<Milliseconds>(curop->elapsedTimeTotal()));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -57,6 +57,7 @@
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
+#include "mongo/util/system_tick_source.h"
 #include <mongo/db/stats/timer_stats.h>
 
 namespace mongo {
@@ -348,6 +349,8 @@ CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {
 }
 
 CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
+    _tickSource = SystemTickSource::get();
+
     if (opCtx) {
         _stack->push(opCtx, this);
     } else {
@@ -408,7 +411,7 @@ void CurOp::setNS_inlock(StringData ns) {
 
 void CurOp::ensureStarted() {
     if (_start == 0) {
-        _start = curTimeMicros64();
+        _start = _tickSource->getTicks();
     }
 }
 
@@ -435,10 +438,10 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     }
 
     // Obtain the total execution time of this operation.
-    _end = curTimeMicros64();
-    _debug.executionTimeMicros = durationCount<Microseconds>(elapsedTimeExcludingPauses());
+    _end = _tickSource->getTicks();
+    _debug.executionTime = duration_cast<Microseconds>(elapsedTimeExcludingPauses());
 
-    const auto executionTimeMillis = _debug.executionTimeMicros / 1000;
+    const auto executionTimeMillis = durationCount<Milliseconds>(_debug.executionTime);
 
     if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(executionTimeMillis);
@@ -841,7 +844,7 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
         s << " remoteOpWaitMillis:" << durationCount<Milliseconds>(*remoteOpWaitTime);
     }
 
-    s << " " << (executionTimeMicros / 1000) << "ms";
+    s << " " << durationCount<Milliseconds>(executionTime) << "ms";
 
     return s.str();
 }
@@ -1010,7 +1013,7 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    pAttrs->add("durationMillis", (executionTimeMicros / 1000));
+    pAttrs->add("durationMillis", durationCount<Milliseconds>(executionTime));
 }
 
 
@@ -1132,7 +1135,7 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    b.appendIntOrLL("millis", executionTimeMicros / 1000);
+    b.appendIntOrLL("millis", durationCount<Milliseconds>(executionTime));
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());
