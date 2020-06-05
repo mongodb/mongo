@@ -81,7 +81,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/summation',
         'aggregation_request',
         'dependencies',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/vector_clock',
+    ],
 )
 
 env.Library(

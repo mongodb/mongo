@@ -131,6 +131,7 @@ env.Library(
         'generic_cursor',
     ],
     LIBDEPS_PRIVATE=[
+        'auth/auth',
         'prepare_conflict_tracker',
     ],
 )
@@ -555,6 +556,7 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/rpc/command_status',
         'audit',
+        'auth/auth',
         'command_generic_argument',
         'commands/server_status_core',
         'commands/test_commands_enabled',

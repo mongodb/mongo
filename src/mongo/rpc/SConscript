@@ -110,6 +110,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/signed_logical_time',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/vector_clock',
     ],
 )
