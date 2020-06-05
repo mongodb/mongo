@@ -59,6 +59,7 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -173,6 +174,7 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
 
 int dbtestsMain(int argc, char** argv, char** envp) {
     ::mongo::setTestCommandsEnabled(true);
+    ::mongo::TestingProctor::instance().setEnabled(true);
     ::mongo::setupSynchronousSignalHandlers();
     mongo::dbtests::initWireSpec();
 

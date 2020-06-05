@@ -158,6 +158,18 @@ env.Library(
 )
 
 env.Library(
+    target="testing_options",
+    source=[
+        "testing_options.cpp",
+        env.Idlc('testing_options.idl')[0],
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/idl/server_parameter",
+    ],
+)
+
+env.Library(
     target="periodic_runner",
     source=[
         "periodic_runner.cpp",
@@ -315,7 +327,6 @@ if get_option('use-diagnostic-latches') == 'on':
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
             '$BUILD_DIR/mongo/db/service_context',
         ],
         LIBDEPS_PRIVATE=[

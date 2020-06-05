@@ -33,6 +33,7 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
@@ -43,6 +44,7 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/testing_proctor.h"
 
 using mongo::Status;
 
@@ -52,7 +54,9 @@ int main(int argc, char** argv, char** envp) {
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
 
+    ::mongo::TestingProctor::instance().setEnabled(true);
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    ::mongo::setTestCommandsEnabled(true);
 
     moe::OptionSection options;
 

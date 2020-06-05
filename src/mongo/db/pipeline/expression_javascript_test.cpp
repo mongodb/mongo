@@ -72,7 +72,6 @@ private:
 
 
 void MapReduceFixture::setUp() {
-    setTestCommandsEnabled(true);
     ServiceContextMongoDTest::setUp();
     ScriptEngine::setup(false);
 }

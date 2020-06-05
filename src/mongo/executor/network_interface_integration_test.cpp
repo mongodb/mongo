@@ -161,7 +161,6 @@ public:
     }
 
     void setUp() override {
-        setTestCommandsEnabled(true);
         startNet(std::make_unique<WaitForIsMasterHook>(this));
     }
 

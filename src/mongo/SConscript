@@ -159,6 +159,7 @@ baseEnv.Library(
         'util/system_clock_source.cpp',
         'util/system_tick_source.cpp',
         'util/text.cpp',
+        'util/testing_proctor.cpp',
         'util/thread_safety_context.cpp',
         'util/time_support.cpp',
         'util/timer.cpp',
@@ -469,6 +470,7 @@ mongod = env.Program(
         'util/ntservice',
         'util/options_parser/options_parser_init',
         'util/periodic_runner_factory',
+        'util/testing_options',
         'util/version_impl',
         'watchdog/watchdog_mongod',
     ],
@@ -574,6 +576,7 @@ mongos = env.Program(
         'util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
         'util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
         'util/ntservice',
+        'util/testing_options',
         'util/version_impl',
     ],
     LIBDEPS_PRIVATE=[

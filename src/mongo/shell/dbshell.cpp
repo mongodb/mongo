@@ -53,7 +53,6 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logger/console_appender.h"
@@ -122,14 +121,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
     return Status::OK();
 }
 
-// Initialize the testCommandsEnabled server parameter to true since the mongo shell does not have
-// any test-only commands that could cause harm to the server, and it may be necessary to enable
-// this to test certain features, for example through benchRun (see SERVER-40419).
-MONGO_INITIALIZER_WITH_PREREQUISITES(EnableShellTestCommands, ("EndStartupOptionSetup"))
-(InitializerContext* context) {
-    setTestCommandsEnabled(true);
-    return Status::OK();
-}
 const auto kAuthParam = "authSource"s;
 
 /**
