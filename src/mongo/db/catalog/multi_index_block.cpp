@@ -293,6 +293,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 
             logv2::DynamicAttributes attrs;
             attrs.add("namespace", ns);
+            attrs.add("buildUUID", _buildUUID);
             attrs.add("properties", *descriptor);
             attrs.add("method", _method);
             if (index.bulk)
@@ -300,9 +301,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                           eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024);
 
             LOGV2(20384,
-                  "index build: starting on {namespace} properties: {properties} using method: "
+                  "Index build: starting on {namespace} properties: {properties} using method: "
                   "{method}",
-                  "index build: starting",
+                  "Index build: starting",
                   attrs);
 
 
@@ -322,6 +323,17 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         if (!status.isOK()) {
             return status;
         }
+
+        opCtx->recoveryUnit()->onCommit([ns, this](auto commitTs) {
+            LOGV2(20346,
+                  "Index build initialized: {buildUUID}: {nss} ({collection_uuid}): indexes: "
+                  "{indexes_size}",
+                  "Index build: initialized",
+                  "buildUUID"_attr = _buildUUID,
+                  "namespace"_attr = ns,
+                  "collectionUUID"_attr = _collectionUUID,
+                  "initializationTimestamp"_attr = commitTs);
+        });
 
         wunit.commit();
         return indexInfoObjs;
@@ -539,8 +551,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     progress->finished();
 
     LOGV2(20391,
-          "index build: collection scan done. scanned {n} total records in {t_seconds} seconds",
+          "Index build: collection scan done. scanned {n} total records in {t_seconds} seconds",
           "Index build: collection scan done",
+          "buildUUID"_attr = _buildUUID,
           "totalRecords"_attr = n,
           "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())));
 

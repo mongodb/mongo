@@ -78,7 +78,8 @@ try {
         }));
     }, testDB.getMongo().port);
 
-    checkLog.containsWithCount(replSet.getPrimary(), "Waiting for index build to complete", 5);
+    checkLog.containsWithCount(
+        replSet.getPrimary(), "Index build: waiting for index build to complete", 5);
 
     // Test setting various commit quorums on the index build in our two node replica set.
     assert.commandFailed(testDB.runCommand(
@@ -125,7 +126,8 @@ try {
         }));
     }, testDB.getMongo().port);
 
-    checkLog.containsWithCount(replSet.getPrimary(), "Waiting for index build to complete", 6);
+    checkLog.containsWithCount(
+        replSet.getPrimary(), "Index build: waiting for index build to complete", 6);
 
     assert.commandFailedWithCode(testDB.runCommand({
         setIndexCommitQuorum: 'twoPhaseIndexBuild',
