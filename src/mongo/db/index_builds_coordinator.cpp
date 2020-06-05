@@ -654,7 +654,6 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     const auto nss = getNsFromUUID(opCtx, collUUID);
 
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
-    indexBuildOptions.replSetAndNotPrimaryAtStart = true;
     indexBuildOptions.applicationMode = applicationMode;
 
     // If this is an initial syncing node, drop any conflicting ready index specs prior to
@@ -1311,8 +1310,6 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(OperationContext* opC
               "collectionUUID"_attr = build.collUUID,
               "buildUUID"_attr = buildUUID);
         IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
-        // Start the index build as if in secondary oplog application.
-        indexBuildOptions.replSetAndNotPrimaryAtStart = true;
         // Indicate that the initialization should not generate oplog entries or timestamps for the
         // first catalog write, and that the original durable catalog entries should be dropped and
         // replaced.
@@ -1994,15 +1991,6 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
         return;
     }
 
-    if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
-        // This build started and failed as a secondary. Single-phase index builds started on
-        // secondaries may not fail. Do not clean up the index build. It must remain unfinished
-        // until it is successfully rebuilt on startup.
-        fassert(31354,
-                status.withContext(str::stream() << "Index build: " << replState->buildUUID
-                                                 << "; Database: " << replState->dbName));
-    }
-
     // The index builder thread can abort on its own if it is interrupted by a user killop. This
     // would prevent us from taking locks. Use a new OperationContext to abort the index build.
     runOnAlternateContext(
@@ -2315,8 +2303,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
         // If we are no longer primary and a single phase index build started as primary attempts to
         // commit, trigger a self-abort.
-        if (!isMaster && IndexBuildAction::kSinglePhaseCommit == action &&
-            !indexBuildOptions.replSetAndNotPrimaryAtStart) {
+        if (!isMaster && IndexBuildAction::kSinglePhaseCommit == action) {
             uassertStatusOK(
                 {ErrorCodes::NotMaster,
                  str::stream() << "Unable to commit index build because we are no longer primary: "
@@ -2363,10 +2350,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         // IndexBuildAborted error code.
         const bool twoPhaseAndNotPrimary =
             IndexBuildProtocol::kTwoPhase == replState->protocol && !isMaster;
-        const bool singlePhaseAndNotPrimaryAtStart =
-            IndexBuildProtocol::kSinglePhase == replState->protocol &&
-            indexBuildOptions.replSetAndNotPrimaryAtStart;
-        if (twoPhaseAndNotPrimary || singlePhaseAndNotPrimaryAtStart) {
+        if (twoPhaseAndNotPrimary) {
             LOGV2_FATAL(4698902,
                         "Index build failed while not primary",
                         "buildUUID"_attr = replState->buildUUID,
@@ -2387,21 +2371,6 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     auto onCreateEachFn = [&](const BSONObj& spec) {
         if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
-            return;
-        }
-
-        if (indexBuildOptions.replSetAndNotPrimaryAtStart) {
-            LOGV2_DEBUG(20671,
-                        1,
-                        "Skipping createIndexes oplog entry for index build: {replState_buildUUID}",
-                        "replState_buildUUID"_attr = replState->buildUUID);
-            // Get a timestamp to complete the index build in the absence of a createIndexBuild
-            // oplog entry.
-            repl::UnreplicatedWritesBlock uwb(opCtx);
-            if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx,
-                                                                              collection->ns())) {
-                LOGV2(20672, "Did not timestamp index commit write");
-            }
             return;
         }
 

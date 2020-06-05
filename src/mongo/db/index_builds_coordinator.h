@@ -86,7 +86,6 @@ public:
      */
     struct IndexBuildOptions {
         boost::optional<CommitQuorumOptions> commitQuorum;
-        bool replSetAndNotPrimaryAtStart = false;
         ApplicationMode applicationMode = ApplicationMode::kNormal;
     };
 
