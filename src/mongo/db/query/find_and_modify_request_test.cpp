@@ -53,7 +53,6 @@ TEST(FindAndModifyRequest, BasicUpdate) {
 }
 
 TEST(FindAndModifyRequest, PipelineUpdate) {
-    setTestCommandsEnabled(true);
     const BSONObj query(BSON("x" << 1));
     const BSONObj pipelineBSON(
         BSON("pipeline" << BSON_ARRAY(BSON("$addFields" << BSON("y" << 1)))));
@@ -660,7 +659,6 @@ TEST(FindAndModifyRequest, ParseWithWriteConcernAsArray) {
 }
 
 TEST(FindAndModifyRequest, ParsesAndSerializesPipelineUpdate) {
-    setTestCommandsEnabled(true);
     BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
             update: [{$replaceWith: {y: 1}}]
@@ -684,7 +682,6 @@ TEST(FindAndModifyRequest, ParsesAndSerializesPipelineUpdate) {
 }
 
 TEST(FindAndModifyRequest, RejectsBothArrayFiltersAndPipelineUpdate) {
-    setTestCommandsEnabled(true);
     BSONObj cmdObj(fromjson(R"json({
             query: { x: 1 },
             update: [{$replaceWith: {y: 1}}],

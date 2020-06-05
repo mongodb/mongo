@@ -268,6 +268,11 @@ jsTestOptions = function() {
             // TestData
             enableTestCommands:
                 TestData.hasOwnProperty('enableTestCommands') ? TestData.enableTestCommands : true,
+            // Testing diagnostics should be enabled by default if no testingDiagnosticsEnabled was
+            // present in TestData
+            testingDiagnosticsEnabled: TestData.hasOwnProperty('testingDiagnosticsEnabled')
+                ? TestData.testingDiagnosticsEnabled
+                : true,
             serviceExecutor: TestData.serviceExecutor,
             setParameters: TestData.setParameters,
             setParametersMongos: TestData.setParametersMongos,

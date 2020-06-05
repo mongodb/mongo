@@ -41,17 +41,7 @@ namespace {
 
 using Level = HierarchicalAcquisitionLevel;
 
-class LatchAnalyzerTest : public ServiceContextTest {
-    void setUp() override {
-        ServiceContextTest::setUp();
-        setTestCommandsEnabled(true);
-    }
-
-    void tearDown() override {
-        setTestCommandsEnabled(false);
-        ServiceContextTest::tearDown();
-    }
-};
+class LatchAnalyzerTest : public ServiceContextTest {};
 
 DEATH_TEST_REGEX_F(LatchAnalyzerTest, AddInvalidWasAbsent, "Fatal assertion.*31360") {
 

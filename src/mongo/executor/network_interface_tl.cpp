@@ -33,7 +33,6 @@
 
 #include "mongo/executor/network_interface_tl.h"
 
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/hedging_metrics.h"
@@ -42,6 +41,7 @@
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 namespace executor {
@@ -129,7 +129,7 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
     _pool = std::make_shared<ConnectionPool>(
         std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
 
-    if (getTestCommandsEnabled()) {
+    if (TestingProctor::instance().isEnabled()) {
         _counters = std::make_unique<SynchronizedCounters>();
     }
 }
