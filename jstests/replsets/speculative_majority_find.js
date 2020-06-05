@@ -59,7 +59,7 @@ let res = primaryDB.runCommand({
 assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
 
 restartServerReplication(secondary);
-replTest.awaitReplication();
+replTest.awaitLastOpCommitted();
 
 jsTestLog("Do a speculative majority read that should succeed.");
 res = primaryDB.runCommand({
@@ -143,7 +143,7 @@ assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
 
 // Let the previous write majority commit.
 restartServerReplication(secondary);
-replTest.awaitReplication();
+replTest.awaitLastOpCommitted();
 
 jsTestLog("Do a speculative majority read with 'afterClusterTime' that should succeed.");
 res = primaryDB.runCommand({
