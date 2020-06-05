@@ -104,8 +104,7 @@ assert.neq(null, conn, 'mongod was unable to start with version ' + tojson(resta
 testDb = conn.getDB(dbName);
 
 // Creating a long collection name on a 4.4 binary with FCV 4.2 should fail.
-assert.commandFailedWithCode(testDb.createCollection('c'.repeat(8192)),
-                             ErrorCodes.IncompatibleServerVersion);
+assert.commandFailedWithCode(testDb.createCollection('c'.repeat(8192)), 4862100);
 
 // Running rename within the same database or across two databases should fail for long collection
 // names.

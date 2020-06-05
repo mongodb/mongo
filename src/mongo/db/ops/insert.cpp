@@ -203,15 +203,20 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     if (!NamespaceString::validCollectionName(coll))
         return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
 
+    NamespaceString nss(db, coll);
+    uassert(4862100,
+            str::stream() << "Fully qualified namespace is too long. Namespace: " << nss.ns()
+                          << " Max: " << NamespaceString::MaxNsCollectionLen,
+            !nss.isNormalCollection() || nss.size() <= NamespaceString::MaxNsCollectionLen);
     const auto& fcv = serverGlobalParams.featureCompatibility;
     if (!fcv.isVersionInitialized() ||
         fcv.getVersion() < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) {
         uassert(ErrorCodes::IncompatibleServerVersion,
                 str::stream() << "Fully qualified namespace is too long for FCV 4.2. Upgrade to "
                                  "FCV 4.4 to create this namespace. Namespace: "
-                              << db << "." << coll
+                              << nss.ns()
                               << " FCV 4.2 Limit: " << NamespaceString::MaxNSCollectionLenFCV42,
-                db.size() + 1 + coll.size() <= NamespaceString::MaxNSCollectionLenFCV42);
+                nss.size() <= NamespaceString::MaxNSCollectionLenFCV42);
     }
 
     // check special areas
