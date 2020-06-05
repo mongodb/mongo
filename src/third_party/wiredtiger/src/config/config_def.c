@@ -303,7 +303,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_log_flush[] = {
 static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor_incremental_subconfigs[] = {
   {"enabled", "boolean", NULL, NULL, NULL, 0}, {"file", "string", NULL, NULL, NULL, 0},
   {"force_stop", "boolean", NULL, NULL, NULL, 0},
-  {"granularity", "int", NULL, "min=1MB,max=2GB", NULL, 0},
+  {"granularity", "int", NULL, "min=4KB,max=2GB", NULL, 0},
   {"src_id", "string", NULL, NULL, NULL, 0}, {"this_id", "string", NULL, NULL, NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 

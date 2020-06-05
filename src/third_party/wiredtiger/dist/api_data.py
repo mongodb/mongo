@@ -1286,7 +1286,7 @@ methods = {
             this setting manages the granularity of how WiredTiger maintains modification
             maps internally. The larger the granularity, the smaller amount of information
             WiredTiger need to maintain''',
-            min='1MB', max='2GB'),
+            min='4KB', max='2GB'),
         Config('src_id', '', r'''
             a string that identifies a previous checkpoint backup source as the source
             of this incremental backup. This identifier must have already been created

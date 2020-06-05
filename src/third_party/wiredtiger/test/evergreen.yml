@@ -2189,7 +2189,7 @@ tasks:
           posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         vars:
-          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer
+          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer
           # run for 2 hours ( 2 * 60 = 120 minutes), don't stop at failed tests, use default config
           format_test_script_args: -t 120
 
@@ -2207,7 +2207,7 @@ tasks:
         # to emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
         # run smoke tests, don't stop at failed tests, use default config
         vars:
-          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer
+          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer
           format_test_script_args: -S
           times: 16
 

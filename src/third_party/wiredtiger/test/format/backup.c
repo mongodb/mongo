@@ -399,15 +399,16 @@ backup(void *arg)
         if (g.c_backup_incr_flag == INCREMENTAL_BLOCK) {
             /*
              * If we're doing a full backup as the start of the incremental backup, only send in an
-             * identifier for this one.
+             * identifier for this one. Also set the block granularity.
              */
             if (incr_full) {
                 active_files_free(&active[0]);
                 active_files_free(&active[1]);
                 active_now = &active[g.backup_id % 2];
                 active_prev = NULL;
-                testutil_check(__wt_snprintf(
-                  cfg, sizeof(cfg), "incremental=(enabled,this_id=ID%" PRIu64 ")", g.backup_id++));
+                testutil_check(__wt_snprintf(cfg, sizeof(cfg),
+                  "incremental=(enabled,granularity=%" PRIu32 "K,this_id=ID%" PRIu64 ")",
+                  g.c_backup_incr_granularity, g.backup_id++));
                 full = true;
                 incr_full = false;
             } else {

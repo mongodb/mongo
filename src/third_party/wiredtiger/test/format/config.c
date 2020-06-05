@@ -30,6 +30,7 @@
 #include "config.h"
 
 static void config_backup_incr(void);
+static void config_backup_incr_granularity(void);
 static void config_backward_compatible(void);
 static void config_cache(void);
 static void config_checkpoint(void);
@@ -280,6 +281,8 @@ config_backup_incr(void)
             if (g.c_logging_archive)
                 config_single("logging.archive=0", false);
         }
+        if (g.c_backup_incr_flag == INCREMENTAL_BLOCK)
+            config_backup_incr_granularity();
         return;
     }
 
@@ -308,8 +311,53 @@ config_backup_incr(void)
     case 9:
     case 10:
         config_single("backup.incremental=block", false);
+        config_backup_incr_granularity();
         break;
     }
+}
+
+/*
+ * config_backup_incr_granularity --
+ *     Configuration of block granularity for incremental backup
+ */
+static void
+config_backup_incr_granularity(void)
+{
+    uint32_t granularity, i;
+    char confbuf[128];
+
+    if (config_is_perm("backup.incr_granularity"))
+        return;
+
+    /*
+     * Three block sizes are interesting. 16MB is the default for WiredTiger and MongoDB. 1MB is the
+     * minimum allowed by MongoDB. Smaller sizes stress block tracking and are good for testing. The
+     * granularity is in units of KB.
+     */
+    granularity = 0;
+    i = mmrand(NULL, 1, 10);
+    switch (i) {
+    case 1: /* 50% small size for stress testing */
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+        granularity = 4 * i;
+        break;
+    case 6: /* 20% 1MB granularity */
+    case 7:
+        granularity = 1024;
+        break;
+    case 8: /* 30% 16MB granularity */
+    case 9:
+    case 10:
+        granularity = 16 * 1024;
+        break;
+    }
+
+    testutil_check(
+      __wt_snprintf(confbuf, sizeof(confbuf), "backup.incr_granularity=%u", granularity));
+    config_single(confbuf, false);
 }
 
 /*
