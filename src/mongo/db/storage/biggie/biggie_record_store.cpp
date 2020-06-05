@@ -490,8 +490,6 @@ boost::optional<Record> RecordStore::ReverseCursor::next() {
         nextRecord.id = RecordId(extractRecordId(it->first));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
 
-        if (_isOplog && nextRecord.id > _visibilityManager->getAllCommittedRecord())
-            return boost::none;
         return nextRecord;
     }
     return boost::none;
@@ -507,9 +505,6 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
         it = workingCopy->rend();
         return boost::none;
     }
-
-    if (_isOplog && id > _visibilityManager->getAllCommittedRecord())
-        return boost::none;
 
     it = StringStore::const_reverse_iterator(++canFind);  // reverse iterator returns item 1 before
     _savedPosition = it->first;
