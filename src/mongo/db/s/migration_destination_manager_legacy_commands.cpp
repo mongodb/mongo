@@ -35,10 +35,12 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
@@ -89,8 +91,7 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        auto shardingState = ShardingState::get(opCtx);
-        uassertStatusOK(shardingState->canAcceptShardedCommands());
+        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
         auto nss = NamespaceString(parseNs(dbname, cmdObj));
 
@@ -109,14 +110,25 @@ public:
 
         // We force a refresh immediately after registering this migration to guarantee that this
         // shard will not receive a chunk after refreshing.
-        const auto shardVersion = forceShardFilteringMetadataRefresh(opCtx, nss);
+        onShardVersionMismatch(opCtx, nss, boost::none);
+
+        const auto collectionEpoch = [&] {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+            auto const optMetadata =
+                CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
+            uassert(
+                ErrorCodes::StaleShardVersion,
+                "Collection's metadata have been found UNKNOWN after a refresh on the recipient",
+                optMetadata);
+            return optMetadata->getShardVersion().epoch();
+        }();
 
         uassertStatusOK(
             MigrationDestinationManager::get(opCtx)->start(opCtx,
                                                            nss,
                                                            std::move(scopedReceiveChunk),
                                                            cloneRequest,
-                                                           shardVersion.epoch(),
+                                                           collectionEpoch,
                                                            writeConcern));
 
         result.appendBool("started", true);
