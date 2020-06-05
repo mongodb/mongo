@@ -426,7 +426,8 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     if (!commitQuorumSatisfied)
         return;
 
-    LOGV2(3856201, "Index build commit quorum satisfied", "indexBuildEntry"_attr = indexBuildEntry);
+    LOGV2(
+        3856201, "Index build: commit quorum satisfied", "indexBuildEntry"_attr = indexBuildEntry);
     _sendCommitQuorumSatisfiedSignal(opCtx, replState);
 }
 
@@ -632,7 +633,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions) {
     LOGV2(3856203,
-          "Index build waiting for next action before completing final phase",
+          "Index build: waiting for next action before completing final phase",
           "buildUUID"_attr = replState->buildUUID);
 
     while (true) {
@@ -644,7 +645,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
         const auto nextAction = _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
 
         LOGV2(3856204,
-              "Index build received signal",
+              "Index build: received signal",
               "buildUUID"_attr = replState->buildUUID,
               "action"_attr = _indexBuildActionToString(nextAction));
 
@@ -661,7 +662,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
                 invariant(replState->indexBuildState.getTimestamp(),
                           replState->buildUUID.toString());
                 LOGV2(3856205,
-                      "Committing index build from oplog entry",
+                      "Index build: committing from oplog entry",
                       "buildUUID"_attr = replState->buildUUID,
                       "commitTimestamp"_attr = replState->indexBuildState.getTimestamp().get(),
                       "collectionUUID"_attr = replState->collectionUUID);

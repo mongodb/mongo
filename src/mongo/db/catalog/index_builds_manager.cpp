@@ -114,15 +114,6 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         return ex.toStatus();
     }
 
-    LOGV2(
-        20346,
-        "Index build initialized: {buildUUID}: {nss} ({collection_uuid} ): indexes: {indexes_size}",
-        "Index build initialized",
-        "indexBuildUUID"_attr = buildUUID,
-        "namespace"_attr = nss,
-        "collectionUuid"_attr = collection->uuid(),
-        "numIndexes"_attr = indexes.size());
-
     return Status::OK();
 }
 

@@ -637,7 +637,7 @@ protected:
     /**
      * Signals the primary to commit the index build by sending "voteCommitIndexBuild" command
      * request to it with write concern 'majority', then waits for that command's response. And,
-     * command gets retried on error. This function gets called after the second draining phase of
+     * command gets retried on error. This function gets called after the first draining phase of
      * index build.
      */
     virtual void _signalPrimaryForCommitReadiness(

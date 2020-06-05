@@ -680,9 +680,11 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     pm.finished();
 
     LOGV2(20685,
-          "index build: inserted {bulk_getKeysInserted} keys from external sorter into index in "
+          "Index build: inserted {bulk_getKeysInserted} keys from external sorter into index in "
           "{timer_seconds} seconds",
-          message,
+          "Index build: inserted keys from external sorter into index",
+          "namespace"_attr = _descriptor->parentNS(),
+          "index"_attr = _descriptor->indexName(),
           "keysInserted"_attr = bulk->getKeysInserted(),
           "duration"_attr = Milliseconds(Seconds(timer.seconds())));
 

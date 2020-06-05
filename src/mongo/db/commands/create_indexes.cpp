@@ -550,7 +550,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {commitQuorum};
 
     LOGV2(20438,
-          "Registering index build",
+          "Index build: registering",
           "buildUUID"_attr = buildUUID,
           "namespace"_attr = ns,
           "collectionUUID"_attr = *collectionUUID,
@@ -564,7 +564,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
         auto deadline = opCtx->getDeadline();
         LOGV2(20440,
-              "Waiting for index build to complete",
+              "Index build: waiting for index build to complete",
               "buildUUID"_attr = buildUUID,
               "deadline"_attr = deadline);
 
@@ -573,7 +573,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             stats = buildIndexFuture.get(opCtx);
         } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruptionEx) {
             LOGV2(20441,
-                  "Index build received interrupt signal",
+                  "Index build: received interrupt signal",
                   "buildUUID"_attr = buildUUID,
                   "signal"_attr = interruptionEx);
 
@@ -585,7 +585,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 // entry from the new primary.
                 if (ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
                     LOGV2(20442,
-                          "Index build ignoring interrupt and continuing in background",
+                          "Index build: ignoring interrupt and continuing in background",
                           "buildUUID"_attr = buildUUID);
                     throw;
                 }
@@ -607,13 +607,14 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                       << ": " << interruptionEx.toString());
                 indexBuildsCoord->abortIndexBuildByBuildUUID(
                     abortCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort, abortReason);
-                LOGV2(
-                    20443, "Index build aborted due to interruption", "buildUUID"_attr = buildUUID);
+                LOGV2(20443,
+                      "Index build: aborted due to interruption",
+                      "buildUUID"_attr = buildUUID);
             }
             throw;
         } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
             LOGV2(20444,
-                  "Index build received interrupt signal due to change in replication state",
+                  "Index build: received interrupt signal due to change in replication state",
                   "buildUUID"_attr = buildUUID,
                   "ex"_attr = ex);
 
@@ -622,7 +623,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // entry from the new primary.
             if (IndexBuildProtocol::kTwoPhase == protocol) {
                 LOGV2(20445,
-                      "Index build ignoring interrupt and continuing in background",
+                      "Index build: ignoring interrupt and continuing in background",
                       "buildUUID"_attr = buildUUID);
                 throw;
             }
@@ -632,11 +633,11 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             indexBuildsCoord->abortIndexBuildByBuildUUID(
                 opCtx, buildUUID, IndexBuildAction::kPrimaryAbort, abortReason);
             LOGV2(
-                20446, "Index build aborted due to NotMaster error", "buildUUID"_attr = buildUUID);
+                20446, "Index build: aborted due to NotMaster error", "buildUUID"_attr = buildUUID);
             throw;
         }
 
-        LOGV2(20447, "Index build completed", "buildUUID"_attr = buildUUID);
+        LOGV2(20447, "Index build: completed", "buildUUID"_attr = buildUUID);
     } catch (DBException& ex) {
         // If the collection is dropped after the initial checks in this function (before the
         // AutoStatsTracker is created), the IndexBuildsCoordinator (either startIndexBuild() or
@@ -644,7 +645,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         // considered an error and the command should return success.
         if (ErrorCodes::NamespaceNotFound == ex.code()) {
             LOGV2(20448,
-                  "Index build failed: collection dropped",
+                  "Index build: failed because collection dropped",
                   "buildUUID"_attr = buildUUID,
                   "namespace"_attr = ns,
                   "collectionUUID"_attr = *collectionUUID,
@@ -653,7 +654,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         // All other errors should be forwarded to the caller with index build information included.
-        LOGV2(20449, "Index build failed", "buildUUID"_attr = buildUUID, "error"_attr = ex);
+        LOGV2(20449, "Index build: failed", "buildUUID"_attr = buildUUID, "error"_attr = ex);
         ex.addContext(str::stream() << "Index build failed: " << buildUUID << ": Collection " << ns
                                     << " ( " << *collectionUUID << " )");
 

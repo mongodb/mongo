@@ -760,7 +760,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
     auto fut = replState->sharedPromise.getFuture();
     LOGV2(20654,
-          "Index build joined after commit",
+          "Index build: joined after commit",
           "buildUUID"_attr = buildUUID,
           "result"_attr = fut.waitNoThrow(opCtx));
 
@@ -1626,7 +1626,10 @@ void IndexBuildsCoordinator::_unregisterIndexBuild(
 
     invariant(_allIndexBuilds.erase(replIndexBuildState->buildUUID));
 
-    LOGV2(4656004, "Unregistering index build", "buildUUID"_attr = replIndexBuildState->buildUUID);
+    LOGV2_DEBUG(4656004,
+                1,
+                "Index build: Unregistering",
+                "buildUUID"_attr = replIndexBuildState->buildUUID);
     _indexBuildsManager.unregisterIndexBuild(replIndexBuildState->buildUUID);
     _indexBuildsCompletedGen++;
     _indexBuildsCondVar.notify_all();
@@ -2128,6 +2131,10 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     _waitForNextIndexBuildActionAndCommit(opCtx, replState, indexBuildOptions);
 }
 
+/*
+ * First phase is doing a collection scan and inserting keys into sorter.
+ * Second phase is extracting the sorted keys and writing them into the new index table.
+ */
 void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     // Collection scan and insert into index.
@@ -2166,8 +2173,8 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
     }
 }
 
-/**
- * Second phase is extracting the sorted keys and writing them into the new index table.
+/*
+ * Third phase is catching up on all the writes that occurred during the first two phases.
  */
 void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
@@ -2217,7 +2224,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
 }
 
 /**
- * Third phase is catching up on all the writes that occurred during the first two phases.
+ * Continue the third phase of catching up on all remaining writes that occurred and then commit.
  * Accepts a commit timestamp for the index (null if not available).
  */
 IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSideTablesAndCommit(
@@ -2283,8 +2290,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                             << replState->buildUUID
                             << ", collection UUID: " << replState->collectionUUID);
 
-    // Perform the third and final drain after releasing a shared lock and reacquiring an
-    // exclusive lock on the database.
+    // Perform the third and final drain after releasing a shared lock and reacquiring an exclusive
+    // lock on the collection.
     uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
         opCtx,
         replState->buildUUID,
@@ -2387,7 +2394,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     removeIndexBuildEntryAfterCommitOrAbort(opCtx, dbAndUUID, *replState);
     replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection);
     LOGV2(20663,
-          "Index build completed successfully",
+          "Index build: completed successfully",
           "buildUUID"_attr = replState->buildUUID,
           "namespace"_attr = collection->ns(),
           "uuid"_attr = replState->collectionUUID,
