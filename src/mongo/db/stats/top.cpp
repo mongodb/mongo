@@ -200,6 +200,9 @@ void Top::appendLatencyStats(const NamespaceString& nss,
 void Top::incrementGlobalLatencyStats(OperationContext* opCtx,
                                       uint64_t latency,
                                       Command::ReadWriteType readWriteType) {
+    if (!opCtx->shouldIncrementLatencyStats())
+        return;
+
     stdx::lock_guard<SimpleMutex> guard(_lock);
     _incrementHistogram(opCtx, latency, &_globalHistogramStats, readWriteType);
 }

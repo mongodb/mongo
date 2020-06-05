@@ -147,6 +147,9 @@ public:
 
             LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
 
+            // Awaitable isMaster commands have high latency by design. Ignore them.
+            opCtx->setShouldIncrementLatencyStats(false);
+
             if (clientTopologyVersion->getProcessId() == mongosTopologyVersion.getProcessId()) {
                 uassert(51761,
                         str::stream()
