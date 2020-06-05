@@ -470,8 +470,8 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
                     continue;
                 }
 
-                log() << "Expected background index build did not complete, rebuilding. "
-                         "Collection: "
+                log() << "Expected background index build did not complete, rebuilding in  "
+                         "foreground - see SERVER-43097. Collection: "
                       << coll << " Index: " << indexName;
                 ret.emplace_back(coll.ns(), indexName);
                 continue;
