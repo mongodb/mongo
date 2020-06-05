@@ -35,38 +35,6 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 structs:
-    shardCollection:
-        description: "The public shardCollection command on mongos"
-        strict: false
-        fields:
-            shardCollection:
-                type: namespacestring
-                description: "The namespace of the collection to shard in the form <database>.<collection>."
-                optional: true
-            shardcollection:
-                type: namespacestring
-                description: "The deprecated version of this command's name"
-                optional: true
-            key:
-                type: object
-                description: "The index specification document to use as the shard key."
-            unique:
-                type: bool
-                description: "Whether the shard key index should enforce a unique constraint"
-                default: false
-            numInitialChunks:
-                type: safeInt64
-                description: "The number of chunks to create initially when sharding an empty collection with a hashed shard key."
-                default: 0
-            presplitHashedZones:
-                type: bool
-                description: "True if the chunks should be pre-split based on the existing zones when sharding a collection with hashed shard key"
-                default: false
-            collation:
-                type: object
-                description: "The collation to use for the shard key index."
-                optional: true
-
     ConfigsvrShardCollectionRequest:
         description: "The request format of the internal shardCollection command on the config server"
         strict: false
@@ -115,7 +83,7 @@ structs:
                 description: "The UUID of the collection that just got sharded."
                 optional: true
 
-    ShardsvrShardCollection:
+    ShardsvrShardCollectionRequest:
         description: "The internal shardCollection command on a primary shard"
         strict: false
         fields:
@@ -156,18 +124,6 @@ structs:
         strict: false
         fields:
             collectionsharded:
-                type: string
-                description: "The name of the collection that just got sharded."
-            collectionUUID:
-                type: uuid
-                description: "The UUID of the collection that just got sharded."
-                optional: true
-
-    ConfigsvrCommitShardCollection:
-        description: "The internal commitShardCollection command on the config server"
-        strict: false
-        fields:
-            _configsvrCommitShardCollection:
                 type: string
                 description: "The name of the collection that just got sharded."
             collectionUUID:

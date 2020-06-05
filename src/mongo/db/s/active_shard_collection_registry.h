@@ -72,23 +72,23 @@ public:
      * Otherwise returns a ConflictingOperationInProgress error.
      */
     StatusWith<ScopedShardCollection> registerShardCollection(
-        const ShardsvrShardCollection& request);
+        const ShardsvrShardCollectionRequest& request);
 
 private:
     friend class ScopedShardCollection;
 
     // Describes the state of a currently active shardCollection operation
     struct ActiveShardCollectionState {
-        ActiveShardCollectionState(ShardsvrShardCollection inRequest)
+        ActiveShardCollectionState(ShardsvrShardCollectionRequest inRequest)
             : activeRequest(std::move(inRequest)) {}
 
         /**
          * Constructs an error status to return in the case of conflicting operations.
          */
-        Status constructErrorStatus(const ShardsvrShardCollection& request) const;
+        Status constructErrorStatus(const ShardsvrShardCollectionRequest& request) const;
 
         // Exact arguments of the currently active operation
-        ShardsvrShardCollection activeRequest;
+        ShardsvrShardCollectionRequest activeRequest;
 
         /**
          * Promise that contains the uuid for this collection so that a shardCollection object

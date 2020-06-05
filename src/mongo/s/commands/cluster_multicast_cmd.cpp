@@ -36,10 +36,9 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_multicast_gen.h"
+#include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -64,17 +63,17 @@ std::vector<HostAndPort> getAllClusterHosts(OperationContext* opCtx) {
     return servers;
 }
 
-class MulticastCmd : public BasicCommand {
+class ClusterMulticastCmd : public BasicCommand {
 public:
-    MulticastCmd() : BasicCommand("multicast") {}
+    ClusterMulticastCmd() : BasicCommand("multicast") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
+
     bool adminOnly() const override {
         return true;
     }
-
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -93,8 +92,8 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        IDLParserErrorContext ctx("ClusterMulticastArgs");
-        auto args = ClusterMulticastArgs::parse(ctx, cmdObj);
+        IDLParserErrorContext ctx("ClusterMulticast");
+        auto args = ClusterMulticast::parse(ctx, cmdObj);
 
         // Grab an arbitrary executor.
         auto executor = Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor();
@@ -118,26 +117,24 @@ public:
 
         bool success = true;
 
-        {
-            BSONObjBuilder bob(result.subobjStart("hosts"));
+        BSONObjBuilder bob(result.subobjStart("hosts"));
 
-            for (const auto& r : results) {
-                HostAndPort host;
-                executor::RemoteCommandResponse response;
-                std::tie(host, response) = r;
+        for (const auto& r : results) {
+            HostAndPort host;
+            executor::RemoteCommandResponse response;
+            std::tie(host, response) = r;
 
-                if (!response.isOK() || !response.data["ok"].trueValue()) {
-                    success = false;
-                }
+            if (!response.isOK() || !response.data["ok"].trueValue()) {
+                success = false;
+            }
 
-                {
-                    BSONObjBuilder subbob(bob.subobjStart(host.toString()));
+            {
+                BSONObjBuilder subbob(bob.subobjStart(host.toString()));
 
-                    if (CommandHelpers::appendCommandStatusNoThrow(subbob, response.status)) {
-                        subbob.append("data", response.data);
-                        if (response.elapsedMillis) {
-                            subbob.append("elapsedMillis", response.elapsedMillis->count());
-                        }
+                if (CommandHelpers::appendCommandStatusNoThrow(subbob, response.status)) {
+                    subbob.append("data", response.data);
+                    if (response.elapsedMillis) {
+                        subbob.append("elapsedMillis", response.elapsedMillis->count());
                     }
                 }
             }
@@ -147,7 +144,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(MulticastCmd);
+MONGO_REGISTER_TEST_COMMAND(ClusterMulticastCmd);
 
 }  // namespace
 }  // namespace mongo

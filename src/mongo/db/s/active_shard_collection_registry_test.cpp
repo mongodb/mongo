@@ -47,7 +47,7 @@ protected:
     ActiveShardCollectionRegistry _registry;
 };
 
-ShardsvrShardCollection createShardsvrShardCollectionRequest(
+ShardsvrShardCollectionRequest createShardsvrShardCollectionRequest(
     const NamespaceString& nss,
     BSONObj key,
     bool unique,
@@ -55,7 +55,7 @@ ShardsvrShardCollection createShardsvrShardCollectionRequest(
     boost::optional<std::vector<mongo::BSONObj>> initialSplitPoints,
     boost::optional<mongo::BSONObj> collation,
     bool UUIDfromPrimaryShard) {
-    ShardsvrShardCollection shardsvrShardCollectionRequest;
+    ShardsvrShardCollectionRequest shardsvrShardCollectionRequest;
     shardsvrShardCollectionRequest.set_shardsvrShardCollection(nss);
     shardsvrShardCollectionRequest.setKey(key);
     shardsvrShardCollectionRequest.setUnique(unique);

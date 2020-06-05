@@ -36,7 +36,7 @@
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/rename_collection.h"
+#include "mongo/db/commands/rename_collection_common.h"
 #include "mongo/db/commands/rename_collection_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"

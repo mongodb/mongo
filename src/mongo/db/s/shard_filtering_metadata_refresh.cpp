@@ -107,8 +107,9 @@ void onShardVersionMismatch(OperationContext* opCtx,
         std::shared_ptr<Notification<void>> critSecSignal;
 
         {
-            AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
-            Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
+            // TODO (SERVER-48394): Views must not cause stale shard version
+            AutoGetCollection autoColl(
+                opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsPermitted);
 
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
             critSecSignal =
@@ -157,9 +158,8 @@ void onShardVersionMismatch(OperationContext* opCtx,
         }
     });
 
-
     if (runRecover) {
-        auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord->isReplEnabled() && !replCoord->getMemberState().secondary()) {
             migrationutil::recoverMigrationCoordinations(opCtx, nss);
         }
@@ -176,8 +176,14 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
         std::shared_ptr<Notification<void>> critSecSignal;
 
         {
-            AutoGetDb autoDb(_opCtx, _nss.db(), MODE_IS);
-            Lock::CollectionLock collLock(_opCtx, _nss, MODE_S);
+            // This acquisition is performed with collection lock MODE_S in order to ensure that any
+            // ongoing writes have completed and become visible
+            AutoGetCollection autoColl(_opCtx,
+                                       _nss,
+                                       MODE_S,
+                                       AutoGetCollection::ViewMode::kViewsForbidden,
+                                       _opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                                           Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
 
             auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
             critSecSignal =
@@ -198,10 +204,11 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
         critSecSignal->get(_opCtx);
     }
 
-    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->isReplEnabled() && !replCoord->getMemberState().secondary()) {
         migrationutil::recoverMigrationCoordinations(_opCtx, _nss);
     }
+
     forceShardFilteringMetadataRefresh(_opCtx, _nss, true);
 }
 

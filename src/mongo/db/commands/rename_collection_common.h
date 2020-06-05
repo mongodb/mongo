@@ -30,10 +30,8 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 

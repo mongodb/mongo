@@ -239,6 +239,7 @@ void CollectionShardingRuntime::forgetReceive(const ChunkRange& range) {
     invariant(_metadataType == MetadataType::kSharded);
     _metadataManager->forgetReceive(range);
 }
+
 SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
                                                                boost::optional<UUID> migrationId,
                                                                CleanWhen when) {
@@ -424,11 +425,13 @@ size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
 
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString nss)
     : _opCtx(opCtx), _nss(std::move(nss)) {
+    // This acquisition is performed with collection lock MODE_S in order to ensure that any ongoing
+    // writes have completed and become visible
     AutoGetCollection autoColl(_opCtx,
                                _nss,
-                               MODE_X,
+                               MODE_S,
                                AutoGetCollection::ViewMode::kViewsForbidden,
-                               opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                               _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);

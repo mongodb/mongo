@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/rename_collection.h"
+#include "mongo/db/commands/rename_collection_common.h"
 
 #include <string>
 #include <vector>
