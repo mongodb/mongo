@@ -160,7 +160,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
     if (runRecover) {
         auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord->isReplEnabled() && !replCoord->getMemberState().secondary()) {
+        if (!replCoord->isReplEnabled() || replCoord->getMemberState().primary()) {
             migrationutil::recoverMigrationCoordinations(opCtx, nss);
         }
     }
@@ -205,7 +205,7 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
     }
 
     auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->isReplEnabled() && !replCoord->getMemberState().secondary()) {
+    if (!replCoord->isReplEnabled() || replCoord->getMemberState().primary()) {
         migrationutil::recoverMigrationCoordinations(_opCtx, _nss);
     }
 
