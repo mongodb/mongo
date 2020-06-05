@@ -239,12 +239,10 @@ void MozJSImplScope::_gcCallback(JSContext* rt, JSGCStatus status, void* data) {
     }
 
     LOGV2_INFO(22787,
-               "MozJS GC {status_JSGC_BEGIN_prologue_epilogue} heap stats -  total: "
-               "{mongo_sm_get_total_bytes} limit: {mongo_sm_get_max_bytes}",
-               "status_JSGC_BEGIN_prologue_epilogue"_attr =
-                   (status == JSGC_BEGIN ? "prologue" : "epilogue"),
-               "mongo_sm_get_total_bytes"_attr = mongo::sm::get_total_bytes(),
-               "mongo_sm_get_max_bytes"_attr = mongo::sm::get_max_bytes());
+               "MozJS GC heap stats",
+               "phase"_attr = (status == JSGC_BEGIN ? "prologue" : "epilogue"),
+               "total"_attr = mongo::sm::get_total_bytes(),
+               "limit"_attr = mongo::sm::get_max_bytes());
 }
 
 #if __has_feature(address_sanitizer)
@@ -949,10 +947,10 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
 
     if (reportError)
         LOGV2_INFO_OPTIONS(
-            4635900,
+            20163,
             logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
-            "{message}",
-            "message"_attr = redact(_error));
+            "{jsError}",
+            "jsError"_attr = redact(_error));
 
     // Clear the status state
     auto status = std::move(_status);

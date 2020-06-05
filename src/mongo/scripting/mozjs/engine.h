@@ -86,8 +86,6 @@ public:
     }
 
 private:
-    std::string printKnownOps_inlock();
-
     /**
      * This mutex protects _opToScopeMap
      */

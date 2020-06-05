@@ -153,8 +153,7 @@ void SessionInfo::finalize(js::FreeOp* fop, JSObject* obj) {
 
             try {
                 LOGV2_INFO(22791,
-                           "Failed to end session {lsid} due to {error}",
-                           "Failed to end session",
+                           "Failed to end logical session",
                            "lsid"_attr = lsid,
                            "error"_attr = status);
             } catch (...) {

@@ -223,7 +223,7 @@ if (condition) {
     // Be careful of functions returning by value
     attrs.add("extra", getExtraInfo());
 }
-LOGV2(1030, "dynamic attributes", attrs);
+LOGV2(1030, "Dynamic attributes", attrs);
 ```
 
 # Type Support
@@ -332,15 +332,15 @@ mapLog indicates that it is a range coming from an associative container where t
 
 ```
 std::array<int, 20> arrayOfInts = ...;
-LOGV2(1010, "log container directly: {values}", "values"_attr = arrayOfInts);
-LOGV2(1011, "log iterator range: {values}", "values"_attr = seqLog(arrayOfInts.begin(), arrayOfInts.end());
-LOGV2(1012, "log first five elements: {values}", "values"_attr = seqLog(arrayOfInts.data(), arrayOfInts.data() + 5);
+LOGV2(1010, "Log container directly: {values}", "values"_attr = arrayOfInts);
+LOGV2(1011, "Log iterator range: {values}", "values"_attr = seqLog(arrayOfInts.begin(), arrayOfInts.end());
+LOGV2(1012, "Log first five elements: {values}", "values"_attr = seqLog(arrayOfInts.data(), arrayOfInts.data() + 5);
 ``` 
 
 ```
 StringMap<BSONObj> bsonMap = ...;
-LOGV2(1013, "log map directly: {values}", "values"_attr = bsonMap);
-LOGV2(1014, "log map iterator range: {values}", "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
+LOGV2(1013, "Log map directly: {values}", "values"_attr = bsonMap);
+LOGV2(1014, "Log map iterator range: {values}", "values"_attr = mapLog(bsonMap.begin(), bsonMap.end());
 ``` 
 
 #### Containers and uint64_t
@@ -354,7 +354,7 @@ std::vector<uint64_t> vec = ...;
 
 // If we know casting to signed is safe
 auto asSigned = [](uint64_t i) { return static_cast<int64_t>(i); };
-LOGV2(2000, "as signed array: {values}", "values"_attr = seqLog(
+LOGV2(2000, "As signed array: {values}", "values"_attr = seqLog(
   boost::make_transform_iterator(vec.begin(), asSigned), 
   boost::make_transform_iterator(vec.end(), asSigned)
 ));
@@ -411,7 +411,7 @@ public:
 ##### Examples
 ```
 const AnyUserType& t = ...;
-LOGV2(2000, "log of user type", logAttr(t));
+LOGV2(2001, "Log of user type", logAttr(t));
 ```
 
 ## Multiple attributes
@@ -436,9 +436,9 @@ NotALoggableType t = ...;
 
 // These two log statements would produce the same output (apart from different id)
 
-LOGV2(2001, "Log of non-loggable type's members", logAttrs(t));
+LOGV2(2002, "Log of non-loggable type's members", logAttrs(t));
 
-LOGV2(2001, "Log of non-loggable type's members", "name"_attr=t.name, "data"_attr=t.data);
+LOGV2(2003, "Log of non-loggable type's members", "name"_attr=t.name, "data"_attr=t.data);
 
 ```
 
