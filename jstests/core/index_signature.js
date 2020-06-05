@@ -14,6 +14,7 @@
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.test;
 coll.drop();
+assert.commandWorked(testDB.createCollection(coll.getName()));
 
 // The key pattern and spec against which other indexes will be compared during createIndexes.
 const initialIndexSpec = {
@@ -30,35 +31,45 @@ function makeSpec(opts) {
     return Object.assign({}, initialIndexSpec, opts || {});
 }
 
-// Verifies that the number of indexes changed in accordance with the 'expectedChange' argument.
-function assertNumIndexesAfterComparedToBefore(cmdRes, expectedChange) {
+// Runs a createIndexes command with the given key pattern and options. Then verifies that the
+// number of indexes changed in accordance with the 'expectedChange' argument.
+function buildIndexAndAssertChangeInIndexCount(keyPattern, indexOptions, expectedChange) {
+    const numIndexesBefore = coll.getIndexes().length;
+    const cmdRes = assert.commandWorked(coll.createIndex(keyPattern, indexOptions));
+
     // In a sharded cluster, the results from all shards are returned in cmdRes.raw.
     assert(cmdRes.numIndexesBefore != null || Object.values(cmdRes.raw), tojson(cmdRes));
-    const numIndexesBefore =
-        (cmdRes.numIndexesBefore != null ? cmdRes.numIndexesBefore
-                                         : Object.values(cmdRes.raw)[0].numIndexesBefore);
     const numIndexesAfter =
         (cmdRes.numIndexesAfter != null ? cmdRes.numIndexesAfter
                                         : Object.values(cmdRes.raw)[0].numIndexesAfter);
-    assert.eq(numIndexesAfter, numIndexesBefore + expectedChange);
+
+    assert.eq(numIndexesAfter, numIndexesBefore + expectedChange, cmdRes);
+}
+
+// Runs a createIndexes command with the given key pattern and options. Then verifies that no index
+// was built, since an index with the same signature already existed.
+function assertIndexAlreadyExists(keyPattern, indexOptions) {
+    buildIndexAndAssertChangeInIndexCount(keyPattern, indexOptions, 0);
+}
+
+// Runs a createIndexes command with the given key pattern and options. Then verifies that a new
+// index was built by checking that the index count increased by 1.
+function assertNewIndexBuilt(keyPattern, indexOptions) {
+    buildIndexAndAssertChangeInIndexCount(keyPattern, indexOptions, 1);
 }
 
 // Create an index on {a: 1} with an explicit collation and a partial filter expression.
-let cmdRes = assert.commandWorked(coll.createIndex(keyPattern, initialIndexSpec));
-assertNumIndexesAfterComparedToBefore(cmdRes, 1);
+assertNewIndexBuilt(keyPattern, initialIndexSpec);
 
 // Verify that an index can be built on the same fields if the collation is different.
-cmdRes = assert.commandWorked(coll.createIndex(
-    keyPattern, makeSpec({name: "simple_collation_index", collation: {locale: "simple"}})));
-assertNumIndexesAfterComparedToBefore(cmdRes, 1);
+assertNewIndexBuilt(keyPattern,
+                    makeSpec({name: "simple_collation_index", collation: {locale: "simple"}}));
 
 // Verify that an index can be built on the same fields if the partialFilterExpression is different.
-cmdRes = assert.commandWorked(
-    coll.createIndex(keyPattern, makeSpec({
-                         name: "partial_filter_index",
-                         partialFilterExpression: {a: {$gt: 5, $lt: 10}, b: "blah"}
-                     })));
-assertNumIndexesAfterComparedToBefore(cmdRes, 1);
+assertNewIndexBuilt(keyPattern, makeSpec({
+                        name: "partial_filter_index",
+                        partialFilterExpression: {a: {$gt: 5, $lt: 10}, b: "blah"}
+                    }));
 
 // Verify that partialFilterExpressions are normalized before being compared. Below, the expression
 // is written differently than in the previous index, but the two are considered equivalent. If we
@@ -66,8 +77,7 @@ assertNumIndexesAfterComparedToBefore(cmdRes, 1);
 // success but will not actually do any work, since the requested index already exists.
 const partialFilterDupeSpec =
     makeSpec({partialFilterExpression: {$and: [{b: "blah"}, {a: {$lt: 10}}, {a: {$gt: 0}}]}});
-cmdRes = assert.commandWorked(coll.createIndex(keyPattern, partialFilterDupeSpec));
-assertNumIndexesAfterComparedToBefore(cmdRes, 0);
+assertIndexAlreadyExists(keyPattern, partialFilterDupeSpec);
 
 // Verify that attempting to build the dupe index with a different name will result in an error.
 partialFilterDupeSpec.name = "partial_filter_dupe_index";
@@ -79,12 +89,10 @@ assert.commandFailedWithCode(coll.createIndex(keyPattern, partialFilterDupeSpec)
 // match the same set of documents as {b: "blah"} in the initial index's partialFilterExpression.
 // But we do not consider these filters equivalent, and so this is considered a distinct index.
 // TODO SERVER-47664: take collation into account in MatchExpression::equivalent().
-cmdRes = assert.commandWorked(
-    coll.createIndex(keyPattern, makeSpec({
-                         name: "partial_filter_collator_index",
-                         partialFilterExpression: {a: {$gt: 0, $lt: 10}, b: "BLAH"}
-                     })));
-assertNumIndexesAfterComparedToBefore(cmdRes, 1);
+assertNewIndexBuilt(keyPattern, makeSpec({
+                        name: "partial_filter_collator_index",
+                        partialFilterExpression: {a: {$gt: 0, $lt: 10}, b: "BLAH"}
+                    }));
 
 // We do not currently sort MatchExpression trees by leaf predicate value in cases where two or more
 // branches are otherwise identical, meaning that we cannot identify certain trivial cases where two
@@ -95,8 +103,7 @@ const partialFilterUnsortedLeaves = makeSpec({
     name: "partial_filter_single_field_multiple_predicates_same_matchtype",
     partialFilterExpression: {$and: [{a: {$type: 1}}, {a: {$type: 2}}]}
 });
-cmdRes = assert.commandWorked(coll.createIndex(keyPattern, partialFilterUnsortedLeaves));
-assertNumIndexesAfterComparedToBefore(cmdRes, 1);
+assertNewIndexBuilt(keyPattern, partialFilterUnsortedLeaves);
 
 // Change the predicate order of the $and and re-run the createIndex. We would expect this index to
 // be considered identical to the existing index, and for the createIndex to return no-op success.
@@ -113,8 +120,7 @@ const nonSignatureOptions =
 
 // Build a new, basic index on {a: 1}, since some of the options we intend to test are not
 // compatible with the partialFilterExpression on the existing {a: 1} indexes.
-cmdRes = assert.commandWorked(coll.createIndex(keyPattern, {name: "basic_index_default_opts"}));
-assertNumIndexesAfterComparedToBefore(cmdRes, 1);
+assertNewIndexBuilt(keyPattern, {name: "basic_index_default_opts"});
 
 // Verify that none of the options in the list are sufficient to uniquely identify an index, meaning
 // that we cannot create a new index on 'keyPattern' by changing any of these fields.
@@ -126,8 +132,7 @@ for (let nonSigOpt of nonSignatureOptions) {
 
 // Build a new index on {$**: 1} and verify that wildcardProjection is a non-signature field.
 // TODO SERVER-47659: wildcardProjection should be part of the signature.
-cmdRes = assert.commandWorked(coll.createIndex({"$**": 1}, {name: "wildcard_index_default_opts"}));
-assertNumIndexesAfterComparedToBefore(cmdRes, 1);
+assertNewIndexBuilt({"$**": 1}, {name: "wildcard_index_default_opts"});
 assert.commandFailedWithCode(coll.createIndex({"$**": 1}, {wildcardProjection: {a: 1}}),
                              ErrorCodes.IndexOptionsConflict);
 })();
