@@ -398,6 +398,10 @@ public:
          */
         kNoOverlap,
         /**
+         * Read from the lastApplied timestamp.
+         */
+        kLastApplied,
+        /**
          * Read from the all_durable timestamp. New transactions will always read from the same
          * timestamp and never advance.
          */
@@ -418,6 +422,8 @@ public:
                 return "kMajorityCommitted";
             case ReadSource::kNoOverlap:
                 return "kNoOverlap";
+            case ReadSource::kLastApplied:
+                return "kLastApplied";
             case ReadSource::kAllDurableSnapshot:
                 return "kAllDurableSnapshot";
             case ReadSource::kProvided:
