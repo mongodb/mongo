@@ -45,7 +45,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
@@ -314,13 +314,13 @@ Status waitForWriteConcern(OperationContext* opCtx,
                     result->fsyncFiles = 1;
                 } else {
                     // We only need to commit the journal if we're durable
-                    StorageControl::waitForJournalFlush(opCtx);
+                    JournalFlusher::get(opCtx)->waitForJournalFlush();
                 }
                 break;
             }
             case WriteConcernOptions::SyncMode::JOURNAL:
                 waitForNoOplogHolesIfNeeded(opCtx);
-                StorageControl::waitForJournalFlush(opCtx);
+                JournalFlusher::get(opCtx)->waitForJournalFlush();
                 break;
         }
     } catch (const DBException& ex) {

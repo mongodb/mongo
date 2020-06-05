@@ -56,6 +56,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -626,7 +627,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         auto status = _externalState->storeLocalConfigDocument(
             opCtx.get(), newConfig.toBSON(), false /* writeOplog */);
         // Wait for durability of the new config document.
-        opCtx->recoveryUnit()->waitUntilDurable(opCtx.get());
+        JournalFlusher::get(opCtx.get())->waitForJournalFlush();
 
         bool isFirstConfig;
         {

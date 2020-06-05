@@ -257,6 +257,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/storage/journal_flusher',
     ],
 )
 
@@ -273,6 +274,7 @@ env.Library(
         'oplog_interface_local',
         'repl_server_parameters',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/storage/journal_flusher',
         '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
 )
@@ -406,6 +408,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/index_build_oplog_entry',
+        '$BUILD_DIR/mongo/db/storage/journal_flusher',
     ],
 )
 
@@ -705,6 +708,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/storage/journal_flusher',
         '$BUILD_DIR/mongo/idl/server_parameter',
         'local_oplog_info',
         'split_horizon',

@@ -37,7 +37,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/background.h"
 
 namespace mongo {
 

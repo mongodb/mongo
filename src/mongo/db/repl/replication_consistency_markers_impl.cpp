@@ -40,6 +40,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -150,7 +151,7 @@ void ReplicationConsistencyMarkersImpl::setInitialSyncFlag(OperationContext* opC
     update.timestamp = Timestamp();
 
     _updateMinValidDocument(opCtx, update);
-    opCtx->recoveryUnit()->waitUntilDurable(opCtx);
+    JournalFlusher::get(opCtx)->waitForJournalFlush();
 }
 
 void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* opCtx) {
@@ -186,7 +187,7 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
     setOplogTruncateAfterPoint(opCtx, Timestamp());
 
     if (getGlobalServiceContext()->getStorageEngine()->isDurable()) {
-        opCtx->recoveryUnit()->waitUntilDurable(opCtx);
+        JournalFlusher::get(opCtx)->waitForJournalFlush();
         replCoord->setMyLastDurableOpTimeAndWallTime(opTimeAndWallTime);
     }
 }
