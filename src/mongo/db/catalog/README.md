@@ -135,7 +135,75 @@ KeyString has its own section below. Index builds discussion may need to referen
 ## Cross-Replica Set Index Builds
 
 # KeyString
-describe how KeyString values are used for comparing and indexing BSON elements
+
+The `KeyString` format is an alternative serialization format for `BSON`. In the text below,
+`KeyString` may refer to values in this format, the C++ namespace of that name or the format itself.
+Indexes sort keys based on their BSON sorting order. In this order all numerical values compare
+according to their mathematical value. Given a BSON document `{ x: 42.0, y : "hello"}`
+and an index with the compound key `{ x : 1, y : 1}`, the document is sorted as the BSON document
+`{"" : 42.0, "": "hello" }`, with the actual comparison as defined by [`BSONObj::woCompare`][] and
+[`BSONElement::compareElements`][]. However, these comparison rules are complicated and can be
+computationally expensive, especially for numeric types as the comparisons may require conversions
+and there are lots of edge cases related to range and precision. Finding a key in a tree containing
+thousands or millions of key-value pairs requires dozens of such comparisons.
+
+To make these comparisons fast, there exists a 1:1 mapping between `BSONObj` and `KeyString`, where
+`KeyString` is [binary comparable](#glossary). So, for a transformation function `t` converting
+`BSONObj` to `KeyString` and two `BSONObj` values `x` and `y`, the following holds:
+* `x < y` ⇔ `memcmp(t(x),t(y)) < 0`
+* `x > y` ⇔ `memcmp(t(x),t(y)) > 0`
+* `x = y` ⇔ `memcmp(t(x),t(y)) = 0`
+
+## Ordering
+
+Index keys with reverse sort order (like `{ x : -1}`) have all their `KeyString` bytes negated to
+ensure correct `memcmp` comparison. As a compound index can have up to 64 keys, for decoding a
+`KeyString` it is necessary to know which components need to have their bytes negated again to get
+the original value. The [`Ordering`] class encodes the direction of each component in a 32-bit
+unsigned integer.
+
+## TypeBits
+
+As the integer `42`, `NumberLong(42)`, double precision `42.0` and `NumberDecimal(42.00)` all
+compare equal, for conversion back from `KeyString` to `BSONObj` additional information is necessary
+in the form of `TypeBits`. When decoding a `KeyString`, typebits are consumed as values with
+ambiguous types are encountered.
+
+## Use in WiredTiger indexes
+
+For indexes other than `_id` , the `RecordId` is appended to the end of the `KeyString` to ensure
+uniqueness. In older versions of MongoDB we didn't do that, but that lead to problems during
+secondary oplog application and [initial sync][] where the uniqueness constraint may be violated
+temporarily. Indexes store key value pairs where they key is the `KeyString`. Current WiredTiger
+secondary unique indexes may have a mix of the old and new representations described below.
+
+| Index type                   | Key                            | Value                                |
+| ---------------------------- | ------------------------------ | ------------------------------------ |
+| `_id` index                  | `KeyString` without `RecordId` | `RecordId` and optionally `TypeBits` |
+| non-unique index             | `KeyString` with `RecordId`    | optionally `TypeBits`                |
+| unique secondary index (new) | `KeyString` with `RecordId`    | optionally `TypeBits`                |
+| unique secondary index (old) | `KeyString` without `RecordId` | `RecordId` and opt. `TypeBits`       |
+
+The reason for the change in index format is that the secondary key uniqueness property can be
+temporarily violated during oplog application (because operations may be applied out of order).
+With prepared transactions, out-of-order commits would conflict with prepared transactions.
+
+## Building KeyString values and passing them around
+
+There are three kinds of builders for constructing `KeyString` values:
+* `KeyString::Builder`: starts building using a small allocation on the stack, and
+  dynamically switches to allocating memory from the heap. This is generally preferable if the value
+  is only needed in the scope where it was created.
+* `KeyString::HeapBuilder`: always builds using dynamic memory allocation. This has advantage that
+   calling the `release` method can transfer ownership of the memory without copying.
+*  `KeyString::PooledBuilder`: This class allow building many `KeyString` values tightly packed into
+   larger blocks. The advantage is fewer, larger memory allocations and no wasted space due to
+   internal fragmentation. This is a good approach when a large number of values is needed, such as
+   for index building. However, memory for a block is only released after _no_ references to that
+   block remain.
+
+The `KeyString::Value` class holds a reference to a `SharedBufferFragment` with the `KeyString` and
+its `TypeBits` if any and can be used for passing around values.
 
 # The External Sorter
 
@@ -195,7 +263,9 @@ MongoDB repair attempts to address the following forms of corruption:
 1. Initialize the WiredTigerKVEngine. If a call to `wiredtiger_open` returns the `WT_TRY_SALVAGE` error code, this indicates there is some form of corruption in the WiredTiger metadata. Attempt to [salvage the metadata](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1046-L1071) by using the WiredTiger `salvage=true` configuration option.
 2. Initialize the StorageEngine and [salvage the `_mdb_catalog` table, if needed](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L95).
 3. Recover orphaned collections.
-    * If an [ident](#ident) is known to WiredTiger but is not present in the `_mdb_catalog`, [create a new collection](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L145-L189) with the prefix `local.orphan.<ident-name>` that references this ident.
+    * If an [ident](#glossary) is known to WiredTiger but is not present in the `_mdb_catalog`,
+    [create a new collection](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L145-L189)
+    with the prefix `local.orphan.<ident-name>` that references this ident.
     * If an ident is present in the `_mdb_catalog` but not known to WiredTiger, [attempt to recover the ident](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L197-L229). This [procedure for orphan recovery](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605) is a less reliable and more invasive. It involves moving the corrupt data file to a temporary file, creates a new table with the same name, replaces the original data file over the new one, and [salvages](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605) the table in attempt to reconstruct the table.
 4. [Verify collection data files](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1195-L1226), and salvage if necessary.
     *  If call to WiredTiger [verify()](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a0334da4c85fe8af4197c9a7de27467d3) fails, call [salvage()](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#ab3399430e474f7005bd5ea20e6ec7a8e), which recovers as much data from a WT data file as possible.
@@ -414,6 +484,16 @@ oplog durability considerations across nodes
 
 # Glossary
 
-## ident
+**ident**: An ident is a unique identifier given to a storage engine resource. Collections and
+indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented
+as tables. For example, collection idents have the form: `collection-<counter>-<random number>`.
 
-And ident is a unique identifier given to a storage engine resource. Collections and indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented as tables. For example, collection idents have the form: `collection-<counter>-<random number>`.
+**binary comparable**: Two values are binary comparable if the lexicographical order over their byte
+representation, from lower memory addresses to higher addresses, is the same as the defined ordering
+for that type. For example, ASCII strings are binary comparable, but double precision floating point
+numbers and little-endian integers are not.
+
+[`BSONObj::woCompare`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonobj.h#L460
+[`BSONElement::compareElements`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonelement.cpp#L285
+[`Ordering`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/ordering.h
+[initial sync]: ../repl/README.md#initial-sync
