@@ -28,11 +28,18 @@ const primary = rst.getPrimary();
 const secondary = rst.getSecondaries()[0];
 
 const initialSyncSecondary = rst.add({
-    rsConfig: {priority: 0},
+    rsConfig: {priority: 0, votes: 0},
     setParameter: {'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'})},
 });
 
 rst.reInitiate();
+
+// Add the new node with votes:0 and then give it votes:1 to avoid 'newlyAdded' and mimic a resync,
+// where a node is in initial sync with 1 vote.
+let nextConfig = rst.getReplSetConfigFromNode(0);
+nextConfig.members[2].votes = 1;
+reconfig(rst, nextConfig, false /* force */, true /* wait */);
+
 assert.commandWorked(initialSyncSecondary.adminCommand({
     waitForFailPoint: "initialSyncHangBeforeFinish",
     timesEntered: 1,

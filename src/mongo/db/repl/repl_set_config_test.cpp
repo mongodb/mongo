@@ -891,11 +891,6 @@ TEST(ReplSetConfig, ConfigServerField) {
 }
 
 TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     ReplSetConfig config(
         ReplSetConfig::parse(BSON("_id"
                                   << "rs0"
@@ -938,11 +933,6 @@ TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {
 }
 
 TEST(ReplSetConfig, RemoveNewlyAddedFieldForMemberConfig) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     ReplSetConfig config(
         ReplSetConfig::parse(BSON("_id"
                                   << "rs0"
@@ -986,11 +976,6 @@ TEST(ReplSetConfig, RemoveNewlyAddedFieldForMemberConfig) {
 }
 
 TEST(ReplSetConfig, ParsingNewlyAddedSetsFieldToTrueCorrectly) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     ReplSetConfig config(
         ReplSetConfig::parse(BSON("_id"
                                   << "rs0"
@@ -1004,11 +989,6 @@ TEST(ReplSetConfig, ParsingNewlyAddedSetsFieldToTrueCorrectly) {
 }
 
 TEST(ReplSetConfig, ParseFailsWithNewlyAddedSetToFalse) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     ReplSetConfig config;
     ASSERT_THROWS(ReplSetConfig::parse(BSON("_id"
                                             << "rs0"
@@ -1020,11 +1000,6 @@ TEST(ReplSetConfig, ParseFailsWithNewlyAddedSetToFalse) {
 }
 
 TEST(ReplSetConfig, NodeWithNewlyAddedFieldHasVotesZero) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     // Create a config for a three-node set with one arbiter and one node with 'newlyAdded: true'.
     ReplSetConfig config(
         ReplSetConfig::parse(BSON("_id"
@@ -1052,11 +1027,6 @@ TEST(ReplSetConfig, NodeWithNewlyAddedFieldHasVotesZero) {
 }
 
 TEST(ReplSetConfig, ToBSONWithoutNewlyAdded) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     // Create a config for a three-node set with one arbiter and one node with 'newlyAdded: true'.
     ReplSetConfig config(
         ReplSetConfig::parse(BSON("_id"
@@ -1383,11 +1353,6 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityWithHorizon) {
 }
 
 TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     ReplSetConfig configA;
     ReplSetConfig configB;
     configA = ReplSetConfig::parse(BSON(

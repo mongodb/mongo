@@ -47,7 +47,7 @@ function reconfigElectionAndCatchUpTimeout(electionTimeout, catchupTimeout) {
     // Reconnect all nodes to make sure reconfig succeeds.
     rst.nodes.forEach(reconnect);
     // Wait for the config with the new term to propagate.
-    waitForConfigReplication(rst.getPrimary());
+    rst.waitForConfigReplication(rst.getPrimary());
     // Reconfigure replica set to decrease catchup timeout.
     var newConfig = rst.getReplSetConfigFromNode();
     newConfig.version++;

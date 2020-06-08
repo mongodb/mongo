@@ -16,23 +16,14 @@ const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest({
-    name: testName,
-    nodes: 1,
-    nodeOptions: {setParameter: {enableAutomaticReconfig: true}},
-    settings: {chainingAllowed: false},
-    useBridge: true
-});
+const rst = new ReplSetTest(
+    {name: testName, nodes: 1, settings: {chainingAllowed: false}, useBridge: true});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
 const primaryColl = primaryDb.getCollection(collName);
-
-// TODO (SERVER-46808): Move this into ReplSetTest.initiate
-waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 0);
-waitForConfigReplication(primary, rst.nodes);
 
 assert.commandWorked(primaryColl.insert({"starting": "doc"}));
 
@@ -42,7 +33,6 @@ const secondary = rst.add({
     setParameter: {
         'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
         'numInitialSyncAttempts': 1,
-        'enableAutomaticReconfig': true,
     }
 });
 rst.reInitiate();
@@ -143,11 +133,11 @@ assertVoteCount(primary, {
 
 // Now try removing the member we added above.
 jsTestLog("[4] Member removal, after initial sync");
+rst.remove(2);
 config = rst.getReplSetConfigFromNode();
 const twoNodeConfig = Object.assign({}, config);
 twoNodeConfig.members = twoNodeConfig.members.slice(0, 2);  // Remove the last node.
 reconfig(rst, twoNodeConfig);
-rst.remove(2);
 
 // Check 'newlyAdded' and vote counts.
 assert(isMemberNewlyAdded(primary, 1));

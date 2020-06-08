@@ -11,6 +11,7 @@
 
 load("jstests/libs/write_concern_util.js");
 load("jstests/libs/fail_point_util.js");
+load('jstests/replsets/rslib.js');
 
 const testName = jsTestName();
 const rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}]});
@@ -24,7 +25,7 @@ assert.commandWorked(primaryDb.test.insert({"starting": "doc"}, {writeConcern: {
 jsTestLog("Adding a new node to the replica set");
 
 const secondary = rst.add({
-    rsConfig: {priority: 0},
+    rsConfig: {priority: 0, votes: 0},
     setParameter: {
         'failpoint.forceSyncSourceCandidate':
             tojson({mode: 'alwaysOn', data: {"hostAndPort": primary.host}}),
@@ -36,6 +37,12 @@ const secondary = rst.add({
 });
 rst.reInitiate();
 rst.waitForState(secondary, ReplSetTest.State.STARTUP_2);
+
+// Add the new node with votes:0 and then give it votes:1 to avoid 'newlyAdded' and mimic a resync,
+// where a node is in initial sync with 1 vote.
+let nextConfig = rst.getReplSetConfigFromNode(0);
+nextConfig.members[2].votes = 1;
+reconfig(rst, nextConfig, false /* force */, true /* wait */);
 
 // Shut down the steady-state secondary so that it cannot participate in the majority.
 rst.stop(1);

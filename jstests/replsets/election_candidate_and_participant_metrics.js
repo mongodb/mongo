@@ -217,7 +217,7 @@ assert.commandWorked(originalPrimary.adminCommand(
 // The new primary might still be processing the reconfig via heartbeat from the original primary's
 // reconfig on step up. Wait for config replication first so it doesn't interfere with the step up
 // on the new primary below.
-waitForConfigReplication(originalPrimary);
+rst.waitForConfigReplication(originalPrimary);
 
 // Attempt to step up the new primary a second time. Due to the failpoint, the current primary
 // should vote no, and as a result the election should fail.

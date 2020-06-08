@@ -169,7 +169,9 @@ public:
 
     ReplSetConfig getConfig() const final;
 
-    void processReplSetGetConfig(BSONObjBuilder*, bool commitmentStatus = false) final;
+    void processReplSetGetConfig(BSONObjBuilder*,
+                                 bool commitmentStatus = false,
+                                 bool includeNewlyAdded = false) final;
 
     void processReplSetMetadata(const rpc::ReplSetMetadata&) final;
 

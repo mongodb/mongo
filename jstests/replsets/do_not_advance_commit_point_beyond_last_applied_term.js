@@ -38,7 +38,7 @@ jsTest.log("Node A is primary in term 1. Node E is delayed.");
 // D: [1]
 // E:
 assert.eq(nodeA, rst.getPrimary());
-waitForConfigReplication(nodeA);
+rst.waitForConfigReplication(nodeA);
 nodeE.disconnect([nodeA, nodeB, nodeC, nodeD]);
 assert.commandWorked(nodeA.getDB(dbName)[collName].insert({term: 1}));
 rst.awaitReplication(undefined, undefined, [nodeB, nodeC, nodeD]);
@@ -54,7 +54,7 @@ assert.commandWorked(nodeB.adminCommand({replSetStepUp: 1}));
 rst.waitForState(nodeA, ReplSetTest.State.SECONDARY);
 assert.eq(nodeB, rst.getPrimary());
 assert.commandWorked(nodeB.getDB(dbName)[collName].insert({term: 2}));
-waitForConfigReplication(nodeB, [nodeA, nodeB, nodeC, nodeD]);
+rst.waitForConfigReplication(nodeB, [nodeA, nodeB, nodeC, nodeD]);
 
 jsTest.log("Node A steps up again in term 3 with votes from A, C, and D and commits a write.");
 // A: [1] [3]

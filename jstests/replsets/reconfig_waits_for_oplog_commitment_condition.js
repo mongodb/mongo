@@ -57,7 +57,7 @@ C2.version = C1.version + 1;
 
 // {n0, n1}
 let C3 = Object.assign({}, origConfig);
-C3.version = C2.version + 1;
+C3.version = C2.version + 2;  // Leave one for the 'newlyAdded' automatic reconfig
 
 jsTestLog("Do a write on primary and commit it in the current config.");
 assert.commandWorked(coll.insert({x: 1}, {writeConcern: {w: "majority"}}));
@@ -66,11 +66,17 @@ jsTestLog("Reconfig to add the secondary back in.");
 // We expect this to succeed but the last committed op from C1 cannot become
 // committed in C2, so the new config is not committed.
 assert.commandWorked(primary.adminCommand({replSetReconfig: C2}));
+
+jsTestLog("Waiting for member 1 to no longer be 'newlyAdded'");
+assert.soonNoExcept(function() {
+    return !isMemberNewlyAdded(primary, 1, false /* force */);
+}, () => tojson(primary.getDB("local").system.replset.findOne()));
+
 assert.eq(isConfigCommitted(primary), false);
 
 // Wait until the config has propagated to the secondary and the primary has learned of it, so that
 // the config replication check is satisfied.
-waitForConfigReplication(primary);
+rst.waitForConfigReplication(primary);
 
 // Reconfig should time out since we have not committed the last committed op from C1 in C2.
 assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: C3, maxTimeMS: 1000}),
@@ -120,7 +126,7 @@ assert.eq(primary, rst.getPrimary());
 assert.eq(isConfigCommitted(primary), false);
 
 // Wait for the config with the new term to propagate.
-waitForConfigReplication(primary);
+rst.waitForConfigReplication(primary);
 
 // Even though the current config has been replicated to all nodes, reconfig should still fail since
 // the primary has not yet committed an op in its term.

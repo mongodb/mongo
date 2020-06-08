@@ -20,8 +20,12 @@ from buildscripts.resmokelib.testing.fixtures import standalone
 class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes
     """Fixture which provides JSTests with a replica set to run against."""
 
-    # Error response codes copied from mongo/base/error_codes.err.
+    # Error response codes copied from mongo/base/error_codes.yml.
     _NODE_NOT_FOUND = 74
+    _NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE = 103
+    _CONFIGURATION_IN_PROGRESS = 109
+    _CURRENT_CONFIG_NOT_COMMITTED_YET = 308
+    _INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
 
     def __init__(  # pylint: disable=too-many-arguments, too-many-locals
             self, logger, job_num, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
@@ -108,7 +112,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
 
-    def setup(self):  # pylint: disable=too-many-branches,too-many-statements
+    def setup(self):  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
         """Set up the replica set."""
         self.replset_name = self.mongod_options.get("replSet", "rs")
         if not self.nodes:
@@ -232,18 +236,44 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 node.await_ready()
             # Add in the members one at a time, since non force reconfigs can only add/remove a
             # single voting member at a time.
-            repl_config["version"] = client.admin.command(
-                {"replSetGetConfig": 1})['config']['version']
             for ind in range(2, len(members) + 1):
-                repl_config["version"] = repl_config["version"] + 1
-                repl_config["members"] = members[:ind]
-                self.logger.info("Issuing replSetReconfig command: %s", repl_config)
-                self._configure_repl_set(
-                    client, {
-                        "replSetReconfig": repl_config,
-                        "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-                    })
+                self.logger.info("Adding in node %d: %s", ind, members[ind - 1])
+                while True:
+                    try:
+                        # 'newlyAdded' removal reconfigs could bump the version.
+                        # Get the current version to be safe.
+                        curr_version = client.admin.command(
+                            {"replSetGetConfig": 1})['config']['version']
+                        repl_config["version"] = curr_version + 1
+                        repl_config["members"] = members[:ind]
+                        self.logger.info("Issuing replSetReconfig command: %s", repl_config)
+                        self._configure_repl_set(
+                            client, {
+                                "replSetReconfig": repl_config,
+                                "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+                            })
+                        break
+                    except pymongo.errors.OperationFailure as err:
+                        # These error codes may be transient, and so we retry the reconfig with a
+                        # (potentially) higher config version. We should not receive these codes
+                        # indefinitely.
+                        if (err.code !=
+                                ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE
+                                and err.code != ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET
+                                and err.code != ReplicaSetFixture._CONFIGURATION_IN_PROGRESS
+                                and err.code != ReplicaSetFixture._NODE_NOT_FOUND and err.code !=
+                                ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE):
+                            msg = ("Operation failure while setting up the "
+                                   "replica set fixture: {}").format(err)
+                            self.logger.error(msg)
+                            raise errors.ServerFailure(msg)
+
+                        msg = ("Retrying failed attempt to add new node to fixture: {}").format(err)
+                        self.logger.error(msg)
+                        time.sleep(0.1)  # Wait a little bit before trying again.
+
         self._await_secondaries()
+        self._await_newly_added_removals()
 
     def pids(self):
         """:return: all pids owned by this fixture if any."""
@@ -406,6 +436,44 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                         node.port, last_stable_recovery_timestamp)
                     break
                 time.sleep(0.1)  # Wait a little bit before trying again.
+
+    def _should_await_newly_added_removals_longer(self, client):
+        """
+        Return whether the current replica set config has any 'newlyAdded' fields.
+
+        Return true if the current config is not committed.
+        """
+
+        get_config_res = client.admin.command(
+            {"replSetGetConfig": 1, "commitmentStatus": True, "$_internalIncludeNewlyAdded": True})
+        for member in get_config_res["config"]["members"]:
+            if "newlyAdded" in member:
+                self.logger.info(
+                    "Waiting longer for 'newlyAdded' removals, " +
+                    "member %d is still 'newlyAdded'", member["_id"])
+                return True
+        if not get_config_res["commitmentStatus"]:
+            self.logger.info("Waiting longer for 'newlyAdded' removals, " +
+                             "config is not yet committed")
+            return True
+
+        return False
+
+    def _await_newly_added_removals(self):
+        """
+        Wait for all 'newlyAdded' fields to be removed from the replica set config.
+
+        Additionally, wait for that config to be committed, and for the in-memory
+        and on-disk configs to match.
+        """
+
+        self.logger.info("Waiting to remove all 'newlyAdded' fields")
+        primary = self.get_primary()
+        client = primary.mongo_client()
+        self.auth(client, self.auth_options)
+        while self._should_await_newly_added_removals_longer(client):
+            time.sleep(0.1)  # Wait a little bit before trying again.
+        self.logger.info("All 'newlyAdded' fields removed")
 
     def _setup_cwrwc_defaults(self):
         """Set up the cluster-wide read/write concern defaults."""

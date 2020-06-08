@@ -318,7 +318,8 @@ ReplSetConfig ReplicationCoordinatorEmbedded::getConfig() const {
 }
 
 void ReplicationCoordinatorEmbedded::processReplSetGetConfig(BSONObjBuilder*,
-                                                             bool commitmentStatus) {
+                                                             bool commitmentStatus,
+                                                             bool includeNewlyAdded) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

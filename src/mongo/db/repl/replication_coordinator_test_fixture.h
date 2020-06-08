@@ -79,8 +79,8 @@ public:
     /**
      * Helpers to construct a config.
      */
-    static BSONObj member(int id, std::string host) {
-        return BSON("_id" << id << "host" << host);
+    static BSONObj member(int id, std::string host, int votes = 1) {
+        return BSON("_id" << id << "host" << host << "votes" << votes << "priority" << votes);
     }
 
     static BSONObj configWithMembers(int version, long long term, BSONArray members) {

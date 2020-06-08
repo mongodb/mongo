@@ -45,11 +45,13 @@ if (storageEngine !== "wiredTiger") {
     conf.members[1].slaveDelay = 24 * 60 * 60;
 
     rst.startSet();
-    // We cannot wait for a stable recovery timestamp or replication due to the slaveDelay.
-    rst.initiateWithAnyNodeAsPrimary(
-        conf,
-        "replSetInitiate",
-        {doNotWaitForStableRecoveryTimestamp: true, doNotWaitForReplication: true});
+    // We cannot wait for a stable recovery timestamp, oplog replication, or config replication due
+    // to the slaveDelay.
+    rst.initiateWithAnyNodeAsPrimary(conf, "replSetInitiate", {
+        doNotWaitForStableRecoveryTimestamp: true,
+        doNotWaitForReplication: true,
+        doNotWaitForNewlyAddedRemovals: true
+    });
     var master = rst.getPrimary();  // Waits for PRIMARY state.
 
     // Reconfigure primary with a small cache size so less data needs to be

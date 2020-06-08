@@ -12,11 +12,7 @@ load('jstests/replsets/rslib.js');
 
 // Start a single node replica set.
 // Disable Chaining so that initial sync nodes always sync from primary.
-const rst = new ReplSetTest({
-    nodes: 1,
-    nodeOptions: {setParameter: {enableAutomaticReconfig: true}},
-    settings: {chainingAllowed: false}
-});
+const rst = new ReplSetTest({nodes: 1, settings: {chainingAllowed: false}});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
@@ -34,7 +30,6 @@ assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 
 let startupParams = {};
 startupParams['failpoint.initialSyncHangAfterDataCloning'] = tojson({mode: 'alwaysOn'});
-startupParams['enableAutomaticReconfig'] = true;
 
 jsTestLog("Upgrade FCV to " + latestFCV);
 assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
