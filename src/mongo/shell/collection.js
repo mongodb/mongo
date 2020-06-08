@@ -274,6 +274,8 @@ DBCollection.prototype.insert = function(obj, options) {
     if (!obj)
         throw Error("no object passed to insert!");
 
+    options = typeof (options) === 'undefined' ? {} : options;
+
     var flags = 0;
 
     var wc = undefined;
@@ -299,7 +301,7 @@ DBCollection.prototype.insert = function(obj, options) {
     var ordered = ((flags & 1) == 0);
 
     if (!wc)
-        wc = this.getWriteConcern();
+        wc = this._createWriteConcern(options);
 
     var result = undefined;
     var startTime =
