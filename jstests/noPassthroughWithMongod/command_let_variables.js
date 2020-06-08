@@ -196,29 +196,9 @@ assert.commandWorked(db.runCommand({
 }));
 assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", "INNER"]}}}).toArray().length, 1);
 
-// find
-let result = assert
-                 .commandWorked(db.runCommand({
-                     find: coll.getName(),
-                     let : {target_species: "Song Thrush (Turdus philomelos)"},
-                     filter: {$expr: {$eq: ["$Species", "$$target_species"]}},
-                     projection: {_id: 0}
-                 }))
-                 .cursor.firstBatch;
-expectedResults = {
-    Species: "Song Thrush (Turdus philomelos)",
-    population_trends: [
-        {term: {start: 1970, end: 2014}, pct_change: -53, annual: -1.7, trend: "weak decline"},
-        {term: {start: 2009, end: 2014}, pct_change: -4, annual: -0.88, trend: "no change"}
-    ]
-};
-
-assert.eq(result.length, 1);
-assert.eq(expectedResults, result[0]);
-
 // findAndModify
 assert.commandWorked(coll.insert({Species: "spy_bird"}));
-result = db.runCommand({
+let result = db.runCommand({
     findAndModify: coll.getName(),
     let : {target_species: "spy_bird"},
     query: {$expr: {$eq: ["$Species", "$$target_species"]}},

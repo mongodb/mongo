@@ -242,7 +242,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
     // Get the set of shards on which we will run the query.
-    auto shardIds = getTargetedShardsForQuery(opCtx,
+    auto shardIds = getTargetedShardsForQuery(query.getExpCtx(),
                                               routingInfo,
                                               query.getQueryRequest().getFilter(),
                                               query.getQueryRequest().getCollation());

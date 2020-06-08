@@ -313,7 +313,7 @@ void createShardDatabase(OperationContext* opCtx, StringData dbName);
  * Returns the shards that would be targeted for the given query according to the given routing
  * info.
  */
-std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
+std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                                             const CachedCollectionRoutingInfo& routingInfo,
                                             const BSONObj& query,
                                             const BSONObj& collation);
