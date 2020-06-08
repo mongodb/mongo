@@ -135,7 +135,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],
 )
 
@@ -1203,7 +1202,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/storage/storage_control',

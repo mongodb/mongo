@@ -30,7 +30,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_test_egress_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
