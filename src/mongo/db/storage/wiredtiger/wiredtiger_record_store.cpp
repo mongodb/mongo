@@ -43,7 +43,6 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/global_settings.h"
@@ -69,6 +68,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -2157,8 +2157,8 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
               "next"_attr = id,
               "last"_attr = _lastReturnedId);
 
-        // Crash when test commands are enabled.
-        invariant(!getTestCommandsEnabled());
+        // Crash when testing diagnostics are enabled.
+        invariant(!TestingProctor::instance().isEnabled());
 
         // Force a retry of the operation from our last known position by acting as-if
         // we received a WT_ROLLBACK error.

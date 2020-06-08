@@ -57,6 +57,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #define TRACING_ENABLED 0
 
@@ -1149,8 +1150,8 @@ protected:
                       "newKey"_attr = redact(toHex(item.data, item.size)),
                       "prevKey"_attr = redact(_key.toString()));
 
-                // Crash when test commands are enabled.
-                invariant(!getTestCommandsEnabled());
+                // Crash when testing diagnostics are enabled.
+                invariant(!TestingProctor::instance().isEnabled());
 
                 // Force a retry of the operation from our last known position by acting as-if
                 // we received a WT_ROLLBACK error.

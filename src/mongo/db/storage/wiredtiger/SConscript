@@ -54,7 +54,6 @@ if wiredtiger:
         LIBDEPS= [
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
             '$BUILD_DIR/mongo/db/catalog/collection',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
             '$BUILD_DIR/mongo/db/concurrency/lock_manager',
