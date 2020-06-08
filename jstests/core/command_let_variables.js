@@ -61,6 +61,7 @@ let expectedResults = [{
     population_trends:
         {term: {start: 2009, end: 2014}, pct_change: 12, annual: 2.38, trend: "weak increase"}
 }];
+
 assert.eq(coll.aggregate(pipeline, {let : {target_trend: "weak increase"}}).toArray(),
           expectedResults);
 
@@ -242,4 +243,17 @@ expectedResults = {
 };
 assert.eq(result.length, 1);
 assert.eq(expectedResults, result[0]);
+
+// Delete tests with let params will delete a record, assert that a point-wise find yields an empty
+// result, and then restore the collection state for further tests down the line. We can't exercise
+// a multi-delete here (limit: 0) because of failures in sharded txn passthrough tests.
+assert.commandWorked(db.runCommand({
+    delete: coll.getName(),
+    let : {target_species: "Song Thrush (Turdus philomelos)"},
+    deletes: [{q: {$and: [{_id: 4}, {$expr: {$eq: ["$Species", "$$target_species"]}}]}, limit: 1}]
+}));
+
+assert.eq(db.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}})
+              .cursor.firstBatch.length,
+          0);
 }());

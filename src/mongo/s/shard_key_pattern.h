@@ -213,6 +213,11 @@ public:
     StatusWith<BSONObj> extractShardKeyFromQuery(OperationContext* opCtx,
                                                  const NamespaceString& nss,
                                                  const BSONObj& basicQuery) const;
+
+    // Used to parse queries that contain let parameters and runtime constants.
+    StatusWith<BSONObj> extractShardKeyFromQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                                 const BSONObj& basicQuery) const;
+
     BSONObj extractShardKeyFromQuery(const CanonicalQuery& query) const;
 
     /**

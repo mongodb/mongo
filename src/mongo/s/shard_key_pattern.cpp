@@ -396,6 +396,27 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
     return extractShardKeyFromQuery(*statusWithCQ.getValue());
 }
 
+StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(
+    boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& basicQuery) const {
+    auto qr = std::make_unique<QueryRequest>(expCtx->ns);
+    qr->setFilter(basicQuery);
+    if (!expCtx->getCollatorBSON().isEmpty()) {
+        qr->setCollation(expCtx->getCollatorBSON());
+    }
+
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(expCtx->opCtx,
+                                     std::move(qr),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!statusWithCQ.isOK()) {
+        return statusWithCQ.getStatus();
+    }
+
+    return extractShardKeyFromQuery(*statusWithCQ.getValue());
+}
+
 BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) const {
     // Extract equalities from query.
     EqualityMatches equalities;

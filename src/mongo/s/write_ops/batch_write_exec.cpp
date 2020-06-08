@@ -219,7 +219,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                 // If we already have a batch for this shard, wait until the next time
                 const auto& targetShardId = nextBatch->getEndpoint().shardName;
-
                 if (pendingBatches.count(targetShardId))
                     continue;
 

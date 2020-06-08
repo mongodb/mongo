@@ -546,6 +546,15 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
 std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* opCtx,
                                                               const BatchItemRef& itemRef) const {
     const auto& deleteOp = itemRef.getDelete();
+    const auto collation = write_ops::collationOf(deleteOp);
+
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               _nss,
+                                                               collation,
+                                                               boost::none,  // explain
+                                                               itemRef.getLet(),
+                                                               itemRef.getRuntimeConstants());
+
     BSONObj shardKey;
     if (_routingInfo->cm()) {
         // Sharded collections have the following further requirements for targeting:
@@ -553,10 +562,8 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
         // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
         shardKey =
             uassertStatusOK(_routingInfo->cm()->getShardKeyPattern().extractShardKeyFromQuery(
-                opCtx, _nss, deleteOp.getQ()));
+                expCtx, deleteOp.getQ()));
     }
-
-    const auto collation = write_ops::collationOf(deleteOp);
 
     // Target the shard key or delete query
     if (!shardKey.isEmpty()) {
@@ -574,12 +581,6 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
     }
-    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
-                                                               _nss,
-                                                               collation,
-                                                               boost::none,  // explain
-                                                               itemRef.getLet(),
-                                                               itemRef.getRuntimeConstants());
     auto cq = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
                                      std::move(qr),

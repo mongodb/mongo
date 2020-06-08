@@ -439,7 +439,6 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
 
     for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end(); ++it) {
         TargetedWriteBatch* batch = it->second;
-
         if (batch->getWrites().empty())
             continue;
 
