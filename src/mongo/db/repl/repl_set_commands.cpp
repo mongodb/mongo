@@ -77,7 +77,7 @@ namespace repl {
 using std::string;
 using std::stringstream;
 
-static const std::string kReplSetReconfigNss = "local.replset.reconfig";
+constexpr StringData kInternalIncludeNewlyAddedFieldName = "$_internalIncludeNewlyAdded"_sd;
 
 class ReplExecutorSSM : public ServerStatusMetric {
 public:
@@ -206,7 +206,21 @@ public:
         bool wantCommitmentStatus;
         uassertStatusOK(bsonExtractBooleanFieldWithDefault(
             cmdObj, "commitmentStatus", false, &wantCommitmentStatus));
-        ReplicationCoordinator::get(opCtx)->processReplSetGetConfig(&result, wantCommitmentStatus);
+
+        if (cmdObj[kInternalIncludeNewlyAddedFieldName]) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "The '$_internalIncludeNewlyAdded' option is only supported when testing"
+                    " commands are enabled",
+                    getTestCommandsEnabled());
+        }
+
+        bool includeNewlyAdded;
+        uassertStatusOK(bsonExtractBooleanFieldWithDefault(
+            cmdObj, kInternalIncludeNewlyAddedFieldName, false, &includeNewlyAdded));
+
+        ReplicationCoordinator::get(opCtx)->processReplSetGetConfig(
+            &result, wantCommitmentStatus, includeNewlyAdded);
+
         return true;
     }
 

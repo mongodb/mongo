@@ -419,7 +419,7 @@ assert = (function() {
         // Used up all attempts
         msg = _buildAssertionMessage(msg);
         if (runHangAnalyzer) {
-            msg = msg + "The hang analyzer is automatically called in assert.retry functions. " +
+            msg = msg + " The hang analyzer is automatically called in assert.retry functions. " +
                 "If you are *expecting* assert.soon to possibly fail, call assert.retry " +
                 "with {runHangAnalyzer: false} as the fifth argument " +
                 "(you can fill unused arguments with `undefined`).";
@@ -481,7 +481,8 @@ assert = (function() {
                 "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg";
             msg = _buildAssertionMessage(msg, msgPrefix);
             if (runHangAnalyzer) {
-                msg = msg + "The hang analyzer is automatically called in assert.time functions. " +
+                msg = msg +
+                    " The hang analyzer is automatically called in assert.time functions. " +
                     "If you are *expecting* assert.soon to possibly fail, call assert.time " +
                     "with {runHangAnalyzer: false} as the fourth argument " +
                     "(you can fill unused arguments with `undefined`).";

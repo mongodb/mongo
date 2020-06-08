@@ -998,8 +998,10 @@ TEST_F(ReplCoordReconfigTest,
     // Start up as a secondary.
     init();
     assertStartSuccess(
-        configWithMembers(
-            1, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"))),
+        configWithMembers(1,
+                          0,
+                          BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1")
+                                                       << member(4, "n4:1", 0))),
         HostAndPort("n1", 1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -1136,14 +1138,14 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentTimesOutIfConfigIsNotCommit
     // Start out in a non-initial config version.
     init();
     auto configVersion = 2;
-    auto Ca_members = BSON_ARRAY(member(1, "n1:1"));
+    auto Ca_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1", 0));
     auto Cb_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"));
 
     // Startup, simulate application of one oplog entry and get elected.
     assertStartSuccess(configWithMembers(configVersion, 0, Ca_members), HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
-    const auto opCtx = makeOperationContext();
-    runSingleNodeElection(opCtx.get());
+    simulateSuccessfulV1Election();
     ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
     ASSERT_EQ(getReplCoord()->getTerm(), 1);
 
@@ -1154,6 +1156,7 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentTimesOutIfConfigIsNotCommit
     respondToAllHeartbeats();
 
     // Do a first reconfig that should succeed since the current config is committed.
+    const auto opCtx = makeOperationContext();
     Status status(ErrorCodes::InternalError, "Not Set");
     configVersion = 3;
     ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
@@ -1175,14 +1178,14 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentReturnsOKIfConfigIsCommitte
     // Start out in a non-initial config version.
     init();
     auto configVersion = 2;
-    auto Ca_members = BSON_ARRAY(member(1, "n1:1"));
+    auto Ca_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1", 0));
     auto Cb_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"));
 
     // Startup, simulate application of one oplog entry and get elected.
     assertStartSuccess(configWithMembers(configVersion, 0, Ca_members), HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
-    const auto opCtx = makeOperationContext();
-    runSingleNodeElection(opCtx.get());
+    simulateSuccessfulV1Election();
     ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
     ASSERT_EQ(getReplCoord()->getTerm(), 1);
 
@@ -1193,6 +1196,7 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentReturnsOKIfConfigIsCommitte
     respondToAllHeartbeats();
 
     // Do a first reconfig that should succeed since the current config is committed.
+    const auto opCtx = makeOperationContext();
     configVersion = 3;
     ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
 
@@ -1206,18 +1210,19 @@ TEST_F(ReplCoordReconfigTest,
     // Start out in a non-initial config version.
     init();
     auto configVersion = 2;
-    auto Ca_members = BSON_ARRAY(member(1, "n1:1"));
+    auto Ca_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1", 0));
     auto Cb_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"));
 
     // Startup, simulate application of one oplog entry and get elected.
     assertStartSuccess(configWithMembers(configVersion, 0, Ca_members), HostAndPort("n1", 1));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0));
-    const auto opCtx = makeOperationContext();
-    runSingleNodeElection(opCtx.get());
+    simulateSuccessfulV1Election();
     ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_PRIMARY);
     ASSERT_EQ(getReplCoord()->getTerm(), 1);
 
     // Write and commit one new oplog entry, and consume any heartbeats.
+    const auto opCtx = makeOperationContext();
     auto commitPoint = OpTime(Timestamp(2, 1), 1);
     replCoordSetMyLastAppliedAndDurableOpTime(commitPoint);
     ASSERT_EQ(getReplCoord()->getLastCommittedOpTime(), commitPoint);
@@ -1242,7 +1247,8 @@ TEST_F(ReplCoordReconfigTest,
     // Start out in a non-initial config version.
     init();
     auto configVersion = 2;
-    auto Ca_members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
+    auto Ca_members = BSON_ARRAY(member(1, "n1:1")
+                                 << member(2, "n2:1") << member(3, "n3:1") << member(4, "n4:1", 0));
     auto Cb_members = BSON_ARRAY(member(1, "n1:1")
                                  << member(2, "n2:1") << member(3, "n3:1") << member(4, "n4:1"));
 
@@ -1402,9 +1408,11 @@ TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
     // Start out in a non-initial config version.
     init();
     auto configVersion = 2;
-    assertStartSuccess(
-        configWithMembers(configVersion, 0, BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1"))),
-        HostAndPort("n1", 1));
+    assertStartSuccess(configWithMembers(configVersion,
+                                         0,
+                                         BSON_ARRAY(member(1, "n1:1")
+                                                    << member(2, "n2:1") << member(3, "n3:1", 0))),
+                       HostAndPort("n1", 1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     // Simulate application of one oplog entry.
@@ -1490,11 +1498,6 @@ TEST_F(ReplCoordReconfigTest, StartElectionOnReconfigToSingleNode) {
 }
 
 TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1520,11 +1523,6 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
 }
 
 TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1554,11 +1552,6 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) 
 }
 
 TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithModifiedHostName) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1583,11 +1576,6 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithModifiedHos
 }
 
 TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIndexButSameID) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1611,11 +1599,6 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIn
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldNodes) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1674,11 +1657,6 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldN
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotAppendNewlyAddedFieldToNewNodes) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1705,11 +1683,6 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotAppendNewlyAddedFieldToNewNode
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldIsSetToTrue) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1730,11 +1703,6 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldIsSetToTrue) 
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldSetToFalse) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1755,11 +1723,6 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldSetToFalse) {
 }
 
 TEST_F(ReplCoordReconfigTest, ParseFailedIfUserProvidesNewlyAddedFieldDuringSafeReconfig) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1789,11 +1752,6 @@ TEST_F(ReplCoordReconfigTest, ParseFailedIfUserProvidesNewlyAddedFieldDuringSafe
 }
 
 TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMember) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1840,11 +1798,6 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
 }
 
 TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPreviouslyAddedNodes) {
-    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1895,11 +1848,6 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
 }
 
 TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) {
-    // Set the flag to add the `newlyAdded` field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1928,11 +1876,6 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) 
 }
 
 TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
-    // Set the flag to add the `newlyAdded` field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -1997,11 +1940,6 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
 }
 
 TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
-    // Set the flag to add the `newlyAdded` field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();
@@ -2031,11 +1969,6 @@ TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigShouldThrowIfArbiterNodesHaveNewlyAddedField) {
-    // Set the flag to add the `newlyAdded` field to MemberConfigs.
-    enableAutomaticReconfig = true;
-    // Set the flag back to false after this test exits.
-    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
-
     setUpNewlyAddedFieldTest();
 
     auto opCtx = makeOperationContext();

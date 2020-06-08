@@ -21,13 +21,17 @@ var rst = new ReplSetTest({
     nodes: [
         {},
         {},
-        {rsConfig: {priority: 0}},
     ],
 });
 const nodes = rst.startSet();
+// Initiate in two steps so that the first two nodes finish initial sync before the third begins
+// its initial sync. This prevents the long getMore timeout from causing the first initial sync to
+// take so much time that the second cannot succeed.
+rst.initiate();
+
 const oldPrimary = nodes[0];
 const newPrimary = nodes[1];
-const secondary = nodes[2];
+const secondary = rst.add({rsConfig: {priority: 0}});
 
 // Make sure this secondary syncs only from the node bound to be the new primary.
 assert.commandWorked(secondary.adminCommand({
@@ -35,7 +39,7 @@ assert.commandWorked(secondary.adminCommand({
     mode: "alwaysOn",
     data: {hostAndPort: newPrimary.host}
 }));
-rst.initiate();
+rst.reInitiate();
 
 // Make sure when the original primary syncs, it's only from the secondary; this avoids spurious log
 // messages.

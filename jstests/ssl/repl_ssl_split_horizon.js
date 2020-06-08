@@ -165,8 +165,9 @@ assert.eq(checkExpectedHorizon(horizonMissingURL, 1, node1localHostname),
           0,
           "does not return localhost as expected");
 
-// Check so we can replSetReconfig to add another horizon
-config.version += 1;
+// Check so we can replSetReconfig to add another horizon.
+// Add 2 to the config version to account for the 'newlyAdded' removal reconfig.
+config.version += 2;
 config.members[0].horizons.other_horizon_name = node0horizonMissingHostname;
 config.members[1].horizons.other_horizon_name = node1horizonMissingHostname;
 

@@ -17,18 +17,13 @@ const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest(
-    {name: testName, nodes: 1, nodeOptions: {setParameter: {enableAutomaticReconfig: true}}});
+const rst = new ReplSetTest({name: testName, nodes: 1});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
 const primaryColl = primaryDb.getCollection(collName);
-
-// TODO(SERVER-46808): Move this into ReplSetTest.initiate
-waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 0);
-waitForConfigReplication(primary, rst.nodes);
 
 assert.commandWorked(primaryColl.insert({a: 1}));
 
@@ -38,7 +33,6 @@ const secondary0 = rst.add({
     setParameter: {
         'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
         'numInitialSyncAttempts': 1,
-        'enableAutomaticReconfig': true,
     }
 });
 rst.reInitiate();
@@ -85,7 +79,6 @@ const secondary1 = rst.add({
     setParameter: {
         'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
         'numInitialSyncAttempts': 1,
-        'enableAutomaticReconfig': true,
     }
 });
 rst.reInitiate();

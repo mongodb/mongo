@@ -203,7 +203,9 @@ assert.soon(function() {
         rs.nodes[i].setSlaveOk();
         rs.nodes[i].getDB("admin").auth("foo", "bar");
         config = rs.nodes[i].getDB("local").system.replset.findOne();
-        if (config.version != 2) {
+        // We expect the config version to be 3 due to the initial config and then the
+        // 'newlyAdded' removal reconfig.
+        if (config.version !== 3) {
             return false;
         }
     }

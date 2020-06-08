@@ -18,8 +18,8 @@ var stopReplicationAndEnforceNewPrimaryToCatchUp;
 var setFailPoint;
 var clearFailPoint;
 var isConfigCommitted;
-var waitForConfigReplication;
 var assertSameConfigContent;
+var getConfigWithNewlyAdded;
 var isMemberNewlyAdded;
 var replConfigHasNewlyAddedMembers;
 var waitForNewlyAddedRemovalForNodeToBeCommitted;
@@ -199,25 +199,59 @@ waitForAllMembers = function(master, timeout) {
 };
 
 /**
- * Run a 'replSetReconfig' command with one retry.
+ * Run a 'replSetReconfig' command with one retry on NodeNotFound and multiple retries on
+ * ConfigurationInProgress, CurrentConfigNotCommittedYet, and
+ * NewReplicaSetConfigurationIncompatible.
  */
 function reconfigWithRetry(primary, config, force) {
-    var admin = primary.getDB("admin");
+    const admin = primary.getDB("admin");
     force = force || false;
-    var reconfigCommand = {
+    let reconfigCommand = {
         replSetReconfig: config,
         force: force,
         maxTimeMS: ReplSetTest.kDefaultTimeoutMS
     };
-    var res = admin.runCommand(reconfigCommand);
 
-    // Retry reconfig if quorum check failed because not enough voting nodes responded.
-    if (!res.ok && res.code === ErrorCodes.NodeNotFound) {
-        print("Replset reconfig failed because quorum check failed. Retry reconfig once. " +
-              "Error: " + tojson(res));
-        res = admin.runCommand(reconfigCommand);
-    }
-    assert.commandWorked(res);
+    assert.soon(function() {
+        const newVersion =
+            assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version + 1;
+        reconfigCommand.replSetReconfig.version = newVersion;
+        const res = admin.runCommand(reconfigCommand);
+
+        // Retry reconfig if quorum check failed because not enough voting nodes responded. One
+        // reason for this is if the connections used for heartbeats get closed on the destination
+        // node.
+        if (!res.ok && res.code === ErrorCodes.NodeNotFound) {
+            print("Replset reconfig failed because quorum check failed. Retry reconfig once. " +
+                  "Error: " + tojson(res));
+            res = admin.runCommand(reconfigCommand);
+        }
+
+        // Always retry on these errors, even if we already retried on NodeNotFound.
+        if (!res.ok &&
+            (res.code === ErrorCodes.ConfigurationInProgress ||
+             res.code === ErrorCodes.CurrentConfigNotCommittedYet)) {
+            print("Replset reconfig failed since another configuration is in progress. Retry.");
+            // Retry.
+            return false;
+        }
+
+        // Always retry on NewReplicaSetConfigurationIncompatible, if the current config version is
+        // higher than the requested one.
+        if (!res.ok && res.code === ErrorCodes.NewReplicaSetConfigurationIncompatible) {
+            const curVersion =
+                assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version;
+            if (curVersion >= newVersion) {
+                print("Replset reconfig failed since the config version was too low. Retry. " +
+                      "Error: " + tojson(res));
+                // Retry.
+                return false;
+            }
+        }
+
+        assert.commandWorked(res);
+        return true;
+    });
 }
 
 /**
@@ -681,27 +715,6 @@ isConfigCommitted = function(node) {
 };
 
 /**
- * Wait until the config on the primary becomes committed.
- */
-waitForConfigReplication = function(primary, nodes) {
-    const nodeHosts = nodes == null ? "all nodes" : tojson(nodes.map((n) => n.host));
-    jsTestLog("Waiting for the config on " + primary.host + " to replicate to " + nodeHosts);
-    assert.soon(function() {
-        const res = primary.adminCommand({replSetGetStatus: 1});
-        const primaryMember = res.members.find((m) => m.self);
-        function hasSameConfig(member) {
-            return member.configVersion === primaryMember.configVersion &&
-                member.configTerm === primaryMember.configTerm;
-        }
-        let members = res.members;
-        if (nodes != null) {
-            members = res.members.filter((m) => nodes.some((node) => m.name === node.host));
-        }
-        return members.every((m) => hasSameConfig(m));
-    });
-};
-
-/**
  * Asserts that replica set config A is the same as replica set config B ignoring the 'version' and
  * 'term' field.
  */
@@ -722,56 +735,37 @@ assertSameConfigContent = function(configA, configB) {
 };
 
 /**
+ * Returns the result of 'replSetGetConfig' with the test-parameter specified that indicates to
+ * include 'newlyAdded' fields.
+ */
+getConfigWithNewlyAdded = function(node) {
+    return assert.commandWorked(
+        node.adminCommand({replSetGetConfig: 1, $_internalIncludeNewlyAdded: true}));
+};
+
+/**
  * @param memberIndex is optional. If not provided, then it will return true even if
  * a single member in the replSet config has "newlyAdded" field.
  */
-isMemberNewlyAdded = function(node, memberIndex, force = false) {
-    // The in-memory config will not include the 'newlyAdded' field, so we must consult the on-disk
-    // version. However, the in-memory config is updated after the config is persisted to disk, so
-    // we must confirm that the in-memory config agrees with the on-disk config, before returning
-    // true or false.
-    const configInMemory = assert.commandWorked(node.adminCommand({replSetGetConfig: 1})).config;
-
-    const versionSetInMemory = configInMemory.hasOwnProperty("version");
-    const termSetInMemory = configInMemory.hasOwnProperty("term");
-
-    // Since the term is not set in a force reconfig, we skip the check for the term if
-    // 'force=true'.
-    if (!versionSetInMemory || (!termSetInMemory && !force)) {
-        throw new Error("isMemberNewlyAdded: in-memory config has no version or term: " +
-                        tojsononeline(configInMemory));
-    }
-
-    const configOnDisk = node.getDB("local").system.replset.findOne();
-    const termSetOnDisk = configOnDisk.hasOwnProperty("term");
-
-    const isVersionSetCorrectly = (configOnDisk.version === configInMemory.version);
-    const isTermSetCorrectly =
-        ((!termSetInMemory && !termSetOnDisk) || (configOnDisk.term === configInMemory.term));
-
-    if (!isVersionSetCorrectly || !isTermSetCorrectly) {
-        throw new error(
-            "isMemberNewlyAdded: in-memory config version/term does not match on-disk config." +
-            " in-memory: " + tojsononeline(configInMemory) +
-            ", on-disk: " + tojsononeline(configOnDisk));
-    }
+isMemberNewlyAdded = function(node, memberIndex) {
+    const config = getConfigWithNewlyAdded(node).config;
 
     const allMembers = (memberIndex === undefined);
-    assert(allMembers || (memberIndex >= 0 && memberIndex < configOnDisk.members.length),
-           "memberIndex should be between 0 and " + (configOnDisk.members.length - 1) +
+    assert(allMembers || (memberIndex >= 0 && memberIndex < config.members.length),
+           "memberIndex should be between 0 and " + (config.members.length - 1) +
                ", but memberIndex is " + memberIndex);
 
     var hasNewlyAdded = (index) => {
-        const memberConfigOnDisk = configOnDisk.members[index];
-        if (memberConfigOnDisk.hasOwnProperty("newlyAdded")) {
-            assert(memberConfigOnDisk["newlyAdded"] === true, () => tojson(configOnDisk));
+        const memberConfig = config.members[index];
+        if (memberConfig.hasOwnProperty("newlyAdded")) {
+            assert(memberConfig["newlyAdded"] === true, config);
             return true;
         }
         return false;
     };
 
     if (allMembers) {
-        for (let i = 0; i < configOnDisk.members.length; i++) {
+        for (let i = 0; i < config.members.length; i++) {
             if (hasNewlyAdded(i))
                 return true;
         }
@@ -790,7 +784,7 @@ waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex, force
     jsTestLog("Waiting for member " + memberIndex + " to no longer be 'newlyAdded'");
     assert.soonNoExcept(function() {
         return !isMemberNewlyAdded(node, memberIndex, force) && isConfigCommitted(node);
-    }, () => tojson(node.getDB("local").system.replset.findOne()));
+    }, getConfigWithNewlyAdded(node).config);
 };
 
 assertVoteCount = function(node, {
