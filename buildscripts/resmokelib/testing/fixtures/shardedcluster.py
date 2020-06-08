@@ -14,6 +14,7 @@ from ... import core
 from ... import errors
 from ... import utils
 from ...utils import registry
+from ...multiversionconstants import LAST_STABLE_MONGOS_BINARY
 
 
 class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes
@@ -336,9 +337,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
         # The last-stable binary is currently expected to live in '/data/multiversion', which is
         # part of the PATH.
-        last_stable_executable = config.DEFAULT_MONGOS_EXECUTABLE + "-" \
-                                + ShardedClusterFixture._LAST_STABLE_BIN_VERSION
-        mongos_executable = self.mongos_executable if self.mixed_bin_versions is None else last_stable_executable
+        mongos_executable = self.mongos_executable if self.mixed_bin_versions is None else LAST_STABLE_MONGOS_BINARY
 
         return _MongoSFixture(mongos_logger, self.job_num, dbpath_prefix=self._dbpath_prefix,
                               mongos_executable=mongos_executable, mongos_options=mongos_options)
