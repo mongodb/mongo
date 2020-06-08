@@ -28,10 +28,11 @@ class WaitForReplication(interface.Hook):
                 rst = new ReplSetTest(conn);
                 rst.awaitReplication();
             }} catch (e) {{
-                if (e.code === ErrorCodes.InterruptedAtShutdown || e.code === ErrorCodes.ShutdownInProgress) {{
-                    jsTestLog("Ignoring shutdown error: " + tojson(e));
+                jsTestLog("WaitForReplication got error: " + tojson(e));
+                if (!e.message.includes('The server is in quiesce mode and will shut down')) {{
+                    throw e;
                 }}
-                throw e;
+                jsTestLog("Ignoring shutdown error in quiesce mode");
             }}"""
         shell_options = {"nodb": "", "eval": js_cmds.format(client_conn)}
         shell_proc = core.programs.mongo_shell_program(self.hook_logger, **shell_options)
