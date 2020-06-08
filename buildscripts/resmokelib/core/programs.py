@@ -10,6 +10,7 @@ import stat
 import sys
 
 from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOD_BINARY
+from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOS_BINARY
 from . import jasper_process
 from . import process
 from .. import config
@@ -194,7 +195,7 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
             executable != LAST_STABLE_MONGOD_BINARY:
         suite_set_parameters["assertStableTimestampEqualsAppliedThroughOnRecovery"] = True
 
-    # TODO(SERVER-46726): Only keep the else block once SERVER-46726 is backported to v4.4
+    # TODO(SERVER-48645): Only keep the else block once v4.4 is not longer the last stable version
     if executable == LAST_STABLE_MONGOD_BINARY:
         suite_set_parameters.setdefault("enableTestCommands", True)
     else:
@@ -277,8 +278,8 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     if "logComponentVerbosity" not in suite_set_parameters:
         suite_set_parameters["logComponentVerbosity"] = default_mongos_log_component_verbosity()
 
-    # TODO(SERVER-46726): Only keep the else block once SERVER-46726 is backported to v4.4
-    if executable == LAST_STABLE_MONGOD_BINARY:
+    # TODO(SERVER-48645): Only keep the else block once v4.4 is not longer the last stable version
+    if executable == LAST_STABLE_MONGOS_BINARY:
         suite_set_parameters.setdefault("enableTestCommands", True)
     else:
         _add_testing_set_parameters(suite_set_parameters)

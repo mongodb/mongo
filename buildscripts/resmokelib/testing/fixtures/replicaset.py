@@ -14,6 +14,7 @@ from . import standalone
 from ... import config
 from ... import errors
 from ... import utils
+from ...multiversionconstants import LAST_STABLE_MONGOD_BINARY
 
 
 class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes
@@ -58,13 +59,11 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             latest_mongod = mongod_executable
             # The last-stable binary is currently expected to live in '/data/multiversion', which is
             # part of the PATH.
-            last_stable_mongod = config.DEFAULT_MONGOD_EXECUTABLE + "-" \
-                                + ReplicaSetFixture._LAST_STABLE_BIN_VERSION
             is_config_svr = "configsvr" in self.replset_config_options and self.replset_config_options[
                 "configsvr"]
             if not is_config_svr:
                 self.mixed_bin_versions = [
-                    latest_mongod if (x == "new") else last_stable_mongod
+                    latest_mongod if (x == "new") else LAST_STABLE_MONGOD_BINARY
                     for x in self.mixed_bin_versions
                 ]
             else:
