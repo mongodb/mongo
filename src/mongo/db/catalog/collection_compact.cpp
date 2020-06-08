@@ -125,7 +125,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
         oldTotalSize - recordStore->storageSize(opCtx) - collection->getIndexSize(opCtx);
     LOGV2(20286,
           "compact {namespace} end, bytes freed: {freedBytes}",
-          "Compact end"
+          "Compact end",
           "namespace"_attr = collectionNss,
           "freedBytes"_attr = totalSizeDiff);
     return totalSizeDiff;
