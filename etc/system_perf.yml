@@ -80,6 +80,7 @@ functions:
         genny: ${genny_rev}
         workloads: ${workloads_rev}
         wtdevelop: ${wtdevelop_rev}
+        signal-processing: ${signal-processing_rev}
 
   "compile mongodb":
     # We create a virtual environment with the Python dependencies for compiling the server
@@ -887,6 +888,11 @@ modules:
   prefix: src/mongo/db/modules
   branch: v4.2
 
+- name: signal-processing
+  repo: git@github.com:10gen/signal-processing.git
+  prefix: signal_processing
+  branch: master
+
 #######################################
 #         Buildvariants               #
 #######################################
@@ -972,6 +978,7 @@ buildvariants:
     - genny
     - workloads
     - linkbench
+    - signal-processing
   expansions:
     setup: single-replica
     cluster: single
