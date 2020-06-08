@@ -41,7 +41,6 @@
 #include "mongo/client/connection_pool.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
@@ -62,6 +61,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -528,7 +528,7 @@ void BackgroundSync::_produce() {
         fassertFailedWithStatus(34440, exceptionToStatus());
     }
 
-    const auto logLevel = getTestCommandsEnabled() ? 0 : 1;
+    const auto logLevel = TestingProctor::instance().isEnabled() ? 0 : 1;
     LOGV2_DEBUG(21092,
                 logLevel,
                 "scheduling fetcher to read remote oplog on {syncSource} starting at "

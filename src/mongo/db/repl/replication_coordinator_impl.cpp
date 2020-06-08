@@ -53,7 +53,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -106,6 +105,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -1923,7 +1923,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
         status = Status{ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
     }
 
-    if (getTestCommandsEnabled() && !status.isOK()) {
+    if (TestingProctor::instance().isEnabled() && !status.isOK()) {
         stdx::lock_guard lock(_mutex);
         LOGV2(21339,
               "Replication failed for write concern: {writeConcern}, waiting for optime: {opTime}, "
