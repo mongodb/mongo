@@ -600,6 +600,11 @@ modules:
   branch: master
 
 
+- name: signal-processing
+  repo: git@github.com:10gen/signal-processing.git
+  prefix: signal_processing
+  branch: master
+
 #######################################
 #         Buildvariants               #
 #######################################
@@ -633,6 +638,7 @@ buildvariants:
   modules: &modules
     - dsi
     - workloads
+    - signal-processing
   expansions:
     setup: single-replica
     cluster: single
