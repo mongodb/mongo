@@ -78,7 +78,7 @@ platforms:
       username: ec2-user
   - name: suse12
     driver:
-      image_id: ami-aeb532c6
+      image_id: ami-043eebeabcc4e3d35
     transport:
       username: ec2-user
   - name: suse15
