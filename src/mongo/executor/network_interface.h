@@ -134,7 +134,7 @@ public:
     };
     /*
      * Returns a copy of the operation counters (see struct Counters above). This method should
-     * only be used in tests, and will invariant if getTestCommands() returns false.
+     * only be used in tests, and will invariant if testing diagnostics are not enabled.
      */
     virtual Counters getCounters() const = 0;
 

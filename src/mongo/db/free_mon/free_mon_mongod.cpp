@@ -45,7 +45,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
 #include "mongo/db/free_mon/free_mon_message.h"
@@ -66,6 +65,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/http_client.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 
@@ -90,7 +90,7 @@ public:
         _executor = makeTaskExecutor(serviceContext);
         _executor->startup();
         _client = HttpClient::create();
-        _client->allowInsecureHTTP(getTestCommandsEnabled());
+        _client->allowInsecureHTTP(TestingProctor::instance().isEnabled());
         _client->setHeaders({"Content-Type: application/octet-stream",
                              "Accept: application/octet-stream",
                              "Expect:"});
@@ -312,8 +312,7 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
         return;
     }
 
-    // Check for http, not https here because testEnabled may not be set yet
-    if (!getTestCommandsEnabled()) {
+    if (!TestingProctor::instance().isEnabled()) {
         uassert(50774,
                 "ExportedFreeMonEndpointURL only supports https:// URLs",
                 FreeMonEndpointURL.compare(0, 5, "https") == 0);

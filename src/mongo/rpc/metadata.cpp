@@ -33,7 +33,6 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
@@ -45,6 +44,7 @@
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 namespace rpc {
@@ -84,7 +84,7 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bo
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
 
     if (clientOperationKeyElem &&
-        (getTestCommandsEnabled() ||
+        (TestingProctor::instance().isEnabled() ||
          authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                        ActionType::internal))) {
         auto opKey = uassertStatusOK(UUID::parse(clientOperationKeyElem));
