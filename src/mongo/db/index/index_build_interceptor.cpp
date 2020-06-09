@@ -88,12 +88,13 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatal
     }
 }
 
-void IndexBuildInterceptor::deleteTemporaryTables(OperationContext* opCtx) {
-    _sideWritesTable->deleteTemporaryTable(opCtx);
+void IndexBuildInterceptor::finalizeTemporaryTables(
+    OperationContext* opCtx, TemporaryRecordStore::FinalizationAction action) {
+    _sideWritesTable->finalizeTemporaryTable(opCtx, action);
     if (_duplicateKeyTracker) {
-        _duplicateKeyTracker->deleteTemporaryTable(opCtx);
+        _duplicateKeyTracker->finalizeTemporaryTable(opCtx, action);
     }
-    _skippedRecordTracker.deleteTemporaryTable(opCtx);
+    _skippedRecordTracker.finalizeTemporaryTable(opCtx, action);
 }
 
 Status IndexBuildInterceptor::recordDuplicateKeys(OperationContext* opCtx,

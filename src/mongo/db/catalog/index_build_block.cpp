@@ -64,9 +64,10 @@ IndexBuildBlock::IndexBuildBlock(IndexCatalog* indexCatalog,
       _buildUUID(indexBuildUUID),
       _indexCatalogEntry(nullptr) {}
 
-void IndexBuildBlock::deleteTemporaryTables(OperationContext* opCtx) {
+void IndexBuildBlock::finalizeTemporaryTables(OperationContext* opCtx,
+                                              TemporaryRecordStore::FinalizationAction action) {
     if (_indexBuildInterceptor) {
-        _indexBuildInterceptor->deleteTemporaryTables(opCtx);
+        _indexBuildInterceptor->finalizeTemporaryTables(opCtx, action);
     }
 }
 

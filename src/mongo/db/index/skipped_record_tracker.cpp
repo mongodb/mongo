@@ -41,9 +41,10 @@ namespace {
 static constexpr StringData kRecordIdField = "recordId"_sd;
 }
 
-void SkippedRecordTracker::deleteTemporaryTable(OperationContext* opCtx) {
+void SkippedRecordTracker::finalizeTemporaryTable(OperationContext* opCtx,
+                                                  TemporaryRecordStore::FinalizationAction action) {
     if (_skippedRecordsTable) {
-        _skippedRecordsTable->deleteTemporaryTable(opCtx);
+        _skippedRecordsTable->finalizeTemporaryTable(opCtx, action);
     }
 }
 

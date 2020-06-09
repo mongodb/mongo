@@ -55,8 +55,9 @@ DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx, const IndexCat
     invariant(_indexCatalogEntry->descriptor()->unique());
 }
 
-void DuplicateKeyTracker::deleteTemporaryTable(OperationContext* opCtx) {
-    _keyConstraintsTable->deleteTemporaryTable(opCtx);
+void DuplicateKeyTracker::finalizeTemporaryTable(OperationContext* opCtx,
+                                                 TemporaryRecordStore::FinalizationAction action) {
+    _keyConstraintsTable->finalizeTemporaryTable(opCtx, action);
 }
 
 Status DuplicateKeyTracker::recordKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys) {

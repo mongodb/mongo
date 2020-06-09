@@ -42,11 +42,17 @@
 namespace mongo {
 
 TemporaryKVRecordStore::~TemporaryKVRecordStore() {
-    invariant(_recordStoreHasBeenDeletedOrKept);
+    invariant(_recordStoreHasBeenFinalized);
 }
 
-void TemporaryKVRecordStore::deleteTemporaryTable(OperationContext* opCtx) {
-    invariant(!_recordStoreHasBeenDeletedOrKept);
+void TemporaryKVRecordStore::finalizeTemporaryTable(OperationContext* opCtx,
+                                                    FinalizationAction action) {
+    invariant(!_recordStoreHasBeenFinalized);
+
+    _recordStoreHasBeenFinalized = true;
+
+    if (action == FinalizationAction::kKeep)
+        return;
 
     // Need at least Global IS before calling into the storage engine, to protect against it being
     // destructed while we're using it.
@@ -58,14 +64,6 @@ void TemporaryKVRecordStore::deleteTemporaryTable(OperationContext* opCtx) {
         LOGV2_ERROR(4841503, "Failed to drop temporary table", "ident"_attr = _rs->getIdent());
     }
     dassert(status, str::stream() << "Failed to drop temporary table. Ident: " << _rs->getIdent());
-
-    _recordStoreHasBeenDeletedOrKept = true;
-}
-
-void TemporaryKVRecordStore::keepTemporaryTable() {
-    invariant(!_recordStoreHasBeenDeletedOrKept);
-
-    _recordStoreHasBeenDeletedOrKept = true;
 }
 
 }  // namespace mongo

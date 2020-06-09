@@ -99,7 +99,8 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
             // a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
                 _indexes[i].block->fail(opCtx, collection);
-                _indexes[i].block->deleteTemporaryTables(opCtx);
+                _indexes[i].block->finalizeTemporaryTables(
+                    opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
             }
 
             // Nodes building an index on behalf of a user (e.g: `createIndexes`, `applyOps`) may
@@ -191,7 +192,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         // thus legal to call init() again after it fails.
         opCtx->recoveryUnit()->onRollback([this, opCtx]() {
             for (auto& index : _indexes) {
-                index.block->deleteTemporaryTables(opCtx);
+                index.block->finalizeTemporaryTables(
+                    opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
             }
             _buildIsCleanedUp = true;
         });
@@ -245,8 +247,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             if (!status.isOK())
                 return status;
 
-            auto indexCleanupGuard =
-                makeGuard([opCtx, &index] { index.block->deleteTemporaryTables(opCtx); });
+            auto indexCleanupGuard = makeGuard([opCtx, &index] {
+                index.block->finalizeTemporaryTables(
+                    opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+            });
 
             index.real = index.block->getEntry()->accessMethod();
             status = index.real->initializeAsEmpty(opCtx);
@@ -680,8 +684,10 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
 
         // The commit() function can be called multiple times on write conflict errors. Dropping the
         // temp tables cannot be rolled back, so do it only after the WUOW commits.
-        opCtx->recoveryUnit()->onCommit(
-            [opCtx, i, this](auto commitTs) { _indexes[i].block->deleteTemporaryTables(opCtx); });
+        opCtx->recoveryUnit()->onCommit([opCtx, i, this](auto commitTs) {
+            _indexes[i].block->finalizeTemporaryTables(
+                opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+        });
     }
 
     onCommit();
@@ -712,13 +718,16 @@ void MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx, bool shutdow
         lk.emplace(opCtx, MODE_IX);
     }
 
+    auto action = TemporaryRecordStore::FinalizationAction::kDelete;
+
     if (shutdown && _buildUUID && _method == IndexBuildMethod::kHybrid &&
         opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
         _writeStateToDisk(opCtx);
+        action = TemporaryRecordStore::FinalizationAction::kKeep;
     }
 
     for (auto& index : _indexes) {
-        index.block->deleteTemporaryTables(opCtx);
+        index.block->finalizeTemporaryTables(opCtx, action);
     }
 
     _buildIsCleanedUp = true;
@@ -769,7 +778,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
                 str::stream() << "Failed to write resumable index build state to disk. UUID: "
                               << *_buildUUID);
 
-        rs->deleteTemporaryTable(opCtx);
+        rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
         return;
     }
 
@@ -777,7 +786,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
 
     LOGV2(4841502, "Wrote resumable index build state to disk", logAttrs(*_buildUUID));
 
-    rs->keepTemporaryTable();
+    rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kKeep);
 }
 
 }  // namespace mongo

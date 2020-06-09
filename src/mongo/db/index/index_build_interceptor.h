@@ -68,15 +68,17 @@ public:
      * table to store any duplicate key constraint violations found during the build, if the index
      * being built has uniqueness constraints.
      *
-     * deleteTemporaryTable() must be called before destruction to delete the temporary tables.
+     * finalizeTemporaryTables() must be called before destruction to delete or keep the temporary
+     * tables.
      */
     IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
 
     /**
-     * Deletes the temporary side writes and duplicate key constraint violations tables. Must be
-     * called before object destruction.
+     * Deletes or keeps the temporary side writes and duplicate key constraint violations tables.
+     * Must be called before object destruction.
      */
-    void deleteTemporaryTables(OperationContext* opCtx);
+    void finalizeTemporaryTables(OperationContext* opCtx,
+                                 TemporaryRecordStore::FinalizationAction action);
 
     /**
      * Client writes that are concurrent with an index build will have their index updates written

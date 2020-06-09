@@ -52,11 +52,12 @@ public:
 
     /**
      * Must be called before the object is destructed if init() has been called.
-     * Cleans up the temporary tables that are created for an index build.
+     * Cleans up or keeps the temporary tables that are created for an index build.
      *
      * Being called in a 'WriteUnitOfWork' has no effect.
      */
-    void deleteTemporaryTables(OperationContext* opCtx);
+    void finalizeTemporaryTables(OperationContext* opCtx,
+                                 TemporaryRecordStore::FinalizationAction action);
 
     /**
      * Initializes a new entry for the index in the IndexCatalog.
