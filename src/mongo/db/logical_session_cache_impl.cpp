@@ -158,7 +158,7 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
     }();
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord && replCoord->getMemberState().arbiter()) {
+    if (replCoord && replCoord->isReplEnabled() && replCoord->getMemberState().arbiter()) {
         return Status::OK();
     }
 
@@ -234,7 +234,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     }();
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord && replCoord->getMemberState().arbiter()) {
+    if (replCoord && replCoord->isReplEnabled() && replCoord->getMemberState().arbiter()) {
         return;
     }
 
