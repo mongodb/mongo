@@ -55,11 +55,13 @@ namespace {
 
 namespace wcp = ::mongo::wildcard_planning;
 
-// Can't index negations of {$eq: <Array>} or {$in: [<Array>, ...]}. Note that we could
-// use the index in principle, though we would need to generate special bounds.
-bool isEqualsArrayOrNotInArray(const MatchExpression* me) {
+// Can't index negations of {$eq: <Array>}, {$lt: <Array>}, {$gt: <Array>}, {$lte: <Array>}, {$gte:
+// <Array>}, or {$in: [<Array>, ...]}. Note that we could use the index in principle, though we
+// would need to generate special bounds.
+bool isComparisonWithArrayPred(const MatchExpression* me) {
     const auto type = me->matchType();
-    if (type == MatchExpression::EQ) {
+    if (type == MatchExpression::EQ || type == MatchExpression::LT || type == MatchExpression::GT ||
+        type == MatchExpression::LTE || type == MatchExpression::GTE) {
         return static_cast<const ComparisonMatchExpression*>(me)->getData().type() ==
             BSONType::Array;
     } else if (type == MatchExpression::MATCH_IN) {
@@ -68,7 +70,6 @@ bool isEqualsArrayOrNotInArray(const MatchExpression* me) {
             return elt.type() == BSONType::Array;
         });
     }
-
     return false;
 }
 
@@ -444,7 +445,16 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                 return false;
             }
 
-            if (isEqualsArrayOrNotInArray(child)) {
+            // Comparisons with arrays have strange enough semantics that inverting the bounds
+            // within a $not has many complex special cases. We avoid indexing these queries, even
+            // though it is sometimes possible to build useful bounds.
+            if (isComparisonWithArrayPred(child)) {
+                return false;
+            }
+
+            // $gt and $lt to MinKey/MaxKey must build inexact bounds if the index is multikey and
+            // therefore cannot be inverted safely in a $not.
+            if (index.multikey && (child->isGTMinKey() || child->isLTMaxKey())) {
                 return false;
             }
 
@@ -623,7 +633,7 @@ bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* q
 
 bool QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex(const MatchExpression* queryExpr) {
     return !(queryExpr->matchType() == MatchExpression::NOT &&
-             isEqualsArrayOrNotInArray(queryExpr->getChild(0)));
+             isComparisonWithArrayPred(queryExpr->getChild(0)));
 }
 
 bool QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(const MatchExpression* queryExpr) {

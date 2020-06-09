@@ -454,6 +454,14 @@ public:
         return false;
     }
 
+    virtual bool isGTMinKey() const {
+        return false;
+    }
+
+    virtual bool isLTMaxKey() const {
+        return false;
+    }
+
     virtual void acceptVisitor(MatchExpressionMutableVisitor* visitor) = 0;
     virtual void acceptVisitor(MatchExpressionConstVisitor* visitor) const = 0;
 

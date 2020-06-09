@@ -414,6 +414,15 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
         }
     }
 
+    // If the query predicate is minKey or maxKey it can't use the same plan as other GT/LT
+    // queries. If the index is multikey and the query involves one of these values, it needs
+    // to use INEXACT_FETCH and the bounds can't be inverted. Therefore these need their own
+    // shape.
+    if (tree->isGTMinKey())
+        *keyBuilder << "min";
+    else if (tree->isLTMaxKey())
+        *keyBuilder << "max";
+
     // Traverse child nodes.
     // Enclose children in [].
     if (tree->numChildren() > 0) {

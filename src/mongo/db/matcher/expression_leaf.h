@@ -299,6 +299,10 @@ public:
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
     }
+
+    bool isLTMaxKey() const final {
+        return _rhs.type() == BSONType::MaxKey;
+    }
 };
 
 class GTMatchExpression final : public ComparisonMatchExpression {
@@ -335,6 +339,10 @@ public:
 
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
+    }
+
+    bool isGTMinKey() const final {
+        return _rhs.type() == BSONType::MinKey;
     }
 };
 

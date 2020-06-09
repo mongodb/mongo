@@ -174,6 +174,43 @@ function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     return true;
 }
 
+function arrayDiff(al, ar, verbose = false, valueComparator) {
+    // Check that these are both arrays.
+    if (!(al instanceof Array)) {
+        debug('arrayDiff: al is not an array: ' + tojson(al));
+        return false;
+    }
+
+    if (!(ar instanceof Array)) {
+        debug('arrayDiff: ar is not an array: ' + tojson(ar));
+        return false;
+    }
+
+    // Keep a set of which indexes we've already used to avoid considering [1,1] as equal to [1,2].
+    const matchedIndexesInRight = new Set();
+    let unmatchedElementsInLeft = [];
+    for (let leftElem of al) {
+        let foundMatch = false;
+        for (let i = 0; i < ar.length; ++i) {
+            if (!matchedIndexesInRight.has(i) && anyEq(leftElem, ar[i], verbose, valueComparator)) {
+                matchedIndexesInRight.add(i);  // Don't use the same value each time.
+                foundMatch = true;
+                break;
+            }
+        }
+        if (!foundMatch) {
+            unmatchedElementsInLeft.push(leftElem);
+        }
+    }
+    let unmatchedElementsInRight = [];
+    for (let i = 0; i < ar.length; ++i) {
+        if (!matchedIndexesInRight.has(i)) {
+            unmatchedElementsInRight.push(ar[i]);
+        }
+    }
+    return {left: unmatchedElementsInLeft, right: unmatchedElementsInRight};
+}
+
 /**
  * Makes a shallow copy of 'a'.
  */
