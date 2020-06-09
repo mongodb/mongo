@@ -464,7 +464,6 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     lk.unlock();
 
     yieldLocksForPreparedTransactions(opCtx.get());
-    invalidateSessionsForStepdown(opCtx.get());
 
     lk.lock();
 
@@ -744,7 +743,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             lk.unlock();
 
             yieldLocksForPreparedTransactions(opCtx.get());
-            invalidateSessionsForStepdown(opCtx.get());
 
             lk.lock();
 
