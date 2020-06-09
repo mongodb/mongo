@@ -230,6 +230,12 @@ __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *le
     item = cbt->tmp;
     current = NULL;
 
+    /*
+     * Assert the session and cursor have the right relationship (not search specific, but search is
+     * a convenient place to check given any operation on a cursor will likely search a page).
+     */
+    WT_ASSERT(session, session->dhandle == cbt->dhandle);
+
     __cursor_pos_clear(cbt);
 
     /*

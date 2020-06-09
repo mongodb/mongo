@@ -1822,6 +1822,7 @@ __wt_btcur_init(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     memset(cbt, 0, sizeof(WT_CURSOR_BTREE));
 
     cbt->iface.session = &session->iface;
+    cbt->dhandle = session->dhandle;
 }
 
 /*

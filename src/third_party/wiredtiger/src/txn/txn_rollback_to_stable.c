@@ -247,10 +247,11 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
 
         /*
          * Stop processing when we find the newer version value of this key is stable according to
-         * the current version stop timestamp. Also it confirms that history store doesn't contains
-         * any newer version than the current version for the key.
+         * the current version stop timestamp when it is not appending the selected update to the
+         * update chain. Also it confirms that history store doesn't contains any newer version than
+         * the current version for the key.
          */
-        if (hs_stop_ts <= rollback_timestamp) {
+        if (!replace && hs_stop_ts <= rollback_timestamp) {
             __wt_verbose(session, WT_VERB_RTS,
               "history store update valid with stop timestamp: %s and stable timestamp: %s",
               __wt_timestamp_to_string(hs_stop_ts, ts_string[0]),
