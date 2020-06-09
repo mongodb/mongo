@@ -120,6 +120,8 @@ public:
      * with both the collection lock and CSRLock held in exclusive mode.
      *
      * In these methods, the CSRLock ensures concurrent access to the critical section.
+     *
+     * The shardVersionRecoverRefresh future must be boost::none when invoking these methods.
      */
     void enterCriticalSectionCatchUpPhase(OperationContext* opCtx, const CSRLock&);
     void enterCriticalSectionCommitPhase(OperationContext* opCtx, const CSRLock&);
@@ -136,7 +138,7 @@ public:
      * If the collection is currently in a critical section, returns the critical section signal to
      * be waited on. Otherwise, returns nullptr.
      *
-     * In this method, the CSRLock ensures concurrent access to the critical section.
+     * This method internally acquires the CSRLock in IS to wait for eventual ongoing operations.
      */
     std::shared_ptr<Notification<void>> getCriticalSectionSignal(
         OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op);
@@ -200,6 +202,32 @@ public:
         return _numMetadataManagerChanges;
     }
 
+    /**
+     * Initializes the shard version recover/refresh shared semifuture for other threads to wait on
+     * it.
+     *
+     * In this method, the CSRLock ensures concurrent access to the shared semifuture.
+     *
+     * To invoke this method, the criticalSectionSignal must not be hold by a different thread.
+     */
+    void setShardVersionRecoverRefreshFuture(SharedSemiFuture<void> future, const CSRLock&);
+
+    /**
+     * If there an ongoing shard version recover/refresh, it returns the shared semifuture to be
+     * waited on. Otherwise, returns boost::none.
+     *
+     * This method internally acquires the CSRLock in IS to wait for eventual ongoing operations.
+     */
+    boost::optional<SharedSemiFuture<void>> getShardVersionRecoverRefreshFuture(
+        OperationContext* opCtx);
+
+    /**
+     * Resets the shard version recover/refresh shared semifuture to boost::none.
+     *
+     * In this method, the CSRLock ensures concurrent access to the shared semifuture.
+     */
+    void resetShardVersionRecoverRefreshFuture(const CSRLock&);
+
 private:
     friend CSRLock;
 
@@ -251,6 +279,9 @@ private:
 
     // Used for testing to check the number of times a new MetadataManager has been installed.
     std::uint64_t _numMetadataManagerChanges{0};
+
+    // Tracks ongoing shard version recover/refresh. Eventually set to the semifuture to wait on.
+    boost::optional<SharedSemiFuture<void>> _shardVersionInRecoverOrRefresh;
 };
 
 /**

@@ -168,11 +168,13 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
                                                                  const CSRLock&) {
+    invariant(!_shardVersionInRecoverOrRefresh);
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCommitPhase(OperationContext* opCtx,
                                                                 const CSRLock&) {
+    invariant(!_shardVersionInRecoverOrRefresh);
     _critSec.enterCriticalSectionCommitPhase();
 }
 
@@ -421,6 +423,24 @@ size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
         return _metadataManager->numberOfRangesScheduledForDeletion();
     }
     return 0;
+}
+
+
+void CollectionShardingRuntime::setShardVersionRecoverRefreshFuture(SharedSemiFuture<void> future,
+                                                                    const CSRLock&) {
+    invariant(!_shardVersionInRecoverOrRefresh);
+    _shardVersionInRecoverOrRefresh.emplace(std::move(future));
+}
+
+boost::optional<SharedSemiFuture<void>>
+CollectionShardingRuntime::getShardVersionRecoverRefreshFuture(OperationContext* opCtx) {
+    auto csrLock = CSRLock::lockShared(opCtx, this);
+    return _shardVersionInRecoverOrRefresh;
+}
+
+void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture(const CSRLock&) {
+    invariant(_shardVersionInRecoverOrRefresh);
+    _shardVersionInRecoverOrRefresh = boost::none;
 }
 
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString nss)
