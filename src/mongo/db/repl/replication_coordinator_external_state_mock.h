@@ -87,7 +87,6 @@ public:
     virtual StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx);
     virtual void closeConnections();
     virtual void onStepDownHook();
-    virtual void onBecomeArbiterHook();
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();

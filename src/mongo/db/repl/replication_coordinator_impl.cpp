@@ -655,7 +655,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             lastOpTimeAndWallTime = lastOpTimeAndWallTimeStatus.getValue();
         }
     } else {
-        _externalState->onBecomeArbiterHook();
+        ReplicaSetAwareServiceRegistry::get(_service).onBecomeArbiter();
     }
 
     const auto lastOpTime = lastOpTimeAndWallTime.opTime;
@@ -1153,6 +1153,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     lk.unlock();
 
     _externalState->onDrainComplete(opCtx);
+    ReplicaSetAwareServiceRegistry::get(_service).onStepUpBegin(opCtx);
 
     if (MONGO_unlikely(hangBeforeRSTLOnDrainComplete.shouldFail())) {
         LOGV2(4712800, "Hanging due to hangBeforeRSTLOnDrainComplete failpoint");
@@ -1227,6 +1228,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
 
         AllowNonLocalWritesBlock writesAllowed(opCtx);
         OpTime firstOpTime = _externalState->onTransitionToPrimary(opCtx);
+        ReplicaSetAwareServiceRegistry::get(_service).onStepUpComplete(opCtx);
         lk.lock();
 
         auto status = _topCoord->completeTransitionToPrimary(firstOpTime);
@@ -4169,6 +4171,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         /* FALLTHROUGH */
         case kActionSteppedDown:
             _externalState->onStepDownHook();
+            ReplicaSetAwareServiceRegistry::get(_service).onStepDown();
             break;
         case kActionStartSingleNodeElection:
             _startElectSelfIfEligibleV1(StartElectionReasonEnum::kElectionTimeout);

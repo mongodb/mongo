@@ -55,6 +55,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
+#include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
@@ -686,7 +687,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
 
         if (isArbiter) {
-            _externalState->onBecomeArbiterHook();
+            ReplicaSetAwareServiceRegistry::get(_service).onBecomeArbiter();
         }
 
         if (!isArbiter && isFirstConfig) {
