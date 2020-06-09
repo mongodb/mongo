@@ -279,6 +279,20 @@ __wt_hs_cursor_close(WT_SESSION_IMPL *session, uint32_t session_flags, bool is_o
 }
 
 /*
+ * __hs_row_search --
+ *     Search the history store for a given key and position the cursor on it.
+ */
+static int
+__hs_row_search(WT_CURSOR_BTREE *hs_cbt, WT_ITEM *srch_key, bool insert)
+{
+    WT_DECL_RET;
+
+    WT_WITH_BTREE(CUR2S(hs_cbt), CUR2BT(hs_cbt),
+      ret = __wt_row_search(hs_cbt, srch_key, insert, NULL, false, NULL));
+    return (ret);
+}
+
+/*
  * __wt_hs_modify --
  *     Make an update to the history store.
  *
@@ -406,7 +420,7 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
      * Search the page and insert the updates. We expect there will be no existing data: assert that
      * we don't find a matching key.
      */
-    WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, &cursor->key, true, NULL, false, NULL));
+    WT_WITH_PAGE_INDEX(session, ret = __hs_row_search(cbt, &cursor->key, true));
     WT_ERR(ret);
     WT_ERR(__wt_hs_modify(cbt, hs_upd));
 
@@ -1354,7 +1368,7 @@ __verify_history_store_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint32
         WT_ERR(__wt_compare(session, NULL, &hs_key, prev_hs_key, &cmp));
         if (cmp == 0)
             continue;
-        WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, &hs_key, false, NULL, false, NULL));
+        WT_WITH_PAGE_INDEX(session, ret = __hs_row_search(cbt, &hs_key, false));
         WT_ERR(ret);
 
         found = cbt->compare == 0;

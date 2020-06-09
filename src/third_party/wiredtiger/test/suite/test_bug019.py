@@ -57,6 +57,8 @@ class test_bug019(wttest.WiredTigerTestCase):
             if i % 500 == 0:
                 prealloc = self.get_prealloc_stat()
                 if prealloc > self.max_prealloc:
+                    self.pr("Updating max_prealloc from " + str(self.max_prealloc))
+                    self.pr("    to new prealloc " + str(prealloc))
                     self.max_prealloc = prealloc
         c.close()
 
@@ -78,6 +80,9 @@ class test_bug019(wttest.WiredTigerTestCase):
         start_prealloc = self.get_prealloc_stat()
         self.populate(self.entries)
         self.session.checkpoint()
+        if self.max_prealloc <= start_prealloc:
+            self.pr("FAILURE: max_prealloc " + str(self.max_prealloc))
+            self.pr("FAILURE: start_prealloc " + str(start_prealloc))
         self.assertTrue(self.max_prealloc > start_prealloc)
 
         # Loop, making sure pre-allocation is working and the range is moving.
