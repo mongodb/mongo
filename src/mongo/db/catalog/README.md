@@ -285,7 +285,110 @@ _Code spelunking starting points:_
 What it does (motivation). How does it do it? Ticketing.
 
 # Collection Validation
-How we check that the data has not been corrupt, by ourselves or other parties involved in the system.
+
+Collection validation is used to check both the validity and integrity of the data, which in turn
+informs us whether there’s any data corruption present in the collection at the time of execution.
+
+There are two forms of validation, foreground and background.
+
+* Foreground validation requires exclusive access to the collection which prevents CRUD operations
+from running. The benefit of this is that we're not validating a potentially stale snapshot and that
+allows us to perform corrective operations such as fixing the collection's fast count.
+
+* Background validation only uses intent locks on the collection and reads using a timestamp in
+order to have a consistent view across the collection and its indexes. This mode allows CRUD
+operations to be performed without being blocked. Background validation also periodically yields its
+locks to allow operations that require exclusive locks to run, such as dropping the collection.
+
+Additionally, users can specify that they'd like to perform a `full` validation.
+* Storage engines run custom validation hooks on the
+  [RecordStore](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/record_store.h#L445-L451)
+  and
+  [SortedDataInterface](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/sorted_data_interface.h#L130-L135)
+  as part of the storage interface.
+* These hooks enable storage engines to perform internal data structure checks that MongoDB would
+  otherwise not be able to perform.
+* Full validations are not compatible with background validation.
+
+[Public docs on how to run validation and interpret the results.](https://docs.mongodb.com/manual/reference/command/validate/)
+
+## Types of Validation
+* Verifies the collection's durable catalog entry and in-memory state match.
+* Indexes are marked as [multikey](#multikey-indexes) correctly.
+* Index [multikey](#multikey-indexes) paths cover all of the records in the `RecordStore`.
+* Indexes are not missing [multikey](#multikey-indexes) metadata information.
+* Index entries are in increasing order if the sort order is ascending.
+* Index entries are in decreasing order if the sort order is descending.
+* Unique indexes do not have duplicate keys.
+* Documents in the collection are valid `BSON`.
+* Fast count matches the number of records in the `RecordStore`.
+  + For foreground validation only.
+* The number of _id index entries always matches the number of records in the `RecordStore`.
+* The number of index entries for each index is not greater than the number of records in the record
+  store.
+  + Not checked for indexed arrays and wildcard indexes.
+* The number of index entries for each index is not less than the number of records in the record
+  store.
+  + Not checked for sparse and partial indexes.
+
+## Validation Procedure
+* Instantiates the objects used throughout the validation procedure.
+    + [ValidateState](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_state.h)
+      maintains the state for the collection being validated, such as locking, cursor management
+      for the collection and each index, data throttling (for background validation), and general
+      information about the collection.
+    + [IndexConsistency](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.h)
+      keeps track of the number of keys detected in the record store and indexes. Detects when there
+      are index inconsistencies and maintains the information about the inconsistencies for
+      reporting.
+    + [ValidateAdaptor](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.h)
+      used to traverse the record store and indexes. Validates that the records seen are valid
+      `BSON` and not corrupted.
+* If a `full` validation was requested, we run the storage engines validation hooks at this point to
+  allow a more thorough check to be performed.
+* Validates the [collection’s in-memory](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection.h)
+  state with the [durable catalog](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/durable_catalog.h#L242-L243)
+  entry information to ensure there are [no mismatches](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L363-L425)
+  between the two.
+* [Initializes all the cursors](https://github.com/mongodb/mongo/blob/07765dda62d4709cddc9506ea378c0d711791b57/src/mongo/db/catalog/validate_state.cpp#L144-L205)
+  on the `RecordStore` and `SortedDataInterface` of each index in the `ValidateState` object.
+    + We choose a read timestamp (`ReadSource`) based on the validation mode and node configuration:
+      |                |  Standalone  | Replica Set  |
+      |----------------|:------------:|--------------|
+      | **Foreground** | kNoTimestamp | kNoTimestamp |
+      | **Background** | kNoTimestamp | kNoOverlap   |
+* Traverses the `RecordStore` using the `ValidateAdaptor` object.
+    + [Validates each record and adds the document's index key set to the IndexConsistency object](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L61-L140)
+      for consistency checks at later stages.
+        + In an effort to reduce the memory footprint of validation, the `IndexConsistency` object
+          [hashes](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L307-L309)
+          the keys passed in to one of many buckets.
+        + Document keys will
+          [increment](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L204-L214)
+          the respective bucket.
+        + Index keys will
+          [decrement](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L239-L248)
+          the respective bucket.
+    + Checks that the `RecordId` is in [increasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L305-L308).
+    + [Adjusts the fast count](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L348-L353)
+      stored in the `RecordStore` (when performing a foreground validation only).
+* Traverses the index entries for each index in the collection.
+    + [Validates the index key order to ensure that index entries are in increasing or decreasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L144-L188).
+    + Adds the index key to the `IndexConsistency` object for consistency checks at later stages.
+* After the traversals are finished, the `IndexConsistency` object is checked to detect any
+  inconsistencies between the collection and indexes.
+    + If a bucket has a `value of 0`, then there are no inconsistencies for the keys that hashed
+      there.
+    + If a bucket has a `value greater than 0`, then we are missing index entries.
+    + If a bucket has a `value less than 0`, then we have extra index entries.
+* Upon detection of any index inconsistencies, the [second phase of validation](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection_validation.cpp#L186-L240)
+  is executed. If no index inconsistencies were detected, we’re finished and we report back to the
+  user.
+    + The second phase of validation re-runs the first phase and expands its memory footprint by
+      recording the detailed information of the keys that were inconsistent during the first phase
+      of validation (keys that hashed to buckets where the value was not 0 in the end).
+    + This is used to [pinpoint exactly where the index inconsistencies were detected](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L109-L202)
+      and to report them.
 
 # Oplog Collection
 
