@@ -560,7 +560,7 @@ var ShardingTest = function(params) {
     this.chunkDiff = function(collName, dbName) {
         var c = this.chunkCounts(collName, dbName);
 
-        var min = 100000000;
+        var min = Number.MAX_VALUE;
         var max = 0;
         for (var s in c) {
             if (c[s] < min)
