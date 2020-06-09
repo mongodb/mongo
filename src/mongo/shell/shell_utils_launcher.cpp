@@ -874,8 +874,18 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
         LOGV2_WARNING(22824, "ResetDbpath(): nothing to do, path was empty");
         return undefinedReturn;
     }
-    if (boost::filesystem::exists(path))
-        boost::filesystem::remove_all(path);
+    if (boost::filesystem::exists(path)) {
+        try {
+            boost::filesystem::remove_all(path);
+        } catch (const boost::filesystem::filesystem_error&) {
+#ifdef _WIN32
+            sleepmillis(100);
+            boost::filesystem::remove_all(path);
+#else
+            throw;
+#endif
+        }
+    }
     boost::filesystem::create_directory(path);
     return undefinedReturn;
 }
