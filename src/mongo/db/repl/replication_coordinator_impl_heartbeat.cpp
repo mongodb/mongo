@@ -798,6 +798,25 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
 
+    // If we were initial syncing and are now REMOVED, we must cancel the initial sync before
+    // installing the new config, to avoid triggering a storage invariant that has initial
+    // sync as a special case.  We'll still fatally fail, but with a more meaningful error.
+    if (_initialSyncer && _memberState.startup2() && myIndexValue == -1) {
+        // The initial syncer may not be called inside the replication lock.
+        auto initialSyncerCopy = _initialSyncer;
+        LOGV2(4848000, "Canceling initial sync as this node is no longer in the configuration");
+        lk.unlock();
+        const auto status = initialSyncerCopy->shutdown();
+        if (!status.isOK()) {
+            LOGV2_WARNING(4848001, "InitialSyncer shutdown failed", "error"_attr = status);
+        }
+        initialSyncerCopy->join();
+        LOGV2_FATAL(4848002,
+                    "Initial sync failed due to node being removed from the configuration. "
+                    "Shutting down now. Restart the server to attempt a new initial sync");
+        lk.lock();
+    }
+
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
 
