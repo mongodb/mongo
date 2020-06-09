@@ -84,5 +84,3 @@ replica_sets_multiversion:
   test_file: jstests/replsets/transactions_during_step_down.js
 - ticket: SERVER-43614
   test_file: jstests/replsets/read_operations_during_step_up.js
-- ticket: SERVER-47645
-  test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
