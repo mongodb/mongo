@@ -137,6 +137,7 @@ typedef struct {
     uint32_t c_auto_throttle;
     uint32_t c_backups;
     char *c_backup_incremental;
+    uint32_t c_backup_incr_granularity;
     uint32_t c_bitcnt;
     uint32_t c_bloom;
     uint32_t c_bloom_bit_count;

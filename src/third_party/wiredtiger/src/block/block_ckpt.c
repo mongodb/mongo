@@ -355,16 +355,16 @@ __ckpt_add_blkmod_entry(
 
     WT_ASSERT(session, blk_mod->granularity != 0);
     /*
-     * Figure out how the starting and ending bits based on the granularity and our offset and
-     * length.
+     * Figure out the starting and ending locations in the bitmap based on its granularity and our
+     * offset and length. The bit locations are zero-based; be careful translating to sizes.
      */
     start_bit = (uint64_t)offset / blk_mod->granularity;
     end_bit = (uint64_t)(offset + len - 1) / blk_mod->granularity;
     WT_ASSERT(session, end_bit < UINT32_MAX);
     /* We want to grow the bitmap by 64 bits, or 8 bytes at a time. */
-    end_rdup_bits = WT_MAX(__wt_rduppo2((uint32_t)end_bit, 64), WT_BLOCK_MODS_LIST_MIN);
-    end_rdup_bytes = end_rdup_bits >> 3;
-    end_buf_bytes = (uint32_t)blk_mod->nbits >> 3;
+    end_rdup_bits = WT_MAX(__wt_rduppo2((uint32_t)end_bit + 1, 64), WT_BLOCK_MODS_LIST_MIN);
+    end_rdup_bytes = __bitstr_size(end_rdup_bits);
+    end_buf_bytes = __bitstr_size((uint32_t)blk_mod->nbits);
     /*
      * We are doing a lot of shifting. Make sure that the number of bytes we end up with is a
      * multiple of eight. We guarantee that in the rounding up call, but also make sure that the
@@ -384,6 +384,9 @@ __ckpt_add_blkmod_entry(
         }
         blk_mod->nbits = end_rdup_bits;
     }
+    /* Make sure we're not going to run past the end of the bitmap */
+    WT_ASSERT(session, blk_mod->bitstring.size >= __bitstr_size((uint32_t)blk_mod->nbits));
+    WT_ASSERT(session, end_bit < blk_mod->nbits);
     /* Set all the bits needed to record this offset/length pair. */
     __bit_nset(blk_mod->bitstring.mem, start_bit, end_bit);
     return (0);

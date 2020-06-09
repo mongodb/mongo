@@ -74,6 +74,9 @@ static CONFIG c[] = {
   {"backup.incremental", "type of backup (block | log | off)", C_IGNORE | C_STRING, 0, 0, 0, NULL,
     &g.c_backup_incremental},
 
+  {"backup.incr_granularity", "incremental backup block granularity in KB", 0x0, 4, 16384, 16384,
+    &g.c_backup_incr_granularity, NULL},
+
   {"btree.bitcnt", "number of bits for fixed-length column-store files", 0x0, 1, 8, 8, &g.c_bitcnt,
     NULL},
 
