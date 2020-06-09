@@ -40,8 +40,8 @@ const createIdx =
     IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {name: 'myidx'});
 if (isJsonLog(primary)) {
     checkLog.containsJson(primary, 20384, {
-        ns: coll.getFullName(),
-        descriptor: (desc) => {
+        namespace: coll.getFullName(),
+        properties: (desc) => {
             return desc.name === 'myidx';
         },
     });

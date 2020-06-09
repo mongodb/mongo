@@ -95,7 +95,7 @@ function startIndexBuildOnSecondaryAndLeaveUnfinished(primaryDB, writeConcern, s
         checkLog.containsWithCount(
             secondaryDB,
             "Index build interrupted due to \'leaveIndexBuildUnfinishedForShutdown\' " +
-                "failpoint. Mimicking shutdown error code.",
+                "failpoint. Mimicking shutdown error code",
             expectedFailPointMessageCount);
 
         // Wait until the secondary has a recovery timestamp beyond the index oplog entry. On
