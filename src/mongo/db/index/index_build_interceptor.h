@@ -147,6 +147,15 @@ public:
      */
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
 
+    std::string getSideWritesTableIdent() const {
+        return _sideWritesTable->rs()->getIdent();
+    }
+
+    boost::optional<std::string> getDuplicateKeyTrackerTableIdent() const {
+        return _duplicateKeyTracker ? boost::make_optional(_duplicateKeyTracker->getTableIdent())
+                                    : boost::none;
+    }
+
 private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 

@@ -261,9 +261,20 @@ public:
      * not perform any storage engine writes. May delete internal tables, but this is not
      * transactional.
      *
-     * This should only be used during shutdown or rollback.
+     * This should only be used during rollback.
      */
-    void abortWithoutCleanup(OperationContext* opCtx);
+    void abortWithoutCleanupForRollback(OperationContext* opCtx);
+
+    /**
+     * May be called at any time after construction but before a successful commit(). Suppresses
+     * the default behavior on destruction of removing all traces of uncommitted index builds. If
+     * this is a two-phase hybrid index build and resumable index builds are supported, writes the
+     * current state of the index build to disk using the storage engine. May delete internal
+     * tables, but this is not transactional.
+     *
+     * This should only be used during shutdown.
+     */
+    void abortWithoutCleanupForShutdown(OperationContext* opCtx);
 
     /**
      * Returns true if this build block supports background writes while building an index. This is
@@ -283,6 +294,10 @@ private:
 
         InsertDeleteOptions options;
     };
+
+    void _abortWithoutCleanup(OperationContext* opCtx, bool shutdown);
+
+    void _writeStateToDisk(OperationContext* opCtx) const;
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;

@@ -73,6 +73,11 @@ public:
      */
     Status retrySkippedRecords(OperationContext* opCtx, const Collection* collection);
 
+    boost::optional<std::string> getTableIdent() const {
+        return _skippedRecordsTable ? boost::make_optional(_skippedRecordsTable->rs()->getIdent())
+                                    : boost::none;
+    }
+
 private:
     IndexCatalogEntry* _indexCatalogEntry;
 

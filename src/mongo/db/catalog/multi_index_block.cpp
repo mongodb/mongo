@@ -611,20 +611,12 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx) {
-    invariant(!_buildIsCleanedUp);
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
-    // underneath us.
-    boost::optional<Lock::GlobalLock> lk;
-    if (!opCtx->lockState()->isWriteLocked()) {
-        lk.emplace(opCtx, MODE_IS);
-    }
+void MultiIndexBlock::abortWithoutCleanupForRollback(OperationContext* opCtx) {
+    _abortWithoutCleanup(opCtx, false /* shutdown */);
+}
 
-    for (auto& index : _indexes) {
-        index.block->deleteTemporaryTables(opCtx);
-    }
-    _buildIsCleanedUp = true;
+void MultiIndexBlock::abortWithoutCleanupForShutdown(OperationContext* opCtx) {
+    _abortWithoutCleanup(opCtx, true /* shutdown */);
 }
 
 MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {};
@@ -695,6 +687,84 @@ bool MultiIndexBlock::isBackgroundBuilding() const {
 
 void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
     _method = indexBuildMethod;
+}
+
+void MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx, bool shutdown) {
+    invariant(!_buildIsCleanedUp);
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
+    // underneath us.
+    boost::optional<Lock::GlobalLock> lk;
+    if (!opCtx->lockState()->isWriteLocked()) {
+        lk.emplace(opCtx, MODE_IX);
+    }
+
+    if (shutdown && _buildUUID && _method == IndexBuildMethod::kHybrid &&
+        opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
+        _writeStateToDisk(opCtx);
+    }
+
+    for (auto& index : _indexes) {
+        index.block->deleteTemporaryTables(opCtx);
+    }
+
+    _buildIsCleanedUp = true;
+}
+
+void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
+    BSONObjBuilder builder;
+    _buildUUID->appendToBuilder(&builder, "_id");
+    builder.append("phase", "unknown");
+    builder.appendNumber("collectionScanPosition", 0LL);
+
+    BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));
+    for (const auto& index : _indexes) {
+        BSONObjBuilder indexInfo(indexesArray.subobjStart());
+        indexInfo.append("tempDir", "");
+        indexInfo.append("fileName", "");
+
+        BSONArrayBuilder ranges(indexInfo.subarrayStart("ranges"));
+        ranges.done();
+
+        auto indexBuildInterceptor = index.block->getEntry()->indexBuildInterceptor();
+        indexInfo.append("sideWritesTable", indexBuildInterceptor->getSideWritesTableIdent());
+
+        if (auto duplicateKeyTrackerTableIdent =
+                indexBuildInterceptor->getDuplicateKeyTrackerTableIdent())
+            indexInfo.append("dupKeyTempTable", *duplicateKeyTrackerTableIdent);
+
+        if (auto skippedRecordTrackerTableIdent =
+                indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent())
+            indexInfo.append("skippedRecordTrackerTable", *skippedRecordTrackerTableIdent);
+
+        indexInfo.done();
+    }
+    indexesArray.done();
+
+    auto obj = builder.done();
+    auto rs = opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx);
+
+    WriteUnitOfWork wuow(opCtx);
+
+    auto status = rs->rs()->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp());
+    if (!status.isOK()) {
+        LOGV2_ERROR(4841501,
+                    "Failed to write resumable index build state to disk",
+                    logAttrs(*_buildUUID),
+                    "error"_attr = status.getStatus());
+        dassert(status,
+                str::stream() << "Failed to write resumable index build state to disk. UUID: "
+                              << *_buildUUID);
+
+        rs->deleteTemporaryTable(opCtx);
+        return;
+    }
+
+    wuow.commit();
+
+    LOGV2(4841502, "Wrote resumable index build state to disk", logAttrs(*_buildUUID));
+
+    rs->keepTemporaryTable();
 }
 
 }  // namespace mongo

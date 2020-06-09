@@ -860,7 +860,8 @@ bool StorageEngineImpl::supportsResumableIndexBuilds() const {
     return enableResumableIndexBuilds && supportsReadConcernMajority() && !isEphemeral() &&
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46;
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46 &&
+        !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
 }
 
 bool StorageEngineImpl::supportsPendingDrops() const {

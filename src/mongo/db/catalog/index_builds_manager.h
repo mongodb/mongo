@@ -158,10 +158,19 @@ public:
      * Returns true if a build existed to be signaled, as opposed to having already finished and
      * been cleared away, or not having yet started..
      */
-    bool abortIndexBuildWithoutCleanup(OperationContext* opCtx,
-                                       Collection* collection,
-                                       const UUID& buildUUID,
-                                       const std::string& reason);
+    bool abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
+                                                  Collection* collection,
+                                                  const UUID& buildUUID,
+                                                  const std::string& reason);
+
+    /**
+     * The same as abortIndexBuildWithoutCleanupForRollback above, but additionally writes the
+     * current state of the index build to disk if the specified index build is a two-phase hybrid
+     * index build and resumable index builds are supported.
+     */
+    bool abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
+                                                  Collection* collection,
+                                                  const UUID& buildUUID);
 
     /**
      * Returns true if the index build supports background writes while building an index. This is

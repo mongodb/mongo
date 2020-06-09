@@ -76,6 +76,10 @@ public:
      */
     Status checkConstraints(OperationContext* opCtx) const;
 
+    std::string getTableIdent() const {
+        return _keyConstraintsTable->rs()->getIdent();
+    }
+
 private:
     const IndexCatalogEntry* _indexCatalogEntry;
 

@@ -294,22 +294,36 @@ bool IndexBuildsManager::abortIndexBuild(OperationContext* opCtx,
     return true;
 }
 
-bool IndexBuildsManager::abortIndexBuildWithoutCleanup(OperationContext* opCtx,
-                                                       Collection* collection,
-                                                       const UUID& buildUUID,
-                                                       const std::string& reason) {
+bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
+                                                                  Collection* collection,
+                                                                  const UUID& buildUUID,
+                                                                  const std::string& reason) {
     auto builder = _getBuilder(buildUUID);
     if (!builder.isOK()) {
         return false;
     }
 
     LOGV2(20347,
-          "Index build aborted without cleanup: {buildUUID}: {reason}",
-          "Index build aborted without cleanup",
-          "buildUUID"_attr = buildUUID,
+          "Index build aborted without cleanup for rollback: {uuid}: {reason}",
+          "Index build aborted without cleanup for rollback",
+          logAttrs(buildUUID),
           "reason"_attr = reason);
 
-    builder.getValue()->abortWithoutCleanup(opCtx);
+    builder.getValue()->abortWithoutCleanupForRollback(opCtx);
+    return true;
+}
+
+bool IndexBuildsManager::abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
+                                                                  Collection* collection,
+                                                                  const UUID& buildUUID) {
+    auto builder = _getBuilder(buildUUID);
+    if (!builder.isOK()) {
+        return false;
+    }
+
+    LOGV2(4841500, "Index build aborted without cleanup for shutdown", logAttrs(buildUUID));
+
+    builder.getValue()->abortWithoutCleanupForShutdown(opCtx);
     return true;
 }
 

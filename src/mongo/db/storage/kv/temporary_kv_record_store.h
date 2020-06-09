@@ -39,8 +39,6 @@ class OperationContext;
 
 /**
  * Implementation of TemporaryRecordStore that manages a temporary RecordStore on a KVEngine.
- *
- * deleteTemporaryTable() must be called before destruction to delete the underlying RecordStore.
  */
 class TemporaryKVRecordStore : public TemporaryRecordStore {
 public:
@@ -62,9 +60,15 @@ public:
      */
     void deleteTemporaryTable(OperationContext* opCtx);
 
+    /**
+     * Keeps the persisted record store. This should be used for temporary tables that need to be
+     * be kept across shutdown.
+     */
+    void keepTemporaryTable();
+
 private:
     KVEngine* _kvEngine;
-    bool _recordStoreHasBeenDeleted = false;
+    bool _recordStoreHasBeenDeletedOrKept = false;
 };
 
 }  // namespace mongo
