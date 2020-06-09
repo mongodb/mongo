@@ -166,14 +166,12 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
     (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
-                                                                 const CSRLock&) {
+void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const CSRLock&) {
     invariant(!_shardVersionInRecoverOrRefresh);
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCommitPhase(OperationContext* opCtx,
-                                                                const CSRLock&) {
+void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&) {
     invariant(!_shardVersionInRecoverOrRefresh);
     _critSec.enterCriticalSectionCommitPhase();
 }
@@ -456,7 +454,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, Na
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
     invariant(csr->getCurrentMetadataIfKnown());
-    csr->enterCriticalSectionCatchUpPhase(_opCtx, csrLock);
+    csr->enterCriticalSectionCatchUpPhase(csrLock);
 }
 
 CollectionCriticalSection::~CollectionCriticalSection() {
@@ -476,7 +474,7 @@ void CollectionCriticalSection::enterCommitPhase() {
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
     invariant(csr->getCurrentMetadataIfKnown());
-    csr->enterCriticalSectionCommitPhase(_opCtx, csrLock);
+    csr->enterCriticalSectionCommitPhase(csrLock);
 }
 
 }  // namespace mongo

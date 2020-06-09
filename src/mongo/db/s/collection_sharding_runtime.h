@@ -123,8 +123,8 @@ public:
      *
      * The shardVersionRecoverRefresh future must be boost::none when invoking these methods.
      */
-    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx, const CSRLock&);
-    void enterCriticalSectionCommitPhase(OperationContext* opCtx, const CSRLock&);
+    void enterCriticalSectionCatchUpPhase(const CSRLock&);
+    void enterCriticalSectionCommitPhase(const CSRLock&);
 
     /**
      * Method to control the collection's critical secion. Method listed below must be called with

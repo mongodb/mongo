@@ -194,7 +194,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 if (!inRecoverOrRefresh && !critSecSignal) {
                     if (runRecover) {
                         CollectionShardingRuntime::get(opCtx, nss)
-                            ->enterCriticalSectionCatchUpPhase(opCtx, csrLock);
+                            ->enterCriticalSectionCatchUpPhase(csrLock);
                     }
 
                     csr->setShardVersionRecoverRefreshFuture(
@@ -250,7 +250,7 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
                     csr->getCriticalSectionSignal(_opCtx, ShardingMigrationCriticalSection::kWrite);
                 if (!inRecoverOrRefresh && !critSecSignal) {
                     CollectionShardingRuntime::get(_opCtx, _nss)
-                        ->enterCriticalSectionCatchUpPhase(_opCtx, csrLock);
+                        ->enterCriticalSectionCatchUpPhase(csrLock);
                     break;
                 }
             }
@@ -290,7 +290,7 @@ void ScopedShardVersionCriticalSection::enterCommitPhase() {
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-    csr->enterCriticalSectionCommitPhase(_opCtx, csrLock);
+    csr->enterCriticalSectionCommitPhase(csrLock);
 }
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
