@@ -13,7 +13,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/curop_helpers.js");    // for waitForCurOpByFilter.
+load("jstests/libs/curop_helpers.js");    // For waitForCurOpByFailPointNoNS.
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 load("jstests/noPassthrough/libs/index_build.js");
 
@@ -47,7 +47,7 @@ function runTest(st, testDb, portNum) {
         assert.eq(collList.cursor.firstBatch.length, 0);
     }, portNum);
 
-    waitForCurOpByFilter(testDb, {"failpointMsg": failpointName});
+    waitForCurOpByFailPointNoNS(testDb, failpointName);
 
     assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
 

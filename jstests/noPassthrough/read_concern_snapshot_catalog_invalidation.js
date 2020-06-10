@@ -4,6 +4,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+
 const kDbName = "test";
 const kCollName = "coll";
 
@@ -14,32 +16,6 @@ rst.initiate();
 const testDB = rst.getPrimary().getDB(kDbName);
 const adminDB = testDB.getSiblingDB("admin");
 const coll = testDB.getCollection(kCollName);
-
-// Waits for the operation to reach the "hangAfterPreallocateSnapshot" failpoint.
-function waitForOp(curOpFilter) {
-    assert.soon(
-        function() {
-            const res =
-                adminDB
-                    .aggregate([
-                        {$currentOp: {}},
-                        {
-                            $match: {
-                                $and: [curOpFilter, {failpointMsg: "hangAfterPreallocateSnapshot"}]
-                            }
-                        }
-                    ])
-                    .toArray();
-            if (res.length === 1) {
-                return true;
-            }
-            return false;
-        },
-        function() {
-            return "Failed to find operation in $currentOp output: " +
-                tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
-        });
-}
 
 function testCommand(cmd, curOpFilter) {
     coll.drop({writeConcern: {w: "majority"}});
@@ -64,7 +40,7 @@ function testCommand(cmd, curOpFilter) {
             "session.endSession();",
         rst.ports[0]);
 
-    waitForOp(curOpFilter);
+    waitForCurOpByFailPointNoNS(testDB, "hangAfterPreallocateSnapshot", curOpFilter);
 
     // Create an index on the collection the command was executed against. This will move the
     // collection's minimum visible timestamp to a point later than the point-in-time referenced

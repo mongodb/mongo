@@ -4,6 +4,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/curop_helpers.js");   // For waitForCurOpByFailPoint().
 load("jstests/libs/parallelTester.js");  // for Thread.
 
 function verifyCurrentOpFields(res, isActive) {
@@ -141,11 +142,7 @@ jsTest.log("Active transaction.");
     txnThread.start();
 
     // Wait until we know the failpoint has been reached.
-    assert.soon(function() {
-        const filter = {"failpointMsg": "waitInFindBeforeMakingBatch"};
-        return assert.commandWorked(st.rs0.getPrimary().getDB("admin").currentOp(filter))
-                   .inprog.length === 1;
-    });
+    waitForCurOpByFailPointNoNS(st.rs0.getPrimary().getDB("admin"), "waitInFindBeforeMakingBatch");
 
     // We don't know the id of the session started by the parallel thread, so use the find's comment
     // to get its currentOp output.

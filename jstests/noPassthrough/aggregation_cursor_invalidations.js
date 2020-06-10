@@ -12,6 +12,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+
 // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
 // the cursor establishing command.
 TestData.disableImplicitSessions = true;
@@ -330,10 +332,7 @@ assert.soon(function() {
 }, 'expected getMore operation to remain active');
 
 // Wait until we know the failpoint has been reached.
-assert.soon(function() {
-    const filter = {"failpointMsg": "waitAfterPinningCursorBeforeGetMoreBatch"};
-    return assert.commandWorked(testDB.currentOp(filter)).inprog.length === 1;
-});
+waitForCurOpByFailPointNoNS(testDB, "waitAfterPinningCursorBeforeGetMoreBatch");
 
 // Kill the operation.
 const opId = assert.commandWorked(testDB.currentOp(curOpFilter)).inprog[0].opid;

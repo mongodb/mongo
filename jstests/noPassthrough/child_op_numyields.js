@@ -5,6 +5,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+
 // Start a single mongoD using MongoRunner.
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -13,16 +15,6 @@ assert.neq(null, conn, "mongod was unable to start up");
 const testDB = conn.getDB("currentop_yield");
 const adminDB = conn.getDB("admin");
 const testColl = testDB.test;
-
-// Queries current operations until a single matching operation is found.
-function awaitMatchingCurrentOp(match) {
-    let currentOp = null;
-    assert.soon(() => {
-        currentOp = adminDB.aggregate([{$currentOp: {}}, match]).toArray();
-        return (currentOp.length === 1);
-    });
-    return currentOp[0];
-}
 
 // Executes a bulk remove using the specified 'docsToRemove' array, captures the 'numYields'
 // metrics from each child op, and confirms that the parent op's 'numYields' total is equivalent
@@ -58,9 +50,8 @@ function runYieldTest(docsToRemove) {
     // op is caught and their individual 'numYields' recorded.
     for (let childCount = 0; childCount < docsToRemove.length; childCount++) {
         // Wait for the child op to hit the first of two failpoints.
-        let childCurOp = awaitMatchingCurrentOp({
-            $match: {ns: testColl.getFullName(), failpointMsg: "hangBeforeChildRemoveOpFinishes"}
-        });
+        let childCurOp = waitForCurOpByFailPoint(
+            testDB, testColl.getFullName(), "hangBeforeChildRemoveOpFinishes")[0];
 
         // Add the child's yield count to the running total, and record the opid.
         assert(childOpId === null || childOpId === childCurOp.opid);
@@ -76,9 +67,7 @@ function runYieldTest(docsToRemove) {
         // Let the operation proceed to the 'hangBeforeChildRemoveOpIsPopped' failpoint.
         assert.commandWorked(testDB.adminCommand(
             {configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "off"}));
-        awaitMatchingCurrentOp({
-            $match: {ns: testColl.getFullName(), failpointMsg: "hangBeforeChildRemoveOpIsPopped"}
-        });
+        waitForCurOpByFailPoint(testDB, testColl.getFullName(), "hangBeforeChildRemoveOpIsPopped");
 
         // If this is not the final child op, re-enable the 'hangBeforeChildRemoveOpFinishes'
         // failpoint from earlier so that we don't miss the next child.
@@ -94,10 +83,8 @@ function runYieldTest(docsToRemove) {
 
     // Wait for the operation to hit the 'hangAfterAllChildRemoveOpsArePopped' failpoint, then
     // take the total number of yields recorded by the parent op.
-    const parentCurOp = awaitMatchingCurrentOp({
-        $match:
-            {opid: childOpId, op: "command", failpointMsg: "hangAfterAllChildRemoveOpsArePopped"}
-    });
+    const parentCurOp = waitForCurOpByFailPointNoNS(
+        testDB, "hangAfterAllChildRemoveOpsArePopped", {opid: childOpId})[0];
 
     // Verify that the parent's yield count equals the sum of the child ops' yields.
     assert.eq(parentCurOp.numYields, childYields);

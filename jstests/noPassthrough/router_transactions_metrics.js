@@ -5,6 +5,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/curop_helpers.js");   // For waitForCurOpByFailPoint().
 load("jstests/libs/parallelTester.js");  // for Thread.
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
@@ -657,11 +658,7 @@ jsTest.log("Active transaction.");
     txnThread.start();
 
     // Wait until we know the failpoint has been reached.
-    assert.soon(function() {
-        const filter = {"failpointMsg": "waitInFindBeforeMakingBatch"};
-        return assert.commandWorked(st.rs0.getPrimary().getDB("admin").currentOp(filter))
-                   .inprog.length === 1;
-    });
+    waitForCurOpByFailPointNoNS(st.rs0.getPrimary().getDB("admin"), "waitInFindBeforeMakingBatch");
 
     expectedStats.currentOpen += 1;
     expectedStats.currentActive += 1;

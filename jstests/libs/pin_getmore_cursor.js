@@ -11,6 +11,8 @@
  * pinned cursors.
  */
 
+load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+
 function withPinnedCursor(
     {conn, sessionId, db, assertFunction, runGetMoreFunc, failPointName, assertEndCounts}) {
     // This test runs manual getMores using different connections, which will not inherit the
@@ -46,16 +48,9 @@ function withPinnedCursor(
         cleanup = startParallelShell(code, conn.port);
 
         // Wait until we know the failpoint has been reached.
-        assert.soon(function() {
-            const arr = db.getSiblingDB("admin")
-                            .aggregate([
-                                {$currentOp: {localOps: true, allUsers: true}},
-                                {$match: {"failpointMsg": failPointName}}
-                            ])
-                            .toArray();
-            return arr.length > 0;
-        });
+        waitForCurOpByFailPointNoNS(db, failPointName, {}, {localOps: true, allUsers: true});
         assertFunction(cursorId, coll);
+
         // Eventually the cursor should be cleaned up.
         assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
 

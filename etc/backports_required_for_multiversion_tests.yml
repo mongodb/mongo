@@ -36,51 +36,17 @@ concurrency_sharded_replication_multiversion:
 replica_sets_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-43614
-  test_file: jstests/core/crud_ops_do_not_throw_locktimeout.js
-- ticket: SERVER-43614
-  test_file: jstests/core/txns/new_transactions_on_session_with_prepared_txn_block_behind_prepare.js
 - ticket: SERVER-47469
   test_file: jstests/core/apply_ops_system_dot_views.js
 
 sharding_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-43614
-  test_file: jstests/core/crud_ops_do_not_throw_locktimeout.js
 - ticket: SERVER-47469
   test_file: jstests/core/apply_ops_system_dot_views.js
 
 sharded_collections_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-43614
-  test_file: jstests/core/crud_ops_do_not_throw_locktimeout.js
 - ticket: SERVER-47469
   test_file: jstests/core/apply_ops_system_dot_views.js
-
-sharding_multiversion:
-- ticket: SERVER-43614
-  test_file: jstests/sharding/kill_pinned_cursor.js
-- ticket: SERVER-43614
-  test_file: jstests/sharding/killop.js
-- ticket: SERVER-43614
-  test_file: jstests/sharding/verify_sessions_expiration_sharded.js
-
-replica_sets_multiversion:
-- ticket: SERVER-43614
-  test_file: jstests/replsets/read_operations_during_step_down.js
-- ticket: SERVER-43614
-  test_file: jstests/replsets/no_disconnect_on_stepdown.js
-- ticket: SERVER-43614
-  test_file: jstests/replsets/step_down_on_secondary.js
-- ticket: SERVER-43614
-  test_file: jstests/replsets/verify_sessions_expiration_rs.js
-- ticket: SERVER-43614
-  test_file: jstests/replsets/initial_sync_during_stepdown.js
-- ticket: SERVER-43614
-  test_file: jstests/replsets/unconditional_step_down.js
-- ticket: SERVER-43614
-  test_file: jstests/replsets/transactions_during_step_down.js
-- ticket: SERVER-43614
-  test_file: jstests/replsets/read_operations_during_step_up.js

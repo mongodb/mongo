@@ -12,6 +12,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -22,15 +24,6 @@ const collName = "upsert_duplicate_key_retry_findAndModify";
 const testColl = testDB.getCollection(collName);
 
 testDB.runCommand({drop: collName});
-
-// Queries current operations until 'count' matching operations are found.
-function awaitMatchingCurrentOpCount(message, count) {
-    assert.soon(() => {
-        const currentOp =
-            adminDB.aggregate([{$currentOp: {}}, {$match: {failpointMsg: message}}]).toArray();
-        return (currentOp.length === count);
-    });
-}
 
 function performUpsert() {
     // This function is called from startParallelShell(), so closed-over variables will not be
@@ -49,7 +42,11 @@ assert.commandWorked(testDB.adminCommand(
 const awaitUpdate1 = startParallelShell(performUpsert, rst.ports[0]);
 const awaitUpdate2 = startParallelShell(performUpsert, rst.ports[0]);
 
-awaitMatchingCurrentOpCount("hangBeforeFindAndModifyPerformsUpdate", 2);
+// Query current operations until 2 matching operations are found.
+assert.soon(() => {
+    const curOps = waitForCurOpByFailPointNoNS(adminDB, "hangBeforeFindAndModifyPerformsUpdate");
+    return curOps.length === 2;
+});
 
 assert.commandWorked(testDB.adminCommand(
     {configureFailPoint: "hangBeforeFindAndModifyPerformsUpdate", mode: "off"}));
