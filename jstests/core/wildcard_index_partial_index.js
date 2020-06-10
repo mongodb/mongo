@@ -45,4 +45,19 @@ testPartialWildcardIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}}
 
 // Case where the partial filter expression is on a field not included in the index.
 testPartialWildcardIndex({"x.$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
+
+// This part of this test is designed to reproduce SERVER-48614. Historically, the correctness of
+// the following queries was impacted by a bug in the plan caching system.
+coll.drop();
+assert.commandWorked(coll.createIndex({"$**": 1}, {partialFilterExpression: {x: 1}}));
+assert.commandWorked(coll.insert({x: 1}));
+
+// Produce an active plan cache entry for a query that can use the index.
+for (let i = 0; i < 2; ++i) {
+    assert.eq(0, coll.find({x: 1, y: 1}).itcount());
+}
+// Run a query with a similar shape, but which is not eligible to use the cached plan. This query
+// should match the document in the collection (but would fail to match if it incorrectly indexed
+// the $eq:null predicate using the wildcard index).
+assert.eq(1, coll.find({x: 1, y: null}).itcount());
 })();
