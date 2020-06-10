@@ -379,6 +379,19 @@ public:
                                          " timestamp.",
                         !targetClusterTime->isNull());
 
+                // It is contradictory to read at a timestamp before a specified afterClusterTime,
+                // and would break read causality.
+                auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
+                if (afterClusterTime) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            str::stream()
+                                << "$_internalReadAtClusterTime value must not be less than "
+                                   "the provided afterClusterTime value. Requested clusterTime: "
+                                << targetClusterTime->toString()
+                                << "; afterClusterTime: " << afterClusterTime->toString(),
+                            targetClusterTime >= afterClusterTime->asTimestamp());
+                }
+
                 // We aren't holding the global lock in intent mode, so it is possible after
                 // comparing 'targetClusterTime' to 'lastAppliedOpTime' for the last applied opTime
                 // to go backwards or for the term to change due to replication rollback. This isn't

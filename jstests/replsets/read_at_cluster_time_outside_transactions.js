@@ -2,7 +2,11 @@
  * Tests that the "find" and "dbHash" commands support reading at a Timestamp by using the
  * $_internalReadAtClusterTime option.
  *
- * @tags: [requires_document_locking, uses_transactions]
+ * @tags: [
+ *   requires_document_locking,
+ *   requires_fcv_46,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";
@@ -31,6 +35,9 @@ rst.nodes.forEach(conn => {
 // insert.
 assert.commandWorked(collection.insert({_id: 1, comment: "should be seen by find command"}));
 assert.commandWorked(collection.insert({_id: 3, comment: "should be seen by find command"}));
+
+const earlierClusterTime = db.getSession().getOperationTime();
+
 assert.commandWorked(collection.insert({_id: 5, comment: "should be seen by getMore command"}));
 
 const clusterTime = db.getSession().getOperationTime();
@@ -113,6 +120,13 @@ assert.commandFailedWithCode(collection.runCommand("find", {
 assert.commandFailedWithCode(db.runCommand({
     dbHash: 1,
     $_internalReadAtClusterTime: futureClusterTime,
+}),
+                             ErrorCodes.InvalidOptions);
+
+// 'find' may not read at a cluster time that is earlier than an 'afterClusterTime' readConcern.
+assert.commandFailedWithCode(collection.runCommand("find", {
+    $_internalReadAtClusterTime: earlierClusterTime,
+    readConcern: {afterClusterTime: clusterTime}
 }),
                              ErrorCodes.InvalidOptions);
 
