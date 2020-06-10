@@ -366,7 +366,6 @@ env.CppUnitTest(
         'expression_date_test.cpp',
         'expression_field_path_test.cpp',
         'expression_find_internal_test.cpp',
-        'expression_internal_remove_field_tombstones_test.cpp',
         'expression_javascript_test.cpp',
         'expression_nary_test.cpp',
         'expression_object_test.cpp',

@@ -445,7 +445,6 @@ public:
     void visit(ExpressionInternalFindPositional* expr) final {}
     void visit(ExpressionInternalFindElemMatch* expr) final {}
     void visit(ExpressionFunction* expr) final {}
-    void visit(ExpressionInternalRemoveFieldTombstones* expr) final {}
     void visit(ExpressionRandom* expr) final {}
 
 private:
@@ -631,7 +630,6 @@ public:
     void visit(ExpressionInternalFindPositional* expr) final {}
     void visit(ExpressionInternalFindElemMatch* expr) final {}
     void visit(ExpressionFunction* expr) final {}
-    void visit(ExpressionInternalRemoveFieldTombstones* expr) final {}
     void visit(ExpressionRandom* expr) final {}
 
 private:
@@ -1179,9 +1177,6 @@ public:
     }
     void visit(ExpressionFunction* expr) final {
         unsupportedExpression("$function");
-    }
-    void visit(ExpressionInternalRemoveFieldTombstones* expr) final {
-        unsupportedExpression("$internalRemoveFieldTombstones");
     }
 
     void visit(ExpressionRandom* expr) final {
