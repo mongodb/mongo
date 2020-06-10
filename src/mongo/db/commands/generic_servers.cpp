@@ -350,7 +350,7 @@ void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
         ::abort();
     });
 
-    LOGV2(20475, "terminating, shutdown command received {cmdObj}", "cmdObj"_attr = cmdObj);
+    LOGV2(20475, "Terminating via shutdown command", "cmdObj"_attr = cmdObj);
 
 #if defined(_WIN32)
     // Signal the ServiceMain thread to shutdown.
