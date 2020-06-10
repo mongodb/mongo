@@ -110,7 +110,9 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
 
     {
         stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-        _isMultikey.store(_catalogIsMultikey(opCtx, &_indexMultikeyPaths));
+        const auto isMultikey = _catalogIsMultikey(opCtx, &_indexMultikeyPaths);
+        _isMultikeyForRead.store(isMultikey);
+        _isMultikeyForWrite.store(isMultikey);
         _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPaths.empty();
     }
 
@@ -182,7 +184,7 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
 }
 
 bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
-    auto ret = _isMultikey.load();
+    auto ret = _isMultikeyForRead.load();
     if (ret) {
         return true;
     }
@@ -260,7 +262,7 @@ void IndexCatalogEntryImpl::setHead(OperationContext* opCtx, RecordId newHead) {
 
 void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                                         const MultikeyPaths& multikeyPaths) {
-    if (!_indexTracksPathLevelMultikeyInfo && isMultikey(opCtx)) {
+    if (!_indexTracksPathLevelMultikeyInfo && _isMultikeyForWrite.load()) {
         // If the index is already set as multikey and we don't have any path-level information to
         // update, then there's nothing more for us to do.
         return;
@@ -323,31 +325,39 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
 
     // It's possible that the index type (e.g. ascending/descending index) supports tracking
     // path-level multikey information, but this particular index doesn't.
-    // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
-    // multikey information in order to avoid unintentionally setting path-level multikey
-    // information on an index created before 3.4.
+    // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level multikey
+    // information in order to avoid unintentionally setting path-level multikey information on an
+    // index created before 3.4.
     const bool indexMetadataHasChanged =
         _collection->setIndexIsMultikey(opCtx, _descriptor->indexName(), paths);
 
-    // When the recovery unit commits, update the multikey paths if needed and clear the plan cache
-    // if the index metadata has changed.
-    opCtx->recoveryUnit()->onCommit(
-        [this, multikeyPaths, indexMetadataHasChanged](boost::optional<Timestamp>) {
-            _isMultikey.store(true);
+    // In the absense of using the storage engine to read from the catalog, we must set multikey
+    // prior to the storage engine transaction committing.
+    //
+    // Moreover, there must not be an `onRollback` handler to reset this back to false. Given a long
+    // enough pause in processing `onRollback` handlers, a later writer that successfully flipped
+    // multikey can be undone. Alternatively, one could use a counter instead of a boolean to avoid
+    // that problem.
+    _isMultikeyForRead.store(true);
+    if (_indexTracksPathLevelMultikeyInfo) {
+        stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+            _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+        }
+    }
 
-            if (_indexTracksPathLevelMultikeyInfo) {
-                stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-                for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-                    _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
-                }
-            }
+    if (indexMetadataHasChanged && _infoCache) {
+        LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
+               << " set to multi key.";
+        _infoCache->clearQueryCache();
+    }
 
-            if (indexMetadataHasChanged && _infoCache) {
-                LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
-                       << " set to multi key.";
-                _infoCache->clearQueryCache();
-            }
-        });
+    opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp>) {
+        // Writers must attempt to flip multikey until it's confirmed a storage engine
+        // transaction successfully commits. Only after this point may a writer optimize out
+        // flipping multikey.
+        _isMultikeyForWrite.store(true);
+    });
 
     // Keep multikey changes in memory to correctly service later reads using this index.
     auto session = OperationContextSession::get(opCtx);
