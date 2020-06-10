@@ -358,6 +358,16 @@ public:
     virtual bool isHealthy() = 0;
 
     /**
+     * The implementation may choose to override this method to provide a quick check for
+     * connection health (e.g., by periodically caching the return value of the last invocation).
+     * Callers should be aware that a "true" return value does not always indicate a healthy
+     * connection.
+     */
+    virtual bool maybeHealthy() {
+        return isHealthy();
+    }
+
+    /**
      * Returns the last used time point for the connection
      */
     Date_t getLastUsed() const;

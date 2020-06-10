@@ -696,7 +696,7 @@ ConnectionPool::ConnectionHandle ConnectionPool::SpecificPool::tryGetConnection(
         _readyPool.erase(iter);
         conn->cancelTimeout();
 
-        if (!conn->isHealthy()) {
+        if (!conn->maybeHealthy()) {
             LOGV2(22561,
                   "Dropping unhealthy pooled connection to {hostAndPort}",
                   "Dropping unhealthy pooled connection",

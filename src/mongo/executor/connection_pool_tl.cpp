@@ -133,6 +133,23 @@ bool TLConnection::isHealthy() {
     return _client->isStillConnected();
 }
 
+bool TLConnection::maybeHealthy() {
+    // The connection has been successfully used after the last time we checked for its health, so
+    // we may assume it's still healthy.
+    if (auto lastUsedWithTimeout = getLastUsed() + kIsHealthyCacheTimeout;
+        lastUsedWithTimeout > _isHealthyExpiresAt) {
+        _isHealthyExpiresAt = lastUsedWithTimeout;
+        // We may reset `_isHealthyCache` below if `now()` has already passed `_isHealthyExpiresAt`.
+        _isHealthyCache = true;
+    }
+
+    if (auto currentTime = now(); !_isHealthyCache || currentTime >= _isHealthyExpiresAt) {
+        _isHealthyCache = isHealthy();
+        _isHealthyExpiresAt = currentTime + kIsHealthyCacheTimeout;
+    }
+    return _isHealthyCache;
+}
+
 AsyncDBClient* TLConnection::client() {
     return _client.get();
 }

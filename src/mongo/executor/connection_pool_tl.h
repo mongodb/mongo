@@ -162,6 +162,7 @@ public:
     const HostAndPort& getHostAndPort() const override;
     transport::ConnectSSLMode getSslMode() const override;
     bool isHealthy() override;
+    bool maybeHealthy() override;
     AsyncDBClient* client();
     Date_t now() override;
 
@@ -177,6 +178,11 @@ private:
     ServiceContext* const _serviceContext;
     std::shared_ptr<ConnectionPool::TimerInterface> _timer;
     const bool _skipAuth;
+
+    // Metadata for caching "isHealthy()" return value to boost performance.
+    bool _isHealthyCache = false;
+    Date_t _isHealthyExpiresAt = Date_t::min();
+    static constexpr auto kIsHealthyCacheTimeout = Milliseconds(1);
 
     HostAndPort _peer;
     transport::ConnectSSLMode _sslMode;
