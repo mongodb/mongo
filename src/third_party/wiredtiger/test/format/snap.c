@@ -101,22 +101,17 @@ snap_track(TINFO *tinfo, thread_op op)
 static void
 print_item_data(const char *tag, const uint8_t *data, size_t size)
 {
-    static const char hex[] = "0123456789abcdef";
-    u_char ch;
+    WT_ITEM tmp;
 
-    fprintf(stderr, "%s {", tag);
-    if (g.type == FIX)
-        fprintf(stderr, "0x%02x", data[0]);
-    else
-        for (; size > 0; --size, ++data) {
-            ch = data[0];
-            if (__wt_isprint(ch))
-                fprintf(stderr, "%c", (int)ch);
-            else
-                fprintf(
-                  stderr, "%x%x", (u_int)hex[(data[0] & 0xf0) >> 4], (u_int)hex[data[0] & 0x0f]);
-        }
-    fprintf(stderr, "}\n");
+    if (g.type == FIX) {
+        fprintf(stderr, "%s {0x%02x}\n", tag, data[0]);
+        return;
+    }
+
+    memset(&tmp, 0, sizeof(tmp));
+    testutil_check(__wt_raw_to_esc_hex(NULL, data, size, &tmp));
+    fprintf(stderr, "%s {%s}\n", tag, (char *)tmp.mem);
+    __wt_buf_free(NULL, &tmp);
 }
 
 /*
@@ -481,8 +476,8 @@ snap_repeat_single(WT_CURSOR *cursor, TINFO *tinfo)
 
     ret = session->timestamp_transaction(session, buf);
     if (ret == 0) {
-        traceop(tinfo, "%-10s%" PRIu64 " ts=%" PRIu64 " {%.*s}", "repeat", snap->keyno, snap->ts,
-          (int)snap->vsize, (char *)snap->vdata);
+        trace_op(tinfo, "repeat %" PRIu64 " ts=%" PRIu64 " {%s}", snap->keyno, snap->ts,
+          trace_bytes(tinfo, snap->vdata, snap->vsize));
 
         /* The only expected error is rollback. */
         ret = snap_verify(cursor, tinfo, snap);

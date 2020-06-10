@@ -1167,6 +1167,21 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4891_meta_ckptlist_get_alloc 2>&1
 
+  - name: csuite-wt6185-modify-ts-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt6185_modify_ts 2>&1
+
   - name: csuite-rwlock-test
     tags: ["pull_request"]
     depends_on:

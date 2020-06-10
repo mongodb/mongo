@@ -497,7 +497,7 @@ wts_verify(WT_CONNECTION *conn, const char *tag)
     track("verify", 0ULL, NULL);
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    tracemsg("%s", "=============== verify start");
+    trace_msg("%s", "=============== verify start");
 
     /*
      * Verify can return EBUSY if the handle isn't available. Don't yield and retry, in the case of
@@ -506,7 +506,7 @@ wts_verify(WT_CONNECTION *conn, const char *tag)
     ret = session->verify(session, g.uri, "strict");
     testutil_assertfmt(ret == 0 || ret == EBUSY, "session.verify: %s: %s", g.uri, tag);
 
-    tracemsg("%s", "=============== verify stop");
+    trace_msg("%s", "=============== verify stop");
     testutil_check(session->close(session, NULL));
 }
 

@@ -345,6 +345,8 @@ typedef struct {
     uint64_t insert_list[256]; /* column-store inserted records */
     u_int insert_list_cnt;
 
+    WT_ITEM vprint; /* Temporary buffer for printable values */
+
 #define TINFO_RUNNING 1  /* Running */
 #define TINFO_COMPLETE 2 /* Finished */
 #define TINFO_JOINED 3   /* Resolved */
