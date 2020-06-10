@@ -22,6 +22,7 @@
 stepback: true
 command_type: system
 pre_error_fails_task: true
+oom_tracker: true
 
 # Files that match an ignore-list pattern will not trigger a build, if they're the only modified
 # files in the patch.
