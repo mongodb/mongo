@@ -150,7 +150,7 @@ void UpdateDriver::parse(
 
     if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
         uassert(ErrorCodes::FailedToParse,
-                "arrayFilters may not be specified for pipeline-syle updates",
+                "arrayFilters may not be specified for pipeline-style updates",
                 arrayFilters.empty());
         _updateExecutor =
             std::make_unique<PipelineExecutor>(_expCtx, updateMod.getUpdatePipeline(), constants);
