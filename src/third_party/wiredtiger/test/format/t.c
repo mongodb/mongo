@@ -404,7 +404,7 @@ usage(void)
       "\t-q run quietly\n"
       "\t-R run on an existing database\n"
       "\t-T all|local\n"
-      "\t-t log operations\n");
+      "\t-t trace operations\n");
 
     config_error();
     exit(EXIT_FAILURE);

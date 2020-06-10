@@ -667,7 +667,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
     __wt_cursor_dhandle_incr_use(session);
 
     if (session->dhandle->checkpoint != NULL)
-        F_SET(cbt, WT_CBT_NO_TXN);
+        F_SET(cbt, WT_CBT_NO_TXN | WT_CBT_NO_TRACKING);
 
     if (bulk) {
         F_SET(cursor, WT_CURSTD_BULK);

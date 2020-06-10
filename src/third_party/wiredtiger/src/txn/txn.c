@@ -765,8 +765,8 @@ __txn_fixup_prepared_update(
      * If the history update already has a stop time point and we are committing the prepared update
      * there is no work to do.
      */
+    WT_ERR(__wt_upd_alloc_tombstone(session, &hs_upd, NULL));
     if (commit) {
-        WT_ERR(__wt_upd_alloc_tombstone(session, &hs_upd, NULL));
         hs_upd->start_ts = txn->commit_timestamp;
         hs_upd->durable_ts = txn->durable_timestamp;
         hs_upd->txnid = txn->id;
@@ -784,9 +784,7 @@ __txn_fixup_prepared_update(
         hs_upd->next->durable_ts = fix_upd->durable_ts;
         hs_upd->next->start_ts = fix_upd->start_ts;
         hs_upd->next->txnid = fix_upd->txnid;
-    } else
-        /* Remove the restored update from history store. */
-        WT_ERR(__wt_upd_alloc_tombstone(session, &hs_upd, NULL));
+    }
 
     WT_ERR(__wt_hs_modify(hs_cbt, hs_upd));
 

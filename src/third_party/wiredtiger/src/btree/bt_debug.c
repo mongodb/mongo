@@ -337,8 +337,6 @@ __wt_debug_addr(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size,
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
 
-    WT_ASSERT(session, S2BT_SAFE(session) != NULL);
-
     bm = S2BT(session)->bm;
 
     WT_RET(__wt_scr_alloc(session, 1024, &buf));
@@ -1022,10 +1020,10 @@ __debug_page(WT_DBG *ds, WT_REF *ref, uint32_t flags)
     WT_SESSION_IMPL *session;
 
     session = ds->session;
+    WT_RET(__wt_scr_alloc(session, 100, &ds->key));
 
     /* Set up history store support. */
     if (!WT_IS_HS(S2BT(session))) {
-        WT_RET(__wt_scr_alloc(session, 100, &ds->key));
         WT_RET(__wt_scr_alloc(session, 0, &ds->hs_key));
         WT_RET(__wt_scr_alloc(session, 0, &ds->hs_value));
         if (session->hs_cursor == NULL) {
