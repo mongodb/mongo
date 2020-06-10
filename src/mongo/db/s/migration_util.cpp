@@ -540,8 +540,9 @@ void submitOrphanRangesForCleanup(OperationContext* opCtx) {
                         2,
                         "Upgrade: Processing collection for orphaned range cleanup",
                         "namespace"_attr = nss);
-
-            submitOrphanRanges(opCtx, nss, uuid);
+            if (!nss.isNamespaceAlwaysUnsharded()) {
+                submitOrphanRanges(opCtx, nss, uuid);
+            }
         }
     }
 }

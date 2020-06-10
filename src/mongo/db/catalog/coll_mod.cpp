@@ -345,8 +345,9 @@ Status _collModInternal(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 
-    // This is necessary to set up CurOp, update the Top stats, and check shard version.
-    OldClientContext ctx(opCtx, nss.ns());
+    // This is necessary to set up CurOp, update the Top stats, and check shard version if the
+    // operation is not on a view.
+    OldClientContext ctx(opCtx, nss.ns(), !view);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);

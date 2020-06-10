@@ -82,8 +82,6 @@ void onDbVersionMismatch(OperationContext* opCtx,
     forceDatabaseRefresh(opCtx, dbName);
 }
 
-}  // namespace
-
 SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
                                                   const NamespaceString nss,
                                                   bool runRecover) {
@@ -98,9 +96,9 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
 
             ON_BLOCK_EXIT([&] {
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                // TODO (SERVER-48394): Views must not cause stale shard version
-                Lock::DBLock autoDb(opCtx.get(), nss.db(), MODE_IX);
-                Lock::CollectionLock collLock(opCtx.get(), nss, MODE_IX);
+                AutoGetCollection autoColl(
+                    opCtx.get(), nss, MODE_IX, AutoGetCollection::ViewMode::kViewsForbidden);
+
                 auto* const csr = CollectionShardingRuntime::get(opCtx.get(), nss);
                 auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx.get(), csr);
                 csr->resetShardVersionRecoverRefreshFuture(csrLock);
@@ -122,12 +120,18 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
         .share();
 }
 
+}  // namespace
+
 void onShardVersionMismatch(OperationContext* opCtx,
                             const NamespaceString& nss,
                             boost::optional<ChunkVersion> shardVersionReceived) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+
+    if (nss.isNamespaceAlwaysUnsharded()) {
+        return;
+    }
 
     ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
@@ -153,9 +157,8 @@ void onShardVersionMismatch(OperationContext* opCtx,
         bool triggeredRecoverRefresh = false;
 
         {
-            // TODO (SERVER-48394): Views must not cause stale shard version
             AutoGetCollection autoColl(
-                opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsPermitted);
+                opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsForbidden);
 
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
