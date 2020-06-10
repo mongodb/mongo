@@ -33,6 +33,8 @@ replica_sets_jscore_multiversion_passthrough:
   test_file: jstests/core/profile_find.js
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
+- ticket: SERVER-48614
+  test_file: jstests/core/wildcard_index_partial_index.js
 
 replica_sets_multiversion:
 - ticket: SERVER-42825
@@ -69,7 +71,11 @@ sharding_multiversion:
 sharding_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
+- ticket: SERVER-48614
+  test_file: jstests/core/wildcard_index_partial_index.js
 
 sharded_collections_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
+- ticket: SERVER-48614
+  test_file: jstests/core/wildcard_index_partial_index.js
