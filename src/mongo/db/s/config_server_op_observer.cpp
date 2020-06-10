@@ -35,10 +35,22 @@
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/cluster_identity_loader.h"
 
 namespace mongo {
+
+namespace {
+
+// The number of pending topologyTime tick points (stored in the _topologyTimeTickPoints vector) is
+// generally expected to be small (since shard topology operations should be infrequent, relative to
+// any config server replication lag).  If the size of this vector exceeds this constant (when a
+// tick point is added), then a warning (with id 4740600) will be logged.
+constexpr size_t kPossiblyExcessiveNumTopologyTimeTickPoints = 3;
+
+}  // namespace
 
 ConfigServerOpObserver::ConfigServerOpObserver() = default;
 
@@ -92,10 +104,148 @@ void ConfigServerOpObserver::onReplicationRollback(OperationContext* opCtx,
     }
 }
 
+void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       OptionalCollectionUUID uuid,
+                                       std::vector<InsertStatement>::const_iterator begin,
+                                       std::vector<InsertStatement>::const_iterator end,
+                                       bool fromMigrate) {
+    if (nss != ShardType::ConfigNS) {
+        return;
+    }
+
+    boost::optional<Timestamp> maxTopologyTime;
+    for (auto it = begin; it != end; it++) {
+        Timestamp newTopologyTime = it->doc[ShardType::topologyTime.name()].timestamp();
+        if (newTopologyTime != Timestamp()) {
+            if (!maxTopologyTime || newTopologyTime > *maxTopologyTime) {
+                maxTopologyTime = newTopologyTime;
+            }
+        }
+    }
+
+    if (maxTopologyTime) {
+        opCtx->recoveryUnit()->onCommit(
+            [this, maxTopologyTime](boost::optional<Timestamp> unusedCommitTime) mutable {
+                _registerTopologyTimeTickPoint(*maxTopologyTime);
+            });
+    }
+}
+
+void ConfigServerOpObserver::onApplyOps(OperationContext* opCtx,
+                                        const std::string& dbName,
+                                        const BSONObj& applyOpCmd) {
+    if (dbName != ShardType::ConfigNS.db()) {
+        return;
+    }
+
+    const auto& updatesElem = applyOpCmd["applyOps"];
+    if (updatesElem.type() != Array) {
+        return;
+    }
+    auto updates = updatesElem.Array();
+    if (updates.size() != 2) {
+        return;
+    }
+
+    if (updates[0].type() != Object) {
+        return;
+    }
+    auto removeShard = updates[0].Obj();
+    if (removeShard["op"].str() != "d") {
+        return;
+    }
+    if (removeShard["ns"].str() != ShardType::ConfigNS.ns()) {
+        return;
+    }
+
+    if (updates[1].type() != Object) {
+        return;
+    }
+    auto updateShard = updates[1].Obj();
+    if (updateShard["op"].str() != "u") {
+        return;
+    }
+    if (updateShard["ns"].str() != ShardType::ConfigNS.ns()) {
+        return;
+    }
+    auto updateElem = updateShard["o"];
+    if (updateElem.type() != Object) {
+        return;
+    }
+    auto updateObj = updateElem.Obj();
+    auto setElem = updateObj["$set"];
+    if (setElem.type() != Object) {
+        return;
+    }
+    auto setObj = setElem.Obj();
+    auto newTopologyTime = setObj[ShardType::topologyTime()].timestamp();
+    if (newTopologyTime == Timestamp()) {
+        return;
+    }
+
+    opCtx->recoveryUnit()->onCommit(
+        [this, newTopologyTime](boost::optional<Timestamp> unusedCommitTime) mutable {
+            _registerTopologyTimeTickPoint(newTopologyTime);
+        });
+}
+
+void ConfigServerOpObserver::_registerTopologyTimeTickPoint(Timestamp newTopologyTime) {
+    std::vector<Timestamp>::size_type numTickPoints = 0;
+    {
+        stdx::lock_guard lg(_mutex);
+        _topologyTimeTickPoints.push_back(newTopologyTime);
+        numTickPoints = _topologyTimeTickPoints.size();
+    }
+    if (numTickPoints >= kPossiblyExcessiveNumTopologyTimeTickPoints) {
+        LOGV2_WARNING(4740600,
+                      "possibly excessive number of topologyTime tick points",
+                      "numTickPoints"_attr = numTickPoints,
+                      "kPossiblyExcessiveNumTopologyTimeTickPoints"_attr =
+                          kPossiblyExcessiveNumTopologyTimeTickPoints);
+    }
+}
+
+void ConfigServerOpObserver::_tickTopologyTimeIfNecessary(ServiceContext* service,
+                                                          Timestamp newCommitPointTime) {
+    stdx::lock_guard lg(_mutex);
+
+    if (_topologyTimeTickPoints.empty()) {
+        return;
+    }
+
+    // Find and remove the topologyTime tick points that have been passed.
+    boost::optional<Timestamp> maxPassedTime;
+    auto it = _topologyTimeTickPoints.begin();
+    while (it != _topologyTimeTickPoints.end()) {
+        const auto& topologyTimeTickPoint = *it;
+        if (newCommitPointTime >= topologyTimeTickPoint) {
+            if (!maxPassedTime || topologyTimeTickPoint > *maxPassedTime) {
+                maxPassedTime = topologyTimeTickPoint;
+            }
+            it = _topologyTimeTickPoints.erase(it);
+        } else {
+            it++;
+        }
+    }
+
+    // If any tick points were passed, tick TopologyTime to the largest one.
+    if (maxPassedTime) {
+        VectorClockMutable::get(service)->tickTo(VectorClock::Component::TopologyTime,
+                                                 LogicalTime(*maxPassedTime));
+    }
+}
+
 void ConfigServerOpObserver::onMajorityCommitPointUpdate(ServiceContext* service,
                                                          const repl::OpTime& newCommitPoint) {
+    Timestamp newCommitPointTime = newCommitPoint.getTimestamp();
+
+    // TopologyTime must always be <= ConfigTime, so ticking them separately is fine as long as
+    // ConfigTime is done first.
     VectorClockMutable::get(service)->tickTo(VectorClock::Component::ConfigTime,
-                                             LogicalTime(newCommitPoint.getTimestamp()));
+                                             LogicalTime(newCommitPointTime));
+
+    _tickTopologyTimeIfNecessary(service, newCommitPointTime);
 }
 
 }  // namespace mongo

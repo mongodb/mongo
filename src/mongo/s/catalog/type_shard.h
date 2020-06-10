@@ -67,6 +67,7 @@ public:
     static const BSONField<long long> maxSizeMB;
     static const BSONField<BSONArray> tags;
     static const BSONField<ShardState> state;
+    static const BSONField<Timestamp> topologyTime;
 
     ShardType() = default;
     ShardType(std::string name, std::string host, std::vector<std::string> tags = {});
@@ -123,6 +124,11 @@ public:
     }
     void setState(const ShardState state);
 
+    Timestamp getTopologyTime() const {
+        return _topologyTime.value_or(Timestamp());
+    }
+    void setTopologyTime(const Timestamp& topologyTime);
+
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
@@ -138,6 +144,8 @@ private:
     boost::optional<std::vector<std::string>> _tags;
     // (O) shard state
     boost::optional<ShardState> _state;
+    // (O) topologyTime
+    boost::optional<Timestamp> _topologyTime;
 };
 
 }  // namespace mongo

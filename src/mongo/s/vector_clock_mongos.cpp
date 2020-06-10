@@ -96,6 +96,7 @@ VectorClock::LogicalTimeArray VectorClockMongoS::_gossipInInternal(OperationCont
     LogicalTimeArray newTime;
     _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
     _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ConfigTime);
+    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::TopologyTime);
     return newTime;
 }
 

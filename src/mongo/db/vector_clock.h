@@ -50,7 +50,8 @@ public:
     enum class Component : uint8_t {
         ClusterTime = 0,
         ConfigTime = 1,
-        _kNumComponents = 2,
+        TopologyTime = 2,
+        _kNumComponents = 3,
     };
 
 private:
@@ -95,6 +96,7 @@ public:
 
     static constexpr char kClusterTimeFieldName[] = "$clusterTime";
     static constexpr char kConfigTimeFieldName[] = "$configTime";
+    static constexpr char kTopologyTimeFieldName[] = "$topologyTime";
 
     // Decorate ServiceContext with VectorClock* which points to the actual vector clock
     // implementation.

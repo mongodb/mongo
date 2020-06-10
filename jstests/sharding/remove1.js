@@ -10,6 +10,10 @@ s.ensurePrimaryShard('needToMove', s.shard0.shardName);
 // Returns an error when trying to remove a shard that doesn't exist.
 assert.commandFailedWithCode(s.s0.adminCommand({removeshard: "shardz"}), ErrorCodes.ShardNotFound);
 
+var topologyTime0 = config.shards.findOne({_id: s.shard0.shardName}).topologyTime;
+var topologyTime1 = config.shards.findOne({_id: s.shard1.shardName}).topologyTime;
+assert.gt(topologyTime1, topologyTime0);
+
 // First remove puts in draining mode, the second tells me a db needs to move, the third
 // actually removes
 assert.commandWorked(s.s0.adminCommand({removeshard: s.shard0.shardName}));
@@ -33,6 +37,9 @@ assert.eq('completed', removeResult.state, 'Shard was not removed: ' + tojson(re
 var existingShards = config.shards.find({}).toArray();
 assert.eq(
     1, existingShards.length, "Removed server still appears in count: " + tojson(existingShards));
+
+var topologyTime2 = existingShards[0].topologyTime;
+assert.gt(topologyTime2, topologyTime1);
 
 assert.commandFailed(s.s0.adminCommand({removeshard: s.shard1.shardName}));
 

@@ -49,6 +49,7 @@ const BSONField<bool> ShardType::draining("draining");
 const BSONField<long long> ShardType::maxSizeMB("maxSize");
 const BSONField<BSONArray> ShardType::tags("tags");
 const BSONField<ShardType::ShardState> ShardType::state("state");
+const BSONField<Timestamp> ShardType::topologyTime("topologyTime");
 
 ShardType::ShardType(std::string name, std::string host, std::vector<std::string> tags)
     : _name(std::move(name)), _host(std::move(host)), _tags(std::move(tags)) {}
@@ -138,6 +139,19 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
         }
     }
 
+    {
+        Timestamp shardTopologyTime;
+        Status status = bsonExtractTimestampField(source, topologyTime.name(), &shardTopologyTime);
+        if (status.isOK()) {
+            shard._topologyTime = shardTopologyTime;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // topologyTime field can be mssing in which case it is presumed to be an uninitialized
+            // timestamp
+        } else {
+            return status;
+        }
+    }
+
     return shard;
 }
 
@@ -174,6 +188,8 @@ BSONObj ShardType::toBSON() const {
         builder.append(tags(), getTags());
     if (_state)
         builder.append(state(), static_cast<std::underlying_type<ShardState>::type>(getState()));
+    if (_topologyTime)
+        builder.append(topologyTime(), getTopologyTime());
 
     return builder.obj();
 }
@@ -204,9 +220,15 @@ void ShardType::setTags(const std::vector<std::string>& tags) {
     invariant(tags.size() > 0);
     _tags = tags;
 }
+
 void ShardType::setState(const ShardState state) {
     invariant(!_state.is_initialized());
     _state = state;
+}
+
+void ShardType::setTopologyTime(const Timestamp& topologyTime) {
+    invariant(!_topologyTime);
+    _topologyTime = topologyTime;
 }
 
 }  // namespace mongo

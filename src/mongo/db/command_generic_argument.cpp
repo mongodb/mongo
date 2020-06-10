@@ -52,7 +52,7 @@ struct SpecialArgRecord {
 // If that changes, it should be added. When you add to this list, consider whether you
 // should also change the filterCommandRequestForPassthrough() function.
 // clang-format off
-static constexpr std::array<SpecialArgRecord, 30> specials{{
+static constexpr std::array<SpecialArgRecord, 31> specials{{
     //                                       /-isGeneric
     //                                       |  /-stripFromRequest
     //                                       |  |  /-stripFromReply
@@ -85,7 +85,8 @@ static constexpr std::array<SpecialArgRecord, 30> specials{{
     {"readOnly"_sd,                          0, 0, 1},
     {"comment"_sd,                           1, 0, 0},
     {"maxTimeMSOpOnly"_sd,                   1, 0, 0},
-    {"$configTime"_sd,                       1, 1, 1}}};
+    {"$configTime"_sd,                       1, 1, 1},
+    {"$topologyTime"_sd,                     1, 1, 1}}};
 // clang-format on
 
 template <bool SpecialArgRecord::*pmo>

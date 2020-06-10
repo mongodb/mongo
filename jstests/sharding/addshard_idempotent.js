@@ -45,11 +45,16 @@ for (var i = 0; i < shards.length; i++) {
     if (shard._id == 'newShard1') {
         assert.eq(shard1.host, shard.host);
         assert.eq(1024, shard.maxSize);
+        assert(shard.topologyTime instanceof Timestamp);
+        var shard1TopologyTime = shard.topologyTime;
     } else {
         assert.eq('newShard2', shard._id);
         assert.eq(shard2.getURL(), shard.host);
+        assert(shard.topologyTime instanceof Timestamp);
+        var shard2TopologyTime = shard.topologyTime;
     }
 }
+assert.gt(shard2TopologyTime, shard1TopologyTime);
 MongoRunner.stopMongod(shard1);
 shard2.stopSet();
 st.stop();

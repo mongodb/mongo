@@ -112,6 +112,7 @@ bool VectorClockMongoD::_gossipOutInternal(OperationContext* opCtx,
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
         serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         _gossipOutComponent(opCtx, out, time, Component::ConfigTime);
+        _gossipOutComponent(opCtx, out, time, Component::TopologyTime);
     }
     return wasClusterTimeOutput;
 }
@@ -129,6 +130,7 @@ VectorClock::LogicalTimeArray VectorClockMongoD::_gossipInInternal(OperationCont
     _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ConfigTime);
+        _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::TopologyTime);
     }
     return newTime;
 }
@@ -166,15 +168,21 @@ LogicalTime VectorClockMongoD::tick(Component component, uint64_t nTicks) {
 }
 
 void VectorClockMongoD::tickTo(Component component, LogicalTime newTime) {
+    if (component == Component::ClusterTime) {
+        // The ClusterTime is allowed to tickTo in certain very limited and trusted cases (eg.
+        // initializing based on oplog timestamps), so we have to allow it here.
+        _advanceComponentTimeTo(component, std::move(newTime));
+        return;
+    }
+
     if (component == Component::ConfigTime &&
         serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         _advanceComponentTimeTo(component, std::move(newTime));
         return;
     }
 
-    if (component == Component::ClusterTime) {
-        // The ClusterTime is allowed to tickTo in certain very limited and trusted cases (eg.
-        // initializing based on oplog timestamps), so we have to allow it here.
+    if (component == Component::TopologyTime &&
+        serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         _advanceComponentTimeTo(component, std::move(newTime));
         return;
     }

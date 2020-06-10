@@ -57,6 +57,7 @@
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
@@ -674,6 +675,12 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             return versionResponse.getValue().commandStatus;
         }
 
+        // Tick clusterTime to get a new topologyTime for this mutation of the topology.
+        auto newTopologyTime =
+            VectorClockMutable::get(opCtx)->tick(VectorClock::Component::ClusterTime, 1);
+
+        shardType.setTopologyTime(newTopologyTime.asTimestamp());
+
         LOGV2(21942,
               "Going to insert new entry for shard into config.shards: {shardType}",
               "Going to insert new entry for shard into config.shards",
@@ -735,9 +742,50 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                 "Could not find shard metadata for shard after adding it. This most likely "
                 "indicates that the shard was removed immediately after it was added."};
     }
+
     stopMonitoringGuard.dismiss();
 
     return shardType.getName();
+}
+
+BSONObj makeCommitRemoveShardCommand(const std::string& removedShardName,
+                                     const std::string& controlShardName,
+                                     const Timestamp& newTopologyTime) {
+    // Remove removeShard's document.
+    BSONArrayBuilder updates;
+    {
+        BSONObjBuilder op;
+        op.append("op", "d");
+        op.appendBool("b", false);  // No upserting
+        op.append("ns", ShardType::ConfigNS.ns());
+
+        BSONObjBuilder n(op.subobjStart("o"));
+        n.append(ShardType::name(), removedShardName);
+        n.done();
+
+        updates.append(op.obj());
+    }
+
+    // Update controlShard's topologyTime.
+    {
+        BSONObjBuilder op;
+        op.append("op", "u");
+        op.appendBool("b", false);
+        op.append("ns", ShardType::ConfigNS.ns());
+
+        BSONObjBuilder n(op.subobjStart("o"));
+        n.append("$set", BSON(ShardType::topologyTime() << newTopologyTime));
+        n.done();
+
+        BSONObjBuilder q(op.subobjStart("o2"));
+        q.append(ShardType::name(), controlShardName);
+        q.done();
+
+        updates.append(op.obj());
+    }
+
+    return BSON("applyOps" << updates.arr() << "alwaysUpsert" << false << "writeConcern"
+                           << ShardingCatalogClient::kLocalWriteConcern.toBSON());
 }
 
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
@@ -850,12 +898,46 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         21949, "Going to remove shard: {shardId}", "Going to remove shard", "shardId"_attr = name);
     audit::logRemoveShard(opCtx->getClient(), name);
 
-    uassertStatusOKWithContext(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             ShardType::ConfigNS,
-                                             BSON(ShardType::name() << name),
-                                             ShardingCatalogClient::kLocalWriteConcern),
-        str::stream() << "error completing removeShard operation on: " << name);
+    // Find a controlShard to be updated.
+    auto controlShardQueryStatus =
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            ShardType::ConfigNS,
+                                            BSON(ShardType::name.ne(name)),
+                                            {},
+                                            1);
+    auto controlShardResponse = uassertStatusOK(controlShardQueryStatus);
+    // Since it's not possible to remove the last shard, there should always be a control shard.
+    uassert(4740601,
+            "unable to find a controlShard to update during removeShard",
+            !controlShardResponse.docs.empty());
+    const auto controlShardStatus = ShardType::fromBSON(controlShardResponse.docs.front());
+    uassertStatusOKWithContext(controlShardStatus, "unable to parse control shard");
+    std::string controlShardName = controlShardStatus.getValue().getName();
+
+    // Tick clusterTime to get a new topologyTime for this mutation of the topology.
+    auto newTopologyTime =
+        VectorClockMutable::get(opCtx)->tick(VectorClock::Component::ClusterTime, 1);
+
+    // Use applyOps to both remove the shard's document and update topologyTime on another document.
+    auto command =
+        makeCommitRemoveShardCommand(name, controlShardName, newTopologyTime.asTimestamp());
+
+    StatusWith<Shard::CommandResponse> applyOpsCommandResponse =
+        configShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            ShardType::ConfigNS.db().toString(),
+            command,
+            Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOKWithContext(applyOpsCommandResponse,
+                               str::stream()
+                                   << "error completing removeShard operation on: " << name);
+    uassertStatusOKWithContext(applyOpsCommandResponse.getValue().commandStatus,
+                               str::stream()
+                                   << "error completing removeShard operation on: " << name);
 
     // The shard which was just removed must be reflected in the shard registry, before the replica
     // set monitor is removed, otherwise the shard would be referencing a dropped RSM. Check that

@@ -24,6 +24,7 @@ assert.neq(null, configDB.databases.findOne({_id: 'testDB'}));
 
 var newShardDoc = configDB.shards.findOne({_id: newShard});
 assert.eq(1024, newShardDoc.maxSize);
+assert(newShardDoc.topologyTime instanceof Timestamp);
 
 // a mongod with an existing database name should not be allowed to become a shard
 var conn2 = MongoRunner.runMongod({'shardsvr': ""});

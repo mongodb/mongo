@@ -344,7 +344,10 @@ const VectorClock::ComponentArray<std::unique_ptr<VectorClock::GossipFormat>>
         std::make_unique<VectorClock::GossipFormat::Signed>(VectorClock::kClusterTimeFieldName),
         std::make_unique<
             VectorClock::GossipFormat::OnlyGossipOutOnNewFCV<VectorClock::GossipFormat::Plain>>(
-            VectorClock::kConfigTimeFieldName)};
+            VectorClock::kConfigTimeFieldName),
+        std::make_unique<
+            VectorClock::GossipFormat::OnlyGossipOutOnNewFCV<VectorClock::GossipFormat::Plain>>(
+            VectorClock::kTopologyTimeFieldName)};
 
 bool VectorClock::gossipOut(OperationContext* opCtx,
                             BSONObjBuilder* outMessage,

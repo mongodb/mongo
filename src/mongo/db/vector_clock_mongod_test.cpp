@@ -132,6 +132,18 @@ DEATH_TEST_F(VectorClockMongoDTest, CannotTickToConfigTime, "Hit a MONGO_UNREACH
     vc->tickTo(VectorClock::Component::ConfigTime, LogicalTime());
 }
 
+DEATH_TEST_F(VectorClockMongoDTest, CannotTickTopologyTime, "Hit a MONGO_UNREACHABLE") {
+    auto sc = getServiceContext();
+    auto vc = VectorClockMutable::get(sc);
+    vc->tick(VectorClock::Component::TopologyTime, 1);
+}
+
+DEATH_TEST_F(VectorClockMongoDTest, CannotTickToTopologyTime, "Hit a MONGO_UNREACHABLE") {
+    auto sc = getServiceContext();
+    auto vc = VectorClockMutable::get(sc);
+    vc->tickTo(VectorClock::Component::TopologyTime, LogicalTime());
+}
+
 TEST_F(VectorClockMongoDTest, GossipOutInternal) {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
@@ -146,10 +158,11 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
     auto obj = bob.obj();
 
     // On plain replset servers, gossip out to internal clients should have $clusterTime, but not
-    // $configTime.
+    // $configTime or $topologyTime.
     ASSERT_TRUE(obj.hasField("$clusterTime"));
     ASSERT_EQ(obj["$clusterTime"].Obj()["clusterTime"].timestamp(), clusterTime.asTimestamp());
     ASSERT_FALSE(obj.hasField("$configTime"));
+    ASSERT_FALSE(obj.hasField("$topologyTime"));
 }
 
 TEST_F(VectorClockMongoDTest, GossipOutExternal) {
@@ -166,10 +179,11 @@ TEST_F(VectorClockMongoDTest, GossipOutExternal) {
     auto obj = bob.obj();
 
     // On plain replset servers, gossip out to external clients should have $clusterTime, but not
-    // $configTime.
+    // $configTime or $topologyTime.
     ASSERT_TRUE(obj.hasField("$clusterTime"));
     ASSERT_EQ(obj["$clusterTime"].Obj()["clusterTime"].timestamp(), clusterTime.asTimestamp());
     ASSERT_FALSE(obj.hasField("$configTime"));
+    ASSERT_FALSE(obj.hasField("$topologyTime"));
 }
 
 TEST_F(VectorClockMongoDTest, GossipInInternal) {
@@ -184,37 +198,40 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
                       << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(2, 2)),
+                      << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2)),
                  false,
                  transport::Session::kInternalClient);
 
     // On plain replset servers, gossip in from internal clients should update $clusterTime, but not
-    // $configTime.
+    // $configTime or $topologyTime.
     auto afterTime = vc->getTime();
     ASSERT_EQ(afterTime[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
     ASSERT_EQ(afterTime[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
                       << BSON("clusterTime" << Timestamp(1, 1) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(1, 1)),
+                      << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1)),
                  false,
                  transport::Session::kInternalClient);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
     ASSERT_EQ(afterTime2[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
                       << BSON("clusterTime" << Timestamp(3, 3) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(3, 3)),
+                      << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3)),
                  false,
                  transport::Session::kInternalClient);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(3, 3));
     ASSERT_EQ(afterTime3[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime3[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 }
 
 TEST_F(VectorClockMongoDTest, GossipInExternal) {
@@ -229,34 +246,37 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
                       << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(2, 2)),
+                      << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2)),
                  false);
 
     // On plain replset servers, gossip in from external clients should update $clusterTime, but not
-    // $configTime.
+    // $configTime or $topologyTime.
     auto afterTime = vc->getTime();
     ASSERT_EQ(afterTime[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
     ASSERT_EQ(afterTime[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
                       << BSON("clusterTime" << Timestamp(1, 1) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(1, 1)),
+                      << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1)),
                  false);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
     ASSERT_EQ(afterTime2[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
                       << BSON("clusterTime" << Timestamp(3, 3) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(3, 3)),
+                      << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3)),
                  false);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(3, 3));
-    ASSERT_EQ(afterTime3[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime3[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 }
 
 }  // namespace

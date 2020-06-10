@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/op_observer.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -81,7 +82,7 @@ public:
                    OptionalCollectionUUID uuid,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) override {}
+                   bool fromMigrate) override;
 
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override {}
 
@@ -155,7 +156,7 @@ public:
 
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
-                    const BSONObj& applyOpCmd) override {}
+                    const BSONObj& applyOpCmd) override;
 
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
@@ -183,6 +184,15 @@ public:
 
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override;
+
+private:
+    void _registerTopologyTimeTickPoint(Timestamp newTopologyTime);
+    void _tickTopologyTimeIfNecessary(ServiceContext* service, Timestamp newCommitPointTime);
+
+    // Guards access to the instance variables below.
+    Mutex _mutex = MONGO_MAKE_LATCH("ConfigServerOpObserver");
+
+    std::vector<Timestamp> _topologyTimeTickPoints;
 };
 
 }  // namespace mongo
