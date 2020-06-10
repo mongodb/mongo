@@ -41,7 +41,7 @@ platforms:
       username: admin
   - name: debian81
     driver:
-      image_id: ami-896d85e2
+      image_id: ami-116d857a
     transport:
       username: admin
   - name: debian92
