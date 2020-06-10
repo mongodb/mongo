@@ -91,6 +91,11 @@ ARTIFACTS_NEEDING_PERMISSIONS = {
     os.path.join("jstests", "libs", "keyForRollover"): 0o600,
 }
 
+ARTIFACT_ENTRIES_MAP_WINDOWS = {
+    "mongo_binaries": "Binaries",
+    "mongo_debugsymbols": "mongo-debugsymbols.zip",
+}
+
 ARTIFACT_ENTRIES_MAP = {
     "mongo_binaries": "Binaries",
     "mongo_debugsymbols": "mongo-debugsymbols.tgz",
@@ -186,9 +191,10 @@ def generate_bypass_expansions(target: TargetBuild, artifacts_list: List) -> Dic
     # Convert the artifacts list to a dictionary for easy lookup.
     artifacts_dict = {artifact["name"].strip(): artifact["link"] for artifact in artifacts_list}
 
+    artifact_entries_map = ARTIFACT_ENTRIES_MAP_WINDOWS if _IS_WINDOWS else ARTIFACT_ENTRIES_MAP
     bypass_expansions = {
         key: _artifact_to_bypass_path(target.project, artifacts_dict[value])
-        for key, value in ARTIFACT_ENTRIES_MAP.items()
+        for key, value in artifact_entries_map.items()
     }
     bypass_expansions["bypass_compile"] = True
     return bypass_expansions
