@@ -56,8 +56,13 @@ assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()})
 st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 st.shardColl(mongosColl, {_id: 1}, false);
 
-const configChunks = st.configRS.getPrimary().getDB("config")["chunks"];
-const origChunk = configChunks.findOne({ns: ns});
+const getChunkHistory = (query) => {
+    // Always read from the config server primary in case there is a failover.
+    const configChunks = st.configRS.getPrimary().getDB("config")["chunks"];
+    return configChunks.findOne(query);
+};
+
+const origChunk = getChunkHistory({ns: ns});
 jsTestLog(`Original chunk: ${tojson(origChunk)}`);
 assert.eq(1, origChunk.history.length, tojson(origChunk));
 let result = mongosDB.runCommand({insert: "test", documents: [{_id: 0}]});
@@ -68,7 +73,7 @@ assert.lte(origChunk.history[0].validAfter, insertTS, `history: ${tojson(origChu
 jsTestLog("Move chunk to shard 1, create second history entry");
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
 const postMoveChunkTime = Date.now();
-let chunk = configChunks.findOne({_id: origChunk._id});
+let chunk = getChunkHistory({_id: origChunk._id});
 jsTestLog(`Chunk: ${tojson(chunk)}`);
 assert.eq(2, chunk.history.length, tojson(chunk));
 
@@ -83,7 +88,7 @@ while (Date.now() - insertTS < testWindowMS) {
     assert.commandWorked(mongosDB.runCommand(
         {find: "test", readConcern: {level: "snapshot", atClusterTime: insertTS}}));
 
-    chunk = configChunks.findOne({_id: origChunk._id});
+    chunk = getChunkHistory({_id: origChunk._id});
     assert.eq(2, chunk.history.length, tojson(chunk));
     sleep(50);
 }
@@ -94,7 +99,7 @@ sleep(chunkExpirationTime + testMarginMS - Date.now());
 
 jsTestLog("Move chunk back to shard 0 to trigger history cleanup");
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
-chunk = configChunks.findOne({_id: origChunk._id});
+chunk = getChunkHistory({_id: origChunk._id});
 jsTestLog(`Chunk: ${tojson(chunk)}`);
 // Oldest history entry was deleted: we added one and deleted one, still have two.
 assert.eq(2, chunk.history.length, tojson(chunk));
