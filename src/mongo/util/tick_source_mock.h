@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
@@ -45,7 +46,7 @@ template <typename D = Milliseconds>
 class TickSourceMock final : public TickSource {
 public:
     TickSource::Tick getTicks() override {
-        return _currentTicks;
+        return _currentTicks.load();
     };
 
     TickSource::Tick getTicksPerSecond() override {
@@ -58,17 +59,17 @@ public:
      * Advance the ticks by the given amount of milliseconds.
      */
     void advance(const D& duration) {
-        _currentTicks += duration.count();
+        _currentTicks.fetchAndAdd(duration.count());
     }
 
     /**
      * Resets the tick count to the given value.
      */
     void reset(TickSource::Tick tick) {
-        _currentTicks = std::move(tick);
+        _currentTicks.store(std::move(tick));
     }
 
 private:
-    TickSource::Tick _currentTicks = 0;
+    AtomicWord<TickSource::Tick> _currentTicks{0};
 };
 }  // namespace mongo
