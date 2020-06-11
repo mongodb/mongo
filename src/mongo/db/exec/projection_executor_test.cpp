@@ -573,7 +573,7 @@ TEST(ProjectionExecutorType, GetExpressionForPathGetsTopLevelExpression) {
     auto projectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
     auto expr = Expression::parseObject(expCtx, projectObj, expCtx->variablesParseState);
     ProjectionPolicies defaultPolicies;
-    auto node = InclusionNode(defaultPolicies);
+    auto node = InclusionNode(defaultPolicies, false);
     node.addExpressionForPath(FieldPath("key"), expr);
     BSONObjBuilder bob;
     ASSERT_EQ(expr, node.getExpressionForPath(FieldPath("key")));
@@ -586,7 +586,7 @@ TEST(ProjectionExecutorType, GetExpressionForPathGetsCorrectTopLevelExpression) 
     auto correctExpr = Expression::parseObject(expCtx, correctObj, expCtx->variablesParseState);
     auto incorrectExpr = Expression::parseObject(expCtx, incorrectObj, expCtx->variablesParseState);
     ProjectionPolicies defaultPolicies;
-    auto node = InclusionNode(defaultPolicies);
+    auto node = InclusionNode(defaultPolicies, false);
     node.addExpressionForPath(FieldPath("key"), correctExpr);
     node.addExpressionForPath(FieldPath("other"), incorrectExpr);
     BSONObjBuilder bob;
@@ -598,7 +598,7 @@ TEST(ProjectionExecutorType, GetExpressionForPathGetsNonTopLevelExpression) {
     auto projectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
     auto expr = Expression::parseObject(expCtx, projectObj, expCtx->variablesParseState);
     ProjectionPolicies defaultPolicies;
-    auto node = InclusionNode(defaultPolicies);
+    auto node = InclusionNode(defaultPolicies, false);
     node.addExpressionForPath(FieldPath("key.second"), expr);
     BSONObjBuilder bob;
     ASSERT_EQ(expr, node.getExpressionForPath(FieldPath("key.second")));
