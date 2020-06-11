@@ -47,7 +47,9 @@ namespace mongo::projection_executor {
  */
 class ProjectionNode {
 public:
-    ProjectionNode(ProjectionPolicies policies, std::string pathToNode = "");
+    ProjectionNode(ProjectionPolicies policies,
+                   bool containsComputedFields,
+                   std::string pathToNode = "");
 
     virtual ~ProjectionNode() = default;
 
@@ -160,7 +162,7 @@ protected:
     std::string _pathToNode;
 
     // Whether this node or any child of this node contains a computed field.
-    bool _subtreeContainsComputedFields{false};
+    bool _subtreeContainsComputedFields;
 
 private:
     // Iterates 'inputDoc' for each projected field, adding to or removing from 'outputDoc'. Also

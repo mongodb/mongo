@@ -55,7 +55,7 @@ public:
                              {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
                               ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays,
                               ProjectionPolicies::ComputedFieldsPolicy::kAllowComputedFields}),
-          _root(new InclusionNode(_policies)) {}
+          _root(new InclusionNode(_policies, true)) {}
 
     /**
      * Creates the data needed to perform an AddFields.

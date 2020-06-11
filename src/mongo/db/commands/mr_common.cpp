@@ -110,7 +110,7 @@ auto translateMap(boost::intrusive_ptr<ExpressionContext> expCtx, std::string co
         ExpressionFieldPath::parse(expCtx.get(), "$$ROOT", expCtx->variablesParseState),
         code);
     auto node = std::make_unique<projection_executor::InclusionNode>(
-        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kExcludeId});
+        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kExcludeId}, false);
     node->addExpressionForPath(FieldPath{"emits"s}, std::move(emitExpression));
     auto inclusion = std::unique_ptr<TransformerInterface>{
         std::make_unique<projection_executor::InclusionProjectionExecutor>(
@@ -153,7 +153,7 @@ auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx,
             code,
             ExpressionFunction::kJavaScript);
         auto node = std::make_unique<projection_executor::InclusionNode>(
-            ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
+            ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId}, false);
         node->addProjectionForPath(FieldPath{"_id"s});
         node->addExpressionForPath(FieldPath{"value"s}, std::move(jsExpression));
         auto inclusion = std::unique_ptr<TransformerInterface>{

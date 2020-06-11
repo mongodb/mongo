@@ -36,8 +36,12 @@ using ArrayRecursionPolicy = ProjectionPolicies::ArrayRecursionPolicy;
 using ComputedFieldsPolicy = ProjectionPolicies::ComputedFieldsPolicy;
 using DefaultIdPolicy = ProjectionPolicies::DefaultIdPolicy;
 
-ProjectionNode::ProjectionNode(ProjectionPolicies policies, std::string pathToNode)
-    : _policies(policies), _pathToNode(std::move(pathToNode)) {}
+ProjectionNode::ProjectionNode(ProjectionPolicies policies,
+                               bool containsComputedFields,
+                               std::string pathToNode)
+    : _policies(policies),
+      _pathToNode(std::move(pathToNode)),
+      _subtreeContainsComputedFields(containsComputedFields) {}
 
 void ProjectionNode::addProjectionForPath(const FieldPath& path) {
     makeOptimizationsStale();
