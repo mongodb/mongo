@@ -1127,7 +1127,6 @@ function appendSetParameterArgs(argArray) {
             argArray.push(...['--setParameter', "enableTestCommands=1"]);
         }
 
-        // TODO SERVER-46726 include v4.4 once SERVER-46726 is backported to v4.4
         if (!programMajorMinorVersion || programMajorMinorVersion > 404) {
             if (jsTest.options().testingDiagnosticsEnabled) {
                 argArray.push(...['--setParameter', "testingDiagnosticsEnabled=1"]);
