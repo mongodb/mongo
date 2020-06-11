@@ -197,13 +197,20 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
                                    << "Failed to read persisted collections entry for collection '"
                                    << nss.ns() << "'.");
 
-    auto statusWithChunk =
-        shardmetadatautil::readShardChunks(opCtx,
-                                           nss,
-                                           BSONObj(),
-                                           BSON(ChunkType::lastmod() << -1),
-                                           1LL,
-                                           statusWithCollection.getValue().getEpoch());
+    auto cachedCollection = statusWithCollection.getValue();
+    if (cachedCollection.getRefreshing() && *cachedCollection.getRefreshing()) {
+        // Chunks was in the middle of refresh last time and we didn't finish cleanly. The version
+        // on the cached collection does not represent the maximum version in the cached chunks.
+        // Furthermore, since we don't bump the versions during refineShardKey and we don't store
+        // the epoch in the cache chunks, we can't tell whether the chunks are pre or post refined.
+        // Therefore, we have no choice but to just throw away the cache and start from scratch.
+        uassertStatusOK(dropChunksAndDeleteCollectionsEntry(opCtx, nss));
+
+        return ChunkVersion::UNSHARDED();
+    }
+
+    auto statusWithChunk = shardmetadatautil::readShardChunks(
+        opCtx, nss, BSONObj(), BSON(ChunkType::lastmod() << -1), 1LL, cachedCollection.getEpoch());
     uassertStatusOKWithContext(
         statusWithChunk,
         str::stream() << "Failed to read highest version persisted chunk for collection '"
