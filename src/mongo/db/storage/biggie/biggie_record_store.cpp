@@ -468,8 +468,10 @@ void RecordStore::Cursor::save() {}
 void RecordStore::Cursor::saveUnpositioned() {}
 
 bool RecordStore::Cursor::restore() {
+    if (!_savedPosition)
+        return true;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    it = (_savedPosition) ? workingCopy->lower_bound(_savedPosition.value()) : workingCopy->end();
+    it = workingCopy->lower_bound(_savedPosition.value());
     _lastMoveWasRestore = it == workingCopy->end() || it->first != _savedPosition.value();
 
     // Capped iterators die on invalidation rather than advancing.
@@ -539,10 +541,11 @@ void RecordStore::ReverseCursor::save() {}
 void RecordStore::ReverseCursor::saveUnpositioned() {}
 
 bool RecordStore::ReverseCursor::restore() {
+    if (!_savedPosition)
+        return true;
+
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    it = _savedPosition
-        ? StringStore::const_reverse_iterator(workingCopy->upper_bound(_savedPosition.value()))
-        : workingCopy->rend();
+    it = StringStore::const_reverse_iterator(workingCopy->upper_bound(_savedPosition.value()));
     _lastMoveWasRestore = (it == workingCopy->rend() || it->first != _savedPosition.value());
 
     // Capped iterators die on invalidation rather than advancing.
