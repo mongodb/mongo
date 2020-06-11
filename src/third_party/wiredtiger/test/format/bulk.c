@@ -178,6 +178,8 @@ wts_load(void)
             }
             g.c_delete_pct += g.c_write_pct / 2;
             g.c_write_pct = g.c_write_pct / 2;
+
+            break;
         }
     }
 
