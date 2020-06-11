@@ -160,6 +160,10 @@ struct __wt_session_impl {
     /* Sessions have an associated statistics bucket based on its ID. */
     u_int stat_bucket; /* Statistics bucket offset */
 
+#ifdef HAVE_DIAGNOSTIC
+    uint8_t dump_raw; /* Configure debugging page dump */
+#endif
+
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_SESSION_BACKUP_CURSOR 0x00000001u
 #define WT_SESSION_BACKUP_DUP 0x00000002u

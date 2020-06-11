@@ -342,7 +342,7 @@ __wt_meta_block_metadata(WT_SESSION_IMPL *session, const char *config, WT_CKPT *
         __wt_encrypt_size(session, kencryptor, a->size, &encrypt_size);
         WT_ERR(__wt_buf_grow(session, b, encrypt_size));
         WT_ERR(__wt_encrypt(session, kencryptor, 0, a, b));
-        WT_ERR(__wt_buf_grow(session, a, b->size * 2));
+        WT_ERR(__wt_buf_grow(session, a, b->size * 2 + 1));
         __wt_fill_hex(b->mem, b->size, a->mem, a->memsize, &a->size);
 
         metadata = a->data;
