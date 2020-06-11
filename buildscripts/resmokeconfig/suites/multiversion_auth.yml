@@ -18,9 +18,6 @@ selector:
   # TODO: SERVER-28104
   - jstests/multiVersion/minor_version_tags_new_old_new.js
 
-  # TODO: SERVER-42982
-  - jstests/multiVersion/upgrade_downgrade_cluster.js
-
   # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
   # it attempts to connect to an upgraded mongoD. Un-blacklist when SERVER-42919 fixes this issue.
   - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
