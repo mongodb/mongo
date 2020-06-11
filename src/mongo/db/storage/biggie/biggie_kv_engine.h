@@ -47,9 +47,8 @@ class JournalListener;
  */
 class KVEngine : public mongo::KVEngine {
 public:
-    KVEngine() : mongo::KVEngine() {}
-
-    virtual ~KVEngine() {}
+    KVEngine();
+    virtual ~KVEngine();
 
     virtual mongo::RecoveryUnit* newRecoveryUnit();
 
