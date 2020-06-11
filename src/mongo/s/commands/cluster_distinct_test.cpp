@@ -80,12 +80,12 @@ TEST_F(ClusterDistinctTest, MaxRetriesSnapshotErrors) {
 }
 
 TEST_F(ClusterDistinctTest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    testAttachesAtClusterTimeForTxnSnapshotReadConcern(kDistinctCmdTargeted,
-                                                       kDistinctCmdScatterGather);
+    testAttachesAtClusterTimeForSnapshotReadConcern(kDistinctCmdTargeted,
+                                                    kDistinctCmdScatterGather);
 }
 
 TEST_F(ClusterDistinctTest, SnapshotReadConcernWithAfterClusterTime) {
-    testTxnSnapshotReadConcernWithAfterClusterTime(kDistinctCmdTargeted, kDistinctCmdScatterGather);
+    testSnapshotReadConcernWithAfterClusterTime(kDistinctCmdTargeted, kDistinctCmdScatterGather);
 }
 
 }  // namespace

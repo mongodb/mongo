@@ -20,7 +20,7 @@ let st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2, mongos: 1});
 let testDB = st.getDB(dbName);
 
 // Insert data to create the collection.
-assert.commandWorked(testDB[collName].insert({x: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(testDB[collName].insert({x: 1}));
 
 flushRoutersAndRefreshShardMetadata(st, {ns: dbName + "." + collName, dbNames: [dbName]});
 

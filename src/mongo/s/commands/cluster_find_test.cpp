@@ -31,23 +31,34 @@
 
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
 
 namespace mongo {
 namespace {
 
 class ClusterFindTest : public ClusterCommandTestFixture {
 protected:
-    // Batch size 1, so when expectInspectRequest returns one doc, mongos doesn't wait for more.
-    const BSONObj kFindCmdScatterGather = BSON("find" << kNss.coll() << "batchSize" << 1);
-    const BSONObj kFindCmdTargeted =
-        BSON("find" << kNss.coll() << "filter" << BSON("_id" << 0) << "batchSize" << 1);
+    const BSONObj kFindCmdScatterGather = BSON("find"
+                                               << "coll");
+    const BSONObj kFindCmdTargeted = BSON("find"
+                                          << "coll"
+                                          << "filter" << BSON("_id" << 0));
 
     // The index of the shard expected to receive the response is used to prevent different shards
     // from returning documents with the same shard key. This is expected to be 0 for queries
     // targeting one shard.
     void expectReturnsSuccess(int shardIndex) override {
-        expectInspectRequest(shardIndex, [](const executor::RemoteCommandRequest&) {});
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
+
+            std::vector<BSONObj> batch = {BSON("_id" << shardIndex)};
+            CursorResponse cursorResponse(kNss, CursorId(0), batch);
+
+            BSONObjBuilder bob;
+            bob.appendElementsUnique(
+                cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse));
+            appendTxnResponseMetadata(bob);
+            return bob.obj();
+        });
     }
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
@@ -57,17 +68,8 @@ protected:
             cb(request);
 
             std::vector<BSONObj> batch = {BSON("_id" << shardIndex)};
-            // User supplies no atClusterTime. For single-shard non-transaction snapshot reads,
-            // mongos lets the shard (which this function simulates) select a read timestamp.
-            boost::optional<Timestamp> atClusterTime;
-            if (request.cmdObj["txnNumber"].eoo() && !request.cmdObj["readConcern"].eoo()) {
-                auto rc = request.cmdObj["readConcern"].Obj();
-                if (rc["level"].String() == "snapshot" && rc["atClusterTime"].eoo()) {
-                    atClusterTime = kShardClusterTime;
-                }
-            }
+            CursorResponse cursorResponse(kNss, CursorId(0), batch);
 
-            CursorResponse cursorResponse(kNss, kCursorId, batch, atClusterTime);
             BSONObjBuilder bob;
             bob.appendElementsUnique(
                 cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse));
@@ -89,23 +91,12 @@ TEST_F(ClusterFindTest, MaxRetriesSnapshotErrors) {
     testMaxRetriesSnapshotErrors(kFindCmdTargeted, kFindCmdScatterGather);
 }
 
-TEST_F(ClusterFindTest, AttachesAtClusterTimeForTransactionSnapshotReadConcern) {
-    testAttachesAtClusterTimeForTxnSnapshotReadConcern(
-        kFindCmdTargeted, kFindCmdScatterGather, true);
+TEST_F(ClusterFindTest, AttachesAtClusterTimeForSnapshotReadConcern) {
+    testAttachesAtClusterTimeForSnapshotReadConcern(kFindCmdTargeted, kFindCmdScatterGather);
 }
 
-TEST_F(ClusterFindTest, TransactionSnapshotReadConcernWithAfterClusterTime) {
-    testTxnSnapshotReadConcernWithAfterClusterTime(kFindCmdTargeted, kFindCmdScatterGather, true);
-}
-
-TEST_F(ClusterFindTest, AttachesAtClusterTimeForNonTransactionSnapshotReadConcern) {
-    testAttachesAtClusterTimeForNonTxnSnapshotReadConcern(
-        kFindCmdTargeted, kFindCmdScatterGather, true);
-}
-
-TEST_F(ClusterFindTest, NonTransactionSnapshotReadConcernWithAfterClusterTime) {
-    testNonTxnSnapshotReadConcernWithAfterClusterTime(
-        kFindCmdTargeted, kFindCmdScatterGather, true);
+TEST_F(ClusterFindTest, SnapshotReadConcernWithAfterClusterTime) {
+    testSnapshotReadConcernWithAfterClusterTime(kFindCmdTargeted, kFindCmdScatterGather);
 }
 
 }  // namespace

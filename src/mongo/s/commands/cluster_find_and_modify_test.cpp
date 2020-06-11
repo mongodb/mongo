@@ -78,11 +78,11 @@ TEST_F(ClusterFindAndModifyTest, MaxRetriesSnapshotErrors) {
 }
 
 TEST_F(ClusterFindAndModifyTest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    testAttachesAtClusterTimeForTxnSnapshotReadConcern(kFindAndModifyCmdTargeted);
+    testAttachesAtClusterTimeForSnapshotReadConcern(kFindAndModifyCmdTargeted);
 }
 
 TEST_F(ClusterFindAndModifyTest, SnapshotReadConcernWithAfterClusterTime) {
-    testTxnSnapshotReadConcernWithAfterClusterTime(kFindAndModifyCmdTargeted);
+    testSnapshotReadConcernWithAfterClusterTime(kFindAndModifyCmdTargeted);
 }
 
 }  // namespace
