@@ -898,6 +898,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         WriteUnitOfWork wuow(opCtx);
         if (!ts.isNull()) {
             uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(ts));
+            opCtx->recoveryUnit()->setOrderedCommit(false);
         }
 
         auto planExecutorResult = mongo::getExecutorUpdate(
