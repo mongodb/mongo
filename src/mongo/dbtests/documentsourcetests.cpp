@@ -97,8 +97,11 @@ protected:
         }
         auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
 
-        auto exec = uassertStatusOK(
-            getExecutor(opCtx(), ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD, 0));
+        auto exec = uassertStatusOK(getExecutor(opCtx(),
+                                                ctx.getCollection(),
+                                                std::move(cq),
+                                                PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                0));
 
         exec->saveState();
         _source = DocumentSourceCursor::create(
@@ -316,7 +319,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
                                            std::move(workingSet),
                                            std::move(collectionScan),
                                            readLock.getCollection(),
-                                           PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT));
+                                           PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT));
 
     // Make a DocumentSourceCursor.
     ctx()->tailableMode = TailableModeEnum::kTailableAndAwaitData;
@@ -357,7 +360,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
                                            std::move(workingSet),
                                            std::move(collectionScan),
                                            readLock.getCollection(),
-                                           PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT));
+                                           PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT));
 
     // Make a DocumentSourceCursor.
     ctx()->tailableMode = TailableModeEnum::kNormal;
@@ -407,7 +410,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
                                            std::move(workingSet),
                                            std::move(collectionScan),
                                            readLock.getCollection(),
-                                           PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED));
+                                           PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED));
 
     // Make a DocumentSourceCursor.
     ctx()->tailableMode = TailableModeEnum::kTailableAndAwaitData;
@@ -447,7 +450,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
                                            std::move(workingSet),
                                            std::move(collectionScan),
                                            readLock.getCollection(),
-                                           PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED));
+                                           PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED));
 
     // Make a DocumentSourceCursor.
     ctx()->tailableMode = TailableModeEnum::kNormal;

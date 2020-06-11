@@ -72,7 +72,7 @@ public:
         OperationContext* opCtx,
         StringData ns,
         Collection* collection,
-        PlanExecutor::YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         const Direction direction = FORWARD);
 
     /**
@@ -82,7 +82,7 @@ public:
         OperationContext* opCtx,
         Collection* collection,
         std::unique_ptr<DeleteStageParams> params,
-        PlanExecutor::YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD);
 
     /**
@@ -95,7 +95,7 @@ public:
         const BSONObj& startKey,
         const BSONObj& endKey,
         BoundInclusion boundInclusion,
-        PlanExecutor::YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
         int options = IXSCAN_DEFAULT);
 
@@ -110,7 +110,7 @@ public:
         const BSONObj& startKey,
         const BSONObj& endKey,
         BoundInclusion boundInclusion,
-        PlanExecutor::YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD);
 
     /**
@@ -122,7 +122,7 @@ public:
         const UpdateStageParams& params,
         const IndexDescriptor* descriptor,
         const BSONObj& key,
-        PlanExecutor::YieldPolicy yieldPolicy);
+        PlanYieldPolicy::YieldPolicy yieldPolicy);
 
 private:
     /**

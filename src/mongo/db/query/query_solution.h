@@ -233,6 +233,11 @@ struct QuerySolutionNode {
                        [](auto& child) { return child.release(); });
     }
 
+    /**
+     * True, if this node, or any of it's children is of the given 'type'.
+     */
+    bool hasNode(StageType type) const;
+
     // These are owned here.
     //
     // TODO SERVER-35512: Make this a vector of unique_ptr.
@@ -312,6 +317,13 @@ struct QuerySolution {
 
     // Owned here. Used by the plan cache.
     std::unique_ptr<SolutionCacheData> cacheData;
+
+    /**
+     * True, of this solution tree contains a node of the given 'type'.
+     */
+    bool hasNode(StageType type) const {
+        return root && root->hasNode(type);
+    }
 
     /**
      * Output a human-readable std::string representing the plan.

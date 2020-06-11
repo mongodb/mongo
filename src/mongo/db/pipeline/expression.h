@@ -1360,6 +1360,10 @@ public:
         return _fieldPath;
     }
 
+    Variables::Id getVariableId() const {
+        return _variable;
+    }
+
     auto getFieldPathWithoutCurrentPrefix() const {
         return _fieldPath.tail();
     }
@@ -1590,6 +1594,10 @@ public:
         return visitor->visit(this);
     }
 
+    auto& getOrderedVariableIds() const {
+        return _orderedVariableIds;
+    }
+
     auto& getVariableMap() const {
         return _variables;
     }
@@ -1600,9 +1608,15 @@ protected:
 private:
     ExpressionLet(ExpressionContext* const expCtx,
                   VariableMap&& vars,
-                  std::vector<boost::intrusive_ptr<Expression>> children);
+                  std::vector<boost::intrusive_ptr<Expression>> children,
+                  std::vector<Variables::Id> orderedVariableIds);
 
     VariableMap _variables;
+
+    // These ids are ordered to match their corresponding _children expressions.
+    std::vector<Variables::Id> _orderedVariableIds;
+
+    // Reference to the last element in the '_children' list.
     boost::intrusive_ptr<Expression>& _subExpression;
 };
 

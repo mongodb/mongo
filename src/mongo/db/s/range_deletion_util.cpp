@@ -188,15 +188,13 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                                                      min,
                                                      max,
                                                      BoundInclusion::kIncludeStartKeyOnly,
-                                                     PlanExecutor::YIELD_MANUAL,
+                                                     PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
                                                      InternalPlanner::FORWARD);
 
     if (MONGO_unlikely(hangBeforeDoingDeletion.shouldFail())) {
         LOGV2(23768, "Hit hangBeforeDoingDeletion failpoint");
         hangBeforeDoingDeletion.pauseWhileSet(opCtx);
     }
-
-    PlanYieldPolicy planYieldPolicy(exec.get(), PlanExecutor::YIELD_MANUAL);
 
     int numDeleted = 0;
     do {

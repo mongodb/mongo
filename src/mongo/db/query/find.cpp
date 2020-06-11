@@ -270,7 +270,7 @@ Message getMore(OperationContext* opCtx,
 
     opCtx->setExhaust(cursorPin->queryOptions() & QueryOption_Exhaust);
 
-    if (cursorPin->lockPolicy() == ClientCursorParams::LockPolicy::kLocksInternally) {
+    if (cursorPin->getExecutor()->lockPolicy() == PlanExecutor::LockPolicy::kLocksInternally) {
         if (!nss.isCollectionlessCursorNamespace()) {
             AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
             statsTracker.emplace(opCtx,
@@ -497,7 +497,7 @@ Message getMore(OperationContext* opCtx,
     // info for an aggregation, but the source PlanExecutor could be destroyed before we know if we
     // need 'execStats' and we do not want to generate the stats eagerly for all operations due to
     // cost.
-    if (cursorPin->lockPolicy() != ClientCursorParams::LockPolicy::kLocksInternally &&
+    if (cursorPin->getExecutor()->lockPolicy() != PlanExecutor::LockPolicy::kLocksInternally &&
         curOp.shouldDBProfile()) {
         BSONObjBuilder execStatsBob;
         Explain::getWinningPlanStats(exec, &execStatsBob);
@@ -756,7 +756,6 @@ bool runQuery(OperationContext* opCtx,
                 opCtx->getWriteConcern(),
                 readConcernArgs,
                 upconvertedQuery,
-                ClientCursorParams::LockPolicy::kLockExternally,
                 {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
                 false  // needsMerge always 'false' for find().
             });

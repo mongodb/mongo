@@ -92,8 +92,11 @@ public:
         unique_ptr<IndexScan> ix = std::make_unique<IndexScan>(
             _expCtx.get(), ctx.getCollection(), params, ws.get(), filterExpr.get());
 
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            _expCtx, std::move(ws), std::move(ix), ctx.getCollection(), PlanExecutor::NO_YIELD);
+        auto statusWithPlanExecutor = PlanExecutor::make(_expCtx,
+                                                         std::move(ws),
+                                                         std::move(ix),
+                                                         ctx.getCollection(),
+                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

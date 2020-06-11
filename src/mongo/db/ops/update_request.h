@@ -228,11 +228,11 @@ public:
         return shouldReturnOldDocs() || shouldReturnNewDocs();
     }
 
-    void setYieldPolicy(PlanExecutor::YieldPolicy yieldPolicy) {
+    void setYieldPolicy(PlanYieldPolicy::YieldPolicy yieldPolicy) {
         _yieldPolicy = yieldPolicy;
     }
 
-    PlanExecutor::YieldPolicy getYieldPolicy() const {
+    PlanYieldPolicy::YieldPolicy getYieldPolicy() const {
         return _yieldPolicy;
     }
 
@@ -333,7 +333,7 @@ private:
     ReturnDocOption _returnDocs = ReturnDocOption::RETURN_NONE;
 
     // Whether or not the update should yield. Defaults to NO_YIELD.
-    PlanExecutor::YieldPolicy _yieldPolicy = PlanExecutor::NO_YIELD;
+    PlanYieldPolicy::YieldPolicy _yieldPolicy = PlanYieldPolicy::YieldPolicy::NO_YIELD;
 };
 
 }  // namespace mongo

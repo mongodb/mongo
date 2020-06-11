@@ -53,7 +53,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const Collection* collection,
         NamespaceString nss,
-        YieldPolicy yieldPolicy);
+        PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     virtual ~PlanExecutorImpl();
     WorkingSet* getWorkingSet() const final;
@@ -83,6 +83,8 @@ public:
     bool isDetached() const final;
     Timestamp getLatestOplogTimestamp() const final;
     BSONObj getPostBatchResumeToken() const final;
+    LockPolicy lockPolicy() const final;
+    bool isPipelineExecutor() const final;
 
 private:
     /**
@@ -96,7 +98,7 @@ private:
                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const Collection* collection,
                      NamespaceString nss,
-                     YieldPolicy yieldPolicy);
+                     PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     /**
      * Clients of PlanExecutor expect that on receiving a new instance from one of the make()

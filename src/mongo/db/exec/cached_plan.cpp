@@ -38,7 +38,9 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
@@ -46,7 +48,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/stage_builder.h"
+#include "mongo/db/query/stage_builder_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -91,7 +93,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         static_cast<size_t>(internalQueryCacheEvictionRatio * _decisionWorks);
 
     // The trial period ends without replanning if the cached plan produces this many results.
-    size_t numResults = MultiPlanStage::getTrialPeriodNumToReturn(*_canonicalQuery);
+    size_t numResults = trial_period::getTrialPeriodNumToReturn(*_canonicalQuery);
 
     for (size_t i = 0; i < maxWorksBeforeReplan; ++i) {
         // Might need to yield between calls to work due to the timer elapsing.
@@ -186,9 +188,9 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     //   2) some stage requested a yield, or
     //   3) we need to yield and retry due to a WriteConflictException.
     // In all cases, the actual yielding happens here.
-    if (yieldPolicy->shouldYieldOrInterrupt()) {
+    if (yieldPolicy->shouldYieldOrInterrupt(expCtx()->opCtx)) {
         // Here's where we yield.
-        return yieldPolicy->yieldOrInterrupt();
+        return yieldPolicy->yieldOrInterrupt(expCtx()->opCtx);
     }
 
     return Status::OK();
@@ -222,8 +224,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
 
     if (1 == solutions.size()) {
         // Only one possible plan. Build the stages from the solution.
-        auto newRoot =
-            StageBuilder::build(opCtx(), collection(), *_canonicalQuery, *solutions[0], _ws);
+        auto&& newRoot = stage_builder::buildClassicExecutableTree(
+            expCtx()->opCtx, collection(), *_canonicalQuery, *solutions[0], _ws);
         _children.emplace_back(std::move(newRoot));
         _replannedQs = std::move(solutions.back());
         solutions.pop_back();
@@ -242,8 +244,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
 
     // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
     // and so on. The working set will be shared by all candidate plans.
-    auto cachingMode = shouldCache ? MultiPlanStage::CachingMode::AlwaysCache
-                                   : MultiPlanStage::CachingMode::NeverCache;
+    auto cachingMode = shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
     _children.emplace_back(
         new MultiPlanStage(expCtx(), collection(), _canonicalQuery, cachingMode));
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
@@ -253,8 +254,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
             solutions[ix]->cacheData->indexFilterApplied = _plannerParams.indexFiltersApplied;
         }
 
-        auto nextPlanRoot =
-            StageBuilder::build(opCtx(), collection(), *_canonicalQuery, *solutions[ix], _ws);
+        auto&& nextPlanRoot = stage_builder::buildClassicExecutableTree(
+            expCtx()->opCtx, collection(), *_canonicalQuery, *solutions[ix], _ws);
 
         multiPlanStage->addPlan(std::move(solutions[ix]), std::move(nextPlanRoot), _ws);
     }
@@ -310,5 +311,4 @@ std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {
 const SpecificStats* CachedPlanStage::getSpecificStats() const {
     return &_specificStats;
 }
-
 }  // namespace mongo

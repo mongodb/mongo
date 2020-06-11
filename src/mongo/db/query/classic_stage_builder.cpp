@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/stage_builder.h"
+#include "mongo/db/query/classic_stage_builder.h"
 
 #include <memory>
 
@@ -64,17 +64,12 @@
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/logv2/log.h"
 
-namespace mongo {
-
+namespace mongo::stage_builder {
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
-std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
-                                       const Collection* collection,
-                                       const CanonicalQuery& cq,
-                                       const QuerySolution& qsol,
-                                       const QuerySolutionNode* root,
-                                       WorkingSet* ws) {
-    auto* const expCtx = cq.getExpCtxRaw();
+std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* root) {
+    auto* const expCtx = _cq.getExpCtxRaw();
+
     switch (root->getType()) {
         case STAGE_COLLSCAN: {
             const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
@@ -90,17 +85,17 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.resumeAfterRecordId = csn->resumeAfterRecordId;
             params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
             return std::make_unique<CollectionScan>(
-                expCtx, collection, params, ws, csn->filter.get());
+                expCtx, _collection, params, _ws, csn->filter.get());
         }
         case STAGE_IXSCAN: {
             const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
 
-            invariant(collection);
-            auto descriptor = collection->getIndexCatalog()->findIndexByName(
-                opCtx, ixn->index.identifier.catalogName);
+            invariant(_collection);
+            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+                _opCtx, ixn->index.identifier.catalogName);
             invariant(descriptor,
-                      str::stream() << "Namespace: " << collection->ns()
-                                    << ", CanonicalQuery: " << cq.toStringShort()
+                      str::stream() << "Namespace: " << _collection->ns()
+                                    << ", CanonicalQuery: " << _cq.toStringShort()
                                     << ", IndexEntry: " << ixn->index.toString());
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
@@ -115,21 +110,21 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.addKeyMetadata = ixn->addKeyMetadata;
             params.shouldDedup = ixn->shouldDedup;
             return std::make_unique<IndexScan>(
-                expCtx, collection, std::move(params), ws, ixn->filter.get());
+                expCtx, _collection, std::move(params), _ws, ixn->filter.get());
         }
         case STAGE_FETCH: {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, fn->children[0], ws);
+            auto childStage = build(fn->children[0]);
             return std::make_unique<FetchStage>(
-                expCtx, ws, std::move(childStage), fn->filter.get(), collection);
+                expCtx, _ws, std::move(childStage), fn->filter.get(), _collection);
         }
         case STAGE_SORT_DEFAULT: {
             auto snDefault = static_cast<const SortNodeDefault*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, snDefault->children[0], ws);
+            auto childStage = build(snDefault->children[0]);
             return std::make_unique<SortStageDefault>(
-                cq.getExpCtx(),
-                ws,
-                SortPattern{snDefault->pattern, cq.getExpCtx()},
+                _cq.getExpCtx(),
+                _ws,
+                SortPattern{snDefault->pattern, _cq.getExpCtx()},
                 snDefault->limit,
                 internalQueryMaxBlockingSortMemoryUsageBytes.load(),
                 snDefault->addSortKeyMetadata,
@@ -137,11 +132,11 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
         }
         case STAGE_SORT_SIMPLE: {
             auto snSimple = static_cast<const SortNodeSimple*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, snSimple->children[0], ws);
+            auto childStage = build(snSimple->children[0]);
             return std::make_unique<SortStageSimple>(
-                cq.getExpCtx(),
-                ws,
-                SortPattern{snSimple->pattern, cq.getExpCtx()},
+                _cq.getExpCtx(),
+                _ws,
+                SortPattern{snSimple->pattern, _cq.getExpCtx()},
                 snSimple->limit,
                 internalQueryMaxBlockingSortMemoryUsageBytes.load(),
                 snSimple->addSortKeyMetadata,
@@ -149,78 +144,77 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
         }
         case STAGE_SORT_KEY_GENERATOR: {
             const SortKeyGeneratorNode* keyGenNode = static_cast<const SortKeyGeneratorNode*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, keyGenNode->children[0], ws);
+            auto childStage = build(keyGenNode->children[0]);
             return std::make_unique<SortKeyGeneratorStage>(
-                cq.getExpCtx(), std::move(childStage), ws, keyGenNode->sortSpec);
+                _cq.getExpCtx(), std::move(childStage), _ws, keyGenNode->sortSpec);
         }
         case STAGE_RETURN_KEY: {
             auto returnKeyNode = static_cast<const ReturnKeyNode*>(root);
-            auto childStage =
-                buildStages(opCtx, collection, cq, qsol, returnKeyNode->children[0], ws);
+            auto childStage = build(returnKeyNode->children[0]);
             return std::make_unique<ReturnKeyStage>(
-                expCtx, std::move(returnKeyNode->sortKeyMetaFields), ws, std::move(childStage));
+                expCtx, std::move(returnKeyNode->sortKeyMetaFields), _ws, std::move(childStage));
         }
         case STAGE_PROJECTION_DEFAULT: {
             auto pn = static_cast<const ProjectionNodeDefault*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
-            return std::make_unique<ProjectionStageDefault>(cq.getExpCtx(),
-                                                            cq.getQueryRequest().getProj(),
-                                                            cq.getProj(),
-                                                            ws,
+            auto childStage = build(pn->children[0]);
+            return std::make_unique<ProjectionStageDefault>(_cq.getExpCtx(),
+                                                            _cq.getQueryRequest().getProj(),
+                                                            _cq.getProj(),
+                                                            _ws,
                                                             std::move(childStage));
         }
         case STAGE_PROJECTION_COVERED: {
             auto pn = static_cast<const ProjectionNodeCovered*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
-            return std::make_unique<ProjectionStageCovered>(cq.getExpCtxRaw(),
-                                                            cq.getQueryRequest().getProj(),
-                                                            cq.getProj(),
-                                                            ws,
+            auto childStage = build(pn->children[0]);
+            return std::make_unique<ProjectionStageCovered>(_cq.getExpCtxRaw(),
+                                                            _cq.getQueryRequest().getProj(),
+                                                            _cq.getProj(),
+                                                            _ws,
                                                             std::move(childStage),
                                                             pn->coveredKeyObj);
         }
         case STAGE_PROJECTION_SIMPLE: {
             auto pn = static_cast<const ProjectionNodeSimple*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
-            return std::make_unique<ProjectionStageSimple>(cq.getExpCtxRaw(),
-                                                           cq.getQueryRequest().getProj(),
-                                                           cq.getProj(),
-                                                           ws,
+            auto childStage = build(pn->children[0]);
+            return std::make_unique<ProjectionStageSimple>(_cq.getExpCtxRaw(),
+                                                           _cq.getQueryRequest().getProj(),
+                                                           _cq.getProj(),
+                                                           _ws,
                                                            std::move(childStage));
         }
         case STAGE_LIMIT: {
             const LimitNode* ln = static_cast<const LimitNode*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, ln->children[0], ws);
-            return std::make_unique<LimitStage>(expCtx, ln->limit, ws, std::move(childStage));
+            auto childStage = build(ln->children[0]);
+            return std::make_unique<LimitStage>(expCtx, ln->limit, _ws, std::move(childStage));
         }
         case STAGE_SKIP: {
             const SkipNode* sn = static_cast<const SkipNode*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, sn->children[0], ws);
-            return std::make_unique<SkipStage>(expCtx, sn->skip, ws, std::move(childStage));
+            auto childStage = build(sn->children[0]);
+            return std::make_unique<SkipStage>(expCtx, sn->skip, _ws, std::move(childStage));
         }
         case STAGE_AND_HASH: {
             const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
-            auto ret = std::make_unique<AndHashStage>(expCtx, ws);
+            auto ret = std::make_unique<AndHashStage>(expCtx, _ws);
             for (size_t i = 0; i < ahn->children.size(); ++i) {
-                auto childStage = buildStages(opCtx, collection, cq, qsol, ahn->children[i], ws);
+                auto childStage = build(ahn->children[i]);
                 ret->addChild(std::move(childStage));
             }
             return ret;
         }
         case STAGE_OR: {
             const OrNode* orn = static_cast<const OrNode*>(root);
-            auto ret = std::make_unique<OrStage>(expCtx, ws, orn->dedup, orn->filter.get());
+            auto ret = std::make_unique<OrStage>(expCtx, _ws, orn->dedup, orn->filter.get());
             for (size_t i = 0; i < orn->children.size(); ++i) {
-                auto childStage = buildStages(opCtx, collection, cq, qsol, orn->children[i], ws);
+                auto childStage = build(orn->children[i]);
                 ret->addChild(std::move(childStage));
             }
             return ret;
         }
         case STAGE_AND_SORTED: {
             const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
-            auto ret = std::make_unique<AndSortedStage>(expCtx, ws);
+            auto ret = std::make_unique<AndSortedStage>(expCtx, _ws);
             for (size_t i = 0; i < asn->children.size(); ++i) {
-                auto childStage = buildStages(opCtx, collection, cq, qsol, asn->children[i], ws);
+                auto childStage = build(asn->children[i]);
                 ret->addChild(std::move(childStage));
             }
             return ret;
@@ -230,10 +224,10 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             MergeSortStageParams params;
             params.dedup = msn->dedup;
             params.pattern = msn->sort;
-            params.collator = cq.getCollator();
-            auto ret = std::make_unique<MergeSortStage>(expCtx, params, ws);
+            params.collator = _cq.getCollator();
+            auto ret = std::make_unique<MergeSortStage>(expCtx, params, _ws);
             for (size_t i = 0; i < msn->children.size(); ++i) {
-                auto childStage = buildStages(opCtx, collection, cq, qsol, msn->children[i], ws);
+                auto childStage = build(msn->children[i]);
                 ret->addChild(std::move(childStage));
             }
             return ret;
@@ -248,12 +242,12 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            invariant(collection);
-            const IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByName(
-                opCtx, node->index.identifier.catalogName);
+            invariant(_collection);
+            const IndexDescriptor* twoDIndex = _collection->getIndexCatalog()->findIndexByName(
+                _opCtx, node->index.identifier.catalogName);
             invariant(twoDIndex);
 
-            return std::make_unique<GeoNear2DStage>(params, expCtx, ws, collection, twoDIndex);
+            return std::make_unique<GeoNear2DStage>(params, expCtx, _ws, _collection, twoDIndex);
         }
         case STAGE_GEO_NEAR_2DSPHERE: {
             const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
@@ -265,21 +259,22 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            invariant(collection);
-            const IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByName(
-                opCtx, node->index.identifier.catalogName);
+            invariant(_collection);
+            const IndexDescriptor* s2Index = _collection->getIndexCatalog()->findIndexByName(
+                _opCtx, node->index.identifier.catalogName);
             invariant(s2Index);
 
-            return std::make_unique<GeoNear2DSphereStage>(params, expCtx, ws, collection, s2Index);
+            return std::make_unique<GeoNear2DSphereStage>(
+                params, expCtx, _ws, _collection, s2Index);
         }
         case STAGE_TEXT: {
             const TextNode* node = static_cast<const TextNode*>(root);
-            invariant(collection);
-            const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(
-                opCtx, node->index.identifier.catalogName);
+            invariant(_collection);
+            const IndexDescriptor* desc = _collection->getIndexCatalog()->findIndexByName(
+                _opCtx, node->index.identifier.catalogName);
             invariant(desc);
             const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(
-                collection->getIndexCatalog()->getEntry(desc)->accessMethod());
+                _collection->getIndexCatalog()->getEntry(desc)->accessMethod());
             invariant(fam);
 
             TextStageParams params(fam->getSpec());
@@ -289,27 +284,28 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             // practice, this means that it is illegal to use the StageBuilder on a QuerySolution
             // created by planning a query that contains "no-op" expressions.
             params.query = static_cast<FTSQueryImpl&>(*node->ftsQuery);
-            params.wantTextScore = cq.metadataDeps()[DocumentMetadataFields::kTextScore];
-            return std::make_unique<TextStage>(expCtx, collection, params, ws, node->filter.get());
+            params.wantTextScore = _cq.metadataDeps()[DocumentMetadataFields::kTextScore];
+            return std::make_unique<TextStage>(
+                expCtx, _collection, params, _ws, node->filter.get());
         }
         case STAGE_SHARDING_FILTER: {
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, fn->children[0], ws);
+            auto childStage = build(fn->children[0]);
 
-            auto css = CollectionShardingState::get(opCtx, collection->ns());
+            auto css = CollectionShardingState::get(_opCtx, _collection->ns());
             return std::make_unique<ShardFilterStage>(
                 expCtx,
                 css->getOwnershipFilter(
-                    opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),
-                ws,
+                    _opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),
+                _ws,
                 std::move(childStage));
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 
-            invariant(collection);
-            auto descriptor = collection->getIndexCatalog()->findIndexByName(
-                opCtx, dn->index.identifier.catalogName);
+            invariant(_collection);
+            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+                _opCtx, dn->index.identifier.catalogName);
             invariant(descriptor);
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
@@ -323,14 +319,14 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.scanDirection = dn->direction;
             params.bounds = dn->bounds;
             params.fieldNo = dn->fieldNo;
-            return std::make_unique<DistinctScan>(expCtx, collection, std::move(params), ws);
+            return std::make_unique<DistinctScan>(expCtx, _collection, std::move(params), _ws);
         }
         case STAGE_COUNT_SCAN: {
             const CountScanNode* csn = static_cast<const CountScanNode*>(root);
 
-            invariant(collection);
-            auto descriptor = collection->getIndexCatalog()->findIndexByName(
-                opCtx, csn->index.identifier.catalogName);
+            invariant(_collection);
+            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+                _opCtx, csn->index.identifier.catalogName);
             invariant(descriptor);
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
@@ -345,13 +341,13 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
             params.startKeyInclusive = csn->startKeyInclusive;
             params.endKey = csn->endKey;
             params.endKeyInclusive = csn->endKeyInclusive;
-            return std::make_unique<CountScan>(expCtx, collection, std::move(params), ws);
+            return std::make_unique<CountScan>(expCtx, _collection, std::move(params), _ws);
         }
         case STAGE_ENSURE_SORTED: {
             const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(root);
-            auto childStage = buildStages(opCtx, collection, cq, qsol, esn->children[0], ws);
+            auto childStage = build(esn->children[0]);
             return std::make_unique<EnsureSortedStage>(
-                expCtx, esn->pattern, ws, std::move(childStage));
+                expCtx, esn->pattern, _ws, std::move(childStage));
         }
         case STAGE_CACHED_PLAN:
         case STAGE_CHANGE_STREAM_PROXY:
@@ -380,23 +376,4 @@ std::unique_ptr<PlanStage> buildStages(OperationContext* opCtx,
 
     MONGO_UNREACHABLE;
 }
-
-std::unique_ptr<PlanStage> StageBuilder::build(OperationContext* opCtx,
-                                               const Collection* collection,
-                                               const CanonicalQuery& cq,
-                                               const QuerySolution& solution,
-                                               WorkingSet* wsIn) {
-    // Only QuerySolutions derived from queries parsed with context, or QuerySolutions derived from
-    // queries that disallow extensions, can be properly executed. If the query does not have
-    // $text/$where context (and $text/$where are allowed), then no attempt should be made to
-    // execute the query.
-    invariant(!cq.canHaveNoopMatchNodes());
-
-    invariant(wsIn);
-    invariant(solution.root);
-
-    QuerySolutionNode* solutionNode = solution.root.get();
-    return buildStages(opCtx, collection, cq, solution, solutionNode, wsIn);
-}
-
-}  // namespace mongo
+}  // namespace mongo::stage_builder

@@ -375,7 +375,7 @@ private:
                                                  startKey,
                                                  endKey,
                                                  BoundInclusion::kIncludeBothStartAndEndKeys,
-                                                 PlanExecutor::YIELD_AUTO,
+                                                 PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                  direction);
 
         try {

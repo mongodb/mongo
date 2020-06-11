@@ -71,7 +71,7 @@ bool checkIfSingleDoc(OperationContext* opCtx,
                                            newmin,
                                            newmax,
                                            BoundInclusion::kIncludeStartKeyOnly,
-                                           PlanExecutor::NO_YIELD);
+                                           PlanYieldPolicy::YieldPolicy::NO_YIELD);
     // check if exactly one document found
     PlanExecutor::ExecState state;
     BSONObj obj;

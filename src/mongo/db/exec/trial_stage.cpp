@@ -76,11 +76,11 @@ Status TrialStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     while (!_specificStats.trialCompleted) {
         WorkingSetID id = WorkingSet::INVALID_ID;
         const bool mustYield = (work(&id) == PlanStage::NEED_YIELD);
-        if (mustYield || yieldPolicy->shouldYieldOrInterrupt()) {
+        if (mustYield || yieldPolicy->shouldYieldOrInterrupt(expCtx()->opCtx)) {
             if (mustYield && !yieldPolicy->canAutoYield()) {
                 throw WriteConflictException();
             }
-            auto yieldStatus = yieldPolicy->yieldOrInterrupt();
+            auto yieldStatus = yieldPolicy->yieldOrInterrupt(expCtx()->opCtx);
             if (!yieldStatus.isOK()) {
                 return yieldStatus;
             }

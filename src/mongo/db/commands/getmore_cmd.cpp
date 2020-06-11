@@ -405,7 +405,8 @@ public:
                         PrepareConflictBehavior::kEnforce);
                 }
             }
-            if (cursorPin->lockPolicy() == ClientCursorParams::LockPolicy::kLocksInternally) {
+            if (cursorPin->getExecutor()->lockPolicy() ==
+                PlanExecutor::LockPolicy::kLocksInternally) {
                 if (!_request.nss.isCollectionlessCursorNamespace()) {
                     statsTracker.emplace(
                         opCtx,
@@ -415,8 +416,8 @@ public:
                         CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_request.nss.db()));
                 }
             } else {
-                invariant(cursorPin->lockPolicy() ==
-                          ClientCursorParams::LockPolicy::kLockExternally);
+                invariant(cursorPin->getExecutor()->lockPolicy() ==
+                          PlanExecutor::LockPolicy::kLockExternally);
 
                 if (MONGO_unlikely(GetMoreHangBeforeReadLock.shouldFail())) {
                     LOGV2(20477,
@@ -638,7 +639,8 @@ public:
             // would be useful to have this info for an aggregation, but the source PlanExecutor
             // could be destroyed before we know if we need 'execStats' and we do not want to
             // generate the stats eagerly for all operations due to cost.
-            if (cursorPin->lockPolicy() != ClientCursorParams::LockPolicy::kLocksInternally &&
+            if (cursorPin->getExecutor()->lockPolicy() !=
+                    PlanExecutor::LockPolicy::kLocksInternally &&
                 curOp->shouldDBProfile()) {
                 BSONObjBuilder execStatsBob;
                 Explain::getWinningPlanStats(exec, &execStatsBob);

@@ -658,13 +658,16 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 }
                 // Use collection scan.
                 planExecutor = isFind
-                    ? InternalPlanner::collectionScan(
-                          opCtx, nsOrUUID.toString(), collection, PlanExecutor::NO_YIELD, direction)
+                    ? InternalPlanner::collectionScan(opCtx,
+                                                      nsOrUUID.toString(),
+                                                      collection,
+                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                      direction)
                     : InternalPlanner::deleteWithCollectionScan(
                           opCtx,
                           collection,
                           makeDeleteStageParamsForDeleteDocuments(),
-                          PlanExecutor::NO_YIELD,
+                          PlanYieldPolicy::YieldPolicy::NO_YIELD,
                           direction);
             } else {
                 // Use index scan.
@@ -696,25 +699,26 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 if (!endKey.isEmpty()) {
                     bounds.second = endKey;
                 }
-                planExecutor = isFind ? InternalPlanner::indexScan(opCtx,
-                                                                   collection,
-                                                                   indexDescriptor,
-                                                                   bounds.first,
-                                                                   bounds.second,
-                                                                   boundInclusion,
-                                                                   PlanExecutor::NO_YIELD,
-                                                                   direction,
-                                                                   InternalPlanner::IXSCAN_FETCH)
-                                      : InternalPlanner::deleteWithIndexScan(
-                                            opCtx,
-                                            collection,
-                                            makeDeleteStageParamsForDeleteDocuments(),
-                                            indexDescriptor,
-                                            bounds.first,
-                                            bounds.second,
-                                            boundInclusion,
-                                            PlanExecutor::NO_YIELD,
-                                            direction);
+                planExecutor = isFind
+                    ? InternalPlanner::indexScan(opCtx,
+                                                 collection,
+                                                 indexDescriptor,
+                                                 bounds.first,
+                                                 bounds.second,
+                                                 boundInclusion,
+                                                 PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                 direction,
+                                                 InternalPlanner::IXSCAN_FETCH)
+                    : InternalPlanner::deleteWithIndexScan(
+                          opCtx,
+                          collection,
+                          makeDeleteStageParamsForDeleteDocuments(),
+                          indexDescriptor,
+                          bounds.first,
+                          bounds.second,
+                          boundInclusion,
+                          PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                          direction);
             }
 
             std::vector<BSONObj> docs;
@@ -867,7 +871,7 @@ Status _updateWithQuery(OperationContext* opCtx,
                         const Timestamp& ts) {
     invariant(!request.isMulti());  // We only want to update one document for performance.
     invariant(!request.shouldReturnAnyDocs());
-    invariant(PlanExecutor::NO_YIELD == request.getYieldPolicy());
+    invariant(PlanYieldPolicy::YieldPolicy::NO_YIELD == request.getYieldPolicy());
 
     auto& nss = request.getNamespaceString();
     return writeConflictRetry(opCtx, "_updateWithQuery", nss.ns(), [&] {
@@ -947,7 +951,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         request.setUpsert(true);
         invariant(!request.isMulti());  // This follows from using an exact _id query.
         invariant(!request.shouldReturnAnyDocs());
-        invariant(PlanExecutor::NO_YIELD == request.getYieldPolicy());
+        invariant(PlanYieldPolicy::YieldPolicy::NO_YIELD == request.getYieldPolicy());
 
         // ParsedUpdate needs to be inside the write conflict retry loop because it contains
         // the UpdateDriver whose state may be modified while we are applying the update.
@@ -1017,7 +1021,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
     request.setNsString(nss);
     request.setQuery(filter);
     request.setMulti(true);
-    request.setYieldPolicy(PlanExecutor::NO_YIELD);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
 
     // This disables the isLegalClientSystemNS() check in getExecutorDelete() which is used to
     // disallow client deletes from unrecognized system collections.
@@ -1072,7 +1076,7 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
         InternalPlanner::collectionScan(opCtx,
                                         NamespaceString::kRsOplogNamespace.ns(),
                                         oplog,
-                                        PlanExecutor::NO_YIELD,
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                         InternalPlanner::BACKWARD);
 
     // A record id in the oplog collection is equivalent to the document's timestamp field.

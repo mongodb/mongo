@@ -473,62 +473,6 @@ GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
 
 
 namespace {
-
-/**
- * Expression which checks whether a legacy 2D index point is contained within our near
- * search annulus.  See nextInterval() below for more discussion.
- * TODO: Make this a standard type of GEO match expression
- */
-class TwoDPtInAnnulusExpression : public LeafMatchExpression {
-public:
-    TwoDPtInAnnulusExpression(const R2Annulus& annulus, StringData twoDPath)
-        : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
-
-    void serialize(BSONObjBuilder* out, bool includePath) const final {
-        out->append("TwoDPtInAnnulusExpression", true);
-    }
-
-    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        if (!e.isABSONObj())
-            return false;
-
-        PointWithCRS point;
-        if (!GeoParser::parseStoredPoint(e, &point).isOK())
-            return false;
-
-        return _annulus.contains(point.oldPoint);
-    }
-
-    //
-    // These won't be called.
-    //
-
-    BSONObj getSerializedRightHandSide() const final {
-        MONGO_UNREACHABLE;
-    }
-
-    void debugString(StringBuilder& debug, int level = 0) const final {
-        MONGO_UNREACHABLE;
-    }
-
-    bool equivalent(const MatchExpression* other) const final {
-        MONGO_UNREACHABLE;
-        return false;
-    }
-
-    unique_ptr<MatchExpression> shallowClone() const final {
-        MONGO_UNREACHABLE;
-        return nullptr;
-    }
-
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
-    R2Annulus _annulus;
-};
-
 // Helper class to maintain ownership of a match expression alongside an index scan
 class FetchStageWithMatch final : public FetchStage {
 public:

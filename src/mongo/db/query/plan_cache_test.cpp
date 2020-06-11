@@ -296,17 +296,20 @@ struct GenerateQuerySolution {
 /**
  * Utility function to create a PlanRankingDecision
  */
-std::unique_ptr<PlanRankingDecision> createDecision(size_t numPlans, size_t works = 0) {
-    unique_ptr<PlanRankingDecision> why(new PlanRankingDecision());
+std::unique_ptr<plan_ranker::PlanRankingDecision> createDecision(size_t numPlans,
+                                                                 size_t works = 0) {
+    auto why = std::make_unique<plan_ranker::PlanRankingDecision>();
+    std::vector<std::unique_ptr<PlanStageStats>> stats;
     for (size_t i = 0; i < numPlans; ++i) {
         CommonStats common("COLLSCAN");
-        auto stats = std::make_unique<PlanStageStats>(common, STAGE_COLLSCAN);
-        stats->specific.reset(new CollectionScanStats());
-        why->stats.push_back(std::move(stats));
-        why->stats[i]->common.works = works;
+        auto stat = std::make_unique<PlanStageStats>(common, STAGE_COLLSCAN);
+        stat->specific.reset(new CollectionScanStats());
+        stat->common.works = works;
+        stats.push_back(std::move(stat));
         why->scores.push_back(0U);
         why->candidateOrder.push_back(i);
     }
+    why->getStats<PlanStageStats>() = std::move(stats);
     return why;
 }
 
@@ -492,7 +495,7 @@ TEST(PlanCacheTest, AddEmptySolutions) {
     PlanCache planCache;
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     std::vector<QuerySolution*> solns;
-    unique_ptr<PlanRankingDecision> decision(createDecision(1U));
+    unique_ptr<plan_ranker::PlanRankingDecision> decision(createDecision(1U));
     QueryTestServiceContext serviceContext;
     ASSERT_NOT_OK(planCache.set(*cq, solns, std::move(decision), Date_t{}));
 }
@@ -678,7 +681,7 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(*cq));
     ASSERT_TRUE(entry->isActive);
-    ASSERT_EQ(entry->decision->stats[0]->common.works, 25U);
+    ASSERT_EQ(entry->decision->getStats<PlanStageStats>()[0]->common.works, 25U);
     ASSERT_EQ(entry->works, 25U);
 
     ASSERT_EQUALS(planCache.size(), 1U);

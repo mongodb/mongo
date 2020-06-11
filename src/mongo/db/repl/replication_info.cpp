@@ -145,8 +145,10 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         {
             const NamespaceString localSources{"local.sources"};
             AutoGetCollectionForReadCommand ctx(opCtx, localSources);
-            auto exec = InternalPlanner::collectionScan(
-                opCtx, localSources.ns(), ctx.getCollection(), PlanExecutor::NO_YIELD);
+            auto exec = InternalPlanner::collectionScan(opCtx,
+                                                        localSources.ns(),
+                                                        ctx.getCollection(),
+                                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
             BSONObj obj;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {

@@ -333,7 +333,7 @@ std::string IdempotencyTest::computeDataHash(Collection* collection) {
                                            BSONObj(),
                                            BSONObj(),
                                            BoundInclusion::kIncludeStartKeyOnly,
-                                           PlanExecutor::NO_YIELD,
+                                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH);
     ASSERT(nullptr != exec.get());

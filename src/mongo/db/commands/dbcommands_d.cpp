@@ -281,7 +281,7 @@ public:
             auto exec = uassertStatusOK(getExecutor(opCtx,
                                                     coll,
                                                     std::move(cq),
-                                                    PlanExecutor::YIELD_MANUAL,
+                                                    PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
                                                     QueryPlannerParams::NO_TABLE_SCAN));
 
             // We need to hold a lock to clean up the PlanExecutor, so make sure we have one when we

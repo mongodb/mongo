@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -131,6 +132,75 @@ public:
         INTERNAL_SCHEMA_UNIQUE_ITEMS,
         INTERNAL_SCHEMA_XOR,
     };
+
+    /**
+     * An iterator to walk through the children expressions of the given MatchExpressions. Along
+     * with the defined 'begin()' and 'end()' functions, which take a reference to a
+     * MatchExpression, this iterator can be used with a range-based loop. For example,
+     *
+     *    const MatchExpression* expr = makeSomeExpression();
+     *    for (const auto& child : *expr) {
+     *       ...
+     *    }
+     *
+     * When incrementing the iterator, no checks are made to ensure the iterator does not pass
+     * beyond the boundary. The caller is responsible to compare the iterator against an iterator
+     * referring to the past-the-end child in the given expression, which can be obtained using
+     * the 'mongo::end(*expr)' call.
+     */
+    template <bool IsConst>
+    class MatchExpressionIterator {
+    public:
+        MatchExpressionIterator(const MatchExpression* expr, size_t index)
+            : _expr(expr), _index(index) {}
+
+        template <bool WasConst, typename = std::enable_if_t<IsConst && !WasConst>>
+        MatchExpressionIterator(const MatchExpressionIterator<WasConst>& other)
+            : _expr(other._expr), _index(other._index) {}
+
+        template <bool WasConst, typename = std::enable_if_t<IsConst && !WasConst>>
+        MatchExpressionIterator& operator=(const MatchExpressionIterator<WasConst>& other) {
+            _expr = other._expr;
+            _index = other._index;
+            return *this;
+        }
+
+        MatchExpressionIterator& operator++() {
+            ++_index;
+            return *this;
+        }
+
+        MatchExpressionIterator operator++(int) {
+            const auto ret{*this};
+            ++(*this);
+            return ret;
+        }
+
+        bool operator==(const MatchExpressionIterator& other) const {
+            return _expr == other._expr && _index == other._index;
+        }
+
+        bool operator!=(const MatchExpressionIterator& other) const {
+            return !(*this == other);
+        }
+
+        template <bool Const = IsConst>
+        auto operator*() const -> std::enable_if_t<!Const, MatchExpression*> {
+            return _expr->getChild(_index);
+        }
+
+        template <bool Const = IsConst>
+        auto operator*() const -> std::enable_if_t<Const, const MatchExpression*> {
+            return _expr->getChild(_index);
+        }
+
+    private:
+        const MatchExpression* _expr;
+        size_t _index;
+    };
+
+    using Iterator = MatchExpressionIterator<false>;
+    using ConstIterator = MatchExpressionIterator<true>;
 
     /**
      * Make simplifying changes to the structure of a MatchExpression tree without altering its
@@ -338,6 +408,9 @@ public:
         return false;
     }
 
+    virtual void acceptVisitor(MatchExpressionMutableVisitor* visitor) = 0;
+    virtual void acceptVisitor(MatchExpressionConstVisitor* visitor) const = 0;
+
     //
     // Debug information
     //
@@ -397,4 +470,21 @@ private:
     MatchType _matchType;
     std::unique_ptr<TagData> _tagData;
 };
+
+inline MatchExpression::Iterator begin(MatchExpression& expr) {
+    return {&expr, 0};
+}
+
+inline MatchExpression::ConstIterator begin(const MatchExpression& expr) {
+    return {&expr, 0};
+}
+
+inline MatchExpression::Iterator end(MatchExpression& expr) {
+    return {&expr, expr.numChildren()};
+}
+
+inline MatchExpression::ConstIterator end(const MatchExpression& expr) {
+    return {&expr, expr.numChildren()};
+}
+
 }  // namespace mongo

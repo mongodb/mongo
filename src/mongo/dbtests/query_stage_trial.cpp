@@ -36,7 +36,7 @@
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -87,8 +87,8 @@ protected:
     }
 
     std::unique_ptr<PlanYieldPolicy> yieldPolicy() {
-        return std::make_unique<PlanYieldPolicy>(
-            PlanExecutor::NO_YIELD, opCtx()->getServiceContext()->getFastClockSource());
+        return std::make_unique<NoopYieldPolicy>(
+            opCtx()->getServiceContext()->getFastClockSource());
     }
 
     OperationContext* opCtx() {

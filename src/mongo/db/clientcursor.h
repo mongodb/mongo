@@ -55,33 +55,12 @@ class RecoveryUnit;
  * using a CursorManager. See cursor_manager.h for more details.
  */
 struct ClientCursorParams {
-    // Describes whether callers should acquire locks when using a ClientCursor. Not all cursors
-    // have the same locking behavior. In particular, find cursors require the caller to lock the
-    // collection in MODE_IS before calling methods on the underlying plan executor. Aggregate
-    // cursors, on the other hand, may access multiple collections and acquire their own locks on
-    // any involved collections while producing query results. Therefore, the caller need not
-    // explicitly acquire any locks when using a ClientCursor which houses execution machinery for
-    // an aggregate.
-    //
-    // The policy is consulted on getMore in order to determine locking behavior, since during
-    // getMore we otherwise could not easily know what flavor of cursor we're using.
-    enum class LockPolicy {
-        // The caller is responsible for locking the collection over which this ClientCursor
-        // executes.
-        kLockExternally,
-
-        // The caller need not hold no locks; this ClientCursor's plan executor acquires any
-        // necessary locks itself.
-        kLocksInternally,
-    };
-
     ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
                        NamespaceString nss,
                        UserNameIterator authenticatedUsersIter,
                        WriteConcernOptions writeConcernOptions,
                        repl::ReadConcernArgs readConcernArgs,
                        BSONObj originatingCommandObj,
-                       LockPolicy lockPolicy,
                        PrivilegeVector originatingPrivileges,
                        bool needsMerge)
         : exec(std::move(planExecutor)),
@@ -92,7 +71,6 @@ struct ClientCursorParams {
                            ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
                            : 0),
           originatingCommandObj(originatingCommandObj.getOwned()),
-          lockPolicy(lockPolicy),
           originatingPrivileges(std::move(originatingPrivileges)),
           needsMerge(needsMerge) {
         while (authenticatedUsersIter.more()) {
@@ -121,7 +99,6 @@ struct ClientCursorParams {
     const repl::ReadConcernArgs readConcernArgs;
     int queryOptions = 0;
     BSONObj originatingCommandObj;
-    const LockPolicy lockPolicy;
     PrivilegeVector originatingPrivileges;
     const bool needsMerge;
 };
@@ -272,10 +249,6 @@ public:
         return StringData(_planSummary);
     }
 
-    ClientCursorParams::LockPolicy lockPolicy() const {
-        return _lockPolicy;
-    }
-
     /**
      * Returns a generic cursor containing diagnostics about this cursor.
      * The caller must either have this cursor pinned or hold a mutex from the cursor manager.
@@ -413,8 +386,6 @@ private:
 
     // See the QueryOptions enum in dbclientinterface.h.
     const int _queryOptions = 0;
-
-    const ClientCursorParams::LockPolicy _lockPolicy;
 
     // The value of a flag specified on the originating command which indicates whether the result
     // of this cursor will be consumed by a merging node (mongos or a mongod selected to perform a

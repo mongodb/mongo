@@ -87,7 +87,7 @@ public:
     /**
      * Get the YieldPolicy, adjusted for GodMode.
      */
-    PlanExecutor::YieldPolicy yieldPolicy() const;
+    PlanYieldPolicy::YieldPolicy yieldPolicy() const;
 
     /**
      * As an optimization, we don't create a canonical query for updates with simple _id

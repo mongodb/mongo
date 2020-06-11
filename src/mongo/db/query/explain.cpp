@@ -50,6 +50,7 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_settings.h"
@@ -626,6 +627,12 @@ BSONObj Explain::statsToBSON(const PlanStageStats& stats, ExplainOptions::Verbos
     return bob.obj();
 }
 
+BSONObj Explain::statsToBSON(const sbe::PlanStageStats& stats,
+                             ExplainOptions::Verbosity verbosity) {
+    BSONObjBuilder bob;
+    return bob.obj();
+}
+
 // static
 void Explain::statsToBSON(const PlanStageStats& stats,
                           BSONObjBuilder* bob,
@@ -636,7 +643,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 // static
 BSONObj Explain::getWinningPlanStats(const PlanExecutor* exec) {
     BSONObjBuilder bob;
-    getWinningPlanStats(exec, &bob);
+    if (!dynamic_cast<const PlanExecutorSBE*>(exec)) {
+        getWinningPlanStats(exec, &bob);
+    }
     return bob.obj();
 }
 
@@ -882,6 +891,10 @@ void Explain::explainStages(PlanExecutor* exec,
                             ExplainOptions::Verbosity verbosity,
                             BSONObj extraInfo,
                             BSONObjBuilder* out) {
+    uassert(4822877,
+            "Explain facility is not supported for SBE plans",
+            !dynamic_cast<PlanExecutorSBE*>(exec));
+
     auto winningPlanTrialStats = Explain::getWinningPlanTrialStats(exec);
 
     Status executePlanStatus = Status::OK();
@@ -915,6 +928,11 @@ void Explain::explainStages(PlanExecutor* exec,
 
 // static
 std::string Explain::getPlanSummary(const PlanExecutor* exec) {
+    // TODO: Handle planSummary when SBE is enabled.
+    if (dynamic_cast<const PlanExecutorSBE*>(exec)) {
+        return "unsupported";
+    }
+
     return getPlanSummary(exec->getRootStage());
 }
 
@@ -950,11 +968,21 @@ std::string Explain::getPlanSummary(const PlanStage* root) {
 }
 
 // static
+std::string Explain::getPlanSummary(const sbe::PlanStage* root) {
+    // TODO: Handle 'planSummary' when SBE is enabled.
+    return "unsupported";
+}
+
+// static
 void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsOut) {
     invariant(nullptr != statsOut);
 
-    PlanStage* root = exec.getRootStage();
+    // TODO: Handle 'getSummaryStats' when SBE is enabled.
+    if (dynamic_cast<const PlanExecutorSBE*>(&exec)) {
+        return;
+    }
 
+    PlanStage* root = exec.getRootStage();
     if (root->stageType() == STAGE_PIPELINE_PROXY ||
         root->stageType() == STAGE_CHANGE_STREAM_PROXY) {
         auto pipelineProxy = static_cast<PipelineProxyStage*>(root);
@@ -1055,14 +1083,15 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
     out->append("works", static_cast<long long>(entry.works));
 
     BSONObjBuilder cachedPlanBob(out->subobjStart("cachedPlan"));
-    Explain::statsToBSON(
-        *entry.decision->stats[0], &cachedPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
+    Explain::statsToBSON(*(entry.decision->getStats<PlanStageStats>()[0]),
+                         &cachedPlanBob,
+                         ExplainOptions::Verbosity::kQueryPlanner);
     cachedPlanBob.doneFast();
 
     out->append("timeOfCreation", entry.timeOfCreation);
 
     BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));
-    for (auto&& stat : entry.decision->stats) {
+    for (auto&& stat : entry.decision->getStats<PlanStageStats>()) {
         BSONObjBuilder planBob(creationBuilder.subobjStart());
         Explain::generateSinglePlanExecutionInfo(
             stat.get(), ExplainOptions::Verbosity::kExecAllPlans, boost::none, &planBob);

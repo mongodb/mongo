@@ -86,16 +86,6 @@ using std::unique_ptr;
 
 namespace {
 /**
- * Returns true if this PlanExecutor is for a Pipeline.
- */
-bool isPipelineExecutor(const PlanExecutor* exec) {
-    invariant(exec);
-    auto rootStage = exec->getRootStage();
-    return rootStage->stageType() == StageType::STAGE_PIPELINE_PROXY ||
-        rootStage->stageType() == StageType::STAGE_CHANGE_STREAM_PROXY;
-}
-
-/**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
  * that we were able to absorb all pipeline stages and pull them into a single PlanExecutor. So,
  * instead of creating a whole pipeline to do nothing more than forward the results of its cursor
@@ -121,6 +111,7 @@ bool canOptimizeAwayPipeline(const Pipeline* pipeline,
  * and thus will be different from that in 'request'.
  */
 bool handleCursorCommand(OperationContext* opCtx,
+                         boost::intrusive_ptr<ExpressionContext> expCtx,
                          const NamespaceString& nsForCursor,
                          std::vector<ClientCursor*> cursors,
                          const AggregationRequest& request,
@@ -211,8 +202,7 @@ bool handleCursorCommand(OperationContext* opCtx,
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
 
-        BSONObj next =
-            exec->getExpCtx()->needsMerge ? nextDoc.toBsonWithMetaData() : nextDoc.toBson();
+        BSONObj next = expCtx->needsMerge ? nextDoc.toBsonWithMetaData() : nextDoc.toBson();
         if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
             exec->enqueue(nextDoc);
             stashedResult = true;
@@ -475,8 +465,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createOuterPipelineProxyExe
     // invalidations. The Pipeline may contain PlanExecutors which *are* yielding
     // PlanExecutors and which *are* registered with their respective collection's
     // CursorManager
-    return uassertStatusOK(PlanExecutor::make(
-        std::move(expCtx), std::move(ws), std::move(proxy), nullptr, PlanExecutor::NO_YIELD, nss));
+    return uassertStatusOK(PlanExecutor::make(std::move(expCtx),
+                                              std::move(ws),
+                                              std::move(proxy),
+                                              nullptr,
+                                              PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                              nss));
 }
 }  // namespace
 
@@ -710,14 +704,6 @@ Status runAggregate(OperationContext* opCtx,
         }
     });
     for (auto&& exec : execs) {
-        // PlanExecutors for pipelines always have a 'kLocksInternally' policy. If this executor is
-        // not for a pipeline, though, that means the pipeline was optimized away and the
-        // PlanExecutor will answer the query using the query engine only. Without the
-        // DocumentSourceCursor to do its locking, an executor needs a 'kLockExternally' policy.
-        auto lockPolicy = isPipelineExecutor(exec.get())
-            ? ClientCursorParams::LockPolicy::kLocksInternally
-            : ClientCursorParams::LockPolicy::kLockExternally;
-
         ClientCursorParams cursorParams(
             std::move(exec),
             origNss,
@@ -725,7 +711,6 @@ Status runAggregate(OperationContext* opCtx,
             opCtx->getWriteConcern(),
             repl::ReadConcernArgs::get(opCtx),
             cmdObj,
-            lockPolicy,
             privileges,
             expCtx->needsMerge);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
@@ -747,13 +732,13 @@ Status runAggregate(OperationContext* opCtx,
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {
-        auto explainExecutor = pins[0].getCursor()->getExecutor();
+        auto explainExecutor = pins[0]->getExecutor();
         auto bodyBuilder = result->getBodyBuilder();
-        if (isPipelineExecutor(explainExecutor)) {
+        if (explainExecutor->isPipelineExecutor()) {
             Explain::explainPipelineExecutor(explainExecutor, *(expCtx->explain), &bodyBuilder);
         } else {
-            invariant(pins[0].getCursor()->lockPolicy() ==
-                      ClientCursorParams::LockPolicy::kLockExternally);
+            invariant(pins[0]->getExecutor()->lockPolicy() ==
+                      PlanExecutor::LockPolicy::kLockExternally);
             invariant(!explainExecutor->isDetached());
             invariant(explainExecutor->getOpCtx() == opCtx);
             // The explainStages() function for a non-pipeline executor expects to be called with
@@ -768,7 +753,7 @@ Status runAggregate(OperationContext* opCtx,
     } else {
         // Cursor must be specified, if explain is not.
         const bool keepCursor =
-            handleCursorCommand(opCtx, origNss, std::move(cursors), request, result);
+            handleCursorCommand(opCtx, expCtx, origNss, std::move(cursors), request, result);
         if (keepCursor) {
             cursorFreer.dismiss();
         }

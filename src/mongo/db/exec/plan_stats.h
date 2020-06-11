@@ -112,14 +112,15 @@ struct CommonStats {
 };
 
 // The universal container for a stage's stats.
-struct PlanStageStats {
-    PlanStageStats(const CommonStats& c, StageType t) : stageType(t), common(c) {}
+template <typename C, typename T = void*>
+struct BasePlanStageStats {
+    BasePlanStageStats(const C& c, T t = {}) : stageType(t), common(c) {}
 
     /**
      * Make a deep copy.
      */
-    PlanStageStats* clone() const {
-        PlanStageStats* stats = new PlanStageStats(common, stageType);
+    BasePlanStageStats<C, T>* clone() const {
+        auto stats = new BasePlanStageStats<C, T>(common, stageType);
         if (specific.get()) {
             stats->specific.reset(specific->clone());
         }
@@ -144,22 +145,23 @@ struct PlanStageStats {
             sizeof(*this);
     }
 
-    // See query/stage_type.h
-    StageType stageType;
+    T stageType;
 
     // Stats exported by implementing the PlanStage interface.
-    CommonStats common;
+    C common;
 
     // Per-stage place to stash additional information
     std::unique_ptr<SpecificStats> specific;
 
     // The stats of the node's children.
-    std::vector<std::unique_ptr<PlanStageStats>> children;
+    std::vector<std::unique_ptr<BasePlanStageStats<C, T>>> children;
 
 private:
-    PlanStageStats(const PlanStageStats&) = delete;
-    PlanStageStats& operator=(const PlanStageStats&) = delete;
+    BasePlanStageStats(const BasePlanStageStats<C, T>&) = delete;
+    BasePlanStageStats& operator=(const BasePlanStageStats<C, T>&) = delete;
 };
+
+using PlanStageStats = BasePlanStageStats<CommonStats, StageType>;
 
 struct AndHashStats : public SpecificStats {
     AndHashStats() = default;

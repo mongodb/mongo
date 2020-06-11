@@ -166,11 +166,12 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     long long excessSize = fromCollection->dataSize(opCtx) - allocatedSpaceGuess;
 
-    auto exec = InternalPlanner::collectionScan(opCtx,
-                                                fromNss.ns(),
-                                                fromCollection,
-                                                PlanExecutor::WRITE_CONFLICT_RETRY_ONLY,
-                                                InternalPlanner::FORWARD);
+    auto exec =
+        InternalPlanner::collectionScan(opCtx,
+                                        fromNss.ns(),
+                                        fromCollection,
+                                        PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY,
+                                        InternalPlanner::FORWARD);
 
     Snapshotted<BSONObj> objToClone;
     RecordId loc;

@@ -135,9 +135,12 @@ void DocumentSourceCursor::loadBatch() {
     PlanExecutor::ExecState state;
     Document resultObj;
 
-    AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _exec->nss());
-    uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
-                        ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
+    boost::optional<AutoGetCollectionForRead> autoColl;
+    if (_exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally) {
+        autoColl.emplace(pExpCtx->opCtx, _exec->nss());
+        uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
+                            ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
+    }
 
     _exec->restoreState();
 
@@ -160,8 +163,8 @@ void DocumentSourceCursor::loadBatch() {
 
         invariant(state == PlanExecutor::IS_EOF);
 
-        // Special case for tailable cursor -- EOF doesn't preclude more results, so keep the
-        // PlanExecutor alive.
+        // Special case for tailable cursor -- EOF doesn't preclude more results, so keep
+        // the PlanExecutor alive.
         if (pExpCtx->isTailableAwaitData()) {
             _exec->saveState();
             return;

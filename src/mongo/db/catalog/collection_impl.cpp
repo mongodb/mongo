@@ -1190,7 +1190,9 @@ StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpec
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExecutor(
-    OperationContext* opCtx, PlanExecutor::YieldPolicy yieldPolicy, ScanDirection scanDirection) {
+    OperationContext* opCtx,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    ScanDirection scanDirection) {
     auto isForward = scanDirection == ScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
     return InternalPlanner::collectionScan(opCtx, _ns.ns(), this, yieldPolicy, direction);

@@ -55,6 +55,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 namespace {
@@ -198,7 +199,7 @@ CachedSolution::~CachedSolution() {
 
 std::unique_ptr<PlanCacheEntry> PlanCacheEntry::create(
     const std::vector<QuerySolution*>& solutions,
-    std::unique_ptr<const PlanRankingDecision> decision,
+    std::unique_ptr<const plan_ranker::PlanRankingDecision> decision,
     const CanonicalQuery& query,
     uint32_t queryHash,
     uint32_t planCacheKey,
@@ -252,7 +253,7 @@ PlanCacheEntry::PlanCacheEntry(std::vector<std::unique_ptr<const SolutionCacheDa
                                const Date_t timeOfCreation,
                                const uint32_t queryHash,
                                const uint32_t planCacheKey,
-                               std::unique_ptr<const PlanRankingDecision> decision,
+                               std::unique_ptr<const plan_ranker::PlanRankingDecision> decision,
                                const bool isActive,
                                const size_t works)
     : plannerData(std::move(plannerData)),
@@ -283,7 +284,7 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::clone() const {
         solutionCacheData[i] = std::unique_ptr<const SolutionCacheData>(plannerData[i]->clone());
     }
 
-    auto decisionPtr = std::unique_ptr<PlanRankingDecision>(decision->clone());
+    auto decisionPtr = std::unique_ptr<plan_ranker::PlanRankingDecision>(decision->clone());
     return std::unique_ptr<PlanCacheEntry>(new PlanCacheEntry(std::move(solutionCacheData),
                                                               query,
                                                               sort,
@@ -556,7 +557,7 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
 
 Status PlanCache::set(const CanonicalQuery& query,
                       const std::vector<QuerySolution*>& solns,
-                      std::unique_ptr<PlanRankingDecision> why,
+                      std::unique_ptr<plan_ranker::PlanRankingDecision> why,
                       Date_t now,
                       boost::optional<double> worksGrowthCoefficient) {
     invariant(why);
@@ -565,7 +566,8 @@ Status PlanCache::set(const CanonicalQuery& query,
         return Status(ErrorCodes::BadValue, "no solutions provided");
     }
 
-    if (why->stats.size() != solns.size()) {
+    auto statsSize = stdx::visit([](auto&& stats) { return stats.size(); }, why->stats);
+    if (statsSize != solns.size()) {
         return Status(ErrorCodes::BadValue, "number of stats in decision must match solutions");
     }
 
@@ -580,8 +582,16 @@ Status PlanCache::set(const CanonicalQuery& query,
                       "match the number of solutions");
     }
 
+    const size_t newWorks = stdx::visit(
+        visit_helper::Overloaded{[](std::vector<std::unique_ptr<PlanStageStats>>& stats) {
+                                     return stats[0]->common.works;
+                                 },
+                                 [](std::vector<std::unique_ptr<sbe::PlanStageStats>>& stats) {
+                                     return calculateNumberOfReads(stats[0].get());
+                                 }},
+
+        why->stats);
     const auto key = computeKey(query);
-    const size_t newWorks = why->stats[0]->common.works;
     stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     bool isNewEntryActive = false;
     uint32_t queryHash;

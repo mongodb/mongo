@@ -36,7 +36,7 @@
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
-#include "mongo/db/query/projection_ast_walker.h"
+#include "mongo/db/query/tree_walker.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo::projection_executor {
@@ -254,7 +254,7 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
         {std::make_unique<Executor>(expCtx, policies, params[kAllowFastPath]), expCtx}};
     ProjectionExecutorVisitor<Executor> executorVisitor{&context};
     projection_ast::PathTrackingWalker walker{&context, {&executorVisitor}, {}};
-    projection_ast_walker::walk(&walker, root);
+    tree_walker::walk<true, projection_ast::ASTNode>(root, &walker);
     if (params[kOptimizeExecutor]) {
         context.data().executor->optimize();
     }

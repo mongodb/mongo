@@ -351,7 +351,7 @@ public:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
-        PlanExecutor::YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         ScanDirection scanDirection) final;
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;

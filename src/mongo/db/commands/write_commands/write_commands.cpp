@@ -418,7 +418,7 @@ private:
             updateRequest.setRuntimeConstants(
                 _batch.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
             updateRequest.setLetParameters(_batch.getLet());
-            updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+            updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             updateRequest.setExplain(verbosity);
 
             const ExtensionsCallbackReal extensionsCallback(opCtx,
@@ -502,7 +502,7 @@ private:
             deleteRequest.setQuery(_batch.getDeletes()[0].getQ());
             deleteRequest.setCollation(write_ops::collationOf(_batch.getDeletes()[0]));
             deleteRequest.setMulti(_batch.getDeletes()[0].getMulti());
-            deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+            deleteRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             deleteRequest.setHint(_batch.getDeletes()[0].getHint());
             deleteRequest.setIsExplain(true);
 

@@ -51,7 +51,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     OperationContext* opCtx,
     StringData ns,
     Collection* collection,
-    PlanExecutor::YieldPolicy yieldPolicy,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
     const Direction direction) {
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
@@ -82,7 +82,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     OperationContext* opCtx,
     Collection* collection,
     std::unique_ptr<DeleteStageParams> params,
-    PlanExecutor::YieldPolicy yieldPolicy,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction) {
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
@@ -109,7 +109,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     const BSONObj& startKey,
     const BSONObj& endKey,
     BoundInclusion boundInclusion,
-    PlanExecutor::YieldPolicy yieldPolicy,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction,
     int options) {
     auto ws = std::make_unique<WorkingSet>();
@@ -141,7 +141,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     const BSONObj& startKey,
     const BSONObj& endKey,
     BoundInclusion boundInclusion,
-    PlanExecutor::YieldPolicy yieldPolicy,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction) {
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
@@ -174,7 +174,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     const UpdateStageParams& params,
     const IndexDescriptor* descriptor,
     const BSONObj& key,
-    PlanExecutor::YieldPolicy yieldPolicy) {
+    PlanYieldPolicy::YieldPolicy yieldPolicy) {
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
 

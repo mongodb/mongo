@@ -42,9 +42,9 @@ types:
     yield_policy:
         bson_serialization_type: string
         description: "The yielding policy of the plan executor"
-        cpp_type: "PlanExecutor::YieldPolicy"
-        serializer: "::mongo::PlanExecutor::serializeYieldPolicy"
-        deserializer: "mongo::PlanExecutor::parseFromBSON"
+        cpp_type: "PlanYieldPolicy::YieldPolicy"
+        serializer: "::mongo::PlanYieldPolicy::serializeYieldPolicy"
+        deserializer: "mongo::PlanYieldPolicy::parseFromBSON"
     stmt_id:
         bson_serialization_type: int
         description: ""
@@ -111,4 +111,4 @@ structs:
             yieldPolicy:
                 description: "The yielding policy of the plan executor."
                 type: yield_policy
-                default: PlanExecutor::NO_YIELD
+                default: PlanYieldPolicy::YieldPolicy::NO_YIELD

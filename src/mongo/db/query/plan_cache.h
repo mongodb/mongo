@@ -43,7 +43,6 @@
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo {
-
 /**
  * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
  */
@@ -107,8 +106,9 @@ public:
     }
 };
 
-
+namespace plan_ranker {
 struct PlanRankingDecision;
+}
 struct QuerySolution;
 struct QuerySolutionNode;
 
@@ -313,7 +313,7 @@ public:
      */
     static std::unique_ptr<PlanCacheEntry> create(
         const std::vector<QuerySolution*>& solutions,
-        std::unique_ptr<const PlanRankingDecision> decision,
+        std::unique_ptr<const plan_ranker::PlanRankingDecision> decision,
         const CanonicalQuery& query,
         uint32_t queryHash,
         uint32_t planCacheKey,
@@ -363,7 +363,7 @@ public:
     //
 
     // Information that went into picking the winning plan and also why the other plans lost.
-    const std::unique_ptr<const PlanRankingDecision> decision;
+    const std::unique_ptr<const plan_ranker::PlanRankingDecision> decision;
 
     // Whether or not the cache entry is active. Inactive cache entries should not be used for
     // planning.
@@ -392,7 +392,7 @@ private:
                    Date_t timeOfCreation,
                    uint32_t queryHash,
                    uint32_t planCacheKey,
-                   std::unique_ptr<const PlanRankingDecision> decision,
+                   std::unique_ptr<const plan_ranker::PlanRankingDecision> decision,
                    bool isActive,
                    size_t works);
 
@@ -477,7 +477,7 @@ public:
      */
     Status set(const CanonicalQuery& query,
                const std::vector<QuerySolution*>& solns,
-               std::unique_ptr<PlanRankingDecision> why,
+               std::unique_ptr<plan_ranker::PlanRankingDecision> why,
                Date_t now,
                boost::optional<double> worksGrowthCoefficient = boost::none);
 
@@ -594,5 +594,4 @@ private:
     // are allowed.
     PlanCacheIndexabilityState _indexabilityState;
 };
-
 }  // namespace mongo

@@ -182,8 +182,11 @@ public:
         unique_ptr<PlanStage> rootFetch = std::make_unique<FetchStage>(
             expCtx.get(), ws.get(), std::move(userRoot), nullptr, collection);
 
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            expCtx, std::move(ws), std::move(rootFetch), collection, PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor = PlanExecutor::make(expCtx,
+                                                         std::move(ws),
+                                                         std::move(rootFetch),
+                                                         collection,
+                                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         fassert(28536, statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

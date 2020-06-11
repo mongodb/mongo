@@ -30,10 +30,15 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <queue>
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/util/partitioned.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -45,10 +50,12 @@ struct CappedInsertNotifierData;
 class Collection;
 class PlanExecutor;
 class PlanStage;
-class PlanYieldPolicy;
 class RecordId;
-struct PlanStageStats;
 class WorkingSet;
+
+namespace sbe {
+class PlanStage;
+}  // namespace sbe
 
 /**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop
@@ -78,100 +85,23 @@ public:
         IS_EOF,
     };
 
-    /**
-     * The yielding policy of the plan executor. By default, an executor does not yield itself
-     * (NO_YIELD).
-     */
-    enum YieldPolicy {
-        // Any call to getNext() may yield. In particular, the executor may die on any call to
-        // getNext() due to a required index or collection becoming invalid during yield. If this
-        // occurs, getNext() will produce an error during yield recovery and will throw an
-        // exception. Additionally, this will handle all WriteConflictExceptions that occur while
-        // processing the query.  With this yield policy, it is possible for getNext() to return
-        // throw with locks released. Cleanup that happens while the stack unwinds cannot assume
-        // locks are held.
-        YIELD_AUTO,
+    // Describes whether callers should acquire locks when using a PlanExecutor. Not all cursors
+    // have the same locking behavior. In particular, find executors using the legacy PlanStage
+    // engine require the caller to lock the collection in MODE_IS. Aggregate executors and SBE
+    // executors, on the other hand, may access multiple collections and acquire their own locks on
+    // any involved collections while producing query results. Therefore, the caller need not
+    // explicitly acquire any locks for such PlanExecutors.
+    //
+    // The policy is consulted on getMore in order to determine locking behavior, since during
+    // getMore we otherwise could not easily know what flavor of cursor we're using.
+    enum class LockPolicy {
+        // The caller is responsible for locking the collection over which this PlanExecutor
+        // executes.
+        kLockExternally,
 
-        // This will handle WriteConflictExceptions that occur while processing the query, but will
-        // not yield locks. abandonSnapshot() will be called if a WriteConflictException occurs so
-        // callers must be prepared to get a new snapshot. The caller must hold their locks
-        // continuously from construction to destruction. Callers which do not want auto-yielding,
-        // but may release their locks during query execution must use the YIELD_MANUAL policy.
-        WRITE_CONFLICT_RETRY_ONLY,
-
-        // Use this policy if you want to disable auto-yielding, but will release locks while using
-        // the PlanExecutor. Any WriteConflictExceptions will be raised to the caller of getNext().
-        //
-        // With this policy, an explicit call must be made to saveState() before releasing locks,
-        // and an explicit call to restoreState() must be made after reacquiring locks.
-        // restoreState() will throw if the PlanExecutor is now invalid due to a catalog operation
-        // (e.g. collection drop) during yield.
-        YIELD_MANUAL,
-
-        // Can be used in one of the following scenarios:
-        //  - The caller will hold a lock continuously for the lifetime of this PlanExecutor.
-        //  - This PlanExecutor doesn't logically belong to a Collection, and so does not need to be
-        //    locked during execution. For example, a PlanExecutor containing a PipelineProxyStage
-        //    which is being used to execute an aggregation pipeline.
-        NO_YIELD,
-
-        // Will not yield locks or storage engine resources, but will check for interrupt.
-        INTERRUPT_ONLY,
-
-        // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
-        // yield, throwing an ErrorCodes::ExceededTimeLimit error.
-        ALWAYS_TIME_OUT,
-
-        // Used for testing, this yield policy will cause the PlanExecutor to be marked as killed on
-        // the first yield, throwing an ErrorCodes::QueryPlanKilled error.
-        ALWAYS_MARK_KILLED,
+        // The caller need not hold no locks; this PlanExecutor acquires any necessary locks itself.
+        kLocksInternally,
     };
-
-    static std::string serializeYieldPolicy(YieldPolicy yieldPolicy) {
-        switch (yieldPolicy) {
-            case YIELD_AUTO:
-                return "YIELD_AUTO";
-            case WRITE_CONFLICT_RETRY_ONLY:
-                return "WRITE_CONFLICT_RETRY_ONLY";
-            case YIELD_MANUAL:
-                return "YIELD_MANUAL";
-            case NO_YIELD:
-                return "NO_YIELD";
-            case INTERRUPT_ONLY:
-                return "INTERRUPT_ONLY";
-            case ALWAYS_TIME_OUT:
-                return "ALWAYS_TIME_OUT";
-            case ALWAYS_MARK_KILLED:
-                return "ALWAYS_MARK_KILLED";
-        }
-        MONGO_UNREACHABLE;
-    }
-
-    static YieldPolicy parseFromBSON(const StringData& element) {
-        const std::string& yieldPolicy = element.toString();
-        if (yieldPolicy == "YIELD_AUTO") {
-            return YIELD_AUTO;
-        }
-        if (yieldPolicy == "WRITE_CONFLICT_RETRY_ONLY") {
-            return WRITE_CONFLICT_RETRY_ONLY;
-        }
-        if (yieldPolicy == "YIELD_MANUAL") {
-            return YIELD_MANUAL;
-        }
-        if (yieldPolicy == "NO_YIELD") {
-            return NO_YIELD;
-        }
-        if (yieldPolicy == "INTERRUPT_ONLY") {
-            return INTERRUPT_ONLY;
-        }
-        if (yieldPolicy == "ALWAYS_TIME_OUT") {
-            return ALWAYS_TIME_OUT;
-        }
-        if (yieldPolicy == "ALWAYS_MARK_KILLED") {
-            return ALWAYS_MARK_KILLED;
-        }
-        MONGO_UNREACHABLE;
-    }
 
     /**
      * This class will ensure a PlanExecutor is disposed before it is deleted.
@@ -247,7 +177,7 @@ public:
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         NamespaceString nss = NamespaceString(),
         std::unique_ptr<QuerySolution> qs = nullptr);
 
@@ -263,9 +193,26 @@ public:
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         NamespaceString nss = NamespaceString(),
         std::unique_ptr<QuerySolution> qs = nullptr);
+
+    /**
+     * These overloads are for SBE.
+     */
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<CanonicalQuery> cq,
+        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+        NamespaceString nss,
+        std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<CanonicalQuery> cq,
+        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+        NamespaceString nss,
+        std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
+        std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
     /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen
@@ -482,6 +429,16 @@ public:
      * for the batch that is currently being built. Otherwise, return an empty object.
      */
     virtual BSONObj getPostBatchResumeToken() const = 0;
+
+    virtual LockPolicy lockPolicy() const = 0;
+
+    /**
+     * Returns true if this PlanExecutor proxies to a Pipeline of DocumentSources.
+     *
+     * TODO SERVER-48478 : Create a new PlanExecutor implementation specifically for executing the
+     * Pipeline, and delete PipelineProxyStage.
+     */
+    virtual bool isPipelineExecutor() const = 0;
 };
 
 }  // namespace mongo

@@ -554,8 +554,6 @@ public:
             // Set up the cursor for getMore.
             CursorId cursorId = 0;
             if (shouldSaveCursor(opCtx, collection, state, exec.get())) {
-                // Create a ClientCursor containing this plan executor and register it with the
-                // cursor manager.
                 ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                     opCtx,
                     {std::move(exec),
@@ -564,7 +562,6 @@ public:
                      opCtx->getWriteConcern(),
                      repl::ReadConcernArgs::get(opCtx),
                      _request.body,
-                     ClientCursorParams::LockPolicy::kLockExternally,
                      {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
                      expCtx->needsMerge});
                 cursorId = pinnedCursor.getCursor()->cursorid();

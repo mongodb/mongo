@@ -31,6 +31,7 @@
 
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
@@ -53,24 +54,6 @@ namespace mongo {
 class MultiPlanStage final : public RequiresCollectionStage {
 public:
     /**
-     * Callers use this to specify how the MultiPlanStage should interact with the plan cache.
-     */
-    enum class CachingMode {
-        // Always write a cache entry for the winning plan to the plan cache, overwriting any
-        // previously existing cache entry for the query shape.
-        AlwaysCache,
-
-        // Write a cache entry for the query shape *unless* we encounter one of the following edge
-        // cases:
-        //  - Two or more plans tied for the win.
-        //  - The winning plan returned zero query results during the plan ranking trial period.
-        SometimesCache,
-
-        // Do not write to the plan cache.
-        NeverCache,
-    };
-
-    /**
      * Takes no ownership.
      *
      * If 'shouldCache' is true, writes a cache entry for the winning plan to the plan cache
@@ -79,7 +62,7 @@ public:
     MultiPlanStage(ExpressionContext* expCtx,
                    const Collection* collection,
                    CanonicalQuery* cq,
-                   CachingMode cachingMode = CachingMode::AlwaysCache);
+                   PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache);
 
     bool isEOF() final;
 
@@ -114,19 +97,6 @@ public:
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
-    /**
-     * Returns the number of times that we are willing to work a plan during a trial period.
-     *
-     * Calculated based on a fixed query knob and the size of the collection.
-     */
-    static size_t getTrialPeriodWorks(OperationContext* opCtx, const Collection* collection);
-
-    /**
-     * Returns the max number of documents which we should allow any plan to return during the
-     * trial period. As soon as any plan hits this number of documents, the trial period ends.
-     */
-    static size_t getTrialPeriodNumToReturn(const CanonicalQuery& query);
-
     /** Return true if a best plan has been chosen  */
     bool bestPlanChosen() const;
 
@@ -134,12 +104,20 @@ public:
     int bestPlanIdx() const;
 
     /**
-     * Returns the QuerySolution for the best plan, or NULL if no best plan
+     * Returns the QuerySolution for the best plan, or NULL if no best plan.
      *
      * The MultiPlanStage retains ownership of the winning QuerySolution and returns an
      * unowned pointer.
      */
-    QuerySolution* bestSolution();
+    const QuerySolution* bestSolution() const;
+
+    /**
+     * Returns the QuerySolution for the best plan, or NULL if no best plan.
+     *
+     * The MultiPlanStage does not retain ownership of the winning QuerySolution and returns
+     * a unique pointer.
+     */
+    std::unique_ptr<QuerySolution> bestSolution();
 
     /**
      * Returns true if a backup plan was picked.
@@ -185,7 +163,7 @@ private:
     static const int kNoSuchPlan = -1;
 
     // Describes the cases in which we should write an entry for the winning plan to the plan cache.
-    const CachingMode _cachingMode;
+    const PlanCachingMode _cachingMode;
 
     // The query that we're trying to figure out the best solution to.
     // not owned here
@@ -195,7 +173,7 @@ private:
     // of all QuerySolutions is retained here, and will *not* be tranferred to the PlanExecutor that
     // wraps this stage. Ownership of the PlanStages will be in PlanStage::_children which maps
     // one-to-one with _candidates.
-    std::vector<CandidatePlan> _candidates;
+    std::vector<plan_ranker::CandidatePlan> _candidates;
 
     // index into _candidates, of the winner of the plan competition
     // uses -1 / kNoSuchPlan when best plan is not (yet) known

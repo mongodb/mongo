@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/query/tree_walker.h"
+
 namespace mongo {
 namespace projection_ast {
 class MatchExpressionASTNode;
@@ -38,13 +40,6 @@ class ProjectionSliceASTNode;
 class ProjectionElemMatchASTNode;
 class ExpressionASTNode;
 class BooleanConstantASTNode;
-
-/**
- * A template type which resolves to 'const T*' if 'IsConst' argument is 'true', and to 'T*'
- * otherwise.
- */
-template <bool IsConst, typename T>
-using MaybeConstPtr = typename std::conditional<IsConst, const T*, T*>::type;
 
 /**
  * Visitor pattern for ProjectionAST.
@@ -58,13 +53,13 @@ template <bool IsConst = false>
 class ProjectionASTVisitor {
 public:
     virtual ~ProjectionASTVisitor() = default;
-    virtual void visit(MaybeConstPtr<IsConst, MatchExpressionASTNode> node) = 0;
-    virtual void visit(MaybeConstPtr<IsConst, ProjectionPathASTNode> node) = 0;
-    virtual void visit(MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) = 0;
-    virtual void visit(MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) = 0;
-    virtual void visit(MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) = 0;
-    virtual void visit(MaybeConstPtr<IsConst, ExpressionASTNode> node) = 0;
-    virtual void visit(MaybeConstPtr<IsConst, BooleanConstantASTNode> node) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, MatchExpressionASTNode> node) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionPathASTNode> node) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, ExpressionASTNode> node) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, BooleanConstantASTNode> node) = 0;
 };
 
 using ProjectionASTMutableVisitor = ProjectionASTVisitor<false>;

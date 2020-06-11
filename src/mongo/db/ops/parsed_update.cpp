@@ -230,8 +230,8 @@ ParsedUpdate::parseArrayFilters(const boost::intrusive_ptr<ExpressionContext>& e
     return std::move(arrayFiltersOut);
 }
 
-PlanExecutor::YieldPolicy ParsedUpdate::yieldPolicy() const {
-    return _request->isGod() ? PlanExecutor::NO_YIELD : _request->getYieldPolicy();
+PlanYieldPolicy::YieldPolicy ParsedUpdate::yieldPolicy() const {
+    return _request->isGod() ? PlanYieldPolicy::YieldPolicy::NO_YIELD : _request->getYieldPolicy();
 }
 
 bool ParsedUpdate::hasParsedQuery() const {

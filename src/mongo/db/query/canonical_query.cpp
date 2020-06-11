@@ -33,6 +33,7 @@
 
 #include "mongo/db/query/canonical_query.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/namespace_string.h"

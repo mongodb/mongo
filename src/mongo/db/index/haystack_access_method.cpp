@@ -134,7 +134,7 @@ void HaystackAccessMethod::searchCommand(OperationContext* opCtx,
                                                    key,
                                                    key,
                                                    BoundInclusion::kIncludeBothStartAndEndKeys,
-                                                   PlanExecutor::NO_YIELD);
+                                                   PlanYieldPolicy::YieldPolicy::NO_YIELD);
             PlanExecutor::ExecState state;
             BSONObj obj;
             RecordId loc;

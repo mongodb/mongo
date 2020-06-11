@@ -33,11 +33,10 @@
 
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
-#include "mongo/db/query/projection_ast_walker.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/tree_walker.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
-
 
 namespace mongo {
 
@@ -123,7 +122,7 @@ std::vector<FieldPath> QueryPlannerCommon::extractSortKeyMetaFieldsFromProjectio
     MetaFieldVisitorContext ctx;
     MetaFieldVisitor visitor(&ctx);
     projection_ast::PathTrackingConstWalker<MetaFieldData> walker{&ctx, {&visitor}, {}};
-    projection_ast_walker::walk(&walker, proj.root());
+    tree_walker::walk<true, projection_ast::ASTNode>(proj.root(), &walker);
 
     return std::move(ctx.data().metaPaths);
 }

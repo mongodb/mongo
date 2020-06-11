@@ -32,7 +32,7 @@
 #include "mongo/db/query/projection_ast_util.h"
 
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
-#include "mongo/db/query/projection_ast_walker.h"
+#include "mongo/db/query/tree_walker.h"
 
 namespace mongo::projection_ast {
 namespace {
@@ -128,7 +128,7 @@ BSONObj astToDebugBSON(const ASTNode* root) {
     BSONPostVisitor postVisitor{&context.data()};
     PathTrackingWalker walker{&context, {&preVisitor}, {&postVisitor}};
 
-    projection_ast_walker::walk(&walker, root);
+    tree_walker::walk<true, projection_ast::ASTNode>(root, &walker);
 
     invariant(context.data().builders.size() == 1);
     return context.data().builders.top().obj();

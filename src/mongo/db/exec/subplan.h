@@ -40,6 +40,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/record_id.h"
@@ -115,7 +116,10 @@ public:
      * Returns true if the i-th branch was planned by retrieving a cached solution,
      * otherwise returns false.
      */
-    bool branchPlannedFromCache(size_t i) const;
+    bool branchPlannedFromCache(size_t i) const {
+        invariant(i < _branchPlannedFromCache.size());
+        return _branchPlannedFromCache[i];
+    }
 
     /**
      * Provide access to the query solution for our composite solution. Does not relinquish
@@ -126,48 +130,6 @@ public:
     }
 
 private:
-    /**
-     * A class used internally in order to keep track of the results of planning
-     * a particular $or branch.
-     */
-    struct BranchPlanningResult {
-        BranchPlanningResult(const BranchPlanningResult&) = delete;
-        BranchPlanningResult& operator=(const BranchPlanningResult&) = delete;
-
-    public:
-        BranchPlanningResult() {}
-
-        // A parsed version of one branch of the $or.
-        std::unique_ptr<CanonicalQuery> canonicalQuery;
-
-        // If there is cache data available, then we store it here rather than generating
-        // a set of alternate plans for the branch. The index tags from the cache data
-        // can be applied directly to the parent $or MatchExpression when generating the
-        // composite solution.
-        std::unique_ptr<CachedSolution> cachedSolution;
-
-        // Query solutions resulting from planning the $or branch.
-        std::vector<std::unique_ptr<QuerySolution>> solutions;
-    };
-
-    /**
-     * Plan each branch of the $or independently, and store the resulting
-     * lists of query solutions in '_solutions'.
-     *
-     * Called from SubplanStage::make so that construction of the subplan stage
-     * fails immediately, rather than returning a plan executor and subsequently
-     * through getNext(...).
-     */
-    Status planSubqueries();
-
-    /**
-     * Uses the query planning results from planSubqueries() and the multi plan stage
-     * to select the best plan for each branch.
-     *
-     * Helper for pickBestPlan().
-     */
-    Status choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy);
-
     /**
      * Used as a fallback if subplanning fails. Helper for pickBestPlan().
      */
@@ -181,20 +143,11 @@ private:
     // Not owned here.
     CanonicalQuery* _query;
 
-    // The copy of the query that we will annotate with tags and use to construct the composite
-    // solution. Must be a rooted $or query, or a contained $or that has been rewritten to a
-    // rooted $or.
-    std::unique_ptr<MatchExpression> _orExpression;
-
     // If we successfully create a "composite solution" by planning each $or branch
     // independently, that solution is owned here.
     std::unique_ptr<QuerySolution> _compositeSolution;
 
-    // Holds a list of the results from planning each branch.
-    std::vector<std::unique_ptr<BranchPlanningResult>> _branchResults;
-
-    // We need this to extract cache-friendly index data from the index assignments.
-    std::map<IndexEntry::Identifier, size_t> _indexMap;
+    // Indicates whether i-th branch of the rooted $or query was planned from a cached solution.
+    std::vector<bool> _branchPlannedFromCache;
 };
-
 }  // namespace mongo

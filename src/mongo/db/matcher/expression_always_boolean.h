@@ -109,6 +109,14 @@ public:
     bool isTriviallyFalse() const final {
         return true;
     }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
 };
 
 class AlwaysTrueMatchExpression final : public AlwaysBooleanMatchExpression {
@@ -127,6 +135,14 @@ public:
 
     bool isTriviallyTrue() const final {
         return true;
+    }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
     }
 };
 

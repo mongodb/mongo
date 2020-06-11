@@ -29,40 +29,48 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 
-#include "mongo/db/query/projection_ast.h"
+namespace mongo {
+namespace sbe {
+class BSONScanStage final : public PlanStage {
+public:
+    BSONScanStage(const char* bsonBegin,
+                  const char* bsonEnd,
+                  boost::optional<value::SlotId> recordSlot,
+                  std::vector<std::string> fields,
+                  value::SlotVector vars);
 
-namespace mongo::projection_ast_walker {
+    std::unique_ptr<PlanStage> clone() const final;
 
+    void prepare(CompileCtx& ctx) final;
+    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
+    void open(bool reOpen) final;
+    PlanState getNext() final;
+    void close() final;
 
-/**
- * Provided with a Walker and an ASTNode*, walk() calls each of the following:
- * * walker.preVisit() once before walking to each child.
- * * walker.inVisit() between walking to each child. It is called multiple times, once between each
- *   pair of children. walker.inVisit() is skipped if the ASTNode has fewer than two children.
- * * walker.postVisit() once after walking to each child.
- * Each of the ASTNode's child ASTNode is recursively walked and the same three methods are
- * called for it.
- *
- * If the caller doesn't intend to modify the AST, then the template argument 'IsConst' should be
- * set to 'true'. In this case the 'node' pointer will be qualified with 'const'.
- */
-template <typename Walker, bool IsConst = true>
-void walk(Walker* walker, projection_ast::MaybeConstPtr<IsConst, projection_ast::ASTNode> node) {
-    if (node) {
-        walker->preVisit(node);
+    std::unique_ptr<PlanStageStats> getStats() const final;
+    const SpecificStats* getSpecificStats() const final;
 
-        auto count = 0ull;
-        for (auto&& child : node->children()) {
-            if (count)
-                walker->inVisit(count, node);
-            ++count;
-            walk<Walker, IsConst>(walker, child.get());
-        }
+    std::vector<DebugPrinter::Block> debugPrint() const final;
 
-        walker->postVisit(node);
-    }
-}
+private:
+    const char* const _bsonBegin;
+    const char* const _bsonEnd;
 
-}  // namespace mongo::projection_ast_walker
+    const boost::optional<value::SlotId> _recordSlot;
+    const std::vector<std::string> _fields;
+    const value::SlotVector _vars;
+
+    std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
+
+    value::FieldAccessorMap _fieldAccessors;
+    value::SlotAccessorMap _varAccessors;
+
+    const char* _bsonCurrent;
+
+    ScanStats _specificStats;
+};
+}  // namespace sbe
+}  // namespace mongo

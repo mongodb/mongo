@@ -31,7 +31,7 @@
 
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
-#include "mongo/db/query/projection_ast_walker.h"
+#include "mongo/db/query/tree_walker.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo {
@@ -174,7 +174,7 @@ auto analyzeProjection(const ProjectionPathASTNode* root, ProjectType type) {
     ProjectionAnalysisVisitor projectionAnalysisVisitor{&deps};
     PathTrackingWalker walker{&context, {&depsAnalysisVisitor, &projectionAnalysisVisitor}, {}};
 
-    projection_ast_walker::walk(&walker, root);
+    tree_walker::walk<true, projection_ast::ASTNode>(root, &walker);
 
     const auto& userData = context.data();
     const auto& tracker = userData.fieldDependencyTracker;

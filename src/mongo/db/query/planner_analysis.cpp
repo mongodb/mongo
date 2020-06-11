@@ -253,20 +253,6 @@ void replaceNodeInTree(QuerySolutionNode** root,
     }
 }
 
-bool hasNode(QuerySolutionNode* root, StageType type) {
-    if (type == root->getType()) {
-        return true;
-    }
-
-    for (size_t i = 0; i < root->children.size(); ++i) {
-        if (hasNode(root->children[i], type)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
                          QuerySolutionNode* solnRoot) {
     // If there is a GeoMatchExpression in the tree on a field with a 2dsphere index,
@@ -892,7 +878,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     // A solution can be blocking if it has a blocking sort stage or
     // a hashed AND stage.
-    bool hasAndHashStage = hasNode(solnRoot.get(), STAGE_AND_HASH);
+    bool hasAndHashStage = solnRoot->hasNode(STAGE_AND_HASH);
     soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
     const QueryRequest& qr = query.getQueryRequest();

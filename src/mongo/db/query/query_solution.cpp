@@ -134,6 +134,20 @@ void QuerySolutionNode::addCommon(str::stream* ss, int indent) const {
     *ss << "providedSorts = {" << providedSorts().debugString() << "}" << '\n';
 }
 
+bool QuerySolutionNode::hasNode(StageType type) const {
+    if (type == getType()) {
+        return true;
+    }
+
+    for (auto&& child : children) {
+        if (child->hasNode(type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 //
 // TextNode
 //

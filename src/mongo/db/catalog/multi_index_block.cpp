@@ -390,11 +390,11 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
     unsigned long long n = 0;
 
-    PlanExecutor::YieldPolicy yieldPolicy;
+    PlanYieldPolicy::YieldPolicy yieldPolicy;
     if (isBackgroundBuilding()) {
-        yieldPolicy = PlanExecutor::YIELD_AUTO;
+        yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     } else {
-        yieldPolicy = PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;
+        yieldPolicy = PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY;
     }
     auto exec =
         collection->makePlanExecutor(opCtx, yieldPolicy, Collection::ScanDirection::kForward);
