@@ -152,6 +152,12 @@ public:
     }
 };
 
+struct SorterRangeInfo {
+    std::streampos startOffset;
+    std::streampos endOffset;
+    uint32_t checksum;
+};
+
 /**
  * This is the sorted output iterator from the sorting framework.
  */
@@ -181,6 +187,11 @@ public:
     // Opens and closes the source of data over which this class iterates, if applicable.
     virtual void openSource() = 0;
     virtual void closeSource() = 0;
+
+    virtual SorterRangeInfo getRangeInfo() const {
+        invariant(false, "Only FileIterator has ranges");
+        MONGO_UNREACHABLE;
+    }
 
 protected:
     SortIteratorInterface() {}  // can only be constructed as a base
@@ -233,10 +244,34 @@ public:
         return _usedDisk;
     }
 
+    std::string getTempDir() const {
+        return _tempDir;
+    }
+
+    std::string getFileName() const {
+        return _fileName;
+    }
+
+    std::vector<SorterRangeInfo> getRangeInfos() const {
+        std::vector<SorterRangeInfo> ranges;
+        ranges.reserve(_iters.size());
+
+        std::transform(_iters.begin(), _iters.end(), std::back_inserter(ranges), [](const auto it) {
+            return it->getRangeInfo();
+        });
+
+        return ranges;
+    }
+
 protected:
     Sorter() {}  // can only be constructed as a base
 
     bool _usedDisk{false};  // Keeps track of whether the sorter used disk or not
+
+    std::string _tempDir;
+    std::string _fileName;
+
+    std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 };
 
 /**

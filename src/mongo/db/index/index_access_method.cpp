@@ -471,6 +471,8 @@ public:
 
     int64_t getKeysInserted() const final;
 
+    State getState() const final;
+
 private:
     std::unique_ptr<Sorter> _sorter;
     IndexCatalogEntry* _indexCatalogEntry;
@@ -487,6 +489,10 @@ private:
     // These are inserted into the sorter after all normal data keys have been added, just
     // before the bulk build is committed.
     KeyStringSet _multikeyMetadataKeys;
+
+    // The RecordId corresponding to the object most recently inserted using this BulkBuilder, or
+    // boost::none if nothing has been inserted into the sorter or done() has already been called.
+    boost::optional<RecordId> _lastRecordIdInserted;
 };
 
 std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initiateBulk(
@@ -567,6 +573,7 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
     _isMultiKey = _isMultiKey ||
         _indexCatalogEntry->accessMethod()->shouldMarkIndexAsMultikey(
             keys->size(), _multikeyMetadataKeys, *multikeyPaths);
+    _lastRecordIdInserted = loc;
 
     return Status::OK();
 }
@@ -585,11 +592,20 @@ AbstractIndexAccessMethod::BulkBuilderImpl::done() {
         _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
+    _lastRecordIdInserted = boost::none;
     return _sorter->done();
 }
 
 int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
     return _keysInserted;
+}
+
+AbstractIndexAccessMethod::BulkBuilder::State AbstractIndexAccessMethod::BulkBuilderImpl::getState()
+    const {
+    return {_lastRecordIdInserted,
+            _sorter->getTempDir(),
+            _sorter->getFileName(),
+            _sorter->getRangeInfos()};
 }
 
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
