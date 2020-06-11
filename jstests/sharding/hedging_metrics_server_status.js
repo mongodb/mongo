@@ -73,7 +73,7 @@ const st = new ShardingTest({
             // Force the mongos to send requests to hosts in alphabetical order of host names.
             "failpoint.networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder":
                 tojson({mode: "alwaysOn"}),
-            maxTimeMSForHedgedReads: 10
+            maxTimeMSForHedgedReads: 500
         }
     }],
     shards: 1,
