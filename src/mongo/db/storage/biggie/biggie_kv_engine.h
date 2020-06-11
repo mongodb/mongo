@@ -161,6 +161,7 @@ public:
 private:
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest = 0;
+    mutable Mutex _identsLock = MONGO_MAKE_LATCH("KVEngine::_identsLock");
     std::map<std::string, bool> _idents;  // TODO : replace with a query to _master.
     std::unique_ptr<VisibilityManager> _visibilityManager;
 
