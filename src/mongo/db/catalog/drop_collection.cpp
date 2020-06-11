@@ -125,6 +125,9 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
     // collection.
     boost::optional<AutoGetDb> autoDb;
     autoDb.emplace(opCtx, startingNss.db(), MODE_IX);
+    if (!autoDb->getDb()) {
+        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+    }
 
     boost::optional<Lock::CollectionLock> collLock;
     collLock.emplace(opCtx, startingNss, MODE_IX);
