@@ -195,7 +195,6 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
             executable != LAST_STABLE_MONGOD_BINARY:
         suite_set_parameters["assertStableTimestampEqualsAppliedThroughOnRecovery"] = True
 
-    # TODO(SERVER-48645): Only keep the else block once v4.4 is not longer the last stable version
     if executable == LAST_STABLE_MONGOD_BINARY:
         suite_set_parameters.setdefault("enableTestCommands", True)
     else:
@@ -278,7 +277,6 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     if "logComponentVerbosity" not in suite_set_parameters:
         suite_set_parameters["logComponentVerbosity"] = default_mongos_log_component_verbosity()
 
-    # TODO(SERVER-48645): Only keep the else block once v4.4 is not longer the last stable version
     if executable == LAST_STABLE_MONGOS_BINARY:
         suite_set_parameters.setdefault("enableTestCommands", True)
     else:
