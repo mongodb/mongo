@@ -893,13 +893,16 @@ private:
     // Set what type of PRIMARY this node currently is.
     void _setLeaderMode(LeaderMode mode);
 
+    // Returns a HostAndPort if one is forced via the 'replSetSyncFrom' command.
+    boost::optional<HostAndPort> _chooseSyncSourceReplSetSyncFrom(Date_t now);
+
     // Does preliminary checks involved in choosing sync source
     // * Do we have a valid configuration?
-    // * Do we have a forced sync source?
+    // * Is the 'forceSyncSourceCandidate' failpoint enabled?
     // * Have we gotten enough pings?
     // Returns a HostAndPort if one is decided (may be empty), boost:none if we need to move to the
     // next step.
-    boost::optional<HostAndPort> _chooseSyncSourceInitialStep(Date_t now);
+    boost::optional<HostAndPort> _chooseSyncSourceInitialChecks(Date_t now);
 
     // Returns the primary node if it is a valid sync source, otherwise returns an empty
     // HostAndPort.
@@ -1054,9 +1057,8 @@ private:
     std::map<HostAndPort, Date_t> _syncSourceBlacklist;
     // The next sync source to be chosen, requested via a replSetSyncFrom command
     int _forceSyncSourceIndex;
-    // Whether the current sync source has been set via a replSetSyncFrom command or
-    // forceSyncSourceCandidate failpoint.
-    bool _syncSourceCurrentlyForced;
+    // Whether the current sync source has been set via a replSetSyncFrom command
+    bool _replSetSyncFromSet;
 
     // Options for this TopologyCoordinator
     Options _options;

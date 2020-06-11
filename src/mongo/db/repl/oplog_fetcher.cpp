@@ -55,6 +55,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterOplogFetcherCallbackScheduled);
 MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogFetcherRetries);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingSuccessfulBatch);
+MONGO_FAIL_POINT_DEFINE(hangOplogFetcherBeforeAdvancingLastFetched);
 
 namespace {
 class OplogBatchStats {
@@ -714,6 +715,10 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     auto status = _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
     if (!status.isOK()) {
         return status;
+    }
+
+    if (MONGO_unlikely(hangOplogFetcherBeforeAdvancingLastFetched.shouldFail())) {
+        hangOplogFetcherBeforeAdvancingLastFetched.pauseWhileSet();
     }
 
     // Start skipping the first doc after at least one doc has been enqueued in the lifetime

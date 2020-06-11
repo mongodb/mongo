@@ -218,7 +218,7 @@ TopologyCoordinator::TopologyCoordinator(Options options)
       _term(OpTime::kUninitializedTerm),
       _currentPrimaryIndex(-1),
       _forceSyncSourceIndex(-1),
-      _syncSourceCurrentlyForced(false),
+      _replSetSyncFromSet(false),
       _options(std::move(options)),
       _selfIndex(-1),
       _maintenanceModeCalls(0),
@@ -248,12 +248,14 @@ HostAndPort TopologyCoordinator::getSyncSourceAddress() const {
 
 void TopologyCoordinator::_clearSyncSource() {
     _syncSource = HostAndPort();
-    _syncSourceCurrentlyForced = false;
+    _replSetSyncFromSet = false;
 }
 
-void TopologyCoordinator::_setSyncSource(HostAndPort newSyncSource, Date_t now, bool forced) {
+void TopologyCoordinator::_setSyncSource(HostAndPort newSyncSource,
+                                         Date_t now,
+                                         bool fromReplSetSyncFrom) {
     _syncSource = newSyncSource;
-    _syncSourceCurrentlyForced = forced;
+    _replSetSyncFromSet = fromReplSetSyncFrom;
 
     // If we chose another node rather than clearing the sync source, update the recent sync source
     // changes.
@@ -265,11 +267,20 @@ void TopologyCoordinator::_setSyncSource(HostAndPort newSyncSource, Date_t now, 
 HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                                                      const OpTime& lastOpTimeFetched,
                                                      ReadPreference readPreference) {
-    // Check to make sure we can choose a sync source, and choose a forced one if set.
-    auto maybeSyncSource = _chooseSyncSourceInitialStep(now);
+    // Check to see if we should choose a sync source because the 'replSetSyncFrom' command was set.
+    auto maybeSyncSource = _chooseSyncSourceReplSetSyncFrom(now);
     if (maybeSyncSource) {
-        bool forced = !maybeSyncSource->empty();
-        _setSyncSource(*maybeSyncSource, now, forced);
+        // If we have a forced sync source via 'replSetSyncFrom', set the _replSetSyncFromSet flag
+        // to true.
+        _setSyncSource(*maybeSyncSource, now, true /* fromReplSetSyncFrom */);
+        return _syncSource;
+    }
+
+    // Check to make sure we can choose a sync source, and choose one if the
+    // 'forceSyncSourceCandidate' failpoint is set.
+    maybeSyncSource = _chooseSyncSourceInitialChecks(now);
+    if (maybeSyncSource) {
+        _setSyncSource(*maybeSyncSource, now);
         return _syncSource;
     }
 
@@ -510,8 +521,26 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
     return true;
 }
 
+boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceReplSetSyncFrom(Date_t now) {
+    if (_selfIndex == -1) {
+        return boost::none;
+    }
 
-boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(Date_t now) {
+    if (_forceSyncSourceIndex == -1) {
+        return boost::none;
+    }
+
+    // If we have a target we've requested to sync from, use it.
+    invariant(_forceSyncSourceIndex < _rsConfig.getNumMembers());
+    auto syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
+    _forceSyncSourceIndex = -1;
+    LOGV2(21782, "Choosing sync source candidate by request", "syncSource"_attr = syncSource);
+    std::string msg(str::stream() << "syncing from: " << syncSource.toString() << " by request");
+    setMyHeartbeatMessage(now, msg);
+    return syncSource;
+}
+
+boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialChecks(Date_t now) {
     // If we are not a member of the current replica set configuration, no sync source is valid.
     if (_selfIndex == -1) {
         LOGV2_DEBUG(
@@ -540,7 +569,6 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
             fassertFailed(50836);
         }
 
-
         if (_memberIsBlacklisted(_rsConfig.getMemberAt(syncSourceIndex), now)) {
             LOGV2(3873119,
                   "Cannot select a sync source because forced candidate is blacklisted.",
@@ -554,18 +582,6 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
               "syncSource"_attr = syncSource);
         std::string msg(str::stream() << "syncing from: " << syncSource.toString()
                                       << " by 'forceSyncSourceCandidate' parameter");
-        setMyHeartbeatMessage(now, msg);
-        return syncSource;
-    }
-
-    // if we have a target we've requested to sync from, use it
-    if (_forceSyncSourceIndex != -1) {
-        invariant(_forceSyncSourceIndex < _rsConfig.getNumMembers());
-        auto syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
-        _forceSyncSourceIndex = -1;
-        LOGV2(21782, "Choosing sync source candidate by request", "syncSource"_attr = syncSource);
-        std::string msg(str::stream()
-                        << "syncing from: " << syncSource.toString() << " by request");
         setMyHeartbeatMessage(now, msg);
         return syncSource;
     }
@@ -3059,6 +3075,13 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     // If we find an eligible sync source that is significantly closer than our current sync source,
     // return true.
 
+    // Do not re-evaluate our sync source if it was set via the replSetSyncFrom command or the
+    // forceSyncSourceCandidate failpoint.
+    auto sfp = forceSyncSourceCandidate.scoped();
+    if (_replSetSyncFromSet || MONGO_unlikely(sfp.isActive())) {
+        return false;
+    }
+
     // If we are in initial sync, do not re-evaluate our sync source.
     const bool nodeInInitialSync = (memberState.startup() || memberState.startup2());
     if (nodeInInitialSync) {
@@ -3073,12 +3096,6 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     // If we have already changed sync sources more than 'maxNumSyncSourceChangesPerHour' in the
     // past hour, do not re-evaluate our sync source.
     if (_recentSyncSourceChanges.changedTooOftenRecently(now)) {
-        return false;
-    }
-
-    // Do not re-evaluate our sync source if it was set via the replSetSyncFrom command or the
-    // forceSyncSourceCandidate failpoint.
-    if (_syncSourceCurrentlyForced) {
         return false;
     }
 
@@ -3103,7 +3120,6 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     if (numPingsNeeded > 0) {
         return false;
     }
-
 
     if (_pings.count(currentSource) == 0) {
         // Ping data for our current sync source could not be found.
