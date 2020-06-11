@@ -1519,6 +1519,26 @@ flag and tell the storage engine that the [`initialDataTimestamp`](#replication-
 is the node's last applied OpTime. Finally, the `InitialSyncer` shuts down and the
 `ReplicationCoordinator` starts steady state replication.
 
+## Initial Sync Semantics
+
+Nodes in initial sync do not contribute to write concern acknowledgment. While in a `STARTUP2`
+state, a node will not send any `replSetUpdatePosition` commands to its sync source. It will also
+have the `lastAppliedOpTime` and `lastDurableOpTime` set to null in heartbeat responses. The
+combined effect of this is that the primary of the replica set will not receive updates about the
+initial syncing node's progress, and will thus not be able to count that member towards the
+acknowledgment of writes.
+
+In a similar vein, we prevent new members from voting (or increasing the number of nodes needed
+to commit majority writes) until they have successfully completed initial sync and transitioned
+to `SECONDARY` state. This is done as follows: whenever a new voting node is added to the set, we
+internally rewrite its `MemberConfig` to have a special [`newlyAdded=true`](https://github.com/mongodb/mongo/blob/80f424c02df47469792917673ab7e6dd77b01421/src/mongo/db/repl/member_config.idl#L75-L81)
+field. This field signifies that this node is temporarily non-voting and should thus be excluded
+from all voter checks or counts. Once the replica set primary receives a heartbeat response from
+the member stating that it is either in `SECONDARY`, `RECOVERING`, or `ROLLBACK` state, that primary
+schedules an automatic reconfig to remove the corresponding `newlyAdded` field. Note that we filter
+that field out of `replSetGetStatus` responses, but it is always visible in the config stored on
+disk.
+
 # Reconfiguration
 
 MongoDB replica sets consist of a set of members, where a *member* corresponds to a single
