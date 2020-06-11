@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/visit_helper.h"
 
 // This file contains classes for serializing document diffs to a format that can be stored in the
 // oplog. Any code/machinery which manipulates document diffs should do so through these classes.
@@ -127,6 +128,34 @@ public:
         _childSubDiffIndex = {};
     }
 
+    size_t computeApproxSize() const {
+        // TODO SERVER-48602: We need to ensure that this function returns in O(1). Incrementally
+        // computing this size might be one option.
+        size_t size = sizeof(int) /* Size of object */ + 1 /* Type byte */ + kArrayHeader.size() +
+            1 /* null terminator */ + 1 /*type byte */ + 1 /* bool size*/;
+
+        if (_newSize) {
+            size += kResizeSectionFieldName.size() + 1 /* Null terminator */ + 1 /* Type byte */ +
+                sizeof(int) /* size of value */;
+        }
+
+        for (auto&& [idx, modification] : _modifications) {
+            stdx::visit(visit_helper::Overloaded{[idx = idx, &size](const Diff& subDiff) {
+                                                     size += sizeof(idx) +
+                                                         kSubDiffSectionFieldName.size() +
+                                                         subDiff.objsize() + 2;
+                                                 },
+                                                 [idx = idx, &size](BSONElement elt) {
+                                                     size += sizeof(idx) +
+                                                         kUpdateSectionFieldName.size() +
+                                                         elt.size() + 2;
+                                                 }},
+                        modification);
+        }
+
+        return size;
+    }
+
 private:
     // The top-level of a diff is never an array diff. One can only construct an ArrayDiffBuilder
     // from a parent DocumentDiffBuilder.
@@ -149,7 +178,7 @@ private:
     DiffBuilderBase* _parent = nullptr;
 
     friend class DocumentDiffBuilder;
-};
+};  // namespace doc_diff
 
 /**
  * Class for building document diffs.
@@ -225,6 +254,33 @@ public:
         invariant(_childSubDiffField);
         _subDiffs.append(*_childSubDiffField, std::move(childDiff));
         _childSubDiffField = {};
+    }
+
+    size_t computeApproxSize() {
+        // TODO SERVER-48602: We need to ensure that this function returns in O(1). Incrementally
+        // computing this size might be one option.
+        size_t size = sizeof(int) /* Size of object */ + 1 /* Type byte */;
+
+        if (!_updates.asTempObj().isEmpty()) {
+            size += 1 /* Type byte */ + kUpdateSectionFieldName.size() /* FieldName */ +
+                1 /* Null terminator */ + _updates.bb().len() + 1 /* Null terminator */;
+        }
+
+        if (!_inserts.asTempObj().isEmpty()) {
+            size += 1 /* Type byte */ + kInsertSectionFieldName.size() /* FieldName */ +
+                1 /* Null terminator */ + _inserts.bb().len() + 1 /* Null terminator */;
+        }
+
+        if (!_deletes.asTempObj().isEmpty()) {
+            size += 1 /* Type byte */ + kDeleteSectionFieldName.size() /* FieldName */ +
+                1 /* Null terminator */ + _deletes.bb().len() + 1 /* Null terminator */;
+        }
+
+        if (!_subDiffs.asTempObj().isEmpty()) {
+            size += 1 /* Type byte */ + kSubDiffSectionFieldName.size() /* FieldName */ +
+                1 /* Null terminator */ + _subDiffs.bb().len() + 1 /* Null terminator */;
+        }
+        return size;
     }
 
 private:

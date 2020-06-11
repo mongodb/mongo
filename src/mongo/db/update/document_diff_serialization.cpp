@@ -33,7 +33,6 @@
 
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/visit_helper.h"
 
 namespace mongo::doc_diff {
 namespace {

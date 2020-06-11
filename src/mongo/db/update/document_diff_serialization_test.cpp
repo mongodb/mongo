@@ -343,5 +343,48 @@ TEST(DiffSerializationTest, SubArrayDiffAbandon) {
                    fromjson("{d : {dField1: false, dField2: false}, u: {uField: 1},"
                             "s: {arr2: {a: true, l: 5}}}"));
 }
+
+TEST(DiffSerializationTest, ValidateComputeApproxSize) {
+    DocumentDiffBuilder builder;
+    builder.addDelete("deleteField");
+    builder.addInsert("insert", BSON("" << 4).firstElement());
+    builder.addUpdate("update1",
+                      BSON(""
+                           << "update")
+                          .firstElement());
+    builder.addDelete("");
+    {
+        // Ensure size of the sub-array diff is included.
+        auto subDiff = builder.startSubArrDiff("subArray");
+        subDiff.setResize(5);
+        subDiff.addUpdate(2, BSON("" << 4).firstElement());
+        subDiff.addUpdate(2,
+                          BSON(""
+                               << "value")
+                              .firstElement());
+
+        auto subSubDiff = subDiff.startSubObjDiff(22);
+        subSubDiff.addInsert("insert2",
+                             BSON(""
+                                  << "")
+                                 .firstElement());
+        subSubDiff.addUpdate("update3", BSON("" << BSONNULL).firstElement());
+    }
+    {
+        // Ensure size of the sub-object diff is included.
+        auto subDiff = builder.startSubObjDiff("subObj");
+        subDiff.addUpdate("setArray",
+                          BSON("" << BSON_ARRAY("val1"
+                                                << "val2" << 3))
+                              .firstElement());
+    }
+    // Update with a sub-object.
+    builder.addUpdate("update4", BSON("" << BSON("nestedObj" << 4LL)).firstElement());
+
+    auto computedSize = builder.computeApproxSize();
+    auto out = builder.release();
+    ASSERT_EQ(computedSize, out.objsize());
+}
+
 }  // namespace
 }  // namespace mongo::doc_diff
