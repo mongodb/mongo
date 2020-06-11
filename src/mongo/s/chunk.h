@@ -143,6 +143,10 @@ public:
         return _chunkInfo.getShardIdAt(_atClusterTime);
     }
 
+    const auto& getRange() const {
+        return _chunkInfo.getRange();
+    }
+
     /**
      * Throws MigrationConflict if the history entry valid for the chunk's pinned cluster time, if
      * it has one, is not the most recent entry (meaning the chunk has moved).
