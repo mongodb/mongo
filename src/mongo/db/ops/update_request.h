@@ -272,10 +272,6 @@ public:
             builder << " runtimeConstants: " << _runtimeConstants->toBSON().toString();
         }
 
-        if (_letParameters) {
-            builder << " letParameters: " << _letParameters;
-        }
-
         builder << " god: " << _god;
         builder << " upsert: " << isUpsert();
         builder << " multi: " << isMulti();

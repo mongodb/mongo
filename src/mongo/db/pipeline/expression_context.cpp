@@ -65,7 +65,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         std::move(processInterface),
                         std::move(resolvedNamespaces),
                         std::move(collUUID),
-                        request.getLetParameters(),
+                        request.letParameters,
                         mayDbProfile) {
 
     if (request.getIsMapReduceCommand()) {

@@ -217,4 +217,23 @@ result = db.runCommand({
     new: true
 });
 assert.eq(result.value, {Species: "not_a_bird", suspect: "dino"}, result);
+
+// Update
+assert.commandWorked(db.runCommand({
+    update: coll.getName(),
+    let : {target_species: "Song Thrush (Turdus philomelos)", new_name: "Song Thrush"},
+    updates: [
+        {q: {$expr: {$eq: ["$Species", "$$target_species"]}}, u: [{$set: {Species: "$$new_name"}}]}
+    ]
+}));
+
+assert.commandWorked(db.runCommand({
+    update: coll.getName(),
+    let : {target_species: "Song Thrush (Turdus philomelos)"},
+    updates: [{
+        q: {$expr: {$eq: ["$Species", "$$target_species"]}},
+        u: [{$set: {Location: "$$place"}}],
+        c: {place: "North America"}
+    }]
+}));
 }());

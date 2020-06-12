@@ -127,7 +127,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   const boost::optional<RuntimeConstants>& constants,
                                   BSONObj collationObj) {
     if (constants) {
-        cmdForShards[AggregationRequest::kRuntimeConstantsName] = Value(constants.get().toBSON());
+        cmdForShards[AggregationRequest::kRuntimeConstants] = Value(constants.get().toBSON());
     }
 
     cmdForShards[AggregationRequest::kFromMongosName] = Value(expCtx->inMongos);
