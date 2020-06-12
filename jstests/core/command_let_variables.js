@@ -262,9 +262,11 @@ assert.commandWorked(testDB.runCommand({
     deletes: [{q: {$and: [{_id: 4}, {$expr: {$eq: ["$Species", "$$target_species"]}}]}, limit: 1}]
 }));
 
-assert.eq(testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}})
-              .cursor.firstBatch.length,
-          0);
+result = assert
+             .commandWorked(
+                 testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}}))
+             .cursor.firstBatch;
+assert.eq(result.length, 0);
 
 // Test that reserved names are not allowed as let variable names.
 assert.commandFailedWithCode(
