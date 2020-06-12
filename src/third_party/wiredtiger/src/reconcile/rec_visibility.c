@@ -140,9 +140,6 @@ __rec_append_orig_value(
              * timestamped globally visible tombstone because even if its timestamp is smaller than
              * the entries in the history store, we can't change the history store entries. This is
              * not correct but we hope we can get away with it.
-             *
-             * FIXME-WT-6171: remove this once we get rid of out of order timestamps and mixed mode
-             * transactions.
              */
             if (unpack->tw.durable_stop_ts != WT_TS_NONE && tombstone_globally_visible)
                 return (0);
