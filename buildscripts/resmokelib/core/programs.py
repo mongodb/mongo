@@ -182,6 +182,11 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
             "mode": "alwaysOn", "data": {"numTickets": config.FLOW_CONTROL_TICKETS}
         }
 
+    # Always enable this invariant for testing.
+    if "assertStableTimestampEqualsAppliedThroughOnRecovery" not in suite_set_parameters and \
+            executable != LAST_STABLE_MONGOD_BINARY:
+        suite_set_parameters["assertStableTimestampEqualsAppliedThroughOnRecovery"] = True
+
     _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {
@@ -342,6 +347,9 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     # to a default.
     if config.FLOW_CONTROL is not None:
         mongod_set_parameters.setdefault("enableFlowControl", config.FLOW_CONTROL == "on")
+
+    # Always enable this invariant in tests.
+    mongod_set_parameters.setdefault("assertStableTimestampEqualsAppliedThroughOnRecovery", True)
 
     # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
     # value to a default.

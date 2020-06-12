@@ -288,3 +288,11 @@ server_parameters:
         # and if it is not, readPreference is 'nearest'.
         default: ""
         validator: { callback: 'validateReadPreferenceMode' }
+
+    assertStableTimestampEqualsAppliedThroughOnRecovery:
+        description: Enables invariant to check stable timestamp equals appliedThrough on recovery.
+        set_at: startup
+        test_only: true
+        cpp_vartype: bool
+        cpp_varname: assertStableTimestampEqualsAppliedThroughOnRecovery
+        default: false

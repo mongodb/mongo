@@ -43,6 +43,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
@@ -427,11 +428,14 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     }
 
     const auto appliedThrough = _consistencyMarkers->getAppliedThrough(opCtx);
-    invariant(!stableTimestamp || stableTimestamp->isNull() || appliedThrough.isNull() ||
-                  *stableTimestamp == appliedThrough.getTimestamp(),
-              str::stream() << "Stable timestamp " << stableTimestamp->toString()
-                            << " does not equal appliedThrough timestamp "
-                            << appliedThrough.toString());
+    if (assertStableTimestampEqualsAppliedThroughOnRecovery) {
+        invariant(!stableTimestamp || stableTimestamp->isNull() || appliedThrough.isNull() ||
+                      *stableTimestamp == appliedThrough.getTimestamp(),
+                  str::stream() << "Stable timestamp " << stableTimestamp->toString()
+                                << " does not equal appliedThrough timestamp "
+                                << appliedThrough.toString());
+    }
+
 
     // This may take an IS lock on the oplog collection.
     _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, stableTimestamp);

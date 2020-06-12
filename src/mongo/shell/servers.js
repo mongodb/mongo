@@ -1265,6 +1265,14 @@ function appendSetParameterArgs(argArray) {
                             continue;
                         }
 
+                        // Do not set this if test commands are not enabled or we are not on a new
+                        // enough version.
+                        if (paramName === "assertStableTimestampEqualsAppliedThroughOnRecovery" &&
+                            (!jsTest.options().enableTestCommands ||
+                             programMajorMinorVersion < 404)) {
+                            continue;
+                        }
+
                         const paramVal = ((param) => {
                             if (typeof param === "object") {
                                 return JSON.stringify(param);

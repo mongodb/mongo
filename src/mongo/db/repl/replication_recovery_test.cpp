@@ -695,6 +695,10 @@ TEST_F(ReplicationRecoveryTest,
 DEATH_TEST_F(ReplicationRecoveryTest,
              RecoveryFailsWithUnmatchedAppliedThrough,
              "Invariant failure") {
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("assertStableTimestampEqualsAppliedThroughOnRecovery")
+                  ->second->setFromString("true"));
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
@@ -834,6 +838,10 @@ TEST_F(ReplicationRecoveryTest, RecoveryDoesNotApplyOperationsIfAppliedThroughIs
 DEATH_TEST_F(ReplicationRecoveryTest,
              RecoveryInvariantsWithUnequalStableTimestampAndAppliedThrough,
              "Invariant failure") {
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("assertStableTimestampEqualsAppliedThroughOnRecovery")
+                  ->second->setFromString("true"));
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
