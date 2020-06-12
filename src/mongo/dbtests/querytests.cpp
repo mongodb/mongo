@@ -54,8 +54,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/timer.h"
 
+namespace mongo {
 namespace {
-namespace QueryTests {
 
 using std::endl;
 using std::string;
@@ -333,7 +333,7 @@ public:
 class GetMoreKillOp : public ClientBase {
 public:
     ~GetMoreKillOp() {
-        getGlobalServiceContext()->unsetKillAllOperations();
+        _opCtx.getServiceContext()->unsetKillAllOperations();
         _client.dropCollection("unittests.querytests.GetMoreKillOp");
     }
     void run() {
@@ -355,7 +355,7 @@ public:
 
         // Set the killop kill all flag, forcing the next get more to fail with a kill op
         // exception.
-        getGlobalServiceContext()->setKillAllOperations();
+        _opCtx.getServiceContext()->setKillAllOperations();
         ASSERT_THROWS_CODE(([&] {
                                while (cursor->more()) {
                                    cursor->next();
@@ -365,7 +365,7 @@ public:
                            ErrorCodes::InterruptedAtShutdown);
 
         // Revert the killop kill all flag.
-        getGlobalServiceContext()->unsetKillAllOperations();
+        _opCtx.getServiceContext()->unsetKillAllOperations();
     }
 };
 
@@ -377,7 +377,7 @@ public:
 class GetMoreInvalidRequest : public ClientBase {
 public:
     ~GetMoreInvalidRequest() {
-        getGlobalServiceContext()->unsetKillAllOperations();
+        _opCtx.getServiceContext()->unsetKillAllOperations();
         _client.dropCollection("unittests.querytests.GetMoreInvalidRequest");
     }
     void run() {
@@ -456,7 +456,7 @@ public:
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -491,7 +491,7 @@ public:
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -524,7 +524,7 @@ public:
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -556,7 +556,7 @@ public:
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -590,7 +590,7 @@ public:
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -646,7 +646,7 @@ public:
 
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -693,7 +693,7 @@ public:
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -706,7 +706,7 @@ public:
         //
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
-        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
             BSONObj info;
             _client.runCommand("local",
                                BSON("emptycapped"
@@ -749,7 +749,7 @@ public:
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -762,7 +762,7 @@ public:
         //
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
-        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
             BSONObj info;
             _client.runCommand("local",
                                BSON("emptycapped"
@@ -1382,7 +1382,7 @@ public:
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -1538,7 +1538,7 @@ public:
 
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -1555,7 +1555,7 @@ public:
         //
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
-        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
             _client.runCommand("local",
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
@@ -1605,7 +1605,7 @@ public:
 
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -1624,7 +1624,7 @@ public:
         //
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
-        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
             _client.runCommand("local",
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
@@ -1670,7 +1670,7 @@ public:
 
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -1698,7 +1698,7 @@ public:
         //
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
-        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+        if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
             _client.runCommand("local",
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
@@ -1908,7 +1908,7 @@ public:
     Exhaust() : CollectionInternalBase("exhaust") {}
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        if (!_opCtx.getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -2066,5 +2066,5 @@ public:
 
 OldStyleSuiteInitializer<All> myall;
 
-}  // namespace QueryTests
 }  // namespace
+}  // namespace mongo

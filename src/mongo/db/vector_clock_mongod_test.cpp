@@ -83,9 +83,8 @@ private:
     std::shared_ptr<KeysCollectionManager> _keyManager;
 };
 
-
 TEST_F(VectorClockMongoDTest, TickClusterTime) {
-    auto sc = getGlobalServiceContext();
+    auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
     const auto t0 = vc->getTime();
@@ -103,7 +102,7 @@ TEST_F(VectorClockMongoDTest, TickClusterTime) {
 }
 
 TEST_F(VectorClockMongoDTest, TickToClusterTime) {
-    auto sc = getGlobalServiceContext();
+    auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
     const auto t0 = vc->getTime();
@@ -123,19 +122,19 @@ TEST_F(VectorClockMongoDTest, TickToClusterTime) {
 }
 
 DEATH_TEST_F(VectorClockMongoDTest, CannotTickConfigTime, "Hit a MONGO_UNREACHABLE") {
-    auto sc = getGlobalServiceContext();
+    auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tick(VectorClock::Component::ConfigTime, 1);
 }
 
 DEATH_TEST_F(VectorClockMongoDTest, CannotTickToConfigTime, "Hit a MONGO_UNREACHABLE") {
-    auto sc = getGlobalServiceContext();
+    auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
     vc->tickTo(VectorClock::Component::ConfigTime, LogicalTime());
 }
 
 TEST_F(VectorClockMongoDTest, GossipOutInternal) {
-    auto sc = getGlobalServiceContext();
+    auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
     LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
@@ -155,7 +154,7 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
 }
 
 TEST_F(VectorClockMongoDTest, GossipOutExternal) {
-    auto sc = getGlobalServiceContext();
+    auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
     LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
@@ -175,7 +174,7 @@ TEST_F(VectorClockMongoDTest, GossipOutExternal) {
 }
 
 TEST_F(VectorClockMongoDTest, GossipInInternal) {
-    auto sc = getGlobalServiceContext();
+    auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
     vc->tick(VectorClock::Component::ClusterTime, 1);
@@ -220,7 +219,7 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
 }
 
 TEST_F(VectorClockMongoDTest, GossipInExternal) {
-    auto sc = getGlobalServiceContext();
+    auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
     vc->tick(VectorClock::Component::ClusterTime, 1);

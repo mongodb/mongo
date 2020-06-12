@@ -63,7 +63,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
                                                                            << "h1"))),
                                              newReplSetId);
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
+                  validateConfigForInitiate(&rses, config, getServiceContext()).getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
@@ -79,7 +79,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
                                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                 << "h1"))),
                                                   newReplSetId);
-    ASSERT_OK(validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
+    ASSERT_OK(validateConfigForInitiate(&rses, config, getServiceContext()).getStatus());
     ASSERT_EQUALS(config.getConfigTerm(), OpTime::kInitialTerm);
 }
 
@@ -104,17 +104,15 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
     presentTwiceExternalState.addSelf(HostAndPort("h3"));
     presentTwiceExternalState.addSelf(HostAndPort("h1"));
 
-    ASSERT_EQUALS(
-        ErrorCodes::NodeNotFound,
-        validateConfigForInitiate(&notPresentExternalState, config, getGlobalServiceContext())
-            .getStatus());
-    ASSERT_EQUALS(
-        ErrorCodes::InvalidReplicaSetConfig,
-        validateConfigForInitiate(&presentTwiceExternalState, config, getGlobalServiceContext())
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                  validateConfigForInitiate(&notPresentExternalState, config, getServiceContext())
+                      .getStatus());
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                  validateConfigForInitiate(&presentTwiceExternalState, config, getServiceContext())
+                      .getStatus());
     ASSERT_EQUALS(1,
                   unittest::assertGet(validateConfigForInitiate(
-                      &presentOnceExternalState, config, getGlobalServiceContext())));
+                      &presentOnceExternalState, config, getServiceContext())));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
@@ -135,10 +133,9 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
-    ASSERT_EQUALS(
-        ErrorCodes::NodeNotElectable,
-        validateConfigForInitiate(&presentOnceExternalState, config, getGlobalServiceContext())
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::NodeNotElectable,
+                  validateConfigForInitiate(&presentOnceExternalState, config, getServiceContext())
+                      .getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiable) {
@@ -157,10 +154,9 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiab
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
-    ASSERT_EQUALS(
-        ErrorCodes::UnsatisfiableWriteConcern,
-        validateConfigForInitiate(&presentOnceExternalState, config, getGlobalServiceContext())
-            .getStatus());
+    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
+                  validateConfigForInitiate(&presentOnceExternalState, config, getServiceContext())
+                      .getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOrOne) {
@@ -209,15 +205,13 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
 
-    ASSERT_OK(
-        validateConfigForInitiate(&presentOnceExternalState, zeroConfig, getGlobalServiceContext())
-            .getStatus());
-    ASSERT_OK(
-        validateConfigForInitiate(&presentOnceExternalState, oneConfig, getGlobalServiceContext())
-            .getStatus());
+    ASSERT_OK(validateConfigForInitiate(&presentOnceExternalState, zeroConfig, getServiceContext())
+                  .getStatus());
+    ASSERT_OK(validateConfigForInitiate(&presentOnceExternalState, oneConfig, getServiceContext())
+                  .getStatus());
     ASSERT_EQUALS(
         ErrorCodes::InvalidReplicaSetConfig,
-        validateConfigForInitiate(&presentOnceExternalState, twoConfig, getGlobalServiceContext())
+        validateConfigForInitiate(&presentOnceExternalState, twoConfig, getServiceContext())
             .getStatus());
 }
 
@@ -260,14 +254,14 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewlyAddedFieldNotAllowed) 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h1"));
 
-    auto status = validateConfigForInitiate(
-                      &presentOnceExternalState, firstNewlyAdded, getGlobalServiceContext())
-                      .getStatus();
+    auto status =
+        validateConfigForInitiate(&presentOnceExternalState, firstNewlyAdded, getServiceContext())
+            .getStatus();
     ASSERT_EQUALS(status, ErrorCodes::InvalidReplicaSetConfig);
     ASSERT_TRUE(status.reason().find("newly_added_h1") != std::string::npos);
-    status = validateConfigForInitiate(
-                 &presentOnceExternalState, lastNewlyAdded, getGlobalServiceContext())
-                 .getStatus();
+    status =
+        validateConfigForInitiate(&presentOnceExternalState, lastNewlyAdded, getServiceContext())
+            .getStatus();
     ASSERT_EQUALS(status, ErrorCodes::InvalidReplicaSetConfig);
     ASSERT_TRUE(status.reason().find("newly_added_h3") != std::string::npos);
 }
@@ -681,7 +675,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
     presentOnceExternalState.addSelf(HostAndPort("h2"));
     ASSERT_EQUALS(
         ErrorCodes::BadValue,
-        validateConfigForInitiate(&presentOnceExternalState, newConfig, getGlobalServiceContext())
+        validateConfigForInitiate(&presentOnceExternalState, newConfig, getServiceContext())
             .getStatus());
 }
 
@@ -758,7 +752,7 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigInvalid) {
     presentOnceExternalState.addSelf(HostAndPort("h2"));
     ASSERT_EQUALS(
         ErrorCodes::BadValue,
-        validateConfigForStartUp(&presentOnceExternalState, newConfig, getGlobalServiceContext())
+        validateConfigForStartUp(&presentOnceExternalState, newConfig, getServiceContext())
             .getStatus());
 }
 
@@ -777,9 +771,8 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigValid) {
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_OK(
-        validateConfigForStartUp(&presentOnceExternalState, newConfig, getGlobalServiceContext())
-            .getStatus());
+    ASSERT_OK(validateConfigForStartUp(&presentOnceExternalState, newConfig, getServiceContext())
+                  .getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigWriteConcernNotSatisfiable) {
@@ -797,9 +790,8 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigWriteConcernNotSati
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_OK(
-        validateConfigForStartUp(&presentOnceExternalState, newConfig, getGlobalServiceContext())
-            .getStatus());
+    ASSERT_OK(validateConfigForStartUp(&presentOnceExternalState, newConfig, getServiceContext())
+                  .getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigInvalid) {
@@ -819,7 +811,7 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigInvalid) 
     presentOnceExternalState.addSelf(HostAndPort("h2"));
     ASSERT_EQUALS(ErrorCodes::BadValue,
                   validateConfigForHeartbeatReconfig(
-                      &presentOnceExternalState, newConfig, getGlobalServiceContext())
+                      &presentOnceExternalState, newConfig, getServiceContext())
                       .getStatus());
 }
 
@@ -838,7 +830,7 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigValid) {
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
     ASSERT_OK(validateConfigForHeartbeatReconfig(
-                  &presentOnceExternalState, newConfig, getGlobalServiceContext())
+                  &presentOnceExternalState, newConfig, getServiceContext())
                   .getStatus());
 }
 
@@ -859,7 +851,7 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigWriteConc
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
     ASSERT_OK(validateConfigForHeartbeatReconfig(
-                  &presentOnceExternalState, newConfig, getGlobalServiceContext())
+                  &presentOnceExternalState, newConfig, getServiceContext())
                   .getStatus());
 }
 
@@ -1102,29 +1094,28 @@ TEST_F(ServiceContextTest, FindSelfInConfig) {
     presentThriceExternalState.addSelf(HostAndPort("h1"));
 
     // Test 'findSelfInConfig'.
-    ASSERT_EQUALS(ErrorCodes::NodeNotFound,
-                  findSelfInConfig(&notPresentExternalState, newConfig, getGlobalServiceContext())
-                      .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::NodeNotFound,
+        findSelfInConfig(&notPresentExternalState, newConfig, getServiceContext()).getStatus());
     ASSERT_EQUALS(
         ErrorCodes::InvalidReplicaSetConfig,
-        findSelfInConfig(&presentThriceExternalState, newConfig, getGlobalServiceContext())
-            .getStatus());
+        findSelfInConfig(&presentThriceExternalState, newConfig, getServiceContext()).getStatus());
     ASSERT_EQUALS(1,
-                  unittest::assertGet(findSelfInConfig(
-                      &presentOnceExternalState, newConfig, getGlobalServiceContext())));
+                  unittest::assertGet(
+                      findSelfInConfig(&presentOnceExternalState, newConfig, getServiceContext())));
 
     // The same rules apply to 'findSelfInConfigIfElectable'.
     ASSERT_EQUALS(
         ErrorCodes::NodeNotFound,
-        findSelfInConfigIfElectable(&notPresentExternalState, newConfig, getGlobalServiceContext())
+        findSelfInConfigIfElectable(&notPresentExternalState, newConfig, getServiceContext())
             .getStatus());
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  findSelfInConfigIfElectable(
-                      &presentThriceExternalState, newConfig, getGlobalServiceContext())
-                      .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidReplicaSetConfig,
+        findSelfInConfigIfElectable(&presentThriceExternalState, newConfig, getServiceContext())
+            .getStatus());
     ASSERT_EQUALS(1,
                   unittest::assertGet(findSelfInConfigIfElectable(
-                      &presentOnceExternalState, newConfig, getGlobalServiceContext())));
+                      &presentOnceExternalState, newConfig, getServiceContext())));
 
     // We must be electable in the new config.
     newConfig = ReplSetConfig::parse(BSON("_id"
@@ -1140,7 +1131,7 @@ TEST_F(ServiceContextTest, FindSelfInConfig) {
 
     ASSERT_EQUALS(
         ErrorCodes::NodeNotElectable,
-        findSelfInConfigIfElectable(&presentOnceExternalState, newConfig, getGlobalServiceContext())
+        findSelfInConfigIfElectable(&presentOnceExternalState, newConfig, getServiceContext())
             .getStatus());
 }
 

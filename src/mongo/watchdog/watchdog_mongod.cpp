@@ -52,11 +52,10 @@
 #include "mongo/watchdog/watchdog_register.h"
 
 namespace mongo {
+namespace {
 
 // Run the watchdog checks at a fixed interval regardless of user choice for monitoring period.
 constexpr Seconds watchdogCheckPeriod = Seconds{10};
-
-namespace {
 
 const auto getWatchdogMonitor =
     ServiceContext::declareDecoration<std::unique_ptr<WatchdogMonitor>>();
@@ -129,7 +128,7 @@ public:
     }
 } watchdogServerStatusSection;
 
-void startWatchdog() {
+void startWatchdog(ServiceContext* service) {
     // Check three paths if set
     // 1. storage directory - optional for inmemory?
     // 2. log path - optional
@@ -192,7 +191,7 @@ void startWatchdog() {
         std::move(checks), watchdogCheckPeriod, period, watchdogTerminate);
 
     // Install the new WatchdogMonitor
-    auto& staticMonitor = getWatchdogMonitor(getGlobalServiceContext());
+    auto& staticMonitor = getWatchdogMonitor(service);
 
     staticMonitor = std::move(monitor);
 

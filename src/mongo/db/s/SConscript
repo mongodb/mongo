@@ -62,6 +62,7 @@ env.Library(
         'move_primary_source_manager.cpp',
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
+        'op_observer_sharding_impl.cpp',
         'periodic_balancer_config_refresher.cpp',
         'periodic_sharded_index_consistency_checker.cpp',
         'range_deletion_util.cpp',
@@ -82,8 +83,8 @@ env.Library(
         'split_chunk.cpp',
         'split_vector.cpp',
         'start_chunk_clone_request.cpp',
-        env.Idlc('range_deletion_task.idl')[0],
         env.Idlc('migration_coordinator_document.idl')[0],
+        env.Idlc('range_deletion_task.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
@@ -124,19 +125,6 @@ env.Library(
     ],
     LIBDEPS=[
         'sharding_api_d',
-    ],
-)
-
-env.Library(
-    target='op_observer_sharding_impl',
-    source=[
-        'op_observer_sharding_impl.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/op_observer_impl',
-    ],
-    LIBDEPS_PRIVATE=[
-        'sharding_runtime_d',
     ],
 )
 

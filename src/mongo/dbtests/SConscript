@@ -160,7 +160,6 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/db/repl/serveronly_repl",
             "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
             "$BUILD_DIR/mongo/db/repl/timestamp_block",
-            "$BUILD_DIR/mongo/db/s/op_observer_sharding_impl",
             "$BUILD_DIR/mongo/db/server_options_core",
             "$BUILD_DIR/mongo/db/sessions_collection_standalone",
             "$BUILD_DIR/mongo/db/storage/biggie/storage_biggie",

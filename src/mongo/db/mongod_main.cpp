@@ -430,7 +430,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     initializeSNMP();
 
-    startWatchdog();
+    startWatchdog(serviceContext);
 
     if (!storageGlobalParams.readOnly) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");

@@ -778,7 +778,6 @@ env.Library(
     ],
 )
 
-
 env.Library(
     target="op_observer_impl",
     source=[

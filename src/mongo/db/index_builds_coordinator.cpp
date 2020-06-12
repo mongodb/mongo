@@ -394,7 +394,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndex
         return status;
     }
 
-    auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
+    auto& collectionCatalog = CollectionCatalog::get(opCtx->getServiceContext());
     Collection* collection = collectionCatalog.lookupCollectionByNamespace(opCtx, nss);
 
     // Complete the index build.
@@ -420,7 +420,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         indexNames.push_back(name);
     }
 
-    auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
+    auto& collectionCatalog = CollectionCatalog::get(opCtx->getServiceContext());
     Collection* collection = collectionCatalog.lookupCollectionByNamespace(opCtx, nss);
     auto indexCatalog = collection->getIndexCatalog();
     {

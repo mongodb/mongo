@@ -53,6 +53,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -74,7 +75,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -206,10 +206,10 @@ public:
         repl::ReplClientInfo::forClient(_opCtx->getClient()).clearLastOp_forTest();
 
         auto registry = std::make_unique<OpObserverRegistry>();
-        registry->addObserver(std::make_unique<OpObserverShardingImpl>());
+        registry->addObserver(std::make_unique<OpObserverImpl>());
         _opCtx->getServiceContext()->setOpObserver(std::move(registry));
 
-        repl::setOplogCollectionName(getGlobalServiceContext());
+        repl::setOplogCollectionName(_opCtx->getServiceContext());
         repl::createOplog(_opCtx);
 
         _clock->tickTo(ClusterTime, LogicalTime(Timestamp(1, 0)));
@@ -466,9 +466,9 @@ public:
     }
 
     void setReplCoordAppliedOpTime(const repl::OpTime& opTime, Date_t wallTime = Date_t()) {
-        repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        repl::ReplicationCoordinator::get(_opCtx->getServiceContext())
             ->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
-        ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ASSERT_OK(repl::ReplicationCoordinator::get(_opCtx->getServiceContext())
                       ->updateTerm(_opCtx, opTime.getTerm()));
     }
 
@@ -2048,7 +2048,7 @@ public:
         // Index build drain will timestamp writes from the side table into the index with the
         // lastApplied timestamp. This is because these writes are not associated with any specific
         // oplog entry.
-        ASSERT_EQ(repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ASSERT_EQ(repl::ReplicationCoordinator::get(_opCtx->getServiceContext())
                       ->getMyLastAppliedOpTime()
                       .getTimestamp(),
                   firstInsert.asTimestamp());
