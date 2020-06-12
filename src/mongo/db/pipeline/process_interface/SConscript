@@ -70,6 +70,16 @@ env.Library(
 )
 
 env.Library(
+    target='mongos_process_interface_factory',
+    source=[
+        'mongos_process_interface_factory.cpp',
+    ],
+    LIBDEPS=[
+        'mongos_process_interface',
+    ],
+)
+
+env.Library(
     target='mongod_process_interface_factory',
     source=[
         'mongod_process_interface_factory.cpp',

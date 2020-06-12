@@ -42,6 +42,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -100,6 +101,46 @@ std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(c
     }
 
     return std::make_unique<WriteConcernErrorDetail>(getWriteConcernErrorDetail(wcErrorElem));
+}
+
+boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTargeter(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& collation,
+    const boost::optional<ExplainOptions::Verbosity>& verbosity,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<RuntimeConstants>& runtimeConstants) {
+
+    auto&& cif = [&]() {
+        if (collation.isEmpty()) {
+            return std::unique_ptr<CollatorInterface>{};
+        } else {
+            return uassertStatusOK(
+                CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
+        }
+    }();
+
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces.emplace(nss.coll(),
+                               ExpressionContext::ResolvedNamespace(nss, std::vector<BSONObj>{}));
+
+    return make_intrusive<ExpressionContext>(
+        opCtx,
+        verbosity,
+        true,   // fromMongos
+        false,  // needs merge
+        false,  // disk use is banned on mongos
+        true,   // bypass document validation, mongos isn't a storage node
+        false,  // not mapReduce
+        nss,
+        runtimeConstants,
+        std::move(cif),
+        MongoProcessInterface::create(opCtx),
+        std::move(resolvedNamespaces),
+        boost::none,  // collection uuid
+        letParameters,
+        false  // mongos has no profile collection
+    );
 }
 
 namespace {

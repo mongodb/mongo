@@ -196,28 +196,6 @@ assert.commandWorked(db.runCommand({
 }));
 assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", "INNER"]}}}).toArray().length, 1);
 
-// findAndModify
-assert.commandWorked(coll.insert({Species: "spy_bird"}));
-let result = db.runCommand({
-    findAndModify: coll.getName(),
-    let : {target_species: "spy_bird"},
-    query: {$expr: {$eq: ["$Species", "$$target_species"]}},
-    update: {Species: "questionable_bird"},
-    fields: {_id: 0},
-    new: true
-});
-assert.eq(result.value, {Species: "questionable_bird"}, result);
-
-result = db.runCommand({
-    findAndModify: coll.getName(),
-    let : {species_name: "not_a_bird", realSpecies: "dino"},
-    query: {$expr: {$eq: ["$Species", "questionable_bird"]}},
-    update: [{$project: {Species: "$$species_name"}}, {$addFields: {suspect: "$$realSpecies"}}],
-    fields: {_id: 0},
-    new: true
-});
-assert.eq(result.value, {Species: "not_a_bird", suspect: "dino"}, result);
-
 // Update
 assert.commandWorked(db.runCommand({
     update: coll.getName(),

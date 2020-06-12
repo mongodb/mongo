@@ -109,7 +109,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         // A collator can enter through both the QueryRequest and ExpressionContext arguments.
         // This invariant ensures that both collators are the same because downstream we
         // pull the collator from only one of the ExpressionContext carrier.
-        invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
+        if (collator.get() && expCtx->getCollator()) {
+            invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
+        }
     }
 
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(

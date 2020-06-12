@@ -46,6 +46,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/shared_request_handling',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         'async_requests_sender',

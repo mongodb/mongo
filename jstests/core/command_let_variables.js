@@ -308,4 +308,35 @@ assert.commandWorked(testDB.runCommand({
     let : {variable: "Song Thrush"},
     cursor: {}
 }));
+
+// Test that findAndModify works correctly with let parameter arguments.
+assert.commandWorked(coll.insert({_id: 5, Species: "spy_bird"}));
+result = testDB.runCommand({
+    findAndModify: coll.getName(),
+    let : {target_species: "spy_bird"},
+    // Querying on _id field for sharded collection passthroughs.
+    query: {$and: [{_id: 5}, {$expr: {$eq: ["$Species", "$$target_species"]}}]},
+    update: {Species: "questionable_bird"},
+    new: true
+});
+expectedResults = {
+    _id: 5,
+    Species: "questionable_bird"
+};
+assert.eq(expectedResults, result.value, result);
+
+result = testDB.runCommand({
+    findAndModify: coll.getName(),
+    let : {species_name: "not_a_bird", realSpecies: "dino"},
+    // Querying on _id field for sharded collection passthroughs.
+    query: {$and: [{_id: 5}, {$expr: {$eq: ["$Species", "questionable_bird"]}}]},
+    update: [{$project: {Species: "$$species_name"}}, {$addFields: {suspect: "$$realSpecies"}}],
+    new: true
+});
+expectedResults = {
+    _id: 5,
+    Species: "not_a_bird",
+    suspect: "dino"
+};
+assert.eq(expectedResults, result.value, result);
 }());
