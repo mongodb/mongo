@@ -520,6 +520,15 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
 
     auto newTermStartDate = loadLastOpTimeAndWallTimeResult.getValue().wallTime;
+    // This constant was based on data described in SERVER-44634. It is in relation to how long the
+    // first majority committed write takes after a new term has started.
+    const auto flowControlGracePeriod = Seconds(4);
+    // SERVER-44634: Disable flow control for a grace period after stepup. Because writes may stop
+    // while a node wins election and steps up, it's likely to determine there's majority point
+    // lag. Moreover, because there are no writes in the system, flow control will believe
+    // secondaries are unable to process oplog entries. This can result in an undesirable "slow
+    // start" phenomena.
+    FlowControl::get(opCtx)->disableUntil(newTermStartDate + flowControlGracePeriod);
     ReplicationMetrics::get(opCtx).setCandidateNewTermStartDate(newTermStartDate);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
