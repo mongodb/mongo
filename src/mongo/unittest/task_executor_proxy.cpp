@@ -39,75 +39,75 @@ TaskExecutorProxy::TaskExecutorProxy(executor::TaskExecutor* executor) : _execut
 TaskExecutorProxy::~TaskExecutorProxy() = default;
 
 executor::TaskExecutor* TaskExecutorProxy::getExecutor() const {
-    return _executor;
+    return _executor.load();
 }
 
 void TaskExecutorProxy::setExecutor(executor::TaskExecutor* executor) {
-    _executor = executor;
+    _executor.store(executor);
 }
 
 void TaskExecutorProxy::startup() {
-    _executor->startup();
+    _executor.load()->startup();
 }
 
 void TaskExecutorProxy::shutdown() {
-    _executor->shutdown();
+    _executor.load()->shutdown();
 }
 
 void TaskExecutorProxy::join() {
-    _executor->join();
+    _executor.load()->join();
 }
 
 SharedSemiFuture<void> TaskExecutorProxy::joinAsync() {
-    return _executor->joinAsync();
+    return _executor.load()->joinAsync();
 }
 
 void TaskExecutorProxy::appendDiagnosticBSON(mongo::BSONObjBuilder* builder) const {
-    _executor->appendDiagnosticBSON(builder);
+    _executor.load()->appendDiagnosticBSON(builder);
 }
 
 Date_t TaskExecutorProxy::now() {
-    return _executor->now();
+    return _executor.load()->now();
 }
 
 StatusWith<executor::TaskExecutor::EventHandle> TaskExecutorProxy::makeEvent() {
-    return _executor->makeEvent();
+    return _executor.load()->makeEvent();
 }
 
 void TaskExecutorProxy::signalEvent(const EventHandle& event) {
-    _executor->signalEvent(event);
+    _executor.load()->signalEvent(event);
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::onEvent(
     const EventHandle& event, CallbackFn&& work) {
-    return _executor->onEvent(event, std::move(work));
+    return _executor.load()->onEvent(event, std::move(work));
 }
 
 void TaskExecutorProxy::waitForEvent(const EventHandle& event) {
-    _executor->waitForEvent(event);
+    _executor.load()->waitForEvent(event);
 }
 
 StatusWith<stdx::cv_status> TaskExecutorProxy::waitForEvent(OperationContext* opCtx,
                                                             const EventHandle& event,
                                                             Date_t deadline) {
-    return _executor->waitForEvent(opCtx, event, deadline);
+    return _executor.load()->waitForEvent(opCtx, event, deadline);
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWork(
     CallbackFn&& work) {
-    return _executor->scheduleWork(std::move(work));
+    return _executor.load()->scheduleWork(std::move(work));
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWorkAt(
     Date_t when, CallbackFn&& work) {
-    return _executor->scheduleWorkAt(when, std::move(work));
+    return _executor.load()->scheduleWorkAt(when, std::move(work));
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleRemoteCommandOnAny(
     const executor::RemoteCommandRequestOnAny& request,
     const RemoteCommandOnAnyCallbackFn& cb,
     const BatonHandle& baton) {
-    return _executor->scheduleRemoteCommandOnAny(request, cb, baton);
+    return _executor.load()->scheduleRemoteCommandOnAny(request, cb, baton);
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle>
@@ -115,23 +115,23 @@ TaskExecutorProxy::scheduleExhaustRemoteCommandOnAny(
     const executor::RemoteCommandRequestOnAny& request,
     const RemoteCommandOnAnyCallbackFn& cb,
     const BatonHandle& baton) {
-    return _executor->scheduleExhaustRemoteCommandOnAny(request, cb, baton);
+    return _executor.load()->scheduleExhaustRemoteCommandOnAny(request, cb, baton);
 }
 
 bool TaskExecutorProxy::hasTasks() {
-    return _executor->hasTasks();
+    return _executor.load()->hasTasks();
 }
 
 void TaskExecutorProxy::cancel(const CallbackHandle& cbHandle) {
-    _executor->cancel(cbHandle);
+    _executor.load()->cancel(cbHandle);
 }
 
 void TaskExecutorProxy::wait(const CallbackHandle& cbHandle, Interruptible* interruptible) {
-    _executor->wait(cbHandle, interruptible);
+    _executor.load()->wait(cbHandle, interruptible);
 }
 
 void TaskExecutorProxy::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
-    _executor->appendConnectionStats(stats);
+    _executor.load()->appendConnectionStats(stats);
 }
 
 }  // namespace unittest

@@ -82,7 +82,7 @@ public:
 
 private:
     // Not owned by us.
-    executor::TaskExecutor* _executor;
+    AtomicWord<executor::TaskExecutor*> _executor;
 };
 
 }  // namespace unittest

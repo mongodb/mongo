@@ -69,29 +69,29 @@ public:
 
     void processResponse(const RemoteCommandRequest& request,
                          const RemoteCommandResponse& response) override {
-        _numResponses++;
+        _numResponses.fetchAndAdd(1);
     }
 
     void finish() {
-        _done = true;
+        _done.store(true);
     }
 
     virtual bool hasReceivedSufficientResponses() const {
-        if (_done) {
-            return _done;
+        if (_done.load()) {
+            return _done.load();
         }
 
-        return _numResponses >= _maxResponses;
+        return _numResponses.load() >= _maxResponses.load();
     }
 
     int getResponseCount() {
-        return _numResponses;
+        return _numResponses.load();
     }
 
 private:
-    bool _done;
-    int64_t _numResponses;
-    int64_t _maxResponses;
+    AtomicWord<bool> _done;
+    AtomicWord<int64_t> _numResponses;
+    AtomicWord<int64_t> _maxResponses;
 };
 
 /**

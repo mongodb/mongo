@@ -45,16 +45,16 @@ ElapsedTracker::ElapsedTracker(ClockSource* cs,
       _last(cs->now()) {}
 
 bool ElapsedTracker::intervalHasElapsed() {
-    if (++_pings >= _hitsBetweenMarks) {
-        _pings = 0;
-        _last = _clock->now();
+    if (_pings.addAndFetch(1) >= _hitsBetweenMarks) {
+        _pings.store(0);
+        _last.store(_clock->now());
         return true;
     }
 
     const auto now = _clock->now();
-    if (now - _last > _msBetweenMarks) {
-        _pings = 0;
-        _last = now;
+    if (now - _last.load() > _msBetweenMarks) {
+        _pings.store(0);
+        _last.store(now);
         return true;
     }
 
@@ -62,8 +62,8 @@ bool ElapsedTracker::intervalHasElapsed() {
 }
 
 void ElapsedTracker::resetLastTime() {
-    _pings = 0;
-    _last = _clock->now();
+    _pings.store(0);
+    _last.store(_clock->now());
 }
 
 }  // namespace mongo

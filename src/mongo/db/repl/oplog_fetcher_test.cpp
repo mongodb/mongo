@@ -691,11 +691,11 @@ TEST_F(OplogFetcherTest,
     ASSERT_EQUALS(ReplicationProcess::kUninitializedRollbackId, shutdownState.getRBID());
 }
 
-bool sharedCallbackStateDestroyed = false;
+AtomicWord<bool> sharedCallbackStateDestroyed{false};
 bool sharedCallbackStateDestroyedSoon() {
     // Wait up to 10 seconds.
     for (auto i = 0; i < 100; i++) {
-        if (sharedCallbackStateDestroyed) {
+        if (sharedCallbackStateDestroyed.load()) {
             return true;
         }
         mongo::sleepmillis(100);
@@ -710,7 +710,7 @@ class SharedCallbackState {
 public:
     SharedCallbackState() {}
     ~SharedCallbackState() {
-        sharedCallbackStateDestroyed = true;
+        sharedCallbackStateDestroyed.store(true);
     }
 };
 
@@ -725,7 +725,7 @@ TEST_F(OplogFetcherTest, OplogFetcherResetsOnShutdownCallbackFnOnCompletion) {
         });
 
     sharedCallbackData.reset();
-    ASSERT_FALSE(sharedCallbackStateDestroyed);
+    ASSERT_FALSE(sharedCallbackStateDestroyed.load());
 
     // This will cause the initial attempt to create a cursor to fail.
     processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
