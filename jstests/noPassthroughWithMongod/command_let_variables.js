@@ -195,23 +195,4 @@ assert.commandWorked(db.runCommand({
     let : {variable: "OUTER"}
 }));
 assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", "INNER"]}}}).toArray().length, 1);
-
-// Update
-assert.commandWorked(db.runCommand({
-    update: coll.getName(),
-    let : {target_species: "Song Thrush (Turdus philomelos)", new_name: "Song Thrush"},
-    updates: [
-        {q: {$expr: {$eq: ["$Species", "$$target_species"]}}, u: [{$set: {Species: "$$new_name"}}]}
-    ]
-}));
-
-assert.commandWorked(db.runCommand({
-    update: coll.getName(),
-    let : {target_species: "Song Thrush (Turdus philomelos)"},
-    updates: [{
-        q: {$expr: {$eq: ["$Species", "$$target_species"]}},
-        u: [{$set: {Location: "$$place"}}],
-        c: {place: "North America"}
-    }]
-}));
 }());

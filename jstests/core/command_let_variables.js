@@ -341,4 +341,65 @@ expectedResults = {
     suspect: "dino"
 };
 assert.eq(expectedResults, result.value, result);
+
+// Test that update respects different parameters in both the query and update part.
+result = assert.commandWorked(testDB.runCommand({
+    update: coll.getName(),
+    updates: [
+        {q: {$expr: {$eq: ["$Species", "$$target_species"]}}, u: [{$set: {Species: "$$new_name"}}]}
+    ],
+    let : {target_species: "Chaffinch (Fringilla coelebs)", new_name: "Chaffinch"}
+}));
+assert.eq(result.n, 1);
+assert.eq(result.nModified, 1);
+
+result = assert.commandWorked(testDB.runCommand(
+    {find: coll.getName(), filter: {$expr: {$eq: ["$Species", "Chaffinch (Fringilla coelebs)"]}}}));
+assert.eq(result.cursor.firstBatch.length, 0);
+
+result = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$Species", "Chaffinch"]}}}));
+assert.eq(result.cursor.firstBatch.length, 1);
+
+// Test that update respects runtime constants and parameters.
+result = assert.commandWorked(testDB.runCommand({
+    update: coll.getName(),
+    updates: [{
+        q: {$expr: {$eq: ["$Species", "$$target_species"]}},
+        u: [{$set: {Timestamp: "$$NOW"}}, {$set: {Species: "$$new_name"}}]
+    }],
+    let : {target_species: "Chaffinch", new_name: "Pied Piper"}
+}));
+assert.eq(result.n, 1);
+assert.eq(result.nModified, 1);
+
+result = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$Species", "Chaffinch"]}}}));
+assert.eq(result.cursor.firstBatch.length, 0, result);
+
+result = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$Species", "Pied Piper"]}}}));
+assert.eq(result.cursor.firstBatch.length, 1, result);
+
+// Test that undefined let params in the update's query part fail gracefully.
+assert.commandFailedWithCode(testDB.runCommand({
+    update: coll.getName(),
+    updates: [{
+        q: {$expr: {$eq: ["$Species", "$$target_species"]}},
+        u: [{$set: {Species: "Homo Erectus"}}]
+    }],
+    let : {cat: "not_a_bird"}
+}),
+                             17276);
+
+// Test that undefined let params in the update's update part fail gracefully.
+assert.commandFailedWithCode(testDB.runCommand({
+    update: coll.getName(),
+    updates: [{
+        q: {$expr: {$eq: ["$Species", "Chaffinch (Fringilla coelebs)"]}},
+        u: [{$set: {Species: "$$new_name"}}]
+    }],
+    let : {cat: "not_a_bird"}
+}),
+                             17276);
 }());
