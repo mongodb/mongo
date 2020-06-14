@@ -30,12 +30,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/chunk_split_state_driver.h"
-
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-
 namespace mongo {
+namespace {
 
 class ChunkSplitStateDriverTestNoTeardown : public unittest::Test {
 public:
@@ -175,4 +174,5 @@ TEST(ChunkSplitStateDriverTest, PrepareErrorsWhenChunkWritesTrackerNoLongerExist
     ASSERT_THROWS(splitDriver->prepareSplit(), AssertionException);
 }
 
+}  // namespace
 }  // namespace mongo

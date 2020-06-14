@@ -39,10 +39,12 @@
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/shard_server_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 
 namespace mongo {
 namespace {
+
+const HostAndPort kTestConfigShardHost("FakeConfigHost", 12345);
 
 const Status kShardNotFoundStatus{ErrorCodes::ShardNotFound, "dummy"};
 const Status kError1Status{ErrorCodes::HostUnreachable, "dummy"};
@@ -77,10 +79,19 @@ HostAndPort makeHostAndPort(const ShardId& shardId) {
     return HostAndPort(str::stream() << shardId << ":123");
 }
 
-}  // namespace
-
-class AppendRawResponsesTest : public ShardServerTestFixture {
+class AppendRawResponsesTest : public ShardingTestFixture {
 protected:
+    AppendRawResponsesTest() {
+        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
+
+        std::vector<std::tuple<ShardId, HostAndPort>> remoteShards;
+        for (const auto& shardId : kShardIdList) {
+            remoteShards.emplace_back(shardId, makeHostAndPort(shardId));
+        }
+
+        addRemoteShards(remoteShards);
+    }
+
     /**
      * Runs 'appendRawResponses' and asserts that the top-level status matches 'expectedStatus', the
      * 'raw' sub-object contains the shards in 'expectedShardsInRawSubObj', and the writeConcern
@@ -120,10 +131,7 @@ protected:
         const auto rawSubObj = resultObj.getField("raw").Obj();
         ASSERT_EQ(rawSubObj.nFields(), int(expectedShardsInRawSubObj.size()));
         for (const auto& shardId : expectedShardsInRawSubObj) {
-            const auto shardConnStr =
-                ConnectionString::forReplicaSet(shardId.toString(), {makeHostAndPort(shardId)})
-                    .toString();
-            ASSERT(rawSubObj.hasField(shardConnStr));
+            ASSERT(rawSubObj.hasField(makeHostAndPort(shardId).toString()));
         }
 
         // Check the shards with successes object.
@@ -150,25 +158,15 @@ protected:
         }
     }
 
-    void setUp() override {
-        ShardServerTestFixture::setUp();
-
-        for (const auto& shardId : kShardIdList) {
-            auto shardTargeter = RemoteCommandTargeterMock::get(
-                uassertStatusOK(shardRegistry()->getShard(operationContext(), shardId))
-                    ->getTargeter());
-            shardTargeter->setConnectionStringReturnValue(
-                ConnectionString::forReplicaSet(shardId.toString(), {makeHostAndPort(shardId)}));
-        }
-    }
-
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override {
 
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:
-            StaticCatalogClient(std::vector<ShardId> shardIds)
-                : ShardingCatalogClientMock(nullptr), _shardIds(std::move(shardIds)) {}
+            StaticCatalogClient(std::unique_ptr<DistLockManager> distLockManager,
+                                std::vector<ShardId> shardIds)
+                : ShardingCatalogClientMock(std::move(distLockManager)),
+                  _shardIds(std::move(shardIds)) {}
 
             StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
                 OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
@@ -188,7 +186,7 @@ protected:
             const std::vector<ShardId> _shardIds;
         };
 
-        return std::make_unique<StaticCatalogClient>(kShardIdList);
+        return std::make_unique<StaticCatalogClient>(std::move(distLockManager), kShardIdList);
     }
 
     const ShardId kShard1{"s1"};
@@ -196,6 +194,7 @@ protected:
     const ShardId kShard3{"s3"};
     const ShardId kShard4{"s4"};
     const ShardId kShard5{"s5"};
+
     const std::vector<ShardId> kShardIdList{kShard1, kShard2, kShard3, kShard4, kShard5};
 
 private:
@@ -569,4 +568,5 @@ TEST_F(AppendRawResponsesTest,
         shardResponses, kError1Status, {kShard3, kShard4, kShard5}, {kShard5}, Status::OK(), true);
 }
 
+}  // namespace
 }  // namespace mongo

@@ -37,9 +37,6 @@ namespace mongo {
 
 class CatalogCacheLoader;
 class ConnectionString;
-class DistLockCatalog;
-class DistLockManager;
-class RemoteCommandTargeterFactoryMock;
 
 namespace repl {
 class ReplSettings;
@@ -75,9 +72,7 @@ public:
     ShardingCatalogClient* catalogClient() const;
     CatalogCache* catalogCache() const;
     ShardRegistry* shardRegistry() const;
-    RemoteCommandTargeterFactoryMock* targeterFactory() const;
     std::shared_ptr<executor::TaskExecutor> executor() const;
-    DistLockManager* distLock() const;
     ClusterCursorManager* clusterCursorManager() const;
     executor::TaskExecutorPool* executorPool() const;
 
@@ -90,11 +85,6 @@ public:
     void shutdownExecutorPool();
 
     repl::ReplicationCoordinatorMock* replicationCoordinator() const;
-
-    /**
-     * Returns the stored raw pointer to the DistLockCatalog, if it has been initialized.
-     */
-    DistLockCatalog* distLockCatalog() const;
 
     /**
      * Returns the stored raw pointer to the OperationContext.
@@ -158,15 +148,6 @@ protected:
 
     /**
      * Base class returns nullptr.
-     *
-     * Note: ShardingCatalogClient takes ownership of DistLockManager, so if DistLockManager is not
-     * nulllptr, a real or mock ShardingCatalogClient must be supplied.
-     */
-    virtual std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager);
-
-    /**
-     * Base class returns nullptr.
      */
     virtual std::unique_ptr<ClusterCursorManager> makeClusterCursorManager();
 
@@ -182,18 +163,6 @@ private:
         _host, HostAndPort("node2:12345"), HostAndPort("node3:12345")};
 
     ServiceContext::UniqueOperationContext _opCtx;
-
-    // Since the RemoteCommandTargeterFactory is currently a private member of ShardFactory, we
-    // store a raw pointer to it here.
-    RemoteCommandTargeterFactoryMock* _targeterFactory = nullptr;
-
-    // Since the DistLockCatalog is currently a private member of ReplSetDistLockManager, we store
-    // a raw pointer to it here.
-    DistLockCatalog* _distLockCatalog = nullptr;
-
-    // Since the DistLockManager is currently a private member of ShardingCatalogClient, we
-    // store a raw pointer to it here.
-    DistLockManager* _distLockManager = nullptr;
 
     repl::ReplicationCoordinatorMock* _replCoord = nullptr;
 

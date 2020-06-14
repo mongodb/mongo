@@ -39,8 +39,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/session_catalog.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -117,9 +116,9 @@ protected:
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
-        ShardingTestFixture::addRemoteShards({std::make_tuple(shard1, hostAndPort1),
-                                              std::make_tuple(shard2, hostAndPort2),
-                                              std::make_tuple(shard3, hostAndPort3)});
+        addRemoteShards({std::make_tuple(shard1, hostAndPort1),
+                         std::make_tuple(shard2, hostAndPort2),
+                         std::make_tuple(shard3, hostAndPort3)});
 
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
@@ -127,8 +126,7 @@ protected:
         // Set up a logical clock with an initial time.
         auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
-        VectorClockMutable::get(getServiceContext())
-            ->tickTo(VectorClock::Component::ClusterTime, kInMemoryLogicalTime);
+        VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
         // Set up a tick source for transaction metrics.
         auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
@@ -1430,8 +1428,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
     // Advance the latest time in the logical clock so the retry attempt will pick a later time.
     LogicalTime laterTime(Timestamp(1000, 1));
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, laterTime);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTime);
 
     // Simulate a snapshot error.
 
@@ -1480,8 +1477,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, laterTimeSameStmt);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1505,8 +1501,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeNewStmt(Timestamp(1000, 1));
     ASSERT_GT(laterTimeNewStmt, laterTimeSameStmt);
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, laterTimeNewStmt);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeNewStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1754,8 +1749,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTime(Timestamp(1000, 1));
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, laterTime);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTime);
 
     ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find", kDummyStatus));
     txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus);
@@ -2321,8 +2315,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, laterTimeSameStmt);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 

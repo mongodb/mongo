@@ -29,16 +29,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/type_shard_identity.h"
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
-
-using std::string;
 
 TEST(ShardIdentityType, RoundTrip) {
     auto clusterId(OID::gen());

@@ -234,11 +234,6 @@ std::unique_ptr<DistLockManager> ShardingMongodTestFixture::makeDistLockManager(
     return nullptr;
 }
 
-std::unique_ptr<ShardingCatalogClient> ShardingMongodTestFixture::makeShardingCatalogClient(
-    std::unique_ptr<DistLockManager> distLockManager) {
-    return nullptr;
-}
-
 std::unique_ptr<ClusterCursorManager> ShardingMongodTestFixture::makeClusterCursorManager() {
     return nullptr;
 }
@@ -346,21 +341,6 @@ std::shared_ptr<executor::TaskExecutor> ShardingMongodTestFixture::executor() co
 repl::ReplicationCoordinatorMock* ShardingMongodTestFixture::replicationCoordinator() const {
     invariant(_replCoord);
     return _replCoord;
-}
-
-DistLockCatalog* ShardingMongodTestFixture::distLockCatalog() const {
-    invariant(_distLockCatalog);
-    return _distLockCatalog;
-}
-
-DistLockManager* ShardingMongodTestFixture::distLock() const {
-    invariant(_distLockManager);
-    return _distLockManager;
-}
-
-RemoteCommandTargeterFactoryMock* ShardingMongodTestFixture::targeterFactory() const {
-    invariant(_targeterFactory);
-    return _targeterFactory;
 }
 
 }  // namespace mongo

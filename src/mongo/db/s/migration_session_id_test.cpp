@@ -37,10 +37,9 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 using unittest::assertGet;
-
-namespace {
 
 TEST(MigrationSessionId, GenerateAndExtract) {
     MigrationSessionId origSessionId = MigrationSessionId::generate("Source", "Dest");

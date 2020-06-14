@@ -138,10 +138,6 @@ ShardingTestFixture::ShardingTestFixture() {
     auto uniqueDistLockManager = std::make_unique<DistLockManagerMock>(nullptr);
     _distLockManager = uniqueDistLockManager.get();
 
-    std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
-        std::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));
-    catalogClient->startup();
-
     NumHostsTargetedMetrics::get(service).startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
@@ -182,16 +178,19 @@ ShardingTestFixture::ShardingTestFixture() {
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
-    Grid::get(operationContext())
-        ->init(std::move(catalogClient),
+    auto const grid = Grid::get(operationContext());
+    grid->init(makeShardingCatalogClient(std::move(uniqueDistLockManager)),
                std::make_unique<CatalogCache>(CatalogCacheLoader::get(service)),
                std::move(shardRegistry),
                std::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
                std::make_unique<BalancerConfiguration>(),
                std::move(executorPool),
                _mockNetwork);
-}
 
+    if (grid->catalogClient()) {
+        grid->catalogClient()->startup();
+    }
+}
 
 ShardingTestFixture::~ShardingTestFixture() {
     CatalogCacheLoader::clearForTests(getServiceContext());
@@ -210,12 +209,6 @@ ShardRegistry* ShardingTestFixture::shardRegistry() const {
     return Grid::get(operationContext())->shardRegistry();
 }
 
-RemoteCommandTargeterFactoryMock* ShardingTestFixture::targeterFactory() const {
-    invariant(_targeterFactory);
-
-    return _targeterFactory;
-}
-
 RemoteCommandTargeterMock* ShardingTestFixture::configTargeter() const {
     invariant(_configTargeter);
 
@@ -226,12 +219,6 @@ std::shared_ptr<executor::TaskExecutor> ShardingTestFixture::executor() const {
     invariant(_fixedExecutor);
 
     return _fixedExecutor;
-}
-
-DistLockManagerMock* ShardingTestFixture::distLock() const {
-    invariant(_distLockManager);
-
-    return _distLockManager;
 }
 
 OperationContext* ShardingTestFixture::operationContext() const {
@@ -508,6 +495,12 @@ void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,
     ASSERT_EQ(expectedTS, afterObj[repl::OpTime::kTimestampFieldName].timestamp());
     ASSERT_TRUE(afterObj.hasField(repl::OpTime::kTermFieldName));
     ASSERT_EQ(expectedTerm, afterObj[repl::OpTime::kTermFieldName].numberLong());
+}
+
+std::unique_ptr<ShardingCatalogClient> ShardingTestFixture::makeShardingCatalogClient(
+    std::unique_ptr<DistLockManager> distLockManager) {
+    invariant(distLockManager);
+    return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
 }  // namespace mongo

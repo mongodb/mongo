@@ -29,13 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/query/store_possible_cursor.h"
-
 #include "mongo/bson/json.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -46,11 +44,9 @@ const NamespaceString nss("test.collection");
 const HostAndPort hostAndPort("testhost", 27017);
 const ShardId shardId("testshard");
 
-class StorePossibleCursorTest : public unittest::Test {
+class StorePossibleCursorTest : public ServiceContextTest {
 protected:
-    StorePossibleCursorTest() : _manager(&_clockSourceMock) {
-        _opCtx = _serviceContext.makeOperationContext();
-    }
+    StorePossibleCursorTest() : _manager(&_clockSourceMock) {}
 
     OperationContext* opCtx() const {
         return _opCtx.get();
@@ -61,8 +57,8 @@ protected:
     }
 
 private:
-    QueryTestServiceContext _serviceContext;
-    ServiceContext::UniqueOperationContext _opCtx;
+    ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
+
     ClockSourceMock _clockSourceMock;
     ClusterCursorManager _manager;
 };

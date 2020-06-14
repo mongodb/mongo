@@ -62,4 +62,9 @@ void ShardingTestFixtureCommon::onFindWithMetadataCommand(
     _networkTestEnv->onFindWithMetadataCommand(func);
 }
 
+std::unique_ptr<ShardingCatalogClient> ShardingTestFixtureCommon::makeShardingCatalogClient(
+    std::unique_ptr<DistLockManager> distLockManager) {
+    return nullptr;
+}
+
 }  // namespace mongo

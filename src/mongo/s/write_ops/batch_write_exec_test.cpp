@@ -35,7 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/session_catalog_router.h"
@@ -1596,8 +1596,7 @@ public:
 
         auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
-        VectorClockMutable::get(getServiceContext())
-            ->tickTo(VectorClock::Component::ClusterTime, kInMemoryLogicalTime);
+        VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
         _scopedSession.emplace(operationContext());
 

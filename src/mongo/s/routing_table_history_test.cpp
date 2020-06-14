@@ -39,14 +39,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_writes_tracker.h"
-#include "mongo/s/shard_server_test_fixture.h"
-
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-
 namespace mongo {
-
 namespace {
 
 const ShardId kThisShard("thisShard");

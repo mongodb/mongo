@@ -42,6 +42,9 @@
 namespace mongo {
 namespace {
 
+using executor::RemoteCommandRequest;
+using unittest::assertGet;
+
 const MigrationSecondaryThrottleOptions kDefaultSecondaryThrottle =
     MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault);
 

@@ -341,6 +341,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='config_server_test_fixture',
+    source=[
+        'config/config_server_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
+        'sharding_catalog_manager',
+    ],
+)
+
 env.CppUnitTest(
     target='db_s_test',
     source=[
@@ -355,11 +366,10 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'chunk_splitter',
+        'config_server_test_fixture',
         'sharding_logging',
         'sharding_runtime_d',
         'type_shard_identity',
@@ -382,9 +392,9 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/repl/replication_info',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/util/version_impl',
         'balancer',
+        'config_server_test_fixture',
     ]
 )
 
@@ -487,7 +497,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/util/version_impl',
+        'config_server_test_fixture',
     ]
 )
