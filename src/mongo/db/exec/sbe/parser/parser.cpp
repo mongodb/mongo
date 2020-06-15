@@ -1,0 +1,1435 @@
+/**
+ *    Copyright (C) 2019-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/exec/sbe/parser/parser.h"
+
+#include "mongo/db/exec/sbe/stages/branch.h"
+#include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/exchange.h"
+#include "mongo/db/exec/sbe/stages/filter.h"
+#include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/exec/sbe/stages/hash_join.h"
+#include "mongo/db/exec/sbe/stages/ix_scan.h"
+#include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/makeobj.h"
+#include "mongo/db/exec/sbe/stages/project.h"
+#include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/stages/sort.h"
+#include "mongo/db/exec/sbe/stages/traverse.h"
+#include "mongo/db/exec/sbe/stages/union.h"
+#include "mongo/db/exec/sbe/stages/unwind.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/str.h"
+
+namespace mongo {
+namespace sbe {
+
+static std::string format_error_message(size_t ln, size_t col, const std::string& msg) {
+    return str::stream() << ln << ":" << col << ": " << msg << '\n';
+}
+
+static constexpr auto kSyntax = R"(
+                ROOT <- OPERATOR
+                OPERATOR <- SCAN / PSCAN / SEEK / IXSCAN / IXSEEK / PROJECT / FILTER / CFILTER /
+                            MKOBJ / GROUP / HJOIN / NLJOIN / LIMIT / SKIP / COSCAN / TRAVERSE /
+                            EXCHANGE / SORT / UNWIND / UNION / BRANCH / SIMPLE_PROJ / PFO /
+                            ESPOOL / LSPOOL / CSPOOL / SSPOOL
+
+                FORWARD_FLAG <- <'true'> / <'false'>
+
+                SCAN <- 'scan' IDENT? # optional variable name of the root object (record) delivered by the scan
+                               IDENT? # optional variable name of the record id delivered by the scan
+                               IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
+                               IDENT # collection name to scan
+                               FORWARD_FLAG # forward scan or not
+
+                PSCAN <- 'pscan' IDENT? # optional variable name of the root object (record) delivered by the scan
+                                 IDENT? # optional variable name of the record id delivered by the scan
+                                 IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
+                                 IDENT # collection name to scan
+
+                SEEK <- 'seek' IDENT # variable name of the key
+                               IDENT? # optional variable name of the root object (record) delivered by the scan
+                               IDENT? # optional variable name of the record id delivered by the scan
+                               IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
+                               IDENT # collection name to scan
+
+                IXSCAN <- 'ixscan' IDENT? # optional variable name of the root object (record) delivered by the scan
+                                   IDENT? # optional variable name of the record id delivered by the scan
+                                   IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
+                                   IDENT # collection name
+                                   IDENT # index name to scan
+                                   FORWARD_FLAG # forward scan or not
+
+                IXSEEK <- 'ixseek' IDENT # variable name of the low key
+                                   IDENT # variable name of the high key
+                                   IDENT? # optional variable name of the root object (record) delivered by the scan
+                                   IDENT? # optional variable name of the record id delivered by the scan
+                                   IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
+                                   IDENT # collection name
+                                   IDENT # index name to scan
+                                   FORWARD_FLAG # forward scan or not
+
+                PROJECT <- 'project' PROJECT_LIST OPERATOR
+                SIMPLE_PROJ <- '$p' IDENT # output
+                                    IDENT # input
+                                    IDENT_LIST # correlated slots
+                                    PFV # path
+                                    OPERATOR # input
+                PFV <- (IDENT '.' PFV) / ( '|' EXPR / IDENT)
+
+                FILTER <- 'filter' '{' EXPR '}' OPERATOR
+                CFILTER <- 'cfilter' '{' EXPR '}' OPERATOR
+                MKOBJ <- 'mkobj' IDENT (IDENT IDENT_LIST)? IDENT_LIST_WITH_RENAMES OPERATOR
+                GROUP <- 'group' IDENT_LIST PROJECT_LIST OPERATOR
+                HJOIN <- 'hj' LEFT RIGHT
+                LEFT <- 'left' IDENT_LIST IDENT_LIST OPERATOR
+                RIGHT <- 'right' IDENT_LIST IDENT_LIST OPERATOR
+
+                NLJOIN <- 'nlj' IDENT_LIST # projected outer variables
+                                IDENT_LIST # correlated parameters
+                                ('{' EXPR '}')? # optional predicate
+                                'left' OPERATOR # outer side
+                                'right' OPERATOR # inner side
+
+                LIMIT <- 'limit' NUMBER OPERATOR
+                SKIP <- 'skip' NUMBER NUMBER? OPERATOR
+                COSCAN <- 'coscan'
+                TRAVERSE <- 'traverse' IDENT # output of traverse
+                                       IDENT # output of traverse as seen inside the 'in' branch
+                                       IDENT # input of traverse
+                                       ('{' EXPR '}')? # optional fold expression
+                                       ('{' EXPR '}')? # optional final expression
+                                       'in' OPERATOR
+                                       'from' OPERATOR
+                EXCHANGE <- 'exchange' IDENT_LIST NUMBER IDENT OPERATOR
+                SORT <- 'sort' IDENT_LIST IDENT_LIST OPERATOR
+                UNWIND <- 'unwind' IDENT IDENT IDENT UNWIND_FLAG OPERATOR
+                UNWIND_FLAG <- <'true'> / <'false'>
+                UNION <- 'union' IDENT_LIST UNION_BRANCH_LIST
+
+                UNION_BRANCH_LIST <- '[' (UNION_BRANCH (',' UNION_BRANCH)* )?']'
+                UNION_BRANCH <- IDENT_LIST OPERATOR
+
+                BRANCH <- 'branch' '{' EXPR '}' # boolean condition/switch
+                                   IDENT_LIST # output of the operator
+                                   IDENT_LIST # output of the then branch
+                                   OPERATOR # then branch
+                                   IDENT_LIST # output of the else branch
+                                   OPERATOR # else branch
+                PFO <- '$pfo' IDENT # output
+                              IDENT # input
+                              IDENT_LIST # correlated slots
+                              PATH # path
+                              OPERATOR # input operator
+                PATH <- '{' PF (',' PF)* '}'
+                PF <- (IDENT ':' PF_ACTION) / PF_DROPALL
+                PF_ACTION <- PATH / PF_EXPR / PF_MEXPR / PF_DROP / PF_INCL
+                PF_DROP <- '0'
+                PF_INCL <- '1'
+                PF_DROPALL <- '~'
+                PF_EXPR <- '=' EXPR
+                PF_MEXPR <- '|' EXPR
+
+                ESPOOL <- 'espool' IDENT # buffer
+                                   IDENT_LIST # slots
+                                   OPERATOR # input stage
+
+                LSPOOL <- 'lspool' IDENT # buffer
+                                   IDENT_LIST # slots
+                                   ('{' EXPR '}')? # optional predicate
+                                   OPERATOR # input stage
+
+                CSPOOL <- 'cspool' IDENT # buffer
+                                   IDENT_LIST # slots
+
+                SSPOOL <- 'sspool' IDENT # buffer
+                                   IDENT_LIST # slots
+
+                PROJECT_LIST <- '[' (ASSIGN (',' ASSIGN)* )?']'
+                ASSIGN <- IDENT '=' EXPR
+
+                EXPR <- EQOP_EXPR LOG_TOK EXPR / EQOP_EXPR
+                LOG_TOK <- <'&&'> / <'||'>
+
+                EQOP_EXPR <- RELOP_EXPR EQ_TOK EQOP_EXPR / RELOP_EXPR
+                EQ_TOK <- <'=='> / <'!='>
+
+                RELOP_EXPR <- ADD_EXPR REL_TOK RELOP_EXPR / ADD_EXPR
+                REL_TOK <- <'<='> / <'<'> / <'>='> / <'>'>
+
+                ADD_EXPR <- MUL_EXPR ADD_TOK ADD_EXPR / MUL_EXPR
+                ADD_TOK <- <'+'> / <'-'>
+
+                MUL_EXPR <- PRIMARY_EXPR MUL_TOK MUL_EXPR / PRIMARY_EXPR
+                MUL_TOK <- <'*'> / <'/'>
+
+                PRIMARY_EXPR <- '(' EXPR ')' / CONST_TOK / IF_EXPR / LET_EXPR / FUN_CALL / IDENT / NUMBER / STRING
+                CONST_TOK <- <'true'> / <'false'> / <'null'> / <'#'>
+
+                IF_EXPR <- 'if' '(' EXPR ',' EXPR ',' EXPR ')'
+
+                LET_EXPR <- 'let' FRAME_PROJECT_LIST EXPR
+                FRAME_PROJECT_LIST <- '[' (ASSIGN (',' ASSIGN)* )?']'
+
+                FUN_CALL <- IDENT '(' (EXPR (',' EXPR)*)? ')'
+
+                IDENT_LIST_WITH_RENAMES <- '[' (IDENT_WITH_RENAME (',' IDENT_WITH_RENAME)*)? ']'
+                IDENT_WITH_RENAME <- IDENT ('=' IDENT)?
+
+                IDENT_LIST <- '[' (IDENT (',' IDENT)*)? ']'
+                IDENT <- RAW_IDENT/ESC_IDENT
+
+                STRING <- < '"' (!'"' .)* '"' > / < '\'' (!'\'' .)* '\'' >
+                STRING_LIST <- '[' (STRING (',' STRING)*)? ']'
+
+                NUMBER      <- < [0-9]+ >
+
+                RAW_IDENT <- < [$a-zA-Z_] [$a-zA-Z0-9-_]* >
+
+                ESC_IDENT <- < '@' '"' (!'"' .)* '"' >
+
+                %whitespace  <-  ([ \t\r\n]* ('#' (!'\n' .)* '\n' [ \t\r\n]*)*)
+                %word        <-  [a-z]+
+        )";
+
+void Parser::walkChildren(AstQuery& ast) {
+    for (const auto& node : ast.nodes) {
+        walk(*node);
+    }
+}
+
+void Parser::walkIdent(AstQuery& ast) {
+    auto str = ast.nodes[0]->token;
+    // Drop @" .. ".
+    if (!str.empty() && str[0] == '@') {
+        str = str.substr(2, str.size() - 3);
+    }
+    ast.identifier = std::move(str);
+}
+
+void Parser::walkIdentList(AstQuery& ast) {
+    walkChildren(ast);
+    for (auto& node : ast.nodes) {
+        ast.identifiers.emplace_back(std::move(node->identifier));
+    }
+}
+
+void Parser::walkIdentWithRename(AstQuery& ast) {
+    walkChildren(ast);
+    std::string identifier;
+    std::string rename;
+
+    if (ast.nodes.size() == 1) {
+        rename = ast.nodes[0]->identifier;
+        identifier = rename;
+    } else {
+        rename = ast.nodes[0]->identifier;
+        identifier = ast.nodes[1]->identifier;
+    }
+
+    ast.identifier = std::move(identifier);
+    ast.rename = std::move(rename);
+}
+
+void Parser::walkIdentListWithRename(AstQuery& ast) {
+    walkChildren(ast);
+
+    for (auto& node : ast.nodes) {
+        ast.identifiers.emplace_back(std::move(node->identifier));
+        ast.renames.emplace_back(std::move(node->rename));
+    }
+}
+
+void Parser::walkProjectList(AstQuery& ast) {
+    walkChildren(ast);
+
+    for (size_t idx = 0; idx < ast.nodes.size(); ++idx) {
+        ast.projects[ast.nodes[idx]->identifier] = std::move(ast.nodes[idx]->expr);
+    }
+}
+
+void Parser::walkAssign(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.identifier = ast.nodes[0]->identifier;
+    ast.expr = std::move(ast.nodes[1]->expr);
+}
+
+void Parser::walkExpr(AstQuery& ast) {
+    walkChildren(ast);
+    if (ast.nodes.size() == 1) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else {
+        EPrimBinary::Op op;
+        if (ast.nodes[1]->token == "&&") {
+            op = EPrimBinary::logicAnd;
+        }
+        if (ast.nodes[1]->token == "||") {
+            op = EPrimBinary::logicOr;
+        }
+
+        ast.expr =
+            makeE<EPrimBinary>(op, std::move(ast.nodes[0]->expr), std::move(ast.nodes[2]->expr));
+    }
+}
+
+void Parser::walkEqopExpr(AstQuery& ast) {
+    walkChildren(ast);
+    if (ast.nodes.size() == 1) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else {
+        EPrimBinary::Op op;
+        if (ast.nodes[1]->token == "==") {
+            op = EPrimBinary::eq;
+        }
+        if (ast.nodes[1]->token == "!=") {
+            op = EPrimBinary::neq;
+        }
+
+        ast.expr =
+            makeE<EPrimBinary>(op, std::move(ast.nodes[0]->expr), std::move(ast.nodes[2]->expr));
+    }
+}
+
+void Parser::walkRelopExpr(AstQuery& ast) {
+    walkChildren(ast);
+    if (ast.nodes.size() == 1) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else {
+        EPrimBinary::Op op;
+        if (ast.nodes[1]->token == "<=") {
+            op = EPrimBinary::lessEq;
+        }
+        if (ast.nodes[1]->token == "<") {
+            op = EPrimBinary::less;
+        }
+        if (ast.nodes[1]->token == ">=") {
+            op = EPrimBinary::greaterEq;
+        }
+        if (ast.nodes[1]->token == ">") {
+            op = EPrimBinary::greater;
+        }
+
+        ast.expr =
+            makeE<EPrimBinary>(op, std::move(ast.nodes[0]->expr), std::move(ast.nodes[2]->expr));
+    }
+}
+
+void Parser::walkAddExpr(AstQuery& ast) {
+    walkChildren(ast);
+    if (ast.nodes.size() == 1) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else {
+        ast.expr =
+            makeE<EPrimBinary>(ast.nodes[1]->token == "+" ? EPrimBinary::add : EPrimBinary::sub,
+                               std::move(ast.nodes[0]->expr),
+                               std::move(ast.nodes[2]->expr));
+    }
+}
+
+void Parser::walkMulExpr(AstQuery& ast) {
+    walkChildren(ast);
+    if (ast.nodes.size() == 1) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else {
+        ast.expr =
+            makeE<EPrimBinary>(ast.nodes[1]->token == "*" ? EPrimBinary::mul : EPrimBinary::div,
+                               std::move(ast.nodes[0]->expr),
+                               std::move(ast.nodes[2]->expr));
+    }
+}
+
+void Parser::walkPrimaryExpr(AstQuery& ast) {
+    using namespace peg::udl;
+
+    walkChildren(ast);
+
+    if (ast.nodes[0]->tag == "IDENT"_) {
+        // Lookup local binds (let) first.
+        auto symbol = lookupSymbol(ast.nodes[0]->identifier);
+        if (symbol) {
+            ast.expr = makeE<EVariable>(symbol->id, symbol->slotId);
+        } else {
+            ast.expr = makeE<EVariable>(lookupSlotStrict(ast.nodes[0]->identifier));
+        }
+    } else if (ast.nodes[0]->tag == "NUMBER"_) {
+        ast.expr = makeE<EConstant>(value::TypeTags::NumberInt64, std::stoll(ast.nodes[0]->token));
+    } else if (ast.nodes[0]->tag == "CONST_TOK"_) {
+        if (ast.nodes[0]->token == "true") {
+            ast.expr = makeE<EConstant>(value::TypeTags::Boolean, 1);
+        } else if (ast.nodes[0]->token == "false") {
+            ast.expr = makeE<EConstant>(value::TypeTags::Boolean, 0);
+        } else if (ast.nodes[0]->token == "null") {
+            ast.expr = makeE<EConstant>(value::TypeTags::Null, 0);
+        } else if (ast.nodes[0]->token == "#") {
+            ast.expr = makeE<EConstant>(value::TypeTags::Nothing, 0);
+        }
+    } else if (ast.nodes[0]->tag == "EXPR"_) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else if (ast.nodes[0]->tag == "IF_EXPR"_) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else if (ast.nodes[0]->tag == "LET_EXPR"_) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else if (ast.nodes[0]->tag == "FUN_CALL"_) {
+        ast.expr = std::move(ast.nodes[0]->expr);
+    } else if (ast.nodes[0]->tag == "STRING"_) {
+        std::string str = ast.nodes[0]->token;
+        // Drop quotes.
+        str = str.substr(1, str.size() - 2);
+        ast.expr = makeE<EConstant>(str);
+    }
+}
+void Parser::walkLetExpr(AstQuery& ast) {
+    auto frame = newFrameSymbolTable();
+    walkChildren(ast);
+
+    auto plist = ast.nodes[0];
+    std::vector<std::unique_ptr<EExpression>> binds;
+
+    binds.resize(frame->table.size());
+    for (auto& symbol : frame->table) {
+        auto it = plist->projects.find(symbol.first);
+        invariant(it != plist->projects.end());
+        binds[symbol.second] = std::move(it->second);
+    }
+    popFrameSymbolTable();
+
+    ast.expr = makeE<ELocalBind>(frame->id, std::move(binds), std::move(ast.nodes[1]->expr));
+}
+
+void Parser::walkFrameProjectList(AstQuery& ast) {
+    value::SlotId slotId{0};
+    for (size_t idx = 0; idx < ast.nodes.size(); ++idx) {
+        walk(*ast.nodes[idx]);
+        currentFrameSymbolTable()->table[ast.nodes[idx]->identifier] = slotId++;
+
+        ast.projects[ast.nodes[idx]->identifier] = std::move(ast.nodes[idx]->expr);
+    }
+}
+
+void Parser::walkIfExpr(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.expr = makeE<EIf>(std::move(ast.nodes[0]->expr),
+                          std::move(ast.nodes[1]->expr),
+                          std::move(ast.nodes[2]->expr));
+}
+
+void Parser::walkFunCall(AstQuery& ast) {
+    walkChildren(ast);
+    std::vector<std::unique_ptr<EExpression>> args;
+
+    for (size_t idx = 1; idx < ast.nodes.size(); ++idx) {
+        args.emplace_back(std::move(ast.nodes[idx]->expr));
+    }
+
+    ast.expr = makeE<EFunction>(ast.nodes[0]->identifier, std::move(args));
+}
+
+void Parser::walkScan(AstQuery& ast) {
+    walkChildren(ast);
+
+    std::string recordName;
+    std::string recordIdName;
+    std::string dbName = _defaultDb;
+    std::string collName;
+    int projectsPos;
+    int forwardPos;
+
+    if (ast.nodes.size() == 5) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        recordIdName = std::move(ast.nodes[1]->identifier);
+        projectsPos = 2;
+        collName = std::move(ast.nodes[3]->identifier);
+        forwardPos = 4;
+    } else if (ast.nodes.size() == 4) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        projectsPos = 1;
+        collName = std::move(ast.nodes[2]->identifier);
+        forwardPos = 3;
+    } else if (ast.nodes.size() == 3) {
+        projectsPos = 0;
+        collName = std::move(ast.nodes[1]->identifier);
+        forwardPos = 2;
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    NamespaceString nssColl{dbName, collName};
+    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
+    auto collection = ctxColl.getCollection();
+    NamespaceStringOrUUID name =
+        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
+    const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
+
+    ast.stage = makeS<ScanStage>(name,
+                                 lookupSlot(recordName),
+                                 lookupSlot(recordIdName),
+                                 ast.nodes[projectsPos]->identifiers,
+                                 lookupSlots(ast.nodes[projectsPos]->renames),
+                                 boost::none,
+                                 forward,
+                                 nullptr,
+                                 nullptr);
+}
+
+void Parser::walkParallelScan(AstQuery& ast) {
+    walkChildren(ast);
+
+    std::string recordName;
+    std::string recordIdName;
+    std::string dbName = _defaultDb;
+    std::string collName;
+    int projectsPos;
+
+    if (ast.nodes.size() == 4) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        recordIdName = std::move(ast.nodes[1]->identifier);
+        projectsPos = 2;
+        collName = std::move(ast.nodes[3]->identifier);
+    } else if (ast.nodes.size() == 3) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        projectsPos = 1;
+        collName = std::move(ast.nodes[2]->identifier);
+    } else if (ast.nodes.size() == 2) {
+        projectsPos = 0;
+        collName = std::move(ast.nodes[1]->identifier);
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    NamespaceString nssColl{dbName, collName};
+    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
+    auto collection = ctxColl.getCollection();
+    NamespaceStringOrUUID name =
+        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
+
+    ast.stage = makeS<ParallelScanStage>(name,
+                                         lookupSlot(recordName),
+                                         lookupSlot(recordIdName),
+                                         ast.nodes[projectsPos]->identifiers,
+                                         lookupSlots(ast.nodes[projectsPos]->renames),
+                                         nullptr);
+}
+
+void Parser::walkSeek(AstQuery& ast) {
+    walkChildren(ast);
+
+    std::string recordName;
+    std::string recordIdName;
+    std::string dbName = _defaultDb;
+    std::string collName;
+    int projectsPos;
+
+    if (ast.nodes.size() == 5) {
+        recordName = std::move(ast.nodes[1]->identifier);
+        recordIdName = std::move(ast.nodes[2]->identifier);
+        projectsPos = 3;
+        collName = std::move(ast.nodes[4]->identifier);
+    } else if (ast.nodes.size() == 4) {
+        recordName = std::move(ast.nodes[1]->identifier);
+        projectsPos = 2;
+        collName = std::move(ast.nodes[3]->identifier);
+    } else if (ast.nodes.size() == 3) {
+        projectsPos = 1;
+        collName = std::move(ast.nodes[2]->identifier);
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    NamespaceString nssColl{dbName, collName};
+    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
+    auto collection = ctxColl.getCollection();
+    NamespaceStringOrUUID name =
+        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
+
+    ast.stage = makeS<ScanStage>(name,
+                                 lookupSlot(recordName),
+                                 lookupSlot(recordIdName),
+                                 ast.nodes[projectsPos]->identifiers,
+                                 lookupSlots(ast.nodes[projectsPos]->renames),
+                                 lookupSlot(ast.nodes[0]->identifier),
+                                 true /* forward */,
+                                 nullptr,
+                                 nullptr);
+}
+
+void Parser::walkIndexScan(AstQuery& ast) {
+    walkChildren(ast);
+
+    std::string recordName;
+    std::string recordIdName;
+    std::string dbName = _defaultDb;
+    std::string collName;
+    std::string indexName;
+    int projectsPos;
+    int forwardPos;
+
+    if (ast.nodes.size() == 6) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        recordIdName = std::move(ast.nodes[1]->identifier);
+        projectsPos = 2;
+        collName = std::move(ast.nodes[3]->identifier);
+        indexName = std::move(ast.nodes[4]->identifier);
+        forwardPos = 5;
+    } else if (ast.nodes.size() == 5) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        projectsPos = 1;
+        collName = std::move(ast.nodes[2]->identifier);
+        indexName = std::move(ast.nodes[3]->identifier);
+        forwardPos = 4;
+    } else if (ast.nodes.size() == 4) {
+        projectsPos = 0;
+        collName = std::move(ast.nodes[1]->identifier);
+        indexName = std::move(ast.nodes[2]->identifier);
+        forwardPos = 3;
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    NamespaceString nssColl{dbName, collName};
+    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
+    auto collection = ctxColl.getCollection();
+    NamespaceStringOrUUID name =
+        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
+    const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
+
+    ast.stage = makeS<IndexScanStage>(name,
+                                      indexName,
+                                      forward,
+                                      lookupSlot(recordName),
+                                      lookupSlot(recordIdName),
+                                      ast.nodes[projectsPos]->identifiers,
+                                      lookupSlots(ast.nodes[projectsPos]->renames),
+                                      boost::none,
+                                      boost::none,
+                                      nullptr,
+                                      nullptr);
+}
+
+void Parser::walkIndexSeek(AstQuery& ast) {
+    walkChildren(ast);
+
+    std::string recordName;
+    std::string recordIdName;
+    std::string dbName = _defaultDb;
+    std::string collName;
+    std::string indexName;
+    int projectsPos;
+    int forwardPos;
+
+    if (ast.nodes.size() == 8) {
+        recordName = std::move(ast.nodes[2]->identifier);
+        recordIdName = std::move(ast.nodes[3]->identifier);
+        projectsPos = 4;
+        collName = std::move(ast.nodes[5]->identifier);
+        indexName = std::move(ast.nodes[6]->identifier);
+        forwardPos = 7;
+    } else if (ast.nodes.size() == 7) {
+        recordName = std::move(ast.nodes[2]->identifier);
+        projectsPos = 3;
+        collName = std::move(ast.nodes[4]->identifier);
+        indexName = std::move(ast.nodes[5]->identifier);
+        forwardPos = 6;
+    } else if (ast.nodes.size() == 6) {
+        projectsPos = 2;
+        collName = std::move(ast.nodes[3]->identifier);
+        indexName = std::move(ast.nodes[4]->identifier);
+        forwardPos = 5;
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    NamespaceString nssColl{dbName, collName};
+    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
+    auto collection = ctxColl.getCollection();
+    NamespaceStringOrUUID name =
+        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
+    const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
+
+    ast.stage = makeS<IndexScanStage>(name,
+                                      indexName,
+                                      forward,
+                                      lookupSlot(recordName),
+                                      lookupSlot(recordIdName),
+                                      ast.nodes[projectsPos]->identifiers,
+                                      lookupSlots(ast.nodes[projectsPos]->renames),
+                                      lookupSlot(ast.nodes[0]->identifier),
+                                      lookupSlot(ast.nodes[1]->identifier),
+                                      nullptr,
+                                      nullptr);
+}
+
+void Parser::walkProject(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage = makeS<ProjectStage>(std::move(ast.nodes[1]->stage),
+                                    lookupSlots(std::move(ast.nodes[0]->projects)));
+}
+
+void Parser::walkFilter(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage =
+        makeS<FilterStage<false>>(std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr));
+}
+
+void Parser::walkCFilter(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage =
+        makeS<FilterStage<true>>(std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr));
+}
+
+void Parser::walkSort(AstQuery& ast) {
+    walkChildren(ast);
+
+    // TODO parse asc/desc
+    std::vector<value::SortDirection> dirs(ast.nodes[0]->identifiers.size(),
+                                           value::SortDirection::Ascending);
+
+    ast.stage = makeS<SortStage>(std::move(ast.nodes[2]->stage),
+                                 lookupSlots(ast.nodes[0]->identifiers),
+                                 std::move(dirs),
+                                 lookupSlots(ast.nodes[1]->identifiers),
+                                 std::numeric_limits<std::size_t>::max(),
+                                 nullptr);
+}
+
+void Parser::walkUnion(AstQuery& ast) {
+    walkChildren(ast);
+
+    std::vector<std::unique_ptr<PlanStage>> inputStages;
+    std::vector<value::SlotVector> inputVals;
+    value::SlotVector outputVals{lookupSlots(ast.nodes[0]->identifiers)};
+
+    for (size_t idx = 0; idx < ast.nodes[1]->nodes.size(); idx++) {
+        inputVals.push_back(lookupSlots(ast.nodes[1]->nodes[idx]->identifiers));
+        inputStages.push_back(std::move(ast.nodes[1]->nodes[idx]->stage));
+    }
+
+    uassert(ErrorCodes::FailedToParse,
+            "Union output values and input values mismatch",
+            std::all_of(
+                inputVals.begin(), inputVals.end(), [size = outputVals.size()](const auto& slots) {
+                    return slots.size() == size;
+                }));
+
+    ast.stage =
+        makeS<UnionStage>(std::move(inputStages), std::move(inputVals), std::move(outputVals));
+}
+
+void Parser::walkUnionBranch(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.identifiers = std::move(ast.nodes[0]->identifiers);
+    ast.stage = std::move(ast.nodes[1]->stage);
+}
+
+void Parser::walkUnwind(AstQuery& ast) {
+    walkChildren(ast);
+
+    bool preserveNullAndEmptyArrays = (ast.nodes[3]->token == "true") ? true : false;
+    ast.stage = makeS<UnwindStage>(std::move(ast.nodes[4]->stage),
+                                   lookupSlotStrict(ast.nodes[2]->identifier),
+                                   lookupSlotStrict(ast.nodes[0]->identifier),
+                                   lookupSlotStrict(ast.nodes[1]->identifier),
+                                   preserveNullAndEmptyArrays);
+}
+
+void Parser::walkMkObj(AstQuery& ast) {
+    walkChildren(ast);
+
+    std::string newRootName = ast.nodes[0]->identifier;
+    std::string oldRootName;
+    std::vector<std::string> restrictFields;
+
+    size_t projectListPos;
+    size_t inputPos;
+    if (ast.nodes.size() == 3) {
+        projectListPos = 1;
+        inputPos = 2;
+    } else {
+        oldRootName = ast.nodes[1]->identifier;
+        restrictFields = std::move(ast.nodes[2]->identifiers);
+        projectListPos = 3;
+        inputPos = 4;
+    }
+
+    ast.stage = makeS<MakeObjStage>(std::move(ast.nodes[inputPos]->stage),
+                                    lookupSlotStrict(newRootName),
+                                    lookupSlot(oldRootName),
+                                    std::move(restrictFields),
+                                    std::move(ast.nodes[projectListPos]->renames),
+                                    lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
+                                    false,
+                                    true);
+}
+
+void Parser::walkGroup(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage = makeS<HashAggStage>(std::move(ast.nodes[2]->stage),
+                                    lookupSlots(std::move(ast.nodes[0]->identifiers)),
+                                    lookupSlots(std::move(ast.nodes[1]->projects)));
+}
+
+void Parser::walkHashJoin(AstQuery& ast) {
+    walkChildren(ast);
+    ast.stage =
+        makeS<HashJoinStage>(std::move(ast.nodes[0]->nodes[2]->stage),          // outer
+                             std::move(ast.nodes[1]->nodes[2]->stage),          // inner
+                             lookupSlots(ast.nodes[0]->nodes[0]->identifiers),  // outer conditions
+                             lookupSlots(ast.nodes[0]->nodes[1]->identifiers),  // outer projections
+                             lookupSlots(ast.nodes[1]->nodes[0]->identifiers),  // inner conditions
+                             lookupSlots(ast.nodes[1]->nodes[1]->identifiers)   // inner projections
+        );
+}
+
+void Parser::walkNLJoin(AstQuery& ast) {
+    walkChildren(ast);
+    size_t outerPos;
+    size_t innerPos;
+    std::unique_ptr<EExpression> predicate;
+
+    if (ast.nodes.size() == 5) {
+        predicate = std::move(ast.nodes[2]->expr);
+        outerPos = 3;
+        innerPos = 4;
+    } else {
+        outerPos = 2;
+        innerPos = 3;
+    }
+
+    ast.stage = makeS<LoopJoinStage>(std::move(ast.nodes[outerPos]->stage),
+                                     std::move(ast.nodes[innerPos]->stage),
+                                     lookupSlots(ast.nodes[0]->identifiers),
+                                     lookupSlots(ast.nodes[1]->identifiers),
+                                     std::move(predicate));
+}
+
+void Parser::walkLimit(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage = makeS<LimitSkipStage>(
+        std::move(ast.nodes[1]->stage), std::stoi(ast.nodes[0]->token), boost::none);
+}
+
+void Parser::walkSkip(AstQuery& ast) {
+    walkChildren(ast);
+
+    if (ast.nodes.size() == 3) {
+        ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[2]->stage),
+                                          std::stoi(ast.nodes[1]->token),
+                                          std::stoi(ast.nodes[0]->token));
+    } else {
+        ast.stage = makeS<LimitSkipStage>(
+            std::move(ast.nodes[1]->stage), boost::none, std::stoi(ast.nodes[0]->token));
+    }
+}
+
+void Parser::walkCoScan(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage = makeS<CoScanStage>();
+}
+
+void Parser::walkTraverse(AstQuery& ast) {
+    walkChildren(ast);
+    size_t inPos;
+    size_t fromPos;
+    size_t foldPos = 0;
+    size_t finalPos = 0;
+
+    if (ast.nodes.size() == 5) {
+        inPos = 3;
+        fromPos = 4;
+    } else if (ast.nodes.size() == 6) {
+        foldPos = 3;
+        inPos = 4;
+        fromPos = 5;
+    } else {
+        foldPos = 3;
+        finalPos = 4;
+        inPos = 5;
+        fromPos = 6;
+    }
+    ast.stage = makeS<TraverseStage>(std::move(ast.nodes[fromPos]->stage),
+                                     std::move(ast.nodes[inPos]->stage),
+                                     lookupSlotStrict(ast.nodes[2]->identifier),
+                                     lookupSlotStrict(ast.nodes[0]->identifier),
+                                     lookupSlotStrict(ast.nodes[1]->identifier),
+                                     sbe::makeSV(),
+                                     foldPos ? std::move(ast.nodes[foldPos]->expr) : nullptr,
+                                     finalPos ? std::move(ast.nodes[finalPos]->expr) : nullptr);
+}
+
+void Parser::walkExchange(AstQuery& ast) {
+    walkChildren(ast);
+    ExchangePolicy policy = [&ast] {
+        if (ast.nodes[2]->identifier == "round") {
+            return ExchangePolicy::roundrobin;
+        }
+
+        if (ast.nodes[2]->identifier == "bcast") {
+            return ExchangePolicy::broadcast;
+        }
+        uasserted(4885901, "unknown exchange policy");
+    }();
+    ast.stage = makeS<ExchangeConsumer>(std::move(ast.nodes[3]->stage),
+                                        std::stoll(ast.nodes[1]->token),
+                                        lookupSlots(ast.nodes[0]->identifiers),
+                                        policy,
+                                        nullptr,
+                                        nullptr);
+}
+
+void Parser::walkBranch(AstQuery& ast) {
+    walkChildren(ast);
+
+    value::SlotVector outputVals{lookupSlots(ast.nodes[1]->identifiers)};
+    value::SlotVector inputThenVals{lookupSlots(ast.nodes[2]->identifiers)};
+    value::SlotVector inputElseVals{lookupSlots(ast.nodes[4]->identifiers)};
+
+    ast.stage = makeS<BranchStage>(std::move(ast.nodes[3]->stage),
+                                   std::move(ast.nodes[5]->stage),
+                                   std::move(ast.nodes[0]->expr),
+                                   std::move(inputThenVals),
+                                   std::move(inputElseVals),
+                                   std::move(outputVals));
+}
+
+std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
+                                                 value::SlotId inputSlot,
+                                                 std::unique_ptr<PlanStage> inputStage,
+                                                 value::SlotVector correlated,
+                                                 value::SlotId outputSlot) {
+    using namespace peg::udl;
+    using namespace std::literals;
+
+    if (ast.nodes.size() == 1) {
+        if (ast.nodes[0]->tag == "EXPR"_) {
+            auto [it, inserted] = _symbolsLookupTable.insert({"__self", inputSlot});
+            invariant(inserted);
+            walk(*ast.nodes[0]);
+            _symbolsLookupTable.erase(it);
+            return makeProjectStage(
+                std::move(inputStage), outputSlot, std::move(ast.nodes[0]->expr));
+        } else {
+            walk(*ast.nodes[0]);
+            return makeProjectStage(
+                std::move(inputStage),
+                outputSlot,
+                makeE<EFunction>("getField"sv,
+                                 makeEs(makeE<EVariable>(inputSlot),
+                                        makeE<EConstant>(ast.nodes[0]->identifier))));
+        }
+    } else {
+        walk(*ast.nodes[0]);
+        auto traverseIn = _slotIdGenerator.generate();
+        auto from =
+            makeProjectStage(std::move(inputStage),
+                             traverseIn,
+                             makeE<EFunction>("getField"sv,
+                                              makeEs(makeE<EVariable>(inputSlot),
+                                                     makeE<EConstant>(ast.nodes[0]->identifier))));
+        auto in = makeS<LimitSkipStage>(makeS<CoScanStage>(), 1, boost::none);
+        auto stage = makeS<TraverseStage>(
+            std::move(from),
+            walkPathValue(*ast.nodes[1], traverseIn, std::move(in), {}, outputSlot),
+            traverseIn,
+            outputSlot,
+            outputSlot,
+            std::move(correlated),
+            nullptr,
+            nullptr);
+
+        return stage;
+    }
+}
+
+void Parser::walkSimpleProj(AstQuery& ast) {
+    walk(*ast.nodes[0]);
+    walk(*ast.nodes[1]);
+    walk(*ast.nodes[2]);
+    walk(*ast.nodes[4]);
+
+    auto inputStage = std::move(ast.nodes[4]->stage);
+    auto outputSlot = lookupSlotStrict(ast.nodes[0]->identifier);
+    auto inputSlot = lookupSlotStrict(ast.nodes[1]->identifier);
+
+    ast.stage = walkPathValue(*ast.nodes[3],
+                              inputSlot,
+                              std::move(inputStage),
+                              lookupSlots(ast.nodes[2]->identifiers),
+                              outputSlot);
+}
+
+bool needNewObject(AstQuery& ast) {
+    using namespace peg::udl;
+
+    switch (ast.tag) {
+        case "PATH"_: {
+            // If anything in the path needs a new object then this path needs a new object.
+            bool newObj = false;
+            for (const auto& node : ast.nodes) {
+                newObj |= needNewObject(*node);
+            }
+            return newObj;
+        }
+        case "PF"_: {
+            if (ast.nodes.size() == 1) {
+                // PF_DROPALL
+                return false;
+            }
+
+            // Follow the action on the field.
+            return needNewObject(*ast.nodes[1]);
+        }
+        case "PF_ACTION"_: {
+
+            return needNewObject(*ast.nodes[0]);
+        }
+        case "PF_DROP"_: {
+            return false;
+        }
+        case "PF_INCL"_: {
+            return false;
+        }
+        case "PF_EXPR"_: {
+            // This is the only place that forces a new object.
+            return true;
+        }
+        case "PF_MEXPR"_: {
+            return false;
+        }
+        default:;
+    }
+    MONGO_UNREACHABLE;
+}
+
+bool returnOldObject(AstQuery& ast) {
+    using namespace peg::udl;
+
+    switch (ast.tag) {
+        case "PATH"_: {
+            // If anything in the path needs a new object then this path needs a new object.
+            bool retOldObj = true;
+            for (const auto& node : ast.nodes) {
+                retOldObj &= returnOldObject(*node);
+            }
+            return retOldObj;
+        }
+        case "PF"_: {
+            if (ast.nodes.size() == 1) {
+                // PF_DROPALL
+                return true;
+            }
+
+            // Follow the action on the field.
+            return returnOldObject(*ast.nodes[1]);
+        }
+        case "PF_ACTION"_: {
+
+            return returnOldObject(*ast.nodes[0]);
+        }
+        case "PF_DROP"_: {
+            return true;
+        }
+        case "PF_INCL"_: {
+            return false;
+        }
+        case "PF_EXPR"_: {
+            return false;
+        }
+        case "PF_MEXPR"_: {
+            return true;
+        }
+        default:;
+    }
+    MONGO_UNREACHABLE;
+}
+
+std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
+                                            value::SlotId inputSlot,
+                                            value::SlotId outputSlot) {
+    using namespace peg::udl;
+
+    // Do we have to unconditionally create a new object?
+    // The algorithm is recursive - if any action anythere is the path needs a new object then the
+    // request is bubbled all the way up.
+    bool newObj = needNewObject(ast);
+    bool restrictAll = false;
+    bool retOldObj = returnOldObject(ast);
+
+    std::vector<std::string> fieldNames;
+    std::vector<std::string> fieldRestrictNames;
+    value::SlotVector fieldVars;
+    std::unique_ptr<PlanStage> stage = makeS<LimitSkipStage>(makeS<CoScanStage>(), 1, boost::none);
+
+    for (size_t idx = ast.nodes.size(); idx-- > 0;) {
+        const auto& pf = ast.nodes[idx];
+        if (pf->nodes[0]->name == "PF_DROPALL") {
+            restrictAll = true;
+        } else {
+            walk(*pf->nodes[0]);
+            const auto& action = *pf->nodes[1];
+            switch (action.nodes[0]->tag) {
+                case "PF_DROP"_: {
+                    fieldRestrictNames.emplace(fieldRestrictNames.begin(),
+                                               std::move(pf->nodes[0]->identifier));
+
+                    break;
+                }
+                case "PF_INCL"_: {
+                    fieldNames.emplace(fieldNames.begin(), std::move(pf->nodes[0]->identifier));
+                    fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
+                    stage = makeProjectStage(
+                        std::move(stage),
+                        fieldVars.front(),
+                        makeE<EFunction>("getField",
+                                         makeEs(makeE<EVariable>(inputSlot),
+                                                makeE<EConstant>(fieldNames.front()))));
+                    break;
+                }
+                case "PF_EXPR"_: {
+                    fieldNames.emplace(fieldNames.begin(), std::move(pf->nodes[0]->identifier));
+                    walk(*action.nodes[0]);
+                    fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
+                    stage = makeProjectStage(std::move(stage),
+                                             fieldVars.front(),
+                                             std::move(action.nodes[0]->nodes[0]->expr));
+                    break;
+                }
+                case "PF_MEXPR"_: {
+                    auto [it, inserted] = _symbolsLookupTable.insert({"__self", inputSlot});
+                    invariant(inserted);
+
+                    fieldNames.emplace(fieldNames.begin(), std::move(pf->nodes[0]->identifier));
+                    walk(*action.nodes[0]);
+                    fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
+                    stage = makeProjectStage(std::move(stage),
+                                             fieldVars.front(),
+                                             std::move(action.nodes[0]->nodes[0]->expr));
+
+                    _symbolsLookupTable.erase(it);
+                    break;
+                }
+                case "PATH"_: {
+                    fieldNames.emplace(fieldNames.begin(), std::move(pf->nodes[0]->identifier));
+                    fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
+                    auto traverseOut = fieldVars.front();
+                    auto traverseIn = _slotIdGenerator.generate();
+                    stage = makeProjectStage(
+                        std::move(stage),
+                        traverseIn,
+                        makeE<EFunction>("getField",
+                                         makeEs(makeE<EVariable>(inputSlot),
+                                                makeE<EConstant>(fieldNames.front()))));
+
+                    stage =
+                        makeS<TraverseStage>(std::move(stage),
+                                             walkPath(*action.nodes[0], traverseIn, traverseOut),
+                                             traverseIn,
+                                             traverseOut,
+                                             traverseOut,
+                                             sbe::makeSV(),
+                                             nullptr,
+                                             nullptr);
+                    break;
+                }
+            }
+        }
+    }
+
+    if (restrictAll) {
+        fieldRestrictNames.clear();
+        fieldRestrictNames.emplace_back("");
+    }
+    stage = makeS<MakeObjStage>(std::move(stage),
+                                outputSlot,
+                                inputSlot,
+                                std::move(fieldRestrictNames),
+                                std::move(fieldNames),
+                                std::move(fieldVars),
+                                newObj,
+                                retOldObj);
+
+    return stage;
+}
+
+void Parser::walkPFO(AstQuery& ast) {
+    walk(*ast.nodes[0]);
+    walk(*ast.nodes[1]);
+    walk(*ast.nodes[2]);
+    walk(*ast.nodes[4]);
+
+
+    ast.stage = makeS<TraverseStage>(std::move(ast.nodes[4]->stage),
+                                     walkPath(*ast.nodes[3],
+                                              lookupSlotStrict(ast.nodes[1]->identifier),
+                                              lookupSlotStrict(ast.nodes[0]->identifier)),
+                                     lookupSlotStrict(ast.nodes[1]->identifier),
+                                     lookupSlotStrict(ast.nodes[0]->identifier),
+                                     lookupSlotStrict(ast.nodes[0]->identifier),
+                                     lookupSlots(ast.nodes[2]->identifiers),
+                                     nullptr,
+                                     nullptr);
+}
+
+void Parser::walkLazyProducerSpool(AstQuery& ast) {
+    walkChildren(ast);
+
+    std::unique_ptr<EExpression> predicate;
+    size_t inputPos;
+
+    if (ast.nodes.size() == 4) {
+        predicate = std::move(ast.nodes[2]->expr);
+        inputPos = 3;
+    } else {
+        inputPos = 2;
+    }
+
+    ast.stage = makeS<SpoolLazyProducerStage>(std::move(ast.nodes[inputPos]->stage),
+                                              lookupSpoolBuffer(ast.nodes[0]->identifier),
+                                              lookupSlots(ast.nodes[1]->identifiers),
+                                              std::move(predicate));
+}
+
+void Parser::walkEagerProducerSpool(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage = makeS<SpoolEagerProducerStage>(std::move(ast.nodes[2]->stage),
+                                               lookupSpoolBuffer(ast.nodes[0]->identifier),
+                                               lookupSlots(ast.nodes[1]->identifiers));
+}
+
+void Parser::walkConsumerSpool(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage = makeS<SpoolConsumerStage<false>>(lookupSpoolBuffer(ast.nodes[0]->identifier),
+                                                 lookupSlots(ast.nodes[1]->identifiers));
+}
+
+void Parser::walkStackConsumerSpool(AstQuery& ast) {
+    walkChildren(ast);
+
+    ast.stage = makeS<SpoolConsumerStage<true>>(lookupSpoolBuffer(ast.nodes[0]->identifier),
+                                                lookupSlots(ast.nodes[1]->identifiers));
+}
+
+void Parser::walk(AstQuery& ast) {
+    using namespace peg::udl;
+
+    switch (ast.tag) {
+        case "OPERATOR"_:
+            walkChildren(ast);
+            ast.stage = std::move(ast.nodes[0]->stage);
+            break;
+        case "ROOT"_:
+            walkChildren(ast);
+            ast.stage = std::move(ast.nodes[0]->stage);
+            break;
+        case "SCAN"_:
+            walkScan(ast);
+            break;
+        case "PSCAN"_:
+            walkParallelScan(ast);
+            break;
+        case "SEEK"_:
+            walkSeek(ast);
+            break;
+        case "IXSCAN"_:
+            walkIndexScan(ast);
+            break;
+        case "IXSEEK"_:
+            walkIndexSeek(ast);
+            break;
+        case "PROJECT"_:
+            walkProject(ast);
+            break;
+        case "FILTER"_:
+            walkFilter(ast);
+            break;
+        case "CFILTER"_:
+            walkCFilter(ast);
+            break;
+        case "SORT"_:
+            walkSort(ast);
+            break;
+        case "UNION"_:
+            walkUnion(ast);
+            break;
+        case "UNION_BRANCH_LIST"_:
+            walkChildren(ast);
+            break;
+        case "UNION_BRANCH"_:
+            walkUnionBranch(ast);
+            break;
+        case "UNWIND"_:
+            walkUnwind(ast);
+            break;
+        case "MKOBJ"_:
+            walkMkObj(ast);
+            break;
+        case "GROUP"_:
+            walkGroup(ast);
+            break;
+        case "HJOIN"_:
+            walkHashJoin(ast);
+            break;
+        case "NLJOIN"_:
+            walkNLJoin(ast);
+            break;
+        case "LIMIT"_:
+            walkLimit(ast);
+            break;
+        case "SKIP"_:
+            walkSkip(ast);
+            break;
+        case "COSCAN"_:
+            walkCoScan(ast);
+            break;
+        case "TRAVERSE"_:
+            walkTraverse(ast);
+            break;
+        case "EXCHANGE"_:
+            walkExchange(ast);
+            break;
+        case "IDENT"_:
+            walkIdent(ast);
+            break;
+        case "IDENT_LIST"_:
+            walkIdentList(ast);
+            break;
+        case "IDENT_WITH_RENAME"_:
+            walkIdentWithRename(ast);
+            break;
+        case "IDENT_LIST_WITH_RENAMES"_:
+            walkIdentListWithRename(ast);
+            break;
+        case "PROJECT_LIST"_:
+            walkProjectList(ast);
+            break;
+        case "ASSIGN"_:
+            walkAssign(ast);
+            break;
+        case "EXPR"_:
+            walkExpr(ast);
+            break;
+        case "EQOP_EXPR"_:
+            walkEqopExpr(ast);
+            break;
+        case "RELOP_EXPR"_:
+            walkRelopExpr(ast);
+            break;
+        case "ADD_EXPR"_:
+            walkAddExpr(ast);
+            break;
+        case "MUL_EXPR"_:
+            walkMulExpr(ast);
+            break;
+        case "PRIMARY_EXPR"_:
+            walkPrimaryExpr(ast);
+            break;
+        case "IF_EXPR"_:
+            walkIfExpr(ast);
+            break;
+        case "LET_EXPR"_:
+            walkLetExpr(ast);
+            break;
+        case "FRAME_PROJECT_LIST"_:
+            walkFrameProjectList(ast);
+            break;
+        case "FUN_CALL"_:
+            walkFunCall(ast);
+            break;
+        case "BRANCH"_:
+            walkBranch(ast);
+            break;
+        case "SIMPLE_PROJ"_:
+            walkSimpleProj(ast);
+            break;
+        case "PFO"_:
+            walkPFO(ast);
+            break;
+        case "ESPOOL"_:
+            walkEagerProducerSpool(ast);
+            break;
+        case "LSPOOL"_:
+            walkLazyProducerSpool(ast);
+            break;
+        case "CSPOOL"_:
+            walkConsumerSpool(ast);
+            break;
+        case "SSPOOL"_:
+            walkStackConsumerSpool(ast);
+            break;
+        default:
+            walkChildren(ast);
+    }
+}
+
+Parser::Parser() {
+    _parser.log = [&](size_t ln, size_t col, const std::string& msg) {
+        LOGV2(4885902, "{msg}", "msg"_attr = format_error_message(ln, col, msg));
+    };
+
+    if (!_parser.load_grammar(kSyntax)) {
+        uasserted(4885903, "Invalid syntax definition.");
+    }
+
+    _parser.enable_packrat_parsing();
+
+    _parser.enable_ast<AstQuery>();
+}
+
+std::unique_ptr<PlanStage> Parser::parse(OperationContext* opCtx,
+                                         StringData defaultDb,
+                                         StringData line) {
+    std::shared_ptr<AstQuery> ast;
+
+    _opCtx = opCtx;
+    _defaultDb = defaultDb.toString();
+
+    auto result = _parser.parse_n(line.rawData(), line.size(), ast);
+    uassert(4885904, "Syntax error in query.", result);
+
+    walk(*ast);
+    uassert(4885905, "Query does not have the root.", ast->stage);
+
+    return std::move(ast->stage);
+}
+}  // namespace sbe
+}  // namespace mongo

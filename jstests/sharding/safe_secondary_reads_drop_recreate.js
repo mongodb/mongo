@@ -273,6 +273,7 @@ let testCases = {
     rolesInfo: {skip: "primary only"},
     saslContinue: {skip: "primary only"},
     saslStart: {skip: "primary only"},
+    sbe: {skip: "internal command"},
     serverStatus: {skip: "does not return user data"},
     setCommittedSnapshot: {skip: "does not return user data"},
     setDefaultRWConcern: {skip: "primary only"},

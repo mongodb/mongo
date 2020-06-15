@@ -265,6 +265,7 @@ const allCommands = {
     rolesInfo: {skip: isPrimaryOnly},
     saslContinue: {skip: isPrimaryOnly},
     saslStart: {skip: isPrimaryOnly},
+    sbe: {skip: isAnInternalCommand},
     serverStatus: {skip: isNotAUserDataRead},
     setCommittedSnapshot: {skip: isNotAUserDataRead},
     setDefaultRWConcern: {skip: isPrimaryOnly},
