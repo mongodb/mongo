@@ -1733,11 +1733,15 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
 
     if (!foundId) {
         auto key = KeyString::toBson(keyString, _ordering);
-        LOGV2_WARNING(51797,
-                      "{record} not found in index for key {key}",
-                      "Record not found in index",
-                      "recordId"_attr = id,
-                      "key"_attr = redact(key));
+        LOGV2_WARNING(
+            51797,
+            "{recordId} not found in collection {collection} on index {index} with key {key} while "
+            "attempting to remove the index entry",
+            "Associated record not found in collection while removing index entry",
+            "collection"_attr = getCollectionNamespace(opCtx),
+            "index"_attr = _indexName,
+            "key"_attr = redact(key),
+            "recordId"_attr = id);
         return;  // nothing to do
     }
 
