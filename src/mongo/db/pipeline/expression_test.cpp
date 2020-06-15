@@ -2976,26 +2976,16 @@ TEST(ExpressionRandom, Basic) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
-    // Test const = false case, we generate new random value on every call to evaluate().
+    // We generate a new random value on every call to evaluate().
     intrusive_ptr<Expression> expression =
         Expression::parseExpression(&expCtx, fromjson("{ $rand: {} }"), vps);
 
     const std::string& serialized = expression->serialize(false).getDocument().toString();
-    ASSERT_EQ("{$rand: {const: false}}", serialized);
+    ASSERT_EQ("{$rand: {}}", serialized);
 
-    const auto randFn1 = [&expression, &expCtx]() -> double {
+    const auto randFn = [&expression, &expCtx]() -> double {
         return expression->evaluate({}, &expCtx.variables).getDouble();
     };
-    assertRandomProperties(randFn1);
-
-    // Test const = true case, we optimize to a const.
-    const auto randFn2 = [&expression, &expCtx, &vps]() -> double {
-        expression =
-            Expression::parseExpression(&expCtx, fromjson("{ $rand: {const: true} }"), vps);
-        const std::string& serialized1 = expression->serialize(false).getDocument().toString();
-        ASSERT_TRUE(serialized1.find("{$const:") == 0);
-        return expression->evaluate({}, &expCtx.variables).getDouble();
-    };
-    assertRandomProperties(randFn2);
+    assertRandomProperties(randFn);
 }
 }  // namespace ExpressionTests

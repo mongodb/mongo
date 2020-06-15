@@ -29,26 +29,4 @@ print("Average: ", avg);
 const err = 10.0 / Math.sqrt(12.0 * N);
 assert.lte(0.5 - err, avg);
 assert.gte(0.5 + err, avg);
-
-const collConst = db.expression_rand_const;
-collConst.drop();
-assert.commandWorked(collConst.insert({_id: i, v: 0}));
-
-const randPipelineConst = [{$project: {r: {$rand: {const : true}}}}];
-let sum = 0.0;
-for (i = 0; i < N; i++) {
-    const resultArrayConst = collConst.aggregate(randPipelineConst).toArray();
-    assert.eq(1, resultArrayConst.length);
-
-    const r = resultArrayConst[0]["r"];
-    assert.lte(0.0, r);
-    assert.gte(1.0, r);
-
-    sum += r;
-}
-
-const avgConst = sum / N;
-print("Average Const: ", avgConst);
-assert.lte(0.5 - err, avgConst);
-assert.gte(0.5 + err, avgConst);
 }());

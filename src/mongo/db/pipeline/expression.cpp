@@ -6439,34 +6439,11 @@ ExpressionRandom::ExpressionRandom(ExpressionContext* const expCtx) : Expression
 intrusive_ptr<Expression> ExpressionRandom::parse(ExpressionContext* const expCtx,
                                                   BSONElement exprElement,
                                                   const VariablesParseState& vps) {
-    bool hasConstField = false;
-    bool isConst = false;
-
     uassert(3040500,
-            str::stream() << "$rand not allowed inside collection validators",
+            "$rand not allowed inside collection validators",
             !expCtx->isParsingCollectionValidator);
 
-    for (const auto& elem : exprElement.Obj()) {
-        const auto fieldName = elem.fieldNameStringData();
-        if (fieldName == "const"_sd) {
-            uassert(
-                3040501, str::stream() << "'const' must be specified just once", !hasConstField);
-
-            uassert(3040502,
-                    str::stream() << "'const' argument must be a boolean, found "
-                                  << typeName(elem.type()),
-                    elem.type() == Bool);
-            isConst = elem.boolean();
-            hasConstField = true;
-        } else {
-            uasserted(3040503, str::stream() << "Unknown argument: " << fieldName);
-        }
-    }
-
-    if (isConst) {
-        ExpressionRandom exprRandom(expCtx);
-        return ExpressionConstant::create(expCtx, Value(exprRandom.getRandomValue()));
-    }
+    uassert(3040501, "$rand does not currently accept arguments", exprElement.Obj().isEmpty());
 
     return new ExpressionRandom(expCtx);
 }
@@ -6484,7 +6461,6 @@ Value ExpressionRandom::evaluate(const Document& root, Variables* variables) con
 }
 
 intrusive_ptr<Expression> ExpressionRandom::optimize() {
-    // Already optimized to ExpressionConstant if "const" option passed in.
     return intrusive_ptr<Expression>(this);
 }
 
@@ -6493,6 +6469,6 @@ void ExpressionRandom::_doAddDependencies(DepsTracker* deps) const {
 }
 
 Value ExpressionRandom::serialize(const bool explain) const {
-    return Value(DOC(getOpName() << DOC("const"_sd << Value(false))));
+    return Value(DOC(getOpName() << Document()));
 }
 }  // namespace mongo
