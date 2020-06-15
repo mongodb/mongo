@@ -115,6 +115,8 @@ ReplicationCoordinator::Mode ReplicationCoordinatorMock::getReplicationMode() co
 }
 
 MemberState ReplicationCoordinatorMock::getMemberState() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return _memberState;
 }
 
@@ -124,10 +126,14 @@ std::vector<MemberData> ReplicationCoordinatorMock::getMemberData() const {
 }
 
 bool ReplicationCoordinatorMock::canAcceptNonLocalWrites() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return _canAcceptNonLocalWrites;
 }
 
 void ReplicationCoordinatorMock::setCanAcceptNonLocalWrites(bool canAcceptNonLocalWrites) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _canAcceptNonLocalWrites = canAcceptNonLocalWrites;
 }
 
@@ -142,6 +148,8 @@ bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState(OperationContext* o
 }
 
 bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState_UNSAFE() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return _memberState.primary() || _memberState.secondary();
 }
 
@@ -173,6 +181,8 @@ bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
 
 bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(OperationContext* opCtx,
                                                             StringData dbName) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     // Return true if we allow writes explicitly even when not in primary state, as in sharding
     // unit tests, so that the op observers can fire but the tests don't have to set all the states
     // as if it's in primary.
@@ -222,18 +232,24 @@ void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
 
 void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTime(
     const OpTimeAndWallTime& opTimeAndWallTime) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _myLastAppliedOpTime = opTimeAndWallTime.opTime;
     _myLastAppliedWallTime = opTimeAndWallTime.wallTime;
 }
 
 void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTime(
     const OpTimeAndWallTime& opTimeAndWallTime) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _myLastDurableOpTime = opTimeAndWallTime.opTime;
     _myLastDurableWallTime = opTimeAndWallTime.wallTime;
 }
 
 void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime, DataConsistency consistency) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     if (opTimeAndWallTime.opTime > _myLastAppliedOpTime) {
         _myLastAppliedOpTime = opTimeAndWallTime.opTime;
         _myLastAppliedWallTime = opTimeAndWallTime.wallTime;
@@ -242,6 +258,8 @@ void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTimeForward(
 
 void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     if (opTimeAndWallTime.opTime > _myLastDurableOpTime) {
         _myLastDurableOpTime = opTimeAndWallTime.opTime;
         _myLastDurableWallTime = opTimeAndWallTime.wallTime;
@@ -249,23 +267,33 @@ void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTimeForward(
 }
 
 void ReplicationCoordinatorMock::resetMyLastOpTimes() {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _myLastDurableOpTime = OpTime();
     _myLastDurableWallTime = Date_t();
 }
 
 OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastAppliedOpTimeAndWallTime() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return {_myLastAppliedOpTime, _myLastAppliedWallTime};
 }
 
 OpTime ReplicationCoordinatorMock::getMyLastAppliedOpTime() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return _myLastAppliedOpTime;
 }
 
 OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastDurableOpTimeAndWallTime() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return {_myLastDurableOpTime, _myLastDurableWallTime};
 }
 
 OpTime ReplicationCoordinatorMock::getMyLastDurableOpTime() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return _myLastDurableOpTime;
 }
 
@@ -302,6 +330,8 @@ HostAndPort ReplicationCoordinatorMock::getMyHostAndPort() const {
 }
 
 Status ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _memberState = newState;
     return Status::OK();
 }
@@ -330,10 +360,14 @@ StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionComm
 }
 
 ReplSetConfig ReplicationCoordinatorMock::getConfig() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return _getConfigReturnValue;
 }
 
 void ReplicationCoordinatorMock::setGetConfigReturnValue(ReplSetConfig returnValue) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _getConfigReturnValue = std::move(returnValue);
 }
 
@@ -450,10 +484,14 @@ void ReplicationCoordinatorMock::blacklistSyncSource(const HostAndPort& host, Da
 
 void ReplicationCoordinatorMock::resetLastOpTimesFromOplog(OperationContext* opCtx,
                                                            DataConsistency consistency) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _resetLastOpTimesCalled = true;
 }
 
 bool ReplicationCoordinatorMock::lastOpTimesWereReset() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return _resetLastOpTimesCalled;
 }
 
@@ -493,10 +531,14 @@ bool ReplicationCoordinatorMock::getWriteConcernMajorityShouldJournal() {
 }
 
 long long ReplicationCoordinatorMock::getTerm() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     return _term;
 }
 
 Status ReplicationCoordinatorMock::updateTerm(OperationContext* opCtx, long long term) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _term = term;
     return Status::OK();
 }
@@ -534,6 +576,8 @@ Status ReplicationCoordinatorMock::stepUpIfEligible(bool skipDryRun) {
 }
 
 void ReplicationCoordinatorMock::alwaysAllowWrites(bool allowWrites) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
     _alwaysAllowWrites = allowWrites;
 }
 
@@ -600,11 +644,12 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorMock::awaitIsMaste
     const SplitHorizon::Parameters& horizonParams,
     boost::optional<TopologyVersion> clientTopologyVersion,
     boost::optional<Date_t> deadline) {
+    auto config = getConfig();
     auto response = std::make_shared<IsMasterResponse>();
-    response->setReplSetVersion(_getConfigReturnValue.getConfigVersion());
+    response->setReplSetVersion(config.getConfigVersion());
     response->setIsMaster(true);
     response->setIsSecondary(false);
-    response->setMe(_getConfigReturnValue.getMemberAt(0).getHostAndPort());
+    response->setMe(config.getMemberAt(0).getHostAndPort());
     response->setElectionId(OID::gen());
     response->setTopologyVersion(TopologyVersion(repl::instanceId, 0));
     return response;
