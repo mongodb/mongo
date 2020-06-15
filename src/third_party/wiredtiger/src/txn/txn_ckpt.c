@@ -1831,15 +1831,9 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
     if (final && !metadata)
         return (__wt_evict_file(session, WT_SYNC_DISCARD));
 
-    /*
-     * If closing an unmodified file, check that no update is required for active readers.
-     */
-    if (!btree->modified && !bulk) {
-        WT_RET(__wt_txn_update_oldest(session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
-        return (__wt_txn_visible_all(session, btree->rec_max_txn, btree->rec_max_timestamp) ?
-            __wt_evict_file(session, WT_SYNC_DISCARD) :
-            EBUSY);
-    }
+    /* Closing an unmodified file. */
+    if (!btree->modified && !bulk)
+        return (__wt_evict_file(session, WT_SYNC_DISCARD));
 
     /*
      * Don't flush data from modified trees independent of system-wide checkpoint when either there

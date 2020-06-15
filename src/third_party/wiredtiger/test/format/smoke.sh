@@ -18,4 +18,5 @@ args="$args runs.threads=4 "
 
 $TEST_WRAPPER ./t $args runs.type=row
 # Force a rebalance to occur with statistics logging to test the utility
-$TEST_WRAPPER ./t $args runs.type=row statistics.server=1 ops.rebalance=1
+# FIXME-WT-6410: temporarily disable running rebalance with timestamps
+# $TEST_WRAPPER ./t $args runs.type=row statistics.server=1 ops.rebalance=1

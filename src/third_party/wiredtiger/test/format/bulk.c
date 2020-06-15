@@ -80,7 +80,7 @@ wts_load(void)
     WT_DECL_RET;
     WT_ITEM key, value;
     WT_SESSION *session;
-    uint32_t keyno;
+    uint32_t committed_keyno, keyno, v;
     bool is_bulk;
 
     conn = g.wts_conn;
@@ -112,19 +112,7 @@ wts_load(void)
     if (g.c_txn_timestamps)
         bulk_begin_transaction(session);
 
-    for (keyno = 0; ++keyno <= g.c_rows;) {
-        /* Do some checking every 10K operations. */
-        if (keyno % 10000 == 0) {
-            /* Report on progress. */
-            track("bulk load", keyno, NULL);
-
-            /* Restart the enclosing transaction so we don't overflow the cache. */
-            if (g.c_txn_timestamps) {
-                bulk_commit_transaction(session);
-                bulk_begin_transaction(session);
-            }
-        }
-
+    for (committed_keyno = keyno = 0; ++keyno <= g.c_rows;) {
         key_gen(&key, keyno);
         val_gen(NULL, &value, keyno);
 
@@ -176,21 +164,34 @@ wts_load(void)
                 g.c_delete_pct += g.c_insert_pct - 5;
                 g.c_insert_pct = 5;
             }
-            g.c_delete_pct += g.c_write_pct / 2;
-            g.c_write_pct = g.c_write_pct / 2;
+            v = g.c_write_pct / 2;
+            g.c_delete_pct += v;
+            g.c_write_pct -= v;
 
             break;
+        }
+
+        /* Restart the enclosing transaction every 5K operations so we don't overflow the cache. */
+        if (keyno % 5000 == 0) {
+            /* Report on progress. */
+            track("bulk load", keyno, NULL);
+
+            if (g.c_txn_timestamps) {
+                bulk_commit_transaction(session);
+                committed_keyno = keyno;
+                bulk_begin_transaction(session);
+            }
         }
     }
 
     /*
-     * We may have exited the loop early, reset our counters to match our insert count. If the count
-     * changed, rewrite the CONFIG file so reopens aren't surprised.
+     * Ideally, the insert loop runs until the number of rows plus one, in which case row counts are
+     * correct. If the loop exited early, reset the counters and rewrite the CONFIG file (so reopens
+     * aren't surprised).
      */
-    --keyno;
-    if (g.rows != keyno) {
-        g.rows = keyno;
-        g.c_rows = (uint32_t)keyno;
+    if (keyno != g.c_rows + 1) {
+        g.rows = committed_keyno;
+        g.c_rows = (uint32_t)committed_keyno;
         config_print(false);
     }
 

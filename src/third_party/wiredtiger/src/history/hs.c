@@ -615,7 +615,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
     WT_MODIFY entries[MAX_REVERSE_MODIFY_NUM];
     WT_MODIFY_VECTOR modifies;
     WT_SAVE_UPD *list;
-    WT_UPDATE *first_non_ts_upd, *oldest_upd, *prev_upd, *upd;
+    WT_UPDATE *first_non_ts_upd, *non_aborted_upd, *oldest_upd, *prev_upd, *upd;
     WT_HS_TIME_POINT stop_time_point;
     wt_off_t hs_size;
     uint64_t insert_cnt, max_hs_size;
@@ -689,7 +689,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
          * newer than a TOMBSTONE must be a full update.
          *
          * The algorithm walks from the oldest update, or the most recently inserted into history
-         * store update. To the newest update and build full updates along the way. It sets the stop
+         * store update, to the newest update and build full updates along the way. It sets the stop
          * time point of the update to the start time point of the next update, squashes the updates
          * that are from the same transaction and of the same start timestamp, calculates reverse
          * modification if prev_upd is a MODIFY, and inserts the update to the history store.
@@ -707,9 +707,12 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
          * tombstone.
          * 4) We have a single tombstone on the chain, it is simply ignored.
          */
-        for (prev_upd = NULL; upd != NULL; prev_upd = upd, upd = upd->next) {
+        for (non_aborted_upd = prev_upd = NULL; upd != NULL;
+             prev_upd = non_aborted_upd, upd = upd->next) {
             if (upd->txnid == WT_TXN_ABORTED)
                 continue;
+
+            non_aborted_upd = upd;
 
             WT_ERR(__wt_modify_vector_push(&modifies, upd));
 
@@ -751,6 +754,21 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
         }
 
         prev_upd = upd = NULL;
+
+        /*
+         * Trim from the end until there is a full update. We need this if we are dealing with
+         * updates without timestamps, and there are timestamped modify updates at the end of update
+         * chain that are not relevant due to newer full updates without timestamps.
+         */
+        for (; modifies.size > 0;) {
+            __wt_modify_vector_peek(&modifies, &upd);
+            if (upd->type == WT_UPDATE_MODIFY) {
+                WT_ASSERT(session, F_ISSET(upd, WT_UPDATE_MASKED_BY_NON_TS_UPDATE));
+                __wt_modify_vector_pop(&modifies, &upd);
+            } else
+                break;
+        }
+        upd = NULL;
 
         /* Construct the oldest full update. */
         WT_ASSERT(session, modifies.size > 0);
