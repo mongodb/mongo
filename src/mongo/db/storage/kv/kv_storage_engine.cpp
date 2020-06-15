@@ -419,7 +419,8 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
             // will return the index to be rebuilt.
             if (indexMetaData.isBackgroundSecondaryBuild && (!foundIdent || !indexMetaData.ready)) {
                 log()
-                    << "Expected background index build did not complete, rebuilding. Collection: "
+                    << "Expected background index build did not complete, rebuilding in foreground"
+                       " - see SERVER-43097. Collection: "
                     << coll << " Index: " << indexName;
                 ret.emplace_back(coll, indexName);
                 continue;

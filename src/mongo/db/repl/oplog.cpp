@@ -219,8 +219,8 @@ bool shouldBuildInForeground(OperationContext* opCtx,
                              const NamespaceString& indexNss,
                              repl::OplogApplication::Mode mode) {
     if (mode == OplogApplication::Mode::kRecovering) {
-        LOG(3) << "apply op: building background index " << index
-               << " in the foreground because the node is in recovery";
+        log() << "apply op: building background index " << index
+              << " in the foreground because the node is in recovery - see SERVER-43097";
         return true;
     }
 
