@@ -120,8 +120,6 @@ public:
      * with both the collection lock and CSRLock held in exclusive mode.
      *
      * In these methods, the CSRLock ensures concurrent access to the critical section.
-     *
-     * The shardVersionRecoverRefresh future must be boost::none when invoking these methods.
      */
     void enterCriticalSectionCatchUpPhase(const CSRLock&);
     void enterCriticalSectionCommitPhase(const CSRLock&);
@@ -286,6 +284,14 @@ private:
 
 /**
  * RAII-style class, which obtains a reference to the critical section for the specified collection.
+ *
+ * Shard version recovery/refresh procedures always wait for the critical section to be released in
+ * order to get the latest shard version.
+ *
+ * However, the critical section can be entered while a recovery/refresh is ongoing because the
+ * shard version obtained from the config server is casually consistent in respect to incoming
+ * opertions (still relying on the current shard version).
+ *
  */
 class CollectionCriticalSection {
     CollectionCriticalSection(const CollectionCriticalSection&) = delete;

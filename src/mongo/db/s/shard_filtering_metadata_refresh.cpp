@@ -102,9 +102,6 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 auto* const csr = CollectionShardingRuntime::get(opCtx.get(), nss);
                 auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx.get(), csr);
                 csr->resetShardVersionRecoverRefreshFuture(csrLock);
-                if (runRecover) {
-                    csr->exitCriticalSection(opCtx.get());
-                }
             });
 
             if (runRecover) {
@@ -194,11 +191,6 @@ void onShardVersionMismatch(OperationContext* opCtx,
                     csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
 
                 if (!inRecoverOrRefresh && !critSecSignal) {
-                    if (runRecover) {
-                        CollectionShardingRuntime::get(opCtx, nss)
-                            ->enterCriticalSectionCatchUpPhase(csrLock);
-                    }
-
                     csr->setShardVersionRecoverRefreshFuture(
                         recoverRefreshShardVersion(opCtx->getServiceContext(), nss, runRecover),
                         csrLock);

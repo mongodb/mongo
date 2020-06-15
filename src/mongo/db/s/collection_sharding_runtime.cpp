@@ -167,12 +167,10 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const CSRLock&) {
-    invariant(!_shardVersionInRecoverOrRefresh);
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&) {
-    invariant(!_shardVersionInRecoverOrRefresh);
     _critSec.enterCriticalSectionCommitPhase();
 }
 
