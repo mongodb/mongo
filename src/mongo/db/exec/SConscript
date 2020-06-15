@@ -84,6 +84,20 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='sbe_cmd',
+    source=[
+        'sbe_cmd.cpp'
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query_exec",
+        "sbe/query_sbe_parser",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+    ],
+)
+
 env.CppUnitTest(
     target='db_exec_test',
     source=[
