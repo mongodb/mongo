@@ -349,6 +349,9 @@ const VectorClock::ComponentArray<std::unique_ptr<VectorClock::GossipFormat>>
 bool VectorClock::gossipOut(OperationContext* opCtx,
                             BSONObjBuilder* outMessage,
                             const transport::Session::TagMask defaultClientSessionTags) const {
+    if (!isEnabled()) {
+        return false;
+    }
     auto clientSessionTags = defaultClientSessionTags;
     if (opCtx && opCtx->getClient()) {
         clientSessionTags = opCtx->getClient()->getSessionTags();
@@ -365,6 +368,9 @@ void VectorClock::gossipIn(OperationContext* opCtx,
                            const BSONObj& inMessage,
                            bool couldBeUnauthenticated,
                            const transport::Session::TagMask defaultClientSessionTags) {
+    if (!isEnabled()) {
+        return;
+    }
     auto clientSessionTags = defaultClientSessionTags;
     if (opCtx && opCtx->getClient()) {
         clientSessionTags = opCtx->getClient()->getSessionTags();
