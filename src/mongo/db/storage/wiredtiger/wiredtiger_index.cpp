@@ -1626,7 +1626,8 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     }
 
     if (!foundId) {
-        warning().stream() << id << " not found in the index for key " << redact(key);
+        warning().stream() << id << " not found in the index for key " << redact(key)
+                           << ". Collection: " << _collectionNamespace << ", Index: " << _indexName;
         return;  // nothing to do
     }
 
