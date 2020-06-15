@@ -454,7 +454,7 @@ int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     return -1;
 }
 
-int ReplSetConfig::findMemberIndexByConfigId(long long configId) const {
+int ReplSetConfig::findMemberIndexByConfigId(int configId) const {
     int x = 0;
     for (const auto& member : getMembers()) {
         if (member.getId() == MemberId(configId)) {

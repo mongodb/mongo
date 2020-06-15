@@ -83,6 +83,24 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_TermIsAlwaysInitialTerm) {
     ASSERT_EQUALS(config.getConfigTerm(), OpTime::kInitialTerm);
 }
 
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_memberId) {
+    ReplicationCoordinatorExternalStateMock rses;
+    rses.addSelf(HostAndPort("h1"));
+
+    // Config with Member id > 255.
+    OID newReplSetId = OID::gen();
+    auto invalidConfig = ReplSetConfig::parseForInitiate(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
+                                      << "h1"))),
+        newReplSetId);
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        validateConfigForInitiate(&rses, invalidConfig, getGlobalServiceContext()).getStatus());
+}
+
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
     ReplSetConfig config;
     OID newReplSetId = OID::gen();
@@ -309,6 +327,55 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigVersionNumberMustB
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                   validateConfigForReconfig(newConfig, oldConfig, false));
 }
+
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_memberId) {
+    ReplicationCoordinatorExternalStateMock externalState;
+    externalState.addSelf(HostAndPort("h1"));
+
+    ReplSetConfig oldConfig;
+    ReplSetConfig newConfig;
+
+    // Case 1: Add a new node with member id > 255.
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1"))));
+    newConfig = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 2 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "h1")
+                           << BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
+                                         << "h2"))));
+    ASSERT_OK(oldConfig.validate());
+    ASSERT_OK(newConfig.validate());
+    ASSERT_EQUALS(ErrorCodes::BadValue, validateConfigForReconfig(oldConfig, newConfig, false));
+
+    // Case 2: Change the member config setting for the existing member with member id > 255.
+    oldConfig = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "h1")
+                           << BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
+                                         << "h2"))));
+    newConfig = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "version" << 2 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "h1")
+                           << BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
+                                         << "h2"
+                                         << "priority" << 0))));
+    ASSERT_OK(oldConfig.validate());
+    ASSERT_OK(newConfig.validate());
+    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false));
+}
+
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetName) {
     ReplicationCoordinatorExternalStateMock externalState;

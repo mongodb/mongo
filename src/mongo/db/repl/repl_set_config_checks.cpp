@@ -142,6 +142,35 @@ Status validateSingleNodeChange(const ReplSetConfig& oldConfig, const ReplSetCon
 }
 
 /**
+ * Returns ErrorCodes::BadValue if the user tries to add new nodes with member id greater than
+ * MemberConfig::kMaxUserMemberId(255).
+ *
+ * validateMemberId() will be called only for replSetReconfig and replSetInitiate commands.
+ *
+ * TODO SERVER-48345: Remove this method on MongoDB v4.6 as we allow users to add new nodes
+ * with member id > MemberConfig::kMaxUserMemberId(255).
+ */
+Status validateMemberId(const ReplSetConfig& newConfig,
+                        const ReplSetConfig& oldConfig = ReplSetConfig()) {
+    for (ReplSetConfig::MemberIterator mNew = newConfig.membersBegin();
+         mNew != newConfig.membersEnd();
+         ++mNew) {
+        auto mNewConfigId = mNew->getId().getData();
+        // Existing members are allowed to have member id greater than kMaxUserMemberId. And,
+        // it can happen only if this node was previously running on MongoDB version greater
+        // than v4.4.
+        if (oldConfig.findMemberIndexByConfigId(mNewConfigId) == -1 &&
+            mNewConfigId > MemberConfig::kMaxUserMemberId) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                              << "Replica set configuration contains new members with "
+                              << "member id greater than " << MemberConfig::kMaxUserMemberId);
+        }
+    }
+    return Status::OK();
+}
+
+/**
  * Compares two initialized and validated replica set configurations, and checks to
  * see if "newConfig" is a legal successor configuration to "oldConfig".
  *
@@ -331,6 +360,11 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
         return StatusWith<int>(status);
     }
 
+    status = validateMemberId(newConfig);
+    if (!status.isOK()) {
+        return status;
+    }
+
     status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
     if (!status.isOK()) {
         return status.withContext(
@@ -377,6 +411,11 @@ Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
     }
 
     status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = validateMemberId(newConfig, oldConfig);
     if (!status.isOK()) {
         return status;
     }

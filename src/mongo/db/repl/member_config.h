@@ -76,6 +76,14 @@ public:
     static const std::string kConfigVoterTagName;
 
     /**
+     * Inline `kMaxUserMemberId` to allow others use
+     * the constant without linking to `member_config.cpp`.
+     *
+     * Maximum allowed member id for new nodes added by user.
+     */
+    inline static const int kMaxUserMemberId = 255;
+
+    /**
      * Construct a MemberConfig from the contents of "mcfg".
      *
      * If "mcfg" describes any tags, builds ReplSetTags for this

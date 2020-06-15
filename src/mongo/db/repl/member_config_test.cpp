@@ -78,19 +78,26 @@ TEST(MemberConfig, ParseFailsWithMissingIdField) {
                        40414);
 }
 
-TEST(MemberConfig, ParseFailsWithIdOutOfRange) {
+TEST(MemberConfig, ParseMemberConfigId) {
     ReplSetTagConfig tagConfig;
     {
+        // Fail case
         ASSERT_THROWS(MemberConfig(BSON("_id" << -1 << "host"
                                               << "localhost:12345"),
                                    &tagConfig),
                       ExceptionFor<ErrorCodes::BadValue>);
     }
     {
-        ASSERT_THROWS(MemberConfig(BSON("_id" << 256 << "host"
-                                              << "localhost:12345"),
-                                   &tagConfig),
-                      ExceptionFor<ErrorCodes::BadValue>);
+        // Pass cases
+        MemberConfig(BSON("_id" << 0 << "host"
+                                << "localhost:12345"),
+                     &tagConfig);
+        MemberConfig(BSON("_id" << MemberConfig::kMaxUserMemberId << "host"
+                                << "localhost:12345"),
+                     &tagConfig);
+        MemberConfig(BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
+                                << "localhost:12345"),
+                     &tagConfig);
     }
 }
 
