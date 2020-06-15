@@ -171,8 +171,8 @@ functions:
       script: |
         set -o errexit
         set -o verbose
+        ${format_test_setting|}
         for i in $(seq ${times|1}); do
-          ${format_test_setting|}
           ${test_env_vars|} ./format.sh ${smp_command|} ${format_test_script_args|} 2>&1
         done
   "many dbs test":
@@ -2204,8 +2204,6 @@ tasks:
       - func: "compile wiredtiger with builtins"
       - func: "format test script"
         vars:
-          # Make sure we dump core on failure
-          format_test_setting: ulimit -c unlimited
           #run for 2 hours ( 2 * 60 = 120 minutes), use default config
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 120
 
@@ -2536,6 +2534,7 @@ buildvariants:
   run_on:
   - ubuntu1804-power8-test
   expansions:
+    format_test_setting: ulimit -c unlimited
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
     test_env_vars:
