@@ -259,7 +259,8 @@ public:
 
         result.appendArray("values", b.obj());
         // If mongos selected atClusterTime or received it from client, transmit it back.
-        if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+        if (!opCtx->inMultiDocumentTransaction() &&
+            repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
             result.append("atClusterTime"_sd,
                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()->asTimestamp());
         }

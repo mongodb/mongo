@@ -269,7 +269,9 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     rpc::OpMsgReplyBuilder replyBuilder;
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
-    options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    if (!opCtx->inMultiDocumentTransaction()) {
+        options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    }
     CursorResponseBuilder responseBuilder(&replyBuilder, options);
     bool stashedResult = false;
 

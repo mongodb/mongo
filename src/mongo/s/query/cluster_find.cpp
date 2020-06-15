@@ -848,7 +848,9 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
     }
 
-    auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    auto atClusterTime = !opCtx->inMultiDocumentTransaction()
+        ? repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()
+        : boost::none;
     return CursorResponse(request.nss,
                           idToReturn,
                           std::move(batch),

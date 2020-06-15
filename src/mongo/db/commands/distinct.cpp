@@ -315,7 +315,8 @@ public:
         }
         valueListBuilder.doneFast();
 
-        if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+        if (!opCtx->inMultiDocumentTransaction() &&
+            repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
             result.append("atClusterTime"_sd,
                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()->asTimestamp());
         }

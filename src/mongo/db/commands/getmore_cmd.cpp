@@ -573,7 +573,9 @@ public:
 
             CursorId respondWithId = 0;
             CursorResponseBuilder::Options options;
-            options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+            if (!opCtx->inMultiDocumentTransaction()) {
+                options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+            }
             CursorResponseBuilder nextBatch(reply, options);
             BSONObj obj;
             std::uint64_t numResults = 0;
