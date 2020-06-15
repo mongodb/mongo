@@ -295,6 +295,31 @@ TEST(ErrorExtraInfo, ConvertCodeOnMissingExtraInfo) {
 }
 #endif
 
+TEST(ErrorExtraInfo, OptionalExtraInfoDoesNotThrowAndReturnsOriginalError) {
+    const auto status = Status(ErrorCodes::ForTestingOptionalErrorExtraInfo, "");
+    ASSERT_EQ(status, ErrorCodes::ForTestingOptionalErrorExtraInfo);
+    // The ErrorExtraInfo pointer should be nullptr.
+    ASSERT(!status.extraInfo());
+}
+
+TEST(ErrorExtraInfo, OptionalExtraInfoStatusParserThrows) {
+    const auto status =
+        Status(ErrorCodes::ForTestingOptionalErrorExtraInfo, "", fromjson("{data: 123}"));
+    ASSERT_EQ(status, ErrorCodes::duplicateCodeForTest(4696200));
+    ASSERT(!status.extraInfo());
+    ASSERT(!status.extraInfo<OptionalErrorExtraInfoExample>());
+}
+
+TEST(ErrorExtraInfo, OptionalExtraInfoStatusParserWorks) {
+    OptionalErrorExtraInfoExample::EnableParserForTest whenInScope;
+    const auto status =
+        Status(ErrorCodes::ForTestingOptionalErrorExtraInfo, "", fromjson("{data: 123}"));
+    ASSERT_EQ(status, ErrorCodes::ForTestingOptionalErrorExtraInfo);
+    ASSERT(status.extraInfo());
+    ASSERT(status.extraInfo<OptionalErrorExtraInfoExample>());
+    ASSERT_EQ(status.extraInfo<OptionalErrorExtraInfoExample>()->data, 123);
+}
+
 TEST(ErrorExtraInfo, TypedConstructorWorks) {
     const auto status = Status(ErrorExtraInfoExample(123), "");
     ASSERT_EQ(status, ErrorCodes::ForTestingErrorExtraInfo);

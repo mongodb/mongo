@@ -51,8 +51,10 @@ Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error code,
         return nullptr;
     if (extra) {
         // The public API prevents getting in to this state.
-        invariant(ErrorCodes::shouldHaveExtraInfo(code));
-    } else if (ErrorCodes::shouldHaveExtraInfo(code)) {
+        invariant(ErrorCodes::canHaveExtraInfo(code));
+    } else if (ErrorCodes::mustHaveExtraInfo(code)) {
+        // If an ErrorExtraInfo class is non-optional, return an error.
+
         // This is possible if code calls a 2-argument Status constructor with a code that should
         // have extra info.
         if (kDebugBuild) {

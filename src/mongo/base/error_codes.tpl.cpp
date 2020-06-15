@@ -36,11 +36,12 @@
 #include "mongo/util/str.h"
 
 //#set $codes_with_extra = [ec for ec in $codes if ec.extra]
+//#set $codes_with_non_optional_extra = [ec for ec in $codes if ec.extra and not ec.extraIsOptional]
 
 namespace mongo {
 
 namespace {
-// You can thing of this namespace as a compile-time map<ErrorCodes::Error, ErrorExtraInfoParser*>.
+// You can think of this namespace as a compile-time map<ErrorCodes::Error, ErrorExtraInfoParser*>.
 namespace parsers {
 //#for $ec in $codes_with_extra
 ErrorExtraInfo::Parser* $ec.name = nullptr;
@@ -88,9 +89,20 @@ bool ErrorCodes::isA<ErrorCategory::$cat.name>(Error err) {
 }
 
 //#end for
-bool ErrorCodes::shouldHaveExtraInfo(Error code) {
+bool ErrorCodes::canHaveExtraInfo(Error code) {
     switch (code) {
         //#for $ec in $codes_with_extra
+        case ErrorCodes::$ec.name:
+            return true;
+        //#end for
+        default:
+            return false;
+    }
+}
+
+bool ErrorCodes::mustHaveExtraInfo(Error code) {
+    switch (code) {
+        //#for $ec in $codes_with_non_optional_extra
         case ErrorCodes::$ec.name:
             return true;
         //#end for

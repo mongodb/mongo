@@ -138,6 +138,37 @@ private:
     static bool isParserEnabledForTest;
 };
 
+/**
+ * This is an example ErrorExtraInfo subclass. It is used for testing the ErrorExtraInfoHandling.
+ *
+ * It is meant to be a duplicate of ErrorExtraInfoExample, except that it is optional. This will
+ * make sure we don't crash the server when an ErrorExtraInfo class is meant to be optional.
+ */
+class OptionalErrorExtraInfoExample final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::ForTestingOptionalErrorExtraInfo;
+
+    void serialize(BSONObjBuilder*) const override;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
+
+    // Everything else in this class is just for testing and shouldn't by copied by users.
+
+    struct EnableParserForTest {
+        EnableParserForTest() {
+            isParserEnabledForTest = true;
+        }
+        ~EnableParserForTest() {
+            isParserEnabledForTest = false;
+        }
+    };
+
+    OptionalErrorExtraInfoExample(int data) : data(data) {}
+    int data;  // This uses the fieldname "data".
+private:
+    static bool isParserEnabledForTest;
+};
+
+
 namespace nested::twice {
 
 /**

@@ -116,7 +116,8 @@ public:
     static bool is${cat.name}(const ErrorContainer& object);
 
     //#end for
-    static bool shouldHaveExtraInfo(Error code);
+    static bool canHaveExtraInfo(Error code);
+    static bool mustHaveExtraInfo(Error code);
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);

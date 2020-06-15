@@ -43,6 +43,8 @@ The error_codes_spec YAML document is a mapping containing two toplevel fields:
           `name`: scalar - error's string name
           `extra`: (optional) scalar - C++ class name for holding ErrorExtraInfo.
           `categories`: (optional) sequence of strings - each must appear in `error_categories`.
+          `extraIsOptional': (optional) boolean - determines if ErrorExtraInfo can be optional for
+                            the ErrorCode.
 """
 
 def init_parser():
@@ -75,10 +77,11 @@ def render_template(template_path, **kw):
 
 
 class ErrorCode:
-    def __init__(self, name, code, extra=None):
+    def __init__(self, name, code, extra=None, extraIsOptional=False):
         self.name = name
         self.code = code
         self.extra = extra
+        self.extraIsOptional = extraIsOptional
         if extra:
             split = extra.split('::')
             if not split[0]:
@@ -148,6 +151,10 @@ def parse_error_definitions_from_file(errors_filename):
     for v in doc['error_codes']:
         assert type(v) is dict
         name, code = v['name'], v['code']
+        extraIsOptional = False
+
+        if 'extraIsOptional' in v:
+            extraIsOptional = v['extraIsOptional']
 
         if 'categories' in v:
             for cat in v['categories']:
@@ -157,7 +164,8 @@ def parse_error_definitions_from_file(errors_filename):
         kw = {}
         if 'extra' in v:
             kw['extra'] = v['extra']
-        error_codes.append(ErrorCode(name, code, **kw))
+
+        error_codes.append(ErrorCode(name, code, **kw, extraIsOptional=extraIsOptional))
 
     for cat, members in cats.items():
         error_classes.append(ErrorClass(cat, members))

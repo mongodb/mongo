@@ -375,6 +375,8 @@ error_codes:
 
     # The code below is for internal use only and must never be returned in a network response.
     - {code: 317,name: ConnectionPoolExpired,categories: [NetworkError,RetriableError]}
+    
+    - {code: 318,name: ForTestingOptionalErrorExtraInfo,extra: OptionalErrorExtraInfoExample,extraIsOptional: True}
 
     # Error codes 4000-8999 are reserved.
 
