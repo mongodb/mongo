@@ -531,7 +531,6 @@ def _create_task(index: int, test_count: int, test: str, task_data: Dict,
     :param task_prefix: String to prefix generated task with.
     :return: Shrub task for given configuration.
     """
-    # TODO: Extract multiversion related code into separate tooling - SERVER-47137
     multiversion_path = task_data.get("use_multiversion")
     display_task_name = task_data["display_task_name"]
     resmoke_args = task_data["resmoke_args"]
