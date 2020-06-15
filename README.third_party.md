@@ -38,6 +38,7 @@ a notice will be included in
 | [MurmurHash3]              | Public Domain     |                  | Unknown + changes |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT               | 0.10.2           | 0.10.2            |                      |                                 |
 | [ocspresponder]            | Apache-2.0        | 0.5.0            | 0.5.0             |                      |                                 |
+| [peglib]                   | MIT               | 0.1.12           | 0.1.12            |                      |                ✗                |
 | [Pcre]                     | BSD-3-Clause      | 8.44             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
 | [SafeInt]                  | MIT               | 3.23             | 3.23              |                      |                                 |
