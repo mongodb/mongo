@@ -193,6 +193,92 @@ void ProgramRegistry::registerReaderThread(ProcessId pid, stdx::thread reader) {
     _outputReaderThreads.emplace(pid, std::move(reader));
 }
 
+bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* const exit_code) {
+    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+    // unregistered pids are dead
+    if (!this->isPidRegistered(pid)) {
+        if (exit_code) {
+            const auto code = _pidToExitCode.find(pid);
+            if (code != _pidToExitCode.end()) {
+                *exit_code = code->second;
+            } else {
+                // If you hit this invariant, you're waiting on a PID that was
+                // never a child of this process.
+                MONGO_UNREACHABLE;
+            }
+        }
+        return true;
+    }
+#ifdef _WIN32
+    HANDLE h = getHandleForPid(pid);
+
+    // wait until the process object is signaled before getting its
+    // exit code. do this even when block is false to ensure that all
+    // file handles open in the process have been closed.
+
+    DWORD ret = WaitForSingleObject(h, (block ? INFINITE : 0));
+    if (ret == WAIT_TIMEOUT) {
+        return false;
+    } else if (ret != WAIT_OBJECT_0) {
+        const auto ewd = errnoWithDescription();
+        LOGV2_INFO(
+            22811, "ProgramRegistry::waitForPid: WaitForSingleObject failed", "error"_attr = ewd);
+    }
+
+    DWORD tmp;
+    if (GetExitCodeProcess(h, &tmp)) {
+        if (tmp == STILL_ACTIVE) {
+            uassert(
+                ErrorCodes::UnknownError, "Process is STILL_ACTIVE even after blocking", !block);
+            return false;
+        }
+        CloseHandle(h);
+        eraseHandleForPid(pid);
+        if (exit_code)
+            *exit_code = tmp;
+        _pidToExitCode[pid] = tmp;
+
+        unregisterProgram(pid);
+        return true;
+    } else {
+        const auto ewd = errnoWithDescription();
+        LOGV2_INFO(22812, "GetExitCodeProcess failed", "error"_attr = ewd);
+        return false;
+    }
+#else
+    int status;
+    int ret;
+    do {
+        errno = 0;
+        ret = waitpid(pid.toNative(), &status, (block ? 0 : WNOHANG));
+    } while (ret == -1 && errno == EINTR);
+    if (ret) {
+        int code;
+        if (WIFEXITED(status)) {
+            code = WEXITSTATUS(status);
+        } else if (WIFSIGNALED(status)) {
+            code = -WTERMSIG(status);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+        _pidToExitCode[pid] = code;
+        if (exit_code) {
+            *exit_code = code;
+        }
+    }
+    if (ret) {
+        unregisterProgram(pid);
+    } else if (block) {
+        uasserted(ErrorCodes::UnknownError, "Process did not exit after blocking");
+    }
+    return ret == pid.toNative();
+#endif
+}
+
+bool ProgramRegistry::isPidDead(const ProcessId pid, int* const exit_code) {
+    return this->waitForPid(pid, false, exit_code);
+}
+
 void ProgramRegistry::getRegisteredPorts(vector<int>& ports) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
     for (const auto& portPid : _portToPidMap) {
@@ -701,68 +787,6 @@ void ProgramRunner::launchProcess(int child_stdout) {
 #endif
 }
 
-// returns true if process exited
-// If this function returns true, it will always call `registry.unregisterProgram(pid);`
-// If block is true, this will throw if it cannot wait for the processes to exit.
-bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = nullptr) {
-#ifdef _WIN32
-    HANDLE h = registry.getHandleForPid(pid);
-
-    // wait until the process object is signaled before getting its
-    // exit code. do this even when block is false to ensure that all
-    // file handles open in the process have been closed.
-
-    DWORD ret = WaitForSingleObject(h, (block ? INFINITE : 0));
-    if (ret == WAIT_TIMEOUT) {
-        return false;
-    } else if (ret != WAIT_OBJECT_0) {
-        const auto ewd = errnoWithDescription();
-        LOGV2_INFO(22811, "wait_for_pid: WaitForSingleObject failed", "error"_attr = ewd);
-    }
-
-    DWORD tmp;
-    if (GetExitCodeProcess(h, &tmp)) {
-        if (tmp == STILL_ACTIVE) {
-            uassert(
-                ErrorCodes::UnknownError, "Process is STILL_ACTIVE even after blocking", !block);
-            return false;
-        }
-        CloseHandle(h);
-        registry.eraseHandleForPid(pid);
-        if (exit_code)
-            *exit_code = tmp;
-
-        registry.unregisterProgram(pid);
-        return true;
-    } else {
-        const auto ewd = errnoWithDescription();
-        LOGV2_INFO(22812, "GetExitCodeProcess failed", "error"_attr = ewd);
-        return false;
-    }
-#else
-    int tmp;
-    int ret;
-    do {
-        ret = waitpid(pid.toNative(), &tmp, (block ? 0 : WNOHANG));
-    } while (ret == -1 && errno == EINTR);
-    if (ret && exit_code) {
-        if (WIFEXITED(tmp)) {
-            *exit_code = WEXITSTATUS(tmp);
-        } else if (WIFSIGNALED(tmp)) {
-            *exit_code = -WTERMSIG(tmp);
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
-    if (ret) {
-        registry.unregisterProgram(pid);
-    } else if (block) {
-        uasserted(ErrorCodes::UnknownError, "Process did not exit after blocking");
-    }
-    return ret == pid.toNative();
-#endif
-}
-
 BSONObj RawMongoProgramOutput(const BSONObj& args, void* data) {
     return BSON("" << programOutputLogger.str());
 }
@@ -775,7 +799,7 @@ BSONObj ClearRawMongoProgramOutput(const BSONObj& args, void* data) {
 BSONObj CheckProgram(const BSONObj& args, void* data) {
     ProcessId pid = ProcessId::fromNative(singleArg(args).numberInt());
     int exit_code = -123456;  // sentinel value
-    bool isDead = wait_for_pid(pid, false, &exit_code);
+    bool isDead = registry.isPidDead(pid, &exit_code);
     if (!isDead) {
         return BSON("" << BSON("alive" << true));
     }
@@ -785,7 +809,7 @@ BSONObj CheckProgram(const BSONObj& args, void* data) {
 BSONObj WaitProgram(const BSONObj& a, void* data) {
     ProcessId pid = ProcessId::fromNative(singleArg(a).numberInt());
     int exit_code = -123456;  // sentinel value
-    wait_for_pid(pid, true, &exit_code);
+    registry.waitForPid(pid, true, &exit_code);
     return BSON(string("") << exit_code);
 }
 
@@ -802,7 +826,7 @@ BSONObj WaitMongoProgram(const BSONObj& a, void* data) {
         return BSON(string("") << 0);
     }
     pid = registry.pidForPort(port);
-    wait_for_pid(pid, true, &exit_code);
+    registry.waitForPid(pid, true, &exit_code);
     return BSON(string("") << exit_code);
 }
 
@@ -848,7 +872,7 @@ BSONObj RunProgram(const BSONObj& a, void* data, bool isMongo) {
     stdx::thread t(r);
     registry.registerReaderThread(r.pid(), std::move(t));
     int exit_code = -123456;  // sentinel value
-    wait_for_pid(r.pid(), true, &exit_code);
+    registry.waitForPid(r.pid(), true, &exit_code);
     return BSON(string("") << exit_code);
 }
 
@@ -1049,7 +1073,7 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt, bool waitPi
     int exitCode = EXIT_FAILURE;
     try {
         LOGV2_INFO(22819, "Waiting for process to terminate.", "pid"_attr = pid);
-        wait_for_pid(pid, true, &exitCode);
+        registry.waitForPid(pid, true, &exitCode);
     } catch (...) {
         LOGV2_WARNING(22828, "Process failed to terminate.", "pid"_attr = pid);
         return EXIT_FAILURE;
@@ -1167,8 +1191,7 @@ std::vector<ProcessId> getRunningMongoChildProcessIds() {
                  registeredPids.end(),
                  std::back_inserter(outPids),
                  [](const ProcessId& pid) {
-                     const bool block = false;
-                     bool isDead = wait_for_pid(pid, block);
+                     bool isDead = registry.isPidDead(pid);
                      return !isDead;
                  });
     return outPids;
