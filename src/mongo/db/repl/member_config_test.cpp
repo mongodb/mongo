@@ -80,24 +80,32 @@ TEST(MemberConfig, ParseFailsWithMissingIdField) {
 
 TEST(MemberConfig, ParseMemberConfigId) {
     ReplSetTagConfig tagConfig;
+    // Fail case
     {
-        // Fail case
         ASSERT_THROWS(MemberConfig(BSON("_id" << -1 << "host"
                                               << "localhost:12345"),
                                    &tagConfig),
                       ExceptionFor<ErrorCodes::BadValue>);
     }
+    // Pass cases
     {
-        // Pass cases
-        MemberConfig(BSON("_id" << 0 << "host"
-                                << "localhost:12345"),
-                     &tagConfig);
-        MemberConfig(BSON("_id" << MemberConfig::kMaxUserMemberId << "host"
-                                << "localhost:12345"),
-                     &tagConfig);
-        MemberConfig(BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
-                                << "localhost:12345"),
-                     &tagConfig);
+
+        MemberConfig mc(BSON("_id" << 0 << "host"
+                                   << "localhost:12345"),
+                        &tagConfig);
+        ASSERT_EQUALS(MemberId(0), mc.getId());
+    }
+    {
+        MemberConfig mc(BSON("_id" << MemberConfig::kMaxUserMemberId << "host"
+                                   << "localhost:12345"),
+                        &tagConfig);
+        ASSERT_EQUALS(MemberId(MemberConfig::kMaxUserMemberId), mc.getId());
+    }
+    {
+        MemberConfig mc(BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
+                                   << "localhost:12345"),
+                        &tagConfig);
+        ASSERT_EQUALS(MemberId(MemberConfig::kMaxUserMemberId + 1), mc.getId());
     }
 }
 
