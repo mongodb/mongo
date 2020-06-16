@@ -541,6 +541,7 @@ buildvariants:
   modules:
     - dsi
     - mongo-perf
+    - signal-processing
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
@@ -610,6 +611,7 @@ buildvariants:
   modules:
     - dsi
     - mongo-perf
+    - signal-processing
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
