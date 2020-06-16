@@ -64,6 +64,10 @@ assert.eq(2, testColl.getIndexes().length, "Standalone didn't have proper indexe
 
 assert.commandWorked(testColl.reIndex());
 
+const nonExistentDb = standalone.getDB('does_not_exist');
+assert.commandFailedWithCode(nonExistentDb.getCollection('test').reIndex(),
+                             ErrorCodes.NamespaceNotFound);
+
 assert.eq(2, testColl.getIndexes().length, "Standalone didn't have proper indexes after reindex");
 
 MongoRunner.stopMongod(standalone);
