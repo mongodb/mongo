@@ -580,24 +580,20 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
 }
 
 void persistCommitDecision(OperationContext* opCtx, const UUID& migrationId) {
-    retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
-        opCtx, "persist migrate commit decision", [&](OperationContext* newOpCtx) {
-            hangInPersistMigrateCommitDecisionInterruptible.pauseWhileSet(newOpCtx);
+    hangInPersistMigrateCommitDecisionInterruptible.pauseWhileSet(opCtx);
 
-            PersistentTaskStore<MigrationCoordinatorDocument> store(
-                NamespaceString::kMigrationCoordinatorsNamespace);
-            store.update(newOpCtx,
-                         QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
-                         BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName
-                                             << "committed")));
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    store.update(
+        opCtx,
+        QUERY(MigrationCoordinatorDocument::kIdFieldName << migrationId),
+        BSON("$set" << BSON(MigrationCoordinatorDocument::kDecisionFieldName << "committed")));
 
-            if (hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.shouldFail()) {
-                hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.pauseWhileSet(
-                    newOpCtx);
-                uasserted(ErrorCodes::InternalError,
-                          "simulate an error response when persisting migrate commit decision");
-            }
-        });
+    if (hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response when persisting migrate commit decision");
+    }
 }
 
 void persistAbortDecision(OperationContext* opCtx, const UUID& migrationId) {
@@ -629,23 +625,18 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                    false /*multi*/);
     deleteOp.setDeletes({query});
 
-    retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
-        opCtx, "cancel range deletion on recipient", [&](OperationContext* newOpCtx) {
-            hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(newOpCtx);
+    hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(opCtx);
 
-            sendToRecipient(
-                newOpCtx,
-                recipientId,
-                deleteOp,
-                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    sendToRecipient(opCtx,
+                    recipientId,
+                    deleteOp,
+                    BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
 
-            if (hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.shouldFail()) {
-                hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.pauseWhileSet(
-                    newOpCtx);
-                uasserted(ErrorCodes::InternalError,
-                          "simulate an error response when deleting range deletion on recipient");
-            }
-        });
+    if (hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response when deleting range deletion on recipient");
+    }
 }
 
 void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
@@ -716,17 +707,14 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
                                   << WriteConcernOptions::Majority << "lsid" << lsid.toBSON()
                                   << "txnNumber" << currentTxnNumber + 1);
 
-    retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
-        opCtx, "advance migration txn number", [&](OperationContext* newOpCtx) {
-            hangInAdvanceTxnNumInterruptible.pauseWhileSet(newOpCtx);
-            sendToRecipient(newOpCtx, recipientId, updateOp, passthroughFields);
+    hangInAdvanceTxnNumInterruptible.pauseWhileSet(opCtx);
+    sendToRecipient(opCtx, recipientId, updateOp, passthroughFields);
 
-            if (hangInAdvanceTxnNumThenSimulateErrorUninterruptible.shouldFail()) {
-                hangInAdvanceTxnNumThenSimulateErrorUninterruptible.pauseWhileSet(newOpCtx);
-                uasserted(ErrorCodes::InternalError,
-                          "simulate an error response when initiating range deletion locally");
-            }
-        });
+    if (hangInAdvanceTxnNumThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInAdvanceTxnNumThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response when initiating range deletion locally");
+    }
 }
 
 void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId) {
@@ -734,18 +722,14 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
     auto query = QUERY(RangeDeletionTask::kIdFieldName << migrationId);
     auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
 
-    retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
-        opCtx, "ready local range deletion", [&](OperationContext* newOpCtx) {
-            hangInReadyRangeDeletionLocallyInterruptible.pauseWhileSet(newOpCtx);
-            store.update(newOpCtx, query, update);
+    hangInReadyRangeDeletionLocallyInterruptible.pauseWhileSet(opCtx);
+    store.update(opCtx, query, update);
 
-            if (hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.shouldFail()) {
-                hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(
-                    newOpCtx);
-                uasserted(ErrorCodes::InternalError,
-                          "simulate an error response when initiating range deletion locally");
-            }
-        });
+    if (hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response when initiating range deletion locally");
+    }
 }
 
 void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId) {
@@ -767,35 +751,25 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     const auto ensureChunkVersionIsGreaterThanRequestBSON =
         ensureChunkVersionIsGreaterThanRequest.toBSON({});
 
-    retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
-        opCtx, "ensureChunkVersionIsGreaterThan", [&](OperationContext* newOpCtx) {
-            hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(newOpCtx);
+    hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(opCtx);
 
-            const auto ensureChunkVersionIsGreaterThanResponse =
-                Grid::get(newOpCtx)
-                    ->shardRegistry()
-                    ->getConfigShard()
-                    ->runCommandWithFixedRetryAttempts(
-                        newOpCtx,
-                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        "admin",
-                        CommandHelpers::appendMajorityWriteConcern(
-                            ensureChunkVersionIsGreaterThanRequestBSON),
-                        Shard::RetryPolicy::kIdempotent);
-            const auto ensureChunkVersionIsGreaterThanStatus =
-                Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
+    const auto ensureChunkVersionIsGreaterThanResponse =
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            CommandHelpers::appendMajorityWriteConcern(ensureChunkVersionIsGreaterThanRequestBSON),
+            Shard::RetryPolicy::kIdempotent);
+    const auto ensureChunkVersionIsGreaterThanStatus =
+        Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
 
-            uassertStatusOK(ensureChunkVersionIsGreaterThanStatus);
+    uassertStatusOK(ensureChunkVersionIsGreaterThanStatus);
 
-            if (hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible
-                    .shouldFail()) {
-                hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible
-                    .pauseWhileSet();
-                uasserted(
-                    ErrorCodes::InternalError,
-                    "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
-            }
-        });
+    if (hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.pauseWhileSet();
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
+    }
 }
 
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {

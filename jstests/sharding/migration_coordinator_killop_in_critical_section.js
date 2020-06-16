@@ -27,6 +27,8 @@ let st = new ShardingTest({shards: 2});
 
 const donorShard = st.shard0;
 const recipientShard = st.shard1;
+const numDocs = 1000;
+const middle = numDocs / 2;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: donorShard.shardName}));
@@ -36,9 +38,13 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     jsTest.log("Testing with " + tojson(arguments) + " using ns " + ns);
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: middle}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: donorShard.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: middle}, to: donorShard.shardName}));
 
     // Insert some docs into the collection.
-    const numDocs = 1000;
     var bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
     for (var i = 0; i < numDocs; i++) {
         bulk.insert({_id: i});
@@ -47,56 +53,64 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
 
     // Simulate a network error on sending commit to the config server, so that the donor tries to
     // recover the commit decision.
-    configureFailPoint(donorShard, "migrationCommitNetworkError");
+    let commitFailpoint = configureFailPoint(donorShard, "migrationCommitNetworkError");
 
     // Set the requested failpoint and launch the moveChunk asynchronously.
     let failPoint = configureFailPoint(donorShard, failPointName);
     const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShardName) {
-            assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
-        }, ns, recipientShard.shardName), st.s.port);
+        funWithArgs(function(ns, toShardName, middle) {
+            let ret = assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {_id: middle}, to: toShardName}));
+            jsTest.log('moveChunk res: ' + tojson(ret));
+        }, ns, recipientShard.shardName, middle), st.s.port);
 
     jsTest.log("Waiting for moveChunk to reach " + failPointName + " failpoint");
     failPoint.wait();
 
-    // Kill the OperationContext being used for the commit decision recovery several times. Note, by
-    // expecting to find a matching OperationContext multiple times, we are verifying that the
-    // commit decision recovery is resumed with a fresh OperationContext after the previous
-    // OperationContext was interrupted by the killOp.
-    jsTest.log("Killing OperationContext for " + opToKillThreadName + " several times");
-    for (let i = 0; i < 10; i++) {
-        let matchingOps;
-        assert.soon(() => {
-            matchingOps = donorShard.getDB("admin")
-                              .aggregate([
-                                  {$currentOp: {'allUsers': true, 'idleConnections': true}},
-                                  {$match: {desc: {$regex: opToKillThreadName}}}
-                              ])
-                              .toArray();
-            // Wait for the opid to be present, since it's possible for currentOp to run after the
-            // Client has been created but before it has been associated with a new
-            // OperationContext.
-            return 1 === matchingOps.length && matchingOps[0].opid != null;
-        }, "Failed to find op with desc " + opToKillThreadName);
-        donorShard.getDB("admin").killOp(matchingOps[0].opid);
-    }
+    let matchingOps;
+    assert.soon(() => {
+        matchingOps = donorShard.getDB("admin")
+                          .aggregate([
+                              {$currentOp: {'allUsers': true, 'idleConnections': true}},
+                              {$match: {desc: {$regex: opToKillThreadName}}}
+                          ])
+                          .toArray();
+        // Wait for the opid to be present, since it's possible for currentOp to run after the
+        // Client has been created but before it has been associated with a new
+        // OperationContext.
+        return 1 === matchingOps.length && matchingOps[0].opid != null;
+    }, "Failed to find op with desc " + opToKillThreadName);
+    jsTest.log("Killing OperationContext for " + opToKillThreadName);
+    donorShard.getDB("admin").killOp(matchingOps[0].opid);
 
     failPoint.off();
 
     awaitResult();
+
+    // Allow the moveChunk to finish:
+    commitFailpoint.off();
+    jsTest.log("Make sure the recovery is executed");
+    assert.eq(st.s0.getDB(dbName).getCollection(collName).countDocuments({}), 1000);
 }
 
+// After SERVER-47982 all the failpoints are hit on the migration recovery, which is performed on
+// another thread which operation context is RecoverRefreshThread. To run this test on a
+// multiversion suite we have to also search for the previous name.
+//
+// TODO (SERVER-47265): operation context name should be RecoverRefreshThread once SERVER-32198 is
+// backported to 4.4
 testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible",
-                         "ensureChunkVersionIsGreaterThan");
+                         "(ensureChunkVersionIsGreaterThan)|(RecoverRefreshThread)");
 testKillOpAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible",
-                         "refreshFilteringMetadataUntilSuccess");
+                         "(refreshFilteringMetadataUntilSuccess)|(RecoverRefreshThread)");
 testKillOpAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible",
-                         "persist migrate commit decision");
+                         "(persist migrate commit decision)|(RecoverRefreshThread)");
 testKillOpAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible",
-                         "cancel range deletion on recipient");
+                         "(cancel range deletion on recipient)|(RecoverRefreshThread)");
 testKillOpAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible",
-                         "ready local range deletion");
-testKillOpAfterFailPoint("hangInAdvanceTxnNumInterruptible", "advance migration txn number");
+                         "(ready local range deletion)|(RecoverRefreshThread)");
+testKillOpAfterFailPoint("hangInAdvanceTxnNumInterruptible",
+                         "(advance migration txn number)|(RecoverRefreshThread)");
 
 st.stop();
 })();

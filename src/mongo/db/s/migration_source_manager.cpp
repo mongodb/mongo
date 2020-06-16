@@ -140,7 +140,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
           "requestParameters"_attr = redact(_args.toString()),
           "collectionEpoch"_attr = _args.getVersionEpoch());
 
-    // Force refresh of the metadata to ensure we have the latest
+    // Make sure the latest shard version is recovered as of the time of the invocation of the
+    // command.
     onShardVersionMismatch(_opCtx, getNss(), boost::none);
 
     // Snapshot the committed metadata from the time the migration starts
@@ -440,29 +441,43 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         Shard::CommandResponse::getEffectiveStatus(commitChunkMigrationResponse);
 
     if (!migrationCommitStatus.isOK()) {
-        migrationutil::ensureChunkVersionIsGreaterThan(_opCtx, _args.getRange(), _chunkVersion);
+        {
+            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+            AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
+            auto* const csr = CollectionShardingRuntime::get(_opCtx, getNss());
+            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+
+            CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata();
+        }
+        scopedGuard.dismiss();
+        _cleanup(false);
+        // Best-effort recover of the shard version.
+        onShardVersionMismatchNoExcept(_opCtx, getNss(), boost::none).ignore();
+        return migrationCommitStatus;
     }
 
-    migrationutil::refreshFilteringMetadataUntilSuccess(_opCtx, getNss());
+    try {
+        forceShardFilteringMetadataRefresh(_opCtx, getNss(), true);
+    } catch (const DBException& ex) {
+        {
+            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+            AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
+            auto* const csr = CollectionShardingRuntime::get(_opCtx, getNss());
+            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
 
-    const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch();
-
-    if (refreshedMetadata.keyBelongsToMe(_args.getMinKey())) {
-        // This condition may only happen if the migration commit has failed for any reason
-        if (migrationCommitStatus.isOK()) {
-            return {ErrorCodes::ConflictingOperationInProgress,
-                    "Migration commit succeeded but refresh found that the chunk is still owned; "
-                    "this node may be a stale primary of its replica set, and the new primary may "
-                    "have re-received the chunk"};
+            CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata();
         }
-
-        _coordinator->setMigrationDecision(migrationutil::MigrationCoordinator::Decision::kAborted);
-
-        // The chunk modification was not applied, so report the original error
-        return migrationCommitStatus.withContext("Chunk move was not successful");
+        scopedGuard.dismiss();
+        _cleanup(false);
+        // Best-effort recover of the shard version.
+        onShardVersionMismatchNoExcept(_opCtx, getNss(), boost::none).ignore();
+        return ex.toStatus();
     }
 
     // Migration succeeded
+
+    const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch();
+
     LOGV2(22018,
           "Migration succeeded and updated collection version to {updatedCollectionVersion}",
           "Migration succeeded and updated collection version",
@@ -479,7 +494,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     // Exit the critical section and ensure that all the necessary state is fully persisted before
     // scheduling orphan cleanup.
-    _cleanup();
+    _cleanup(true);
 
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
@@ -537,7 +552,7 @@ void MigrationSourceManager::cleanupOnError() {
         ShardingCatalogClient::kMajorityWriteConcern);
 
     try {
-        _cleanup();
+        _cleanup(true);
     } catch (const DBException& ex) {
         LOGV2_WARNING(22022,
                       "Failed to clean up migration with request parameters "
@@ -613,7 +628,7 @@ void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
         });
 }
 
-void MigrationSourceManager::_cleanup() {
+void MigrationSourceManager::_cleanup(bool completeMigration) {
     invariant(_state != kDone);
 
     auto cloneDriver = [&]() {
@@ -668,15 +683,15 @@ void MigrationSourceManager::_cleanup() {
         ShardingStateRecovery::endMetadataOp(_opCtx);
     }
 
-    if (_state >= kCloning) {
+    if (completeMigration && _state >= kCloning) {
         invariant(_coordinator);
         if (_state < kCommittingOnConfig) {
             _coordinator->setMigrationDecision(
                 migrationutil::MigrationCoordinator::Decision::kAborted);
         }
-        // This can be called on an exception path after the OperationContext has been
-        // interrupted, so use a new OperationContext. Note, it's valid to call
-        // getServiceContext on an interrupted OperationContext.
+        // This can be called on an exception path after the OperationContext has been interrupted,
+        // so use a new OperationContext. Note, it's valid to call getServiceContext on an
+        // interrupted OperationContext.
         auto newClient = _opCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {
             stdx::lock_guard<Client> lk(*newClient.get());

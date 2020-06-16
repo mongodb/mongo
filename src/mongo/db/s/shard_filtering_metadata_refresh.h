@@ -57,7 +57,7 @@ class OperationContext;
  */
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      ChunkVersion shardVersionReceived) noexcept;
+                                      boost::optional<ChunkVersion> shardVersionReceived) noexcept;
 
 void onShardVersionMismatch(OperationContext* opCtx,
                             const NamespaceString& nss,

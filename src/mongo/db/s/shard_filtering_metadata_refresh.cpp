@@ -289,7 +289,7 @@ void ScopedShardVersionCriticalSection::enterCommitPhase() {
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      ChunkVersion shardVersionReceived) noexcept {
+                                      boost::optional<ChunkVersion> shardVersionReceived) noexcept {
     try {
         onShardVersionMismatch(opCtx, nss, shardVersionReceived);
         return Status::OK();
