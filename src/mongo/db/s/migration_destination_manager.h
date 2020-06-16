@@ -203,7 +203,7 @@ private:
     stdx::thread _migrateThreadHandle;
 
     // The resumable range deleter is used in FCV 4.4+.
-    bool _enableResumableRangeDeleter{true};
+    bool _useFCV44RangeDeleterProtocol{true};
 
     boost::optional<UUID> _migrationId;
     LogicalSessionId _lsid;

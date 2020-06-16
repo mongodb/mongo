@@ -353,14 +353,14 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     // Note: It is expected that the FCV cannot change while the node is donating or receiving a
     // chunk. This is guaranteed by the setFCV command serializing with donating and receiving
     // chunks via the ActiveMigrationsRegistry.
-    _enableResumableRangeDeleter =
+    _useFCV44RangeDeleterProtocol =
         fcvVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44;
 
     _state = READY;
     _stateChangedCV.notify_all();
     _errmsg = "";
 
-    if (_enableResumableRangeDeleter) {
+    if (_useFCV44RangeDeleterProtocol) {
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "Missing migrationId in FCV 4.4",
                 cloneRequest.hasMigrationId());
@@ -790,7 +790,7 @@ void MigrationDestinationManager::_migrateThread() {
         // txnNumber on this session while this node is still executing the recipient side
         //(which is important because otherwise, this node may create orphans after the
         // range deletion task on this node has been processed).
-        if (_enableResumableRangeDeleter) {
+        if (_useFCV44RangeDeleterProtocol) {
             opCtx->setLogicalSessionId(_lsid);
             opCtx->setTxnNumber(_txnNumber);
 
@@ -809,7 +809,7 @@ void MigrationDestinationManager::_migrateThread() {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
     }
 
-    if (!_enableResumableRangeDeleter) {
+    if (!_useFCV44RangeDeleterProtocol) {
         if (getState() != DONE) {
             _forgetPending(opCtx, ChunkRange(_min, _max));
         }
@@ -839,7 +839,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
           "fromShard"_attr = _fromShard,
           "epoch"_attr = _epoch,
           "sessionId"_attr = *_sessionId,
-          "migrationId"_attr = _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+          "migrationId"_attr = _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
 
     MoveTimingHelper timing(
         outerOpCtx, "to", _nss.ns(), _min, _max, 6 /* steps */, &_errmsg, _toShard, _fromShard);
@@ -850,7 +850,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         LOGV2_ERROR(22013,
                     "Migration abort requested before the migration started",
                     "migrationId"_attr =
-                        _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+                        _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
         return;
     }
 
@@ -867,7 +867,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
         // 2. Ensure any data which might have been left orphaned in the range being moved has been
         // deleted.
-        if (_enableResumableRangeDeleter) {
+        if (_useFCV44RangeDeleterProtocol) {
             while (migrationutil::checkForConflictingDeletions(
                 outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
                 uassert(ErrorCodes::ResumableRangeDeleterDisabled,
@@ -884,7 +884,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                       "namespace"_attr = _nss.ns(),
                       "range"_attr = redact(range.toString()),
                       "migrationId"_attr =
-                          _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+                          _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
 
                 auto status = CollectionShardingRuntime::waitForClean(
                     outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
@@ -1028,7 +1028,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                     if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
                         LOGV2_WARNING(22011,
                                       "secondaryThrottle on, but doc insert timed out; continuing",
-                                      "migrationId"_attr = _enableResumableRangeDeleter
+                                      "migrationId"_attr = _useFCV44RangeDeleterProtocol
                                           ? _migrationId->toBSON()
                                           : BSONObj());
                     } else {
@@ -1107,7 +1107,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                     LOGV2(22002,
                           "Migration aborted while waiting for replication at catch up stage",
                           "migrationId"_attr =
-                              _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+                              _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
                     return;
                 }
 
@@ -1118,7 +1118,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                     LOGV2(22003,
                           "secondaries having hard time keeping up with migrate",
                           "migrationId"_attr =
-                              _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+                              _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
                 }
 
                 sleepmillis(20);
@@ -1141,7 +1141,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         LOGV2(22004,
               "Waiting for replication to catch up before entering critical section",
               "migrationId"_attr =
-                  _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+                  _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
 
         auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
             opCtx, lastOpApplied, _writeConcern);
@@ -1151,7 +1151,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         LOGV2(22005,
               "Chunk data replicated successfully.",
               "migrationId"_attr =
-                  _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+                  _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
     }
 
     {
@@ -1191,7 +1191,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                 LOGV2(22006,
                       "Migration aborted while transferring mods",
                       "migrationId"_attr =
-                          _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+                          _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
                 return;
             }
 
@@ -1314,7 +1314,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                                     updatedDoc,
                                     &localDoc)) {
                 const auto migrationId =
-                    _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj();
+                    _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj();
 
                 // Exception will abort migration cleanly
                 LOGV2_ERROR_OPTIONS(
@@ -1358,7 +1358,7 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
                   "chunkMax"_attr = redact(_max),
                   "lastOpApplied"_attr = op,
                   "migrationId"_attr =
-                      _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+                      _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
         }
         return false;
     }
@@ -1369,7 +1369,7 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
           "namespace"_attr = _nss.ns(),
           "chunkMin"_attr = redact(_min),
           "chunkMax"_attr = redact(_max),
-          "migrationId"_attr = _enableResumableRangeDeleter ? _migrationId->toBSON() : BSONObj());
+          "migrationId"_attr = _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
 
     return true;
 }
