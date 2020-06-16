@@ -336,6 +336,7 @@ RLEs
 RMW
 RNG
 RPC
+RTS
 RUNDIR
 RWLOCK
 RXB
@@ -1251,6 +1252,7 @@ srch
 ssize
 startup
 statlog
+stb
 stderr
 stdin
 stdout
@@ -1308,6 +1310,7 @@ timedwait
 timestamp
 timestamped
 timestamps
+tinfo
 tmp
 todo
 tokenizer

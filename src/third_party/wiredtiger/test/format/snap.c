@@ -29,15 +29,111 @@
 #include "format.h"
 
 /*
+ * Issue a warning when there enough consecutive unsuccessful checks for rollback to stable.
+ */
+#define WARN_RTS_NO_CHECK 5
+
+/*
  * snap_init --
  *     Initialize the repeatable operation tracking.
  */
 void
-snap_init(TINFO *tinfo, uint64_t read_ts, bool repeatable_reads)
+snap_init(TINFO *tinfo)
 {
+    /*
+     * We maintain two snap lists. The current one is indicated by tinfo->s, and keeps the most
+     * recent operations. The other one is used when we are running with rollback_to_stable. When
+     * each thread notices that the stable timestamp has changed, it stashes the current snap list
+     * and starts fresh with the other snap list. After we've completed a rollback_to_stable, we can
+     * the secondary snap list to see the state of keys/values seen and updated at the time of the
+     * rollback.
+     */
+    if (g.c_txn_rollback_to_stable) {
+        tinfo->s = &tinfo->snap_states[1];
+        tinfo->snap_list = dcalloc(SNAP_LIST_SIZE, sizeof(SNAP_OPS));
+        tinfo->snap_end = &tinfo->snap_list[SNAP_LIST_SIZE];
+    }
+    tinfo->s = &tinfo->snap_states[0];
+    tinfo->snap_list = dcalloc(SNAP_LIST_SIZE, sizeof(SNAP_OPS));
+    tinfo->snap_end = &tinfo->snap_list[SNAP_LIST_SIZE];
+    tinfo->snap_current = tinfo->snap_list;
+}
+
+/*
+ * snap_teardown --
+ *     Tear down the repeatable operation tracking structures.
+ */
+void
+snap_teardown(TINFO *tinfo)
+{
+    SNAP_OPS *snaplist;
+    u_int i, snap_index;
+
+    for (snap_index = 0; snap_index < WT_ELEMENTS(tinfo->snap_states); snap_index++)
+        if ((snaplist = tinfo->snap_states[snap_index].snap_state_list) != NULL) {
+            for (i = 0; i < SNAP_LIST_SIZE; ++i) {
+                free(snaplist[i].kdata);
+                free(snaplist[i].vdata);
+            }
+            free(snaplist);
+        }
+}
+
+/*
+ * snap_clear --
+ *     Clear a single snap entry.
+ */
+static void
+snap_clear_one(SNAP_OPS *snap)
+{
+    snap->repeatable = false;
+}
+
+/*
+ * snap_clear --
+ *     Clear the snap list.
+ */
+static void
+snap_clear(TINFO *tinfo)
+{
+    SNAP_OPS *snap;
+
+    for (snap = tinfo->snap_list; snap < tinfo->snap_end; ++snap)
+        snap_clear_one(snap);
+}
+
+/*
+ * snap_op_init --
+ *     Initialize the repeatable operation tracking for each new operation.
+ */
+void
+snap_op_init(TINFO *tinfo, uint64_t read_ts, bool repeatable_reads)
+{
+    uint64_t stable_ts;
+
     ++tinfo->opid;
 
-    tinfo->snap_first = tinfo->snap;
+    if (g.c_txn_rollback_to_stable) {
+        /*
+         * If the stable timestamp has changed and we've advanced beyond it, preserve the current
+         * snapshot history up to this point, we'll use it verify rollback_to_stable. Switch our
+         * tracking to the other snap list.
+         */
+        stable_ts = __wt_atomic_addv64(&g.stable_timestamp, 0);
+        if (stable_ts != tinfo->stable_ts && read_ts > stable_ts) {
+            tinfo->stable_ts = stable_ts;
+            if (tinfo->s == &tinfo->snap_states[0])
+                tinfo->s = &tinfo->snap_states[1];
+            else
+                tinfo->s = &tinfo->snap_states[0];
+            tinfo->snap_current = tinfo->snap_list;
+
+            /* Clear out older info from the snap list. */
+            snap_clear(tinfo);
+        }
+    }
+
+    tinfo->snap_first = tinfo->snap_current;
 
     tinfo->read_ts = read_ts;
     tinfo->repeatable_reads = repeatable_reads;
@@ -54,7 +150,7 @@ snap_track(TINFO *tinfo, thread_op op)
     WT_ITEM *ip;
     SNAP_OPS *snap;
 
-    snap = tinfo->snap;
+    snap = tinfo->snap_current;
     snap->op = op;
     snap->opid = tinfo->opid;
     snap->keyno = tinfo->keyno;
@@ -82,15 +178,15 @@ snap_track(TINFO *tinfo, thread_op op)
     }
 
     /* Move to the next slot, wrap at the end of the circular buffer. */
-    if (++tinfo->snap >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
-        tinfo->snap = tinfo->snap_list;
+    if (++tinfo->snap_current >= tinfo->snap_end)
+        tinfo->snap_current = tinfo->snap_list;
 
     /*
      * It's possible to pass this transaction's buffer starting point and start replacing our own
      * entries. If that happens, we can't repeat operations because we don't know which ones were
      * previously modified.
      */
-    if (tinfo->snap->opid == tinfo->opid)
+    if (tinfo->snap_current->opid == tinfo->opid)
         tinfo->repeatable_wrap = true;
 }
 
@@ -236,10 +332,9 @@ static void
 snap_ts_clear(TINFO *tinfo, uint64_t ts)
 {
     SNAP_OPS *snap;
-    int count;
 
     /* Check from the first slot to the last. */
-    for (snap = tinfo->snap_list, count = WT_ELEMENTS(tinfo->snap_list); count > 0; --count, ++snap)
+    for (snap = tinfo->snap_list; snap < tinfo->snap_end; ++snap)
         if (snap->repeatable && snap->ts <= ts)
             snap->repeatable = false;
 }
@@ -297,7 +392,7 @@ snap_repeat_ok_commit(TINFO *tinfo, SNAP_OPS *current)
      */
     for (p = current;;) {
         /* Wrap at the end of the circular buffer. */
-        if (++p >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
+        if (++p >= tinfo->snap_end)
             p = tinfo->snap_list;
         if (p->opid != tinfo->opid)
             break;
@@ -311,7 +406,7 @@ snap_repeat_ok_commit(TINFO *tinfo, SNAP_OPS *current)
     for (p = current;;) {
         /* Wrap at the beginning of the circular buffer. */
         if (--p < tinfo->snap_list)
-            p = &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list) - 1];
+            p = &tinfo->snap_list[SNAP_LIST_SIZE - 1];
         if (p->opid != tinfo->opid)
             break;
 
@@ -341,7 +436,7 @@ snap_repeat_ok_rollback(TINFO *tinfo, SNAP_OPS *current)
     for (p = current;;) {
         /* Wrap at the beginning of the circular buffer. */
         if (--p < tinfo->snap_list)
-            p = &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list) - 1];
+            p = &tinfo->snap_list[SNAP_LIST_SIZE - 1];
         if (p->opid != tinfo->opid)
             break;
 
@@ -367,7 +462,7 @@ snap_repeat_txn(WT_CURSOR *cursor, TINFO *tinfo)
     /* Check from the first operation we saved to the last. */
     for (current = tinfo->snap_first;; ++current) {
         /* Wrap at the end of the circular buffer. */
-        if (current >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
+        if (current >= tinfo->snap_end)
             current = tinfo->snap_list;
         if (current->opid != tinfo->opid)
             break;
@@ -401,7 +496,7 @@ snap_repeat_update(TINFO *tinfo, bool committed)
     /* Check from the first operation we saved to the last. */
     for (current = tinfo->snap_first;; ++current) {
         /* Wrap at the end of the circular buffer. */
-        if (current >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
+        if (current >= tinfo->snap_end)
             current = tinfo->snap_list;
         if (current->opid != tinfo->opid)
             break;
@@ -429,45 +524,22 @@ snap_repeat_update(TINFO *tinfo, bool committed)
 }
 
 /*
- * snap_repeat_single --
- *     Repeat an historic operation.
+ * snap_repeat --
+ *     Repeat one operation.
  */
-void
-snap_repeat_single(WT_CURSOR *cursor, TINFO *tinfo)
+static void
+snap_repeat(WT_CURSOR *cursor, TINFO *tinfo, SNAP_OPS *snap, bool rollback_allowed)
 {
-    SNAP_OPS *snap;
     WT_DECL_RET;
     WT_SESSION *session;
-    int count;
-    u_int v;
     char buf[64];
 
     session = cursor->session;
 
     /*
-     * Start at a random spot in the list of operations and look for a read to retry. Stop when
-     * we've walked the entire list or found one.
-     */
-    v = mmrand(&tinfo->rnd, 1, WT_ELEMENTS(tinfo->snap_list)) - 1;
-    for (snap = &tinfo->snap_list[v], count = WT_ELEMENTS(tinfo->snap_list); count > 0;
-         --count, ++snap) {
-        /* Wrap at the end of the circular buffer. */
-        if (snap >= &tinfo->snap_list[WT_ELEMENTS(tinfo->snap_list)])
-            snap = tinfo->snap_list;
-
-        if (snap->repeatable)
-            break;
-    }
-
-    if (count == 0)
-        return;
-
-    /*
      * Start a new transaction. Set the read timestamp. Verify the record. Discard the transaction.
      */
-    while ((ret = session->begin_transaction(session, "isolation=snapshot")) == WT_CACHE_FULL)
-        __wt_yield();
-    testutil_check(ret);
+    wiredtiger_begin_transaction(session, "isolation=snapshot");
 
     /*
      * If the timestamp has aged out of the system, we'll get EINVAL when we try and set it.
@@ -482,7 +554,7 @@ snap_repeat_single(WT_CURSOR *cursor, TINFO *tinfo)
         /* The only expected error is rollback. */
         ret = snap_verify(cursor, tinfo, snap);
 
-        if (ret != 0 && ret != WT_ROLLBACK)
+        if (ret != 0 && (!rollback_allowed || ret != WT_ROLLBACK))
             testutil_check(ret);
     } else if (ret == EINVAL)
         snap_ts_clear(tinfo, snap->ts);
@@ -491,4 +563,92 @@ snap_repeat_single(WT_CURSOR *cursor, TINFO *tinfo)
 
     /* Discard the transaction. */
     testutil_check(session->rollback_transaction(session, NULL));
+}
+
+/*
+ * snap_repeat_single --
+ *     Repeat an historic operation.
+ */
+void
+snap_repeat_single(WT_CURSOR *cursor, TINFO *tinfo)
+{
+    SNAP_OPS *snap;
+    u_int v;
+    int count;
+
+    /*
+     * Start at a random spot in the list of operations and look for a read to retry. Stop when
+     * we've walked the entire list or found one.
+     */
+    v = mmrand(&tinfo->rnd, 1, SNAP_LIST_SIZE) - 1;
+    for (snap = &tinfo->snap_list[v], count = SNAP_LIST_SIZE; count > 0; --count, ++snap) {
+        /* Wrap at the end of the circular buffer. */
+        if (snap >= tinfo->snap_end)
+            snap = tinfo->snap_list;
+
+        if (snap->repeatable)
+            break;
+    }
+
+    if (count == 0)
+        return;
+
+    snap_repeat(cursor, tinfo, snap, true);
+}
+
+/*
+ * snap_repeat_rollback --
+ *     Repeat all known operations after a rollback.
+ */
+void
+snap_repeat_rollback(WT_CURSOR *cursor, TINFO **tinfo_array, size_t tinfo_count)
+{
+    SNAP_OPS *snap;
+    SNAP_STATE *state;
+    TINFO *tinfo, **tinfop;
+    uint32_t count;
+    size_t i, statenum;
+    char buf[100];
+
+    count = 0;
+
+    track("rollback_to_stable: checking", 0ULL, NULL);
+    for (i = 0, tinfop = tinfo_array; i < tinfo_count; ++i, ++tinfop) {
+        tinfo = *tinfop;
+
+        /*
+         * For this thread, walk through both sets of snaps ("states"), looking for entries that are
+         * repeatable and have relevant timestamps. One set will have the most current operations,
+         * meaning they will likely be newer than the stable timestamp, and thus cannot be checked.
+         * The other set typically has operations that are just before the stable timestamp, so are
+         * candidates for checking.
+         */
+        for (statenum = 0; statenum < WT_ELEMENTS(tinfo->snap_states); statenum++) {
+            state = &tinfo->snap_states[statenum];
+            for (snap = state->snap_state_list; snap < state->snap_state_end; ++snap) {
+                if (snap->repeatable && snap->ts <= g.stable_timestamp &&
+                  snap->ts >= g.oldest_timestamp) {
+                    snap_repeat(cursor, tinfo, snap, false);
+                    ++count;
+                    if (count % 100 == 0) {
+                        testutil_check(__wt_snprintf(
+                          buf, sizeof(buf), "rollback_to_stable: %" PRIu32 " ops repeated", count));
+                        track(buf, 0ULL, NULL);
+                    }
+                }
+                snap_clear_one(snap);
+            }
+        }
+    }
+
+    /* Show the final result and check that we're accomplishing some checking. */
+    testutil_check(
+      __wt_snprintf(buf, sizeof(buf), "rollback_to_stable: %" PRIu32 " ops repeated", count));
+    track(buf, 0ULL, NULL);
+    if (count == 0) {
+        if (++g.rts_no_check >= WARN_RTS_NO_CHECK)
+            fprintf(stderr,
+              "Warning: %" PRIu32 " consecutive runs with no rollback_to_stable checking\n", count);
+    } else
+        g.rts_no_check = 0;
 }
