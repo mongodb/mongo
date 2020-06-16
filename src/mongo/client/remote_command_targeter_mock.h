@@ -31,9 +31,7 @@
 
 #include <set>
 
-#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
-#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

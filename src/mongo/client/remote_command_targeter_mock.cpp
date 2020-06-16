@@ -31,9 +31,6 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/client/read_preference.h"
-
 namespace mongo {
 
 RemoteCommandTargeterMock::RemoteCommandTargeterMock()

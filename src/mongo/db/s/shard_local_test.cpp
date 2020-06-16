@@ -29,10 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/client/shard_local.h"
-
-#include <memory>
-
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -40,6 +36,7 @@
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/shard_local.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/client/shard_registry.h"

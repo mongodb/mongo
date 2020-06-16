@@ -33,14 +33,12 @@
 
 #include <vector>
 
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_logging.h"
-#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/str.h"
@@ -49,25 +47,14 @@
 namespace mongo {
 namespace {
 
-using executor::NetworkInterfaceMock;
-using executor::TaskExecutor;
-using stdx::async;
 using unittest::assertGet;
 
-const HostAndPort configHost{"TestHost1"};
-
-class InfoLoggingTest : public ShardingTestFixture {
+class InfoLoggingTest : public ShardServerTestFixture {
 public:
     enum CollType { ActionLog, ChangeLog };
 
     InfoLoggingTest(CollType configCollType, int cappedSize)
         : _configCollType(configCollType), _cappedSize(cappedSize) {}
-
-    void setUp() override {
-        ShardingTestFixture::setUp();
-
-        configTargeter()->setFindHostReturnValue(configHost);
-    }
 
 protected:
     void noRetryAfterSuccessfulCreate() {
@@ -75,8 +62,9 @@ protected:
             log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)).transitional_ignore();
         });
 
-        expectConfigCollectionCreate(configHost, getConfigCollName(), _cappedSize, BSON("ok" << 1));
-        expectConfigCollectionInsert(configHost,
+        expectConfigCollectionCreate(
+            kConfigHostAndPort, getConfigCollName(), _cappedSize, BSON("ok" << 1));
+        expectConfigCollectionInsert(kConfigHostAndPort,
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a chunk",
@@ -92,7 +80,7 @@ protected:
                 .transitional_ignore();
         });
 
-        expectConfigCollectionInsert(configHost,
+        expectConfigCollectionInsert(kConfigHostAndPort,
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",
@@ -112,8 +100,8 @@ protected:
         CommandHelpers::appendCommandStatusNoThrow(
             createResponseBuilder, Status(ErrorCodes::NamespaceExists, "coll already exists"));
         expectConfigCollectionCreate(
-            configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
-        expectConfigCollectionInsert(configHost,
+            kConfigHostAndPort, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
+        expectConfigCollectionInsert(kConfigHostAndPort,
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a chunk",
@@ -129,7 +117,7 @@ protected:
                 .transitional_ignore();
         });
 
-        expectConfigCollectionInsert(configHost,
+        expectConfigCollectionInsert(kConfigHostAndPort,
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",
@@ -149,7 +137,7 @@ protected:
         CommandHelpers::appendCommandStatusNoThrow(
             createResponseBuilder, Status(ErrorCodes::Interrupted, "operation interrupted"));
         expectConfigCollectionCreate(
-            configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
+            kConfigHostAndPort, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
 
         // Now wait for the logAction call to return
         future.default_timed_get();
@@ -160,8 +148,9 @@ protected:
                 .transitional_ignore();
         });
 
-        expectConfigCollectionCreate(configHost, getConfigCollName(), _cappedSize, BSON("ok" << 1));
-        expectConfigCollectionInsert(configHost,
+        expectConfigCollectionCreate(
+            kConfigHostAndPort, getConfigCollName(), _cappedSize, BSON("ok" << 1));
+        expectConfigCollectionInsert(kConfigHostAndPort,
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",

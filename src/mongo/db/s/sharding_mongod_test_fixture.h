@@ -36,7 +36,6 @@
 namespace mongo {
 
 class CatalogCacheLoader;
-class ConnectionString;
 
 namespace repl {
 class ReplSettings;
@@ -53,9 +52,11 @@ class ReplSettings;
  */
 class ShardingMongodTestFixture : public ServiceContextMongoDTest,
                                   public ShardingTestFixtureCommon {
-public:
+protected:
     ShardingMongodTestFixture();
     ~ShardingMongodTestFixture();
+
+    void tearDown() override;
 
     /**
      * Initializes sharding components according to the cluster role in
@@ -86,25 +87,6 @@ public:
 
     repl::ReplicationCoordinatorMock* replicationCoordinator() const;
 
-    /**
-     * Returns the stored raw pointer to the OperationContext.
-     */
-    OperationContext* operationContext() const {
-        return _opCtx.get();
-    }
-
-protected:
-    /**
-     * Sets up this fixture with a storage engine, OpObserver, and as a member of a replica set.
-     */
-    void setUp() override;
-
-    /**
-     * Resets the storage engine and operation context, and shuts down and resets any sharding
-     * components that have been initialized but not yet shut down and reset.
-     */
-    void tearDown() override;
-
     // Methods for creating and returning sharding components. Some of these methods have been
     // implemented to return the real implementation of the component as the default, while others
     // return a mock or nullptr. Subclasses can override any of these methods to create and
@@ -119,13 +101,6 @@ protected:
      */
     virtual std::unique_ptr<repl::ReplicationCoordinatorMock> makeReplicationCoordinator(
         repl::ReplSettings replSettings);
-
-    /**
-     * Base class returns a TaskExecutorPool with a fixed TaskExecutor and a set of arbitrary
-     * executors containing one TaskExecutor, each backed by a NetworkInterfaceMock/ThreadPoolMock
-     * subsytem.
-     */
-    virtual std::unique_ptr<executor::TaskExecutorPool> makeTaskExecutorPool();
 
     /**
      * Base class returns a real implementation of ShardRegistry.
@@ -157,12 +132,16 @@ protected:
     virtual std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration();
 
 private:
-    const HostAndPort _host{"node1:12345"};
+    /**
+     * Base class returns a TaskExecutorPool with a fixed TaskExecutor and a set of arbitrary
+     * executors containing one TaskExecutor, each backed by a NetworkInterfaceMock/ThreadPoolMock
+     * subsytem.
+     */
+    std::unique_ptr<executor::TaskExecutorPool> _makeTaskExecutorPool();
+
     const std::string _setName = "mySet";
     const std::vector<HostAndPort> _servers{
-        _host, HostAndPort("node2:12345"), HostAndPort("node3:12345")};
-
-    ServiceContext::UniqueOperationContext _opCtx;
+        HostAndPort("node1:12345"), HostAndPort("node2:12345"), HostAndPort("node3:12345")};
 
     repl::ReplicationCoordinatorMock* _replCoord = nullptr;
 

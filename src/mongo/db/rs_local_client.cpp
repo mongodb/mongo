@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-#include <boost/none_t.hpp>
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/client/rs_local_client.h"
+#include "mongo/db/rs_local_client.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -42,7 +38,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"
-#include "mongo/s/client/shard.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

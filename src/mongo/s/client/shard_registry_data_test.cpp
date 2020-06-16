@@ -29,11 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
-#include <utility>
-
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
@@ -83,7 +78,6 @@ private:
     std::unique_ptr<ShardFactory> _shardFactory;
 };
 
-
 TEST_F(ShardRegistryDataTest, AddConfigShard) {
     ConnectionString configCS("rs/dummy1:1234,dummy2:2345,dummy3:3456", ConnectionString::SET);
     auto configShard = shardFactory()->createShard(ShardRegistry::kConfigServerShardId, configCS);
@@ -94,5 +88,5 @@ TEST_F(ShardRegistryDataTest, AddConfigShard) {
     ASSERT_EQUALS(configCS.toString(), data.getConfigShard()->originalConnString().toString());
 }
 
-}  // unnamed namespace
+}  // namespace
 }  // namespace mongo

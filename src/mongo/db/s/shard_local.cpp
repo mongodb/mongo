@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-#include <boost/none_t.hpp>
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/client/shard_local.h"
+#include "mongo/db/s/shard_local.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"

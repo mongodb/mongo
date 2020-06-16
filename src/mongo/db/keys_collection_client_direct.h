@@ -32,9 +32,8 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/status.h"
 #include "mongo/db/keys_collection_client.h"
-#include "mongo/s/client/rs_local_client.h"
+#include "mongo/db/rs_local_client.h"
 
 namespace mongo {
 

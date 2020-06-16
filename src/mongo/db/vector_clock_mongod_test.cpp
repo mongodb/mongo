@@ -32,10 +32,9 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/s/sharding_mongod_test_fixture.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

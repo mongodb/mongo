@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/bson/json.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
@@ -44,7 +45,6 @@
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_tick_source.h"

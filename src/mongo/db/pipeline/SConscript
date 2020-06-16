@@ -402,7 +402,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/s/query/router_exec_stage',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',

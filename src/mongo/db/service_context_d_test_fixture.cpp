@@ -90,6 +90,9 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
+    CollectionShardingStateFactory::set(
+        getServiceContext(),
+        std::make_unique<CollectionShardingStateFactoryShard>(getServiceContext()));
 }
 
 ServiceContextMongoDTest::~ServiceContextMongoDTest() {
@@ -105,14 +108,6 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);
     std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);
-}
-
-void ServiceContextMongoDTest::setUp() {
-    ServiceContextTest::setUp();
-
-    CollectionShardingStateFactory::set(
-        getServiceContext(),
-        std::make_unique<CollectionShardingStateFactoryShard>(getServiceContext()));
 }
 
 void ServiceContextMongoDTest::tearDown() {

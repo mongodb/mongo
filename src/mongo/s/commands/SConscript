@@ -154,7 +154,7 @@ env.Library(
     ],
     LIBDEPS=[
         'cluster_commands',
-        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
     ]
 )
 

@@ -29,18 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-class ConnectionString;
-class OperationContext;
-struct ReadPreferenceSetting;
-struct HostAndPort;
-template <typename T>
-class StatusWith;
 
 /**
  * Interface encapsulating the targeting logic for a given replica set or a standalone host.

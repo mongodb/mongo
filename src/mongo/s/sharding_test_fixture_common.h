@@ -29,31 +29,33 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/session.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 class DistLockCatalog;
 class DistLockManager;
-class RemoteCommandTargeterFactoryMock;
 
 namespace executor {
-class NetworkInterfaceMock;
 class TaskExecutor;
 }  // namespace executor
 
 /**
  * Contains common functionality and tools, which apply to both mongos and mongod unit-tests.
  */
-class ShardingTestFixtureCommon {
-public:
+class ShardingTestFixtureCommon : public virtual ServiceContextTest {
+protected:
     ShardingTestFixtureCommon();
     ~ShardingTestFixtureCommon();
+
+    OperationContext* operationContext() const {
+        return _opCtxHolder.get();
+    }
 
     template <typename Lambda>
     executor::NetworkTestEnv::FutureHandle<typename std::invoke_result<Lambda>::type> launchAsync(
@@ -93,6 +95,26 @@ public:
     void onFindWithMetadataCommand(
         executor::NetworkTestEnv::OnFindCommandWithMetadataFunction func);
 
+    /**
+     * Waits for an operation which creates a capped config collection with the specified name and
+     * capped size.
+     */
+    void expectConfigCollectionCreate(const HostAndPort& configHost,
+                                      StringData collName,
+                                      int cappedSize,
+                                      const BSONObj& response);
+
+    /**
+     * Wait for a single insert in one of the change or action log collections with the specified
+     * contents and return a successful response.
+     */
+    void expectConfigCollectionInsert(const HostAndPort& configHost,
+                                      StringData collName,
+                                      Date_t timestamp,
+                                      const std::string& what,
+                                      const std::string& ns,
+                                      const BSONObj& detail);
+
 protected:
     /**
      * Base class returns nullptr.
@@ -125,6 +147,10 @@ protected:
     // Since the DistLockManager is currently a private member of ShardingCatalogClient, we
     // store a raw pointer to it here.
     DistLockManager* _distLockManager = nullptr;
+
+private:
+    // Keeps the lifetime of the operation context
+    ServiceContext::UniqueOperationContext _opCtxHolder;
 };
 
 }  // namespace mongo

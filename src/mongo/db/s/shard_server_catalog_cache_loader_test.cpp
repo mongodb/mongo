@@ -29,13 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/shard_server_catalog_cache_loader.h"
-
 #include "mongo/db/s/catalog_cache_loader_mock.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

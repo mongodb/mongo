@@ -30,9 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/connection_string.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -42,7 +39,6 @@
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

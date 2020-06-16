@@ -120,7 +120,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/vector_clock_mongod',
-        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'mongos_process_interface',
         'shardsvr_process_interface',
     ]

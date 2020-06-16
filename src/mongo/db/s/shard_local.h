@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/s/client/rs_local_client.h"
+#include "mongo/db/rs_local_client.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {

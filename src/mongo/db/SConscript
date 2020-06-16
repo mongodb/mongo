@@ -1507,6 +1507,17 @@ env.Library(
 )
 
 env.Library(
+    target='rs_local_client',
+    source=[
+        'rs_local_client.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        'dbdirectclient',
+    ],
+)
+
+env.Library(
     target='keys_collection_document',
     source=[
         'keys_collection_document.cpp',
@@ -1523,11 +1534,13 @@ env.Library(
         'keys_collection_client_direct.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
+        '$BUILD_DIR/mongo/s/client/shard_interface',
         'keys_collection_document',
         'logical_time',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
-        '$BUILD_DIR/mongo/s/client/rs_local_client',
-        '$BUILD_DIR/mongo/s/client/shard_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        'rs_local_client',
     ],
 )
 
@@ -1635,11 +1648,11 @@ env.Library(
         'logical_clock_test_fixture.cpp',
     ],
     LIBDEPS= [
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        's/sharding_mongod_test_fixture',
         'signed_logical_time',
         'vector_clock',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
-        '$BUILD_DIR/mongo/util/clock_source_mock'
     ],
 )
 
@@ -1663,7 +1676,6 @@ env.Library(
         'service_context_d_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
         'service_context_test_fixture',
     ],
     LIBDEPS_PRIVATE=[
@@ -1989,7 +2001,7 @@ env.CppLibfuzzerTest(
         '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/unittest/unittest/',
+        '$BUILD_DIR/mongo/unittest/unittest',
     ],
 )
 

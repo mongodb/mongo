@@ -33,12 +33,11 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/json.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/split_chunk.h"
 #include "mongo/db/server_options.h"
-#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -51,10 +50,8 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

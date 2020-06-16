@@ -29,15 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/chunk_manager.h"
-
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_writes_tracker.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

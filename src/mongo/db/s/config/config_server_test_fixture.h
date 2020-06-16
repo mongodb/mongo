@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog_raii.h"
-#include "mongo/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/s/sharding_mongod_test_fixture.h"
 
 namespace mongo {
 
@@ -43,17 +43,18 @@ class Shard;
 class ShardId;
 class ShardRegistry;
 class ShardType;
-template <typename T>
-class StatusWith;
 
 /**
  * Provides config-specific functionality in addition to the mock storage engine and mock network
  * provided by ShardingMongodTestFixture.
  */
 class ConfigServerTestFixture : public ShardingMongodTestFixture {
-public:
+protected:
     ConfigServerTestFixture();
     ~ConfigServerTestFixture();
+
+    void setUp() override;
+    void tearDown() override;
 
     std::shared_ptr<Shard> getConfigShard() const;
 
@@ -150,12 +151,6 @@ public:
      */
     std::vector<KeysCollectionDocument> getKeys(OperationContext* opCtx);
 
-protected:
-    /**
-     * Sets this node up as a mongod with sharding components for ClusterRole::ConfigServer.
-     */
-    void setUp() override;
-
     /**
      * Sets this node up and locks the config db in _setUp() before calling
      * initializeGlobalShardingStateForMongodForTest(). The RAII object for the database lock is
@@ -169,8 +164,6 @@ protected:
      * Uses setUpAndLockConfigDb() above.
      */
     void setUpAndInitializeConfigDb();
-
-    void tearDown() override;
 
     std::unique_ptr<DistLockCatalog> makeDistLockCatalog() override;
 

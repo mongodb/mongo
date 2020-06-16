@@ -32,10 +32,9 @@
 #include <map>
 
 #include "mongo/client/remote_command_targeter_factory.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 
 namespace mongo {
-
-class RemoteCommandTargeterMock;
 
 /**
  * Factory which instantiates mock remote command targeters. This class is not thread-safe and is

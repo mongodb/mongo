@@ -29,9 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/shard_server_test_fixture.h"
-
-#include <memory>
+#include "mongo/db/s/shard_server_test_fixture.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
@@ -45,11 +43,8 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 
 namespace mongo {
-namespace {
 
-const HostAndPort kConfigHostAndPort("dummy", 123);
-
-}  // namespace
+const HostAndPort ShardServerTestFixture::kConfigHostAndPort("dummy", 123);
 
 ShardServerTestFixture::ShardServerTestFixture() = default;
 
@@ -61,7 +56,6 @@ std::shared_ptr<RemoteCommandTargeterMock> ShardServerTestFixture::configTargete
 
 void ShardServerTestFixture::setUp() {
     ShardingMongodTestFixture::setUp();
-
 
     replicationCoordinator()->alwaysAllowWrites(true);
 

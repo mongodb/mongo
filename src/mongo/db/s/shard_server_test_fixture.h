@@ -29,12 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/server_options.h"
-#include "mongo/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/s/sharding_mongod_test_fixture.h"
 
 namespace mongo {
-
-class RemoteCommandTargeterMock;
 
 /**
  * Test fixture for shard components, as opposed to config or mongos components. Provides a mock
@@ -42,9 +39,12 @@ class RemoteCommandTargeterMock;
  * dist lock catalog and manager with a real catalog client.
  */
 class ShardServerTestFixture : public ShardingMongodTestFixture {
-public:
+protected:
     ShardServerTestFixture();
     ~ShardServerTestFixture();
+
+    void setUp() override;
+    void tearDown() override;
 
     /**
      * Returns the mock targeter for the config server. Useful to use like so,
@@ -56,11 +56,6 @@ public:
      * must be set.
      */
     std::shared_ptr<RemoteCommandTargeterMock> configTargeterMock();
-
-protected:
-    void setUp() override;
-
-    void tearDown() override;
 
     /**
      * Creates a DistLockCatalogMock.
@@ -78,6 +73,8 @@ protected:
      */
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override;
+
+    static const HostAndPort kConfigHostAndPort;
 
     const ShardId _myShardName{"myShardName"};
     OID _clusterId;

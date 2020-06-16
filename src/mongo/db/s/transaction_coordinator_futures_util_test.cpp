@@ -30,12 +30,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace txn {

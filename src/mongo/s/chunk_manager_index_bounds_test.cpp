@@ -41,7 +41,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
@@ -59,7 +58,8 @@ protected:
         const NamespaceString nss("test.foo");
         auto qr = std::make_unique<QueryRequest>(nss);
         qr->setFilter(queryObj);
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(operationContext()));
         auto statusWithCQ =
             CanonicalQuery::canonicalize(operationContext(),
                                          std::move(qr),

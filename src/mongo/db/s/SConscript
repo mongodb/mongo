@@ -81,6 +81,7 @@ env.Library(
         'sharding_state_recovery.cpp',
         'sharding_statistics.cpp',
         'split_chunk.cpp',
+        'shard_local.cpp',
         'split_vector.cpp',
         'start_chunk_clone_request.cpp',
         env.Idlc('migration_coordinator_document.idl')[0],
@@ -95,13 +96,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/op_observer_impl',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/remove_saver',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/vector_clock_mongod',
-        '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         'chunk_splitter',
@@ -113,6 +112,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/rs_local_client',
         '$BUILD_DIR/mongo/db/session_catalog',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ],
@@ -342,60 +342,40 @@ env.Library(
 )
 
 env.Library(
+    target='sharding_mongod_test_fixture',
+    source=[
+        'sharding_mongod_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture_common',
+        'sharding_runtime_d',
+    ],
+)
+
+env.Library(
+    target='shard_server_test_fixture',
+    source=[
+        'shard_server_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
+        'sharding_mongod_test_fixture',
+    ],
+)
+
+env.Library(
     target='config_server_test_fixture',
     source=[
         'config/config_server_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
         'sharding_catalog_manager',
+        'sharding_mongod_test_fixture',
     ],
-)
-
-env.CppUnitTest(
-    target='db_s_test',
-    source=[
-        'chunk_split_state_driver_test.cpp',
-        'config_server_op_observer_test.cpp',
-        'migration_session_id_test.cpp',
-        'sharding_logging_test.cpp',
-        'start_chunk_clone_request_test.cpp',
-        'type_shard_identity_test.cpp',
-        'vector_clock_config_server_test.cpp',
-        'wait_for_majority_service_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-        'chunk_splitter',
-        'config_server_test_fixture',
-        'sharding_logging',
-        'sharding_runtime_d',
-        'type_shard_identity',
-    ],
-)
-
-env.CppUnitTest(
-    target='db_s_balancer_test',
-    source=[
-        'balancer/balancer_chunk_selection_policy_test.cpp',
-        'balancer/balancer_policy_test.cpp',
-        'balancer/cluster_statistics_test.cpp',
-        'balancer/core_options_stub.cpp',
-        'balancer/migration_manager_test.cpp',
-        'balancer/migration_test_fixture.cpp',
-        'balancer/scoped_migration_request_test.cpp',
-        'balancer/type_migration_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
-        '$BUILD_DIR/mongo/db/repl/replication_info',
-        '$BUILD_DIR/mongo/util/version_impl',
-        'balancer',
-        'config_server_test_fixture',
-    ]
 )
 
 env.CppUnitTest(
@@ -405,18 +385,25 @@ env.CppUnitTest(
         'active_move_primaries_registry_test.cpp',
         'active_shard_collection_registry_test.cpp',
         'catalog_cache_loader_mock.cpp',
+        'chunk_split_state_driver_test.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
         'migration_destination_manager_test.cpp',
+        'migration_session_id_test.cpp',
         'migration_util_test.cpp',
         'namespace_metadata_change_notifications_test.cpp',
         'session_catalog_migration_destination_test.cpp',
         'session_catalog_migration_source_test.cpp',
+        'shard_local_test.cpp',
         'shard_metadata_util_test.cpp',
         'shard_server_catalog_cache_loader_test.cpp',
         'sharding_initialization_mongod_test.cpp',
         'sharding_initialization_op_observer_test.cpp',
+        'sharding_logging_test.cpp',
         'split_vector_test.cpp',
+        'start_chunk_clone_request_test.cpp',
+        'type_shard_identity_test.cpp',
         'vector_clock_shard_server_test.cpp',
+        'wait_for_majority_service_test.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -427,9 +414,9 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
-        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
+        'shard_server_test_fixture',
+        'sharding_logging',
         'sharding_runtime_d',
     ],
 )
@@ -450,9 +437,8 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
+        'shard_server_test_fixture',
     ],
 )
 
@@ -470,13 +456,13 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
-        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
+        'shard_server_test_fixture',
         'transaction_coordinator',
     ],
 )
 
 env.CppUnitTest(
-    target='db_s_sharding_catalog_manager_test',
+    target='db_s_config_server_test',
     source=[
         'config/initial_split_policy_test.cpp',
         'config/sharding_catalog_manager_add_shard_test.cpp',
@@ -494,10 +480,24 @@ env.CppUnitTest(
         'config/sharding_catalog_manager_remove_shard_test.cpp',
         'config/sharding_catalog_manager_shard_collection_test.cpp',
         'config/sharding_catalog_manager_split_chunk_test.cpp',
+        'balancer/balancer_chunk_selection_policy_test.cpp',
+        'balancer/balancer_policy_test.cpp',
+        'balancer/cluster_statistics_test.cpp',
+        'balancer/core_options_stub.cpp',
+        'balancer/migration_manager_test.cpp',
+        'balancer/migration_test_fixture.cpp',
+        'balancer/scoped_migration_request_test.cpp',
+        'balancer/type_migration_test.cpp',
+        'config_server_op_observer_test.cpp',
+        'vector_clock_config_server_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
+        '$BUILD_DIR/mongo/db/repl/replication_info',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/util/version_impl',
+        'balancer',
         'config_server_test_fixture',
     ]
 )

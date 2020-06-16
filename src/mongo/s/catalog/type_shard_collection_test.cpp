@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/s/catalog/type_shard_collection.h"
 
 #include "mongo/bson/oid.h"

@@ -47,7 +47,6 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -56,7 +55,6 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
@@ -95,8 +93,9 @@ std::unique_ptr<ShardingTaskExecutor> makeShardingTestExecutor(
 
 }  // namespace
 
-ShardingTestFixture::ShardingTestFixture() {
-    auto const service = getServiceContext();
+ShardingTestFixture::ShardingTestFixture()
+    : _transportSession(transport::MockSession::create(nullptr)) {
+    const auto service = getServiceContext();
 
     // Configure the service context
     service->setFastClockSource(std::make_unique<ClockSourceMock>());
@@ -104,8 +103,6 @@ ShardingTestFixture::ShardingTestFixture() {
     service->setTickSource(std::make_unique<TickSourceMock<>>());
 
     CollatorFactoryInterface::set(service, std::make_unique<CollatorFactoryMock>());
-    _transportSession = transport::MockSession::create(nullptr);
-    _opCtx = makeOperationContext();
 
     // Set up executor pool used for most operations.
     auto makeMetadataHookList = [&] {
@@ -146,10 +143,6 @@ ShardingTestFixture::ShardingTestFixture() {
     auto targeterFactory(std::make_unique<RemoteCommandTargeterFactoryMock>());
     auto targeterFactoryPtr = targeterFactory.get();
     _targeterFactory = targeterFactoryPtr;
-
-    auto configTargeter(std::make_unique<RemoteCommandTargeterMock>());
-    _configTargeter = configTargeter.get();
-    _targeterFactory->addTargeterToReturn(configCS, std::move(configTargeter));
 
     ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
                                                    const ShardId& shardId,
@@ -196,6 +189,10 @@ ShardingTestFixture::~ShardingTestFixture() {
     CatalogCacheLoader::clearForTests(getServiceContext());
 }
 
+std::shared_ptr<RemoteCommandTargeterMock> ShardingTestFixture::configTargeter() {
+    return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
+}
+
 void ShardingTestFixture::shutdownExecutor() {
     if (_fixedExecutor)
         _fixedExecutor->shutdown();
@@ -209,22 +206,10 @@ ShardRegistry* ShardingTestFixture::shardRegistry() const {
     return Grid::get(operationContext())->shardRegistry();
 }
 
-RemoteCommandTargeterMock* ShardingTestFixture::configTargeter() const {
-    invariant(_configTargeter);
-
-    return _configTargeter;
-}
-
 std::shared_ptr<executor::TaskExecutor> ShardingTestFixture::executor() const {
     invariant(_fixedExecutor);
 
     return _fixedExecutor;
-}
-
-OperationContext* ShardingTestFixture::operationContext() const {
-    invariant(_opCtx);
-
-    return _opCtx.get();
 }
 
 void ShardingTestFixture::onCommandForPoolExecutor(NetworkTestEnv::OnCommandFunction func) {
@@ -313,94 +298,6 @@ void ShardingTestFixture::expectInserts(const NamespaceString& nss,
 
         return response.toBSON();
     });
-}
-
-void ShardingTestFixture::expectConfigCollectionCreate(const HostAndPort& configHost,
-                                                       StringData collName,
-                                                       int cappedSize,
-                                                       const BSONObj& response) {
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS("config", request.dbname);
-
-        BSONObj expectedCreateCmd =
-            BSON("create" << collName << "capped" << true << "size" << cappedSize << "writeConcern"
-                          << BSON("w"
-                                  << "majority"
-                                  << "wtimeout" << 60000)
-                          << "maxTimeMS" << 30000);
-        ASSERT_BSONOBJ_EQ(expectedCreateCmd, request.cmdObj);
-
-        return response;
-    });
-}
-
-void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& configHost,
-                                                       StringData collName,
-                                                       Date_t timestamp,
-                                                       const std::string& what,
-                                                       const std::string& ns,
-                                                       const BSONObj& detail) {
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(NamespaceString::kConfigDb, request.dbname);
-
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        const auto insertOp = InsertOp::parse(opMsgRequest);
-
-        ASSERT_EQ(NamespaceString::kConfigDb, insertOp.getNamespace().db());
-        ASSERT_EQ(collName, insertOp.getNamespace().coll());
-
-        const auto& inserts = insertOp.getDocuments();
-        ASSERT_EQUALS(1U, inserts.size());
-
-        const ChangeLogType& actualChangeLog = assertGet(ChangeLogType::fromBSON(inserts.front()));
-
-        ASSERT_EQUALS(operationContext()->getClient()->clientAddress(true),
-                      actualChangeLog.getClientAddr());
-        ASSERT_BSONOBJ_EQ(detail, actualChangeLog.getDetails());
-        ASSERT_EQUALS(ns, actualChangeLog.getNS());
-        const std::string expectedServer = str::stream() << network()->getHostName() << ":27017";
-        ASSERT_EQUALS(expectedServer, actualChangeLog.getServer());
-        ASSERT_EQUALS(timestamp, actualChangeLog.getTime());
-        ASSERT_EQUALS(what, actualChangeLog.getWhat());
-
-        // Handle changeId specially because there's no way to know what OID was generated
-        std::string changeId = actualChangeLog.getChangeId();
-        size_t firstDash = changeId.find("-");
-        size_t lastDash = changeId.rfind("-");
-
-        const std::string serverPiece = changeId.substr(0, firstDash);
-        const std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);
-        const std::string oidPiece = changeId.substr(lastDash + 1);
-
-        const std::string expectedServerPiece = str::stream()
-            << Grid::get(operationContext())->getNetwork()->getHostName() << ":27017";
-        ASSERT_EQUALS(expectedServerPiece, serverPiece);
-        ASSERT_EQUALS(timestamp.toString(), timePiece);
-
-        OID generatedOID;
-        // Just make sure this doesn't throws and assume the OID is valid
-        generatedOID.init(oidPiece);
-
-        BatchedCommandResponse response;
-        response.setStatus(Status::OK());
-
-        return response.toBSON();
-    });
-}
-
-void ShardingTestFixture::expectChangeLogCreate(const HostAndPort& configHost,
-                                                const BSONObj& response) {
-    expectConfigCollectionCreate(configHost, "changelog", 10 * 1024 * 1024, response);
-}
-
-void ShardingTestFixture::expectChangeLogInsert(const HostAndPort& configHost,
-                                                Date_t timestamp,
-                                                const std::string& what,
-                                                const std::string& ns,
-                                                const BSONObj& detail) {
-    expectConfigCollectionInsert(configHost, "changelog", timestamp, what, ns, detail);
 }
 
 void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost,

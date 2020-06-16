@@ -30,8 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/migration_destination_manager.h"
-#include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 
 namespace mongo {
 namespace {

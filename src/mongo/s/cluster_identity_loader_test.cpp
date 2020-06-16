@@ -37,7 +37,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/service_context.h"
-#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"

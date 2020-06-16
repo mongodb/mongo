@@ -35,7 +35,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/client/shard_registry.h"

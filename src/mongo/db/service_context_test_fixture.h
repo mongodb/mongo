@@ -35,7 +35,6 @@
 
 namespace mongo {
 
-
 class ScopedGlobalServiceContextForTest {
 public:
     /**
