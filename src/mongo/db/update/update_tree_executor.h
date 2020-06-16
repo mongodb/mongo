@@ -42,8 +42,37 @@ public:
         : _updateTree(std::move(node)) {}
 
     ApplyResult applyUpdate(ApplyParams applyParams) const final {
+        mutablebson::Document logDocument;
+        boost::optional<LogBuilder> optLogBuilder;
+        const bool generateOplogEntry =
+            applyParams.logMode != ApplyParams::LogMode::kDoNotGenerateOplogEntry;
+        if (generateOplogEntry) {
+            optLogBuilder.emplace(logDocument.root());
+        }
+
         UpdateNode::UpdateNodeApplyParams updateNodeApplyParams;
-        return _updateTree->apply(applyParams, updateNodeApplyParams);
+        updateNodeApplyParams.logBuilder = optLogBuilder.get_ptr();
+
+        auto ret = _updateTree->apply(applyParams, updateNodeApplyParams);
+
+        if (generateOplogEntry) {
+            // In versions since 3.6, the absence of a $v field indicates either a
+            // replacement-style update or a "classic" modifier-style update.
+            //
+            // Since 3.6, the presence of a $v field with value 1 may also indicate that the oplog
+            // entry is a "classic" modifier-style update.
+            //
+            // While we could elide this $v field when providing a value of 1, we continue to log
+            // it because:
+            // (a) It avoids an unnecessary oplog format change.
+            // (b) It is easy to distinguish from $v: 2 delta-style oplog entries.
+            invariant(optLogBuilder->setVersion(UpdateOplogEntryVersion::kUpdateNodeV1));
+
+            invariant(ret.oplogEntry.isEmpty());
+            ret.oplogEntry = logDocument.getObject();
+        }
+
+        return ret;
     }
 
     UpdateNode* getUpdateTree() {

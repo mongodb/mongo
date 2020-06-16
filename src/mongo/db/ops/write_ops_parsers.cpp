@@ -34,8 +34,10 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 
@@ -208,11 +210,47 @@ write_ops::Delete DeleteOp::parseLegacy(const Message& msgRaw) {
     return op;
 }
 
+write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry(
+    const BSONObj& oField) {
+    BSONElement vField = oField[kUpdateOplogEntryVersionFieldName];
+
+    // If this field appears it should be an integer.
+    uassert(4772600,
+            str::stream() << "Expected $v field to be missing or an integer, but got type: "
+                          << vField.type(),
+            !vField.ok() ||
+                (vField.type() == BSONType::NumberInt || vField.type() == BSONType::NumberLong));
+
+    if (vField.ok() && vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
+        // Make sure there's a diff field.
+        BSONElement diff = oField["diff"];
+        uassert(4772601,
+                str::stream() << "Expected 'diff' field to be an object, instead got type: "
+                              << diff.type(),
+                diff.type() == BSONType::Object);
+
+        return UpdateModification(doc_diff::Diff{diff.embeddedObject()}, DiffTag{});
+    } else if (!vField.ok() ||
+               vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1)) {
+        // Treat it as a "classic" update which can either be a full replacement or a
+        // modifier-style update. Which variant it is will be determined when the update driver is
+        // constructed.
+        return UpdateModification(oField);
+    }
+
+    // The $v field must be present, but have some unsupported value.
+    uasserted(4772604,
+              str::stream() << "Unrecognized value for '$v' (Version) field: "
+                            << vField.numberInt());
+}
+
+write_ops::UpdateModification::UpdateModification(doc_diff::Diff diff, DiffTag)
+    : _update(std::move(diff)) {}
+
 write_ops::UpdateModification::UpdateModification(BSONElement update) {
     const auto type = update.type();
     if (type == BSONType::Object) {
-        _classicUpdate = update.Obj();
-        _type = Type::kClassic;
+        _update = ClassicUpdate{update.Obj()};
         return;
     }
 
@@ -220,18 +258,24 @@ write_ops::UpdateModification::UpdateModification(BSONElement update) {
             "Update argument must be either an object or an array",
             type == BSONType::Array);
 
-    _type = Type::kPipeline;
-
-    _pipeline = uassertStatusOK(AggregationRequest::parsePipelineFromBSON(update));
+    _update = PipelineUpdate{uassertStatusOK(AggregationRequest::parsePipelineFromBSON(update))};
 }
 
 write_ops::UpdateModification::UpdateModification(const BSONObj& update) {
-    _classicUpdate = update;
-    _type = Type::kClassic;
+    // Do a sanity check that the $v field is either not provided or has value of 1.
+    const auto versionElem = update["$v"];
+    uassert(4772602,
+            str::stream() << "Expected classic update either contain no '$v' field, or "
+                          << "'$v' field with value 1, but found: " << versionElem,
+            !versionElem.ok() ||
+                versionElem.numberInt() ==
+                    static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1));
+
+    _update = ClassicUpdate{update};
 }
 
 write_ops::UpdateModification::UpdateModification(std::vector<BSONObj> pipeline)
-    : _type{Type::kPipeline}, _pipeline{std::move(pipeline)} {}
+    : _update{PipelineUpdate{std::move(pipeline)}} {}
 
 write_ops::UpdateModification write_ops::UpdateModification::parseFromBSON(BSONElement elem) {
     return UpdateModification(elem);
@@ -242,18 +286,50 @@ write_ops::UpdateModification write_ops::UpdateModification::parseLegacyOpUpdate
     return UpdateModification(obj);
 }
 
+int write_ops::UpdateModification::objsize() const {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [](const ClassicUpdate& classic) -> int { return classic.bson.objsize(); },
+            [](const PipelineUpdate& pipeline) -> int {
+                int size = 0;
+                std::for_each(pipeline.begin(), pipeline.end(), [&size](const BSONObj& obj) {
+                    size += obj.objsize() + kWriteCommandBSONArrayPerElementOverheadBytes;
+                });
+
+                return size + kWriteCommandBSONArrayPerElementOverheadBytes;
+            },
+            [](const doc_diff::Diff& diff) -> int { return diff.objsize(); }},
+        _update);
+}
+
+
+write_ops::UpdateModification::Type write_ops::UpdateModification::type() const {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [](const ClassicUpdate& classic) { return Type::kClassic; },
+            [](const PipelineUpdate& pipelineUpdate) { return Type::kPipeline; },
+            [](const doc_diff::Diff& diff) { return Type::kDelta; }},
+        _update);
+}
+
 void write_ops::UpdateModification::serializeToBSON(StringData fieldName,
                                                     BSONObjBuilder* bob) const {
-    if (_type == Type::kClassic) {
-        *bob << fieldName << *_classicUpdate;
-        return;
-    }
 
-    BSONArrayBuilder arrayBuilder(bob->subarrayStart(fieldName));
-    for (auto&& stage : *_pipeline) {
-        arrayBuilder << stage;
-    }
-    arrayBuilder.doneFast();
+    stdx::visit(
+        visit_helper::Overloaded{
+            [fieldName, bob](const ClassicUpdate& classic) { *bob << fieldName << classic.bson; },
+            [fieldName, bob](const PipelineUpdate& pipeline) {
+                BSONArrayBuilder arrayBuilder(bob->subarrayStart(fieldName));
+                for (auto&& stage : pipeline) {
+                    arrayBuilder << stage;
+                }
+                arrayBuilder.doneFast();
+            },
+            [](const doc_diff::Diff& diff) {
+                // We never serialize delta style updates.
+                MONGO_UNREACHABLE;
+            }},
+        _update);
 }
 
 }  // namespace mongo

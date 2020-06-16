@@ -82,6 +82,10 @@ public:
         // For example, if the update is {$set: {'a.b.c': 5}}, and the document is {a: {}}, then at
         // the leaf node, 'pathTaken'="a".
         std::shared_ptr<FieldRef> pathTaken = std::make_shared<FieldRef>();
+
+        // Builder object used for constructing an oplog entry. A value of nullptr indicates that
+        // no oplog entry needs to be constructed.
+        LogBuilder* logBuilder = nullptr;
     };
 
     explicit UpdateNode(Type type, Context context = Context::kAll)

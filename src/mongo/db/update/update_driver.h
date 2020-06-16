@@ -56,7 +56,7 @@ class OperationContext;
 
 class UpdateDriver {
 public:
-    enum class UpdateType { kOperator, kReplacement, kPipeline };
+    enum class UpdateType { kOperator, kReplacement, kPipeline, kDelta };
 
     UpdateDriver(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 

@@ -45,9 +45,15 @@ namespace mongo {
 class ObjectReplaceExecutor : public UpdateExecutor {
 
 public:
-    // Applies a replacement style update to 'applyParams.element'. If
-    // 'replacementDocContainsIdField' is false then the _id field from the original document will
-    // be preserved.
+    /**
+     * Applies a replacement style update to 'applyParams.element'.
+     *
+     * If 'replacementDocContainsIdField' is false then the _id field from the original document
+     * will be preserved.
+     *
+     * This function will ignore the log mode provided in 'applyParams'. The 'oplogEntry' field
+     * of the returned ApplyResult is always empty.
+     */
     static ApplyResult applyReplacementUpdate(ApplyParams applyParams,
                                               const BSONObj& replacementDoc,
                                               bool replacementDocContainsIdField);

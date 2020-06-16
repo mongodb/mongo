@@ -51,7 +51,7 @@ protected:
         mongo::LogicalClock::set(service, std::move(logicalClock));
     }
 
-    void resetApplyParams() {
+    virtual void resetApplyParams() {
         _immutablePathsVector.clear();
         _immutablePaths.clear();
         _pathToCreate = std::make_shared<FieldRef>();
@@ -66,15 +66,15 @@ protected:
         _modifiedPaths.clear();
     }
 
-    UpdateExecutor::ApplyParams getApplyParams(mutablebson::Element element) {
+    virtual UpdateExecutor::ApplyParams getApplyParams(mutablebson::Element element) {
         UpdateExecutor::ApplyParams applyParams(element, _immutablePaths);
         applyParams.matchedField = _matchedField;
         applyParams.insert = _insert;
         applyParams.fromOplogApplication = _fromOplogApplication;
         applyParams.validateForStorage = _validateForStorage;
         applyParams.indexData = _indexData.get();
-        applyParams.logBuilder = _logBuilder.get();
         applyParams.modifiedPaths = &_modifiedPaths;
+        applyParams.logMode = ApplyParams::LogMode::kGenerateOplogEntry;
         return applyParams;
     }
 
@@ -82,6 +82,7 @@ protected:
         UpdateNode::UpdateNodeApplyParams applyParams;
         applyParams.pathToCreate = _pathToCreate;
         applyParams.pathTaken = _pathTaken;
+        applyParams.logBuilder = _logBuilder.get();
         return applyParams;
     }
 

@@ -364,3 +364,9 @@ server_parameters:
     validator:
       gt: 0
 
+  internalQueryEnableLoggingV2OplogEntries:
+    description: "If true, this node may log $v:2 delta-style oplog entries."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryEnableLoggingV2OplogEntries"
+    cpp_vartype: AtomicWord<bool>
+    default: false

@@ -240,9 +240,8 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
     ApplyParams unsetParams(applyParams);
     unsetParams.element = fromElement;
 
-    UpdateNodeApplyParams unsetUpdateNodeApplyParams;
-    unsetUpdateNodeApplyParams.pathToCreate = std::make_shared<FieldRef>();
-    unsetUpdateNodeApplyParams.pathTaken = fromFieldRef;
+    UpdateNodeApplyParams unsetUpdateNodeApplyParams{
+        std::make_shared<FieldRef>(), fromFieldRef, updateNodeApplyParams.logBuilder};
 
     UnsetNode unsetElement;
     auto unsetElementApplyResult = unsetElement.apply(unsetParams, unsetUpdateNodeApplyParams);

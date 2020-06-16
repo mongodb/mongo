@@ -39,37 +39,21 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/delta_executor.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/str.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 
 using pathsupport::EqualityMatches;
 
 namespace {
-
-StatusWith<UpdateSemantics> updateSemanticsFromElement(BSONElement element) {
-    if (element.type() != BSONType::NumberInt && element.type() != BSONType::NumberLong) {
-        return {ErrorCodes::BadValue, "'$v' (UpdateSemantics) field must be an integer."};
-    }
-
-    auto updateSemantics = element.numberLong();
-
-    // As of 3.7, we only support one version of the update language.
-    if (updateSemantics != static_cast<int>(UpdateSemantics::kUpdateNode)) {
-        return {ErrorCodes::Error(40682),
-                str::stream() << "Unrecognized value for '$v' (UpdateSemantics) field: "
-                              << updateSemantics};
-    }
-
-    return static_cast<UpdateSemantics>(updateSemantics);
-}
-
 modifiertable::ModifierType validateMod(BSONElement mod) {
     auto modType = modifiertable::getType(mod.fieldName());
 
@@ -104,16 +88,16 @@ bool parseUpdateExpression(
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters) {
     bool positional = false;
     std::set<std::string> foundIdentifiers;
-    bool foundUpdateSemanticsField = false;
+    bool foundVersionField = false;
     for (auto&& mod : updateExpr) {
         // If there is a "$v" field among the modifiers, it should have already been used by the
         // caller to determine that this is the correct parsing function.
-        if (mod.fieldNameStringData() == LogBuilder::kUpdateSemanticsFieldName) {
-            uassert(ErrorCodes::BadValue,
-                    "Duplicate $v in oplog update document",
-                    !foundUpdateSemanticsField);
-            foundUpdateSemanticsField = true;
-            invariant(mod.numberLong() == static_cast<long long>(UpdateSemantics::kUpdateNode));
+        if (mod.fieldNameStringData() == kUpdateOplogEntryVersionFieldName) {
+            uassert(
+                ErrorCodes::BadValue, "Duplicate $v in oplog update document", !foundVersionField);
+            foundVersionField = true;
+            invariant(mod.numberLong() ==
+                      static_cast<long long>(UpdateOplogEntryVersion::kUpdateNodeV1));
             continue;
         }
 
@@ -158,6 +142,16 @@ void UpdateDriver::parse(
         return;
     }
 
+    if (updateMod.type() == write_ops::UpdateModification::Type::kDelta) {
+        uassert(4772603,
+                "arrayFilters may not be specified for delta-syle updates",
+                arrayFilters.empty());
+
+        _updateType = UpdateType::kDelta;
+        _updateExecutor = std::make_unique<DeltaExecutor>(updateMod.getDiff());
+        return;
+    }
+
     uassert(51198, "Constant values may only be specified for pipeline updates", !constants);
 
     // Check if the update expression is a full object replacement.
@@ -175,18 +169,21 @@ void UpdateDriver::parse(
 
     invariant(_updateType == UpdateType::kOperator);
 
-    // Some versions of mongod support more than one version of the update language and look for a
-    // $v "UpdateSemantics" field when applying an oplog entry, in order to know which version of
-    // the update language to apply with. We currently only support the 'kUpdateNode' version, but
-    // we parse $v and check its value for compatibility.
+    // By this point we are expecting a "classic" update. This version of mongod only supports $v:
+    // 1 (modifier language) and $v: 2 (delta) (older versions support $v: 0). We've already
+    // checked whether this is a delta update so we check that the $v field isn't present, or has a
+    // value of 1.
+
     auto updateExpr = updateMod.getUpdateClassic();
-    BSONElement updateSemanticsElement = updateExpr[LogBuilder::kUpdateSemanticsFieldName];
-    if (updateSemanticsElement) {
+    BSONElement versionElement = updateExpr[kUpdateOplogEntryVersionFieldName];
+    if (versionElement) {
         uassert(ErrorCodes::FailedToParse,
                 "The $v update field is only recognized internally",
                 _fromOplogApplication);
 
-        uassertStatusOK(updateSemanticsFromElement(updateSemanticsElement));
+        // The UpdateModification should have verified that the value of $v is valid.
+        invariant(versionElement.numberInt() ==
+                  static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1));
     }
 
     auto root = std::make_unique<UpdateObjectNode>();
@@ -253,12 +250,9 @@ Status UpdateDriver::update(StringData matchedField,
                             FieldRefSetWithStorage* modifiedPaths) {
     // TODO: assert that update() is called at most once in a !_multi case.
 
-    _affectIndices =
-        ((_updateType == UpdateType::kReplacement || _updateType == UpdateType::kPipeline) &&
-         (_indexedFields != nullptr));
+    _affectIndices = (_updateType != UpdateType::kOperator && _indexedFields != nullptr);
 
     _logDoc.reset();
-    LogBuilder logBuilder(_logDoc.root());
 
     UpdateExecutor::ApplyParams applyParams(doc->root(), immutablePaths);
     applyParams.matchedField = matchedField;
@@ -271,7 +265,9 @@ Status UpdateDriver::update(StringData matchedField,
     invariant(!modifiedPaths || modifiedPaths->empty());
 
     if (_logOp && logOpRec) {
-        applyParams.logBuilder = &logBuilder;
+        applyParams.logMode = internalQueryEnableLoggingV2OplogEntries.load()
+            ? ApplyParams::LogMode::kGenerateOplogEntry
+            : ApplyParams::LogMode::kGenerateOnlyV1OplogEntry;
     }
 
     invariant(_updateExecutor);
@@ -283,22 +279,10 @@ Status UpdateDriver::update(StringData matchedField,
     if (docWasModified) {
         *docWasModified = !applyResult.noop;
     }
-    if (_updateType == UpdateType::kOperator && _logOp && logOpRec) {
-        // If there are binVersion=3.6 mongod nodes in the replica set, they need to be told that
-        // this update is using the "kUpdateNode" version of the update semantics and not the older
-        // update semantics that could be used by a featureCompatibilityVersion=3.4 node.
-        //
-        // TODO (SERVER-32240): Once binVersion <= 3.6 nodes are not supported in a replica set, we
-        // can safely elide this "$v" UpdateSemantics field from oplog entries, because there will
-        // only one supported version, which all nodes will assume is in use.
-        //
-        // We also don't need to specify the semantics for a full document replacement (and there
-        // would be no place to put a "$v" field in the update document).
-        invariant(logBuilder.setUpdateSemantics(UpdateSemantics::kUpdateNode));
-    }
 
-    if (_logOp && logOpRec)
-        *logOpRec = _logDoc.getObject();
+    if (_logOp && logOpRec && !applyResult.noop) {
+        *logOpRec = applyResult.oplogEntry;
+    }
 
     return Status::OK();
 }

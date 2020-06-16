@@ -200,8 +200,8 @@ UpdateExecutor::ApplyResult ModifierNode::applyToExistingElement(
             applyParams.element, leftSibling, rightSibling, recursionLevel, updateResult);
     }
 
-    if (applyParams.logBuilder) {
-        logUpdate(applyParams.logBuilder,
+    if (auto logBuilder = updateNodeApplyParams.logBuilder) {
+        logUpdate(logBuilder,
                   updateNodeApplyParams.pathTaken->dottedField(),
                   applyParams.element,
                   updateResult);
@@ -299,9 +299,8 @@ UpdateExecutor::ApplyResult ModifierNode::applyToNonexistentElement(
             applyResult.indexesAffected = false;
         }
 
-        if (applyParams.logBuilder) {
-            logUpdate(
-                applyParams.logBuilder, fullPath.dottedField(), newElement, ModifyResult::kCreated);
+        if (auto logBuilder = updateNodeApplyParams.logBuilder) {
+            logUpdate(logBuilder, fullPath.dottedField(), newElement, ModifyResult::kCreated);
         }
 
         return applyResult;

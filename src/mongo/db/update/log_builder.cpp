@@ -39,17 +39,9 @@ const char kSet[] = "$set";
 const char kUnset[] = "$unset";
 }  // namespace
 
-constexpr StringData LogBuilder::kUpdateSemanticsFieldName;
-
 inline Status LogBuilder::addToSection(Element newElt, Element* section, const char* sectionName) {
     // If we don't already have this section, try to create it now.
     if (!section->ok()) {
-        // If we already have object replacement data, we can't also have section entries.
-        if (hasObjectReplacement())
-            return Status(ErrorCodes::IllegalOperation,
-                          "LogBuilder: Invalid attempt to add a $set/$unset entry"
-                          "to a log with an existing object replacement");
-
         mutablebson::Document& doc = _logRoot.getDocument();
 
         // We should not already have an element with the section name under the root.
@@ -66,16 +58,11 @@ inline Status LogBuilder::addToSection(Element newElt, Element* section, const c
         if (!result.isOK())
             return result;
         *section = newElement;
-
-        // Invalidate attempts to add an object replacement, now that we have a named
-        // section under the root.
-        _objectReplacementAccumulator = doc.end();
     }
 
     // Whatever transpired, we should now have an ok accumulator for the section, and not
     // have a replacement accumulator.
     dassert(section->ok());
-    dassert(!_objectReplacementAccumulator.ok());
 
     // Enqueue the provided element to the section and propagate the result.
     return section->pushBack(newElt);
@@ -126,60 +113,17 @@ Status LogBuilder::addToUnsets(StringData path) {
     return addToSection(logElement, &_unsetAccumulator, kUnset);
 }
 
-Status LogBuilder::setUpdateSemantics(UpdateSemantics updateSemantics) {
-    if (hasObjectReplacement()) {
-        return Status(ErrorCodes::IllegalOperation,
-                      "LogBuilder: Invalid attempt to add a $v entry to a log with an existing "
-                      "object replacement");
-    }
-
-    if (_updateSemantics.ok()) {
+Status LogBuilder::setVersion(UpdateOplogEntryVersion oplogVersion) {
+    if (_version.ok()) {
         return Status(ErrorCodes::IllegalOperation, "LogBuilder: Invalid attempt to set $v twice.");
     }
 
     mutablebson::Document& doc = _logRoot.getDocument();
-    _updateSemantics =
-        doc.makeElementInt(kUpdateSemanticsFieldName, static_cast<int>(updateSemantics));
+    _version =
+        doc.makeElementInt(kUpdateOplogEntryVersionFieldName, static_cast<int>(oplogVersion));
 
-    dassert(_logRoot[kUpdateSemanticsFieldName] == doc.end());
+    dassert(_logRoot[kUpdateOplogEntryVersionFieldName] == doc.end());
 
-    return _logRoot.pushFront(_updateSemantics);
+    return _logRoot.pushFront(_version);
 }
-
-Status LogBuilder::getReplacementObject(Element* outElt) {
-    // If the replacement accumulator is not ok, we must have started a $set or $unset
-    // already, so an object replacement is not permitted.
-    if (!_objectReplacementAccumulator.ok()) {
-        dassert(_setAccumulator.ok() || _unsetAccumulator.ok());
-        return Status(ErrorCodes::IllegalOperation,
-                      "LogBuilder: Invalid attempt to obtain the object replacement slot "
-                      "for a log containing $set or $unset entries");
-    }
-
-    if (hasObjectReplacement())
-        return Status(ErrorCodes::IllegalOperation,
-                      "LogBuilder: Invalid attempt to acquire the replacement object "
-                      "in a log with existing object replacement data");
-
-    if (_updateSemantics.ok()) {
-        return Status(ErrorCodes::IllegalOperation,
-                      "LogBuilder: Invalid attempt to acquire the replacement object in a log with "
-                      "an update semantics value");
-    }
-
-    // OK to enqueue object replacement items.
-    *outElt = _objectReplacementAccumulator;
-    return Status::OK();
-}
-
-inline bool LogBuilder::hasObjectReplacement() const {
-    if (!_objectReplacementAccumulator.ok())
-        return false;
-
-    dassert(!_setAccumulator.ok());
-    dassert(!_unsetAccumulator.ok());
-
-    return _objectReplacementAccumulator.hasChildren();
-}
-
 }  // namespace mongo

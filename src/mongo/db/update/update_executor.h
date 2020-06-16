@@ -32,7 +32,6 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/update/log_builder.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
 
@@ -50,6 +49,23 @@ public:
      * The parameters required by UpdateExecutor::applyUpdate.
      */
     struct ApplyParams {
+        /**
+         * Enum indicating whether/what kind of oplog entry should be returned in the ApplyResult
+         * by the update executor.
+         */
+        enum class LogMode {
+            // Indicates that no oplog entry should be produced.
+            kDoNotGenerateOplogEntry,
+
+            // Indicates that the update executor should produce an oplog entry. Only the $v: 1
+            // format or replacement-style format may be used, however.
+            kGenerateOnlyV1OplogEntry,
+
+            // Indicates that the update executor should produce an oplog entry, and may use any
+            // format.
+            kGenerateOplogEntry
+        };
+
         ApplyParams(mutablebson::Element element, const FieldRefSet& immutablePaths)
             : element(element), immutablePaths(immutablePaths) {}
 
@@ -77,8 +93,10 @@ public:
         // Used to determine whether indexes are affected.
         const UpdateIndexData* indexData = nullptr;
 
-        // If provided, UpdateNode::apply will log the update here.
-        LogBuilder* logBuilder = nullptr;
+        // Indicates whether/what type of oplog entry should be produced by the update executor.
+        // If 'logMode' indicates an oplog entry should be produced but the update turns out to be
+        // a noop, an oplog entry may not be produced.
+        LogMode logMode = LogMode::kDoNotGenerateOplogEntry;
 
         // If provided, UpdateNode::apply will populate this with a path to each modified field.
         FieldRefSetWithStorage* modifiedPaths = nullptr;
@@ -97,6 +115,11 @@ public:
 
         bool indexesAffected = true;
         bool noop = false;
+
+        // The oplog entry to log. This is only populated if the operation is not considered a
+        // noop and if the 'logMode' provided in ApplyParams indicates that an oplog entry should
+        // be generated.
+        BSONObj oplogEntry;
     };
 
 

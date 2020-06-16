@@ -33,10 +33,12 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 namespace write_ops {
-
 // Conservative per array element overhead. This value was calculated as 1 byte (element type) + 5
 // bytes (max string encoding of the array index encoded as string and the maximum key is 99999) + 1
 // byte (zero terminator) = 7 bytes
@@ -55,18 +57,23 @@ void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder
 
 class UpdateModification {
 public:
-    enum class Type { kClassic, kPipeline };
+    enum class Type { kClassic, kPipeline, kDelta };
 
-    static StringData typeToString(Type type) {
-        return (type == Type::kClassic ? "Classic"_sd : "Pipeline"_sd);
-    }
+    /**
+     * Used to indicate that a diff is being passed to the constructor.
+     */
+    struct DiffTag {};
+
+    // Given the 'o' field of an update oplog entry, will return an UpdateModification that can be
+    // applied.
+    static UpdateModification parseFromOplogEntry(const BSONObj& oField);
 
     UpdateModification() = default;
     UpdateModification(BSONElement update);
     UpdateModification(std::vector<BSONObj> pipeline);
+    UpdateModification(doc_diff::Diff, DiffTag);
     // This constructor exists only to provide a fast-path for constructing classic-style updates.
     UpdateModification(const BSONObj& update);
-
 
     /**
      * These methods support IDL parsing of the "u" field from the update command and OP_UPDATE.
@@ -83,50 +90,51 @@ public:
     // representing an aggregation stage, due to the leading '$'' character.
     static UpdateModification parseLegacyOpUpdateFromBSON(const BSONObj& obj);
 
-    int objsize() const {
-        if (_type == Type::kClassic) {
-            return _classicUpdate->objsize();
-        }
+    int objsize() const;
 
-        int size = 0;
-        std::for_each(_pipeline->begin(), _pipeline->end(), [&size](const BSONObj& obj) {
-            size += obj.objsize() + kWriteCommandBSONArrayPerElementOverheadBytes;
-        });
-
-        return size + kWriteCommandBSONArrayPerElementOverheadBytes;
-    }
-
-    Type type() const {
-        return _type;
-    }
+    Type type() const;
 
     BSONObj getUpdateClassic() const {
-        invariant(_type == Type::kClassic);
-        return *_classicUpdate;
+        invariant(type() == Type::kClassic);
+        return stdx::get<ClassicUpdate>(_update).bson;
     }
 
     const std::vector<BSONObj>& getUpdatePipeline() const {
-        invariant(_type == Type::kPipeline);
-        return *_pipeline;
+        invariant(type() == Type::kPipeline);
+        return stdx::get<PipelineUpdate>(_update);
+    }
+
+    doc_diff::Diff getDiff() const {
+        invariant(type() == Type::kDelta);
+        return stdx::get<doc_diff::Diff>(_update);
     }
 
     std::string toString() const {
         StringBuilder sb;
-        sb << "{type: " << typeToString(_type) << ", update: ";
 
-        if (_type == Type::kClassic) {
-            sb << *_classicUpdate << "}";
-        } else {
-            sb << Value(*_pipeline).toString();
-        }
+        stdx::visit(visit_helper::Overloaded{[&sb](const ClassicUpdate& classic) {
+                                                 sb << "{type: Classic, update: " << classic.bson
+                                                    << "}";
+                                             },
+                                             [&sb](const PipelineUpdate& pipeline) {
+                                                 sb << "{type: Pipeline, update: "
+                                                    << Value(pipeline).toString() << "}";
+                                             },
+                                             [&sb](const doc_diff::Diff& diff) {
+                                                 sb << "{type: Delta, update: " << diff << "}";
+                                             }},
+                    _update);
 
         return sb.str();
     }
 
 private:
-    Type _type = Type::kClassic;
-    boost::optional<BSONObj> _classicUpdate;
-    boost::optional<std::vector<BSONObj>> _pipeline;
+    // Wrapper class used to avoid having a variant where multiple alternatives have the same type.
+    struct ClassicUpdate {
+        BSONObj bson;
+    };
+    using PipelineUpdate = std::vector<BSONObj>;
+    stdx::variant<ClassicUpdate, PipelineUpdate, doc_diff::Diff> _update;
 };
 
 }  // namespace write_ops

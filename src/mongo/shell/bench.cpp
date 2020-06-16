@@ -1187,6 +1187,11 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                 pipelineBuilder.doneFast();
                                 break;
                             }
+                            case write_ops::UpdateModification::Type::kDelta:
+                                // It is not possible to run a delta update directly from a client.
+                                // Delta updates are only executed on secondaries as part of oplog
+                                // application.
+                                MONGO_UNREACHABLE;
                         }
                         singleUpdate.append("multi", this->multi);
                         singleUpdate.append("upsert", this->upsert);

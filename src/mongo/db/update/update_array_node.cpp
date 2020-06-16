@@ -139,10 +139,11 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
 
             auto childApplyParams = applyParams;
             childApplyParams.element = childElement;
-            if (!childrenShouldLogThemselves) {
-                childApplyParams.logBuilder = nullptr;
-            }
             auto childUpdateNodeApplyParams = updateNodeApplyParams;
+            if (!childrenShouldLogThemselves) {
+                childApplyParams.logMode = ApplyParams::LogMode::kDoNotGenerateOplogEntry;
+                childUpdateNodeApplyParams.logBuilder = nullptr;
+            }
 
             auto childApplyResult =
                 mergedChild->apply(childApplyParams, childUpdateNodeApplyParams);
@@ -165,24 +166,25 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
     }
 
     // If the child updates have not been logged, log the updated array elements.
-    if (!childrenShouldLogThemselves && applyParams.logBuilder) {
+    auto* const logBuilder = updateNodeApplyParams.logBuilder;
+    if (!childrenShouldLogThemselves && logBuilder) {
         if (nModified > 1) {
 
             // Log the entire array.
-            auto logElement = applyParams.logBuilder->getDocument().makeElementWithNewFieldName(
+            auto logElement = logBuilder->getDocument().makeElementWithNewFieldName(
                 updateNodeApplyParams.pathTaken->dottedField(), applyParams.element);
             invariant(logElement.ok());
-            uassertStatusOK(applyParams.logBuilder->addToSets(logElement));
+            uassertStatusOK(logBuilder->addToSets(logElement));
         } else if (nModified == 1) {
 
             // Log the modified array element.
             invariant(modifiedElement);
             FieldRef::FieldRefTempAppend tempAppend(*(updateNodeApplyParams.pathTaken),
                                                     modifiedElement->getFieldName());
-            auto logElement = applyParams.logBuilder->getDocument().makeElementWithNewFieldName(
+            auto logElement = logBuilder->getDocument().makeElementWithNewFieldName(
                 updateNodeApplyParams.pathTaken->dottedField(), *modifiedElement);
             invariant(logElement.ok());
-            uassertStatusOK(applyParams.logBuilder->addToSets(logElement));
+            uassertStatusOK(logBuilder->addToSets(logElement));
         }
     }
 
