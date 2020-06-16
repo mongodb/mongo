@@ -278,6 +278,7 @@ public:
 
                 result.append("ns", nss.ns());
                 result.append("code", status.code());
+                result.append("message", status.reason());
                 requestedVersion.appendLegacyWithField(&result, "version");
                 currVersion.appendLegacyWithField(&result, "globalVersion");
                 result.appendBool("reloadConfig", true);
