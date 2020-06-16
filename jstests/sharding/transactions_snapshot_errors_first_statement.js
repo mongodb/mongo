@@ -149,7 +149,7 @@ jsTestLog("Two shard sharded transaction");
 
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 15}, to: st.shard1.shardName}));
 assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
-assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
+assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, collName, 2, errorCode, true /* isSharded */);
