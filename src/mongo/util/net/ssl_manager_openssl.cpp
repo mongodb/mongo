@@ -796,7 +796,6 @@ StatusWith<std::pair<OCSPCertIDSet, Date_t>> parseAndValidateOCSPResponse(
                                  << "Response Status: " << responseStatus);
         case OCSP_RESPONSE_STATUS_TRYLATER:
         case OCSP_RESPONSE_STATUS_INTERNALERROR:
-            // TODO: SERVER-42936 Add support for tlsAllowInvalidCertificates
             return getSSLFailure(str::stream()
                                  << "Error querying the OCSP responder, an error occured in the "
                                  << "responder itself. Response Status: " << responseStatus);
