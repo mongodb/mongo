@@ -8,6 +8,8 @@ import sys
 import time
 from distutils import spawn  # pylint: disable=no-name-in-module
 
+import psutil
+
 from buildscripts.resmokelib import core
 
 _IS_WINDOWS = (sys.platform == "win32")
@@ -106,3 +108,23 @@ def signal_process(logger, pid, signalnum):
 
     except AttributeError:
         logger.error("Cannot send signal to a process on Windows")
+
+
+def pause_process(logger, pname, pid):
+    """Pausing process."""
+
+    logger.info("Suspending process %s with PID %d", pname, pid)
+    try:
+        psutil.Process(pid).suspend()
+    except psutil.NoSuchProcess as err:
+        logger.error("Process not found: %s", err.msg)
+
+
+def resume_process(logger, pname, pid):
+    """Resuming  process."""
+
+    logger.info("Resuming process %s with PID %d", pname, pid)
+    try:
+        psutil.Process(pid).resume()
+    except psutil.NoSuchProcess as err:
+        logger.error("Process not found: %s", err.msg)

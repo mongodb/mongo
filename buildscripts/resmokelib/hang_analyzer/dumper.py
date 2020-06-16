@@ -225,11 +225,13 @@ class LLDBDumper(Dumper):
                 self._root_logger.info("Dumping core to %s", dump_file)
 
             cmds += [
+                "platform shell kill -CONT %d" % pid,
                 "attach -p %d" % pid,
                 "target modules list",
                 "thread backtrace all",
                 dump_command,
                 "process detach",
+                "platform shell kill -STOP %d" % pid,
             ]
 
         return cmds
@@ -367,6 +369,7 @@ class GDBDumper(Dumper):
 
             cmds += [
                 "attach %d" % pid,
+                "handle SIGSTOP ignore noprint",
                 "info sharedlibrary",
                 "info threads",  # Dump a simple list of commands to get the thread name
             ] + raw_stacks_commands + [

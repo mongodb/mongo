@@ -21,7 +21,7 @@ import traceback
 from buildscripts.resmokelib.hang_analyzer import dumper
 from buildscripts.resmokelib.hang_analyzer import extractor
 from buildscripts.resmokelib.hang_analyzer import process_list
-from buildscripts.resmokelib.hang_analyzer.process import signal_process, signal_python
+from buildscripts.resmokelib.hang_analyzer.process import signal_process, signal_python, pause_process, resume_process
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 
@@ -62,6 +62,12 @@ class HangAnalyzer(Subcommand):
 
         max_dump_size_bytes = int(self.options.max_core_dumps_size) * 1024 * 1024
 
+        # Suspending all processes, except python, to prevent them from getting unstuck when
+        # the hang analyzer attaches to them.
+        for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:
+            for pid in pinfo.pidv:
+                pause_process(self.root_logger, pinfo.name, pid)
+
         # Dump python processes by signalling them. The resmoke.py process will generate
         # the report.json, when signalled, so we do this before attaching to other processes.
         for pinfo in [pinfo for pinfo in processes if pinfo.name.startswith("python")]:
@@ -101,6 +107,11 @@ class HangAnalyzer(Subcommand):
                 signal_process(self.root_logger, pid, signal.SIGABRT)
 
         self.root_logger.info("Done analyzing all processes for hangs")
+
+        # Resuming all suspended processes.
+        for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:
+            for pid in pinfo.pidv:
+                resume_process(self.root_logger, pinfo.name, pid)
 
         for exception in trapped_exceptions:
             self.root_logger.info(exception)
