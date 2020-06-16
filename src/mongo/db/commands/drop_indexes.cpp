@@ -131,7 +131,8 @@ public:
         AutoGetCollection autoColl(opCtx, toReIndexNss, MODE_X);
         Collection* collection = autoColl.getCollection();
         if (!collection) {
-            if (ViewCatalog::get(autoColl.getDb())->lookup(opCtx, toReIndexNss.ns()))
+            auto db = autoColl.getDb();
+            if (db && ViewCatalog::get(db)->lookup(opCtx, toReIndexNss.ns()))
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "can't re-index a view");
             else
                 uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
