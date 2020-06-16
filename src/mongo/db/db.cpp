@@ -1073,11 +1073,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         lsc->joinOnShutDown();
     }
 
-    // Terminate the index consistency check.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        PeriodicShardedIndexConsistencyChecker::get(serviceContext).onShutDown();
-    }
-
     // Shutdown the TransportLayer so that new connections aren't accepted
     if (auto tl = serviceContext->getTransportLayer()) {
         LOGV2_OPTIONS(
@@ -1116,6 +1111,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // This can wait a long time while we drain the secondary's apply queue, especially if
         // it is building an index.
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
+
+        // Terminate the index consistency check.
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            PeriodicShardedIndexConsistencyChecker::get(serviceContext).onShutDown();
+        }
 
         ShardingInitializationMongoD::get(serviceContext)->shutDown(opCtx);
 
