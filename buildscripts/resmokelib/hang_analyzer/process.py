@@ -128,3 +128,17 @@ def resume_process(logger, pname, pid):
         psutil.Process(pid).resume()
     except psutil.NoSuchProcess as err:
         logger.error("Process not found: %s", err.msg)
+
+
+def kill_processes(logger, processes):
+    """Kill processes with SIGKILL."""
+    logger.info("Starting to kill processes. Logs should be ignored from this point.")
+    for pinfo in processes:
+        for pid in pinfo.pidv:
+            try:
+                proc = psutil.Process(pid)
+                logger.info("Killing process %s with pid %d", pinfo.name, pid)
+                proc.kill()
+            except psutil.NoSuchProcess:
+                # Process has already terminated.
+                pass

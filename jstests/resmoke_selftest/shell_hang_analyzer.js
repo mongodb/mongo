@@ -17,17 +17,21 @@ const anyLineMatches = function(lines, rex) {
  */
 
 const child = MongoRunner.runMongod();
-try {
-    clearRawMongoProgramOutput();
+clearRawMongoProgramOutput();
 
-    // drive-by test for enable(). Separate test for disable() below.
-    MongoRunner.runHangAnalyzer.disable();
-    MongoRunner.runHangAnalyzer.enable();
+// drive-by test for enable(). Separate test for disable() below.
+MongoRunner.runHangAnalyzer.disable();
+MongoRunner.runHangAnalyzer.enable();
 
-    MongoRunner.runHangAnalyzer([child.pid]);
+MongoRunner.runHangAnalyzer([child.pid]);
+
+if (TestData && TestData.inEvergreen) {
+    assert.soon(() => {
+        // Ensure the hang-analyzer has killed the process.
+        return !checkProgram(child.pid).alive;
+    });
 
     const lines = rawMongoProgramOutput().split('\n');
-
     if (_isAddressSanitizerActive()) {
         assert.soon(() => {
             // On ASAN builds, we never dump the core during hang analyzer runs,
@@ -42,7 +46,8 @@ try {
             return anyLineMatches(lines, /Dumping core/);
         });
     }
-} finally {
+} else {
+    // When running locally the hang-analyzer is not run.
     MongoRunner.stopMongod(child);
 }
 })();

@@ -20,8 +20,8 @@ import traceback
 
 from buildscripts.resmokelib.hang_analyzer import dumper
 from buildscripts.resmokelib.hang_analyzer import extractor
+from buildscripts.resmokelib.hang_analyzer import process
 from buildscripts.resmokelib.hang_analyzer import process_list
-from buildscripts.resmokelib.hang_analyzer.process import signal_process, signal_python, pause_process, resume_process
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 
@@ -66,13 +66,13 @@ class HangAnalyzer(Subcommand):
         # the hang analyzer attaches to them.
         for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:
             for pid in pinfo.pidv:
-                pause_process(self.root_logger, pinfo.name, pid)
+                process.pause_process(self.root_logger, pinfo.name, pid)
 
         # Dump python processes by signalling them. The resmoke.py process will generate
         # the report.json, when signalled, so we do this before attaching to other processes.
         for pinfo in [pinfo for pinfo in processes if pinfo.name.startswith("python")]:
             for pid in pinfo.pidv:
-                signal_python(self.root_logger, pinfo.name, pid)
+                process.signal_python(self.root_logger, pinfo.name, pid)
 
         trapped_exceptions = []
 
@@ -104,14 +104,18 @@ class HangAnalyzer(Subcommand):
             for pid in pinfo.pidv:
                 self.root_logger.info("Sending signal SIGABRT to go process %s with PID %d",
                                       pinfo.name, pid)
-                signal_process(self.root_logger, pid, signal.SIGABRT)
+                process.signal_process(self.root_logger, pid, signal.SIGABRT)
 
         self.root_logger.info("Done analyzing all processes for hangs")
 
-        # Resuming all suspended processes.
-        for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:
-            for pid in pinfo.pidv:
-                resume_process(self.root_logger, pinfo.name, pid)
+        # Kill processes if "-k" was specified.
+        if self.options.kill_processes:
+            process.kill_processes(self.root_logger, processes)
+        else:
+            # Resuming all suspended processes.
+            for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:
+                for pid in pinfo.pidv:
+                    process.resume_process(self.root_logger, pinfo.name, pid)
 
         for exception in trapped_exceptions:
             self.root_logger.info(exception)
@@ -223,3 +227,6 @@ class HangAnalyzerPlugin(PluginInterface):
             " command line to have the debugger's output written to multiple"
             " locations. By default, the debugger's output is written only to the"
             " Python process's stdout.")
+        parser.add_argument('-k', '--kill-processes', dest='kill_processes', action="store_true",
+                            default=False,
+                            help="Kills the analyzed processes after analysis completes.")

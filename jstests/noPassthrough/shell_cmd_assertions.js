@@ -412,7 +412,14 @@ tests.push(function assertCallsHangAnalyzer() {
 tests.forEach((test) => {
     jsTest.log(`Starting test '${test.name}'`);
     setup();
-    test();
+    const oldMongoRunner = MongoRunner;
+    try {
+        // We shouldn't actually run the hang-analyzer for these tests.
+        MongoRunner.runHangAnalyzer = Function.prototype;
+        test();
+    } finally {
+        MongoRunner = oldMongoRunner;
+    }
 });
 
 /* cleanup */
