@@ -169,7 +169,6 @@ struct __wt_btree {
     uint64_t write_gen;   /* Write generation */
     uint64_t rec_max_txn; /* Maximum txn seen (clean trees) */
     wt_timestamp_t rec_max_timestamp;
-    uint64_t hs_counter; /* History store counter */
 
     uint64_t checkpoint_gen;       /* Checkpoint generation */
     WT_SESSION_IMPL *sync_session; /* Syncing session */

@@ -306,10 +306,38 @@ __wt_hs_cursor_close(WT_SESSION_IMPL *session, uint32_t session_flags, bool is_o
 static int
 __hs_row_search(WT_CURSOR_BTREE *hs_cbt, WT_ITEM *srch_key, bool insert)
 {
+    WT_CURSOR *hs_cursor;
     WT_DECL_RET;
+    bool leaf_found;
 
-    WT_WITH_BTREE(CUR2S(hs_cbt), CUR2BT(hs_cbt),
-      ret = __wt_row_search(hs_cbt, srch_key, insert, NULL, false, NULL));
+    hs_cursor = &hs_cbt->iface;
+    leaf_found = false;
+
+    /*
+     * Check whether the search key can be find in the provided leaf page, if exists. Otherwise
+     * perform a full search.
+     */
+    if (hs_cbt->ref != NULL) {
+        WT_WITH_BTREE(CUR2S(hs_cbt), CUR2BT(hs_cbt),
+          ret = __wt_row_search(hs_cbt, srch_key, insert, hs_cbt->ref, false, &leaf_found));
+        WT_RET(ret);
+
+        /*
+         * Only use the pinned page search results if search returns an exact match or a slot other
+         * than the page's boundary slots, if that's not the case, the record might belong on an
+         * entirely different page.
+         */
+        if (leaf_found && (hs_cbt->compare != 0 &&
+                            (hs_cbt->slot == 0 || hs_cbt->slot == hs_cbt->ref->page->entries - 1)))
+            leaf_found = false;
+        if (!leaf_found)
+            hs_cursor->reset(hs_cursor);
+    }
+
+    if (!leaf_found)
+        WT_WITH_BTREE(CUR2S(hs_cbt), CUR2BT(hs_cbt),
+          ret = __wt_row_search(hs_cbt, srch_key, insert, NULL, false, NULL));
+
 #ifdef HAVE_DIAGNOSTIC
     WT_TRET(__wt_cursor_key_order_init(hs_cbt));
 #endif
@@ -398,18 +426,49 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
   WT_HS_TIME_POINT *stop_time_point)
 {
     WT_CURSOR_BTREE *cbt;
+    WT_DECL_ITEM(hs_key);
     WT_DECL_RET;
     WT_UPDATE *hs_upd, *upd_local;
+    wt_timestamp_t hs_start_ts;
+    uint64_t counter, hs_counter;
+    uint32_t hs_btree_id;
+    int cmp;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     hs_upd = upd_local = NULL;
+    counter = 0;
+
+    /* Allocate buffers for the data store and history store key. */
+    WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
+
+    /*
+     * Adjust counter if there exists an update in the history store with same btree id, key and
+     * timestamp. Otherwise the newly inserting history store record may fall behind the existing
+     * one can lead to wrong order.
+     */
+    WT_ERR_NOTFOUND_OK(
+      __wt_hs_cursor_position(session, cursor, btree->id, key, upd->start_ts), true);
+    if (ret == 0) {
+        WT_ERR(cursor->get_key(cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
+
+        /*
+         * Check the whether the existing record is also from the same timestamp.
+         *
+         * Verify simple checks first to confirm whether the retrieved update same or not before
+         * performing the expensive key comparison.
+         */
+        if (hs_btree_id == btree->id && upd->start_ts == hs_start_ts) {
+            WT_ERR(__wt_compare(session, NULL, hs_key, key, &cmp));
+            if (cmp == 0)
+                counter = hs_counter + 1;
+        }
+    }
 
     /*
      * Use WT_CURSOR.set_key and WT_CURSOR.set_value to create key and value items, then use them to
      * create an update chain for a direct insertion onto the history store page.
      */
-    cursor->set_key(
-      cursor, btree->id, key, upd->start_ts, __wt_atomic_add64(&btree->hs_counter, 1));
+    cursor->set_key(cursor, btree->id, key, upd->start_ts, counter);
     cursor->set_value(
       cursor, stop_time_point->durable_ts, upd->durable_ts, (uint64_t)type, hs_value);
 
@@ -452,6 +511,7 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
     WT_STAT_CONN_INCR(session, cache_hs_insert);
 
 err:
+    __wt_scr_free(session, &hs_key);
     if (ret != 0) {
         __wt_free_update_list(session, &hs_upd);
 
@@ -950,7 +1010,7 @@ err:
  */
 int
 __wt_hs_cursor_position(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t btree_id,
-  WT_ITEM *key, wt_timestamp_t timestamp)
+  const WT_ITEM *key, wt_timestamp_t timestamp)
 {
     WT_DECL_ITEM(srch_key);
     WT_DECL_RET;

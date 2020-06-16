@@ -83,8 +83,13 @@ hs_cursor(void *arg)
         /* Search to the last-known location. */
         if (!restart) {
             cursor->set_key(cursor, hs_btree_id, &key, hs_start_ts, hs_counter);
+
+            /*
+             * Limit expected errors because this is a diagnostic check (the WiredTiger API allows
+             * prepare-conflict, but that would be unexpected from the history store file).
+             */
             ret = cursor->search_near(cursor, &exact);
-            testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+            testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
         }
 
         /*
@@ -99,7 +104,7 @@ hs_cursor(void *arg)
                   cursor, &hs_stop_durable_ts, &hs_durable_timestamp, &hs_upd_type, &hs_value));
                 continue;
             }
-            testutil_assert(ret == WT_NOTFOUND);
+            testutil_assert(ret == WT_NOTFOUND || ret == WT_ROLLBACK);
             break;
         }
 

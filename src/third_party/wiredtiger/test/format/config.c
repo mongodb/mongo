@@ -942,7 +942,9 @@ config_transaction(void)
         if (g.c_txn_freq != 100 && config_is_perm("transaction.frequency"))
             testutil_die(EINVAL, "snapshot isolation requires transaction frequency set to 100");
     }
-
+    if (g.c_txn_rollback_to_stable && config_is_perm("transaction.rollback_to_stable") &&
+      g.c_isolation_flag != ISOLATION_SNAPSHOT && config_is_perm("transaction.isolation"))
+        testutil_die(EINVAL, "rollback to stable requires snapshot isolation");
     /*
      * The permanent configuration has no incompatible settings, adjust the temporary configuration
      * as necessary. Prepare overrides timestamps, overrides isolation, for no reason other than
@@ -957,6 +959,12 @@ config_transaction(void)
             config_single("transaction.isolation=snapshot", false);
         if (g.c_txn_freq != 100)
             config_single("transaction.frequency=100", false);
+    }
+    if (g.c_txn_rollback_to_stable) {
+        if (!g.c_txn_timestamps)
+            config_single("transaction.timestamps=on", false);
+        if (g.c_logging)
+            config_single("logging=off", false);
     }
     if (g.c_txn_timestamps) {
         if (g.c_isolation_flag != ISOLATION_SNAPSHOT)

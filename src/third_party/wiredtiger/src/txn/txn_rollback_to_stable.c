@@ -819,6 +819,40 @@ err:
 }
 
 /*
+ * __wt_rts_page_skip --
+ *     Skip if rollback to stable doesn't requires to read this page.
+ */
+int
+__wt_rts_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+{
+    wt_timestamp_t rollback_timestamp;
+
+    rollback_timestamp = *(wt_timestamp_t *)(context);
+    *skipp = false; /* Default to reading */
+
+    /* If the page is in-memory, we want to look at it. */
+    if (ref->state != WT_REF_DISK)
+        return (0);
+
+    /*
+     * Rollback to stable doesn't read leaf pages into memory as part of the tree walk. The leaf
+     * page is loaded into memory in the caller functions if it has newer updates that are need to
+     * be aborted. Don't process further on leaf pages as part of tree walk function.
+     */
+    if (!F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+        return (0);
+
+    /* Check whether this ref has any possible updates to be aborted. */
+    if (!__rollback_page_needs_abort(session, ref, rollback_timestamp)) {
+        *skipp = true;
+        __wt_verbose(session, WT_VERB_RTS, "%p: internal page walk skipped", (void *)ref);
+        WT_STAT_CONN_INCR(session, txn_rts_skip_interal_pages_walk);
+    }
+
+    return (0);
+}
+
+/*
  * __rollback_to_stable_btree_walk --
  *     Called for each open handle - choose to either skip or wipe the commits
  */
@@ -830,8 +864,8 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
 
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
-    while ((ret = __wt_tree_walk(
-              session, &ref, WT_READ_CACHE_LEAF | WT_READ_NO_EVICT | WT_READ_WONT_NEED)) == 0 &&
+    while ((ret = __wt_tree_walk_custom_skip(session, &ref, __wt_rts_page_skip, &rollback_timestamp,
+              WT_READ_CACHE_LEAF | WT_READ_NO_EVICT | WT_READ_WONT_NEED)) == 0 &&
       ref != NULL)
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
             WT_INTL_FOREACH_BEGIN (session, ref->page, child_ref) {
