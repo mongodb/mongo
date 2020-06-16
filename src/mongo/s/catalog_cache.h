@@ -311,6 +311,11 @@ private:
      * Cache entry describing a collection.
      */
     struct CollectionRoutingInfoEntry {
+        CollectionRoutingInfoEntry() = default;
+        // Disable copy (and move) semantics
+        CollectionRoutingInfoEntry(const CollectionRoutingInfoEntry&) = delete;
+        CollectionRoutingInfoEntry& operator=(const CollectionRoutingInfoEntry&) = delete;
+
         // Specifies whether this cache entry needs a refresh (in which case routingInfo should not
         // be relied on) or it doesn't, in which case there should be a non-null routingInfo.
         bool needsRefresh{true};
@@ -338,11 +343,6 @@ private:
         // Contains a notification to be waited on for the refresh to complete (only available if
         // needsRefresh is true)
         std::shared_ptr<Notification<Status>> refreshCompletionNotification;
-
-        // Until SERVER-34061 goes in, after a database refresh, one thread should also load the
-        // sharded collections. In case multiple threads were queued up on the refresh, this bool
-        // ensures only the first loads the collections.
-        bool mustLoadShardedCollections{true};
 
         // Contains the cached info about the database (only available if needsRefresh is false)
         boost::optional<DatabaseType> dbt;
@@ -390,7 +390,7 @@ private:
      * Retrieves the collection entry for the given namespace, creating the entry if one does not
      * already exist.
      */
-    boost::optional<CollectionRoutingInfoEntry&> _createOrGetCollectionEntry(
+    std::shared_ptr<CollectionRoutingInfoEntry> _createOrGetCollectionEntry(
         WithLock wl, const NamespaceString& nss);
 
     /**

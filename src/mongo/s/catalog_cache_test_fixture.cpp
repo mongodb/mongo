@@ -158,7 +158,6 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
 
     expectFindSendBSONObjVector(kConfigHostAndPort, {databaseBSON});
     expectFindSendBSONObjVector(kConfigHostAndPort, {collectionBSON});
-    expectFindSendBSONObjVector(kConfigHostAndPort, {collectionBSON});
     expectFindSendBSONObjVector(kConfigHostAndPort, initialChunks);
 
     auto routingInfo = future.default_timed_get();
@@ -214,7 +213,6 @@ CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChun
     if (!nss.isAdminDB() && !nss.isConfigDB()) {
         expectGetDatabase(nss);
     }
-    expectGetCollection(nss, epoch, shardKeyPattern);
     expectGetCollection(nss, epoch, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         ChunkVersion version(1, 0, epoch);

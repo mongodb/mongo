@@ -58,7 +58,6 @@ TEST_F(ShardedProcessInterfaceTest, TestInsert) {
     auto future = launchAsync([&] { ASSERT_TRUE(outStage->getNext().isEOF()); });
 
     expectGetDatabase(kOutNss);
-    expectGetCollection(kOutNss, OID::gen(), ShardKeyPattern{BSON("_id" << 1)});
 
     // Testing the collection options are propagated.
     const BSONObj collectionOptions = BSON("validationLevel"

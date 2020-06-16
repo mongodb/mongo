@@ -170,29 +170,6 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
                 continue;
             }
 
-            if (dbEntry->mustLoadShardedCollections) {
-                // If this is the first time we are loading info for this database, also load the
-                // sharded collections.
-                // TODO (SERVER-34061): Stop loading sharded collections when loading a database.
-
-                const auto dbNameCopy = dbName.toString();
-                repl::OpTime collLoadConfigOptime;
-                const std::vector<CollectionType> collections =
-                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
-                        opCtx, &dbNameCopy, &collLoadConfigOptime));
-
-                CollectionInfoMap collectionEntries;
-                for (const auto& coll : collections) {
-                    if (coll.getDropped()) {
-                        continue;
-                    }
-                    collectionEntries[coll.getNs().ns()] =
-                        std::make_shared<CollectionRoutingInfoEntry>();
-                }
-                _collectionsByDb[dbName] = std::move(collectionEntries);
-                dbEntry->mustLoadShardedCollections = false;
-            }
-
             auto primaryShard = uassertStatusOKWithContext(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt->getPrimary()),
                 str::stream() << "could not find the primary shard for database " << dbName);
@@ -247,17 +224,7 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
 
         stdx::unique_lock<Latch> ul(_mutex);
 
-        const auto itDb = _collectionsByDb.find(nss.db());
-        if (itDb == _collectionsByDb.end()) {
-            return {CachedCollectionRoutingInfo(nss, dbInfo, nullptr), refreshActionTaken};
-        }
-
-        const auto itColl = itDb->second.find(nss.ns());
-        if (itColl == itDb->second.end()) {
-            return {CachedCollectionRoutingInfo(nss, dbInfo, nullptr), refreshActionTaken};
-        }
-
-        auto& collEntry = itColl->second;
+        auto collEntry = _createOrGetCollectionEntry(ul, nss);
 
         if (collEntry->needsRefresh &&
             (!gEnableFinerGrainedCatalogCacheRefresh || collEntry->epochHasChanged ||
@@ -301,9 +268,13 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
             continue;
         }
 
-        auto cm = std::make_shared<ChunkManager>(collEntry->routingInfo, atClusterTime);
+        std::shared_ptr<ChunkManager> chunkManager = nullptr;
+        if (collEntry->routingInfo) {
+            chunkManager = std::make_shared<ChunkManager>(collEntry->routingInfo, atClusterTime);
+        }
 
-        return {CachedCollectionRoutingInfo(nss, dbInfo, std::move(cm)), refreshActionTaken};
+        return {CachedCollectionRoutingInfo(nss, dbInfo, std::move(chunkManager)),
+                refreshActionTaken};
     }
 }
 
@@ -511,7 +482,7 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
                         "namespace"_attr = collNs,
                         "shardId"_attr = shardId);
 
-            if (!collRoutingInfoEntry->needsRefresh) {
+            if (!collRoutingInfoEntry->needsRefresh && collRoutingInfoEntry->routingInfo) {
                 // The set of shards on which this collection contains chunks.
                 std::set<ShardId> shardsOwningDataForCollection;
                 collRoutingInfoEntry->routingInfo->getAllShardIds(&shardsOwningDataForCollection);
@@ -815,18 +786,8 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
 
         setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
 
-        if (!newRoutingInfo) {
-            // The refresh found that collection was dropped, so remove it from our cache.
-            auto itDb = _collectionsByDb.find(nss.db());
-            if (itDb == _collectionsByDb.end()) {
-                // The entire database was dropped.
-                return;
-            }
-            itDb->second.erase(nss.ns());
-            return;
-        } else if (existingRoutingInfo &&
-                   existingRoutingInfo->getSequenceNumber() ==
-                       newRoutingInfo->getSequenceNumber()) {
+        if (existingRoutingInfo && newRoutingInfo &&
+            existingRoutingInfo->getSequenceNumber() == newRoutingInfo->getSequenceNumber()) {
             // If the routingInfo hasn't changed, we need to manually reset stale shards.
             newRoutingInfo->setAllShardsRefreshed();
         }
@@ -864,51 +825,38 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
 
 void CatalogCache::_createOrGetCollectionEntryAndMarkEpochStale(const NamespaceString& nss) {
     stdx::lock_guard<Latch> lg(_mutex);
-    auto optionalRoutingInfoEntry = _createOrGetCollectionEntry(lg, nss);
-    if (!optionalRoutingInfoEntry) {
-        return;
-    }
-
-    optionalRoutingInfoEntry->needsRefresh = true;
-    optionalRoutingInfoEntry->epochHasChanged = true;
+    auto collRoutingInfoEntry = _createOrGetCollectionEntry(lg, nss);
+    collRoutingInfoEntry->needsRefresh = true;
+    collRoutingInfoEntry->epochHasChanged = true;
 }
 
 void CatalogCache::_createOrGetCollectionEntryAndMarkShardStale(const NamespaceString& nss,
                                                                 const ShardId& staleShardId) {
     stdx::lock_guard<Latch> lg(_mutex);
-    auto optionalRoutingInfoEntry = _createOrGetCollectionEntry(lg, nss);
-    if (!optionalRoutingInfoEntry) {
-        return;
-    }
-
-    optionalRoutingInfoEntry->needsRefresh = true;
-    if (optionalRoutingInfoEntry->routingInfo) {
-        optionalRoutingInfoEntry->routingInfo->setShardStale(staleShardId);
+    auto collRoutingInfoEntry = _createOrGetCollectionEntry(lg, nss);
+    collRoutingInfoEntry->needsRefresh = true;
+    if (collRoutingInfoEntry->routingInfo) {
+        collRoutingInfoEntry->routingInfo->setShardStale(staleShardId);
     }
 }
 
 void CatalogCache::_createOrGetCollectionEntryAndMarkAsNeedsRefresh(const NamespaceString& nss) {
     stdx::lock_guard<Latch> lg(_mutex);
-    auto optionalRoutingInfoEntry = _createOrGetCollectionEntry(lg, nss);
-    if (!optionalRoutingInfoEntry) {
-        return;
-    }
-
-    optionalRoutingInfoEntry->needsRefresh = true;
+    auto collRoutingInfoEntry = _createOrGetCollectionEntry(lg, nss);
+    collRoutingInfoEntry->needsRefresh = true;
 }
 
-boost::optional<CatalogCache::CollectionRoutingInfoEntry&>
-CatalogCache::_createOrGetCollectionEntry(WithLock wl, const NamespaceString& nss) {
-    auto itDb = _collectionsByDb.find(nss.db());
-    if (itDb == _collectionsByDb.end()) {
-        return boost::none;
+std::shared_ptr<CatalogCache::CollectionRoutingInfoEntry> CatalogCache::_createOrGetCollectionEntry(
+    WithLock wl, const NamespaceString& nss) {
+    auto& collectionsForDb = _collectionsByDb[nss.db()];
+    if (!collectionsForDb.contains(nss.ns())) {
+        // TODO SERVER-46199: ensure collections cache size is capped
+        // currently no routine except for dropDatabase is removing cached collection entries and
+        // the cache for a specific DB can grow indefinitely.
+        collectionsForDb[nss.ns()] = std::make_shared<CollectionRoutingInfoEntry>();
     }
 
-    if (itDb->second.find(nss.ns()) == itDb->second.end()) {
-        itDb->second[nss.ns()] = std::make_shared<CollectionRoutingInfoEntry>();
-    }
-
-    return *itDb->second[nss.ns()];
+    return collectionsForDb[nss.ns()];
 }
 
 void CatalogCache::Stats::report(BSONObjBuilder* builder) const {

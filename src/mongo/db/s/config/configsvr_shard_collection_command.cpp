@@ -357,12 +357,7 @@ public:
             result << "collectionUUID" << *uuid;
         }
 
-        auto routingInfo =
-            uassertStatusOK(catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, nss));
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                "Collection was successfully written as sharded but got dropped before it "
-                "could be evenly distributed",
-                routingInfo.cm());
+        catalogCache->onEpochChange(nss);
 
         return true;
     }

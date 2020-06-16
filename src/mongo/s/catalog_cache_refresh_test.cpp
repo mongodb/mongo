@@ -84,7 +84,6 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     expectGetDatabase();
-    expectGetCollection(epoch, shardKeyPattern);
 
     expectGetCollection(epoch, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
@@ -226,7 +225,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
         FAIL(str::stream() << "Returning corrupted collection entry did not fail and returned "
                            << (cm ? cm->toString() : routingInfo->db().primaryId().toString()));
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::FailedToParse, ex.code());
+        ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
     }
 }
 
@@ -237,7 +236,6 @@ TEST_F(CatalogCacheRefreshTest, FullLoadNoChunksFound) {
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     expectGetDatabase();
-    expectGetCollection(epoch, shardKeyPattern);
 
     // Return no chunks three times, which is how frequently the catalog cache retries
     expectGetCollection(epoch, shardKeyPattern);
@@ -300,7 +298,6 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     expectGetDatabase();
-    expectGetCollection(epoch, shardKeyPattern);
 
     // Return no chunks three times, which is how frequently the catalog cache retries
     expectGetCollection(epoch, shardKeyPattern);
@@ -334,7 +331,6 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithLowestVersion) {
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     expectGetDatabase();
-    expectGetCollection(epoch, shardKeyPattern);
 
     const auto incompleteChunks = [&]() {
         ChunkVersion version(1, 0, epoch);
@@ -393,7 +389,6 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithHighestVersion) {
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     expectGetDatabase();
-    expectGetCollection(epoch, shardKeyPattern);
 
     const auto incompleteChunks = [&]() {
         ChunkVersion version(1, 0, epoch);

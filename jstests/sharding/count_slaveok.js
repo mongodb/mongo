@@ -3,8 +3,10 @@
  * secondary is up.
  */
 
-// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
+// This test shuts down a shard's node and because of this consistency checking
+// cannot be performed on that node, which causes the consistency checker to fail.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 
 (function() {

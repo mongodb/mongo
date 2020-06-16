@@ -7,8 +7,10 @@
  * This test verifies this behavior.
  */
 
-// This test shuts down a shard.
+// This test shuts down a shard's node and because of this consistency checking
+// cannot be performed on that node, which causes the consistency checker to fail.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 (function() {
 // Helper function that runs listIndexes against shards to check for the existence of an index.
