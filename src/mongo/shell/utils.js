@@ -366,6 +366,7 @@ jsTestOptions = function() {
             inEvergreen: TestData.inEvergreen || false,
 
             undoRecorderPath: TestData.undoRecorderPath,
+            backupOnRestartDir: TestData.backupOnRestartDir || false,
         });
     }
     return _jsTestOptions;

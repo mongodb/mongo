@@ -925,7 +925,11 @@ void copyDir(const boost::filesystem::path& from, const boost::filesystem::path&
     }
 }
 
-// NOTE target dbpath will be cleared first
+/**
+ * Called from JS as  `copyDbpath(fromDir, toDir);`
+ *
+ * The destination dbpath will be cleared first.
+ */
 BSONObj CopyDbpath(const BSONObj& a, void* data) {
     uassert(ErrorCodes::FailedToParse, "Expected 2 fields", a.nFields() == 2);
     BSONObjIterator i(a);
@@ -938,7 +942,7 @@ BSONObj CopyDbpath(const BSONObj& a, void* data) {
     }
     if (boost::filesystem::exists(to))
         boost::filesystem::remove_all(to);
-    boost::filesystem::create_directory(to);
+    boost::filesystem::create_directories(to);
     copyDir(from, to);
     return undefinedReturn;
 }

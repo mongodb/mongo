@@ -324,6 +324,7 @@ MongoRunner.logicalOptions = {
     waitForConnect: true,
     bridgeOptions: true,
     skipValidation: true,
+    backupOnRestartDir: true,
 };
 
 MongoRunner.toRealPath = function(path, pathOpts) {
@@ -862,11 +863,25 @@ MongoRunner.runMongod = function(opts) {
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
 
+        let backupOnRestartDir = jsTest.options()["backupOnRestartDir"] || false;
+
         if (opts.forceLock)
             removeFile(opts.dbpath + "/mongod.lock");
         if ((opts.cleanData || opts.startClean) || (!opts.restart && !opts.noCleanData)) {
             print("Resetting db path '" + opts.dbpath + "'");
             resetDbpath(opts.dbpath);
+        } else {
+            if (backupOnRestartDir) {
+                let pathOpts = {"backupDir": backupOnRestartDir, "dbpath": opts.dbpath};
+                let backupDir = MongoRunner.toRealDir("$backupDir/$dbpath", pathOpts);
+                // `toRealDir` assumes the patterned directory should be under
+                // `MongoRunner.dataPath`. In this case, preserve the user input as is.
+                backupDir = backupDir.substring(MongoRunner.dataPath.length);
+
+                print("Backing up data files. DBPath: " + opts.dbpath +
+                      " Backing up under: " + backupDir);
+                copyDbpath(opts.dbpath, backupDir);
+            }
         }
 
         var mongodProgram = MongoRunner.mongodPath;

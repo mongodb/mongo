@@ -324,6 +324,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     else:
         test_name = None
     shortcut_opts = {
+        "backupOnRestartDir": (config.BACKUP_ON_RESTART_DIR, None),
         "enableMajorityReadConcern": (config.MAJORITY_READ_CONCERN, True),
         "mixedBinVersions": (config.MIXED_BIN_VERSIONS, ""),
         "noJournal": (config.NO_JOURNAL, False),

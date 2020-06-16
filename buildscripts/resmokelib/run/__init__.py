@@ -816,6 +816,12 @@ class RunPlugin(PluginInterface):
             metavar="ON|OFF", help="Enable or disable linear chaining for tests using "
             "ReplicaSetFixture.")
 
+        parser.add_argument(
+            "--backupOnRestartDir", action="store", type=str, dest="backup_on_restart_dir",
+            metavar="DIRECTORY", help=
+            "Every time a mongod restarts on existing data files, the data files will be backed up underneath the input directory."
+        )
+
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,
             description=("Internal options for advanced users and resmoke developers."

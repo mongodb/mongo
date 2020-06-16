@@ -84,6 +84,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
     _config.BASE_PORT = int(config.pop("base_port"))
+    _config.BACKUP_ON_RESTART_DIR = config.pop("backup_on_restart_dir")
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
     _config.DRY_RUN = config.pop("dry_run")
