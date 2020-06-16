@@ -285,13 +285,12 @@ private:
 /**
  * RAII-style class, which obtains a reference to the critical section for the specified collection.
  *
+ *
  * Shard version recovery/refresh procedures always wait for the critical section to be released in
- * order to get the latest shard version.
+ * order to serialise with concurrent moveChunk/shardCollection commit operations.
  *
- * However, the critical section can be entered while a recovery/refresh is ongoing because the
- * shard version obtained from the config server is casually consistent in respect to incoming
- * opertions (still relying on the current shard version).
- *
+ * Entering the critical section doesn't serialise with concurrent recovery/refresh, because
+ * causally such refreshes would have happened *before* the critical section was entered.
  */
 class CollectionCriticalSection {
     CollectionCriticalSection(const CollectionCriticalSection&) = delete;
