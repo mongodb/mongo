@@ -89,16 +89,15 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_memberId) {
 
     // Config with Member id > 255.
     OID newReplSetId = OID::gen();
-    auto invalidConfig = ReplSetConfig::parseForInitiate(
-        BSON("_id"
-             << "rs0"
-             << "version" << 1 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
-                                      << "h1"))),
-        newReplSetId);
-    ASSERT_EQUALS(
-        ErrorCodes::BadValue,
-        validateConfigForInitiate(&rses, invalidConfig, getGlobalServiceContext()).getStatus());
+    auto validConfig =
+        ReplSetConfig::parseForInitiate(BSON("_id"
+                                             << "rs0"
+                                             << "version" << 1 << "protocolVersion" << 1
+                                             << "members"
+                                             << BSON_ARRAY(BSON("_id" << 256 << "host"
+                                                                      << "h1"))),
+                                        newReplSetId);
+    ASSERT_OK(validateConfigForInitiate(&rses, validConfig, getGlobalServiceContext()).getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
@@ -341,36 +340,33 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_memberId) {
                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                    << "h1"))));
-    newConfig = ReplSetConfig::parse(
-        BSON("_id"
-             << "rs0"
-             << "version" << 2 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "h1")
-                           << BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
-                                         << "h2"))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 256 << "host"
+                                                                      << "h2"))));
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
-    ASSERT_EQUALS(ErrorCodes::BadValue, validateConfigForReconfig(oldConfig, newConfig, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false));
 
     // Case 2: Change the member config setting for the existing member with member id > 255.
-    oldConfig = ReplSetConfig::parse(
-        BSON("_id"
-             << "rs0"
-             << "version" << 1 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "h1")
-                           << BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
-                                         << "h2"))));
-    newConfig = ReplSetConfig::parse(
-        BSON("_id"
-             << "rs0"
-             << "version" << 2 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "h1")
-                           << BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
-                                         << "h2"
-                                         << "priority" << 0))));
+    oldConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 256 << "host"
+                                                                      << "h2"))));
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 256 << "host"
+                                                                      << "h2"
+                                                                      << "priority" << 0))));
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
     ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false));

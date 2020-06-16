@@ -89,23 +89,22 @@ TEST(MemberConfig, ParseMemberConfigId) {
     }
     // Pass cases
     {
-
         MemberConfig mc(BSON("_id" << 0 << "host"
                                    << "localhost:12345"),
                         &tagConfig);
         ASSERT_EQUALS(MemberId(0), mc.getId());
     }
     {
-        MemberConfig mc(BSON("_id" << MemberConfig::kMaxUserMemberId << "host"
+        MemberConfig mc(BSON("_id" << 255 << "host"
                                    << "localhost:12345"),
                         &tagConfig);
-        ASSERT_EQUALS(MemberId(MemberConfig::kMaxUserMemberId), mc.getId());
+        ASSERT_EQUALS(MemberId(255), mc.getId());
     }
     {
-        MemberConfig mc(BSON("_id" << (MemberConfig::kMaxUserMemberId + 1) << "host"
+        MemberConfig mc(BSON("_id" << 256 << "host"
                                    << "localhost:12345"),
                         &tagConfig);
-        ASSERT_EQUALS(MemberId(MemberConfig::kMaxUserMemberId + 1), mc.getId());
+        ASSERT_EQUALS(MemberId(256), mc.getId());
     }
 }
 
