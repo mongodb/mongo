@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_gen.h"
 
@@ -61,6 +62,14 @@ Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
 void onShardVersionMismatch(OperationContext* opCtx,
                             const NamespaceString& nss,
                             boost::optional<ChunkVersion> shardVersionReceived);
+
+/**
+ * Unconditionally get the shard's filtering metadata from the config server on the calling thread
+ * and returns it or throw.
+ *
+ * NOTE: Does network I/O, so it must not be called with a lock
+ */
+CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Unconditionally causes the shard's filtering metadata to be refreshed from the config server and

@@ -303,6 +303,27 @@ Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
     }
 }
 
+CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const NamespaceString& nss) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->getClient()->isInDirectClient());
+
+    if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
+        uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
+    }
+
+    auto* const shardingState = ShardingState::get(opCtx);
+    invariant(shardingState->canAcceptShardedCommands());
+
+    auto routingInfo = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss, true));
+
+    if (!routingInfo.cm()) {
+        return CollectionMetadata();
+    }
+
+    return CollectionMetadata(routingInfo.cm(), shardingState->shardId());
+}
+
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 bool forceRefreshFromThisThread) {

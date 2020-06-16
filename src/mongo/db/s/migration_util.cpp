@@ -54,6 +54,7 @@
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/write_concern.h"
@@ -913,21 +914,60 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
             ensureChunkVersionIsGreaterThan(
                 opCtx, doc.getRange(), doc.getPreMigrationChunkVersion());
 
-            refreshFilteringMetadataUntilSuccess(opCtx, doc.getNss());
+            hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(opCtx);
 
-            const auto refreshedMetadata = [&] {
-                AutoGetCollection autoColl(opCtx, doc.getNss(), MODE_IS);
-                auto const optMetadata = CollectionShardingRuntime::get(opCtx, doc.getNss())
-                                             ->getCurrentMetadataIfKnown();
-                invariant(
-                    optMetadata,
-                    "Collection's metadata have been found UNKNOWN during migration recovery");
-                return optMetadata.get();
-            }();
+            CollectionMetadata currentMetadata;
+            try {
+                currentMetadata = forceGetCurrentMetadata(opCtx, doc.getNss());
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // A filtering metadata refresh can throw NamespaceNotFound if the database was
+                // dropped from the cluster.
+            }
 
-            if (!refreshedMetadata.isSharded() ||
-                !refreshedMetadata.uuidMatches(doc.getCollectionUuid())) {
-                if (!refreshedMetadata.isSharded()) {
+            if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
+                    .shouldFail()) {
+                hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
+                    .pauseWhileSet();
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response for forceShardFilteringMetadataRefresh");
+            }
+
+            auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc]() {
+                AutoGetDb autoDb(opCtx, doc.getNss().db(), MODE_IX);
+                Lock::CollectionLock collLock(opCtx, doc.getNss(), MODE_IX);
+                auto* const csr = CollectionShardingRuntime::get(opCtx, doc.getNss());
+
+                auto optMetadata = csr->getCurrentMetadataIfKnown();
+
+                // We already have a shard version, make sure we're setting the latest
+                if (optMetadata) {
+                    const auto& metadata = *optMetadata;
+                    if (metadata.isSharded() &&
+                        metadata.getCollVersion().epoch() ==
+                            currentMetadata.getCollVersion().epoch() &&
+                        metadata.getCollVersion() >= currentMetadata.getCollVersion()) {
+                        LOGV2_DEBUG(4836501,
+                                    1,
+                                    "Skipping refresh of metadata for {namespace} "
+                                    "{latestCollectionVersion} with "
+                                    "an older {refreshedCollectionVersion}",
+                                    "Skipping metadata refresh because collection already has at "
+                                    "least as recent "
+                                    "metadata",
+                                    "namespace"_attr = doc.getNss(),
+                                    "latestCollectionVersion"_attr = metadata.getCollVersion(),
+                                    "refreshedCollectionVersion"_attr =
+                                        currentMetadata.getCollVersion());
+                        return;
+                    }
+                }
+
+                csr->setFilteringMetadata(opCtx, std::move(currentMetadata));
+            };
+
+            if (!currentMetadata.isSharded() ||
+                !currentMetadata.uuidMatches(doc.getCollectionUuid())) {
+                if (!currentMetadata.isSharded()) {
                     LOGV2(47985003,
                           "During migration recovery the collection was discovered to have been "
                           "dropped."
@@ -944,23 +984,25 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
                           "recipient as well as the migration coordinator document on this node",
                           "migrationCoordinatorDocument"_attr = redact(doc.toBSON()),
                           "refreshedMetadataUUID"_attr =
-                              refreshedMetadata.getChunkManager()->getUUID(),
+                              currentMetadata.getChunkManager()->getUUID(),
                           "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
                 }
 
                 deleteRangeDeletionTaskOnRecipient(opCtx, doc.getRecipientShardId(), doc.getId());
                 deleteRangeDeletionTaskLocally(opCtx, doc.getId());
                 coordinator.forgetMigration(opCtx);
+                setFilteringMetadata();
                 return true;
             }
 
-            if (refreshedMetadata.keyBelongsToMe(doc.getRange().getMin())) {
+            if (currentMetadata.keyBelongsToMe(doc.getRange().getMin())) {
                 coordinator.setMigrationDecision(MigrationCoordinator::Decision::kAborted);
             } else {
                 coordinator.setMigrationDecision(MigrationCoordinator::Decision::kCommitted);
             }
 
             coordinator.completeMigration(opCtx);
+            setFilteringMetadata();
             return true;
         });
 }
