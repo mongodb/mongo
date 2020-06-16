@@ -1351,11 +1351,11 @@ private:
      * Merges changes from base to other into current. Throws merge_conflict_exception if there are
      * merge conflicts.
      */
-    void _merge3Helper(Node* current,
-                       const Node* base,
-                       const Node* other,
-                       std::vector<Node*>& context,
-                       std::vector<uint8_t>& trieKeyIndex) {
+    Node* _merge3Helper(Node* current,
+                        const Node* base,
+                        const Node* other,
+                        std::vector<Node*>& context,
+                        std::vector<uint8_t>& trieKeyIndex) {
         context.push_back(current);
 
         // Root doesn't have a trie key.
@@ -1423,7 +1423,17 @@ private:
                 if (node->_trieKey == baseNode->_trieKey &&
                     baseNode->_trieKey == otherNode->_trieKey && node->_data == baseNode->_data &&
                     baseNode->_data == otherNode->_data) {
-                    _merge3Helper(node, baseNode, otherNode, context, trieKeyIndex);
+                    Node* updatedNode =
+                        _merge3Helper(node, baseNode, otherNode, context, trieKeyIndex);
+                    if (!updatedNode->_data) {
+                        // Drop if leaf node without data, that is not valid. Otherwise we might
+                        // need to compress if we have only one child.
+                        if (updatedNode->isLeaf()) {
+                            current->_children[key] = nullptr;
+                        } else {
+                            _compressOnlyChild(updatedNode);
+                        }
+                    }
                 } else {
                     _mergeResolveConflict(node, baseNode, otherNode);
                     _rebuildContext(context, trieKeyIndex);
@@ -1444,6 +1454,8 @@ private:
         context.pop_back();
         if (!trieKeyIndex.empty())
             trieKeyIndex.pop_back();
+
+        return current;
     }
 
     Node* _begin(Node* root) const noexcept {
