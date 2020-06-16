@@ -259,5 +259,11 @@ public:
 
         return {*fieldPaths, targetCollectionVersion};
     }
+
+    void setExpectedShardVersion(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 boost::optional<ChunkVersion> chunkVersion) override {
+        // Do nothing.
+    }
 };
 }  // namespace mongo

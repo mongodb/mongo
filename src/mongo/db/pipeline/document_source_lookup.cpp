@@ -234,16 +234,6 @@ BSONObj buildEqualityOrQuery(const std::string& fieldName, const BSONArray& valu
     return orBuilder.obj();
 }
 
-void assertIsValidCollectionState(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, expCtx->ns)) {
-        const bool foreignShardedAllowed =
-            getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
-        if (!foreignShardedAllowed) {
-            uasserted(51069, "Cannot run $lookup with sharded foreign collection");
-        }
-    }
-}
-
 void lookupPipeValidator(const Pipeline& pipeline) {
     const auto& sources = pipeline.getSources();
     std::for_each(sources.begin(), sources.end(), [](auto& src) {
@@ -252,6 +242,10 @@ void lookupPipeValidator(const Pipeline& pipeline) {
                               << " is not allowed within a $lookup's sub-pipeline",
                 src->constraints().isAllowedInLookupPipeline());
     });
+}
+
+bool foreignShardedLookupAllowed() {
+    return getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
 }
 }  // namespace
 
@@ -278,7 +272,20 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
         _resolvedPipeline.back() = matchStage;
     }
 
-    auto pipeline = buildPipeline(inputDoc);
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+    try {
+        pipeline = buildPipeline(inputDoc);
+    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+        // If lookup on a sharded collection is disallowed and the foreign collection is sharded,
+        // throw a custom exception.
+        if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+            uassert(51069,
+                    "Cannot run $lookup with sharded foreign collection",
+                    foreignShardedLookupAllowed() || !staleInfo->getVersionWanted() ||
+                        staleInfo->getVersionWanted() == ChunkVersion::UNSHARDED());
+        }
+        throw;
+    }
 
     std::vector<Value> results;
     long long objsize = 0;
@@ -308,10 +315,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     // Copy all 'let' variables into the foreign pipeline's expression context.
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
 
-    assertIsValidCollectionState(_fromExpCtx);
-
     // Resolve the 'let' variables to values per the given input document.
     resolveLetVariables(inputDoc, &_fromExpCtx->variables);
+
+    if (!foreignShardedLookupAllowed()) {
+        // Enforce that the foreign collection must be unsharded for lookup.
+        _fromExpCtx->mongoProcessInterface->setExpectedShardVersion(
+            _fromExpCtx->opCtx, _fromExpCtx->ns, ChunkVersion::UNSHARDED());
+    }
 
     // If we don't have a cache, build and return the pipeline immediately.
     if (!_cache || _cache->isAbandoned()) {

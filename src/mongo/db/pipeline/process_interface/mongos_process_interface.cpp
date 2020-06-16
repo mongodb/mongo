@@ -278,8 +278,9 @@ std::vector<GenericCursor> MongosProcessInterface::getIdleCursors(
 }
 
 bool MongosProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    auto routingInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-    return routingInfo.isOK() && routingInfo.getValue().cm();
+    auto routingInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    return static_cast<bool>(routingInfo.cm());
 }
 
 bool MongosProcessInterface::fieldsHaveSupportingUniqueIndex(

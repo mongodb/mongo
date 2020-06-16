@@ -55,11 +55,12 @@ CollectionMetadata makeShardedMetadata(OperationContext* opCtx, UUID uuid = UUID
         kTestNss, uuid, kShardKeyPattern, nullptr, false, epoch, {std::move(chunk)});
     std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, boost::none);
 
-    auto& oss = OperationShardingState::get(opCtx);
-    if (!oss.hasShardVersion()) {
+    if (!OperationShardingState::isOperationVersioned(opCtx)) {
         const auto version = cm->getVersion(ShardId("0"));
         BSONObjBuilder builder;
         version.appendToCommand(&builder);
+
+        auto& oss = OperationShardingState::get(opCtx);
         oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
     }
     return CollectionMetadata(std::move(cm), ShardId("0"));

@@ -199,7 +199,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
     const auto nss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
 
-    const auto& oss = OperationShardingState::get(opCtx);
+    auto& oss = OperationShardingState::get(opCtx);
     const auto shardVersion = oss.getShardVersion(nss);
     const auto dbVersion = oss.getDbVersion(dbName);
 

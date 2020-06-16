@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -53,11 +54,9 @@ namespace mongo {
 using namespace fmt::literals;
 
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-    return CollectionShardingState::get(opCtx, nss)
-        ->getCollectionDescription_DEPRECATED()
-        .isSharded();
+    auto routingInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    return static_cast<bool>(routingInfo.cm());
 }
 
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
@@ -348,6 +347,19 @@ std::unique_ptr<Pipeline, PipelineDeleter>
 ShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
                                                           bool allowTargetingShards) {
     return sharded_agg_helpers::attachCursorToPipeline(ownedPipeline, allowTargetingShards);
+}
+
+void ShardServerProcessInterface::setExpectedShardVersion(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<ChunkVersion> chunkVersion) {
+    auto& oss = OperationShardingState::get(opCtx);
+    if (oss.hasShardVersion(nss)) {
+        invariant(oss.getShardVersion(nss) == chunkVersion);
+    } else {
+        OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+            nss, chunkVersion, boost::none);
+    }
 }
 
 }  // namespace mongo

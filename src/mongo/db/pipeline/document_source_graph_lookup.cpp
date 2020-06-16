@@ -48,14 +48,8 @@
 namespace mongo {
 
 namespace {
-void assertIsValidCollectionState(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, expCtx->ns)) {
-        const bool foreignShardedAllowed =
-            getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
-        if (!foreignShardedAllowed) {
-            uasserted(31428, "Cannot run $graphLookup with sharded foreign collection");
-        }
-    }
+bool foreignShardedLookupAllowed() {
+    return getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
 }
 }  // namespace
 
@@ -187,8 +181,12 @@ void DocumentSourceGraphLookUp::doDispose() {
 void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     long long depth = 0;
     bool shouldPerformAnotherQuery;
-    assertIsValidCollectionState(_fromExpCtx);
     do {
+        if (!foreignShardedLookupAllowed()) {
+            // Enforce that the foreign collection must be unsharded for $graphLookup.
+            _fromExpCtx->mongoProcessInterface->setExpectedShardVersion(
+                _fromExpCtx->opCtx, _fromExpCtx->ns, ChunkVersion::UNSHARDED());
+        }
         shouldPerformAnotherQuery = false;
 
         // Check whether each key in the frontier exists in the cache or needs to be queried.
@@ -359,7 +357,19 @@ void DocumentSourceGraphLookUp::performSearch() {
         _frontierUsageBytes += startingValue.getApproximateSize();
     }
 
-    doBreadthFirstSearch();
+    try {
+        doBreadthFirstSearch();
+    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+        // If lookup on a sharded collection is disallowed and the foreign collection is sharded,
+        // throw a custom exception.
+        if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+            uassert(31428,
+                    "Cannot run $graphLookup with sharded foreign collection",
+                    foreignShardedLookupAllowed() || !staleInfo->getVersionWanted() ||
+                        staleInfo->getVersionWanted() == ChunkVersion::UNSHARDED());
+        }
+        throw;
+    }
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() const {

@@ -211,6 +211,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void setExpectedShardVersion(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 boost::optional<ChunkVersion> chunkVersion) override {
+        MONGO_UNREACHABLE;
+    }
+
     std::unique_ptr<ResourceYielder> getResourceYielder() const override {
         return nullptr;
     }

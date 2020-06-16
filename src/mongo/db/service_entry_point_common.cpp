@@ -1131,7 +1131,7 @@ void execCommandDatabase(OperationContext* opCtx,
             oss.initializeClientRoutingVersionsFromCommand(invocation->ns(), request.body);
 
             auto const shardingState = ShardingState::get(opCtx);
-            if (oss.hasShardVersion() || oss.hasDbVersion()) {
+            if (OperationShardingState::isOperationVersioned(opCtx) || oss.hasDbVersion()) {
                 uassertStatusOK(shardingState->canAcceptShardedCommands());
             }
 

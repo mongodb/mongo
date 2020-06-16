@@ -37,7 +37,11 @@ assert.commandWorked(mongosDB.runCommand({
 }));
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: primaryShard,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {
+        "command.aggregate": mongosColl.getName(),
+        "command.comment": testName,
+        errCode: {$exists: false}
+    }
 });
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: shard1DB,

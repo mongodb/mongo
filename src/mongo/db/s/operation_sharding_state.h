@@ -99,25 +99,26 @@ public:
     void initializeClientRoutingVersionsFromCommand(NamespaceString nss, const BSONObj& cmdObj);
 
     /**
-     * Stores the given shardVersion and databaseVersion for the given namespace.
+     * Stores the given shardVersion and databaseVersion for the given namespace. Note: The shard
+     * version for the given namespace stored in the OperationShardingState can be overwritten if it
+     * has not been checked yet.
      */
     void initializeClientRoutingVersions(NamespaceString nss,
                                          const boost::optional<ChunkVersion>& shardVersion,
                                          const boost::optional<DatabaseVersion>& dbVersion);
 
     /**
-     * Returns whether or not there is a shard version associated with this operation.
+     * Returns whether or not there is a shard version for the namespace associated with this
+     * operation.
      */
-    bool hasShardVersion() const;
+    bool hasShardVersion(const NamespaceString& nss) const;
 
     /**
      * Returns the shard version (i.e. maximum chunk version) of a namespace being used by the
      * operation. Documents in chunks which did not belong on this shard at this shard version
      * will be filtered out.
-     *
-     * Returns ChunkVersion::UNSHARDED() if setGlobalUnshardedShardVersion has been called.
      */
-    boost::optional<ChunkVersion> getShardVersion(const NamespaceString& nss) const;
+    boost::optional<ChunkVersion> getShardVersion(const NamespaceString& nss);
 
     /**
      * Returns true if the client sent a databaseVersion for any namespace.
@@ -129,12 +130,6 @@ public:
      * version sent by the client (if any), else returns boost::none.
      */
     boost::optional<DatabaseVersion> getDbVersion(const StringData dbName) const;
-
-    /**
-     * Makes the OperationShardingState behave as if an UNSHARDED shardVersion was sent for every
-     * possible namespace.
-     */
-    void setGlobalUnshardedShardVersion();
 
     /**
      * This call is a no op if there isn't a currently active migration critical section. Otherwise
@@ -189,14 +184,14 @@ private:
     // Specifies whether the request is allowed to create database/collection implicitly
     bool _allowImplicitCollectionCreation{true};
 
-    // Should be set to true if all collections accessed are expected to be unsharded.
-    bool _globalUnshardedShardVersion = false;
-
     // The OperationShardingState class supports storing shardVersions for multiple namespaces (and
     // databaseVersions for multiple databases), even though client code has not been written yet to
     // *send* multiple shardVersions or databaseVersions.
     StringMap<ChunkVersion> _shardVersions;
     StringMap<DatabaseVersion> _databaseVersions;
+
+    // Stores shards that have undergone a version check.
+    StringDataSet _shardVersionsChecked;
 
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a migration for that namespace, which was in critical section.

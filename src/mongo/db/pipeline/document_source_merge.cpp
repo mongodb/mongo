@@ -477,7 +477,8 @@ StageConstraints DocumentSourceMerge::constraints(Pipeline::SplitState pipeState
     // either choice will work correctly, we are simply applying a heuristic optimization.
     return {StreamType::kStreaming,
             PositionRequirement::kLast,
-            pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs)
+            pExpCtx->inMongos &&
+                    pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs)
                 ? HostTypeRequirement::kAnyShard
                 : HostTypeRequirement::kPrimaryShard,
             DiskUseRequirement::kWritesPersistentData,

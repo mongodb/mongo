@@ -43,10 +43,13 @@ public:
     using CommonMongodProcessInterface::CommonMongodProcessInterface;
 
     /**
-     * Note: Information returned can be stale. Caller should always attach shardVersion when
-     * sending request against nss based on this information.
+     * Note: Cannot be called while holding a lock. Refreshes from the config servers if the
+     * metadata for the given namespace does not exist. Otherwise, will not automatically refresh,
+     * so the answer may be stale or become stale after calling. Caller should always attach
+     * shardVersion when sending request against nss based on this information.
      */
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
+
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nss,
                                       ChunkVersion targetCollectionVersion) const final;
@@ -119,6 +122,10 @@ public:
      */
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         Pipeline* pipeline, bool allowTargetingShards) final;
+
+    void setExpectedShardVersion(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 boost::optional<ChunkVersion> chunkVersion) final;
 };
 
 }  // namespace mongo

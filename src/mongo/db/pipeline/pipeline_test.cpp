@@ -2622,6 +2622,7 @@ class MergeWithShardedCollection : public ShardMergerBase {
         };
 
         auto expCtx = ShardMergerBase::createExpressionContext(request);
+        expCtx->inMongos = true;
         expCtx->mongoProcessInterface = std::make_shared<ProcessInterface>();
         return expCtx;
     }

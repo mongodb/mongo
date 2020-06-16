@@ -111,6 +111,12 @@ public:
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs) override;
 
+    void setExpectedShardVersion(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 boost::optional<ChunkVersion> chunkVersion) override {
+        // Do nothing on a non-shardsvr mongoD.
+    }
+
 protected:
     // This constructor is marked as protected in order to prevent instantiation since this
     // interface is designed to have a concrete process interface for each possible

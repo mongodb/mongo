@@ -109,7 +109,11 @@ function runAggShardTargetTest({splitPoint}) {
     // primary shard).
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
-        filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+        filter: {
+            "command.aggregate": mongosColl.getName(),
+            "command.comment": testName,
+            errCode: {$exists: false}
+        }
     });
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard1DB,
