@@ -79,7 +79,7 @@ class PeriodicKillSecondaries(interface.Hook):
     def _run(self, test_report):
         try:
             hook_test_case = PeriodicKillSecondariesTestCase.create_after_test(
-                self.logger.test_case_logger, self._last_test, self, test_report)
+                self.logger, self._last_test, self, test_report)
             hook_test_case.configure(self.fixture)
             hook_test_case.run_dynamic_test(test_report)
         finally:

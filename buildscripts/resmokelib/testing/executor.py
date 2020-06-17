@@ -234,7 +234,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 success = False
         return success
 
-    def _make_fixture(self, job_num, job_logger):
+    def _make_fixture(self, job_num):
         """Create a fixture for a job."""
 
         fixture_config = {}
@@ -243,11 +243,11 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             fixture_config = self.fixture_config.copy()
             fixture_class = fixture_config.pop("class")
 
-        fixture_logger = job_logger.new_fixture_logger(fixture_class)
+        fixture_logger = logging.loggers.new_fixture_logger(fixture_class, job_num)
 
         return fixtures.make_fixture(fixture_class, fixture_logger, job_num, **fixture_config)
 
-    def _make_hooks(self, fixture):
+    def _make_hooks(self, fixture, job_num):
         """Create the hooks for the job's fixture."""
 
         hooks = []
@@ -256,7 +256,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             hook_config = hook_config.copy()
             hook_class = hook_config.pop("class")
 
-            hook_logger = logging.loggers.new_hook_logger(hook_class, fixture.logger)
+            hook_logger = logging.loggers.new_hook_logger(hook_class, job_num)
             hook = _hooks.make_hook(hook_class, hook_logger, fixture, **hook_config)
             hooks.append(hook)
 
@@ -271,10 +271,10 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         """
         job_logger = logging.loggers.new_job_logger(self._suite.test_kind, job_num)
 
-        fixture = self._make_fixture(job_num, job_logger)
-        hooks = self._make_hooks(fixture)
+        fixture = self._make_fixture(job_num)
+        hooks = self._make_hooks(fixture, job_num)
 
-        report = _report.TestReport(job_logger, self._suite.options)
+        report = _report.TestReport(job_logger, self._suite.options, job_num)
 
         return _job.Job(job_num, job_logger, fixture, hooks, report, self.archival,
                         self._suite.options, self.test_queue_logger)

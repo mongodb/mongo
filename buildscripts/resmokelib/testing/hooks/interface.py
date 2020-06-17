@@ -27,9 +27,6 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):
     def __init__(self, hook_logger, fixture, description):
         """Initialize the Hook with the specified fixture."""
 
-        if not isinstance(hook_logger, loggers.HookLogger):
-            raise TypeError("logger must be a HookLogger instance")
-
         self.logger = hook_logger
         self.fixture = fixture
         self.description = description

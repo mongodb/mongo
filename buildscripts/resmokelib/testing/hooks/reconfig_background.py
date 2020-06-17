@@ -43,7 +43,7 @@ class DoReconfigInBackground(jsfile.JSHook):
             return
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            self.logger.test_case_logger, test, self, self._js_filename, self._shell_options)
+            self.logger, test, self, self._js_filename, self._shell_options)
         hook_test_case.configure(self.fixture)
 
         self.logger.info("Resuming the background reconfig thread.")

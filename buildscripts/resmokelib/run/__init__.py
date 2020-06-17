@@ -58,7 +58,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
     def _setup_logging(self):
         logging.loggers.configure_loggers()
         logging.flush.start_thread()
-        self._exec_logger = logging.loggers.EXECUTOR_LOGGER
+        self._exec_logger = logging.loggers.ROOT_EXECUTOR_LOGGER
         self._resmoke_logger = logging.loggers.new_resmoke_logger()
 
     def _exit_logging(self):
