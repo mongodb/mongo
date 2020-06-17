@@ -72,7 +72,7 @@ class ChunkMap {
     using ChunkInfoMap = std::map<std::string, std::shared_ptr<ChunkInfo>>;
 
 public:
-    ChunkMap(Ordering ordering) : _shardKeyOrdering(std::move(ordering)) {}
+    ChunkMap() {}
 
     size_t size() const {
         return _chunkMap.size();
@@ -111,7 +111,6 @@ private:
         const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
 
     ChunkInfoMap _chunkMap;
-    const Ordering _shardKeyOrdering;
 };
 
 /**
@@ -259,11 +258,6 @@ private:
                         bool unique,
                         ChunkMap chunkMap,
                         ChunkVersion collectionVersion);
-
-    /**
-     * Does a single pass over the chunkMap and constructs the ShardVersionMap object.
-     */
-    ShardVersionMap _constructShardVersionMap() const;
 
     ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
 

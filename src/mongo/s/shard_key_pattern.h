@@ -124,6 +124,12 @@ public:
     std::string toString() const;
 
     /**
+     * Converts the passed in key pattern into a KeyString.
+     * Note: this function strips the field names when creating the KeyString.
+     */
+    static std::string toKeyString(const BSONObj& shardKey);
+
+    /**
      * Returns true if the provided document is a shard key - i.e. has the same fields as the
      * shard key pattern and valid shard key values.
      */

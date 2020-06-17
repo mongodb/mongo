@@ -52,8 +52,6 @@ private:
 }  // namespace
 
 TEST_F(ChunkMapTest, TestAddChunk) {
-    ChunkMap chunkMap(Ordering::make(getShardKeyPattern().toBSON()));
-
     const OID epoch = OID::gen();
     ChunkVersion version{1, 0, epoch};
 
@@ -63,13 +61,14 @@ TEST_F(ChunkMapTest, TestAddChunk) {
                   version,
                   kThisShard};
 
+    ChunkMap chunkMap{};
     chunkMap.addChunk(chunk);
 
     ASSERT_EQ(chunkMap.size(), 1);
 }
 
 TEST_F(ChunkMapTest, TestEnumerateAllChunks) {
-    ChunkMap chunkMap(Ordering::make(getShardKeyPattern().toBSON()));
+    ChunkMap chunkMap{};
 
     const OID epoch = OID::gen();
     ChunkVersion version{1, 0, epoch};
@@ -98,7 +97,7 @@ TEST_F(ChunkMapTest, TestEnumerateAllChunks) {
 }
 
 TEST_F(ChunkMapTest, TestIntersectingChunk) {
-    ChunkMap chunkMap(Ordering::make(getShardKeyPattern().toBSON()));
+    ChunkMap chunkMap{};
 
     const OID epoch = OID::gen();
     ChunkVersion version{1, 0, epoch};
@@ -122,7 +121,7 @@ TEST_F(ChunkMapTest, TestIntersectingChunk) {
 }
 
 TEST_F(ChunkMapTest, TestEnumerateOverlappingChunks) {
-    ChunkMap chunkMap(Ordering::make(getShardKeyPattern().toBSON()));
+    ChunkMap chunkMap{};
 
     const OID epoch = OID::gen();
     ChunkVersion version{1, 0, epoch};
