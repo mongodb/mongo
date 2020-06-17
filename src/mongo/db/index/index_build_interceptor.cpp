@@ -366,7 +366,16 @@ bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
                    "applied, despite the table appearing empty. Writes recorded: "
                 << writesRecorded << ", applied: " << _numApplied;
             log() << message;
-            return false;
+
+            // If _numApplied is less than writesRecorded, this suggests that there are keys not
+            // visible in our snapshot, so we return false. If _numApplied is greater than
+            // writesRecorded, this suggests that we either double-counted or double-applied a key.
+            // Double counting would suggest a bug in the code that tracks inserts, but these
+            // counters are only used for progress reporting and invariants. Double-inserting could
+            // be concerning, but indexes allow key overwrites, so we would never introduce an
+            // inconsistency in this case; we would just overwrite a previous key. Thus, we return
+            // true.
+            return writesRecorded < _numApplied;
         }
         return true;
     }
