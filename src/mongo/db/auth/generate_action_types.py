@@ -151,7 +151,7 @@ sourceFileTemplate = """// AUTO-GENERATED FILE DO NOT EDIT
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/action_type_gen.h"
 
 #include <cstdint>
 #include <iostream>
