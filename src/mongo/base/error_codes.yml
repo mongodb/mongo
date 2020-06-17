@@ -373,6 +373,9 @@ error_codes:
     # The code below is for internal use only and must never be returned in a network response.
     - {code: 316,name: QueryTrialRunCompleted}
 
+    # The code below is for internal use only and must never be returned in a network response.
+    - {code: 317,name: ConnectionPoolExpired,categories: [NetworkError,RetriableError]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
