@@ -392,13 +392,6 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
             break;
 
         /*
-         * Don't scrub when the history store table is in use: scrubbing is counter-productive in
-         * that case.
-         */
-        if (F_ISSET(cache, WT_CACHE_EVICT_HS))
-            break;
-
-        /*
          * We haven't reached the current target.
          *
          * Don't wait indefinitely: there might be dirty pages that can't be evicted. If we can't

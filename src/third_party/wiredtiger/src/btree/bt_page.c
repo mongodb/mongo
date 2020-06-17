@@ -220,8 +220,9 @@ __wt_page_inmem(
 
     /* Update the page's cache statistics. */
     __wt_cache_page_inmem_incr(session, page, size);
+
     if (LF_ISSET(WT_PAGE_DISK_ALLOC))
-        __wt_cache_page_image_incr(session, dsk->mem_size);
+        __wt_cache_page_image_incr(session, page);
 
     /* Link the new internal page to the parent. */
     if (ref != NULL) {

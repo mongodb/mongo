@@ -270,6 +270,7 @@ struct __wt_page_modify {
 
     /* Dirty bytes added to the cache. */
     size_t bytes_dirty;
+    size_t bytes_updates;
 
     /*
      * When pages are reconciled, the result is one or more replacement blocks. A replacement block
