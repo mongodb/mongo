@@ -326,8 +326,8 @@ commandsRemovedFromMongosIn44.forEach(function(cmd) {
     testCases[cmd] = {skip: "must define test coverage for 4.2 backwards compatibility"};
 });
 
-// Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
-let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};
+// Set the secondaries to priority 0 to prevent the primaries from stepping down.
+let rsOpts = {nodes: [{}, {rsConfig: {priority: 0}}]};
 let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
 
 let recipientShardPrimary = st.rs1.getPrimary();
