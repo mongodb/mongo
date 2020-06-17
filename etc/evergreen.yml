@@ -12584,7 +12584,7 @@ buildvariants:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
-    san_options: TSAN_OPTIONS="suppressions=etc/tsan.suppressions:halt_on_error=1"
+    san_options: TSAN_OPTIONS="die_after_fork=0:suppressions=etc/tsan.suppressions:halt_on_error=1"
     # TODO: Remove some of the excluded tags when the Biggie storage engine is
     # further along in development: https://jira.mongodb.org/browse/SERVER-48325
     test_flags: --storageEngine=biggie --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read

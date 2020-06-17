@@ -2962,7 +2962,11 @@ def doConfigure(myenv):
             myenv.AppendUnique(CPPDEFINES=['ADDRESS_SANITIZER'])
 
         if using_tsan:
-            tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
+            # die_after_fork=0 is a temporary setting to allow tests to continue while we figure out why
+            # we're running afoul of it. If we remove it here, it also needs to be removed from the test
+            # variant in etc/evergreen.yml
+            # TODO: https://jira.mongodb.org/browse/SERVER-49121
+            tsan_options += "die_after_fork=0:suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
             myenv['ENV']['TSAN_OPTIONS'] = tsan_options
             myenv.AppendUnique(CPPDEFINES=['THREAD_SANITIZER'])
 
