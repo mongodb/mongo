@@ -110,11 +110,12 @@ const standaloneWC = {
     w: 1,
     j: true
 };
-let standalone = MongoRunner.runMongod({auth: ''});
+let standalone = MongoRunner.runMongod({auth: '', useHostName: false});
 runTest('Standalone', {primary: standalone, wc: standaloneWC}, function() {
     const dbpath = standalone.dbpath;
     MongoRunner.stopMongod(standalone);
-    standalone = MongoRunner.runMongod({auth: '', restart: true, cleanData: false, dbpath: dbpath});
+    standalone = MongoRunner.runMongod(
+        {auth: '', restart: true, cleanData: false, dbpath: dbpath, useHostName: false});
     return {primary: standalone, wc: standaloneWC};
 });
 MongoRunner.stopMongod(standalone);
@@ -125,8 +126,13 @@ const replsetWC = {
     w: replsetNodes,
     j: true
 };
-const replset =
-    new ReplSetTest({name: 'rs0', nodes: replsetNodes, nodeOptions: {auth: ''}, keyFile: keyfile});
+const replset = new ReplSetTest({
+    name: 'rs0',
+    nodes: replsetNodes,
+    nodeOptions: {auth: ''},
+    keyFile: keyfile,
+    useHostName: false,
+});
 replset.startSet();
 replset.initiate();
 replset.awaitSecondaryNodes();
