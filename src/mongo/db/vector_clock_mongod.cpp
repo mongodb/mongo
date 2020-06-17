@@ -69,8 +69,8 @@ protected:
     bool _permitRefreshDuringGossipOut() const override;
 
 private:
-    void onStepUpBegin(OperationContext* opCtx) override {}
-    void onStepUpComplete(OperationContext* opCtx) override {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) override {}
+    void onStepUpComplete(OperationContext* opCtx, long long term) override {}
     void onStepDown() override {}
     void onBecomeArbiter() override;
 };

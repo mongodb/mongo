@@ -107,12 +107,12 @@ public:
     /**
      * Called prior to stepping up as PRIMARY, ie. after drain mode has completed.
      */
-    virtual void onStepUpBegin(OperationContext* opCtx) = 0;
+    virtual void onStepUpBegin(OperationContext* opCtx, long long term) = 0;
 
     /**
      * Called after the node has transitioned to PRIMARY.
      */
-    virtual void onStepUpComplete(OperationContext* opCtx) = 0;
+    virtual void onStepUpComplete(OperationContext* opCtx, long long term) = 0;
 
     /**
      * Called after the node has transitioned out of PRIMARY. Usually this is into SECONDARY, but it
@@ -171,8 +171,8 @@ public:
 
     static ReplicaSetAwareServiceRegistry& get(ServiceContext* serviceContext);
 
-    void onStepUpBegin(OperationContext* opCtx) final;
-    void onStepUpComplete(OperationContext* opCtx) final;
+    void onStepUpBegin(OperationContext* opCtx, long long term) final;
+    void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;
     void onBecomeArbiter() final;
 

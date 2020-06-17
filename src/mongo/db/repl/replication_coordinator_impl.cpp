@@ -1153,7 +1153,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     lk.unlock();
 
     _externalState->onDrainComplete(opCtx);
-    ReplicaSetAwareServiceRegistry::get(_service).onStepUpBegin(opCtx);
+    ReplicaSetAwareServiceRegistry::get(_service).onStepUpBegin(opCtx, termWhenBufferIsEmpty);
 
     if (MONGO_unlikely(hangBeforeRSTLOnDrainComplete.shouldFail())) {
         LOGV2(4712800, "Hanging due to hangBeforeRSTLOnDrainComplete failpoint");
@@ -1228,7 +1228,8 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
 
         AllowNonLocalWritesBlock writesAllowed(opCtx);
         OpTime firstOpTime = _externalState->onTransitionToPrimary(opCtx);
-        ReplicaSetAwareServiceRegistry::get(_service).onStepUpComplete(opCtx);
+        ReplicaSetAwareServiceRegistry::get(_service).onStepUpComplete(opCtx,
+                                                                       firstOpTime.getTerm());
         lk.lock();
 
         auto status = _topCoord->completeTransitionToPrimary(firstOpTime);
@@ -1240,6 +1241,8 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
             return;
         }
         invariant(status);
+        invariant(firstOpTime.getTerm() == _topCoord->getTerm());
+        invariant(termWhenBufferIsEmpty == _topCoord->getTerm());
     }
 
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged

@@ -50,15 +50,15 @@ ReplicaSetAwareServiceRegistry& ReplicaSetAwareServiceRegistry::get(
     return registryDecoration(serviceContext);
 }
 
-void ReplicaSetAwareServiceRegistry::onStepUpBegin(OperationContext* opCtx) {
+void ReplicaSetAwareServiceRegistry::onStepUpBegin(OperationContext* opCtx, long long term) {
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
-        service->onStepUpBegin(opCtx);
+        service->onStepUpBegin(opCtx, term);
     });
 }
 
-void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx) {
+void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
-        service->onStepUpComplete(opCtx);
+        service->onStepUpComplete(opCtx, term);
     });
 }
 

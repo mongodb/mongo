@@ -45,11 +45,11 @@ public:
     int numCallsOnBecomeArbiter{0};
 
 protected:
-    void onStepUpBegin(OperationContext* opCtx) override {
+    void onStepUpBegin(OperationContext* opCtx, long long term) override {
         numCallsOnStepUpBegin++;
     }
 
-    void onStepUpComplete(OperationContext* opCtx) override {
+    void onStepUpComplete(OperationContext* opCtx, long long term) override {
         numCallsOnStepUpComplete++;
     }
 
@@ -120,16 +120,16 @@ private:
         return true;
     }
 
-    void onStepUpBegin(OperationContext* opCtx) final {
+    void onStepUpBegin(OperationContext* opCtx, long long term) final {
         ASSERT_EQ(numCallsOnStepUpBegin,
                   ServiceB::get(getServiceContext())->numCallsOnStepUpBegin - 1);
-        TestService::onStepUpBegin(opCtx);
+        TestService::onStepUpBegin(opCtx, term);
     }
 
-    void onStepUpComplete(OperationContext* opCtx) final {
+    void onStepUpComplete(OperationContext* opCtx, long long term) final {
         ASSERT_EQ(numCallsOnStepUpComplete,
                   ServiceB::get(getServiceContext())->numCallsOnStepUpComplete - 1);
-        TestService::onStepUpComplete(opCtx);
+        TestService::onStepUpComplete(opCtx, term);
     }
 
     void onStepDown() final {
@@ -183,11 +183,11 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, c->numCallsOnStepDown);
     ASSERT_EQ(0, c->numCallsOnBecomeArbiter);
 
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, 0);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, 0);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, 0);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, 0);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, 0);
     ReplicaSetAwareServiceRegistry::get(sc).onStepDown();
     ReplicaSetAwareServiceRegistry::get(sc).onBecomeArbiter();
 

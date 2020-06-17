@@ -185,14 +185,14 @@ Balancer::~Balancer() {
     waitForBalancerToStop();
 }
 
-void Balancer::onStepUpBegin(OperationContext* opCtx) {
+void Balancer::onStepUpBegin(OperationContext* opCtx, long long term) {
     // Before starting step-up, ensure the balancer is ready to start. Specifically, that the
     // balancer is actually stopped, because it may still be in the process of stopping if this
     // node was previously primary.
     waitForBalancerToStop();
 }
 
-void Balancer::onStepUpComplete(OperationContext* opCtx) {
+void Balancer::onStepUpComplete(OperationContext* opCtx, long long term) {
     initiateBalancer(opCtx);
 }
 
