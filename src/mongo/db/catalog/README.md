@@ -553,8 +553,6 @@ _Code spelunking starting points:_
   * 'durable' confusingly means journaling is enabled.
 * [_Whether WT journals a collection_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L560-L580)
 
-What collections are journaled, and how.
-
 # Flow Control
 What it does (motivation). How does it do it? Ticketing.
 
@@ -782,24 +780,22 @@ Additionally, secondaries apply batches of oplog entries out of order and simila
 unclean shutdown.
 
 # Glossary
-_put terms here that can either be briefly explained in order to be simply referenced by above sections; or terms with links to sections for complete explanation so topics can be found quickly when not obviously covered by a section_
-
-**ident**: An ident is a unique identifier given to a storage engine resource. Collections and
-indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented
-as tables. For example, collection idents have the form: `collection-<counter>-<random number>`.
-
 **binary comparable**: Two values are binary comparable if the lexicographical order over their byte
 representation, from lower memory addresses to higher addresses, is the same as the defined ordering
 for that type. For example, ASCII strings are binary comparable, but double precision floating point
 numbers and little-endian integers are not.
 
-**`oplog hole`**: an uncommitted oplog write that can exist with out-of-order writes when a later
+**ident**: An ident is a unique identifier given to a storage engine resource. Collections and
+indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented
+as tables. For example, collection idents have the form: `collection-<counter>-<random number>`.
+
+**oplog hole**: an uncommitted oplog write that can exist with out-of-order writes when a later
 timestamped write happens to commit first. Oplog holes can exist in-memory and persisted on disk.
 
-**`oplogReadTimestamp`**: the timestamp used for WT forward cursor oplog reads in order to avoid
+**oplogReadTimestamp**: the timestamp used for WT forward cursor oplog reads in order to avoid
 advancing past oplog holes. Tracks in-memory oplog holes.
 
-**`oplogTruncateAfterPoint`**: the timestamp after which oplog entries will be truncated during
+**oplogTruncateAfterPoint**: the timestamp after which oplog entries will be truncated during
 startup recovery after an unclean shutdown. Tracks persisted oplog holes.
 
 [`BSONObj::woCompare`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonobj.h#L460
