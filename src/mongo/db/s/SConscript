@@ -210,7 +210,7 @@ env.Library(
         'sharding_logging',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/replica_set_aware_service',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         'sharding_runtime_d_params',
     ],
 )

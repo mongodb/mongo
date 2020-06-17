@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/replica_set_aware_service.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context_test_fixture.h"
 
 namespace mongo {
