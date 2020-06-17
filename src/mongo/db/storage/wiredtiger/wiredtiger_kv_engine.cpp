@@ -184,7 +184,7 @@ std::string WiredTigerFileVersion::getDowngradeString() {
                 MONGO_UNREACHABLE;
         }
     }
-    return "compatibility=(release=3.3)";
+    return "compatibility=(release=10.0)";
 }
 
 using std::set;
