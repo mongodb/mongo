@@ -416,8 +416,8 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         // Verify that splitPoints are not repeated
         if (endKey.woCompare(startKey) == 0) {
             return {ErrorCodes::InvalidOptions,
-                    str::stream() << "Split on lower bound of chunk "
-                                  << ChunkRange(startKey, endKey).toString() << "is not allowed"};
+                    str::stream() << "Split on lower bound of chunk [" << startKey.toString()
+                                  << ", " << endKey.toString() << "] is not allowed"};
         }
 
         // verify that splits don't use disallowed BSON object format
