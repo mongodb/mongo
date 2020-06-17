@@ -6,6 +6,7 @@
 // Tag this test as 'requires_find_command' to prevent it from running in the legacy passthrough.
 // @tags: [
 //   requires_find_command,
+//   exclude_from_large_txns
 // ]
 //
 
