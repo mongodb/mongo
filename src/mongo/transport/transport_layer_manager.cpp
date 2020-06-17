@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/transport/transport_layer_manager.h"
@@ -38,6 +40,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
@@ -135,6 +138,10 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
 
     transport::TransportLayerASIO::Options opts(config);
     if (config->serviceExecutor == "adaptive") {
+        LOGV2_OPTIONS(4870401,
+                      {logv2::LogTag::kStartupWarnings},
+                      "The adaptive service executor implementation is deprecated, please leave "
+                      "--serviceExecutor unspecified");
         opts.transportMode = transport::Mode::kAsynchronous;
     } else if (config->serviceExecutor == "synchronous") {
         opts.transportMode = transport::Mode::kSynchronous;
