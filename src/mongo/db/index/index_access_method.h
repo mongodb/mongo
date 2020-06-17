@@ -205,13 +205,6 @@ public:
     public:
         using Sorter = mongo::Sorter<KeyString::Value, mongo::NullValue>;
 
-        struct State {
-            boost::optional<RecordId> lastRecordIdInserted;
-            std::string tempDir;
-            std::string fileName;
-            std::vector<SorterRangeInfo> ranges;
-        };
-
         virtual ~BulkBuilder() = default;
 
         /**
@@ -238,9 +231,14 @@ public:
         virtual int64_t getKeysInserted() const = 0;
 
         /**
-         * Returns the current state of this BulkBuilder and its underlying Sorter.
+         * Returns the current state of this BulkBuilder's underlying Sorter.
          */
-        virtual State getState() const = 0;
+        virtual Sorter::State getSorterState() const = 0;
+
+        /**
+         * Persists on disk the keys that have been inserted using this BulkBuilder.
+         */
+        virtual void persistDataForShutdown() = 0;
     };
 
     /**

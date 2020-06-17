@@ -502,6 +502,9 @@ Status MultiIndexBlock::insert(OperationContext* opCtx, const BSONObj& doc, cons
         if (!idxStatus.isOK())
             return idxStatus;
     }
+
+    _lastRecordIdInserted = loc;
+
     return Status::OK();
 }
 
@@ -513,6 +516,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
                                             std::set<RecordId>* dupRecords) {
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
+
+    invariant(_phase == Phase::kCollectionScan, _phaseToString(_phase));
+    _phase = Phase::kBulkLoad;
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         // If 'dupRecords' is provided, it will be used to store all records that would result in
         // duplicate key errors. Only pass 'dupKeysInserted', which stores inserted duplicate keys,
@@ -572,6 +579,13 @@ Status MultiIndexBlock::drainBackgroundWrites(
     IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy) {
     invariant(!_buildIsCleanedUp);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    // Background writes are drained three times (once without blocking writes and twice blocking
+    // writes), so we may either be coming from the bulk load phase or be already in the drain
+    // writes phase.
+    invariant(_phase == Phase::kBulkLoad || _phase == Phase::kDrainWrites, _phaseToString(_phase));
+    _phase = Phase::kDrainWrites;
+
     const Collection* coll =
         CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, _collectionUUID.get());
 
@@ -724,8 +738,7 @@ void MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx, bool shutdow
 
     auto action = TemporaryRecordStore::FinalizationAction::kDelete;
 
-    if (shutdown && _buildUUID && _method == IndexBuildMethod::kHybrid &&
-        opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
+    if (_shouldWriteStateToDisk(opCtx, shutdown)) {
         _writeStateToDisk(opCtx);
         action = TemporaryRecordStore::FinalizationAction::kKeep;
     }
@@ -737,37 +750,13 @@ void MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx, bool shutdow
     _buildIsCleanedUp = true;
 }
 
+bool MultiIndexBlock::_shouldWriteStateToDisk(OperationContext* opCtx, bool shutdown) const {
+    return shutdown && _buildUUID && !_buildIsCleanedUp && _method == IndexBuildMethod::kHybrid &&
+        opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds();
+}
+
 void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
-    BSONObjBuilder builder;
-    _buildUUID->appendToBuilder(&builder, "_id");
-    builder.append("phase", "unknown");
-    builder.appendNumber("collectionScanPosition", 0LL);
-
-    BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));
-    for (const auto& index : _indexes) {
-        BSONObjBuilder indexInfo(indexesArray.subobjStart());
-        indexInfo.append("tempDir", "");
-        indexInfo.append("fileName", "");
-
-        BSONArrayBuilder ranges(indexInfo.subarrayStart("ranges"));
-        ranges.done();
-
-        auto indexBuildInterceptor = index.block->getEntry()->indexBuildInterceptor();
-        indexInfo.append("sideWritesTable", indexBuildInterceptor->getSideWritesTableIdent());
-
-        if (auto duplicateKeyTrackerTableIdent =
-                indexBuildInterceptor->getDuplicateKeyTrackerTableIdent())
-            indexInfo.append("dupKeyTempTable", *duplicateKeyTrackerTableIdent);
-
-        if (auto skippedRecordTrackerTableIdent =
-                indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent())
-            indexInfo.append("skippedRecordTrackerTable", *skippedRecordTrackerTableIdent);
-
-        indexInfo.done();
-    }
-    indexesArray.done();
-
-    auto obj = builder.done();
+    auto obj = _constructStateObject();
     auto rs = opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx);
 
     WriteUnitOfWork wuow(opCtx);
@@ -791,6 +780,72 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
     LOGV2(4841502, "Wrote resumable index build state to disk", logAttrs(*_buildUUID));
 
     rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kKeep);
+}
+
+BSONObj MultiIndexBlock::_constructStateObject() const {
+    BSONObjBuilder builder;
+    _buildUUID->appendToBuilder(&builder, "_id");
+    builder.append("phase", _phaseToString(_phase));
+
+    // We can be interrupted by shutdown before inserting the first document from the collection
+    // scan, in which case there is no _lastRecordIdInserted.
+    if (_phase == Phase::kCollectionScan && _lastRecordIdInserted)
+        builder.append("collectionScanPosition", _lastRecordIdInserted->repr());
+
+    BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));
+    for (const auto& index : _indexes) {
+        BSONObjBuilder indexInfo(indexesArray.subobjStart());
+
+        if (_phase == Phase::kCollectionScan || _phase == Phase::kBulkLoad) {
+            auto state = index.bulk->getSorterState();
+
+            indexInfo.append("tempDir", state.tempDir);
+            indexInfo.append("fileName", state.fileName);
+
+            BSONArrayBuilder ranges(indexInfo.subarrayStart("ranges"));
+            for (const auto& rangeInfo : state.ranges) {
+                BSONObjBuilder range(ranges.subobjStart());
+
+                range.append("startOffset", rangeInfo.startOffset);
+                range.append("endOffset", rangeInfo.endOffset);
+                range.appendNumber("checksum", static_cast<long long>(rangeInfo.checksum));
+
+                range.done();
+            }
+            ranges.done();
+        }
+
+        auto indexBuildInterceptor = index.block->getEntry()->indexBuildInterceptor();
+        indexInfo.append("sideWritesTable", indexBuildInterceptor->getSideWritesTableIdent());
+
+        if (auto duplicateKeyTrackerTableIdent =
+                indexBuildInterceptor->getDuplicateKeyTrackerTableIdent())
+            indexInfo.append("dupKeyTempTable", *duplicateKeyTrackerTableIdent);
+
+        if (auto skippedRecordTrackerTableIdent =
+                indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent())
+            indexInfo.append("skippedRecordTrackerTable", *skippedRecordTrackerTableIdent);
+
+        indexInfo.done();
+
+        // Ensure the data we are referencing has been persisted to disk.
+        index.bulk->persistDataForShutdown();
+    }
+    indexesArray.done();
+
+    return builder.obj();
+}
+
+std::string MultiIndexBlock::_phaseToString(Phase phase) const {
+    switch (phase) {
+        case Phase::kCollectionScan:
+            return "collection scan";
+        case Phase::kBulkLoad:
+            return "bulk load";
+        case Phase::kDrainWrites:
+            return "drain writes";
+    }
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

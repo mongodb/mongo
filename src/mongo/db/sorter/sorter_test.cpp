@@ -480,12 +480,13 @@ private:
     }
 
     void assertRangeInfo(unowned_ptr<IWSorter> sorter, const SortOptions& opts) {
+        auto state = sorter->getState();
         if (opts.extSortAllowed) {
-            ASSERT_EQ(sorter->getTempDir(), opts.tempDir);
-            ASSERT_NE(sorter->getFileName(), "");
+            ASSERT_EQ(state.tempDir, opts.tempDir);
+            ASSERT_NE(state.fileName, "");
         }
         if (auto numRanges = correctNumRanges()) {
-            ASSERT_EQ(sorter->getRangeInfos().size(), *numRanges);
+            ASSERT_EQ(state.ranges.size(), *numRanges);
         }
     }
 };

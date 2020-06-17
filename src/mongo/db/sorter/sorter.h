@@ -153,8 +153,8 @@ public:
 };
 
 struct SorterRangeInfo {
-    std::streampos startOffset;
-    std::streampos endOffset;
+    std::streamoff startOffset;
+    std::streamoff endOffset;
     uint32_t checksum;
 };
 
@@ -224,6 +224,12 @@ public:
                       typename Value::SorterDeserializeSettings>
         Settings;
 
+    struct State {
+        std::string tempDir;
+        std::string fileName;
+        std::vector<SorterRangeInfo> ranges;
+    };
+
     template <typename Comparator>
     static Sorter* make(const SortOptions& opts,
                         const Comparator& comp,
@@ -244,29 +250,23 @@ public:
         return _usedDisk;
     }
 
-    std::string getTempDir() const {
-        return _tempDir;
+    State getState() const {
+        return {_tempDir, _fileName, _getRangeInfos()};
     }
 
-    std::string getFileName() const {
-        return _fileName;
-    }
-
-    std::vector<SorterRangeInfo> getRangeInfos() const {
-        std::vector<SorterRangeInfo> ranges;
-        ranges.reserve(_iters.size());
-
-        std::transform(_iters.begin(), _iters.end(), std::back_inserter(ranges), [](const auto it) {
-            return it->getRangeInfo();
-        });
-
-        return ranges;
-    }
+    void persistDataForShutdown();
 
 protected:
     Sorter() {}  // can only be constructed as a base
 
+    virtual void spill() = 0;
+
+    std::vector<SorterRangeInfo> _getRangeInfos() const;
+
     bool _usedDisk{false};  // Keeps track of whether the sorter used disk or not
+
+    // Whether the files written by this Sorter should be kept on destruction.
+    bool _shouldKeepFilesOnDestruction = false;
 
     std::string _tempDir;
     std::string _fileName;

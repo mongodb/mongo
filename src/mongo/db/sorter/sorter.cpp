@@ -537,7 +537,7 @@ public:
     }
 
     ~NoLimitSorter() {
-        if (!_done) {
+        if (!_done && !this->_shouldKeepFilesOnDestruction) {
             // If done() was never called to return a MergeIterator, then this Sorter still owns
             // file deletion.
             DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileName));
@@ -669,6 +669,10 @@ public:
     }
 
 private:
+    void spill() {
+        invariant(false, "LimitOneSorter does not spill to disk");
+    }
+
     const Comparator _comp;
     Data _best;
     bool _haveData;  // false at start, set to true on first call to add()
@@ -711,7 +715,7 @@ public:
     }
 
     ~TopKSorter() {
-        if (!_done) {
+        if (!_done && !this->_shouldKeepFilesOnDestruction) {
             // If done() was never called to return a MergeIterator, then this Sorter still owns
             // file deletion.
             DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileName));
@@ -936,6 +940,24 @@ private:
 };
 
 }  // namespace sorter
+
+template <typename Key, typename Value>
+std::vector<SorterRangeInfo> Sorter<Key, Value>::_getRangeInfos() const {
+    std::vector<SorterRangeInfo> ranges;
+    ranges.reserve(_iters.size());
+
+    std::transform(_iters.begin(), _iters.end(), std::back_inserter(ranges), [](const auto it) {
+        return it->getRangeInfo();
+    });
+
+    return ranges;
+}
+
+template <typename Key, typename Value>
+void Sorter<Key, Value>::persistDataForShutdown() {
+    spill();
+    _shouldKeepFilesOnDestruction = true;
+}
 
 //
 // SortedFileWriter

@@ -295,9 +295,17 @@ private:
         InsertDeleteOptions options;
     };
 
+    enum class Phase { kCollectionScan, kBulkLoad, kDrainWrites };
+
     void _abortWithoutCleanup(OperationContext* opCtx, bool shutdown);
 
+    bool _shouldWriteStateToDisk(OperationContext* opCtx, bool shutdown) const;
+
     void _writeStateToDisk(OperationContext* opCtx) const;
+
+    BSONObj _constructStateObject() const;
+
+    std::string _phaseToString(Phase phase) const;
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;
@@ -315,5 +323,12 @@ private:
     // A unique identifier associating this index build with a two-phase index build within a
     // replica set.
     boost::optional<UUID> _buildUUID;
+
+    // The RecordId corresponding to the object most recently inserted using this MultiIndexBlock,
+    // or boost::none if nothing has been inserted.
+    boost::optional<RecordId> _lastRecordIdInserted;
+
+    // The current phase of the index build.
+    Phase _phase = Phase::kCollectionScan;
 };
 }  // namespace mongo
