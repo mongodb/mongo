@@ -33,6 +33,7 @@
 
 #include <cstdint>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
@@ -2478,7 +2479,7 @@ public:
     }
 };
 
-class TimestampIndexDrops : public StorageTimestampTest {
+class TimestampIndexDropsWildcard : public StorageTimestampTest {
 public:
     void run() {
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
@@ -2538,6 +2539,85 @@ public:
                               nss,
                               BSON("index"
                                    << "*"),
+                              &result));
+
+        // Assert that each index is dropped individually and with its own timestamp. The order of
+        // dropping and creating are not guaranteed to be the same, but assert all of the created
+        // indexes were also dropped.
+        size_t nIdents = indexIdents.size();
+        for (size_t i = 0; i < nIdents; i++) {
+            OneOffRead oor(_opCtx, beforeDropTs.addTicks(i + 1).asTimestamp());
+
+            auto ident = getDroppedIndexIdent(durableCatalog, origIdents);
+            indexIdents.erase(std::remove(indexIdents.begin(), indexIdents.end(), ident));
+
+            origIdents = durableCatalog->getAllIdents(_opCtx);
+        }
+        ASSERT_EQ(indexIdents.size(), 0ul) << "Dropped idents should match created idents";
+    }
+};
+
+class TimestampIndexDropsListed : public StorageTimestampTest {
+public:
+    void run() {
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto durableCatalog = storageEngine->getCatalog();
+
+        NamespaceString nss("unittests.timestampIndexDrops");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
+
+        const LogicalTime insertTimestamp = _clock->tick(ClusterTime, 1);
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2 << "c" << 3),
+                                           insertTimestamp.asTimestamp(),
+                                           presentTerm));
+            wuow.commit();
+            ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        }
+
+
+        const Timestamp beforeIndexBuild = _clock->tick(ClusterTime, 1).asTimestamp();
+
+        // Save the pre-state idents so we can capture the specific ident related to index
+        // creation.
+        std::vector<std::string> origIdents = durableCatalog->getAllIdents(_opCtx);
+
+        std::vector<Timestamp> afterCreateTimestamps;
+        std::vector<std::string> indexIdents;
+        // Create an index and get the ident for each index.
+        for (auto key : {"a", "b", "c"}) {
+            createIndex(autoColl.getCollection(), str::stream() << key << "_1", BSON(key << 1));
+
+            // Timestamps at the completion of each index build.
+            afterCreateTimestamps.push_back(_clock->tick(ClusterTime, 1).asTimestamp());
+
+            // Add the new ident to the vector and reset the current idents.
+            indexIdents.push_back(
+                getNewIndexIdentAtTime(durableCatalog, origIdents, Timestamp::min()));
+            origIdents = durableCatalog->getAllIdents(_opCtx);
+        }
+
+        // Ensure each index is visible at the correct timestamp, and not before.
+        for (size_t i = 0; i < indexIdents.size(); i++) {
+            auto beforeTs = (i == 0) ? beforeIndexBuild : afterCreateTimestamps[i - 1];
+            assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdents[i], beforeTs);
+            assertIdentsExistAtTimestamp(
+                durableCatalog, "", indexIdents[i], afterCreateTimestamps[i]);
+        }
+
+        const LogicalTime beforeDropTs = _clock->getTime()[ClusterTime];
+
+        // Drop all of the indexes.
+        BSONObjBuilder result;
+        ASSERT_OK(dropIndexes(_opCtx,
+                              nss,
+                              BSON("index" << BSON_ARRAY("a_1"
+                                                         << "b_1"
+                                                         << "c_1")),
                               &result));
 
         // Assert that each index is dropped individually and with its own timestamp. The order of
@@ -3905,7 +3985,8 @@ public:
         addIf<TimestampMultiIndexBuilds>();
         addIf<TimestampMultiIndexBuildsDuringRename>();
         addIf<TimestampAbortIndexBuild>();
-        addIf<TimestampIndexDrops>();
+        addIf<TimestampIndexDropsWildcard>();
+        addIf<TimestampIndexDropsListed>();
         addIf<TimestampIndexOplogApplicationOnPrimary>();
         addIf<SecondaryReadsDuringBatchApplicationAreAllowed>();
         addIf<ViewCreationSeparateTransaction>();

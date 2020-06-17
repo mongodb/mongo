@@ -209,13 +209,16 @@ Status dropIndexByDescriptor(OperationContext* opCtx,
                           << "can't drop unfinished index with name: " << desc->indexName());
     }
 
+    // Log the operation first, which reserves an optime in the oplog and sets the timestamp for
+    // future writes. This guarantees the durable catalog's metadata change to share the same
+    // timestamp when dropping the index below.
+    opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+        opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
+
     auto s = indexCatalog->dropIndex(opCtx, desc);
     if (!s.isOK()) {
         return s;
     }
-
-    opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-        opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
 
     return Status::OK();
 }
