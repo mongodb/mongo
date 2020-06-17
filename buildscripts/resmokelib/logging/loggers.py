@@ -3,10 +3,10 @@
 import logging
 import sys
 
-from . import buildlogger
-from . import formatters
-from .. import errors
-from .. import config
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.logging import buildlogger
+from buildscripts.resmokelib.logging import formatters
 
 _DEFAULT_FORMAT = "[%(name)s] %(message)s"
 

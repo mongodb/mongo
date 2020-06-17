@@ -2,9 +2,9 @@
 
 import signal
 
-from . import interface
-from ...core import programs
-from ... import logging
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib.core import programs
+from buildscripts.resmokelib.testing.fixtures import interface
 
 
 class YesFixture(interface.Fixture):  # pylint: disable=abstract-method

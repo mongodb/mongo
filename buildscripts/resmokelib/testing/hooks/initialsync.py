@@ -7,12 +7,12 @@ import bson
 import bson.errors
 import pymongo.errors
 
-from . import cleanup
-from . import interface
-from . import jsfile
-from ..fixtures import interface as fixture_interface
-from ..fixtures import replicaset
-from ... import errors
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib.testing.fixtures import replicaset
+from buildscripts.resmokelib.testing.hooks import cleanup
+from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.hooks import jsfile
 
 
 class BackgroundInitialSync(interface.Hook):

@@ -7,11 +7,11 @@ import time
 import pymongo
 import pymongo.errors
 
-from . import interface
-from ... import config
-from ... import core
-from ... import errors
-from ... import utils
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.fixtures import interface
 
 
 class MongoDFixture(interface.Fixture):

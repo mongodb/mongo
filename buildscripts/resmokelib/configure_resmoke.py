@@ -1,18 +1,14 @@
 """Configure the command line input for the resmoke 'run' subcommand."""
 
+import configparser
+import datetime
 import os
 import os.path
-import sys
-import shlex
-import configparser
 
-from typing import NamedTuple
-
-import datetime
 import pymongo.uri_parser
 
-from . import config as _config
-from . import utils
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import utils
 
 
 def validate_and_update_config(parser, args):

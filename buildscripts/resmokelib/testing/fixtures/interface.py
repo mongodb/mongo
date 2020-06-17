@@ -7,12 +7,12 @@ from enum import Enum
 import pymongo
 import pymongo.errors
 
-from ... import config
-from ... import errors
-from ... import logging
-from ... import multiversionconstants as multiversion
-from ... import utils
-from ...utils import registry
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import multiversionconstants as multiversion
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.utils import registry
 
 _FIXTURES = {}  # type: ignore
 

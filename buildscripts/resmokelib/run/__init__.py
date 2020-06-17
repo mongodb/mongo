@@ -21,8 +21,7 @@ try:
 except ImportError:
     pass
 
-# pylint: disable=wrong-import-position
-import buildscripts.resmokelib.parser as main_parser
+from buildscripts.resmokelib import parser as main_parser
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib import errors

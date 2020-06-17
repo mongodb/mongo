@@ -7,14 +7,13 @@ import json
 import os
 import os.path
 import stat
-import sys
 
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.core import jasper_process
+from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOD_BINARY
 from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOS_BINARY
-from . import jasper_process
-from . import process
-from .. import config
-from .. import utils
 
 # The below parameters define the default 'logComponentVerbosity' object passed to mongod processes
 # started either directly via resmoke or those that will get started by the mongo shell. We allow

@@ -1,9 +1,10 @@
 """Functions to list processes in each OS and search for interesting processes."""
 
-import os
-import io
-import sys
 import csv
+import io
+import os
+import sys
+
 from typing import List, NamedTuple, Union
 
 from buildscripts.resmokelib.hang_analyzer.process import call, callo, find_program

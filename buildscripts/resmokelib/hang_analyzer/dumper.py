@@ -1,13 +1,13 @@
 """Tools to dump debug info for each OS."""
 
-from abc import ABCMeta, abstractmethod
+import itertools
 import logging
 import os
 import sys
 import tempfile
-import itertools
-from distutils import spawn  # pylint: disable=no-name-in-module
+from abc import ABCMeta, abstractmethod
 from collections import namedtuple
+from distutils import spawn  # pylint: disable=no-name-in-module
 
 from buildscripts.resmokelib.hang_analyzer.process import call, callo, find_program
 from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo

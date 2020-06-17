@@ -1,11 +1,11 @@
 """Miscellaneous utility functions used by the hang analyzer."""
 
+import logging
 import os
+import signal
+import subprocess
 import sys
 import time
-import signal
-import logging
-import subprocess
 from distutils import spawn  # pylint: disable=no-name-in-module
 
 from buildscripts.resmokelib import core

@@ -8,8 +8,8 @@ import threading
 import time
 import unittest
 
-from .. import config as _config
-from .. import logging
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import logging
 
 
 # pylint: disable=attribute-defined-outside-init

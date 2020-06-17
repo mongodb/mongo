@@ -6,16 +6,16 @@ import time
 import pymongo
 import pymongo.errors
 
-from . import interface
-from . import standalone
-from . import replicaset
-from ... import config
-from ... import core
-from ... import logging
-from ... import errors
-from ... import utils
-from ...utils import registry
-from ...multiversionconstants import LAST_STABLE_MONGOS_BINARY
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOS_BINARY
+from buildscripts.resmokelib.testing.fixtures import interface
+from buildscripts.resmokelib.testing.fixtures import replicaset
+from buildscripts.resmokelib.testing.fixtures import standalone
+from buildscripts.resmokelib.utils import registry
 
 
 class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes

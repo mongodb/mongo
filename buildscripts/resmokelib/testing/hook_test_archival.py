@@ -3,10 +3,10 @@
 import os
 import threading
 
-from .. import config
-from .. import utils
-from .. import errors
-from ..utils import globstar
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.utils import globstar
 
 
 class HookTestArchival(object):

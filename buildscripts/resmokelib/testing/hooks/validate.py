@@ -2,7 +2,7 @@
 
 import os.path
 
-from . import jsfile
+from buildscripts.resmokelib.testing.hooks import jsfile
 
 
 class ValidateCollections(jsfile.DataConsistencyHook):

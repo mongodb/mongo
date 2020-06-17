@@ -11,10 +11,10 @@ import pymongo.errors
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib.testing.hooks import interface
 
 
 class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-attributes

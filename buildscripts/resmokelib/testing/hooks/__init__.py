@@ -5,8 +5,8 @@ by allowing special code to be executed before or after each test, and
 before or after each suite.
 """
 
-from .interface import make_hook
-from ...utils import autoloader as _autoloader
+from buildscripts.resmokelib.testing.hooks.interface import make_hook
+from buildscripts.resmokelib.utils import autoloader as _autoloader
 
 # We dynamically load all modules in the hooks/ package so that any Hook classes declared
 # within them are automatically registered.

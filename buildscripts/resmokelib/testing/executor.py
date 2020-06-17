@@ -3,19 +3,19 @@
 import threading
 import time
 
-from . import fixtures
-from . import hook_test_archival as archival
-from . import hooks as _hooks
-from . import job as _job
-from .queue_element import queue_elem_factory
-from . import report as _report
-from . import testcases
-from .. import config as _config
-from .. import errors
-from .. import utils
-from .. import logging
-from ..core import network
-from ..utils.queue import Queue
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.core import network
+from buildscripts.resmokelib.testing import fixtures
+from buildscripts.resmokelib.testing import hook_test_archival as archival
+from buildscripts.resmokelib.testing import hooks as _hooks
+from buildscripts.resmokelib.testing import job as _job
+from buildscripts.resmokelib.testing import report as _report
+from buildscripts.resmokelib.testing import testcases
+from buildscripts.resmokelib.testing.queue_element import queue_elem_factory
+from buildscripts.resmokelib.utils.queue import Queue
 
 
 class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes

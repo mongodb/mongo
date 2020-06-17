@@ -1,5 +1,4 @@
 """Interactions with the undodb tool-suite."""
-from typing import Optional
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 

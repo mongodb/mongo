@@ -8,8 +8,8 @@ import os.path
 import unittest
 import uuid
 
-from ... import logging
-from ...utils import registry
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib.utils import registry
 
 _TEST_CASES = {}  # type: ignore
 

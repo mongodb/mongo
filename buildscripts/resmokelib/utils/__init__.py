@@ -7,7 +7,7 @@ import sys
 
 import yaml
 
-from . import archival
+from buildscripts.resmokelib.utils import archival
 
 
 @contextlib.contextmanager

@@ -1,14 +1,12 @@
 """Parser for command line arguments."""
 
+import argparse
 import shlex
 
-import argparse
-
-from . import configure_resmoke
-
-from .run import RunPlugin
-from .hang_analyzer import HangAnalyzerPlugin
-from .undodb import UndoDbPlugin
+from buildscripts.resmokelib import configure_resmoke
+from buildscripts.resmokelib.hang_analyzer import HangAnalyzerPlugin
+from buildscripts.resmokelib.run import RunPlugin
+from buildscripts.resmokelib.undodb import UndoDbPlugin
 
 _PLUGINS = [
     RunPlugin(),

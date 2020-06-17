@@ -2,10 +2,10 @@
 
 import sys
 
-from ..testcases import interface as testcase
-from ... import errors
-from ...logging import loggers
-from ...utils import registry
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.logging import loggers
+from buildscripts.resmokelib.testing.testcases import interface as testcase
+from buildscripts.resmokelib.utils import registry
 
 _HOOKS = {}  # type: ignore
 

@@ -6,12 +6,12 @@ import os.path
 import sys
 import threading
 
-from . import interface
-from ... import config
-from ... import core
-from ... import logging
-from ... import utils
-from ...utils import registry
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.testcases import interface
+from buildscripts.resmokelib.utils import registry
 
 
 class _SingleJSTestCase(interface.ProcessTestCase):

@@ -3,16 +3,14 @@
 Serves as an alternative to process.py.
 """
 
-import sys
-
 try:
     import grpc
 except ImportError:
     pass
 
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib import errors
-from . import process as _process
+from buildscripts.resmokelib.core import process as _process
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 
 
 class Process(_process.Process):

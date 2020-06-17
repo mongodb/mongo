@@ -2,7 +2,7 @@
 
 import os
 
-from . import interface
+from buildscripts.resmokelib.testing.hooks import interface
 
 
 class CleanEveryN(interface.Hook):

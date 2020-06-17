@@ -8,15 +8,15 @@ import atexit
 import logging
 import os
 import os.path
+import subprocess
 import sys
 import threading
-import subprocess
 
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors
-import buildscripts.resmokelib.config as _config
-from . import pipe  # pylint: disable=wrong-import-position
-from .. import utils  # pylint: disable=wrong-import-position
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.core import pipe
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 
 # Attempt to avoid race conditions (e.g. hangs caused by a file descriptor being left open) when
 # starting subprocesses concurrently from multiple threads by guarding calls to subprocess.Popen()

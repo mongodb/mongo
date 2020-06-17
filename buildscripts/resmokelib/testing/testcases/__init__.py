@@ -1,7 +1,7 @@
 """Package containing subclasses of unittest.TestCase."""
 
-from .interface import make_test_case
-from ...utils import autoloader as _autoloader
+from buildscripts.resmokelib.testing.testcases.interface import make_test_case
+from buildscripts.resmokelib.utils import autoloader as _autoloader
 
 # We dynamically load all modules in the testcases/ package so that any TestCase classes declared
 # within them are automatically registered.

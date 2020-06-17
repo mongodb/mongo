@@ -1,14 +1,14 @@
 """Unit tests for the buildscripts.resmokelib.selector module."""
 
-import sys
 import fnmatch
 import os.path
+import sys
 import unittest
 
+import buildscripts.resmokelib.config
 import buildscripts.resmokelib.parser as parser
 import buildscripts.resmokelib.selector as selector
 import buildscripts.resmokelib.utils.globstar as globstar
-import buildscripts.resmokelib.config
 
 # pylint: disable=missing-docstring,protected-access
 

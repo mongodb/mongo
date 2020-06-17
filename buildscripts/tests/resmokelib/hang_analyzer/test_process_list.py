@@ -1,6 +1,5 @@
 """Unit tests for the buildscripts.resmokelib.hang_analyzer.process_list module."""
 
-import logging
 import unittest
 
 from mock import Mock, patch

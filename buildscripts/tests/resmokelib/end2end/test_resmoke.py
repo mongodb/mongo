@@ -3,15 +3,12 @@
 import logging
 import os
 import os.path
-import subprocess
 import sys
 import time
 import unittest
 
-import psutil
-
-from buildscripts.resmokelib.utils import rmtree
 from buildscripts.resmokelib import core
+from buildscripts.resmokelib.utils import rmtree
 
 # pylint: disable=missing-docstring,protected-access
 

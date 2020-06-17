@@ -4,13 +4,12 @@ import sys
 import time
 from collections import namedtuple
 
-from . import queue_element
-from . import testcases
-from .. import config
-from .. import errors
-from ..testing.hooks import stepdown
-from ..testing.testcases import fixture as _fixture
-from ..utils import queue as _queue
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.testing import testcases
+from buildscripts.resmokelib.testing.hooks import stepdown
+from buildscripts.resmokelib.testing.testcases import fixture as _fixture
+from buildscripts.resmokelib.utils import queue as _queue
 
 
 class Job(object):  # pylint: disable=too-many-instance-attributes

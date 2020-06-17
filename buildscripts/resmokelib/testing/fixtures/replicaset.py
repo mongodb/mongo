@@ -3,19 +3,18 @@
 import os.path
 import time
 
-import bson.errors
 import pymongo
 import pymongo.errors
 import pymongo.write_concern
 
-from . import interface
-from . import replicaset_utils
-from . import standalone
-from ... import config
-from ... import logging
-from ... import errors
-from ... import utils
-from ...multiversionconstants import LAST_STABLE_MONGOD_BINARY
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOD_BINARY
+from buildscripts.resmokelib.testing.fixtures import interface
+from buildscripts.resmokelib.testing.fixtures import replicaset_utils
+from buildscripts.resmokelib.testing.fixtures import standalone
 
 
 class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes

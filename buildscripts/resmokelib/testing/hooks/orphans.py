@@ -2,8 +2,8 @@
 
 import os.path
 
-from . import jsfile
-from ..fixtures import shardedcluster
+from buildscripts.resmokelib.testing.fixtures import shardedcluster
+from buildscripts.resmokelib.testing.hooks import jsfile
 
 
 class CheckOrphansDeleted(jsfile.DataConsistencyHook):
