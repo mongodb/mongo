@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/exec/sbe/values/slot_id_generator.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/str.h"
 

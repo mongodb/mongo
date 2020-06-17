@@ -59,7 +59,6 @@ using FrameId = int64_t;
 using SpoolId = int64_t;
 
 namespace value {
-using SlotId = int64_t;
 
 /**
  * Type dispatch tags.
@@ -666,129 +665,6 @@ inline TypeTags getWidestNumericalType(TypeTags lhsTag, TypeTags rhsTag) noexcep
     }
 }
 
-class SlotAccessor {
-public:
-    virtual ~SlotAccessor() = 0;
-    /**
-     * Returns a non-owning view of value currently stored in the slot. The returned value is valid
-     * until the content of this slot changes (usually as a result of calling getNext()). If the
-     * caller needs to hold onto the value longer then it must make a copy of the value.
-     */
-    virtual std::pair<TypeTags, Value> getViewOfValue() const = 0;
-
-    /**
-     * Sometimes it may be determined that a caller is the last one to access this slot. If that is
-     * the case then the caller can use this optimized method to move out the value out of the slot
-     * saving the extra copy operation. Not all slots own the values stored in them so they must
-     * make a deep copy. The returned value is owned by the caller.
-     */
-    virtual std::pair<TypeTags, Value> copyOrMoveValue() = 0;
-};
-inline SlotAccessor::~SlotAccessor() {}
-
-class ViewOfValueAccessor final : public SlotAccessor {
-public:
-    // Return non-owning view of the value.
-    std::pair<TypeTags, Value> getViewOfValue() const override {
-        return {_tag, _val};
-    }
-
-    // Return a copy.
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
-        return copyValue(_tag, _val);
-    }
-
-    void reset() {
-        reset(TypeTags::Nothing, 0);
-    }
-
-    void reset(TypeTags tag, Value val) {
-        _tag = tag;
-        _val = val;
-    }
-
-private:
-    TypeTags _tag{TypeTags::Nothing};
-    Value _val{0};
-};
-
-class OwnedValueAccessor final : public SlotAccessor {
-public:
-    OwnedValueAccessor() = default;
-    OwnedValueAccessor(const OwnedValueAccessor& other) {
-        if (other._owned) {
-            auto [tag, val] = copyValue(other._tag, other._val);
-            _tag = tag;
-            _val = val;
-            _owned = true;
-        } else {
-            _tag = other._tag;
-            _val = other._val;
-            _owned = false;
-        }
-    }
-    OwnedValueAccessor(OwnedValueAccessor&& other) noexcept {
-        _tag = other._tag;
-        _val = other._val;
-        _owned = other._owned;
-
-        other._owned = false;
-    }
-
-    ~OwnedValueAccessor() {
-        release();
-    }
-
-    // Copy and swap idiom for a single copy/move assignment operator.
-    OwnedValueAccessor& operator=(OwnedValueAccessor other) noexcept {
-        std::swap(_tag, other._tag);
-        std::swap(_val, other._val);
-        std::swap(_owned, other._owned);
-        return *this;
-    }
-
-    // Return non-owning view of the value.
-    std::pair<TypeTags, Value> getViewOfValue() const override {
-        return {_tag, _val};
-    }
-
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
-        if (_owned) {
-            _owned = false;
-            return {_tag, _val};
-        } else {
-            return copyValue(_tag, _val);
-        }
-    }
-
-    void reset() {
-        reset(TypeTags::Nothing, 0);
-    }
-
-    void reset(TypeTags tag, Value val) {
-        reset(true, tag, val);
-    }
-
-    void reset(bool owned, TypeTags tag, Value val) {
-        release();
-
-        _tag = tag;
-        _val = val;
-        _owned = owned;
-    }
-
-private:
-    void release() {
-        if (_owned) {
-            releaseValue(_tag, _val);
-            _owned = false;
-        }
-    }
-
-    TypeTags _tag{TypeTags::Nothing};
-    Value _val;
-    bool _owned{false};
-};
 
 class ObjectEnumerator {
 public:
@@ -838,12 +714,17 @@ private:
     const char* _objectEnd{nullptr};
 };
 
+/**
+ * Holds a view of an array-like type (e.g. TypeTags::Array or TypeTags::bsonArray), and provides an
+ * iterface to iterate over the values that are the elements of the array.
+ */
 class ArrayEnumerator {
 public:
     ArrayEnumerator() = default;
     ArrayEnumerator(TypeTags tag, Value val) {
         reset(tag, val);
     }
+
     void reset(TypeTags tag, Value val) {
         _tagArray = tag;
         _valArray = val;
@@ -864,6 +745,7 @@ public:
             MONGO_UNREACHABLE;
         }
     }
+
     std::pair<TypeTags, Value> getViewOfValue() const;
 
     bool atEnd() const {
@@ -894,172 +776,6 @@ private:
     const char* _arrayCurrent{nullptr};
     const char* _arrayEnd{nullptr};
 };
-
-class ArrayAccessor final : public SlotAccessor {
-public:
-    void reset(TypeTags tag, Value val) {
-        _enumerator.reset(tag, val);
-    }
-
-    // Return non-owning view of the value.
-    std::pair<TypeTags, Value> getViewOfValue() const override {
-        return _enumerator.getViewOfValue();
-    }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
-        // We can never move out values from array.
-        auto [tag, val] = getViewOfValue();
-        return copyValue(tag, val);
-    }
-
-    bool atEnd() const {
-        return _enumerator.atEnd();
-    }
-
-    bool advance() {
-        return _enumerator.advance();
-    }
-
-private:
-    ArrayEnumerator _enumerator;
-};
-
-struct MaterializedRow {
-    std::vector<OwnedValueAccessor> _fields;
-
-    void makeOwned() {
-        for (auto& f : _fields) {
-            auto [tag, val] = f.getViewOfValue();
-            auto [copyTag, copyVal] = copyValue(tag, val);
-            f.reset(copyTag, copyVal);
-        }
-    }
-    bool operator==(const MaterializedRow& rhs) const {
-        for (size_t idx = 0; idx < _fields.size(); ++idx) {
-            auto [lhsTag, lhsVal] = _fields[idx].getViewOfValue();
-            auto [rhsTag, rhsVal] = rhs._fields[idx].getViewOfValue();
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-
-            if (tag != TypeTags::NumberInt32 || val != 0) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-};
-
-struct MaterializedRowComparator {
-    const std::vector<SortDirection>& _direction;
-    // TODO - add collator and whatnot.
-
-    MaterializedRowComparator(const std::vector<value::SortDirection>& direction)
-        : _direction(direction) {}
-
-    bool operator()(const MaterializedRow& lhs, const MaterializedRow& rhs) const {
-        for (size_t idx = 0; idx < lhs._fields.size(); ++idx) {
-            auto [lhsTag, lhsVal] = lhs._fields[idx].getViewOfValue();
-            auto [rhsTag, rhsVal] = rhs._fields[idx].getViewOfValue();
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-            if (tag != TypeTags::NumberInt32) {
-                return false;
-            }
-            if (bitcastTo<int32_t>(val) < 0 && _direction[idx] == SortDirection::Ascending) {
-                return true;
-            }
-            if (bitcastTo<int32_t>(val) > 0 && _direction[idx] == SortDirection::Descending) {
-                return true;
-            }
-            if (bitcastTo<int32_t>(val) != 0) {
-                return false;
-            }
-        }
-
-        return false;
-    }
-};
-struct MaterializedRowHasher {
-    std::size_t operator()(const MaterializedRow& k) const {
-        size_t res = 17;
-        for (auto& f : k._fields) {
-            auto [tag, val] = f.getViewOfValue();
-            res = res * 31 + hashValue(tag, val);
-        }
-        return res;
-    }
-};
-
-template <typename T>
-class MaterializedRowKeyAccessor final : public SlotAccessor {
-public:
-    MaterializedRowKeyAccessor(T& it, size_t slot) : _it(it), _slot(slot) {}
-
-    std::pair<TypeTags, Value> getViewOfValue() const override {
-        return _it->first._fields[_slot].getViewOfValue();
-    }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
-        // We can never move out values from keys.
-        auto [tag, val] = getViewOfValue();
-        return copyValue(tag, val);
-    }
-
-private:
-    T& _it;
-    size_t _slot;
-};
-
-template <typename T>
-class MaterializedRowValueAccessor final : public SlotAccessor {
-public:
-    MaterializedRowValueAccessor(T& it, size_t slot) : _it(it), _slot(slot) {}
-
-    std::pair<TypeTags, Value> getViewOfValue() const override {
-        return _it->second._fields[_slot].getViewOfValue();
-    }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
-        return _it->second._fields[_slot].copyOrMoveValue();
-    }
-
-    void reset(bool owned, TypeTags tag, Value val) {
-        _it->second._fields[_slot].reset(owned, tag, val);
-    }
-
-private:
-    T& _it;
-    size_t _slot;
-};
-
-template <typename T>
-class MaterializedRowAccessor final : public SlotAccessor {
-public:
-    MaterializedRowAccessor(T& container, const size_t& it, size_t slot)
-        : _container(container), _it(it), _slot(slot) {}
-
-    std::pair<TypeTags, Value> getViewOfValue() const override {
-        return _container[_it]._fields[_slot].getViewOfValue();
-    }
-    std::pair<TypeTags, Value> copyOrMoveValue() override {
-        return _container[_it]._fields[_slot].copyOrMoveValue();
-    }
-
-    void reset(bool owned, TypeTags tag, Value val) {
-        _container[_it]._fields[_slot].reset(owned, tag, val);
-    }
-
-private:
-    T& _container;
-    const size_t& _it;
-    const size_t _slot;
-};
-
-/**
- * Commonly used containers
- */
-template <typename T>
-using SlotMap = absl::flat_hash_map<SlotId, T>;
-using SlotAccessorMap = SlotMap<SlotAccessor*>;
-using FieldAccessorMap = absl::flat_hash_map<std::string, std::unique_ptr<ViewOfValueAccessor>>;
-using SlotSet = absl::flat_hash_set<SlotId>;
-using SlotVector = std::vector<SlotId>;
 
 }  // namespace value
 }  // namespace sbe

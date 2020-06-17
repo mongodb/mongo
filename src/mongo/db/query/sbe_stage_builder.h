@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/id_generators.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/exec/trial_run_progress_tracker.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"

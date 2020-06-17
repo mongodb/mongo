@@ -33,6 +33,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo {

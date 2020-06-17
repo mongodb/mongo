@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 
 namespace mongo::sbe::value {
 /**
