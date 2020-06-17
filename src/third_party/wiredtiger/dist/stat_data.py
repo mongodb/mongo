@@ -218,6 +218,7 @@ connection_stats = [
     CacheStat('cache_bytes_hs', 'bytes belonging to the history store table in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_max', 'maximum bytes configured', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_other', 'bytes not belonging to page images in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_updates', 'bytes allocated for updates', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),
     CacheStat('cache_bytes_write', 'bytes written from cache', 'size'),
     CacheStat('cache_eviction_active_workers', 'eviction worker thread active', 'no_clear'),

@@ -1802,6 +1802,8 @@ static inline bool __wt_eviction_dirty_needed(WT_SESSION_IMPL *session, double *
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, bool readonly,
   double *pct_fullp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline bool __wt_eviction_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_isalnum(u_char c) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_isalpha(u_char c) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_isdigit(u_char c) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -2106,6 +2108,8 @@ static inline uint64_t __wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_btree_bytes_inuse(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline uint64_t __wt_btree_bytes_updates(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_btree_dirty_inuse(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_btree_dirty_leaf_inuse(WT_SESSION_IMPL *session)
@@ -2117,6 +2121,8 @@ static inline uint64_t __wt_cache_bytes_inuse(WT_CACHE *cache)
 static inline uint64_t __wt_cache_bytes_other(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_cache_bytes_plus_overhead(WT_CACHE *cache, uint64_t sz)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline uint64_t __wt_cache_bytes_updates(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_cache_dirty_inuse(WT_CACHE *cache)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -2133,6 +2139,8 @@ static inline uint64_t __wt_clock(WT_SESSION_IMPL *session)
 static inline uint64_t __wt_clock_to_nsec(uint64_t end, uint64_t begin)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_rdtsc(void) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline uint64_t __wt_safe_sub(uint64_t v1, uint64_t v2)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_txn_oldest_id(WT_SESSION_IMPL *session)
@@ -2146,9 +2154,11 @@ static inline void __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page
 static inline void __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page);
 static inline void __wt_cache_page_byte_dirty_decr(
   WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
+static inline void __wt_cache_page_byte_updates_decr(
+  WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
 static inline void __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page);
-static inline void __wt_cache_page_image_decr(WT_SESSION_IMPL *session, uint32_t size);
-static inline void __wt_cache_page_image_incr(WT_SESSION_IMPL *session, uint32_t size);
+static inline void __wt_cache_page_image_decr(WT_SESSION_IMPL *session, WT_PAGE *page);
+static inline void __wt_cache_page_image_incr(WT_SESSION_IMPL *session, WT_PAGE *page);
 static inline void __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
 static inline void __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
 static inline void __wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page);

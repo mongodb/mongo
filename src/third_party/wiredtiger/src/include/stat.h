@@ -336,6 +336,7 @@ struct __wt_connection_stats {
     int64_t cache_read_app_time;
     int64_t cache_write_app_count;
     int64_t cache_write_app_time;
+    int64_t cache_bytes_updates;
     int64_t cache_bytes_image;
     int64_t cache_bytes_hs;
     int64_t cache_bytes_inuse;

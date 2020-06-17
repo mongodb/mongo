@@ -30,6 +30,16 @@ __wt_hex(int c)
 }
 
 /*
+ * __wt_safe_sub --
+ *     Subtract unsigned integers, rounding to zero if the result would be negative.
+ */
+static inline uint64_t
+__wt_safe_sub(uint64_t v1, uint64_t v2)
+{
+    return (v2 > v1 ? 0 : v1 - v2);
+}
+
+/*
  * __wt_strdup --
  *     ANSI strdup function.
  */
