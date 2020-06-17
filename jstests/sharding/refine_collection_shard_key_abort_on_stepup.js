@@ -7,6 +7,7 @@
 // @tags: [
 //   requires_find_command,
 //   requires_fcv_44,
+//   exclude_from_large_txns
 // ]
 //
 
