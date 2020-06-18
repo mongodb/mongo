@@ -55,15 +55,20 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
     }
 
     LOGV2(22376,
-          "Reconfiguring WiredTiger storage engine with config string: \"{str}\"",
-          "str"_attr = str);
+          "Reconfiguring WiredTiger storage engine with config string: \"{config}\"",
+          "Reconfiguring WiredTiger storage engine",
+          "config"_attr = str);
 
     invariant(_data.second);
     int ret = _data.second->reconfigure(str.c_str());
     if (ret != 0) {
+        const char* errorStr = wiredtiger_strerror(ret);
         string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
-                                       << ret << "): " << wiredtiger_strerror(ret));
-        LOGV2_ERROR(22378, "{result}", "result"_attr = result);
+                                       << ret << "): " << errorStr);
+        LOGV2_ERROR(22378,
+                    "WiredTiger reconfiguration failed",
+                    "error"_attr = ret,
+                    "message"_attr = errorStr);
 
         return Status(ErrorCodes::BadValue, result);
     }

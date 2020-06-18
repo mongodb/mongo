@@ -581,7 +581,7 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
                     LOGV2_WARNING(20239,
                                   "Unable to fetch pinned user",
                                   "user"_attr = userName.toString(),
-                                  "status"_attr = status);
+                                  "error"_attr = status);
                 } else {
                     LOGV2_DEBUG(20233, 2, "Pinned user not found", "user"_attr = userName);
                 }
@@ -663,14 +663,14 @@ AuthorizationManagerImpl::AuthSchemaVersionCache::AuthSchemaVersionCache(
           1 /* cacheSize */),
       _externalState(externalState) {}
 
-boost::optional<int> AuthorizationManagerImpl::AuthSchemaVersionCache::_lookup(
-    OperationContext* opCtx, int unusedKey) {
+AuthorizationManagerImpl::AuthSchemaVersionCache::LookupResult
+AuthorizationManagerImpl::AuthSchemaVersionCache::_lookup(OperationContext* opCtx, int unusedKey) {
     invariant(unusedKey == 0);
 
     int authzVersion;
     uassertStatusOK(_externalState->getStoredAuthorizationVersion(opCtx, &authzVersion));
 
-    return authzVersion;
+    return LookupResult(authzVersion);
 }
 
 AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
@@ -689,8 +689,9 @@ AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
       _authSchemaVersionCache(authSchemaVersionCache),
       _externalState(externalState) {}
 
-boost::optional<User> AuthorizationManagerImpl::UserCacheImpl::_lookup(OperationContext* opCtx,
-                                                                       const UserRequest& userReq) {
+AuthorizationManagerImpl::UserCacheImpl::LookupResult
+AuthorizationManagerImpl::UserCacheImpl::_lookup(OperationContext* opCtx,
+                                                 const UserRequest& userReq) {
     LOGV2_DEBUG(20238, 1, "Getting user record", "user"_attr = userReq.name);
 
     // Number of times to retry a user document that fetches due to transient AuthSchemaIncompatible
@@ -713,7 +714,7 @@ boost::optional<User> AuthorizationManagerImpl::UserCacheImpl::_lookup(Operation
 
                 User user(userReq.name);
                 uassertStatusOK(initializeUserFromPrivilegeDocument(&user, userObj));
-                return user;
+                return LookupResult(std::move(user));
             }
             case schemaVersion24:
                 _authSchemaVersionCache->invalidateAll();

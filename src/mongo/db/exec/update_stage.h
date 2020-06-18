@@ -147,11 +147,9 @@ protected:
     // Stats
     UpdateStats _specificStats;
 
-    // True if the request should be checked for an update to the shard key.
-    bool _shouldCheckForShardKeyUpdate;
-
-    // True if updated documents should be validated with storage_validation::storageValid().
-    bool _enforceOkForStorage;
+    // A user-initiated write is one which is not caused by oplog application and is not part of a
+    // chunk migration
+    bool _isUserInitiatedWrite;
 
     // These get reused for each update.
     mutablebson::Document& _doc;

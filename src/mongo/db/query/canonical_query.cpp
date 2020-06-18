@@ -33,6 +33,7 @@
 
 #include "mongo/db/query/canonical_query.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/namespace_string.h"
@@ -98,11 +99,19 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make MatchExpression.
     boost::intrusive_ptr<ExpressionContext> newExpCtx;
     if (!expCtx.get()) {
-        newExpCtx = make_intrusive<ExpressionContext>(
-            opCtx, std::move(collator), qr->nss(), qr->getRuntimeConstants());
+        newExpCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                      std::move(collator),
+                                                      qr->nss(),
+                                                      qr->getRuntimeConstants(),
+                                                      qr->getLetParameters());
     } else {
         newExpCtx = expCtx;
-        invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
+        // A collator can enter through both the QueryRequest and ExpressionContext arguments.
+        // This invariant ensures that both collators are the same because downstream we
+        // pull the collator from only one of the ExpressionContext carrier.
+        if (collator.get() && expCtx->getCollator()) {
+            invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
+        }
     }
 
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(

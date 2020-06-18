@@ -80,9 +80,12 @@ TEST(ReplSetHeartbeatArgs, AcceptsUnknownField) {
 class ReplCoordHBV1Test : public ReplCoordTest {
 protected:
     void assertMemberState(MemberState expected, std::string msg = "");
-    ReplSetHeartbeatResponse receiveHeartbeatFrom(const ReplSetConfig& rsConfig,
-                                                  int sourceId,
-                                                  const HostAndPort& source);
+    ReplSetHeartbeatResponse receiveHeartbeatFrom(
+        const ReplSetConfig& rsConfig,
+        int sourceId,
+        const HostAndPort& source,
+        const int term = 1,
+        const boost::optional<int> currentPrimaryId = boost::none);
 };
 
 void ReplCoordHBV1Test::assertMemberState(const MemberState expected, std::string msg) {
@@ -91,16 +94,22 @@ void ReplCoordHBV1Test::assertMemberState(const MemberState expected, std::strin
                                << " but found " << actual.toString() << " - " << msg;
 }
 
-ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(const ReplSetConfig& rsConfig,
-                                                                 int sourceId,
-                                                                 const HostAndPort& source) {
+ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(
+    const ReplSetConfig& rsConfig,
+    int sourceId,
+    const HostAndPort& source,
+    const int term,
+    const boost::optional<int> currentPrimaryId) {
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setConfigVersion(rsConfig.getConfigVersion());
     hbArgs.setConfigTerm(rsConfig.getConfigTerm());
     hbArgs.setSetName(rsConfig.getReplSetName());
     hbArgs.setSenderHost(source);
     hbArgs.setSenderId(sourceId);
-    hbArgs.setTerm(1);
+    hbArgs.setTerm(term);
+    if (currentPrimaryId) {
+        hbArgs.setPrimaryId(*currentPrimaryId);
+    }
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
@@ -175,6 +184,115 @@ TEST_F(ReplCoordHBV1Test,
     exitNetwork();
 
     ASSERT_TRUE(getExternalState()->threadsStarted());
+}
+
+TEST_F(ReplCoordHBV1Test,
+       SecondaryReceivesHeartbeatRequestFromPrimaryWithDifferentPrimaryIdRestartsHeartbeats) {
+    auto replAllSeverityGuard = unittest::MinimumLoggedSeverityGuard{
+        logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(3)};
+
+    auto replConfigBson = BSON("_id"
+                               << "mySet"
+                               << "protocolVersion" << 1 << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                        << "node1:12345")
+                                             << BSON("_id" << 2 << "host"
+                                                           << "node2:12345")
+                                             << BSON("_id" << 3 << "host"
+                                                           << "node3:12345")));
+
+    assertStartSuccess(replConfigBson, HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    getReplCoord()->updateTerm_forTest(1, nullptr);
+    ASSERT_EQ(getReplCoord()->getTerm(), 1);
+
+    enterNetwork();
+    // Ignore the first 2 messages.
+    for (int j = 0; j < 2; ++j) {
+        const auto noi = getNet()->getNextReadyRequest();
+        noi->getRequest();
+        getNet()->blackHole(noi);
+    }
+    ASSERT_FALSE(getNet()->hasReadyRequests());
+    exitNetwork();
+
+    // We're a secondary and we receive a request from node3 saying it's the primary.
+    receiveHeartbeatFrom(getReplCoord()->getConfig(),
+                         3 /* senderId */,
+                         HostAndPort("node3", 12345),
+                         1 /* term */,
+                         3 /* currentPrimaryId */);
+
+    enterNetwork();
+    std::set<std::string> expectedHosts{"node2", "node3"};
+    std::set<std::string> actualHosts;
+    for (size_t i = 0; i < expectedHosts.size(); i++) {
+        const auto noi = getNet()->getNextReadyRequest();
+        // 'request' represents the request sent from self(node1) back to node3
+        const RemoteCommandRequest& request = noi->getRequest();
+        ReplSetHeartbeatArgsV1 args;
+        ASSERT_OK(args.initialize(request.cmdObj));
+        actualHosts.insert(request.target.host());
+        ASSERT_EQ(args.getPrimaryId(), -1);
+        // We don't need to respond.
+        getNet()->blackHole(noi);
+    }
+    ASSERT(expectedHosts == actualHosts);
+    ASSERT_FALSE(getNet()->hasReadyRequests());
+    exitNetwork();
+
+    // Heartbeat in a stale term shouldn't re-schedule heartbeats.
+    receiveHeartbeatFrom(getReplCoord()->getConfig(),
+                         3 /* senderId */,
+                         HostAndPort("node3", 12345),
+                         0 /* term */,
+                         3 /* currentPrimaryId */);
+    enterNetwork();
+    ASSERT_FALSE(getNet()->hasReadyRequests());
+    exitNetwork();
+}
+
+TEST_F(
+    ReplCoordHBV1Test,
+    SecondaryReceivesHeartbeatRequestFromSecondaryWithDifferentPrimaryIdDoesNotRestartHeartbeats) {
+    auto replAllSeverityGuard = unittest::MinimumLoggedSeverityGuard{
+        logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(3)};
+    auto replConfigBson = BSON("_id"
+                               << "mySet"
+                               << "protocolVersion" << 1 << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                        << "node1:12345")
+                                             << BSON("_id" << 2 << "host"
+                                                           << "node2:12345")
+                                             << BSON("_id" << 3 << "host"
+                                                           << "node3:12345")));
+
+    assertStartSuccess(replConfigBson, HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_EQ(getReplCoord()->getTerm(), 0);
+
+    enterNetwork();
+    // Ignore the first 2 messages.
+    for (int j = 0; j < 2; ++j) {
+        const auto noi = getNet()->getNextReadyRequest();
+        noi->getRequest();
+        getNet()->blackHole(noi);
+    }
+    exitNetwork();
+
+    // Node 2 thinks 3 is the primary. We don't restart heartbeats for that.
+    receiveHeartbeatFrom(getReplCoord()->getConfig(),
+                         2 /* senderId */,
+                         HostAndPort("node3", 12345),
+                         0 /* term */,
+                         3 /* currentPrimaryId */);
+
+    {
+        enterNetwork();
+        ASSERT_FALSE(getNet()->hasReadyRequests());
+        exitNetwork();
+    }
 }
 
 class ReplCoordHBV1ReconfigTest : public ReplCoordHBV1Test {
@@ -478,6 +596,65 @@ TEST_F(ReplCoordHBV1ReconfigTest,
     auto myConfig = getReplCoord()->getConfig();
     ASSERT_EQ(myConfig.getConfigVersion(), initConfigVersion + 1);
     ASSERT_EQ(myConfig.getConfigTerm(), UninitializedTerm);
+}
+
+TEST_F(ReplCoordHBV1Test, RejectHeartbeatReconfigDuringElection) {
+    auto severityGuard = unittest::MinimumLoggedSeverityGuard{
+        logv2::LogComponent::kReplicationHeartbeats, logv2::LogSeverity::Debug(1)};
+
+    auto term = 1;
+    auto version = 1;
+    auto members = BSON_ARRAY(member(1, "h1:1") << member(2, "h2:1") << member(3, "h3:1"));
+    auto configObj = configWithMembers(version, term, members);
+    assertStartSuccess(configObj, {"h1", 1});
+
+    OpTime time1(Timestamp(100, 1), 0);
+    replCoordSetMyLastAppliedAndDurableOpTime(time1, getNet()->now());
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    simulateEnoughHeartbeatsForAllNodesUp();
+    simulateSuccessfulDryRun();
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    // Attach a config with a higher version and the same term.
+    ReplSetConfig rsConfig = assertMakeRSConfig(configWithMembers(version + 1, term, members));
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfig(rsConfig);
+    hbResp.setAppliedOpTimeAndWallTime({time1, getNet()->now()});
+    hbResp.setDurableOpTimeAndWallTime({time1, getNet()->now()});
+    auto hbRespObj = (BSONObjBuilder(hbResp.toBSON()) << "ok" << 1).obj();
+
+    startCapturingLogMessages();
+    getReplCoord()->handleHeartbeatResponse_forTest(hbRespObj, 1);
+    getNet()->enterNetwork();
+    getNet()->runReadyNetworkOperations();
+    getNet()->exitNetwork();
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Not scheduling a heartbeat reconfig when running for election"));
+
+    auto net = getNet();
+    net->enterNetwork();
+    while (net->hasReadyRequests()) {
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        LOGV2(482571, "processing", "to"_attr = request.target, "cmd"_attr = request.cmdObj);
+        if (request.cmdObj.firstElementFieldNameStringData() != "replSetRequestVotes") {
+            net->blackHole(noi);
+        } else {
+            auto response = BSON("ok" << 1 << "term" << term << "voteGranted" << true << "reason"
+                                      << "");
+            net->scheduleResponse(noi, net->now(), makeResponseStatus(response));
+        }
+        net->runReadyNetworkOperations();
+    }
+    net->exitNetwork();
+
+    getReplCoord()->waitForElectionFinish_forTest();
+    ASSERT(getReplCoord()->getMemberState().primary());
 }
 
 TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {

@@ -163,8 +163,8 @@ void CommonProcessInterface::updateClientOperationTime(OperationContext* opCtx) 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord) {
         auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
-        repl::OpTime opTime(operationTime.asTimestamp(), replCoord->getTerm());
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastProxyWriteOpTimeForward(opTime);
+        repl::ReplClientInfo::forClient(opCtx->getClient())
+            .setLastProxyWriteTimestampForward(operationTime.asTimestamp());
     }
 }
 

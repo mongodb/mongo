@@ -167,7 +167,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] dump [-jrx] [-c checkpoint] [-f output] [-t timestamp] uri</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] dump [-jprx] [-c checkpoint] [-f output] [-t timestamp] uri</code>
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -184,6 +184,10 @@ the \c -f option re-directs the output to the specified file.
 @par <code>-j</code>
 Dump in JSON (<a href="http://www.json.org">JavaScript Object Notation</a>)
 format.
+
+@par <code>-p</code>
+Dump in human-readable format (pretty-print). The \c -p flag is incompatible
+with the \c load command.
 
 @par <code>-r</code>
 Dump in reverse order, from largest key to smallest.
@@ -325,7 +329,7 @@ Display the database log.
 The \c printlog command outputs the database log.
 
 @subsection util_printlog_synopsis Synopsis
-<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] printlog [-x] [-f output]</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] printlog [-mx] [-f output]</code>
 
 @subsection util_printlog_options Options
 The following are command-specific options for the \c printlog command:
@@ -333,6 +337,9 @@ The following are command-specific options for the \c printlog command:
 @par <code>-f</code>
 By default, the \c printlog command output is written to the standard
 output; the \c -f option re-directs the output to the specified file.
+
+@par <code>-m</code>
+Print only message-type log records.
 
 @par <code>-x</code>
 Keys and value items in the log are printed in hex format in addition
@@ -437,7 +444,7 @@ The \c verify command verifies the specified table, exiting success if
 the data source is correct, and failure if the data source is corrupted.
 
 @subsection util_verify_synopsis Synopsis
-<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] verify [-s] [-d dump_address | dump_blocks | dump_history | dump_layout | dump_offsets=#,# | dump_pages ] [uri]</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] verify [-s] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# | dump_pages ] [uri]</code>
 
 @subsection util_verify_options Options
 The following are command-specific options for the \c verify command:

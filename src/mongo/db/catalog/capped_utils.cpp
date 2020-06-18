@@ -34,7 +34,6 @@
 #include "mongo/db/catalog/capped_utils.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -92,7 +91,6 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
                           << "Cannot truncate a live oplog while replicating: " << collectionName);
     }
 
-    BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collection->uuid());
 
     WriteUnitOfWork wuow(opCtx);
@@ -168,20 +166,21 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     long long excessSize = fromCollection->dataSize(opCtx) - allocatedSpaceGuess;
 
-    auto exec = InternalPlanner::collectionScan(opCtx,
-                                                fromNss.ns(),
-                                                fromCollection,
-                                                PlanExecutor::WRITE_CONFLICT_RETRY_ONLY,
-                                                InternalPlanner::FORWARD);
+    auto exec =
+        InternalPlanner::collectionScan(opCtx,
+                                        fromNss.ns(),
+                                        fromCollection,
+                                        PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY,
+                                        InternalPlanner::FORWARD);
 
     Snapshotted<BSONObj> objToClone;
     RecordId loc;
-    PlanExecutor::ExecState state = PlanExecutor::FAILURE;  // suppress uninitialized warnings
 
     DisableDocumentValidation validationDisabler(opCtx);
 
     int retries = 0;  // non-zero when retrying our last document.
     while (true) {
+        PlanExecutor::ExecState state = PlanExecutor::IS_EOF;
         if (!retries) {
             state = exec->getNextSnapshotted(&objToClone, &loc);
         }
@@ -197,9 +196,6 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                 }
                 break;
             }
-            default:
-                // A collection scan plan which does not yield should never fail.
-                MONGO_UNREACHABLE;
         }
 
         try {
@@ -252,7 +248,6 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
     uassert(
         ErrorCodes::NamespaceNotFound, str::stream() << "database " << dbname << " not found", db);
 
-    BackgroundOperation::assertNoBgOpInProgForNs(ns);
     if (Collection* coll = autoColl.getCollection()) {
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }

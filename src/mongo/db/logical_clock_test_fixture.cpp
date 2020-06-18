@@ -40,6 +40,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -71,14 +72,14 @@ void LogicalClockTestFixture::tearDown() {
     ShardingMongodTestFixture::tearDown();
 }
 
-LogicalClock* LogicalClockTestFixture::resetClock() {
+VectorClockMutable* LogicalClockTestFixture::resetClock() {
     auto service = getServiceContext();
-    auto logicalClock = std::make_unique<LogicalClock>(service);
+    VectorClock::get(service)->resetVectorClock_forTest();
+    return VectorClockMutable::get(service);
+}
 
-    LogicalClock::set(service, std::move(logicalClock));
-    _clock = LogicalClock::get(service);
-
-    return _clock;
+void LogicalClockTestFixture::advanceClusterTime(LogicalTime newTime) {
+    VectorClock::get(getServiceContext())->advanceClusterTime_forTest(newTime);
 }
 
 LogicalClock* LogicalClockTestFixture::getClock() const {

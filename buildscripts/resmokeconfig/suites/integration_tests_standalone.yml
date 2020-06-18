@@ -19,4 +19,6 @@ executor:
     class: MongoDFixture
     mongod_options:
       set_parameters:
+        logComponentVerbosity:
+          command: 2
         enableTestCommands: 1

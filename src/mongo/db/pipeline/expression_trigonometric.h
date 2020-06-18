@@ -103,7 +103,7 @@ struct ExclusiveBoundType {
 template <typename BoundedTrigType, typename BoundType>
 class ExpressionBoundedTrigonometric : public ExpressionSingleNumericArg<BoundedTrigType> {
 public:
-    explicit ExpressionBoundedTrigonometric(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    explicit ExpressionBoundedTrigonometric(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<BoundedTrigType>(expCtx) {}
 
     std::string toString(double d) const {
@@ -198,7 +198,7 @@ public:
 template <typename TrigType>
 class ExpressionUnboundedTrigonometric : public ExpressionSingleNumericArg<TrigType> {
 public:
-    explicit ExpressionUnboundedTrigonometric(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    explicit ExpressionUnboundedTrigonometric(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<TrigType>(expCtx) {}
 
     /**

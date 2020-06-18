@@ -41,7 +41,7 @@ __curbulk_insert_fix(WT_CURSOR *cursor)
     uint64_t recno;
 
     cbulk = (WT_CURSOR_BULK *)cursor;
-    btree = cbulk->cbt.btree;
+    btree = CUR2BT(&cbulk->cbt);
 
     /*
      * Bulk cursor inserts are updates, but don't need auto-commit transactions because they are
@@ -91,7 +91,7 @@ __curbulk_insert_fix_bitmap(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cbulk = (WT_CURSOR_BULK *)cursor;
-    btree = cbulk->cbt.btree;
+    btree = CUR2BT(&cbulk->cbt);
 
     /*
      * Bulk cursor inserts are updates, but don't need auto-commit transactions because they are
@@ -124,7 +124,7 @@ __curbulk_insert_var(WT_CURSOR *cursor)
     uint64_t recno;
 
     cbulk = (WT_CURSOR_BULK *)cursor;
-    btree = cbulk->cbt.btree;
+    btree = CUR2BT(&cbulk->cbt);
 
     /*
      * Bulk cursor inserts are updates, but don't need auto-commit transactions because they are
@@ -228,7 +228,7 @@ __curbulk_insert_row(WT_CURSOR *cursor)
     int cmp;
 
     cbulk = (WT_CURSOR_BULK *)cursor;
-    btree = cbulk->cbt.btree;
+    btree = CUR2BT(&cbulk->cbt);
 
     /*
      * Bulk cursor inserts are updates, but don't need auto-commit transactions because they are
@@ -274,7 +274,7 @@ __curbulk_insert_row_skip_check(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cbulk = (WT_CURSOR_BULK *)cursor;
-    btree = cbulk->cbt.btree;
+    btree = CUR2BT(&cbulk->cbt);
 
     /*
      * Bulk cursor inserts are updates, but don't need auto-commit transactions because they are
@@ -301,27 +301,27 @@ int
 __wt_curbulk_init(
   WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool bitmap, bool skip_sort_check)
 {
-    WT_CURSOR *c;
+    WT_CURSOR *cursor;
     WT_CURSOR_BTREE *cbt;
 
-    c = &cbulk->cbt.iface;
+    cursor = &cbulk->cbt.iface;
     cbt = &cbulk->cbt;
 
     /* Bulk cursors only support insert and close (reset is a no-op). */
-    __wt_cursor_set_notsup(c);
-    switch (cbt->btree->type) {
+    __wt_cursor_set_notsup(cursor);
+    switch (CUR2BT(cbt)->type) {
     case BTREE_COL_FIX:
-        c->insert = bitmap ? __curbulk_insert_fix_bitmap : __curbulk_insert_fix;
+        cursor->insert = bitmap ? __curbulk_insert_fix_bitmap : __curbulk_insert_fix;
         break;
     case BTREE_COL_VAR:
-        c->insert = __curbulk_insert_var;
+        cursor->insert = __curbulk_insert_var;
         break;
     case BTREE_ROW:
         /*
          * Row-store order comparisons are expensive, so we optionally skip them when we know the
          * input is correct.
          */
-        c->insert = skip_sort_check ? __curbulk_insert_row_skip_check : __curbulk_insert_row;
+        cursor->insert = skip_sort_check ? __curbulk_insert_row_skip_check : __curbulk_insert_row;
         break;
     }
 
@@ -329,7 +329,22 @@ __wt_curbulk_init(
     cbulk->recno = 0;
     cbulk->bitmap = bitmap;
     if (bitmap)
-        F_SET(c, WT_CURSTD_RAW);
+        F_SET(cursor, WT_CURSTD_RAW);
 
     return (__wt_bulk_init(session, cbulk));
+}
+
+/*
+ * __wt_curbulk_close --
+ *     Close a bulk cursor.
+ */
+int
+__wt_curbulk_close(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
+{
+    WT_DECL_RET;
+
+    ret = __wt_bulk_wrapup(session, cbulk);
+
+    __wt_buf_free(session, &cbulk->last);
+    return (ret);
 }

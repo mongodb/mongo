@@ -40,9 +40,11 @@ const target = db.all_modes_target;
 (function testWhenMatchedReplaceWhenNotMatchedFail() {
     assert(target.drop());
     assert.commandWorked(target.insert([{_id: 1, a: 10}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
-    const error = assert.throws(
-        () => source.aggregate(
-            [{$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "fail"}}]));
+    const error = assert.throws(() => source.aggregate([
+        {$sort: {_id: 1}},
+        {$_internalInhibitOptimization: {}},
+        {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "fail"}}
+    ]));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     assertArrayEq({
         actual: target.find().toArray(),
@@ -161,9 +163,11 @@ const target = db.all_modes_target;
     assert(target.drop());
     assert.commandWorked(
         target.insert([{_id: 1, a: 10, c: "x"}, {_id: 3, a: 30, c: "y"}, {_id: 4, a: 40, c: "z"}]));
-    const error = assert.throws(
-        () => source.aggregate(
-            [{$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "fail"}}]));
+    const error = assert.throws(() => source.aggregate([
+        {$sort: {_id: 1}},
+        {$_internalInhibitOptimization: {}},
+        {$merge: {into: target.getName(), whenMatched: "merge", whenNotMatched: "fail"}}
+    ]));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     assertArrayEq({
         actual: target.find().toArray(),
@@ -219,10 +223,17 @@ const target = db.all_modes_target;
     assert(target.drop());
     assert.commandWorked(
         target.insert([{_id: 1, a: 10, c: "x"}, {_id: 3, a: 30, c: "y"}, {_id: 4, a: 40, c: "z"}]));
-    const error = assert.throws(() => source.aggregate([{
-        $merge:
-            {into: target.getName(), whenMatched: [{$addFields: {x: 2}}], whenNotMatched: "fail"}
-    }]));
+    const error = assert.throws(() => source.aggregate([
+        {$sort: {_id: 1}},
+        {$_internalInhibitOptimization: {}},
+        {
+            $merge: {
+                into: target.getName(),
+                whenMatched: [{$addFields: {x: 2}}],
+                whenNotMatched: "fail"
+            }
+        }
+    ]));
     assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
     assertArrayEq({
         actual: target.find().toArray(),

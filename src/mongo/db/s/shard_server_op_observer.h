@@ -106,7 +106,7 @@ public:
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
-                            const OplogSlot& createOpTime) override {}
+                            const OplogSlot& createOpTime) override;
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,

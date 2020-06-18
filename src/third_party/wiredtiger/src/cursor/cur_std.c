@@ -655,6 +655,9 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     __wt_buf_free(session, &cursor->key);
     __wt_buf_free(session, &cursor->value);
 
+    /* Discard the underlying WT_CURSOR_BTREE buffers. */
+    __wt_btcur_cache((WT_CURSOR_BTREE *)cursor);
+
     /*
      * Acquire a reference while decrementing the in-use counter. After this point, the dhandle may
      * be marked dead, but the actual handle won't be removed.
@@ -1109,10 +1112,16 @@ __wt_cursor_init(
      */
     WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
     if (cval.len != 0 && owner == NULL) {
-        F_SET(cursor, WT_STRING_MATCH("json", cval.str, cval.len) ?
-            WT_CURSTD_DUMP_JSON :
-            (WT_STRING_MATCH("print", cval.str, cval.len) ? WT_CURSTD_DUMP_PRINT :
-                                                            WT_CURSTD_DUMP_HEX));
+        uint32_t dump_flag;
+        if (WT_STRING_MATCH("json", cval.str, cval.len))
+            dump_flag = WT_CURSTD_DUMP_JSON;
+        else if (WT_STRING_MATCH("print", cval.str, cval.len))
+            dump_flag = WT_CURSTD_DUMP_PRINT;
+        else if (WT_STRING_MATCH("pretty", cval.str, cval.len))
+            dump_flag = WT_CURSTD_DUMP_PRETTY;
+        else
+            dump_flag = WT_CURSTD_DUMP_HEX;
+        F_SET(cursor, dump_flag);
         /*
          * Dump cursors should not have owners: only the top-level cursor should be wrapped in a
          * dump cursor.

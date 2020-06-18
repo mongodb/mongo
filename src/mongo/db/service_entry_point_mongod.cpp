@@ -236,7 +236,7 @@ public:
         if (isReplSet) {
             // Attach our own last opTime.
             repl::OpTime lastOpTimeFromClient =
-                repl::ReplClientInfo::forClient(opCtx->getClient()).getMaxKnownOpTime();
+                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
 
             if (isShardingAware || isConfig) {

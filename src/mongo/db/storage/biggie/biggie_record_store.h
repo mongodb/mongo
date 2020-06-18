@@ -112,12 +112,12 @@ public:
 private:
     friend class VisibilityManagerChange;
 
+    void _initHighestIdIfNeeded(OperationContext* opCtx);
+
     /**
      * This gets the next (guaranteed) unique record id.
      */
-    inline int64_t _nextRecordId() {
-        return _highestRecordId.fetchAndAdd(1);
-    }
+    int64_t _nextRecordId(OperationContext* opCtx);
 
     /**
      *  Two helper functions for deleting excess records in capped record stores.
@@ -142,7 +142,8 @@ private:
 
     mutable Mutex _cappedDeleterMutex = MONGO_MAKE_LATCH("RecordStore::_cappedDeleterMutex");
 
-    AtomicWord<long long> _highestRecordId{1};
+    mutable Mutex _initHighestIdMutex = MONGO_MAKE_LATCH("RecordStore::_initHighestIdMutex");
+    AtomicWord<long long> _highestRecordId{0};
     AtomicWord<long long> _numRecords{0};
     AtomicWord<long long> _dataSize{0};
 
@@ -171,15 +172,11 @@ private:
 
     class Cursor final : public SeekableRecordCursor {
         OperationContext* opCtx;
-        StringData _ident;
-        std::string _prefix;
-        std::string _postfix;
+        const RecordStore& _rs;
         StringStore::const_iterator it;
         boost::optional<std::string> _savedPosition;
         bool _needFirstSeek = true;
         bool _lastMoveWasRestore = false;
-        bool _isCapped;
-        bool _isOplog;
         VisibilityManager* _visibilityManager;
 
     public:
@@ -200,15 +197,11 @@ private:
 
     class ReverseCursor final : public SeekableRecordCursor {
         OperationContext* opCtx;
-        StringData _ident;
-        std::string _prefix;
-        std::string _postfix;
+        const RecordStore& _rs;
         StringStore::const_reverse_iterator it;
         boost::optional<std::string> _savedPosition;
         bool _needFirstSeek = true;
         bool _lastMoveWasRestore = false;
-        bool _isCapped;
-        bool _isOplog;
         VisibilityManager* _visibilityManager;
 
     public:

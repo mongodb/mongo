@@ -1,12 +1,13 @@
 """The unittest.TestCase for Server Discovery and Monitoring JSON tests."""
 import os
 import os.path
-from . import interface
-from ... import core
-from ... import config
-from ... import utils
-from ...utils import globstar
-from ... import errors
+
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.testcases import interface
+from buildscripts.resmokelib.utils import globstar
 
 
 class SDAMJsonTestCase(interface.ProcessTestCase):

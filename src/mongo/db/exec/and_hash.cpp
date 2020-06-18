@@ -140,14 +140,6 @@ PlanStage::StageState AndHashStage::doWork(WorkingSetID* out) {
                     // yield.
                     _ws->get(_lookAheadResults[i])->makeObjOwnedIfNeeded();
                     break;  // Stop looking at this child.
-                } else if (PlanStage::FAILURE == childStatus) {
-                    // The stage which produces a failure is responsible for allocating a working
-                    // set member with error details.
-                    invariant(WorkingSet::INVALID_ID != _lookAheadResults[i]);
-                    *out = _lookAheadResults[i];
-                    _hashingChildren = false;
-                    _dataMap.clear();
-                    return childStatus;
                 }
                 // We ignore NEED_TIME. TODO: what do we want to do if we get NEED_YIELD here?
             }
@@ -165,12 +157,10 @@ PlanStage::StageState AndHashStage::doWork(WorkingSetID* out) {
     if (_hashingChildren) {
         // Check memory usage of previously hashed results.
         if (_memUsage > _maxMemUsage) {
-            str::stream ss;
-            ss << "hashed AND stage buffered data usage of " << _memUsage
+            StringBuilder sb;
+            sb << "hashed AND stage buffered data usage of " << _memUsage
                << " bytes exceeds internal limit of " << kDefaultMaxMemUsageBytes << " bytes";
-            Status status(ErrorCodes::Overflow, ss);
-            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
-            return PlanStage::FAILURE;
+            uasserted(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed, sb.str());
         }
 
         if (0 == _currentChild) {
@@ -279,12 +269,6 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
         _specificStats.mapAfterChild.push_back(_dataMap.size());
 
         return PlanStage::NEED_TIME;
-    } else if (PlanStage::FAILURE == childStatus) {
-        // The stage which produces a failure is responsible for allocating a working set member
-        // with error details.
-        invariant(WorkingSet::INVALID_ID != id);
-        *out = id;
-        return childStatus;
     } else {
         if (PlanStage::NEED_YIELD == childStatus) {
             *out = id;
@@ -364,12 +348,6 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
         }
 
         return PlanStage::NEED_TIME;
-    } else if (PlanStage::FAILURE == childStatus) {
-        // The stage which produces a failure is responsible for allocating a working set member
-        // with error details.
-        invariant(WorkingSet::INVALID_ID != id);
-        *out = id;
-        return childStatus;
     } else {
         if (PlanStage::NEED_YIELD == childStatus) {
             *out = id;

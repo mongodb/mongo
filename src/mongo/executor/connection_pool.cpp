@@ -63,7 +63,7 @@ namespace {
 
 auto makeSeveritySuppressor() {
     return std::make_unique<logv2::KeyedSeveritySuppressor<HostAndPort>>(
-        Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2));
+        Seconds{1}, logv2::LogSeverity::Log(), logv2::LogSeverity::Debug(2));
 }
 
 template <typename Map, typename Key>
@@ -1133,9 +1133,8 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
             std::pop_heap(begin(_requests), end(_requests), RequestComparator{});
 
             auto& request = _requests.back();
-            request.second.setError(Status(
-                ErrorCodes::NetworkInterfaceExceededTimeLimit,
-                fmt::format("Couldn't get a connection within the time limit of {}", timeout)));
+            request.second.setError(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                                           "Couldn't get a connection within the time limit"));
             _requests.pop_back();
 
             // Since we've failed a request, we've interacted with external users
@@ -1199,7 +1198,7 @@ void ConnectionPool::SpecificPool::updateController() {
                 invariant(pool->_requests.empty());
             }
 
-            pool->triggerShutdown(Status(ErrorCodes::ShutdownInProgress,
+            pool->triggerShutdown(Status(ErrorCodes::ConnectionPoolExpired,
                                          str::stream() << "Pool for " << host << " has expired."));
         }
         return;

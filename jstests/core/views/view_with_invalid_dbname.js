@@ -1,9 +1,6 @@
 // When loading the view catalog, the server should not crash because it encountered a view with an
 // invalid name. This test is specifically for the case of a view with a dbname that contains an
 // embedded null character (SERVER-36859).
-//
-// @tags: [ SERVER-38379 ]
-
 (function() {
 "use strict";
 

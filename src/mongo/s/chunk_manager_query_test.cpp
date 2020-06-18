@@ -33,9 +33,13 @@
 
 #include <set>
 
+#include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -71,8 +75,18 @@ protected:
             makeChunkManager(kNss, shardKeyPattern, std::move(defaultCollator), false, splitPoints);
 
         std::set<ShardId> shardIds;
-        chunkManager->getShardIdsForQuery(operationContext(), query, queryCollation, &shardIds);
 
+        auto&& cif = [&]() {
+            if (queryCollation.isEmpty()) {
+                return std::unique_ptr<CollatorInterface>{};
+            } else {
+                return uassertStatusOK(CollatorFactoryInterface::get(getServiceContext())
+                                           ->makeFromBSON(queryCollation));
+            }
+        }();
+        auto expCtx =
+            make_intrusive<ExpressionContextForTest>(operationContext(), kNss, std::move(cif));
+        chunkManager->getShardIdsForQuery(expCtx, query, queryCollation, &shardIds);
         _assertShardIdsMatch(expectedShardIds, shardIds);
     }
 
@@ -515,9 +529,9 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     chunkManager.getShardIdsForRange(BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);
     ASSERT_EQ(2, shardIds.size());
 
+    const auto expCtx = make_intrusive<ExpressionContextForTest>();
     shardIds.clear();
-    chunkManager.getShardIdsForQuery(
-        operationContext(), BSON("x" << BSON("$gt" << -20)), {}, &shardIds);
+    chunkManager.getShardIdsForQuery(expCtx, BSON("x" << BSON("$gt" << -20)), {}, &shardIds);
     ASSERT_EQ(2, shardIds.size());
 }
 

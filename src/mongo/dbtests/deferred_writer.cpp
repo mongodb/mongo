@@ -117,8 +117,10 @@ public:
         AutoGetCollection agc(_opCtx.get(), kTestNamespace, MODE_IS);
         ASSERT_TRUE(agc.getCollection());
 
-        auto plan = InternalPlanner::collectionScan(
-            _opCtx.get(), kTestNamespace.ns(), agc.getCollection(), PlanExecutor::NO_YIELD);
+        auto plan = InternalPlanner::collectionScan(_opCtx.get(),
+                                                    kTestNamespace.ns(),
+                                                    agc.getCollection(),
+                                                    PlanYieldPolicy::YieldPolicy::NO_YIELD);
 
         std::vector<BSONObj> result;
         BSONObj i;

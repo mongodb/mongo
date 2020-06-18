@@ -64,3 +64,4 @@ executor:
         # WiredTiger write tickets available to below the maximum number of database clients to
         # trigger this situation at least some of the time.
         wiredTigerConcurrentWriteTransactions: 64
+        roleGraphInvalidationIsFatal: 1

@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/vector_clock_mutable.h"
 
@@ -53,24 +54,25 @@ public:
     void tickTo(Component component, LogicalTime newTime) override;
 
 protected:
-    void _gossipOutInternal(BSONObjBuilder* out) const override;
-    void _gossipOutExternal(BSONObjBuilder* out) const override;
-    LogicalTimeArray _gossipInInternal(const BSONObj& in) override;
-    LogicalTimeArray _gossipInExternal(const BSONObj& in) override;
+    bool _gossipOutInternal(OperationContext* opCtx,
+                            BSONObjBuilder* out,
+                            const LogicalTimeArray& time) const override;
+    bool _gossipOutExternal(OperationContext* opCtx,
+                            BSONObjBuilder* out,
+                            const LogicalTimeArray& time) const override;
+    LogicalTimeArray _gossipInInternal(OperationContext* opCtx,
+                                       const BSONObj& in,
+                                       bool couldBeUnauthenticated) override;
+    LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
+                                       const BSONObj& in,
+                                       bool couldBeUnauthenticated) override;
+    bool _permitRefreshDuringGossipOut() const override;
 
 private:
-    enum class ReplState {
-        Unset,
-        StepUpBegin,
-        StepUpComplete,
-        StepDown,
-    };
-
-    void onStepUpBegin(OperationContext* opCtx) override;
-    void onStepUpComplete(OperationContext* opCtx) override;
-    void onStepDown() override;
-
-    ReplState _replState{ReplState::Unset};
+    void onStepUpBegin(OperationContext* opCtx) override {}
+    void onStepUpComplete(OperationContext* opCtx) override {}
+    void onStepDown() override {}
+    void onBecomeArbiter() override;
 };
 
 const auto vectorClockMongoDDecoration = ServiceContext::declareDecoration<VectorClockMongoD>();
@@ -95,53 +97,52 @@ VectorClockMongoD::VectorClockMongoD() = default;
 
 VectorClockMongoD::~VectorClockMongoD() = default;
 
-void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx) {
-    _replState = ReplState::StepUpBegin;
+void VectorClockMongoD::onBecomeArbiter() {
+    // The node has become an arbiter, hence will not need logical clock for external operations.
+    _disable();
+    if (auto validator = LogicalTimeValidator::get(_service)) {
+        validator->stopKeyManager();
+    }
 }
 
-void VectorClockMongoD::onStepUpComplete(OperationContext* opCtx) {
-    _replState = ReplState::StepUpComplete;
-}
-
-void VectorClockMongoD::onStepDown() {
-    _replState = ReplState::StepDown;
-}
-
-void VectorClockMongoD::_gossipOutInternal(BSONObjBuilder* out) const {
-    VectorTime now = getTime();
-    // TODO SERVER-47914: re-enable gossipping of VectorClock's ClusterTime once LogicalClock has
-    // been migrated into VectorClock.
-    // _gossipOutComponent(out, now, Component::ClusterTime);
+bool VectorClockMongoD::_gossipOutInternal(OperationContext* opCtx,
+                                           BSONObjBuilder* out,
+                                           const LogicalTimeArray& time) const {
+    bool wasClusterTimeOutput = _gossipOutComponent(opCtx, out, time, Component::ClusterTime);
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
         serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        _gossipOutComponent(out, now, Component::ConfigTime);
+        _gossipOutComponent(opCtx, out, time, Component::ConfigTime);
     }
+    return wasClusterTimeOutput;
 }
 
-void VectorClockMongoD::_gossipOutExternal(BSONObjBuilder* out) const {
-    // TODO SERVER-47914: re-enable gossipping of VectorClock's ClusterTime once LogicalClock has
-    // been migrated into VectorClock.
-    // VectorTime now = getTime();
-    // _gossipOutComponent(out, now, Component::ClusterTime);
+bool VectorClockMongoD::_gossipOutExternal(OperationContext* opCtx,
+                                           BSONObjBuilder* out,
+                                           const LogicalTimeArray& time) const {
+    return _gossipOutComponent(opCtx, out, time, Component::ClusterTime);
 }
 
-VectorClock::LogicalTimeArray VectorClockMongoD::_gossipInInternal(const BSONObj& in) {
+VectorClock::LogicalTimeArray VectorClockMongoD::_gossipInInternal(OperationContext* opCtx,
+                                                                   const BSONObj& in,
+                                                                   bool couldBeUnauthenticated) {
     LogicalTimeArray newTime;
-    // TODO SERVER-47914: re-enable gossipping of VectorClock's ClusterTime once LogicalClock has
-    // been migrated into VectorClock.
-    // _gossipInComponent(in, &newTime, Component::ClusterTime);
+    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        _gossipInComponent(in, &newTime, Component::ConfigTime);
+        _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ConfigTime);
     }
     return newTime;
 }
 
-VectorClock::LogicalTimeArray VectorClockMongoD::_gossipInExternal(const BSONObj& in) {
+VectorClock::LogicalTimeArray VectorClockMongoD::_gossipInExternal(OperationContext* opCtx,
+                                                                   const BSONObj& in,
+                                                                   bool couldBeUnauthenticated) {
     LogicalTimeArray newTime;
-    // TODO SERVER-47914: re-enable gossipping of VectorClock's ClusterTime once LogicalClock has
-    // been migrated into VectorClock.
-    // _gossipInComponent(in, &newTime, Component::ClusterTime);
+    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
     return newTime;
+}
+
+bool VectorClockMongoD::_permitRefreshDuringGossipOut() const {
+    return false;
 }
 
 LogicalTime VectorClockMongoD::tick(Component component, uint64_t nTicks) {
@@ -167,6 +168,13 @@ LogicalTime VectorClockMongoD::tick(Component component, uint64_t nTicks) {
 void VectorClockMongoD::tickTo(Component component, LogicalTime newTime) {
     if (component == Component::ConfigTime &&
         serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        _advanceComponentTimeTo(component, std::move(newTime));
+        return;
+    }
+
+    if (component == Component::ClusterTime) {
+        // The ClusterTime is allowed to tickTo in certain very limited and trusted cases (eg.
+        // initializing based on oplog timestamps), so we have to allow it here.
         _advanceComponentTimeTo(component, std::move(newTime));
         return;
     }

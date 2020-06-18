@@ -78,7 +78,10 @@ Status ServiceExecutorReserved::start() {
 }
 
 Status ServiceExecutorReserved::_startWorker() {
-    LOGV2(22978, "Starting new worker thread for {name} service executor", "name"_attr = _name);
+    LOGV2(22978,
+          "Starting new worker thread for {name} service executor",
+          "Starting new worker thread for service executor",
+          "name"_attr = _name);
     return launchServiceWorkerThread([this] {
         stdx::unique_lock<Latch> lk(_mutex);
         _numRunningWorkerThreads.addAndFetch(1);
@@ -116,8 +119,9 @@ Status ServiceExecutorReserved::_startWorker() {
                 auto threadStartStatus = _startWorker();
                 if (!threadStartStatus.isOK()) {
                     LOGV2_WARNING(22981,
-                                  "Could not start new reserve worker thread: {threadStartStatus}",
-                                  "threadStartStatus"_attr = threadStartStatus);
+                                  "Could not start new reserve worker thread: {error}",
+                                  "Could not start new reserve worker thread",
+                                  "error"_attr = threadStartStatus);
                 }
             }
 
@@ -136,8 +140,11 @@ Status ServiceExecutorReserved::_startWorker() {
             }
         }
 
-        LOGV2_DEBUG(
-            22979, 3, "Exiting worker thread in {name} service executor", "name"_attr = _name);
+        LOGV2_DEBUG(22979,
+                    3,
+                    "Exiting worker thread in {name} service executor",
+                    "Exiting worker thread in service executor",
+                    "name"_attr = _name);
     });
 }
 

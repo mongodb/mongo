@@ -65,6 +65,10 @@ public:
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
+    // Names of privilege document collections
+    static constexpr StringData kSystemUsers = "system.users"_sd;
+    static constexpr StringData kSystemRoles = "system.roles"_sd;
+
     // Prefix for orphan collections
     static constexpr StringData kOrphanCollectionPrefix = "orphan."_sd;
     static constexpr StringData kOrphanCollectionDb = "local"_sd;
@@ -234,6 +238,12 @@ public:
     bool isServerConfigurationCollection() const {
         return (db() == kAdminDb) && (coll() == "system.version");
     }
+    bool isPrivilegeCollection() const {
+        if (!isAdminDB()) {
+            return false;
+        }
+        return (coll() == kSystemUsers) || (coll() == kSystemRoles);
+    }
     bool isConfigDB() const {
         return db() == kConfigDb;
     }
@@ -317,8 +327,8 @@ public:
      * Returns true if the namespace is valid. Special namespaces for internal use are considered as
      * valid.
      */
-    bool isValid() const {
-        return validDBName(db(), DollarInDbNameBehavior::Allow) && !coll().empty();
+    bool isValid(DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) const {
+        return validDBName(db(), behavior) && !coll().empty();
     }
 
     /**
@@ -414,7 +424,7 @@ public:
 
 private:
     std::string _ns;
-    size_t _dotIndex;
+    size_t _dotIndex = 0;
 };
 
 /**

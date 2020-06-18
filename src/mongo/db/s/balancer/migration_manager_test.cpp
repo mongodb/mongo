@@ -42,6 +42,9 @@
 namespace mongo {
 namespace {
 
+using executor::RemoteCommandRequest;
+using unittest::assertGet;
+
 const MigrationSecondaryThrottleOptions kDefaultSecondaryThrottle =
     MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault);
 
@@ -137,7 +140,7 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
                                                       MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([this, migrationRequests] {
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
         // Scheduling the moveChunk commands requires finding a host to which to send the command.
@@ -211,7 +214,7 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
                                                       MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([this, migrationRequests] {
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
         // Scheduling the moveChunk commands requires finding a host to which to send the command.
@@ -272,7 +275,7 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
                                                       MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([this, chunk1, chunk2, migrationRequests] {
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
         // Scheduling a moveChunk command requires finding a host to which to send the command. Set
@@ -322,7 +325,7 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
                                                       MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([this, chunk1, migrationRequests] {
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
         // Scheduling a moveChunk command requires finding a host to which to send the command. Set
@@ -361,7 +364,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
         setUpChunk(collName, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     auto future = launchAsync([&] {
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
         // Scheduling a moveChunk command requires finding a host to which to send the command. Set
@@ -463,7 +466,7 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
 
     auto future = launchAsync([&] {
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
         // Scheduling a moveChunk command requires finding a host to which to send the command. Set
@@ -524,7 +527,7 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
 
     auto future = launchAsync([this] {
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
         // Scheduling the moveChunk commands requires finding hosts to which to send the commands.
@@ -635,7 +638,7 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
                                                       MigrateInfo::chunksImbalance}};
 
     auto future = launchAsync([&] {
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
 
         // Scheduling the moveChunk commands requires finding a host to which to send the command.

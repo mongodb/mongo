@@ -85,7 +85,7 @@ TEST_F(QueuedDataStageTest, getValidStats) {
 //
 // Test that our stats are updated as we perform operations.
 //
-TEST_F(QueuedDataStageTest, validateStats) {
+TEST_F(QueuedDataStageTest, ValidateStats) {
     WorkingSet ws;
     WorkingSetID wsID;
     auto expCtx = make_intrusive<ExpressionContext>(opCtx(), nullptr, kNss);
@@ -100,18 +100,11 @@ TEST_F(QueuedDataStageTest, validateStats) {
     ASSERT_EQUALS(stats->advanced, 0U);
     ASSERT_FALSE(stats->isEOF);
 
-    // 'perform' some operations, validate stats
-    // needTime
-    mock->pushBack(PlanStage::NEED_TIME);
-    mock->work(&wsID);
-    ASSERT_EQUALS(stats->works, 1U);
-    ASSERT_EQUALS(stats->needTime, 1U);
-
     // advanced, with pushed data
     WorkingSetID id = ws.allocate();
     mock->pushBack(id);
     mock->work(&wsID);
-    ASSERT_EQUALS(stats->works, 2U);
+    ASSERT_EQUALS(stats->works, 1U);
     ASSERT_EQUALS(stats->advanced, 1U);
 
     // yields

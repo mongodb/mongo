@@ -6,11 +6,11 @@ selector:
   # defining a new test suite for your benchmarks. Doing so ensures they'll still run as part of the
   # Evergreen task associated with the new test suite.
   exclude_files:
+  # The trailing asterisk is for handling the .exe extension on Windows.
   # These benchmarks are being run as part of the benchmarks_sharding.yml test suite.
-  - build/**/mongo/s/**/*
+  - build/install/bin/chunk_manager_refresh_bm*
   # Hash table benchmark is really slow, don't run on evergreen
-  - build/**/mongo/util/hash_table_bm*
-
+  - build/install/bin/hash_table_bm*
 
 executor:
   config: {}

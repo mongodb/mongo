@@ -45,6 +45,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -777,19 +778,28 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
 
     // Copy the complete history.
     auto newHistory = origChunk.getValue().getHistory();
-    const int kHistorySecs = 10;
-
     invariant(validAfter);
 
-    // Update the history of the migrated chunk.
-    // Drop the history that is too old (10 seconds of history for now).
-    // TODO SERVER-33831 to update the old history removal policy.
+    // Drop old history. Keep at least 1 entry so ChunkInfo::getShardIdAt finds valid history for
+    // any query younger than the history window.
     if (!MONGO_unlikely(skipExpiringOldChunkHistory.shouldFail())) {
-        while (!newHistory.empty() &&
-               newHistory.back().getValidAfter().getSecs() + kHistorySecs <
+        const int kHistorySecs = 10;
+        auto windowInSeconds = std::max(minSnapshotHistoryWindowInSeconds.load(), kHistorySecs);
+        int entriesDeleted = 0;
+        while (newHistory.size() > 1 &&
+               newHistory.back().getValidAfter().getSecs() + windowInSeconds <
                    validAfter.get().getSecs()) {
             newHistory.pop_back();
+            ++entriesDeleted;
         }
+
+        logv2::DynamicAttributes attrs;
+        attrs.add("entriesDeleted", entriesDeleted);
+        if (!newHistory.empty()) {
+            attrs.add("oldestEntryValidAfter", newHistory.back().getValidAfter());
+        }
+
+        LOGV2_DEBUG(4778500, 1, "Deleted old chunk history entries", attrs);
     }
 
     if (!newHistory.empty() && newHistory.front().getValidAfter() >= validAfter.get()) {
@@ -1083,6 +1093,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             23887,
             "ensureChunkVersionIsGreaterThan bumped the version of the chunk with minKey {minKey}, "
             "maxKey {maxKey}, and epoch {epoch}. Chunk is now {newChunk}",
+            "ensureChunkVersionIsGreaterThan bumped the the chunk version",
             "minKey"_attr = minKey,
             "maxKey"_attr = maxKey,
             "epoch"_attr = version.epoch(),

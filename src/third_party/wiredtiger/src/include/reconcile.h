@@ -28,6 +28,12 @@ struct __wt_reconcile {
     /* Track the oldest running transaction. */
     uint64_t last_running;
 
+    /* Track the oldest running id. This one doesn't consider checkpoint. */
+    uint64_t rec_start_oldest_id;
+
+    /* Track the pinned timestamp at the time reconciliation started. */
+    wt_timestamp_t rec_start_pinned_ts;
+
     /* Track the page's min/maximum transactions. */
     uint64_t max_txn;
     wt_timestamp_t max_ts;
@@ -138,6 +144,30 @@ struct __wt_reconcile {
     size_t min_space_avail; /* Remaining space in this chunk to put a minimum size boundary */
 
     /*
+     * Counters tracking how much time information is included in reconciliation for each page that
+     * is written to disk. The number of entries on a page is limited to a 32 bit number so these
+     * counters can be too.
+     */
+    uint32_t count_durable_start_ts;
+    uint32_t count_start_ts;
+    uint32_t count_start_txn;
+    uint32_t count_durable_stop_ts;
+    uint32_t count_stop_ts;
+    uint32_t count_stop_txn;
+    uint32_t count_prepare;
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_REC_TIME_NEWEST_START_DURABLE_TS 0x01u
+#define WT_REC_TIME_NEWEST_STOP_DURABLE_TS 0x02u
+#define WT_REC_TIME_NEWEST_STOP_TS 0x04u
+#define WT_REC_TIME_NEWEST_STOP_TXN 0x08u
+#define WT_REC_TIME_OLDEST_START_TS 0x10u
+#define WT_REC_TIME_OLDEST_START_TXN 0x20u
+#define WT_REC_TIME_PREPARE 0x40u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint16_t ts_usage_flags;
+
+    /*
      * Saved update list, supporting WT_REC_HS configurations. While reviewing updates for each
      * page, we save WT_UPDATE lists here, and then move them to per-block areas as the blocks are
      * defined.
@@ -226,8 +256,8 @@ struct __wt_reconcile {
     WT_CURSOR_BTREE update_modify_cbt;
 
     /*
-     * Variables to track reconciled pages containing cells with time window values and prepared
-     * transactions.
+     * Variables to track reconciliation calls for pages containing cells with time window values
+     * and prepared transactions.
      */
     bool rec_page_cell_with_ts;
     bool rec_page_cell_with_txn_id;

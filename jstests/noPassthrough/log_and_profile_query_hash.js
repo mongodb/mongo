@@ -156,7 +156,7 @@ const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
 // 'planCacheKey' and 'queryHash'. Confirm only one line does this.
 const creationLogList = log.filter(
     logLine => (
-        logLine.indexOf("Creating inactive cache entry for query shape") != -1 &&
+        logLine.indexOf("Creating inactive cache entry for query") != -1 &&
         (!isJsonLog(conn)
              ? (logLine.indexOf("planCacheKey " + String(onCreationHashes.planCacheKey)) != -1 &&
                 logLine.indexOf("queryHash " + String(onCreationHashes.queryHash)) != -1)

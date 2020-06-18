@@ -39,7 +39,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -116,17 +116,17 @@ protected:
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
-        ShardingTestFixture::addRemoteShards({std::make_tuple(shard1, hostAndPort1),
-                                              std::make_tuple(shard2, hostAndPort2),
-                                              std::make_tuple(shard3, hostAndPort3)});
+        addRemoteShards({std::make_tuple(shard1, hostAndPort1),
+                         std::make_tuple(shard2, hostAndPort2),
+                         std::make_tuple(shard3, hostAndPort3)});
 
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         // Set up a logical clock with an initial time.
         auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
-        logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
+        VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
         // Set up a tick source for transaction metrics.
         auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
@@ -1012,8 +1012,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     ASSERT(expectedHostAndPorts == seenHostAndPorts);
 }
 
+// TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
 TEST_F(TransactionRouterTestWithDefaultSession,
-       SendCommitDirectlyToReadOnlyShardsThenWriteShardForMultipleParticipantsOnlyOneDidAWrite) {
+       SendCoordinateCommitForMultipleParticipantsOnlyOneDidAWrite) {
     TxnNumber txnNum{3};
 
     auto txnRouter = TransactionRouter::get(operationContext());
@@ -1040,25 +1041,22 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         ASSERT_EQ("admin", request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
-        ASSERT_EQ(cmdName, "commitTransaction");
+        ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+        std::set<std::string> expectedParticipants = {shard1.toString(), shard2.toString()};
+        auto participantElements = request.cmdObj["participants"].Array();
+        ASSERT_EQ(expectedParticipants.size(), participantElements.size());
+
+        for (const auto& element : participantElements) {
+            auto shardId = element["shardId"].valuestr();
+            ASSERT_EQ(1ull, expectedParticipants.count(shardId));
+            expectedParticipants.erase(shardId);
+        }
 
         checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
 
         return BSON("ok" << 1);
     });
-
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(hostAndPort2, request.target);
-        ASSERT_EQ("admin", request.dbname);
-
-        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
-        ASSERT_EQ(cmdName, "commitTransaction");
-
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, false);
-
-        return BSON("ok" << 1);
-    });
-
 
     future.default_timed_get();
 }
@@ -1430,7 +1428,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
     // Advance the latest time in the logical clock so the retry attempt will pick a later time.
     LogicalTime laterTime(Timestamp(1000, 1));
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTime);
 
     // Simulate a snapshot error.
 
@@ -1479,7 +1477,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTimeSameStmt);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1503,7 +1501,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeNewStmt(Timestamp(1000, 1));
     ASSERT_GT(laterTimeNewStmt, laterTimeSameStmt);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTimeNewStmt);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeNewStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1751,7 +1749,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTime(Timestamp(1000, 1));
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTime);
 
     ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find", kDummyStatus));
     txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus);
@@ -2317,7 +2315,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTimeSameStmt);
+    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -3028,8 +3026,7 @@ protected:
         startCapturingLogMessages();
         auto future = launchAsync(
             [&] { txnRouter().commitTransaction(operationContext(), kDummyRecoveryToken); });
-        expectCommitTransaction();
-        expectCommitTransaction();
+        expectCoordinateCommitTransaction();
         future.default_timed_get();
         stopCapturingLogMessages();
     }
@@ -3359,18 +3356,17 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_SingleShard) {
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("coordinator:"));
 }
 
+// TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
 TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_SingleWriteShard) {
     beginSlowTxnWithDefaultTxnNumber();
     runSingleWriteShardCommit();
 
-    ASSERT_EQUALS(
-        1,
-        countBSONFormatLogLinesIsSubset(BSON(
-            "attr" << BSON("commitType"
-                           << "singleWriteShard"
-                           << "numParticipants" << 2 << "commitDurationMicros" << BSONUndefined))));
-
-    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("coordinator:"));
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("commitType"
+                                          << "twoPhaseCommit"
+                                          << "numParticipants" << 2 << "commitDurationMicros"
+                                          << BSONUndefined << "coordinator" << BSONUndefined))));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingCommitType_ReadOnly) {

@@ -189,7 +189,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
             auto writeConcern = uassertStatusOK(WriteConcernOptions::parse(elem.embeddedObject()));
             request.setWriteConcern(writeConcern);
-        } else if (kRuntimeConstants == fieldName) {
+        } else if (kRuntimeConstantsName == fieldName) {
             // TODO SERVER-46384: Remove 'runtimeConstants' in 4.5 since it is redundant with 'let'
             try {
                 IDLParserErrorContext ctx("internalRuntimeConstants");
@@ -197,18 +197,18 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
-        } else if (kLet == fieldName) {
+        } else if (kLetName == fieldName) {
             if (elem.type() != BSONType::Object)
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
                             << fieldName << " must be an object, not a " << typeName(elem.type())};
-            auto bob = BSONObjBuilder{request.letParameters};
+            auto bob = BSONObjBuilder{request.getLetParameters()};
             bob.appendElementsUnique(elem.embeddedObject());
-            request.letParameters = bob.obj();
-        } else if (fieldName == kUse44SortKeys) {
+            request._letParameters = bob.obj();
+        } else if (fieldName == kUse44SortKeysName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << kUse44SortKeys << " must be a boolean, not a "
+                        str::stream() << kUse44SortKeysName << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
             // TODO SERVER-47065: A 4.6 node still has to accept the 'use44SortKeys' field, since it
@@ -219,13 +219,17 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             // 4.6 upgrade purposes, since a 4.4 mongoS will always send {useNewUpsert:true} to the
             // shards. We do nothing with it because useNewUpsert will be automatically used in 4.6
             // when appropriate. Remove this final vestige of useNewUpsert during the 4.7 dev cycle.
-        } else if (fieldName == kIsMapReduceCommand) {
+        } else if (fieldName == kIsMapReduceCommandName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << kIsMapReduceCommand << " must be a boolean, not a "
+                        str::stream() << kIsMapReduceCommandName << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
             request.setIsMapReduceCommand(elem.boolean());
+        } else if (isMongocryptdArgument(fieldName)) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "unrecognized field '" << elem.fieldName()
+                                  << "'. This command may be meant for a mongocryptd process."};
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
@@ -323,9 +327,9 @@ Document AggregationRequest::serializeToCommandObj() const {
         {WriteConcernOptions::kWriteConcernField,
          _writeConcern ? Value(_writeConcern->toBSON()) : Value()},
         // Only serialize runtime constants if any were specified.
-        {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
-        {kIsMapReduceCommand, _isMapReduceCommand ? Value(true) : Value()},
-        {kLet, !letParameters.isEmpty() ? Value(letParameters) : Value()},
+        {kRuntimeConstantsName, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
+        {kIsMapReduceCommandName, _isMapReduceCommand ? Value(true) : Value()},
+        {kLetName, !_letParameters.isEmpty() ? Value(_letParameters) : Value()},
     };
 }
 }  // namespace mongo

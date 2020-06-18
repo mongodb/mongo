@@ -84,7 +84,7 @@ private:
     bool _isNetworkTimeout(const Status& status) const;
     bool _isNodeShuttingDown(const Status& status) const;
     bool _isNetworkError(const Status& status) const;
-    bool _isNotMasterOrNotRecovering(const Status& status) const;
+    bool _isNotMasterOrNodeRecovering(const Status& status) const;
     bool _isNotMaster(const Status& status) const;
 
     const std::string _setName;

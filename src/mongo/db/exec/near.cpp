@@ -46,8 +46,9 @@ NearStage::NearStage(ExpressionContext* expCtx,
                      const char* typeName,
                      StageType type,
                      WorkingSet* workingSet,
+                     const Collection* collection,
                      const IndexDescriptor* indexDescriptor)
-    : RequiresIndexStage(typeName, expCtx, indexDescriptor, workingSet),
+    : RequiresIndexStage(typeName, expCtx, collection, indexDescriptor, workingSet),
       _workingSet(workingSet),
       _searchState(SearchState_Initializing),
       _nextIntervalStats(nullptr),
@@ -81,7 +82,6 @@ PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
 
 PlanStage::StageState NearStage::doWork(WorkingSetID* out) {
     WorkingSetID toReturn = WorkingSet::INVALID_ID;
-    Status error = Status::OK();
     PlanStage::StageState nextState = PlanStage::NEED_TIME;
 
     //
@@ -91,7 +91,7 @@ PlanStage::StageState NearStage::doWork(WorkingSetID* out) {
     if (SearchState_Initializing == _searchState) {
         nextState = initNext(&toReturn);
     } else if (SearchState_Buffering == _searchState) {
-        nextState = bufferNext(&toReturn, &error);
+        nextState = bufferNext(&toReturn);
     } else if (SearchState_Advancing == _searchState) {
         nextState = advanceNext(&toReturn);
     } else {
@@ -103,9 +103,7 @@ PlanStage::StageState NearStage::doWork(WorkingSetID* out) {
     // Handle the results
     //
 
-    if (PlanStage::FAILURE == nextState) {
-        *out = WorkingSetCommon::allocateStatusMember(_workingSet, error);
-    } else if (PlanStage::ADVANCED == nextState) {
+    if (PlanStage::ADVANCED == nextState) {
         *out = toReturn;
     } else if (PlanStage::NEED_YIELD == nextState) {
         *out = toReturn;
@@ -132,28 +130,20 @@ struct NearStage::SearchResult {
 };
 
 // Set "toReturn" when NEED_YIELD.
-PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* error) {
+PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     //
     // Try to retrieve the next covered member
     //
 
     if (!_nextInterval) {
-        StatusWith<CoveredInterval*> intervalStatus =
-            nextInterval(opCtx(), _workingSet, collection());
-        if (!intervalStatus.isOK()) {
-            _searchState = SearchState_Finished;
-            *error = intervalStatus.getStatus();
-            return PlanStage::FAILURE;
-        }
-
-        if (nullptr == intervalStatus.getValue()) {
+        auto interval = nextInterval(opCtx(), _workingSet, collection());
+        if (!interval) {
             _searchState = SearchState_Finished;
             return PlanStage::IS_EOF;
         }
 
         // CoveredInterval and its child stage are owned by _childrenIntervals
-        _childrenIntervals.push_back(
-            std::unique_ptr<NearStage::CoveredInterval>{intervalStatus.getValue()});
+        _childrenIntervals.push_back(std::move(interval));
         _nextInterval = _childrenIntervals.back().get();
         _specificStats.intervalStats.emplace_back();
         _nextIntervalStats = &_specificStats.intervalStats.back();
@@ -168,9 +158,6 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     if (PlanStage::IS_EOF == intervalState) {
         _searchState = SearchState_Advancing;
         return PlanStage::NEED_TIME;
-    } else if (PlanStage::FAILURE == intervalState) {
-        *error = WorkingSetCommon::getMemberStatus(*_workingSet->get(nextMemberID));
-        return intervalState;
     } else if (PlanStage::NEED_YIELD == intervalState) {
         *toReturn = nextMemberID;
         return intervalState;
@@ -194,17 +181,9 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
 
     ++_nextIntervalStats->numResultsBuffered;
 
-    StatusWith<double> distanceStatus = computeDistance(nextMember);
-
-    if (!distanceStatus.isOK()) {
-        _searchState = SearchState_Finished;
-        *error = distanceStatus.getStatus();
-        return PlanStage::FAILURE;
-    }
-
     // If the member's distance is in the current distance interval, add it to our buffered
     // results.
-    double memberDistance = distanceStatus.getValue();
+    auto memberDistance = computeDistance(nextMember);
 
     // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
     nextMember->makeObjOwnedIfNeeded();

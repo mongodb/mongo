@@ -1015,13 +1015,12 @@ TEST_F(TransactionCoordinatorTest,
 class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
 public:
     void setUp() override {
-        TransactionCoordinatorTestBase::setUp();
-
         getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-
         auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
         tickSource->reset(1);
         getServiceContext()->setTickSource(std::move(tickSource));
+
+        TransactionCoordinatorTestBase::setUp();
     }
 
     ServerTransactionCoordinatorsMetrics* metrics() {
@@ -2023,7 +2022,8 @@ TEST_F(TransactionCoordinatorMetricsTest,
     network()->enterNetwork();
     network()->runReadyNetworkOperations();
     network()->exitNetwork();
-    coordinator.onCompletion().get();
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedDueToReplStateChange);
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);
@@ -2100,7 +2100,8 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     // The last thing the coordinator will do on the hijacked commit response thread is signal
     // the coordinator's completion.
     future.timed_get(kLongFutureTimeout);
-    coordinator.onCompletion().get();
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedDueToReplStateChange);
 
     checkStats(stats, expectedStats);
     checkMetrics(expectedMetrics);

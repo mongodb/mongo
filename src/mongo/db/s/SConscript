@@ -62,12 +62,12 @@ env.Library(
         'move_primary_source_manager.cpp',
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
+        'op_observer_sharding_impl.cpp',
         'periodic_balancer_config_refresher.cpp',
         'periodic_sharded_index_consistency_checker.cpp',
         'range_deletion_util.cpp',
         'read_only_catalog_cache_loader.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
-        'scoped_shard_version_critical_section.cpp',
         'session_catalog_migration_destination.cpp',
         'session_catalog_migration_source.cpp',
         'shard_filtering_metadata_refresh.cpp',
@@ -83,8 +83,8 @@ env.Library(
         'split_chunk.cpp',
         'split_vector.cpp',
         'start_chunk_clone_request.cpp',
-        env.Idlc('range_deletion_task.idl')[0],
         env.Idlc('migration_coordinator_document.idl')[0],
+        env.Idlc('range_deletion_task.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
@@ -100,7 +100,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/remove_saver',
         '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/db/vector_clock_d',
+        '$BUILD_DIR/mongo/db/vector_clock_mongod',
         '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/sharding_initialization',
@@ -129,19 +129,6 @@ env.Library(
 )
 
 env.Library(
-    target='op_observer_sharding_impl',
-    source=[
-        'op_observer_sharding_impl.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/op_observer_impl',
-    ],
-    LIBDEPS_PRIVATE=[
-        'sharding_runtime_d',
-    ],
-)
-
-env.Library(
     target='transaction_coordinator',
     source=[
         'server_transaction_coordinators_metrics.cpp',
@@ -166,6 +153,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/vector_clock_mutable',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/grid',
         'sharding_api_d',
@@ -255,7 +243,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/snapshot_window_options',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
 
@@ -351,6 +341,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='config_server_test_fixture',
+    source=[
+        'config/config_server_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
+        'sharding_catalog_manager',
+    ],
+)
+
 env.CppUnitTest(
     target='db_s_test',
     source=[
@@ -365,10 +366,10 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'chunk_splitter',
+        'config_server_test_fixture',
         'sharding_logging',
         'sharding_runtime_d',
         'type_shard_identity',
@@ -391,9 +392,9 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/repl/replication_info',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/util/version_impl',
         'balancer',
+        'config_server_test_fixture',
     ]
 )
 
@@ -419,6 +420,7 @@ env.CppUnitTest(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/keys_collection_client_direct',
         '$BUILD_DIR/mongo/db/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/query/query_request',
@@ -495,7 +497,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/util/version_impl',
+        'config_server_test_fixture',
     ]
 )

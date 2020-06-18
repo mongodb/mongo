@@ -2,8 +2,9 @@
 
 import signal
 
-from . import interface
-from ...core import programs
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib.core import programs
+from buildscripts.resmokelib.testing.fixtures import interface
 
 
 class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
@@ -32,7 +33,8 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
             self.__processes[i] = process
 
     def _make_process(self, index):
-        logger = self.logger.new_fixture_node_logger("yes{:d}".format(index))
+        logger = logging.loggers.new_fixture_node_logger(self.__class__.__name__, self.job_num,
+                                                         "yes{:d}".format(index))
         return programs.generic_program(logger, ["yes", self.__message])
 
     def _do_teardown(self, mode=None):

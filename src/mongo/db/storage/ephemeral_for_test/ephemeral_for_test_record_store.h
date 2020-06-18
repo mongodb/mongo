@@ -103,9 +103,7 @@ public:
         return _data->dataSize;
     }
 
-    virtual long long numRecords(OperationContext* opCtx) const {
-        return _data->records.size();
-    }
+    virtual long long numRecords(OperationContext* opCtx) const;
 
     virtual boost::optional<RecordId> oplogStartHack(OperationContext* opCtx,
                                                      const RecordId& startingPosition) const;

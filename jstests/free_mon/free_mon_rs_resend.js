@@ -41,6 +41,7 @@ mock_web_sec.waitRegisters(1);
 
 WaitForFreeMonServerStatusState(rst.getPrimary(), 'enabled');
 WaitForFreeMonServerStatusState(rst.getSecondary(), 'enabled');
+ValidateFreeMonReplicaSet(rst);
 
 mock_web.waitRegisters(2);
 mock_web_sec.waitRegisters(2);

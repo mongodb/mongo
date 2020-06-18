@@ -1,0 +1,78 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='query_sbe_plan_stats',
+    source=[
+        'stages/plan_stats.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        ]
+    )
+
+env.Library(
+    target='query_sbe',
+    source=[
+        'expressions/expression.cpp',
+        'stages/branch.cpp',
+        'stages/bson_scan.cpp',
+        'stages/check_bounds.cpp',
+        'stages/co_scan.cpp',
+        'stages/exchange.cpp',
+        'stages/hash_agg.cpp',
+        'stages/hash_join.cpp',
+        'stages/limit_skip.cpp',
+        'stages/loop_join.cpp',
+        'stages/makeobj.cpp',
+        'stages/project.cpp',
+        'stages/sort.cpp',
+        'stages/spool.cpp',
+        'stages/stages.cpp',
+        'stages/text_match.cpp',
+        'stages/traverse.cpp',
+        'stages/union.cpp',
+        'stages/unwind.cpp',
+        'util/debug_print.cpp',
+        'values/bson.cpp',
+        'values/value.cpp',
+        'vm/arith.cpp',
+        'vm/vm.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/scoped_timer',
+        '$BUILD_DIR/mongo/db/query/plan_yield_policy',
+        '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+        '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'query_sbe_plan_stats'
+         ]
+    )
+
+env.Library(
+    target='query_sbe_storage',
+    source=[
+        'stages/ix_scan.cpp',
+        'stages/scan.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/db_raii',
+        'query_sbe'
+        ]
+    )
+
+env.CppUnitTest(
+    target='db_sbe_test',
+    source=[
+        'sbe_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'query_sbe'
+    ]
+)

@@ -83,37 +83,37 @@ mongo::Scope* MozJSScriptEngine::createScopeForCurrentThread(boost::optional<int
 
 void MozJSScriptEngine::interrupt(unsigned opId) {
     stdx::lock_guard<Latch> intLock(_globalInterruptLock);
+    auto knownOps = [&]() {
+        std::vector<unsigned> ret;
+        for (auto&& iSc : _opToScopeMap) {
+            ret.push_back(iSc.first);
+        }
+        return ret;
+    };
     OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
     if (iScope == _opToScopeMap.end()) {
         // got interrupt request for a scope that no longer exists
-        LOGV2_DEBUG(22783,
-                    1,
-                    "received interrupt request for unknown op: {opId}{printKnownOps_inlock}",
-                    "opId"_attr = opId,
-                    "printKnownOps_inlock"_attr = printKnownOps_inlock());
+        if (shouldLog(logv2::LogSeverity::Debug(2))) {
+            // This log record gets extra attributes when the log severity is at Debug(2)
+            // but we still log the record at log severity Debug(1). Simplify this if SERVER-48671
+            // gets done
+            LOGV2_DEBUG(22783,
+                        1,
+                        "Received interrupt request for unknown op",
+                        "opId"_attr = opId,
+                        "knownOps"_attr = knownOps());
+        } else {
+            LOGV2_DEBUG(22790, 1, "Received interrupt request for unknown op", "opId"_attr = opId);
+        }
         return;
     }
-
-    LOGV2_DEBUG(22784,
-                1,
-                "interrupting op: {opId}{printKnownOps_inlock}",
-                "opId"_attr = opId,
-                "printKnownOps_inlock"_attr = printKnownOps_inlock());
-    iScope->second->kill();
-}
-
-std::string MozJSScriptEngine::printKnownOps_inlock() {
-    str::stream out;
-
     if (shouldLog(logv2::LogSeverity::Debug(2))) {
-        out << "  known ops: \n";
-
-        for (auto&& iSc : _opToScopeMap) {
-            out << "  " << iSc.first << "\n";
-        }
+        // Like above, this log record gets extra attributes when the log severity is at Debug(2)
+        LOGV2_DEBUG(22809, 1, "Interrupting op", "opId"_attr = opId, "knownOps"_attr = knownOps());
+    } else {
+        LOGV2_DEBUG(22808, 1, "Interrupting op", "opId"_attr = opId);
     }
-
-    return out;
+    iScope->second->kill();
 }
 
 void MozJSScriptEngine::interruptAll() {
@@ -157,8 +157,8 @@ void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScop
 
     LOGV2_DEBUG(22785,
                 2,
-                "SMScope {reinterpret_cast_uint64_t_scope} registered for op {opId}",
-                "reinterpret_cast_uint64_t_scope"_attr = reinterpret_cast<uint64_t>(scope),
+                "scope registered for op",
+                "scope"_attr = reinterpret_cast<uint64_t>(scope),
                 "opId"_attr = opId);
     Status status = opCtx->checkForInterruptNoAssert();
     if (!status.isOK()) {
@@ -171,8 +171,8 @@ void MozJSScriptEngine::unregisterOperation(unsigned int opId) {
 
     LOGV2_DEBUG(22786,
                 2,
-                "ImplScope {reinterpret_cast_uint64_t_this} unregistered for op {opId}",
-                "reinterpret_cast_uint64_t_this"_attr = reinterpret_cast<uint64_t>(this),
+                "scope unregistered for op",
+                "scope"_attr = reinterpret_cast<uint64_t>(this),
                 "opId"_attr = opId);
 
     if (opId != 0) {

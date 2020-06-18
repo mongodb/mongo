@@ -52,19 +52,19 @@ bool canSwitchReadSource(OperationContext* opCtx) {
     return false;
 }
 
-bool shouldReadAtNoOverlap(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           std::string* reason) {
+bool shouldReadAtLastApplied(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             std::string* reason) {
 
-    // If this is true, then the operation opted-in to the PBWM lock, implying that it cannot read
-    // at no-overlap. It's important to note that it is possible for this to be false, but still be
+    // If this is true, then the operation opted-in to the PBWM lock, implying that it cannot change
+    // its ReadSource. It's important to note that it is possible for this to be false, but still be
     // holding the PBWM lock, explained below.
     if (opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         *reason = "conflicts with batch application";
         return false;
     }
 
-    // If we are already holding the PBWM lock, do not read at no-overlap. Snapshots acquired by an
+    // If we are already holding the PBWM lock, do not change ReadSource. Snapshots acquired by an
     // operation after a yield/restore must see all writes in the pre-yield snapshot. Once a
     // snapshot is reading without a timestamp, we choose to continue acquiring snapshots without a
     // timestamp. This is done in lieu of determining a timestamp far enough in the future that's
@@ -72,19 +72,19 @@ bool shouldReadAtNoOverlap(OperationContext* opCtx,
     // held concurrently, which is often the case when DBDirectClient is used.
     if (opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_IS)) {
         *reason = "PBWM lock is held";
-        LOGV2_DEBUG(20577, 1, "not reading at no-overlap because the PBWM lock is held");
+        LOGV2_DEBUG(20577, 1, "not reading at lastApplied because the PBWM lock is held");
         return false;
     }
 
     // If we are in a replication state (like secondary or primary catch-up) where we are not
-    // accepting writes, we should read at no-overlap. If this node can accept writes, then no
+    // accepting writes, we should read at lastApplied. If this node can accept writes, then no
     // conflicting replication batches are being applied and we can read from the default snapshot.
     if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin")) {
         *reason = "primary";
         return false;
     }
 
-    // Non-replicated collections do not need to read at no-overlap, as those collections are not
+    // Non-replicated collections do not need to read at lastApplied, as those collections are not
     // written by the replication system.  However, the oplog is special, as it *is* written by the
     // replication system.
     if (!nss.isReplicated() && !nss.isOplog()) {
@@ -103,28 +103,31 @@ boost::optional<RecoveryUnit::ReadSource> getNewReadSource(OperationContext* opC
 
     const auto existing = opCtx->recoveryUnit()->getTimestampReadSource();
     std::string reason;
-    const bool readAtNoOverlap = shouldReadAtNoOverlap(opCtx, nss, &reason);
+    const bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, &reason);
     if (existing == RecoveryUnit::ReadSource::kUnset) {
         // Shifting from reading without a timestamp to reading with a timestamp can be dangerous
         // because writes will appear to vanish. This case is intended for new reads on secondaries
         // and query yield recovery after state transitions from primary to secondary.
-        if (readAtNoOverlap) {
-            LOGV2_DEBUG(4452901, 2, "Changing ReadSource to kNoOverlap", logAttrs(nss));
-            return RecoveryUnit::ReadSource::kNoOverlap;
+
+        // If a query recovers from a yield and the node is no longer primary, it must start reading
+        // at the lastApplied point because reading without a timestamp is not safe.
+        if (readAtLastApplied) {
+            LOGV2_DEBUG(4452901, 2, "Changing ReadSource to kLastApplied", logAttrs(nss));
+            return RecoveryUnit::ReadSource::kLastApplied;
         }
-    } else if (existing == RecoveryUnit::ReadSource::kNoOverlap) {
-        // For some reason, we can no longer read at kNoOverlap.
+    } else if (existing == RecoveryUnit::ReadSource::kLastApplied) {
+        // For some reason, we can no longer read at lastApplied.
         // An operation that yields a timestamped snapshot must restore a snapshot with at least as
         // large of a timestamp, or with proper consideration of rollback scenarios, no timestamp.
         // Given readers do not survive rollbacks, it's okay to go from reading with a timestamp to
         // reading without one. More writes will become visible.
-        if (!readAtNoOverlap) {
+        if (!readAtLastApplied) {
             LOGV2_DEBUG(
                 4452902, 2, "Changing ReadSource to kUnset", logAttrs(nss), "reason"_attr = reason);
             // This shift to kUnset assumes that callers will not make future attempts to manipulate
             // their ReadSources after performing reads at an un-timetamped snapshot. The only
             // exception is callers of this function that may need to change from kUnset to
-            // kNoOverlap in the event of a catalog conflict or query yield.
+            // kLastApplied in the event of a catalog conflict or query yield.
             return RecoveryUnit::ReadSource::kUnset;
         }
     }

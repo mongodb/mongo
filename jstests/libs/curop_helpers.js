@@ -1,26 +1,32 @@
-// Wait until the current operation matches the filter.
-function waitForCurOpByFilter(db, filter) {
+// Wait until the current operation matches the filter. Returns the resulting array of operations.
+function waitForCurOpByFilter(db, filter, options = {}) {
     const adminDB = db.getSiblingDB("admin");
+    let results = [];
     assert.soon(
         () => {
-            return adminDB.aggregate([{$currentOp: {}}, {$match: filter}]).itcount() == 1;
+            results = adminDB.aggregate([{$currentOp: options}, {$match: filter}]).toArray();
+            return results.length > 0;
         },
         () => {
-            return "Failed to find a matching op for filter \"" + tojson(filter) +
-                "\" in currentOp output: " +
-                tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
+            return "Failed to find a matching op for filter: " + tojson(filter) +
+                "in currentOp output: " + tojson(results);
         });
+    return results;
 }
 
-// Wait until the current operation reaches the fail point "failPoint" for the given
-// namespace "nss".
-function waitForCurOpByFailPoint(db, nss, failPoint) {
-    let filter = {$and: [{"ns": nss}, {"failpointMsg": failPoint}]};
-    waitForCurOpByFilter(db, filter);
+// Wait until the current operation reaches the fail point "failPoint" for the given namespace
+// "nss". Accepts an optional filter to apply alongside the "failpointMsg". Returns the resulting
+// array of operations.
+function waitForCurOpByFailPoint(db, nss, failPoint, filter = {}, options = {}) {
+    const adjustedFilter = {
+        $and: [{ns: nss}, filter, {$or: [{failpointMsg: failPoint}, {msg: failPoint}]}]
+    };
+    return waitForCurOpByFilter(db, adjustedFilter, options);
 }
 
-// Wait until the current operation reaches the fail point "failPoint" with no namespace.
-function waitForCurOpByFailPointNoNS(db, failPoint) {
-    const filter = {"failpointMsg": failPoint};
-    waitForCurOpByFilter(db, filter);
+// Wait until the current operation reaches the fail point "failPoint" with no namespace. Returns
+// the resulting array of operations.
+function waitForCurOpByFailPointNoNS(db, failPoint, filter = {}, options = {}) {
+    const adjustedFilter = {$and: [filter, {$or: [{failpointMsg: failPoint}, {msg: failPoint}]}]};
+    return waitForCurOpByFilter(db, adjustedFilter, options);
 }

@@ -1,3 +1,0 @@
-# Note: This version is checked by python modules in buildscripts/linter/
-mypy == 0.580; python_version > "3.4"
-typing

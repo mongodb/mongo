@@ -69,7 +69,6 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
-    invariant(!indexBuildOptions.replSetAndNotPrimaryAtStart);
     _runIndexBuild(opCtx, buildUUID, indexBuildOptions);
 
     auto replState = invariant(_getIndexBuild(buildUUID));

@@ -95,6 +95,15 @@ def generate(env):
         if var.startswith("CCACHE_"):
             env["ENV"][var] = host_value
 
+    # SERVER-48289: Adding roll-your-own CFLAGS and CXXFLAGS can cause some very "weird" issues
+    # with using icecc and ccache if they turn out not to be supported by the compiler. Rather
+    # than try to filter each and every flag someone might try for the ones we know don't
+    # work, we'll just let the compiler ignore them. A better approach might be to pre-filter
+    # flags coming in from the environment by passing them through the appropriate *IfSupported
+    # method, but that's a much larger effort.
+    if env.ToolchainIs("clang"):
+        env.AppendUnique(CCFLAGS=["-Qunused-arguments"])
+
     # Record our found CCACHE_VERSION. Other tools that need to know
     # about ccache (like iecc) should query this variable to determine
     # if ccache is active. Looking at the CCACHE variable in the

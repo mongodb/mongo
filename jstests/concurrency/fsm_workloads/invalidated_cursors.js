@@ -49,14 +49,18 @@ var $config = (function() {
 
             this.indexSpecs.forEach(indexSpec => {
                 let res = db[collName].createIndex(indexSpec);
-                assertWorkedOrFailedHandleTxnErrors(
-                    res,
-                    [
-                        ErrorCodes.DatabaseDropPending,
-                        ErrorCodes.IndexBuildAborted,
-                        ErrorCodes.IndexBuildAlreadyInProgress
-                    ],
-                    [ErrorCodes.DatabaseDropPending, ErrorCodes.IndexBuildAborted]);
+                assertWorkedOrFailedHandleTxnErrors(res,
+                                                    [
+                                                        ErrorCodes.DatabaseDropPending,
+                                                        ErrorCodes.IndexBuildAborted,
+                                                        ErrorCodes.IndexBuildAlreadyInProgress,
+                                                        ErrorCodes.NoMatchingDocument,
+                                                    ],
+                                                    [
+                                                        ErrorCodes.DatabaseDropPending,
+                                                        ErrorCodes.IndexBuildAborted,
+                                                        ErrorCodes.NoMatchingDocument,
+                                                    ]);
             });
         },
 
@@ -247,9 +251,11 @@ var $config = (function() {
             myDB[targetColl].dropIndex(indexSpec);
 
             // Re-create the index that was dropped.
-            assertAlways.commandWorkedOrFailedWithCode(
-                myDB[targetColl].createIndex(indexSpec),
-                [ErrorCodes.IndexBuildAborted, ErrorCodes.DatabaseDropPending]);
+            assertAlways.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec), [
+                ErrorCodes.DatabaseDropPending,
+                ErrorCodes.IndexBuildAborted,
+                ErrorCodes.NoMatchingDocument,
+            ]);
         }
     };
 

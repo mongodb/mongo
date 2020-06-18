@@ -83,36 +83,29 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
 namespace {
 
 /**
- * If the operation succeeded, then Status::OK() is returned, possibly with a document value
- * to return to the client. If no matching document to update or remove was found, then none
- * is returned. Otherwise, the updated or deleted document is returned.
- *
- * If the operation failed, throws.
+ * If the operation succeeded, then returns either a document to return to the client, or
+ * boost::none if no matching document to update/remove was found. If the operation failed, throws.
  */
 boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
                                          PlanExecutor* exec,
                                          bool isRemove) {
     BSONObj value;
-    PlanExecutor::ExecState state = exec->getNext(&value, nullptr);
+    PlanExecutor::ExecState state;
+    try {
+        state = exec->getNext(&value, nullptr);
+    } catch (DBException& exception) {
+        LOGV2_WARNING(23802,
+                      "Plan executor error during findAndModify: {error}, stats: {stats}",
+                      "Plan executor error during findAndModify",
+                      "error"_attr = exception.toStatus(),
+                      "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
+
+        exception.addContext("Plan executor error during findAndModify");
+        throw;
+    }
 
     if (PlanExecutor::ADVANCED == state) {
         return {std::move(value)};
-    }
-
-    if (PlanExecutor::FAILURE == state) {
-        // We should always have a valid status member object at this point.
-        auto status = WorkingSetCommon::getMemberObjectStatus(value);
-        invariant(!status.isOK());
-        LOGV2_WARNING(
-            23802,
-            "Plan executor error during findAndModify: {state}, status: {error}, stats: {stats}",
-            "Plan executor error during findAndModify",
-            "state"_attr = PlanExecutor::statestr(state),
-            "error"_attr = status,
-            "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
-
-        uassertStatusOKWithContext(status, "Plan executor error during findAndModify");
-        MONGO_UNREACHABLE;
     }
 
     invariant(state == PlanExecutor::IS_EOF);
@@ -121,7 +114,7 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
 
 void makeUpdateRequest(OperationContext* opCtx,
                        const FindAndModifyRequest& args,
-                       bool explain,
+                       boost::optional<ExplainOptions::Verbosity> explain,
                        UpdateRequest* requestOut) {
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
@@ -140,8 +133,9 @@ void makeUpdateRequest(OperationContext* opCtx,
     requestOut->setMulti(false);
     requestOut->setExplain(explain);
 
-    requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
-                                                                   : PlanExecutor::YIELD_AUTO);
+    requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction()
+                                   ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                                   : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 }
 
 void makeDeleteRequest(OperationContext* opCtx,
@@ -160,8 +154,9 @@ void makeDeleteRequest(OperationContext* opCtx,
     requestOut->setReturnDeleted(true);  // Always return the old value.
     requestOut->setIsExplain(explain);
 
-    requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction() ? PlanExecutor::INTERRUPT_ONLY
-                                                                   : PlanExecutor::YIELD_AUTO);
+    requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction()
+                                   ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                                   : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 }
 
 void appendCommandResponse(const PlanExecutor* exec,
@@ -291,8 +286,7 @@ public:
         } else {
             auto request = UpdateRequest();
             request.setNamespaceString(nsString);
-            const bool isExplain = true;
-            makeUpdateRequest(opCtx, args, isExplain, &request);
+            makeUpdateRequest(opCtx, args, verbosity, &request);
 
             const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
             ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
@@ -385,8 +379,8 @@ public:
                 for (;;) {
                     auto request = UpdateRequest();
                     request.setNamespaceString(nsString);
-                    const bool isExplain = false;
-                    makeUpdateRequest(opCtx, args, isExplain, &request);
+                    const auto verbosity = boost::none;
+                    makeUpdateRequest(opCtx, args, verbosity, &request);
 
                     if (opCtx->getTxnNumber()) {
                         request.setStmtId(stmtId);
@@ -454,12 +448,10 @@ public:
         AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
 
         {
-            boost::optional<int> dbProfilingLevel;
-            if (autoColl.getDb())
-                dbProfilingLevel = autoColl.getDb()->getProfilingLevel();
-
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
+            CurOp::get(opCtx)->enter_inlock(
+                nsString.ns().c_str(),
+                CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nsString.db()));
         }
 
         assertCanWrite(opCtx, nsString);
@@ -483,7 +475,7 @@ public:
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);
         if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
         opDebug->setPlanSummaryMetrics(summaryStats);
 
@@ -514,11 +506,10 @@ public:
         Database* db = autoColl.ensureDbExists();
 
         {
-            boost::optional<int> dbProfilingLevel;
-            dbProfilingLevel = db->getProfilingLevel();
-
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
+            CurOp::get(opCtx)->enter_inlock(
+                nsString.ns().c_str(),
+                CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nsString.db()));
         }
 
         assertCanWrite(opCtx, nsString);
@@ -534,7 +525,7 @@ public:
 
             // If someone else beat us to creating the collection, do nothing
             if (!collection) {
-                uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
+                uassertStatusOK(userAllowedCreateNS(nsString));
                 WriteUnitOfWork wuow(opCtx);
                 CollectionOptions defaultCollectionOptions;
                 uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
@@ -565,7 +556,7 @@ public:
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);
         if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
         UpdateStage::recordUpdateStatsInOpDebug(UpdateStage::getUpdateStats(exec.get()), opDebug);
         opDebug->setPlanSummaryMetrics(summaryStats);

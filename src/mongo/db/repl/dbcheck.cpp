@@ -194,7 +194,7 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
                                        start.obj(),
                                        end.obj(),
                                        BoundInclusion::kIncludeEndKeyOnly,
-                                       PlanExecutor::NO_YIELD,
+                                       PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                        InternalPlanner::FORWARD,
                                        InternalPlanner::IXSCAN_FETCH);
 }

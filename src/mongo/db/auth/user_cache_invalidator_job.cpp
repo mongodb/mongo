@@ -67,6 +67,7 @@ public:
             LOGV2_DEBUG(20259,
                         5,
                         "setInterval: old={previousInterval}, new={newInterval}",
+                        "setInterval",
                         "previousInterval"_attr = _interval,
                         "newInterval"_attr = interval);
             _interval = interval;
@@ -102,6 +103,7 @@ public:
             LOGV2_DEBUG(20260,
                         5,
                         "wait: now={now}, expiry={expiry}",
+                        "wait",
                         "now"_attr = now,
                         "expiry"_attr = expiry);
 
@@ -198,7 +200,7 @@ void UserCacheInvalidator::initialize(OperationContext* opCtx) {
     LOGV2_WARNING(20265,
                   "An error occurred while fetching initial user cache generation from config "
                   "servers",
-                  "status"_attr = swCurrentGeneration.getStatus());
+                  "error"_attr = swCurrentGeneration.getStatus());
     _previousGeneration = OID();
 }
 
@@ -213,13 +215,13 @@ void UserCacheInvalidator::run() {
             LOGV2_WARNING(20266,
                           "An error occurred while fetching current user cache generation from "
                           "config servers",
-                          "status"_attr = swCurrentGeneration.getStatus());
+                          "error"_attr = swCurrentGeneration.getStatus());
 
             // When in doubt, invalidate the cache
             try {
                 _authzManager->invalidateUserCache(opCtx.get());
             } catch (const DBException& e) {
-                LOGV2_WARNING(20267, "Error invalidating user cache", "status"_attr = e.toStatus());
+                LOGV2_WARNING(20267, "Error invalidating user cache", "error"_attr = e.toStatus());
             }
             continue;
         }
@@ -228,13 +230,14 @@ void UserCacheInvalidator::run() {
             LOGV2(20263,
                   "User cache generation changed from {previousGeneration} to "
                   "{currentGeneration}; invalidating user cache",
+                  "User cache generation changed; invalidating user cache",
                   "previousGeneration"_attr = oidOrTimestampToString(_previousGeneration),
                   "currentGeneration"_attr =
                       oidOrTimestampToString(swCurrentGeneration.getValue()));
             try {
                 _authzManager->invalidateUserCache(opCtx.get());
             } catch (const DBException& e) {
-                LOGV2_WARNING(20268, "Error invalidating user cache", "status"_attr = e.toStatus());
+                LOGV2_WARNING(20268, "Error invalidating user cache", "error"_attr = e.toStatus());
             }
             _previousGeneration = swCurrentGeneration.getValue();
         }

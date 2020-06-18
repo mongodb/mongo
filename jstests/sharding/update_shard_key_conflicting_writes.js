@@ -6,10 +6,9 @@
  * sessionDB.coll.find() will throw "Cannot run a legacy query on a session".
  *
  * @tags: [
- *   requires_find_command,
- *   uses_transactions,
- *   uses_multi_shard_transaction,
- *   need_fixing_for_46
+ *  requires_find_command,
+ *  uses_multi_shard_transaction,
+ *  uses_transactions,
  * ]
  */
 
@@ -279,9 +278,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     }));
     awaitShell();
     awaitShell2();
+    assert.soon(() => db.foo.find({"x": -100}).itcount() === 0);
     assert.soon(() => db.foo.find({"x": 10}).itcount() === 1);
     assert.eq(1, db.foo.find({"a": 4}).itcount());
-    assert.eq(0, db.foo.find({"x": -100}).itcount());
     assert.eq(0, db.foo.find({"a": 5}).itcount());
 })();
 
@@ -319,7 +318,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     awaitShell();
     awaitShell2();
     assert.soon(() => db.foo.find({"x": 10}).itcount() === 0);
-    assert.eq(1, db.foo.find({"x": -70}).itcount());
+    assert.soon(() => db.foo.find({"x": -70}).itcount() === 1);
 })();
 
 /**

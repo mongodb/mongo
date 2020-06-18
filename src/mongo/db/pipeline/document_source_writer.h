@@ -53,12 +53,16 @@ class DocumentSourceWriteBlock {
     repl::ReadConcernArgs _originalArgs;
     RecoveryUnit::ReadSource _originalSource;
     EnforcePrepareConflictsBlock _enforcePrepareConflictsBlock;
+    Timestamp _originalTimestamp;
 
 public:
     DocumentSourceWriteBlock(OperationContext* opCtx)
         : _opCtx(opCtx), _enforcePrepareConflictsBlock(opCtx) {
         _originalArgs = repl::ReadConcernArgs::get(_opCtx);
         _originalSource = _opCtx->recoveryUnit()->getTimestampReadSource();
+        if (_originalSource == RecoveryUnit::ReadSource::kProvided) {
+            _originalTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+        }
 
         repl::ReadConcernArgs::get(_opCtx) = repl::ReadConcernArgs();
         _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::kUnset);
@@ -66,7 +70,11 @@ public:
 
     ~DocumentSourceWriteBlock() {
         repl::ReadConcernArgs::get(_opCtx) = _originalArgs;
-        _opCtx->recoveryUnit()->setTimestampReadSource(_originalSource);
+        if (_originalSource == RecoveryUnit::ReadSource::kProvided) {
+            _opCtx->recoveryUnit()->setTimestampReadSource(_originalSource, _originalTimestamp);
+        } else {
+            _opCtx->recoveryUnit()->setTimestampReadSource(_originalSource);
+        }
     }
 };
 

@@ -142,9 +142,10 @@ public:
 
     ~CachedMetaGenerator() {
         LOGV2(23393,
-              "CachedMetaGenerator: {hits}/{hits_misses}",
+              "CachedMetaGenerator: {hits}/{hitsAndMisses}",
+              "CachedMetaGenerator",
               "hits"_attr = _hits,
-              "hits_misses"_attr = (_hits + _misses));
+              "hitsAndMisses"_attr = (_hits + _misses));
     }
 
     const RedactedMeta& load(void* addr) {
@@ -407,8 +408,9 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
     std::set<int> pendingTids;
     iterateTids([&](int tid) { pendingTids.insert(tid); });
     LOGV2(23394,
-          "Preparing to dump up to {pendingTids_size} thread stacks",
-          "pendingTids_size"_attr = pendingTids.size());
+          "Preparing to dump up to {numThreads} thread stacks",
+          "Preparing to dump thread stacks",
+          "numThreads"_attr = pendingTids.size());
 
     messageStorage.resize(pendingTids.size());
     received.reserve(pendingTids.size());
@@ -425,9 +427,10 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
         if (int r = tgkill(getpid(), *iter, _signal); r < 0) {
             int errsv = errno;
             LOGV2(23395,
-                  "failed to signal thread ({iter}):{strerror_errsv}",
-                  "iter"_attr = *iter,
-                  "strerror_errsv"_attr = strerror(errsv));
+                  "Failed to signal thread ({tid}): {error}",
+                  "Failed to signal thread",
+                  "tid"_attr = *iter,
+                  "error"_attr = strerror(errsv));
             missedTids.push_back(*iter);
             iter = pendingTids.erase(iter);
         } else {
@@ -435,8 +438,9 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
         }
     }
     LOGV2(23396,
-          "signalled {pendingTids_size} threads",
-          "pendingTids_size"_attr = pendingTids.size());
+          "Signalled {numThreads} threads",
+          "Signalled threads",
+          "numThreads"_attr = pendingTids.size());
 
     size_t napMicros = 0;
     while (!pendingTids.empty()) {
@@ -503,11 +507,17 @@ void State::printStacks() {
             LOGV2(31423, "===== multithread stacktrace session begin =====");
         }
         void prologue(const BSONObj& obj) override {
-            LOGV2(31424, "stacktrace prologue: {}", "prologue"_attr = obj);
+            LOGV2(31424,
+                  "Stacktrace Prologue: {prologue}",
+                  "Stacktrace Prologue",
+                  "prologue"_attr = obj);
         }
         void threadRecordsOpen() override {}
         void threadRecord(const BSONObj& obj) override {
-            LOGV2(31425, "stacktrace record: {}", "threadRecord"_attr = obj);
+            LOGV2(31425,  //
+                  "Stacktrace Record: {record}",
+                  "Stacktrace Record",
+                  "record"_attr = obj);
         }
         void threadRecordsClose() override {}
         void close() override {
@@ -606,6 +616,7 @@ void State::printToEmitter(AbstractEmitter& emitter) {
 }
 
 void State::action(siginfo_t* si) {
+    const auto errnoGuard = makeGuard([e = errno] { errno = e; });
     switch (si->si_code) {
         case SI_USER:
         case SI_QUEUE:
@@ -637,17 +648,18 @@ void initialize(int signal) {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sigemptyset(&sa.sa_mask);
+    // We should never need to add to this lambda because it simply sets up handler
+    // execution. Any changes should either be in State::action or in the signal
+    // handler itself.
     sa.sa_sigaction = [](int, siginfo_t* si, void*) { stateSingleton->action(si); };
-    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
     if (sigaction(signal, &sa, nullptr) != 0) {
         int savedErr = errno;
-        LOGV2_FATAL(
-            31376,
-            "{format_FMT_STRING_Failed_to_install_sigaction_for_signal_signal_strerror_savedErr}",
-            "format_FMT_STRING_Failed_to_install_sigaction_for_signal_signal_strerror_savedErr"_attr =
-                format(FMT_STRING("Failed to install sigaction for signal {} ({})"),
-                       signal,
-                       strerror(savedErr)));
+        LOGV2_FATAL(31376,
+                    "Failed to install sigaction for signal {signal}: {error}",
+                    "Failed to install sigaction for signal",
+                    "signal"_attr = signal,
+                    "error"_attr = strerror(savedErr));
     }
 }
 

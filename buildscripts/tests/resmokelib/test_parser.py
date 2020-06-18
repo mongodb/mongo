@@ -2,7 +2,8 @@
 
 import unittest
 
-from buildscripts.resmokelib import parser as _parser
+from buildscripts.resmokelib.parser import parse, parse_command_line
+from buildscripts.resmokelib.run import to_local_args
 
 # pylint: disable=missing-docstring
 
@@ -11,7 +12,7 @@ class TestLocalCommandLine(unittest.TestCase):
     """Unit tests for the to_local_args() function."""
 
     def test_keeps_any_positional_arguments(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "test_file1.js",
             "test_file2.js",
@@ -32,7 +33,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_keeps_continue_on_failure_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--continueOnFailure",
@@ -47,7 +48,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_keeps_exclude_with_any_tags_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--excludeWithAnyTags=tag1,tag2,tag4",
@@ -64,7 +65,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_keeps_include_with_any_tags_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--includeWithAnyTags=tag1,tag2,tag4",
@@ -81,7 +82,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_keeps_no_journal_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--nojournal",
@@ -96,7 +97,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_keeps_num_clients_per_fixture_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--numClientsPerFixture=10",
@@ -111,7 +112,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_keeps_repeat_options(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--repeatSuites=1000",
@@ -125,7 +126,7 @@ class TestLocalCommandLine(unittest.TestCase):
             "--repeatSuites=1000",
         ])
 
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--repeatTests=1000",
@@ -139,7 +140,7 @@ class TestLocalCommandLine(unittest.TestCase):
             "--repeatTests=1000",
         ])
 
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--repeatTestsMax=1000",
@@ -158,7 +159,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_keeps_shuffle_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--shuffle",
@@ -173,7 +174,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_keeps_storage_engine_cache_size_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--storageEngineCacheSizeGB=1",
@@ -188,7 +189,7 @@ class TestLocalCommandLine(unittest.TestCase):
         ])
 
     def test_origin_suite_option_replaces_suite_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             # We intentionally say --suite rather than --suites here to protect against this command
             # line option from becoming ambiguous if more similarly named command line options are
             # added in the future.
@@ -202,7 +203,7 @@ class TestLocalCommandLine(unittest.TestCase):
                          ["run", "--suites=my_entire_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_archival_options(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--archiveLimitMb=100",
@@ -213,7 +214,7 @@ class TestLocalCommandLine(unittest.TestCase):
         self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_evergreen_options(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--buildId=some_build_id",
@@ -233,7 +234,7 @@ class TestLocalCommandLine(unittest.TestCase):
         self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_log_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--log=buildlogger",
@@ -244,7 +245,7 @@ class TestLocalCommandLine(unittest.TestCase):
         self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_report_file_options(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--reportFailureStatus=fail",
@@ -256,7 +257,7 @@ class TestLocalCommandLine(unittest.TestCase):
         self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_stagger_jobs_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--staggerJobs=on",
@@ -266,7 +267,7 @@ class TestLocalCommandLine(unittest.TestCase):
         self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_removes_tag_file_option(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites=my_suite",
             "--tagFile=etc/test_retrial.yml",
@@ -276,7 +277,7 @@ class TestLocalCommandLine(unittest.TestCase):
         self.assertEqual(cmdline, ["run", "--suites=my_suite", "--storageEngine=my_storage_engine"])
 
     def test_accepts_space_delimited_args(self):
-        cmdline = _parser.to_local_args([
+        cmdline = to_local_args([
             "run",
             "--suites",
             "my_suite",
@@ -302,7 +303,7 @@ class TestParseArgs(unittest.TestCase):
     """Unit tests for the parse() function."""
 
     def test_files_at_end(self):
-        _, args = _parser._parse([  # pylint: disable=protected-access
+        _, args = parse([
             "run",
             "--suites=my_suite1,my_suite2",
             "test_file1.js",
@@ -319,7 +320,7 @@ class TestParseArgs(unittest.TestCase):
         self.assertEqual(args.suite_files, "my_suite1,my_suite2")
 
     def test_files_in_the_middle(self):
-        _, args = _parser._parse([  # pylint: disable=protected-access
+        _, args = parse([
             "run",
             "--storageEngine=my_storage_engine",
             "test_file1.js",
@@ -340,13 +341,13 @@ class TestParseCommandLine(unittest.TestCase):
     """Unit tests for the parse_command_line() function."""
 
     def test_find_suites(self):
-        subcommand_obj = _parser.parse_command_line(['find-suites'])
+        subcommand_obj = parse_command_line(['find-suites'])
         self.assertTrue(hasattr(subcommand_obj, 'execute'))
 
     def test_list_suites(self):
-        subcommand_obj = _parser.parse_command_line(['list-suites'])
+        subcommand_obj = parse_command_line(['list-suites'])
         self.assertTrue(hasattr(subcommand_obj, 'execute'))
 
     def test_run(self):
-        subcommand_obj = _parser.parse_command_line(['run', '--suite=my_suite', 'my_test.js'])
+        subcommand_obj = parse_command_line(['run', '--suite=my_suite', 'my_test.js'])
         self.assertTrue(hasattr(subcommand_obj, 'execute'))

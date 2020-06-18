@@ -803,7 +803,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                           "Removed user from session cache of user information because of "
                           "refresh failure",
                           "user"_attr = name,
-                          "status"_attr = status);
+                          "error"_attr = status);
                     continue;  // No need to advance "it" in this case.
                 }
                 default:
@@ -811,11 +811,11 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     // out-of-date privilege data.
                     LOGV2_WARNING(20247,
                                   "Could not fetch updated user privilege information for {user}; "
-                                  "continuing to use old information. Reason is {status}",
+                                  "continuing to use old information. Reason is {error}",
                                   "Could not fetch updated user privilege information, continuing "
                                   "to use old information"
                                   "user"_attr = name,
-                                  "status"_attr = redact(status));
+                                  "error"_attr = redact(status));
                     removeGuard.dismiss();
                     break;
             }

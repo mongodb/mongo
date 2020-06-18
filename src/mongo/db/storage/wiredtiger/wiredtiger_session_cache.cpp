@@ -92,20 +92,21 @@ void _openCursor(WT_SESSION* session,
     }
 
     if (ret != 0) {
+        auto status = wtRCToStatus(ret);
         std::string cursorErrMsg = str::stream()
-            << "Failed to open a WiredTiger cursor. Reason: " << wtRCToStatus(ret)
-            << ", uri: " << uri << ", config: " << config;
+            << "Failed to open a WiredTiger cursor. Reason: " << status << ", uri: " << uri
+            << ", config: " << config;
 
         if (ret == ENOENT) {
             uasserted(ErrorCodes::CursorNotFound, cursorErrMsg);
         }
 
-        LOGV2_ERROR(22421, "{cursorErrMsg}", "cursorErrMsg"_attr = cursorErrMsg);
-        LOGV2_ERROR(22422,
-                    "This may be due to data corruption. {kWTRepairMsg}",
-                    "kWTRepairMsg"_attr = kWTRepairMsg);
-
-        fassertFailedNoTrace(50882);
+        LOGV2_FATAL_NOTRACE(50882,
+                            "Failed to open WiredTiger cursor. This may be due to data corruption",
+                            "uri"_attr = uri,
+                            "config"_attr = config,
+                            "error"_attr = status,
+                            "message"_attr = kWTRepairMsg);
     }
 }
 }  // namespace
@@ -243,8 +244,6 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // For inMemory storage engines, the data is "as durable as it's going to get".
     // That is, a restart is equivalent to a complete node failure.
     if (isEphemeral()) {
-        // Update the JournalListener before we return. As far as listeners are concerned, all
-        // writes are as 'durable' as they are ever going to get on an inMemory storage engine.
         auto journalListener = [&]() -> JournalListener* {
             // The JournalListener may not be set immediately, so we must check under a mutex so as
             // not to access the variable while setting a JournalListener. A JournalListener is only
@@ -253,8 +252,11 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             return _journalListener;
         }();
         if (journalListener && useListener == UseJournalListener::kUpdate) {
+            // Update the JournalListener before we return. Does a write while fetching the
+            // timestamp if primary. As far as listeners are concerned, all writes are as 'durable'
+            // as they are ever going to get on an inMemory storage engine.
             auto token = _journalListener->getToken(opCtx);
-            _journalListener->onDurable(token);
+            journalListener->onDurable(token);
         }
         return;
     }
@@ -282,9 +284,6 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
         UniqueWiredTigerSession session = getSession();
         WT_SESSION* s = session->getSession();
         {
-            // Update a value that tracks the latest write that is safe across startup recovery (in
-            // the repl layer) and then report the time of that write as durable after we flush
-            // in-memory to disk.
             auto journalListener = [&]() -> JournalListener* {
                 // The JournalListener may not be set immediately, so we must check under a mutex so
                 // as not to access the variable while setting a JournalListener. A JournalListener
@@ -294,7 +293,11 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             }();
             boost::optional<JournalListener::Token> token;
             if (journalListener && useListener == UseJournalListener::kUpdate) {
-                token = _journalListener->getToken(opCtx);
+                // Update a persisted value with the latest write timestamp that is safe across
+                // startup recovery in the repl layer. Then report that timestamp as durable to the
+                // repl layer below after we have flushed in-memory data to disk.
+                // Note: only does a write if primary, otherwise just fetches the timestamp.
+                token = journalListener->getToken(opCtx);
             }
 
             auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
@@ -302,11 +305,27 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             invariantWTOK(s->checkpoint(s, config));
 
             if (token) {
-                _journalListener->onDurable(token.get());
+                journalListener->onDurable(token.get());
             }
         }
         LOGV2_DEBUG(22418, 4, "created checkpoint (forced)");
         return;
+    }
+
+    auto journalListener = [&]() -> JournalListener* {
+        // The JournalListener may not be set immediately, so we must check under a mutex so as not
+        // to access the variable while setting a JournalListener. A JournalListener is only allowed
+        // to be set once, so using the pointer outside of a mutex is safe.
+        stdx::unique_lock<Latch> lk(_journalListenerMutex);
+        return _journalListener;
+    }();
+    boost::optional<JournalListener::Token> token;
+    if (journalListener && useListener == UseJournalListener::kUpdate) {
+        // Update a persisted value with the latest write timestamp that is safe across startup
+        // recovery in the repl layer. Then report that timestamp as durable to the repl layer below
+        // after we have flushed in-memory data to disk.
+        // Note: only does a write if primary, otherwise just fetches the timestamp.
+        token = journalListener->getToken(opCtx);
     }
 
     uint32_t start = _lastSyncTime.load();
@@ -321,20 +340,6 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     _lastSyncTime.store(current + 1);
 
     // Nobody has synched yet, so we have to sync ourselves.
-
-    // Update a value that tracks the latest write that is safe across startup recovery (in the repl
-    // layer) and then report the time of that write as durable after we flush in-memory to disk.
-    auto journalListener = [&]() -> JournalListener* {
-        // The JournalListener may not be set immediately, so we must check under a mutex so as not
-        // to access the variable while setting a JournalListener. A JournalListener is only allowed
-        // to be set once, so using the pointer outside of a mutex is safe.
-        stdx::unique_lock<Latch> lk(_journalListenerMutex);
-        return _journalListener;
-    }();
-    boost::optional<JournalListener::Token> token;
-    if (journalListener && useListener == UseJournalListener::kUpdate) {
-        token = _journalListener->getToken(opCtx);
-    }
 
     // Initialize on first use.
     if (!_waitUntilDurableSession) {
@@ -352,7 +357,7 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     }
 
     if (token) {
-        _journalListener->onDurable(token.get());
+        journalListener->onDurable(token.get());
     }
 }
 

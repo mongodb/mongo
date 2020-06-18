@@ -44,7 +44,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/initialize_operation_session_info.h"
@@ -68,7 +67,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -77,6 +75,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/session_catalog_router.h"
@@ -98,42 +97,6 @@ namespace {
 const auto kOperationTime = "operationTime"_sd;
 
 /**
- * Extract and process metadata from the command request body.
- */
-Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
-    ReadPreferenceSetting::get(opCtx) =
-        uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(cmdObj));
-
-    VectorClock::get(opCtx)->gossipIn(cmdObj, opCtx->getClient()->getSessionTags());
-
-    auto logicalClock = LogicalClock::get(opCtx);
-    invariant(logicalClock);
-
-    auto logicalTimeMetadata = rpc::LogicalTimeMetadata::readFromMetadata(cmdObj);
-    if (!logicalTimeMetadata.isOK()) {
-        return logicalTimeMetadata.getStatus();
-    }
-
-    auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
-    const auto& signedTime = logicalTimeMetadata.getValue().getSignedTime();
-
-    // No need to check proof is no time is given.
-    if (signedTime.getTime() == LogicalTime::kUninitialized) {
-        return Status::OK();
-    }
-
-    if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-        auto advanceClockStatus = logicalTimeValidator->validate(opCtx, signedTime);
-
-        if (!advanceClockStatus.isOK()) {
-            return advanceClockStatus;
-        }
-    }
-
-    return logicalClock->advanceClusterTime(signedTime.getTime());
-}
-
-/**
  * Invoking `shouldGossipLogicalTime()` is expected to always return "true" during normal execution.
  * SERVER-48013 uses this property to avoid the cost of calling this function during normal
  * execution. However, it might be desired to do the validation for test purposes (e.g.,
@@ -147,8 +110,6 @@ MONGO_FAIL_POINT_DEFINE(allowSkippingAppendRequiredFieldsToResponse);
  * Append required fields to command response.
  */
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
-    VectorClock::get(opCtx)->gossipOut(responseBuilder, opCtx->getClient()->getSessionTags());
-
     // TODO SERVER-48142 should remove the following block.
     if (MONGO_unlikely(allowSkippingAppendRequiredFieldsToResponse.shouldFail())) {
         auto validator = LogicalTimeValidator::get(opCtx);
@@ -158,35 +119,34 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
         }
     }
 
-    auto now = LogicalClock::get(opCtx)->getClusterTime();
+    // The appended operationTime must always be <= the appended $clusterTime, so in case we need to
+    // use $clusterTime as the operationTime below, take a $clusterTime value which is guaranteed to
+    // be <= the value output by gossipOut().
+    auto clusterTime = VectorClock::get(opCtx)->getTime()[VectorClock::Component::ClusterTime];
 
-    // Add operationTime.
-    auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
-    if (operationTime != LogicalTime::kUninitialized) {
-        LOGV2_DEBUG(22764,
-                    5,
-                    "Appending operationTime: {operationTime}",
-                    "Appending operationTime",
-                    "operationTime"_attr = operationTime.asTimestamp());
-        responseBuilder->append(kOperationTime, operationTime.asTimestamp());
-    } else if (now != LogicalTime::kUninitialized) {
-        // If we don't know the actual operation time, use the cluster time instead. This is
-        // safe but not optimal because we can always return a later operation time than actual.
-        LOGV2_DEBUG(22765,
-                    5,
-                    "Appending clusterTime as operationTime {clusterTime}",
-                    "Appending clusterTime as operationTime",
-                    "clusterTime"_attr = now.asTimestamp());
-        responseBuilder->append(kOperationTime, now.asTimestamp());
-    }
+    bool clusterTimeWasOutput = VectorClock::get(opCtx)->gossipOut(opCtx, responseBuilder);
 
-    // Add $clusterTime.
-    if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-        SignedLogicalTime dummySignedTime(now, TimeProofService::TimeProof(), 0);
-        rpc::LogicalTimeMetadata(dummySignedTime).writeToMetadata(responseBuilder);
-    } else {
-        auto currentTime = LogicalTimeValidator::get(opCtx)->signLogicalTime(opCtx, now);
-        rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
+    // Ensure that either both operationTime and $clusterTime are output, or neither.
+    if (clusterTimeWasOutput) {
+        auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
+        if (operationTime != LogicalTime::kUninitialized) {
+            LOGV2_DEBUG(22764,
+                        5,
+                        "Appending operationTime: {operationTime}",
+                        "Appending operationTime",
+                        "operationTime"_attr = operationTime.asTimestamp());
+            operationTime.appendAsOperationTime(responseBuilder);
+        } else if (clusterTime != LogicalTime::kUninitialized) {
+            // If we don't know the actual operation time, use the cluster time instead. This is
+            // safe but not optimal because we can always return a later operation time than
+            // actual.
+            LOGV2_DEBUG(22765,
+                        5,
+                        "Appending clusterTime as operationTime {clusterTime}",
+                        "Appending clusterTime as operationTime",
+                        "clusterTime"_attr = clusterTime.asTimestamp());
+            clusterTime.appendAsOperationTime(responseBuilder);
+        }
     }
 }
 
@@ -272,35 +232,15 @@ void execCommandClient(OperationContext* opCtx,
             return;
         }
 
-        auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
-            !TransactionRouter::get(opCtx) && !readConcernArgs.getArgsAtClusterTime()) {
-            // Select the latest known clusterTime as the atClusterTime for snapshot reads outside
-            // of transactions.
-            auto atClusterTime = [&] {
-                auto latestKnownClusterTime = LogicalClock::get(opCtx)->getClusterTime();
-                // If the user passed afterClusterTime, the chosen time must be greater than or
-                // equal to it.
-                auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
-                if (afterClusterTime && *afterClusterTime > latestKnownClusterTime) {
-                    return afterClusterTime->asTimestamp();
-                }
-                return latestKnownClusterTime.asTimestamp();
-            }();
-            readConcernArgs.setArgsAtClusterTimeForSnapshot(atClusterTime);
-        }
-
         // attach tracking
         rpc::TrackingMetadata trackingMetadata;
         trackingMetadata.initWithOperName(c->getName());
         rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
 
-        auto metadataStatus = processCommandMetadata(opCtx, request.body);
-        if (!metadataStatus.isOK()) {
-            auto body = result->getBodyBuilder();
-            CommandHelpers::appendCommandStatusNoThrow(body, metadataStatus);
-            return;
-        }
+        // Extract and process metadata from the command request body.
+        ReadPreferenceSetting::get(opCtx) =
+            uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(request.body));
+        VectorClock::get(opCtx)->gossipIn(opCtx, request.body, !c->requiresAuth());
 
         auto txnRouter = TransactionRouter::get(opCtx);
         if (txnRouter) {
@@ -676,6 +616,24 @@ void runCommand(OperationContext* opCtx,
                           "unexpected change of namespace when retrying");
             }
 
+            // On each try, select the latest known clusterTime as the atClusterTime for snapshot
+            // reads outside of transactions.
+            if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
+                !TransactionRouter::get(opCtx) &&
+                (!readConcernArgs.getArgsAtClusterTime() ||
+                 readConcernArgs.wasAtClusterTimeSelected())) {
+                auto atClusterTime = [&] {
+                    auto latestKnownClusterTime = LogicalClock::get(opCtx)->getClusterTime();
+                    // Choose a time after the user-supplied afterClusterTime.
+                    auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
+                    if (afterClusterTime && *afterClusterTime > latestKnownClusterTime) {
+                        return afterClusterTime->asTimestamp();
+                    }
+                    return latestKnownClusterTime.asTimestamp();
+                }();
+                readConcernArgs.setArgsAtClusterTimeForSnapshot(atClusterTime);
+            }
+
             replyBuilder->reset();
             try {
                 execCommandClient(opCtx, invocation.get(), request, replyBuilder);
@@ -863,6 +821,11 @@ void runCommand(OperationContext* opCtx,
 
                     abortGuard.dismiss();
                     continue;
+                } else if (!ReadConcernArgs::get(opCtx).wasAtClusterTimeSelected()) {
+                    // Non-transaction snapshot read. The client sent readConcern: {level:
+                    // "snapshot", atClusterTime: T}, where T is older than
+                    // minSnapshotHistoryWindowInSeconds, retrying won't succeed.
+                    throw;
                 }
 
                 if (canRetry) {
@@ -888,6 +851,26 @@ void runCommand(OperationContext* opCtx,
             opCtx, osi, command->getName(), e.code(), boost::none, true /* isInternalClient */);
         errorBuilder->appendElements(errorLabels);
         throw;
+    }
+}
+
+/**
+ * Attaches the topology version to the response.
+ */
+void attachTopologyVersionDuringShutdown(OperationContext* opCtx,
+                                         const DBException& ex,
+                                         BSONObjBuilder* errorBuilder) {
+    // Only attach the topology version if the mongos is in quiesce mode. If the mongos is in
+    // quiesce mode, this shutdown error is due to mongos rather than a shard.
+    auto code = ex.code();
+    if (code && ErrorCodes::isA<ErrorCategory::ShutdownError>(code)) {
+        if (auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx);
+            mongosTopCoord && mongosTopCoord->inQuiesceMode()) {
+            // Append the topology version to the response.
+            const auto topologyVersion = mongosTopCoord->getTopologyVersion();
+            BSONObjBuilder topologyVersionBuilder(errorBuilder->subobjStart("topologyVersion"));
+            topologyVersion.serialize(&topologyVersionBuilder);
+        }
     }
 }
 
@@ -1078,10 +1061,13 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
         if (propagateException) {
             throw;
         }
+
         reply->reset();
         auto bob = reply->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(bob, ex.toStatus());
         appendRequiredFieldsToResponse(opCtx, &bob);
+
+        attachTopologyVersionDuringShutdown(opCtx, ex, &errorBuilder);
         bob.appendElements(errorBuilder.obj());
     }
 

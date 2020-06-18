@@ -28,6 +28,8 @@ import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
 from buildscripts.evergreen_generate_resmoke_tasks import Suite, ConfigOptions
 import buildscripts.evergreen_gen_fuzzer_tests as gen_fuzzer
 
+# pylint: disable=len-as-condition
+
 LOGGER = structlog.getLogger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
@@ -324,6 +326,7 @@ class EvergreenMultiversionConfigGenerator(object):
 
         if self.options.is_jstestfuzz:
             self._generate_fuzzer_tasks(build_variant, version_configs, is_sharded)
+            return
 
         suites = self.generate_resmoke_suites()
         sub_tasks = set()
@@ -359,6 +362,11 @@ class EvergreenMultiversionConfigGenerator(object):
         shrub_project = ShrubProject.empty()
         shrub_project.add_build_variant(build_variant)
         write_file_to_dir(CONFIG_DIR, f"{self.task}.json", shrub_project.json())
+
+        if len(os.listdir(CONFIG_DIR)) == 0:
+            raise RuntimeError(
+                f"Multiversion suite generator unexpectedly yielded no configuration in '{CONFIG_DIR}'"
+            )
 
 
 @click.group()
@@ -432,6 +440,11 @@ def generate_exclude_yaml(suite: str, task_path_suffix: str, is_generated_suite:
         suite_yaml_dict[file_name] = generate_resmoke.generate_resmoke_suite_config(
             suite_config, file_name, excludes=list(files_to_exclude))
     else:
+        if not os.path.exists(CONFIG_DIR) or len(os.listdir(CONFIG_DIR)) == 0:
+            LOGGER.info(
+                f"No configuration files exist in '{CONFIG_DIR}'. Skipping exclude file generation")
+            return
+
         # We expect the generated suites to already have been generated in the generated config
         # directory.
         suites_dir = CONFIG_DIR

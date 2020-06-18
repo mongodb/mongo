@@ -74,6 +74,9 @@ Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == EMFILE) {
         return Status(ErrorCodes::TooManyFilesOpen, s);
     }
+    if (retCode == EBUSY) {
+        return Status(ErrorCodes::ObjectIsBusy, s);
+    }
 
     uassert(ErrorCodes::ExceededMemoryLimit, s, retCode != WT_CACHE_FULL);
 
@@ -144,8 +147,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(OperationContext* opCt
         cursor = session->getCachedCursor(
             "metadata:create", WiredTigerSession::kMetadataCreateTableId, NULL);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        LOGV2_ERROR(22433, "{ex}", "ex"_attr = ex);
-        fassertFailedNoTrace(51257);
+        LOGV2_FATAL_NOTRACE(51257, "Cursor not found", "error"_attr = ex);
     }
     invariant(cursor);
     auto releaser = makeGuard(
@@ -171,8 +173,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, Str
     try {
         cursor = session->getCachedCursor("metadata:", WiredTigerSession::kMetadataTableId, NULL);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        LOGV2_ERROR(22434, "{ex}", "ex"_attr = ex);
-        fassertFailedNoTrace(31293);
+        LOGV2_FATAL_NOTRACE(31293, "Cursor not found", "error"_attr = ex);
     }
     invariant(cursor);
     auto releaser =
@@ -400,9 +401,10 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
     }
     if (cacheSizeMB > kMaxSizeCacheMB) {
         LOGV2(22429,
-              "Requested cache size: {cacheSizeMB}MB exceeds max; setting to {kMaxSizeCacheMB}MB",
-              "cacheSizeMB"_attr = cacheSizeMB,
-              "kMaxSizeCacheMB"_attr = kMaxSizeCacheMB);
+              "Requested cache size: {requestedMB}MB exceeds max; setting to {maximumMB}MB",
+              "Requested cache size exceeds max, setting to maximum",
+              "requestedMB"_attr = cacheSizeMB,
+              "maximumMB"_attr = kMaxSizeCacheMB);
         cacheSizeMB = kMaxSizeCacheMB;
     }
     return static_cast<size_t>(cacheSizeMB);
@@ -435,10 +437,10 @@ int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
             }
         }
         LOGV2_ERROR(22435,
-                    "WiredTiger error ({errorCode}) {message} Raw: {message2}",
-                    "errorCode"_attr = errorCode,
-                    "message"_attr = redact(message),
-                    "message2"_attr = message);
+                    "WiredTiger error ({error}) {message}",
+                    "WiredTiger error",
+                    "error"_attr = errorCode,
+                    "message"_attr = message);
 
         // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
         if (storageGlobalParams.repair) {
@@ -458,7 +460,8 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
     try {
         LOGV2_ERROR(22436,
                     "WiredTiger error ({errorCode}) {message}",
-                    "errorCode"_attr = errorCode,
+                    "WiredTiger error",
+                    "error"_attr = errorCode,
                     "message"_attr = redact(message));
 
         // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
@@ -636,13 +639,14 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
     int ret = session->alter(session, uri.c_str(), setting.c_str());
     if (ret) {
         LOGV2_FATAL(50756,
-                    "Failed to update log setting. Uri: {uri} Enable? {on} Ret: {ret} MD: "
-                    "{existingMetadata} Msg: {session_strerror_session_ret}",
+                    "Failed to update log setting. Uri: {uri} Enable? {enable} Ret: {error} MD: "
+                    "{metadata} Msg: {message}",
+                    "Failed to update log setting",
                     "uri"_attr = uri,
-                    "on"_attr = on,
-                    "ret"_attr = ret,
-                    "existingMetadata"_attr = redact(existingMetadata),
-                    "session_strerror_session_ret"_attr = session->strerror(session, ret));
+                    "enable"_attr = on,
+                    "error"_attr = ret,
+                    "metadata"_attr = redact(existingMetadata),
+                    "message"_attr = session->strerror(session, ret));
     }
 
     return Status::OK();

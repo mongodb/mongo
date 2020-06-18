@@ -59,14 +59,8 @@ namespace {
 enum class CleanupResult { kDone, kContinue, kError };
 
 /**
- * If the resumable range deleter is disabled:
- * Cleans up one range of orphaned data starting from a range that overlaps or starts at
- * 'startingFromKey'.  If empty, startingFromKey is the minimum key of the sharded range.
- *
- * If the resumable range deleter is enabled:
  * Waits for all possibly orphaned ranges on 'nss' to be cleaned up.
  *
- * @return CleanupResult::kContinue and 'stoppedAtKey' if orphaned range was found and cleaned
  * @return CleanupResult::kDone if no orphaned ranges remain
  * @return CleanupResult::kError and 'errMsg' if an error occurred
  *
@@ -75,203 +69,86 @@ enum class CleanupResult { kDone, kContinue, kError };
 CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                                   const NamespaceString& ns,
                                   const BSONObj& startingFromKeyConst,
-                                  BSONObj* stoppedAtKey,
                                   std::string* errMsg) {
-    // Note that 'disableResumableRangeDeleter' is a startup-only parameter, so it cannot change
-    // while this process is running.
-    if (!disableResumableRangeDeleter.load()) {
-        boost::optional<ChunkRange> range;
-        boost::optional<UUID> collectionUuid;
-        {
-            AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-            if (!autoColl.getCollection()) {
-                LOGV2(4416000,
-                      "cleanupOrphaned skipping waiting for orphaned data cleanup because "
-                      "{namespace} does not exist",
-                      "cleanupOrphaned skipping waiting for orphaned data cleanup because "
-                      "collection does not exist",
-                      "namespace"_attr = ns.ns());
-                return CleanupResult::kDone;
-            }
-            collectionUuid.emplace(autoColl.getCollection()->uuid());
-
-            auto* const css = CollectionShardingRuntime::get(opCtx, ns);
-            const auto collDesc = css->getCollectionDescription();
-            if (!collDesc.isSharded()) {
-                LOGV2(4416001,
-                      "cleanupOrphaned skipping waiting for orphaned data cleanup because "
-                      "{namespace} is not sharded",
-                      "cleanupOrphaned skipping waiting for orphaned data cleanup because "
-                      "collection is not sharded",
-                      "namespace"_attr = ns.ns());
-                return CleanupResult::kDone;
-            }
-            range.emplace(collDesc.getMinKey(), collDesc.getMaxKey());
-
-            // Though the 'startingFromKey' parameter is not used as the min key of the range to
-            // wait for, we still validate that 'startingFromKey' in the same way as the original
-            // cleanupOrphaned logic did if 'startingFromKey' is present.
-            BSONObj keyPattern = collDesc.getKeyPattern();
-            if (!startingFromKeyConst.isEmpty() && !collDesc.isValidKey(startingFromKeyConst)) {
-                LOGV2_ERROR_OPTIONS(
-                    4416002,
-                    {logv2::UserAssertAfterLog(ErrorCodes::OrphanedRangeCleanUpFailed)},
-                    "Could not cleanup orphaned data because start key does not match shard key "
-                    "pattern",
-                    "startKey"_attr = redact(startingFromKeyConst),
-                    "shardKeyPattern"_attr = keyPattern);
-            }
+    boost::optional<ChunkRange> range;
+    boost::optional<UUID> collectionUuid;
+    {
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        if (!autoColl.getCollection()) {
+            LOGV2(4416000,
+                  "cleanupOrphaned skipping waiting for orphaned data cleanup because "
+                  "{namespace} does not exist",
+                  "cleanupOrphaned skipping waiting for orphaned data cleanup because "
+                  "collection does not exist",
+                  "namespace"_attr = ns.ns());
+            return CleanupResult::kDone;
         }
+        collectionUuid.emplace(autoColl.getCollection()->uuid());
 
-        // We actually want to wait until there are no range deletion tasks for this namespace/UUID,
-        // but we don't have a good way to wait for that event, so instead we wait for there to be
-        // no tasks being processed in memory for this namespace/UUID.
-        // However, it's possible this node has recently stepped up, and the stepup recovery task to
-        // resubmit range deletion tasks for processing has not yet completed. In that case,
-        // waitForClean will return though there are still tasks in config.rangeDeletions, so we
-        // sleep for a short time and then try waitForClean again.
-        while (auto numRemainingDeletionTasks =
-                   migrationutil::checkForConflictingDeletions(opCtx, *range, *collectionUuid)) {
-            LOGV2(4416003,
-                  "cleanupOrphaned going to wait for range deletion tasks to complete",
-                  "namespace"_attr = ns.ns(),
-                  "collectionUUID"_attr = *collectionUuid,
-                  "numRemainingDeletionTasks"_attr = numRemainingDeletionTasks);
-
-            auto status =
-                CollectionShardingRuntime::waitForClean(opCtx, ns, *collectionUuid, *range);
-
-            if (!status.isOK()) {
-                *errMsg = status.reason();
-                return CleanupResult::kError;
-            }
-
-            opCtx->sleepFor(Milliseconds(1000));
+        auto* const csr = CollectionShardingRuntime::get(opCtx, ns);
+        const auto optCollDescr = csr->getCurrentMetadataIfKnown();
+        if (!optCollDescr || !optCollDescr->isSharded()) {
+            LOGV2(4416001,
+                  "cleanupOrphaned skipping waiting for orphaned data cleanup because "
+                  "{namespace} is not sharded",
+                  "cleanupOrphaned skipping waiting for orphaned data cleanup because "
+                  "collection is not sharded",
+                  "namespace"_attr = ns.ns());
+            return CleanupResult::kDone;
         }
+        range.emplace(optCollDescr->getMinKey(), optCollDescr->getMaxKey());
 
-        return CleanupResult::kDone;
-    } else {
-
-        BSONObj startingFromKey = startingFromKeyConst;
-        boost::optional<ChunkRange> targetRange;
-        SharedSemiFuture<void> cleanupCompleteFuture;
-
-        {
-            AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-            auto* const css = CollectionShardingRuntime::get(opCtx, ns);
-            const auto collDesc = css->getCollectionDescription();
-            if (!collDesc.isSharded()) {
-                LOGV2(21911,
-                      "cleanupOrphaned skipping orphaned data cleanup because collection is not "
-                      "sharded",
-                      "namespace"_attr = ns.ns());
-                return CleanupResult::kDone;
-            }
-
-            BSONObj keyPattern = collDesc.getKeyPattern();
-            if (!startingFromKey.isEmpty()) {
-                if (!collDesc.isValidKey(startingFromKey)) {
-                    LOGV2_ERROR_OPTIONS(
-                        21912,
-                        {logv2::UserAssertAfterLog(ErrorCodes::OrphanedRangeCleanUpFailed)},
-                        "Could not cleanup orphaned data, start key {startKey} does not match "
-                        "shard key pattern {shardKeyPattern}",
-                        "Could not cleanup orphaned data because start key does not match shard "
-                        "key pattern",
-                        "startKey"_attr = redact(startingFromKey),
-                        "shardKeyPattern"_attr = keyPattern);
-                }
-            } else {
-                startingFromKey = collDesc.getMinKey();
-            }
-
-            targetRange = css->getNextOrphanRange(startingFromKey);
-            if (!targetRange) {
-                LOGV2_DEBUG(21913,
-                            1,
-                            "cleanupOrphaned returning because no orphan ranges remain",
-                            "namespace"_attr = ns.toString(),
-                            "startingFromKey"_attr = redact(startingFromKey));
-
-                return CleanupResult::kDone;
-            }
-
-            *stoppedAtKey = targetRange->getMax();
-
-            cleanupCompleteFuture =
-                css->cleanUpRange(*targetRange, boost::none, CollectionShardingRuntime::kNow);
+        // Though the 'startingFromKey' parameter is not used as the min key of the range to
+        // wait for, we still validate that 'startingFromKey' in the same way as the original
+        // cleanupOrphaned logic did if 'startingFromKey' is present.
+        BSONObj keyPattern = optCollDescr->getKeyPattern();
+        if (!startingFromKeyConst.isEmpty() && !optCollDescr->isValidKey(startingFromKeyConst)) {
+            LOGV2_ERROR_OPTIONS(
+                4416002,
+                {logv2::UserAssertAfterLog(ErrorCodes::OrphanedRangeCleanUpFailed)},
+                "Could not cleanup orphaned data because start key does not match shard key "
+                "pattern",
+                "startKey"_attr = redact(startingFromKeyConst),
+                "shardKeyPattern"_attr = keyPattern);
         }
-
-        // Sleep waiting for our own deletion. We don't actually care about any others, so there is
-        // no need to call css::waitForClean() here.
-
-        LOGV2_DEBUG(21914,
-                    1,
-                    "cleanupOrphaned requested for {namespace} starting from {startingFromKey}, "
-                    "removing next orphan range {targetRange}; waiting...",
-                    "cleanupOrphaned requested",
-                    "namespace"_attr = ns.toString(),
-                    "startingFromKey"_attr = redact(startingFromKey),
-                    "targetRange"_attr = redact(targetRange->toString()));
-
-        Status result = cleanupCompleteFuture.getNoThrow(opCtx);
-
-        LOGV2_DEBUG(21915,
-                    1,
-                    "Finished waiting for last {namespace} orphan range cleanup",
-                    "Finished waiting for last orphan range cleanup in collection",
-                    "namespace"_attr = ns.toString());
-
-        if (!result.isOK()) {
-            LOGV2_ERROR_OPTIONS(21916,
-                                {logv2::UserAssertAfterLog(result.code())},
-                                "Error waiting for last {namespace} orphan range cleanup: {error}",
-                                "Error waiting for last orphan range cleanup in collection",
-                                "namespace"_attr = ns.ns(),
-                                "error"_attr = redact(result.reason()));
-        }
-
-        return CleanupResult::kContinue;
     }
+
+    // We actually want to wait until there are no range deletion tasks for this namespace/UUID,
+    // but we don't have a good way to wait for that event, so instead we wait for there to be
+    // no tasks being processed in memory for this namespace/UUID.
+    // However, it's possible this node has recently stepped up, and the stepup recovery task to
+    // resubmit range deletion tasks for processing has not yet completed. In that case,
+    // waitForClean will return though there are still tasks in config.rangeDeletions, so we
+    // sleep for a short time and then try waitForClean again.
+    while (auto numRemainingDeletionTasks =
+               migrationutil::checkForConflictingDeletions(opCtx, *range, *collectionUuid)) {
+        uassert(ErrorCodes::ResumableRangeDeleterDisabled,
+                "Failing cleanupOrphaned because the disableResumableRangeDeleter server parameter "
+                "is set to true and this shard contains range deletion tasks for the collection.",
+                !disableResumableRangeDeleter.load());
+
+        LOGV2(4416003,
+              "cleanupOrphaned going to wait for range deletion tasks to complete",
+              "namespace"_attr = ns.ns(),
+              "collectionUUID"_attr = *collectionUuid,
+              "numRemainingDeletionTasks"_attr = numRemainingDeletionTasks);
+
+        auto status = CollectionShardingRuntime::waitForClean(opCtx, ns, *collectionUuid, *range);
+
+        if (!status.isOK()) {
+            *errMsg = status.reason();
+            return CleanupResult::kError;
+        }
+
+        opCtx->sleepFor(Milliseconds(1000));
+    }
+
+    return CleanupResult::kDone;
 }
 
 /**
- * If 'disableResumableRangeDeleter=true':
- *
- * Called on a particular namespace, and if the collection is sharded will clean up a single
- * orphaned data range which overlaps or starts after a passed-in 'startingFromKey'.  Returns true
- * and a 'stoppedAtKey' (which will start a search for the next orphaned range if the command is
- * called again) or no key if there are no more orphaned ranges in the collection.
- *
- * If the collection is not sharded, returns true but no 'stoppedAtKey'.
- * On failure, returns false and an error message.
- *
- * Calling this command repeatedly until no 'stoppedAtKey' is returned ensures that the
- * full collection range is searched for orphaned documents, but since sharding state may
- * change between calls there is no guarantee that all orphaned documents were found unless
- * the balancer is off.
- *
- * Safe to call with the balancer on.
- *
- * Format:
- *
- * {
- *      cleanupOrphaned: <ns>,
- *      // optional parameters:
- *      startingAtKey: { <shardKeyValue> }, // defaults to lowest value
- *      secondaryThrottle: <bool>, // defaults to true
- *      // defaults to { w: "majority", wtimeout: 60000 }. Applies to individual writes.
- *      writeConcern: { <writeConcern options> }
- * }
- *
- * If 'disableResumableRangeDeleter=false':
- *
  * Called on a particular namespace, and if the collection is sharded will wait for the number of
- * range deletion tasks on the collection on this shard to reach zero. Returns true on completion,
- * but never returns 'stoppedAtKey', since it always returns once there are no more orphaned ranges.
- *
- * If the collection is not sharded, returns true and no 'stoppedAtKey'.
- * On failure, returns false and an error message.
+ * range deletion tasks on the collection on this shard to reach zero.
  *
  * Since the sharding state may change after this call returns, there is no guarantee that orphans
  * won't re-appear as a result of migrations that commit after this call returns.
@@ -308,9 +185,6 @@ public:
     static BSONField<std::string> nsField;
     static BSONField<BSONObj> startingFromKeyField;
 
-    // Output
-    static BSONField<BSONObj> stoppedAtKeyField;
-
     bool errmsgRun(OperationContext* opCtx,
                    std::string const& db,
                    const BSONObj& cmdObj,
@@ -339,21 +213,14 @@ public:
             return false;
         }
 
-        forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
+        onShardVersionMismatch(opCtx, nss, boost::none);
 
-        BSONObj stoppedAtKey;
-        CleanupResult cleanupResult =
-            cleanupOrphanedData(opCtx, nss, startingFromKey, &stoppedAtKey, &errmsg);
+        CleanupResult cleanupResult = cleanupOrphanedData(opCtx, nss, startingFromKey, &errmsg);
 
         if (cleanupResult == CleanupResult::kError) {
             return false;
         }
-
-        if (cleanupResult == CleanupResult::kContinue) {
-            result.append(stoppedAtKeyField(), stoppedAtKey);
-        } else {
-            dassert(cleanupResult == CleanupResult::kDone);
-        }
+        dassert(cleanupResult == CleanupResult::kDone);
 
         return true;
     }
@@ -362,7 +229,6 @@ public:
 
 BSONField<std::string> CleanupOrphanedCommand::nsField("cleanupOrphaned");
 BSONField<BSONObj> CleanupOrphanedCommand::startingFromKeyField("startingFromKey");
-BSONField<BSONObj> CleanupOrphanedCommand::stoppedAtKeyField("stoppedAtKey");
 
 }  // namespace
 }  // namespace mongo

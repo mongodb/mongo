@@ -93,4 +93,5 @@ executor:
         enableTestCommands: 1
         # Enable aggressive WiredTiger eviction.
         wiredTigerEvictionDebugMode: true
+        roleGraphInvalidationIsFatal: 1
     num_nodes: 3

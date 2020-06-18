@@ -33,10 +33,12 @@
 
 namespace mongo {
 
+class ServiceContext;
+
 /**
  * Start the watchdog.
  */
-void startWatchdog();
+void startWatchdog(ServiceContext* service);
 
 /**
  * Callbacks used by the 'watchdogPeriodSeconds' set parameter.

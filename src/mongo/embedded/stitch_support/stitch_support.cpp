@@ -123,8 +123,7 @@ ServiceContext* initialize() {
     // The global initializers can take arguments, which would normally be supplied on the command
     // line, but we assume that clients of this library will never want anything other than the
     // defaults for all configuration that would be controlled by these parameters.
-    Status status =
-        mongo::runGlobalInitializers(0 /* argc */, nullptr /* argv */, nullptr /* envp */);
+    Status status = mongo::runGlobalInitializers(std::vector<std::string>{});
     uassertStatusOKWithContext(status, "Global initialization failed");
     setGlobalServiceContext(ServiceContext::make());
     auto serviceContext = getGlobalServiceContext();

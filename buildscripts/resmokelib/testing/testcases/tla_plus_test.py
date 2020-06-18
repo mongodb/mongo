@@ -2,8 +2,8 @@
 
 import os
 
-from . import interface
-from ... import core
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib.testing.testcases import interface
 
 
 class TLAPlusTestCase(interface.ProcessTestCase):

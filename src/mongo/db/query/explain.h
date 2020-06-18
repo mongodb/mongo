@@ -128,6 +128,9 @@ public:
     static BSONObj statsToBSON(
         const PlanStageStats& stats,
         ExplainOptions::Verbosity verbosity = ExplainOptions::Verbosity::kExecStats);
+    static BSONObj statsToBSON(
+        const sbe::PlanStageStats& stats,
+        ExplainOptions::Verbosity verbosity = ExplainOptions::Verbosity::kExecStats);
 
     /**
      * This version of stats tree to BSON conversion returns the result through the
@@ -146,6 +149,7 @@ public:
      */
     static std::string getPlanSummary(const PlanExecutor* exec);
     static std::string getPlanSummary(const PlanStage* root);
+    static std::string getPlanSummary(const sbe::PlanStage* root);
 
     /**
      * Fills out 'statsOut' with summary stats using the execution tree contained

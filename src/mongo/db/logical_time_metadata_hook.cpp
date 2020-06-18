@@ -33,10 +33,8 @@
 
 #include <memory>
 
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_time_tracker.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
+#include "mongo/db/vector_clock.h"
 
 namespace mongo {
 
@@ -45,48 +43,35 @@ namespace rpc {
 namespace {
 const char kOperationTimeFieldName[] = "operationTime";
 }
+
+// TODO SERVER-48434: Rename this class to VectorClockMetadataHook.
 LogicalTimeMetadataHook::LogicalTimeMetadataHook(ServiceContext* service) : _service(service) {}
 
 Status LogicalTimeMetadataHook::writeRequestMetadata(OperationContext* opCtx,
                                                      BSONObjBuilder* metadataBob) {
-    auto validator = LogicalTimeValidator::get(_service);
-    if (!validator || !LogicalClock::get(_service)->isEnabled()) {
-        return Status::OK();
-    }
-
-    auto newTime = LogicalClock::get(_service)->getClusterTime();
-    LogicalTimeMetadata metadata(validator->trySignLogicalTime(newTime));
-    metadata.writeToMetadata(metadataBob);
+    VectorClock::get(_service)->gossipOut(opCtx, metadataBob, transport::Session::kInternalClient);
     return Status::OK();
 }
 
 Status LogicalTimeMetadataHook::readReplyMetadata(OperationContext* opCtx,
                                                   StringData replySource,
                                                   const BSONObj& metadataObj) {
-    auto parseStatus = LogicalTimeMetadata::readFromMetadata(metadataObj);
-    if (!parseStatus.isOK()) {
-        return parseStatus.getStatus();
-    }
-
-    auto& signedTime = parseStatus.getValue().getSignedTime();
-
-    // LogicalTimeMetadata is default constructed if no cluster time metadata was sent, so a
-    // default constructed SignedLogicalTime should be ignored.
-    if (signedTime.getTime() == LogicalTime::kUninitialized ||
-        !LogicalClock::get(_service)->isEnabled()) {
+    if (!VectorClock::get(_service)->isEnabled()) {
         return Status::OK();
     }
 
     if (opCtx) {
         auto timeTracker = OperationTimeTracker::get(opCtx);
-
         auto operationTime = metadataObj[kOperationTimeFieldName];
         if (!operationTime.eoo()) {
             invariant(operationTime.type() == BSONType::bsonTimestamp);
             timeTracker->updateOperationTime(LogicalTime(operationTime.timestamp()));
         }
     }
-    return LogicalClock::get(_service)->advanceClusterTime(signedTime.getTime());
+
+    VectorClock::get(_service)->gossipIn(
+        opCtx, metadataObj, false /* couldBeUnauthorized */, transport::Session::kInternalClient);
+    return Status::OK();
 }
 
 }  // namespace rpc

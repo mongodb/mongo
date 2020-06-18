@@ -54,6 +54,8 @@ Status InitializerDependencyGraph::addInitializer(std::string name,
     if (!initFn)
         return Status(ErrorCodes::BadValue, "Illegal to supply a NULL function");
 
+    invariant(!frozen());
+
     InitializerDependencyNode& newNode = _nodes[name];
     if (newNode.initFn) {
         return Status(ErrorCodes::Error(50999), name);

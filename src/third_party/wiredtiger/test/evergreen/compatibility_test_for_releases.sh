@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 ##############################################################################################
 # Check branches to ensure forward/backward compatibility, including some upgrade/downgrade testing.
+# Pass in -l to trigger the longer version of this test which tests more variants.
 ##############################################################################################
 
 set -e
@@ -149,14 +150,43 @@ upgrade_downgrade()
         done
 }
 
+#############################################################
+# usage strinf
+#############################################################
+usage()
+{
+    echo "Usage: \tcompatibility_test_for_releases [-l]"
+    echo "\t-l\trun additional variants of wiredtiger"
+    exit 1
+}
+
+long=false
+
+if [ $# -eq 1 ]; then
+    if [ $1 = "-l" ]; then
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo "Performing long compatibility test run"
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        long=true
+    else
+        (usage)
+    fi
+else
+    if [ $# -gt 1 ]; then
+        (usage)
+    fi
+fi
+
 # Create a directory in which to do the work.
 top="test-compatibility-run"
 rm -rf "$top" && mkdir "$top"
 cd "$top"
 
 # Build the branches.
-(build_branch mongodb-3.4)
-(build_branch mongodb-3.6)
+if [ "$long" = true ]; then
+    (build_branch mongodb-3.4)
+    (build_branch mongodb-3.6)
+fi
 (build_branch mongodb-4.0)
 (build_branch mongodb-4.2)
 (build_branch mongodb-4.4)
@@ -165,30 +195,40 @@ cd "$top"
 # Get the names of the last two WiredTiger releases, wt1 is the most recent release, wt2 is the
 # release before that. Minor trickiness, we depend on the "develop" directory already existing
 # so we have a source in which to do git commands.
-cd develop; wt1=$(get_prev_version 1); cd ..
-(build_branch "$wt1")
-cd develop; wt2=$(get_prev_version 2); cd ..
-(build_branch "$wt2")
+if [ "$long" = true ]; then
+    cd develop; wt1=$(get_prev_version 1); cd ..
+    (build_branch "$wt1")
+    cd develop; wt2=$(get_prev_version 2); cd ..
+    (build_branch "$wt2")
+fi
 
 # Run format in each branch for supported access methods.
-(run_format mongodb-3.4 "fix row var")
-(run_format mongodb-3.6 "fix row var")
+if [ "$long" = true ]; then
+    (run_format mongodb-3.4 "fix row var")
+    (run_format mongodb-3.6 "fix row var")
+fi
 (run_format mongodb-4.0 "fix row var")
 (run_format mongodb-4.2 "fix row var")
 (run_format mongodb-4.4 "row")
 (run_format develop "row")
-(run_format "$wt1" "fix row var")
-(run_format "$wt2" "fix row var")
+if [ "$long" = true ]; then
+    (run_format "$wt1" "fix row var")
+    (run_format "$wt2" "fix row var")
+fi
 
 # Verify backward compatibility for supported access methods.
-(verify_branches mongodb-3.6 mongodb-3.4 "fix row var")
-(verify_branches mongodb-4.0 mongodb-3.6 "fix row var")
+if [ "$long" = true ]; then
+    (verify_branches mongodb-3.6 mongodb-3.4 "fix row var")
+    (verify_branches mongodb-4.0 mongodb-3.6 "fix row var")
+fi
 (verify_branches mongodb-4.2 mongodb-4.0 "fix row var")
 (verify_branches mongodb-4.4 mongodb-4.2 "fix row var")
 (verify_branches develop mongodb-4.4 "row")
 (verify_branches develop mongodb-4.2 "row")
-(verify_branches "$wt1" "$wt2" "row")
-(verify_branches develop "$wt1" "row")
+if [ "$long" = true ]; then
+    (verify_branches "$wt1" "$wt2" "row")
+    (verify_branches develop "$wt1" "row")
+fi
 
 # Verify forward compatibility for supported access methods.
 (verify_branches mongodb-4.2 mongodb-4.4 "row")

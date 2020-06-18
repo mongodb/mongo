@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
@@ -64,6 +65,13 @@ BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
                                     const bool& isDonorShard,
                                     const BSONObj& min,
                                     const BSONObj& max);
+
+/**
+ * Returns a chunk range with extended or truncated boundaries to match the number of fields in the
+ * given metadata's shard key pattern.
+ */
+ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
+                                             const ChunkRange& range);
 
 /**
  * Returns an executor to be used to run commands related to submitting tasks to the range deleter.
@@ -212,6 +220,12 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
  * migration coordination to completion.
  */
 void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
+
+/**
+ * Drive each unfished migration coordination in the given namespace to completion.
+ * Assumes the caller to have entered CollectionCriticalSection.
+ */
+void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss);
 
 }  // namespace migrationutil
 }  // namespace mongo

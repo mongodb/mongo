@@ -560,7 +560,7 @@ var ShardingTest = function(params) {
     this.chunkDiff = function(collName, dbName) {
         var c = this.chunkCounts(collName, dbName);
 
-        var min = 100000000;
+        var min = Number.MAX_VALUE;
         var max = 0;
         for (var s in c) {
             if (c[s] < min)
@@ -1543,6 +1543,12 @@ var ShardingTest = function(params) {
 
         options = Object.merge(options, otherParams.mongosOptions);
         options = Object.merge(options, otherParams["s" + i]);
+
+        // The default time for mongos quiesce mode in response to SIGTERM is 15 seconds.
+        // Reduce this to 100ms for faster shutdown.
+        options.setParameter = options.setParameter || {};
+        options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown =
+            options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown || 100;
 
         options.port = options.port || _allocatePortForMongos();
 

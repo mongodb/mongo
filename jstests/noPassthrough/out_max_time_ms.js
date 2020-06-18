@@ -3,6 +3,7 @@
  * @tags: [requires_sharding, requires_replication]
  */
 (function() {
+load("jstests/libs/curop_helpers.js");    // For waitForCurOpByFailPoint().
 load("jstests/libs/fixture_helpers.js");  // For isMongos().
 load("jstests/libs/profiler.js");         // For profilerHasSingleMatchingEntryOrThrow.
 
@@ -18,21 +19,6 @@ function insertDocs(coll) {
     for (let i = 0; i < nDocs; i++) {
         assert.commandWorked(coll.insert({_id: i}, {writeConcern: {w: "majority"}}));
     }
-}
-
-/**
- * Wait until the server sets its CurOp "failpointMsg" to the failpoint name, indicating that it's
- * hanging.
- */
-function waitUntilServerHangsOnFailPoint(conn, fpName) {
-    // Be sure that the server is hanging on the failpoint.
-    assert.soon(function() {
-        const filter = {"failpointMsg": fpName};
-        const ops = conn.getDB("admin")
-                        .aggregate([{$currentOp: {allUsers: true}}, {$match: filter}])
-                        .toArray();
-        return ops.length == 1;
-    });
 }
 
 /**
@@ -77,7 +63,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     shellStr += `(${runAggregate.toString()})();`;
     const awaitShell = startParallelShell(shellStr, conn.port);
 
-    waitUntilServerHangsOnFailPoint(failPointConn, failPointName);
+    waitForCurOpByFailPointNoNS(failPointConn.getDB("admin"), failPointName);
 
     assert.commandWorked(maxTimeMsConn.getDB("admin").runCommand(
         {configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}));

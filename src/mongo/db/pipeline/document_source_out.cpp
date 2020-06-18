@@ -35,7 +35,6 @@
 
 #include <fmt/format.h>
 
-#include "mongo/db/background.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"

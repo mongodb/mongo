@@ -69,17 +69,6 @@ public:
     /**
      * Add a result to the back of the queue.
      *
-     * Note: do not add PlanStage::ADVANCED with this method, ADVANCED can
-     * only be added with a data member.
-     *
-     * Work() goes through the queue.
-     * Either no data is returned (just a state), or...
-     */
-    void pushBack(const PlanStage::StageState state);
-
-    /**
-     * ...data is returned (and we ADVANCED)
-     *
      * The caller is responsible for allocating 'id' and filling out the WSM keyed by 'id'
      * appropriately.
      *
@@ -95,7 +84,6 @@ private:
     WorkingSet* _ws;
 
     // The data we return.
-    std::queue<PlanStage::StageState> _results;
     std::queue<WorkingSetID> _members;
 
     // Stats

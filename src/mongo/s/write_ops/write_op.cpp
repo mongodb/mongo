@@ -59,9 +59,9 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             return std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Update) {
-            return targeter.targetUpdate(opCtx, _itemRef.getUpdate());
+            return targeter.targetUpdate(opCtx, _itemRef);
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-            return targeter.targetDelete(opCtx, _itemRef.getDelete());
+            return targeter.targetDelete(opCtx, _itemRef);
         }
         MONGO_UNREACHABLE;
     }();

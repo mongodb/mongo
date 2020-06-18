@@ -117,7 +117,7 @@ public:
         invariant(_context);
     }
 
-    void visit(MaybeConstPtr<IsConst, ProjectionPathASTNode> node) final {
+    void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionPathASTNode> node) final {
         if (node->parent()) {
             _context->setBasePath(_context->fullPath());
             _context->popFrontFieldName();
@@ -126,12 +126,12 @@ public:
         _context->pushFieldNames({node->fieldNames().begin(), node->fieldNames().end()});
     }
 
-    void visit(MaybeConstPtr<IsConst, MatchExpressionASTNode> node) final {}
-    void visit(MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) final {}
-    void visit(MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) final {}
-    void visit(MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) final {}
-    void visit(MaybeConstPtr<IsConst, ExpressionASTNode> node) final {}
-    void visit(MaybeConstPtr<IsConst, BooleanConstantASTNode> node) final {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, MatchExpressionASTNode> node) final {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) final {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) final {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) final {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, ExpressionASTNode> node) final {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, BooleanConstantASTNode> node) final {}
 
 private:
     PathTrackingVisitorContext<UserData>* _context;
@@ -150,7 +150,7 @@ public:
         invariant(_context);
     }
 
-    void visit(MaybeConstPtr<IsConst, ProjectionPathASTNode> node) final {
+    void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionPathASTNode> node) final {
         _context->popFieldNames();
 
         if (_context->basePath()) {
@@ -165,27 +165,27 @@ public:
         }
     }
 
-    void visit(MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) final {
+    void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionPositionalASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) final {
+    void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionSliceASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) final {
+    void visit(tree_walker::MaybeConstPtr<IsConst, ProjectionElemMatchASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(MaybeConstPtr<IsConst, ExpressionASTNode> node) final {
+    void visit(tree_walker::MaybeConstPtr<IsConst, ExpressionASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(MaybeConstPtr<IsConst, BooleanConstantASTNode> node) final {
+    void visit(tree_walker::MaybeConstPtr<IsConst, BooleanConstantASTNode> node) final {
         _context->popFrontFieldName();
     }
 
-    void visit(MaybeConstPtr<IsConst, MatchExpressionASTNode> node) final {}
+    void visit(tree_walker::MaybeConstPtr<IsConst, MatchExpressionASTNode> node) final {}
 
 private:
     PathTrackingVisitorContext<UserData>* _context;
@@ -225,19 +225,19 @@ public:
         _postVisitors.push_back(&_pathTrackingPostVisitor);
     }
 
-    void preVisit(MaybeConstPtr<IsConst, projection_ast::ASTNode> node) {
+    void preVisit(tree_walker::MaybeConstPtr<IsConst, projection_ast::ASTNode> node) {
         for (auto visitor : _preVisitors) {
             node->acceptVisitor(visitor);
         }
     }
 
-    void postVisit(MaybeConstPtr<IsConst, projection_ast::ASTNode> node) {
+    void postVisit(tree_walker::MaybeConstPtr<IsConst, projection_ast::ASTNode> node) {
         for (auto visitor : _postVisitors) {
             node->acceptVisitor(visitor);
         }
     }
 
-    void inVisit(long count, MaybeConstPtr<IsConst, ASTNode> node) {}
+    void inVisit(long count, tree_walker::MaybeConstPtr<IsConst, ASTNode> node) {}
 
 private:
     PathTrackingPreVisitor<UserData, IsConst> _pathTrackingPreVisitor;

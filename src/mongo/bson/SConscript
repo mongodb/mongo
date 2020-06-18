@@ -60,6 +60,7 @@ asioEnv.CppIntegrationTest(
         'ugly_bson_integration_test.cpp'
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/executor/network_interface_fixture',
         '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/transport/transport_layer_egress_init',

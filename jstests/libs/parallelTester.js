@@ -218,6 +218,7 @@ if (typeof _threadInject != "undefined") {
         // The following tests cannot run when shell readMode is legacy.
         if (db.getMongo().readMode() === "legacy") {
             var requires_find_command = [
+                "apply_ops_system_dot_views.js",
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",
                 "views/dbref_projection.js",
@@ -276,6 +277,7 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_find.js",
             parallelFilesDir + "/profile_findandmodify.js",
             parallelFilesDir + "/profile_getmore.js",
+            parallelFilesDir + "/profile_hide_index.js",
             parallelFilesDir + "/profile_insert.js",
             parallelFilesDir + "/profile_list_collections.js",
             parallelFilesDir + "/profile_list_indexes.js",

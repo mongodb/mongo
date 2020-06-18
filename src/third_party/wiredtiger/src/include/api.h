@@ -86,10 +86,10 @@
     while (0)
 
 /* An API call wrapped in a transaction if necessary. */
-#define TXN_API_CALL(s, h, n, bt, config, cfg)                              \
+#define TXN_API_CALL(s, h, n, dh, config, cfg)                              \
     do {                                                                    \
         bool __autotxn = false, __update = false;                           \
-        API_CALL(s, h, n, bt, config, cfg);                                 \
+        API_CALL(s, h, n, dh, config, cfg);                                 \
         __wt_txn_timestamp_flags(s);                                        \
         __autotxn = !F_ISSET((s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING); \
         if (__autotxn)                                                      \
@@ -171,6 +171,8 @@
 #define SESSION_API_CALL_PREPARE_ALLOWED(s, n, config, cfg) \
     API_CALL(s, WT_SESSION, n, NULL, config, cfg)
 
+#define SESSION_API_CALL_PREPARE_ALLOWED_NOCONF(s, n) API_CALL_NOCONF(s, WT_SESSION, n, NULL)
+
 #define SESSION_API_CALL_PREPARE_NOT_ALLOWED(s, n, config, cfg) \
     SESSION_API_PREPARE_CHECK(s, WT_SESSION, n);                \
     API_CALL(s, WT_SESSION, n, NULL, config, cfg)
@@ -233,12 +235,12 @@
     CURSOR_REMOVE_API_CALL(cur, s, bt);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)
 
-#define CURSOR_UPDATE_API_CALL_BTREE(cur, s, n, bt)                                                \
-    (s) = (WT_SESSION_IMPL *)(cur)->session;                                                       \
-    SESSION_API_PREPARE_CHECK(s, WT_CURSOR, n);                                                    \
-    TXN_API_CALL_NOCONF(s, WT_CURSOR, n, ((WT_BTREE *)(bt))->dhandle);                             \
-    if (F_ISSET(S2C(s), WT_CONN_IN_MEMORY) && !F_ISSET((WT_BTREE *)(bt), WT_BTREE_IGNORE_CACHE) && \
-      __wt_cache_full(s))                                                                          \
+#define CURSOR_UPDATE_API_CALL_BTREE(cur, s, n)                                               \
+    (s) = (WT_SESSION_IMPL *)(cur)->session;                                                  \
+    SESSION_API_PREPARE_CHECK(s, WT_CURSOR, n);                                               \
+    TXN_API_CALL_NOCONF(s, WT_CURSOR, n, ((WT_CURSOR_BTREE *)(cur))->dhandle);                \
+    if (F_ISSET(S2C(s), WT_CONN_IN_MEMORY) && !F_ISSET(CUR2BT(cur), WT_BTREE_IGNORE_CACHE) && \
+      __wt_cache_full(s))                                                                     \
         WT_ERR(WT_CACHE_FULL);
 
 #define CURSOR_UPDATE_API_CALL(cur, s, n)       \

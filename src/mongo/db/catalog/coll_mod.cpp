@@ -37,7 +37,6 @@
 #include <memory>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
@@ -98,6 +97,16 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             BSONObj indexObj = e.Obj();
             StringData indexName;
             BSONObj keyPattern;
+
+            for (auto&& elem : indexObj) {
+                const auto field = elem.fieldNameStringData();
+                if (field != "name" && field != "keyPattern" && field != "expireAfterSeconds" &&
+                    field != "hidden") {
+                    return {ErrorCodes::InvalidOptions,
+                            str::stream()
+                                << "Unrecognized field '" << field << "' in 'index' option"};
+                }
+            }
 
             BSONElement nameElem = indexObj["name"];
             BSONElement keyPatternElem = indexObj["keyPattern"];
@@ -327,7 +336,6 @@ Status _collModInternal(OperationContext* opCtx,
 
     // This can kill all cursors so don't allow running it while a background operation is in
     // progress.
-    BackgroundOperation::assertNoBgOpInProgForNs(nss);
     if (coll) {
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }
@@ -337,8 +345,9 @@ Status _collModInternal(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 
-    // This is necessary to set up CurOp, update the Top stats, and check shard version.
-    OldClientContext ctx(opCtx, nss.ns());
+    // This is necessary to set up CurOp, update the Top stats, and check shard version if the
+    // operation is not on a view.
+    OldClientContext ctx(opCtx, nss.ns(), !view);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
@@ -461,7 +470,7 @@ Status _collModInternal(OperationContext* opCtx,
                 oldExpireSecs, newExpireSecs, oldHidden, newHidden, result));
 
             if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
-                LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled.");
+                LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled");
                 uasserted(50970, "trigger rollback after the index update");
             }
         }

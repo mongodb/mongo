@@ -31,9 +31,8 @@
 
 #include "mongo/db/update/current_date_node.h"
 
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/vector_clock_mutable.h"
 
 namespace mongo {
 
@@ -42,12 +41,13 @@ constexpr StringData kType = "$type"_sd;
 constexpr StringData kDate = "date"_sd;
 constexpr StringData kTimestamp = "timestamp"_sd;
 
-void setValue(mutablebson::Element* element, bool typeIsDate) {
+void setValue(ServiceContext* service, mutablebson::Element* element, bool typeIsDate) {
     if (typeIsDate) {
         invariant(element->setValueDate(mongo::jsTime()));
     } else {
-        invariant(element->setValueTimestamp(
-            LogicalClock::get(getGlobalServiceContext())->reserveTicks(1).asTimestamp()));
+        invariant(element->setValueTimestamp(VectorClockMutable::get(service)
+                                                 ->tick(VectorClock::Component::ClusterTime, 1)
+                                                 .asTimestamp()));
     }
 }
 }  // namespace
@@ -92,17 +92,19 @@ Status CurrentDateNode::init(BSONElement modExpr,
                                        " or a $type expression ({$type: 'timestamp/date'}).");
     }
 
+    _service = expCtx->opCtx->getServiceContext();
+
     return Status::OK();
 }
 
 ModifierNode::ModifyResult CurrentDateNode::updateExistingElement(
     mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
-    setValue(element, _typeIsDate);
+    setValue(_service, element, _typeIsDate);
     return ModifyResult::kNormalUpdate;
 }
 
 void CurrentDateNode::setValueForNewElement(mutablebson::Element* element) const {
-    setValue(element, _typeIsDate);
+    setValue(_service, element, _typeIsDate);
 }
 
 BSONObj CurrentDateNode::operatorValue() const {

@@ -1114,7 +1114,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
             LOGV2_DEBUG(20947,
                         5,
                         "Can't build index intersection solution: AND_SORTED is not possible and "
-                        "AND_HASH is disabled.");
+                        "AND_HASH is disabled");
             return nullptr;
         }
     }
@@ -1181,7 +1181,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
     // when any of our children lack index tags.  If a node lacks an index tag it cannot
     // be answered via an index.
     if (!inArrayOperator && 0 != root->numChildren()) {
-        LOGV2_WARNING(20948, "planner OR error, non-indexed child of OR.");
+        LOGV2_WARNING(20948, "Planner OR error, non-indexed child of OR");
         // We won't enumerate an OR without indices for each child, so this isn't an issue, even
         // if we have an AND with an OR child -- we won't get here unless the OR is fully
         // indexed.

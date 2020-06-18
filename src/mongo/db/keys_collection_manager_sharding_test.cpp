@@ -37,9 +37,9 @@
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/logical_clock.h"
+#include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/config_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
@@ -261,7 +261,8 @@ TEST_F(KeysManagerShardedTest, ShouldCreateKeysIfKeyGeneratorEnabled) {
     keyManager()->startMonitoring(getServiceContext());
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, currentTime);
 
     keyManager()->enableKeyGenerator(operationContext(), true);
     keyManager()->refreshNow(operationContext());
@@ -277,7 +278,8 @@ TEST_F(KeysManagerShardedTest, EnableModeFlipFlopStressTest) {
     keyManager()->startMonitoring(getServiceContext());
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, currentTime);
 
     bool doEnable = true;
 
@@ -303,7 +305,8 @@ TEST_F(KeysManagerShardedTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateK
 
     // Set the time to be very ahead so the updater will be forced to create new keys.
     const LogicalTime fakeTime(Timestamp(20000, 0));
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(fakeTime);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, fakeTime);
 
     FailPointEnableBlock failWriteBlock("failCollectionInserts");
 
@@ -325,7 +328,8 @@ TEST_F(KeysManagerShardedTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateK
 
 TEST_F(KeysManagerShardedTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
     const LogicalTime currentTime(Timestamp(100, 0));
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, currentTime);
 
     {
         FailPointEnableBlock failKeyGenerationBlock("disableKeyGeneration");
@@ -346,7 +350,8 @@ TEST_F(KeysManagerShardedTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPo
 
 TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     const LogicalTime currentTime(Timestamp(100, 0));
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+    VectorClockMutable::get(operationContext())
+        ->tickTo(VectorClock::Component::ClusterTime, currentTime);
 
     ASSERT_EQ(false, keyManager()->hasSeenKeys());
 

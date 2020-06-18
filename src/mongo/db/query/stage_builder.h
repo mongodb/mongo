@@ -29,31 +29,35 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/query_solution.h"
 
-namespace mongo {
-
-class OperationContext;
-
+namespace mongo::stage_builder {
 /**
- * The StageBuilder converts a QuerySolution to an executable tree of PlanStage(s).
+ * The StageBuilder converts a QuerySolution tree to an executable tree of PlanStage(s), with the
+ * specific type defined by the 'PlanStageType' parameter.
  */
+template <typename PlanStageType>
 class StageBuilder {
 public:
-    /**
-     * Turns 'solution' into an executable tree of PlanStage(s). Returns a pointer to the root of
-     * the plan stage tree.
-     *
-     * 'cq' must be the CanonicalQuery from which 'solution' is derived. Illegal to call if 'wsIn'
-     * is nullptr, or if 'solution.root' is nullptr.
-     */
-    static std::unique_ptr<PlanStage> build(OperationContext* opCtx,
-                                            const Collection* collection,
-                                            const CanonicalQuery& cq,
-                                            const QuerySolution& solution,
-                                            WorkingSet* wsIn);
-};
+    StageBuilder(OperationContext* opCtx,
+                 const Collection* collection,
+                 const CanonicalQuery& cq,
+                 const QuerySolution& solution)
+        : _opCtx(opCtx), _collection(collection), _cq(cq), _solution(solution) {}
 
-}  // namespace mongo
+    virtual ~StageBuilder() = default;
+
+    /**
+     * Given a root node of a QuerySolution tree, builds and returns a corresponding executable
+     * tree of PlanStages.
+     */
+    virtual std::unique_ptr<PlanStageType> build(const QuerySolutionNode* root) = 0;
+
+protected:
+    OperationContext* _opCtx;
+    const Collection* _collection;
+    const CanonicalQuery& _cq;
+    const QuerySolution& _solution;
+};
+}  // namespace mongo::stage_builder

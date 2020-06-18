@@ -1,9 +1,11 @@
 // Tests multi-statement transactions metrics in the serverStatus output from mongos in various
 // basic cases.
-// @tags: [uses_transactions, uses_multi_shard_transaction]
+// TODO (SERVER-48341): Remove requires_fcv_46 after backporting SERVER-48307 to 4.4.
+// @tags: [requires_fcv_46, uses_transactions, uses_multi_shard_transaction]
 (function() {
 "use strict";
 
+load("jstests/libs/curop_helpers.js");   // For waitForCurOpByFailPoint().
 load("jstests/libs/parallelTester.js");  // for Thread.
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
@@ -373,6 +375,7 @@ jsTest.log("Failed single shard transaction.");
     verifyServerStatusValues(st, expectedStats);
 })();
 
+// TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
 jsTest.log("Successful single write shard transaction.");
 (() => {
     startSingleWriteShardTransaction();
@@ -382,13 +385,14 @@ jsTest.log("Successful single write shard transaction.");
     expectedStats.currentOpen -= 1;
     expectedStats.currentInactive -= 1;
     expectedStats.totalCommitted += 1;
-    expectedStats.commitTypes.singleWriteShard.initiated += 1;
-    expectedStats.commitTypes.singleWriteShard.successful += 1;
+    expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
+    expectedStats.commitTypes.twoPhaseCommit.successful += 1;
     expectedStats.totalParticipantsAtCommit += 2;
-    expectedStats.totalRequestsTargeted += 2;
+    expectedStats.totalRequestsTargeted += 1;
     verifyServerStatusValues(st, expectedStats);
 })();
 
+// TODO (SERVER-48340): Re-enable the single-write-shard transaction commit optimization.
 jsTest.log("Failed single write shard transaction.");
 (() => {
     startSingleWriteShardTransaction();
@@ -401,12 +405,10 @@ jsTest.log("Failed single write shard transaction.");
     expectedStats.currentInactive -= 1;
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["NoSuchTransaction"] += 1;
-    expectedStats.commitTypes.singleWriteShard.initiated += 1;
+    expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
     expectedStats.totalParticipantsAtCommit += 2;
-    // In a single write shard commit, all read shards are committed first, then the
-    // write shards, so if committing on a read shard fails, the write shards aren't targeted.
-    // The implicit abort after will target all shards.
-    expectedStats.totalRequestsTargeted += 1 + 2;
+    // There are no implicit aborts after two phase commit, so the coordinator is targeted once.
+    expectedStats.totalRequestsTargeted += 1;
     verifyServerStatusValues(st, expectedStats);
 })();
 
@@ -656,11 +658,7 @@ jsTest.log("Active transaction.");
     txnThread.start();
 
     // Wait until we know the failpoint has been reached.
-    assert.soon(function() {
-        const filter = {"failpointMsg": "waitInFindBeforeMakingBatch"};
-        return assert.commandWorked(st.rs0.getPrimary().getDB("admin").currentOp(filter))
-                   .inprog.length === 1;
-    });
+    waitForCurOpByFailPointNoNS(st.rs0.getPrimary().getDB("admin"), "waitInFindBeforeMakingBatch");
 
     expectedStats.currentOpen += 1;
     expectedStats.currentActive += 1;

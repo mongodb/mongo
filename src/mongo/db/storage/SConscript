@@ -186,9 +186,9 @@ env.Library(
         ],
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
-    PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
-        '$BUILD_DIR/mongo/mongos',
+    LIBDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongod_initializers',
+        '$BUILD_DIR/mongo/mongos_initializers',
         ],
     )
 
@@ -201,8 +201,8 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
     ],
-    PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
+    LIBDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongod_initializers',
     ],
 )
 
@@ -517,9 +517,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
+        '$BUILD_DIR/mongo/db/vector_clock',
+        'two_phase_index_build_knobs_idl',
     ],
 )
 

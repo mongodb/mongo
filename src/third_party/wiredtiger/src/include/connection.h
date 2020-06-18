@@ -209,7 +209,8 @@ struct __wt_connection_impl {
     uintmax_t optrack_pid;            /* Cache the process ID. */
 
     WT_LSN *debug_ckpt;      /* Debug mode checkpoint LSNs. */
-    uint32_t debug_ckpt_cnt; /* Checkpoint retention number */
+    uint32_t debug_ckpt_cnt; /* Checkpoint log file retention number */
+    uint32_t debug_log_cnt;  /* Log file retention count */
 
     void **foc;      /* Free-on-close array */
     size_t foc_cnt;  /* Array entries */
@@ -312,6 +313,7 @@ struct __wt_connection_impl {
     uint32_t stat_flags; /* Options declared in flags.py */
 
     /* Connection statistics */
+    uint64_t rec_maximum_seconds; /* Maximum seconds reconciliation took. */
     WT_CONNECTION_STATS *stats[WT_COUNTER_SLOTS];
     WT_CONNECTION_STATS *stat_array;
 
@@ -352,16 +354,17 @@ struct __wt_connection_impl {
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_CONN_LOG_ARCHIVE 0x001u         /* Archive is enabled */
-#define WT_CONN_LOG_DEBUG_MODE 0x002u      /* Debug-mode logging enabled */
-#define WT_CONN_LOG_DOWNGRADED 0x004u      /* Running older version */
-#define WT_CONN_LOG_ENABLED 0x008u         /* Logging is enabled */
-#define WT_CONN_LOG_EXISTED 0x010u         /* Log files found */
-#define WT_CONN_LOG_FORCE_DOWNGRADE 0x020u /* Force downgrade */
-#define WT_CONN_LOG_RECOVER_DIRTY 0x040u   /* Recovering unclean */
-#define WT_CONN_LOG_RECOVER_DONE 0x080u    /* Recovery completed */
-#define WT_CONN_LOG_RECOVER_ERR 0x100u     /* Error if recovery required */
-#define WT_CONN_LOG_RECOVER_FAILED 0x200u  /* Recovery failed */
-#define WT_CONN_LOG_ZERO_FILL 0x400u       /* Manually zero files */
+#define WT_CONN_LOG_CONFIG_ENABLED 0x002u  /* Logging is configured */
+#define WT_CONN_LOG_DEBUG_MODE 0x004u      /* Debug-mode logging enabled */
+#define WT_CONN_LOG_DOWNGRADED 0x008u      /* Running older version */
+#define WT_CONN_LOG_ENABLED 0x010u         /* Logging is enabled */
+#define WT_CONN_LOG_EXISTED 0x020u         /* Log files found */
+#define WT_CONN_LOG_FORCE_DOWNGRADE 0x040u /* Force downgrade */
+#define WT_CONN_LOG_RECOVER_DIRTY 0x080u   /* Recovering unclean */
+#define WT_CONN_LOG_RECOVER_DONE 0x100u    /* Recovery completed */
+#define WT_CONN_LOG_RECOVER_ERR 0x200u     /* Error if recovery required */
+#define WT_CONN_LOG_RECOVER_FAILED 0x400u  /* Recovery failed */
+#define WT_CONN_LOG_ZERO_FILL 0x800u       /* Manually zero files */
                                            /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t log_flags;                    /* Global logging configuration */
     WT_CONDVAR *log_cond;                  /* Log server wait mutex */
@@ -493,15 +496,16 @@ struct __wt_connection_impl {
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_TIMING_STRESS_AGGRESSIVE_SWEEP 0x001u
 #define WT_TIMING_STRESS_CHECKPOINT_SLOW 0x002u
-#define WT_TIMING_STRESS_HS_SWEEP 0x004u
-#define WT_TIMING_STRESS_SPLIT_1 0x008u
-#define WT_TIMING_STRESS_SPLIT_2 0x010u
-#define WT_TIMING_STRESS_SPLIT_3 0x020u
-#define WT_TIMING_STRESS_SPLIT_4 0x040u
-#define WT_TIMING_STRESS_SPLIT_5 0x080u
-#define WT_TIMING_STRESS_SPLIT_6 0x100u
-#define WT_TIMING_STRESS_SPLIT_7 0x200u
-#define WT_TIMING_STRESS_SPLIT_8 0x400u
+#define WT_TIMING_STRESS_HS_CHECKPOINT_DELAY 0x004u
+#define WT_TIMING_STRESS_HS_SWEEP 0x008u
+#define WT_TIMING_STRESS_SPLIT_1 0x010u
+#define WT_TIMING_STRESS_SPLIT_2 0x020u
+#define WT_TIMING_STRESS_SPLIT_3 0x040u
+#define WT_TIMING_STRESS_SPLIT_4 0x080u
+#define WT_TIMING_STRESS_SPLIT_5 0x100u
+#define WT_TIMING_STRESS_SPLIT_6 0x200u
+#define WT_TIMING_STRESS_SPLIT_7 0x400u
+#define WT_TIMING_STRESS_SPLIT_8 0x800u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint64_t timing_stress_flags;
 

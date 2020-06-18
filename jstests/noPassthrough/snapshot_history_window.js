@@ -7,7 +7,13 @@
 (function() {
 "use strict";
 
-const replSet = new ReplSetTest({nodes: 1});
+const replSet = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {
+        // Increase log verbosity for storage so we can see how the oldest_timestamp is set.
+        setParameter: {logComponentVerbosity: tojson({storage: 2})}
+    }
+});
 
 replSet.startSet();
 replSet.initiate();
@@ -20,10 +26,11 @@ const historyWindowSecs = 10;
 assert.commandWorked(primaryDB.adminCommand(
     {setParameter: 1, minSnapshotHistoryWindowInSeconds: historyWindowSecs}));
 
-const startTime = Date.now();
 const insertTimestamp =
     assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: 0}]}))
         .operationTime;
+const startTime = Date.now();
+jsTestLog(`Inserted one document at ${insertTimestamp}`);
 let nextId = 1;
 
 // Test snapshot window with 1s margin.
@@ -49,7 +56,8 @@ while (Date.now() - startTime < testWindowMS) {
 }
 
 // Sleep enough to make sure the insertTimestamp falls off the snapshot window.
-sleep(testMarginMS * 2);
+const historyExpirationTime = startTime + historyWindowSecs * 1000;
+sleep(historyExpirationTime + testMarginMS - Date.now());
 // Perform another majority write to advance the stable timestamp and the oldest timestamp again.
 assert.commandWorked(primaryDB.runCommand(
     {insert: collName, documents: [{_id: nextId}], writeConcern: {w: "majority"}}));

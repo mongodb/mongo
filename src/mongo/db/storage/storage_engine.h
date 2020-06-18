@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -91,8 +92,8 @@ public:
          * Return a new instance of the StorageEngine. The lockFile parameter may be null if
          * params.readOnly is set. Caller owns the returned pointer.
          */
-        virtual StorageEngine* create(const StorageGlobalParams& params,
-                                      const StorageEngineLockFile* lockFile) const = 0;
+        virtual std::unique_ptr<StorageEngine> create(
+            const StorageGlobalParams& params, const StorageEngineLockFile* lockFile) const = 0;
 
         /**
          * Returns the name of the storage engine.
@@ -423,6 +424,8 @@ public:
      */
     virtual bool supportsOplogStones() const = 0;
 
+    virtual bool supportsResumableIndexBuilds() const = 0;
+
     /**
      * Returns true if the storage engine supports deferring collection drops until the the storage
      * engine determines that the storage layer artifacts for the pending drops are no longer needed
@@ -547,6 +550,10 @@ public:
      * Returns the all_durable timestamp. All transactions with timestamps earlier than the
      * all_durable timestamp are committed. Only storage engines that support document level locking
      * must provide an implementation. Other storage engines may provide a no-op implementation.
+     *
+     * The all_durable timestamp is the in-memory no holes point. That does not mean that there are
+     * no holes behind it on disk. The all_durable timestamp also might not correspond with any
+     * oplog entry, but instead have a timestamp value between that of two oplog entries.
      *
      * The all_durable timestamp only includes non-prepared transactions that have been given a
      * commit_timestamp and prepared transactions that have been given a durable_timestamp.

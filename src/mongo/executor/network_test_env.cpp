@@ -56,7 +56,10 @@ void NetworkTestEnv::onCommands(std::vector<OnCommandFunction> funcs) {
 
         auto resultStatus = func(request);
 
-        if (resultStatus.isOK()) {
+        if (request.fireAndForgetMode ==
+            executor::RemoteCommandRequestBase::FireAndForgetMode::kOn) {
+            _mockNetwork->blackHole(noi);
+        } else if (resultStatus.isOK()) {
             BSONObjBuilder result(std::move(resultStatus.getValue()));
             CommandHelpers::appendCommandStatusNoThrow(result, resultStatus.getStatus());
             const RemoteCommandResponse response(result.obj(), Milliseconds(1));
@@ -79,7 +82,9 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
 
     auto cmdResponseStatus = func(request);
 
-    if (cmdResponseStatus.isOK()) {
+    if (request.fireAndForgetMode == executor::RemoteCommandRequestBase::FireAndForgetMode::kOn) {
+        _mockNetwork->blackHole(noi);
+    } else if (cmdResponseStatus.isOK()) {
         BSONObjBuilder result(std::move(cmdResponseStatus.data));
         CommandHelpers::appendCommandStatusNoThrow(result, cmdResponseStatus.status);
         const RemoteCommandResponse response(result.obj(), Milliseconds(1));

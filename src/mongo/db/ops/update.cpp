@@ -57,7 +57,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     invariant(db);
 
     // Explain should never use this helper.
-    invariant(!request.isExplain());
+    invariant(!request.explain());
 
     const NamespaceString& nsString = request.getNamespaceString();
     invariant(opCtx->lockState()->isCollectionLockedForMode(nsString, MODE_IX));
@@ -95,7 +95,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     auto exec = uassertStatusOK(
         getExecutorUpdate(nullOpDebug, collection, &parsedUpdate, boost::none /* verbosity */));
 
-    uassertStatusOK(exec->executePlan());
+    exec->executePlan();
 
     const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
 

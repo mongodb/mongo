@@ -60,6 +60,7 @@ public:
         kExecAllPlans = 2,
     };
 
+    static constexpr StringData kCommandName = "explain"_sd;
     static constexpr StringData kVerbosityName = "verbosity"_sd;
 
     // String representations for verbosity levels.

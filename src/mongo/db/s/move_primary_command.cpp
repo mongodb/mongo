@@ -50,8 +50,9 @@ namespace {
 void uassertStatusOKWithWarning(const Status& status) {
     if (!status.isOK()) {
         LOGV2_WARNING(23762,
-                      "movePrimary failed{causedBy_status}",
-                      "causedBy_status"_attr = causedBy(redact(status)));
+                      "movePrimary failed: {error}",
+                      "movePrimary failed",
+                      "error"_attr = redact(status));
         uassertStatusOK(status);
     }
 }

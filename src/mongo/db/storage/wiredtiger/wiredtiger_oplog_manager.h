@@ -98,16 +98,6 @@ public:
     std::uint64_t getOplogReadTimestamp() const;
     void setOplogReadTimestamp(Timestamp ts);
 
-    /**
-     * Returns the all_durable timestamp. All transactions with timestamps earlier than the
-     * all_durable timestamp are committed.
-     *
-     * The all_durable timestamp is the in-memory no holes point. That does not mean that there are
-     * no holes behind it on disk. The all_durable timestamp also might not correspond with any
-     * oplog entry, but instead have a timestamp value between that of two oplog entries.
-     */
-    uint64_t fetchAllDurableValue(WT_CONNECTION* conn);
-
 private:
     /**
      * Runs the oplog visibility updates when signaled by triggerOplogVisibilityUpdate() until
@@ -134,6 +124,13 @@ private:
 
     bool _isRunning = false;
     bool _shuttingDown = false;
-    bool _opsWaitingForOplogVisibility = false;
+
+    // Triggers an oplog visibility update -- can be delayed if no callers are waiting for an
+    // update, per the _opsWaitingForOplogVisibility counter.
+    bool _triggerOplogVisibilityUpdate = false;
+
+    // Incremented when a caller is waiting for more of the oplog to become visible, to avoid update
+    // delays for batching.
+    int64_t _opsWaitingForOplogVisibilityUpdate = 0;
 };
 }  // namespace mongo

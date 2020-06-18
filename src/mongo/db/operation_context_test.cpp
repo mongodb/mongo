@@ -27,19 +27,25 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
 #include <memory>
 
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -1008,6 +1014,83 @@ TEST(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
 
     worker.join();
     ASSERT_FALSE(optCtx->isWaitingForConditionOrInterrupt());
+}
+
+TEST(OperationContextTest, TestActiveClientOperationsForClientsWithoutSession) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
+    {
+        auto opCtx = client->makeOperationContext();
+        ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
+    }
+    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
+}
+
+TEST(OperationContextTest, TestActiveClientOperations) {
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle session = transportLayer.createSession();
+
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest", session);
+    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
+
+    {
+        auto optCtx = client->makeOperationContext();
+        ASSERT_EQ(serviceCtx->getActiveClientOperations(), 1);
+    }
+    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
+
+    {
+        auto optCtx = client->makeOperationContext();
+        ASSERT_EQ(serviceCtx->getActiveClientOperations(), 1);
+        serviceCtx->killAndDelistOperation(optCtx.get());
+        ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
+    }
+    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
+}
+
+TEST(OperationContextTest, CurrentOpExcludesKilledOperations) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("MainClient");
+    auto opCtx = client->makeOperationContext();
+
+    for (auto truncateOps : {true, false}) {
+        for (auto backtraceMode : {true, false}) {
+            BSONObjBuilder bobNoOpCtx, bobKilledOpCtx;
+            // We use a separate client thread to generate CurrentOp reports in presence and absence
+            // of an `opCtx`. This is because `CurOp::reportCurrentOpForClient()` accepts an `opCtx`
+            // as input and requires it to be present throughout its execution.
+            stdx::thread thread([&]() mutable {
+                auto threadClient = serviceCtx->makeClient("ThreadClient");
+
+                // Generate report in absence of any opCtx
+                CurOp::reportCurrentOpForClient(
+                    opCtx.get(), threadClient.get(), truncateOps, backtraceMode, &bobNoOpCtx);
+
+                auto threadOpCtx = threadClient->makeOperationContext();
+                serviceCtx->killAndDelistOperation(threadOpCtx.get());
+
+                // Generate report in presence of a killed opCtx
+                CurOp::reportCurrentOpForClient(
+                    opCtx.get(), threadClient.get(), truncateOps, backtraceMode, &bobKilledOpCtx);
+            });
+
+            thread.join();
+            auto objNoOpCtx = bobNoOpCtx.obj();
+            auto objKilledOpCtx = bobKilledOpCtx.obj();
+
+            LOGV2_DEBUG(4780201, 1, "With no opCtx", "object"_attr = objNoOpCtx);
+            LOGV2_DEBUG(4780202, 1, "With killed opCtx", "object"_attr = objKilledOpCtx);
+
+            ASSERT_EQ(objNoOpCtx.nFields(), objKilledOpCtx.nFields());
+
+            auto compareBSONObjs = [](BSONObj& a, BSONObj& b) -> bool {
+                return (a == b).type == BSONObj::DeferredComparison::Type::kEQ;
+            };
+            ASSERT(compareBSONObjs(objNoOpCtx, objKilledOpCtx));
+        }
+    }
 }
 
 }  // namespace

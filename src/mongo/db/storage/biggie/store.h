@@ -555,10 +555,10 @@ public:
 
         Node* node = nullptr;
 
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
         size_t depth = prev->_depth + prev->_trieKey.size();
         while (depth < key.size()) {
-            uint8_t c = static_cast<uint8_t>(charKey[depth]);
+            uint8_t c = charKey[depth];
             node = prev->_children[c].get();
             if (node == nullptr) {
                 return false;
@@ -580,6 +580,11 @@ public:
 
         Node* deleted = context.back().first;
         context.pop_back();
+
+        // If the to-be deleted node is an internal node without data it is hidden from the user and
+        // should not be deleted
+        if (!deleted->_data)
+            return false;
 
         if (!deleted->isLeaf()) {
             // The to-be deleted node is an internal node, and therefore updating its data to be
@@ -674,13 +679,13 @@ public:
 
     const_iterator lower_bound(const Key& key) const {
         Node* node = _root.get();
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
         std::vector<std::pair<Node*, uint8_t>> context;
         size_t depth = 0;
 
         // Traverse the path given the key to see if the node exists.
         while (depth < key.size()) {
-            uint8_t idx = static_cast<uint8_t>(charKey[depth]);
+            uint8_t idx = charKey[depth];
 
             // When we go back up the tree to search for the lower bound of key, always search to
             // the right of 'idx' so that we never search anything less than what the lower bound
@@ -700,7 +705,7 @@ public:
                 // Check if the current key in the tree is greater than the one we are looking
                 // for since it can't be equal at this point. It can be greater in two ways:
                 // It can be longer or it can have a larger character at the mismatch index.
-                uint8_t mismatchChar = static_cast<uint8_t>(charKey[mismatchIdx + depth]);
+                uint8_t mismatchChar = charKey[mismatchIdx + depth];
                 if (mismatchIdx == key.size() - depth ||
                     node->_trieKey[mismatchIdx] > mismatchChar) {
                     // If the current key is greater and has a value it is the lower bound.
@@ -919,7 +924,7 @@ private:
     }
 
     Node* _findNode(const Key& key) const {
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
 
         unsigned int depth = _root->_depth;
         unsigned int initialDepthOffset = depth;
@@ -931,13 +936,15 @@ private:
             }
             depth++;
 
-            if (depth == key.size()) {
+            // Return node if entire trieKey matches.
+            if (depth == key.size() && _root->_data &&
+                (key.size() - initialDepthOffset) == _root->_trieKey.size()) {
                 return _root.get();
             }
         }
 
         depth = _root->_depth + _root->_trieKey.size();
-        uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
+        uint8_t childFirstChar = charKey[depth];
         auto node = _root->_children[childFirstChar];
 
         while (node != nullptr) {
@@ -954,7 +961,7 @@ private:
 
             depth = node->_depth + node->_trieKey.size();
 
-            childFirstChar = static_cast<uint8_t>(charKey[depth]);
+            childFirstChar = charKey[depth];
             node = node->_children[childFirstChar];
         }
 
@@ -999,10 +1006,10 @@ private:
     std::pair<const_iterator, bool> _upsertWithCopyOnSharedNodes(
         Key key, boost::optional<value_type> value) {
 
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
 
         int depth = _root->_depth + _root->_trieKey.size();
-        uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
+        uint8_t childFirstChar = charKey[depth];
 
         _makeRootUnique();
 
@@ -1074,7 +1081,7 @@ private:
             }
 
             depth = node->_depth + node->_trieKey.size();
-            childFirstChar = static_cast<uint8_t>(charKey[depth]);
+            childFirstChar = charKey[depth];
 
             prev = node.get();
             node = node->_children[childFirstChar];
@@ -1095,10 +1102,10 @@ private:
      * Return a uint8_t vector with the first 'count' characters of
      * 'old'.
      */
-    std::vector<uint8_t> _makeKey(const char* old, size_t count) {
+    std::vector<uint8_t> _makeKey(const uint8_t* old, size_t count) {
         std::vector<uint8_t> key;
         for (size_t i = 0; i < count; ++i) {
-            uint8_t c = static_cast<uint8_t>(old[i]);
+            uint8_t c = old[i];
             key.push_back(c);
         }
         return key;
@@ -1141,11 +1148,11 @@ private:
         std::vector<Node*> context;
         context.push_back(node);
 
-        const char* charKey = key.data();
+        const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
         size_t depth = node->_depth + node->_trieKey.size();
 
         while (depth < key.size()) {
-            uint8_t c = static_cast<uint8_t>(charKey[depth]);
+            uint8_t c = charKey[depth];
             node = node->_children[c].get();
             context.push_back(node);
             depth = node->_depth + node->_trieKey.size();
@@ -1157,12 +1164,12 @@ private:
      * Return the index at which 'key1' and 'key2' differ.
      * This function will interpret the bytes in 'key2' as unsigned values.
      */
-    size_t _comparePrefix(std::vector<uint8_t> key1, const char* key2, size_t len2) const {
+    size_t _comparePrefix(std::vector<uint8_t> key1, const uint8_t* key2, size_t len2) const {
         size_t smaller = std::min(key1.size(), len2);
 
         size_t i = 0;
         for (; i < smaller; ++i) {
-            uint8_t c = static_cast<uint8_t>(key2[i]);
+            uint8_t c = key2[i];
             if (key1[i] != c) {
                 return i;
             }
@@ -1344,11 +1351,11 @@ private:
      * Merges changes from base to other into current. Throws merge_conflict_exception if there are
      * merge conflicts.
      */
-    void _merge3Helper(Node* current,
-                       const Node* base,
-                       const Node* other,
-                       std::vector<Node*>& context,
-                       std::vector<uint8_t>& trieKeyIndex) {
+    Node* _merge3Helper(Node* current,
+                        const Node* base,
+                        const Node* other,
+                        std::vector<Node*>& context,
+                        std::vector<uint8_t>& trieKeyIndex) {
         context.push_back(current);
 
         // Root doesn't have a trie key.
@@ -1400,9 +1407,13 @@ private:
                     current->_children[key] = other->_children[key];
                 }
             } else if (baseNode && otherNode && baseNode != otherNode) {
-                // If all three are unique and leaf nodes, then it is a merge conflict.
-                if (node->isLeaf() && baseNode->isLeaf() && otherNode->isLeaf())
-                    throw merge_conflict_exception();
+                // If all three are unique and leaf nodes with different data, then it is a merge
+                // conflict.
+                if (node->isLeaf() && baseNode->isLeaf() && otherNode->isLeaf()) {
+                    if (node->_data != baseNode->_data || baseNode->_data != otherNode->_data)
+                        throw merge_conflict_exception();
+                    continue;
+                }
 
                 // If the keys and data are all the exact same, then we can keep recursing.
                 // Otherwise, we manually resolve the differences element by element. The
@@ -1412,7 +1423,17 @@ private:
                 if (node->_trieKey == baseNode->_trieKey &&
                     baseNode->_trieKey == otherNode->_trieKey && node->_data == baseNode->_data &&
                     baseNode->_data == otherNode->_data) {
-                    _merge3Helper(node, baseNode, otherNode, context, trieKeyIndex);
+                    Node* updatedNode =
+                        _merge3Helper(node, baseNode, otherNode, context, trieKeyIndex);
+                    if (!updatedNode->_data) {
+                        // Drop if leaf node without data, that is not valid. Otherwise we might
+                        // need to compress if we have only one child.
+                        if (updatedNode->isLeaf()) {
+                            current->_children[key] = nullptr;
+                        } else {
+                            _compressOnlyChild(updatedNode);
+                        }
+                    }
                 } else {
                     _mergeResolveConflict(node, baseNode, otherNode);
                     _rebuildContext(context, trieKeyIndex);
@@ -1433,6 +1454,8 @@ private:
         context.pop_back();
         if (!trieKeyIndex.empty())
             trieKeyIndex.pop_back();
+
+        return current;
     }
 
     Node* _begin(Node* root) const noexcept {

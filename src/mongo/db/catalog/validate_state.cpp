@@ -53,17 +53,15 @@ namespace CollectionValidation {
 
 ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             bool background,
-                             ValidateOptions options,
+                             ValidateMode mode,
                              bool turnOnExtraLoggingForTest)
     : _nss(nss),
-      _background(background),
-      _options(options),
+      _mode(mode),
       _dataThrottle(opCtx),
       _extraLoggingForTest(turnOnExtraLoggingForTest) {
 
     // Subsequent re-locks will use the UUID when 'background' is true.
-    if (_background) {
+    if (isBackground()) {
         // We need to hold the global lock throughout the entire validation to avoid having to save
         // and restore our cursors used throughout. This is done in order to avoid abandoning the
         // snapshot and invalidating our cursors.
@@ -93,7 +91,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
 }
 
 void ValidateState::yield(OperationContext* opCtx) {
-    if (_background) {
+    if (isBackground()) {
         _yieldLocks(opCtx);
     } else {
         _yieldCursors(opCtx);
@@ -101,7 +99,7 @@ void ValidateState::yield(OperationContext* opCtx) {
 }
 
 void ValidateState::_yieldLocks(OperationContext* opCtx) {
-    invariant(_background);
+    invariant(isBackground());
 
     // Drop and reacquire the locks.
     _relockDatabaseAndCollection(opCtx);
@@ -123,7 +121,7 @@ void ValidateState::_yieldLocks(OperationContext* opCtx) {
 };
 
 void ValidateState::_yieldCursors(OperationContext* opCtx) {
-    invariant(!_background);
+    invariant(!isBackground());
 
     // Save all the cursors.
     for (const auto& indexCursor : _indexCursors) {
@@ -150,7 +148,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     // Background validation will read from a snapshot opened on the all durable timestamp instead
     // of the latest data. This allows concurrent writes to go ahead without interfering with
     // validation's view of the data.
-    if (_background) {
+    if (isBackground()) {
         invariant(!opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
         opCtx->recoveryUnit()->abandonSnapshot();
         // Background validation is expecting to read from the all durable timestamp, but
@@ -168,7 +166,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     // We want to share the same data throttle instance across all the cursors used during this
     // validation. Validations started on other collections will not share the same data
     // throttle instance.
-    if (!_background) {
+    if (!isBackground()) {
         _dataThrottle.turnThrottlingOff();
     }
 
@@ -207,7 +205,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
 }
 
 void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
-    invariant(_background);
+    invariant(isBackground());
 
     _collectionLock.reset();
     _databaseLock.reset();

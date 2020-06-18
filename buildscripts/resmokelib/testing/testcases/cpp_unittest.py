@@ -1,8 +1,8 @@
 """The unittest.TestCase for C++ unit tests."""
 
-from . import interface
-from ... import core
-from ... import utils
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.testcases import interface
 
 
 class CPPUnitTestCase(interface.ProcessTestCase):

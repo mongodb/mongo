@@ -32,6 +32,7 @@
 
 
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 
@@ -105,6 +106,14 @@ public:
 
     const GeoExpression& getGeoExpression() const {
         return *_query;
+    }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
     }
 
 private:
@@ -191,6 +200,14 @@ public:
         return *_query;
     }
 
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
@@ -203,4 +220,66 @@ private:
     std::shared_ptr<const GeoNearExpression> _query;
 };
 
+/**
+ * Expression which checks whether a legacy 2D index point is contained within our near
+ * search annulus.  See nextInterval() below for more discussion.
+ * TODO: Make this a standard type of GEO match expression
+ */
+class TwoDPtInAnnulusExpression : public LeafMatchExpression {
+public:
+    TwoDPtInAnnulusExpression(const R2Annulus& annulus, StringData twoDPath)
+        : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
+
+    void serialize(BSONObjBuilder* out, bool includePath) const final {
+        out->append("TwoDPtInAnnulusExpression", true);
+    }
+
+    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
+        if (!e.isABSONObj())
+            return false;
+
+        PointWithCRS point;
+        if (!GeoParser::parseStoredPoint(e, &point).isOK())
+            return false;
+
+        return _annulus.contains(point.oldPoint);
+    }
+
+    //
+    // These won't be called.
+    //
+
+    BSONObj getSerializedRightHandSide() const final {
+        MONGO_UNREACHABLE;
+    }
+
+    void debugString(StringBuilder& debug, int level = 0) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    bool equivalent(const MatchExpression* other) const final {
+        MONGO_UNREACHABLE;
+        return false;
+    }
+
+    std::unique_ptr<MatchExpression> shallowClone() const final {
+        MONGO_UNREACHABLE;
+        return nullptr;
+    }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+
+    R2Annulus _annulus;
+};
 }  // namespace mongo

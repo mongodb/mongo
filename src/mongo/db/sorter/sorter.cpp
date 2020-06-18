@@ -246,6 +246,10 @@ public:
         return Data(std::move(first), std::move(second));
     }
 
+    SorterRangeInfo getRangeInfo() const {
+        return {_fileStartOffset, _fileEndOffset, _originalChecksum};
+    }
+
 private:
     /**
      * Attempts to refill the _bufferReader if it is empty. Expects _done to be false.
@@ -527,15 +531,16 @@ public:
         : _comp(comp), _settings(settings), _opts(opts), _memUsed(0) {
         verify(_opts.limit == 0);
         if (_opts.extSortAllowed) {
-            _fileName = _opts.tempDir + "/" + nextFileName();
+            this->_tempDir = _opts.tempDir;
+            this->_fileName = _opts.tempDir + "/" + nextFileName();
         }
     }
 
     ~NoLimitSorter() {
-        if (!_done) {
+        if (!_done && !this->_shouldKeepFilesOnDestruction) {
             // If done() was never called to return a MergeIterator, then this Sorter still owns
             // file deletion.
-            DESTRUCTOR_GUARD(boost::filesystem::remove(_fileName));
+            DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileName));
         }
     }
 
@@ -554,13 +559,13 @@ public:
     Iterator* done() {
         invariant(!_done);
 
-        if (_iters.empty()) {
+        if (this->_iters.empty()) {
             sort();
             return new InMemIterator<Key, Value>(_data);
         }
 
         spill();
-        Iterator* mergeIt = Iterator::merge(_iters, _fileName, _opts, _comp);
+        Iterator* mergeIt = Iterator::merge(this->_iters, this->_fileName, _opts, _comp);
         _done = true;
         return mergeIt;
     }
@@ -607,14 +612,14 @@ private:
         sort();
 
         SortedFileWriter<Key, Value> writer(
-            _opts, _fileName, _nextSortedFileWriterOffset, _settings);
+            _opts, this->_fileName, _nextSortedFileWriterOffset, _settings);
         for (; !_data.empty(); _data.pop_front()) {
             writer.addAlreadySorted(_data.front().first, _data.front().second);
         }
         Iterator* iteratorPtr = writer.done();
         _nextSortedFileWriterOffset = writer.getFileEndOffset();
 
-        _iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));
+        this->_iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));
 
         _memUsed = 0;
     }
@@ -622,12 +627,10 @@ private:
     const Comparator _comp;
     const Settings _settings;
     SortOptions _opts;
-    std::string _fileName;
     std::streampos _nextSortedFileWriterOffset = 0;
     bool _done = false;
     size_t _memUsed;
-    std::deque<Data> _data;                         // the "current" data
-    std::vector<std::shared_ptr<Iterator>> _iters;  // data that has already been spilled
+    std::deque<Data> _data;  // Data that has not been spilled.
 };
 
 template <typename Key, typename Value, typename Comparator>
@@ -666,6 +669,10 @@ public:
     }
 
 private:
+    void spill() {
+        invariant(false, "LimitOneSorter does not spill to disk");
+    }
+
     const Comparator _comp;
     Data _best;
     bool _haveData;  // false at start, set to true on first call to add()
@@ -694,7 +701,8 @@ public:
         verify(_opts.limit > 1);
 
         if (_opts.extSortAllowed) {
-            _fileName = _opts.tempDir + "/" + nextFileName();
+            this->_tempDir = _opts.tempDir;
+            this->_fileName = _opts.tempDir + "/" + nextFileName();
         }
 
         // Preallocate a fixed sized vector of the required size if we don't expect it to have a
@@ -707,10 +715,10 @@ public:
     }
 
     ~TopKSorter() {
-        if (!_done) {
+        if (!_done && !this->_shouldKeepFilesOnDestruction) {
             // If done() was never called to return a MergeIterator, then this Sorter still owns
             // file deletion.
-            DESTRUCTOR_GUARD(boost::filesystem::remove(_fileName));
+            DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileName));
         }
     }
 
@@ -760,13 +768,13 @@ public:
     }
 
     Iterator* done() {
-        if (_iters.empty()) {
+        if (this->_iters.empty()) {
             sort();
             return new InMemIterator<Key, Value>(_data);
         }
 
         spill();
-        Iterator* iterator = Iterator::merge(_iters, _fileName, _opts, _comp);
+        Iterator* iterator = Iterator::merge(this->_iters, this->_fileName, _opts, _comp);
         _done = true;
         return iterator;
     }
@@ -897,7 +905,7 @@ private:
         updateCutoff();
 
         SortedFileWriter<Key, Value> writer(
-            _opts, _fileName, _nextSortedFileWriterOffset, _settings);
+            _opts, this->_fileName, _nextSortedFileWriterOffset, _settings);
         for (size_t i = 0; i < _data.size(); i++) {
             writer.addAlreadySorted(_data[i].first, _data[i].second);
         }
@@ -907,7 +915,7 @@ private:
 
         Iterator* iteratorPtr = writer.done();
         _nextSortedFileWriterOffset = writer.getFileEndOffset();
-        _iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));
+        this->_iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));
 
         _memUsed = 0;
     }
@@ -915,12 +923,12 @@ private:
     const Comparator _comp;
     const Settings _settings;
     SortOptions _opts;
-    std::string _fileName;
     std::streampos _nextSortedFileWriterOffset = 0;
     bool _done = false;
     size_t _memUsed;
-    std::vector<Data> _data;  // the "current" data. Organized as max-heap if size == limit.
-    std::vector<std::shared_ptr<Iterator>> _iters;  // data that has already been spilled
+
+    // Data that has not been spilled. Organized as max-heap if size == limit.
+    std::vector<Data> _data;
 
     // See updateCutoff() for a full description of how these members are used.
     bool _haveCutoff;
@@ -932,6 +940,24 @@ private:
 };
 
 }  // namespace sorter
+
+template <typename Key, typename Value>
+std::vector<SorterRangeInfo> Sorter<Key, Value>::_getRangeInfos() const {
+    std::vector<SorterRangeInfo> ranges;
+    ranges.reserve(_iters.size());
+
+    std::transform(_iters.begin(), _iters.end(), std::back_inserter(ranges), [](const auto it) {
+        return it->getRangeInfo();
+    });
+
+    return ranges;
+}
+
+template <typename Key, typename Value>
+void Sorter<Key, Value>::persistDataForShutdown() {
+    spill();
+    _shouldKeepFilesOnDestruction = true;
+}
 
 //
 // SortedFileWriter

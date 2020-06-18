@@ -383,9 +383,10 @@ void ServiceStateMachine::_sourceCallback(Status status) {
         LOGV2_DEBUG(
             22986,
             2,
-            "Session from {remote} encountered a network error during SourceMessage: {status}",
+            "Session from {remote} encountered a network error during SourceMessage: {error}",
+            "Session from remote encountered a network error during SourceMessage",
             "remote"_attr = remote,
-            "status"_attr = status);
+            "error"_attr = status);
         _state.store(State::EndSession);
     } else if (status == TransportLayer::TicketSessionClosedStatus) {
         // Our session may have been closed internally.
@@ -396,11 +397,12 @@ void ServiceStateMachine::_sourceCallback(Status status) {
         _state.store(State::EndSession);
     } else {
         LOGV2(22988,
-              "Error receiving request from client: {status}. Ending connection from {remote} "
-              "(connection id: {session_id})",
-              "status"_attr = status,
+              "Error receiving request from client: {error}. Ending connection from {remote} "
+              "(connection id: {connnection_id})",
+              "Error receiving request from client. Ending connection from remote",
+              "error"_attr = status,
               "remote"_attr = remote,
-              "session_id"_attr = _session()->id());
+              "connection_id"_attr = _session()->id());
         _state.store(State::EndSession);
     }
 
@@ -423,11 +425,12 @@ void ServiceStateMachine::_sinkCallback(Status status) {
     // scheduleNext() to unwind the stack and do the next step.
     if (!status.isOK()) {
         LOGV2(22989,
-              "Error sending response to client: {status}. Ending connection from {session_remote} "
-              "(connection id: {session_id})",
-              "status"_attr = status,
-              "session_remote"_attr = _session()->remote(),
-              "session_id"_attr = _session()->id());
+              "Error sending response to client: {error}. Ending connection from {remote} "
+              "(connection id: {connection_id})",
+              "Error sending response to client. Ending connection from remote",
+              "error"_attr = status,
+              "remote"_attr = _session()->remote(),
+              "connection_id"_attr = _session()->id());
         _state.store(State::EndSession);
         return _runNextInGuard(std::move(guard));
     } else if (_inExhaust) {
@@ -474,9 +477,12 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
     // database work for this request.
     DbResponse dbresponse = _sep->handleRequest(opCtx.get(), _inMessage);
 
-    // opCtx must be destroyed here so that the operation cannot show
-    // up in currentOp results after the response reaches the client
-    opCtx.reset();
+    // opCtx must be killed and delisted here so that the operation cannot show up in currentOp
+    // results after the response reaches the client. The destruction is postponed for later to
+    // mitigate its performance impact on the critical path of execution.
+    _serviceContext->killAndDelistOperation(opCtx.get(), ErrorCodes::OperationIsKilledAndDelisted);
+    invariant(!_killedOpCtx);
+    _killedOpCtx = std::move(opCtx);
 
     // Format our response, if we have one
     Message& toSink = dbresponse.response;
@@ -542,6 +548,12 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
         _state.store(curState);
     }
 
+    // Destroy the opCtx (already killed) here, to potentially use the delay between clients'
+    // requests to hide the destruction cost.
+    if (MONGO_likely(_killedOpCtx)) {
+        _killedOpCtx.reset();
+    }
+
     // Make sure the current Client got set correctly
     dassert(Client::getCurrent() == _dbClientPtr);
     try {
@@ -562,8 +574,9 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
         return;
     } catch (const DBException& e) {
         LOGV2(22990,
-              "DBException handling request, closing client connection: {e}",
-              "e"_attr = redact(e));
+              "DBException handling request, closing client connection: {error}",
+              "DBException handling request, closing client connection",
+              "error"_attr = redact(e));
     }
     // No need to catch std::exception, as std::terminate will be called when the exception bubbles
     // to the top of the stack
@@ -628,8 +641,9 @@ void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask t
     // set, then skip the termination check.
     if ((sessionTags & tags) || (sessionTags & transport::Session::kPending)) {
         LOGV2(22991,
-              "Skip closing connection for connection # {session_id}",
-              "session_id"_attr = _session()->id());
+              "Skip closing connection for connection # {connection_id}",
+              "Skip closing connection for connection",
+              "connection_id"_attr = _session()->id());
         return;
     }
 
@@ -649,8 +663,9 @@ void ServiceStateMachine::_terminateAndLogIfError(Status status) {
     if (!status.isOK()) {
         LOGV2_WARNING_OPTIONS(22993,
                               {logv2::LogComponent::kExecutor},
-                              "Terminating session due to error: {status}",
-                              "status"_attr = status);
+                              "Terminating session due to error: {error}",
+                              "Terminating session due to error",
+                              "error"_attr = status);
         terminate();
     }
 }
@@ -671,11 +686,18 @@ void ServiceStateMachine::_cleanupExhaustResources() noexcept try {
     }
 } catch (const DBException& e) {
     LOGV2(22992,
-          "Error cleaning up resources for exhaust requests: {e_toStatus}",
-          "e_toStatus"_attr = e.toStatus());
+          "Error cleaning up resources for exhaust requests: {error}",
+          "Error cleaning up resources for exhaust requests",
+          "error"_attr = e.toStatus());
 }
 
 void ServiceStateMachine::_cleanupSession(ThreadGuard guard) {
+    // Ensure the delayed destruction of opCtx always happens before doing the cleanup.
+    if (MONGO_likely(_killedOpCtx)) {
+        _killedOpCtx.reset();
+    }
+    invariant(!_killedOpCtx);
+
     _cleanupExhaustResources();
 
     _state.store(State::Ended);

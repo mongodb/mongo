@@ -139,6 +139,8 @@ void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
         _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
     } else if (remoteCommandStatus == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
         _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
+    } else if (ErrorCodes::isShutdownError(remoteCommandStatus.code())) {
+        _targeter->markHostShuttingDown(remoteHost, remoteCommandStatus);
     }
 }
 
@@ -368,7 +370,9 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     }
 
     const Milliseconds maxTimeMS =
-        std::min(opCtx->getRemainingMaxTimeMillis(), kDefaultConfigCommandTimeout);
+        std::min(opCtx->getRemainingMaxTimeMillis(),
+                 nss == ChunkType::ConfigNS ? Milliseconds(gFindChunksOnConfigTimeoutMS.load())
+                                            : kDefaultConfigCommandTimeout);
 
     BSONObjBuilder findCmdBuilder;
 

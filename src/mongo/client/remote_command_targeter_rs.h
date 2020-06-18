@@ -66,6 +66,8 @@ public:
 
     void markHostUnreachable(const HostAndPort& host, const Status& status) override;
 
+    void markHostShuttingDown(const HostAndPort& host, const Status& status) override;
+
 private:
     // Name of the replica set which this targeter maintains
     const std::string _rsName;

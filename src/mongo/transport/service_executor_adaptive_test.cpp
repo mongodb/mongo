@@ -227,7 +227,10 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckThreads) {
 
     waitFor.store(6);
     auto tasks = waitFor.load() / 2;
-    LOGV2(22968, "Scheduling {tasks} blocked tasks", "tasks"_attr = tasks);
+    LOGV2(22968,
+          "Scheduling {tasks} blocked tasks",
+          "Scheduling blocked tasks",
+          "tasks"_attr = tasks);
     for (auto i = 0; i < tasks; i++) {
         ASSERT_OK(exec->schedule(blockedTask,
                                  ServiceExecutor::kEmptyFlags,

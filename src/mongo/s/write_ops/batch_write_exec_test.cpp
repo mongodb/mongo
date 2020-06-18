@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/session_catalog_router.h"
@@ -317,6 +318,169 @@ TEST_F(BatchWriteExecTest, SingleOpUnordered) {
     future.default_timed_get();
 }
 
+TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
+    // Try to update the single doc where a let param is used in the shard key.
+    const auto let = BSON("y" << 100);
+    const auto rtc = RuntimeConstants{Date_t::now(), Timestamp(1, 1)};
+    const auto q = BSON("x"
+                        << "$$y");
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        updateOp.setLet(let);
+        updateOp.setRuntimeConstants(rtc);
+        updateOp.setUpdates(std::vector{write_ops::UpdateOpEntry(q,
+                                                                 {BSON("Key"
+                                                                       << "100")})});
+        return updateOp;
+    }());
+    updateRequest.setWriteConcern(BSONObj());
+
+    const static auto epoch = OID::gen();
+
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef) const override {
+            return std::vector<ShardEndpoint>{
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+                   BSON("x" << 0),
+                   BSON("x" << MAXKEY))});
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, updateRequest, &response, &stats);
+
+        return response;
+    });
+
+    // The update will hit the first shard.
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setNModified(1);
+
+        // Check that let params and runtimeConstants are propigated to shards.
+        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+        const auto actualBatchedUpdate(BatchedCommandRequest::parseUpdate(opMsgRequest));
+        ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
+        ASSERT_EQUALS(actualBatchedUpdate.getRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
+        ASSERT_EQUALS(actualBatchedUpdate.getRuntimeConstants()->getClusterTime(),
+                      rtc.getClusterTime());
+
+        // Check that let params are only forwarded and not evaluated.
+        auto expectedQ = BSON("x"
+                              << "$$y");
+        for (auto&& u : actualBatchedUpdate.getUpdateRequest().getUpdates())
+            ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
+
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(1, response.getNModified());
+}
+
+TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
+    // Try to update the single doc where a let param is used in the shard key.
+    const auto let = BSON("y" << 100);
+    const auto rtc = RuntimeConstants{Date_t::now(), Timestamp(1, 1)};
+    const auto q = BSON("x"
+                        << "$$y");
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::Delete deleteOp(nss);
+        deleteOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        deleteOp.setLet(let);
+        deleteOp.setRuntimeConstants(rtc);
+        deleteOp.setDeletes(std::vector{write_ops::DeleteOpEntry(q, false)});
+        return deleteOp;
+    }());
+    deleteRequest.setWriteConcern(BSONObj());
+
+    const static auto epoch = OID::gen();
+
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+    protected:
+        std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef) const override {
+            return std::vector<ShardEndpoint>{
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+                   BSON("x" << 0),
+                   BSON("x" << MAXKEY))});
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, deleteRequest, &response, &stats);
+
+        return response;
+    });
+
+    // The update will hit the first shard.
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+
+        // Check that let params are propigated to shards.
+        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+        const auto actualBatchedUpdate(BatchedCommandRequest::parseDelete(opMsgRequest));
+        ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
+        ASSERT_EQUALS(actualBatchedUpdate.getRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
+        ASSERT_EQUALS(actualBatchedUpdate.getRuntimeConstants()->getClusterTime(),
+                      rtc.getClusterTime());
+
+        // Check that let params are only forwarded and not evaluated.
+        auto expectedQ = BSON("x"
+                              << "$$y");
+        for (auto&& u : actualBatchedUpdate.getDeleteRequest().getDeletes())
+            ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
+
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+}
+
 TEST_F(BatchWriteExecTest, MultiOpLargeOrdered) {
     const int kNumDocsToInsert = 100'000;
     const std::string kDocValue(200, 'x');
@@ -450,8 +614,8 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(
-            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef) const override {
             return std::vector<ShardEndpoint>{
                 ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
                 ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
@@ -551,8 +715,8 @@ TEST_F(BatchWriteExecTest,
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(
-            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef) const override {
             return std::vector<ShardEndpoint>{
                 ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
                 ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
@@ -667,8 +831,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(
-            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef) const override {
             return std::vector<ShardEndpoint>{
                 ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
                 ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
@@ -794,8 +958,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(
-            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef) const override {
             return std::vector<ShardEndpoint>{
                 ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
                 ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
@@ -919,8 +1083,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
     public:
         using MockNSTargeter::MockNSTargeter;
 
-        std::vector<ShardEndpoint> targetUpdate(
-            OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+        std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                                const BatchItemRef& itemRef) const override {
             if (targetAll) {
                 return std::vector<ShardEndpoint>{
                     ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
@@ -1431,8 +1595,8 @@ public:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
-        logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
+        VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
         _scopedSession.emplace(operationContext());
 

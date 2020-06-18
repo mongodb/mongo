@@ -114,7 +114,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     auto configCursor = establishCursors(expCtx->opCtx,
                                          expCtx->mongoProcessInterface->taskExecutor,
                                          aggReq.getNamespaceString(),
-                                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                         ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
                                          {{configShard->getId(), cmdObjWithRWC}},
                                          false);
     invariant(configCursor.size() == 1);
@@ -127,18 +127,19 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   const boost::optional<RuntimeConstants>& constants,
                                   BSONObj collationObj) {
     if (constants) {
-        cmdForShards[AggregationRequest::kRuntimeConstants] = Value(constants.get().toBSON());
+        cmdForShards[AggregationRequest::kRuntimeConstantsName] = Value(constants.get().toBSON());
     }
 
     cmdForShards[AggregationRequest::kFromMongosName] = Value(expCtx->inMongos);
+
+    if (!collationObj.isEmpty()) {
+        cmdForShards[AggregationRequest::kCollationName] = Value(collationObj);
+    }
+
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
     if (explainVerbosity) {
         cmdForShards.reset(wrapAggAsExplain(cmdForShards.freeze(), *explainVerbosity));
-    }
-
-    if (!collationObj.isEmpty()) {
-        cmdForShards[AggregationRequest::kCollationName] = Value(collationObj);
     }
 
     if (expCtx->opCtx->getTxnNumber()) {
@@ -215,7 +216,7 @@ std::vector<RemoteCursor> establishShardCursors(
                             getDesiredRetryPolicy(opCtx));
 }
 
-std::set<ShardId> getTargetedShards(OperationContext* opCtx,
+std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expCtx,
                                     bool mustRunOnAllShards,
                                     const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
                                     const BSONObj shardQuery,
@@ -223,14 +224,14 @@ std::set<ShardId> getTargetedShards(OperationContext* opCtx,
     if (mustRunOnAllShards) {
         // The pipeline begins with a stage which must be run on all shards.
         std::vector<ShardId> shardIds;
-        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx, &shardIds);
+        Grid::get(expCtx->opCtx)->shardRegistry()->getAllShardIds(expCtx->opCtx, &shardIds);
         return {std::make_move_iterator(shardIds.begin()), std::make_move_iterator(shardIds.end())};
     }
 
     // If we don't need to run on all shards, then we should always have a valid routing table.
     invariant(routingInfo);
 
-    return getTargetedShardsForQuery(opCtx, *routingInfo, shardQuery, collation);
+    return getTargetedShardsForQuery(expCtx, *routingInfo, shardQuery, collation);
 }
 
 /**
@@ -799,7 +800,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     const auto collationObj = expCtx->getCollatorBSON();
     const bool mustRunOnAll = mustRunOnAllShards(expCtx->ns, hasChangeStream);
     std::set<ShardId> shardIds =
-        getTargetedShards(opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);
+        getTargetedShards(expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);
 
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
     // - There is a stage that needs to be run on the primary shard and the single target shard
@@ -857,7 +858,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         }
         // Rebuild the set of shards as the shard registry might have changed.
         shardIds = getTargetedShards(
-            opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);
+            expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);
     }
 
     // If there were no shards when we began execution, we wouldn't have run this aggregation in the

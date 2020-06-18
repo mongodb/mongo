@@ -84,4 +84,5 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1
+        roleGraphInvalidationIsFatal: 1
     num_nodes: 3

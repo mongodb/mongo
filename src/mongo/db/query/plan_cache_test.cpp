@@ -296,17 +296,20 @@ struct GenerateQuerySolution {
 /**
  * Utility function to create a PlanRankingDecision
  */
-std::unique_ptr<PlanRankingDecision> createDecision(size_t numPlans, size_t works = 0) {
-    unique_ptr<PlanRankingDecision> why(new PlanRankingDecision());
+std::unique_ptr<plan_ranker::PlanRankingDecision> createDecision(size_t numPlans,
+                                                                 size_t works = 0) {
+    auto why = std::make_unique<plan_ranker::PlanRankingDecision>();
+    std::vector<std::unique_ptr<PlanStageStats>> stats;
     for (size_t i = 0; i < numPlans; ++i) {
         CommonStats common("COLLSCAN");
-        auto stats = std::make_unique<PlanStageStats>(common, STAGE_COLLSCAN);
-        stats->specific.reset(new CollectionScanStats());
-        why->stats.push_back(std::move(stats));
-        why->stats[i]->common.works = works;
+        auto stat = std::make_unique<PlanStageStats>(common, STAGE_COLLSCAN);
+        stat->specific.reset(new CollectionScanStats());
+        stat->common.works = works;
+        stats.push_back(std::move(stat));
         why->scores.push_back(0U);
         why->candidateOrder.push_back(i);
     }
+    why->getStats<PlanStageStats>() = std::move(stats);
     return why;
 }
 
@@ -492,7 +495,7 @@ TEST(PlanCacheTest, AddEmptySolutions) {
     PlanCache planCache;
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     std::vector<QuerySolution*> solns;
-    unique_ptr<PlanRankingDecision> decision(createDecision(1U));
+    unique_ptr<plan_ranker::PlanRankingDecision> decision(createDecision(1U));
     QueryTestServiceContext serviceContext;
     ASSERT_NOT_OK(planCache.set(*cq, solns, std::move(decision), Date_t{}));
 }
@@ -678,7 +681,7 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(*cq));
     ASSERT_TRUE(entry->isActive);
-    ASSERT_EQ(entry->decision->stats[0]->common.works, 25U);
+    ASSERT_EQ(entry->decision->getStats<PlanStageStats>()[0]->common.works, 25U);
     ASSERT_EQ(entry->works, 25U);
 
     ASSERT_EQUALS(planCache.size(), 1U);
@@ -2008,6 +2011,164 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
                                                   planCache.computeKey(*inWithNonEmptyObj));
     ASSERT_EQ(planCache.computeKey(*inWithNonEmptyObj).getUnstablePart(), "<0>");
     ASSERT_EQ(planCache.computeKey(*inWithEmptyObj).getUnstablePart(), "<1>");
+}
+
+TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilterExpression) {
+    BSONObj filterObj = BSON("x" << BSON("$gt" << 0));
+    std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
+
+    auto entryProjUpdatePair = makeWildcardUpdate(BSON("$**" << 1));
+    auto indexInfo = std::move(entryProjUpdatePair.first);
+    indexInfo.filterExpr = filterExpr.get();
+
+    PlanCache planCache;
+    planCache.notifyOfIndexUpdates({indexInfo});
+
+    // Test that queries on field 'x' are discriminated based on their relationship with the partial
+    // filter expression.
+    {
+        auto compatibleWithFilter = canonicalize("{x: {$eq: 5}}");
+        auto incompatibleWithFilter = canonicalize("{x: {$eq: -5}}");
+        auto compatibleKey = planCache.computeKey(*compatibleWithFilter);
+        auto incompatibleKey = planCache.computeKey(*incompatibleWithFilter);
+
+        assertPlanCacheKeysUnequalDueToDiscriminators(compatibleKey, incompatibleKey);
+        // The discriminator strings have the format "<xx>". That is, there are two discriminator
+        // bits for the "x" predicate, the first pertaining to the partialFilterExpression and the
+        // second around applicability to the wildcard index.
+        ASSERT_EQ(compatibleKey.getUnstablePart(), "<11>");
+        ASSERT_EQ(incompatibleKey.getUnstablePart(), "<01>");
+    }
+
+    // The partialFilterExpression should lead to a discriminator over field 'x', but not over 'y'.
+    // (Separately, there are wildcard-related discriminator bits for both 'x' and 'y'.)
+    {
+        auto compatibleWithFilter = canonicalize("{x: {$eq: 5}, y: 1}");
+        auto incompatibleWithFilter = canonicalize("{x: {$eq: -5}, y: 1}");
+        auto compatibleKey = planCache.computeKey(*compatibleWithFilter);
+        auto incompatibleKey = planCache.computeKey(*incompatibleWithFilter);
+
+        assertPlanCacheKeysUnequalDueToDiscriminators(compatibleKey, incompatibleKey);
+        // The discriminator strings have the format "<xx><y>". That is, there are two discriminator
+        // bits for the "x" predicate (the first pertaining to the partialFilterExpression, the
+        // second around applicability to the wildcard index) and one discriminator bit for "y".
+        ASSERT_EQ(compatibleKey.getUnstablePart(), "<11><1>");
+        ASSERT_EQ(incompatibleKey.getUnstablePart(), "<01><1>");
+    }
+
+    // $eq:null predicates cannot be assigned to a wildcard index. Make sure that this is
+    // discrimated correctly. This test is designed to reproduce SERVER-48614.
+    {
+        auto compatibleQuery = canonicalize("{x: {$eq: 5}, y: 1}");
+        auto incompatibleQuery = canonicalize("{x: {$eq: 5}, y: null}");
+        auto compatibleKey = planCache.computeKey(*compatibleQuery);
+        auto incompatibleKey = planCache.computeKey(*incompatibleQuery);
+
+        assertPlanCacheKeysUnequalDueToDiscriminators(compatibleKey, incompatibleKey);
+        // The discriminator strings have the format "<xx><y>". That is, there are two discriminator
+        // bits for the "x" predicate (the first pertaining to the partialFilterExpression, the
+        // second around applicability to the wildcard index) and one discriminator bit for "y".
+        ASSERT_EQ(compatibleKey.getUnstablePart(), "<11><1>");
+        ASSERT_EQ(incompatibleKey.getUnstablePart(), "<11><0>");
+    }
+
+    // Test that the discriminators are correct for an $eq:null predicate on 'x'. This predicate is
+    // imcompatible for two reasons: null equality predicates cannot be answered by wildcard
+    // indexes, and the predicate is not compatible with the partial filter expression. This should
+    // result in two "0" bits inside the discriminator string.
+    {
+        auto key = planCache.computeKey(*canonicalize("{x: {$eq: null}}"));
+        ASSERT_EQ(key.getUnstablePart(), "<00>");
+    }
+}
+
+TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterAndExpression) {
+    // Partial filter is an AND of multiple conditions.
+    BSONObj filterObj = BSON("x" << BSON("$gt" << 0) << "y" << BSON("$gt" << 0));
+    std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
+
+    auto entryProjUpdatePair = makeWildcardUpdate(BSON("$**" << 1));
+    auto indexInfo = std::move(entryProjUpdatePair.first);
+    indexInfo.filterExpr = filterExpr.get();
+
+    PlanCache planCache;
+    planCache.notifyOfIndexUpdates({indexInfo});
+
+    {
+        // The discriminators should have the format <xx><yy><z>. The 'z' predicate has just one
+        // discriminator because it is not referenced in the partial filter expression.  All
+        // predicates are compatible.
+        auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, z: {$eq: 3}}"));
+        ASSERT_EQ(key.getUnstablePart(), "<11><11><1>");
+    }
+
+    {
+        // The discriminators should have the format <xx><yy><z>. The 'y' predicate is not
+        // compatible with the partial filter expression, leading to one of the 'y' bits being set
+        // to zero.
+        auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: -2}, z: {$eq: 3}}"));
+        ASSERT_EQ(key.getUnstablePart(), "<11><01><1>");
+    }
+}
+
+TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterOnNestedField) {
+    BSONObj filterObj = BSON("x.y" << BSON("$gt" << 0));
+    std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
+
+    auto entryProjUpdatePair = makeWildcardUpdate(BSON("$**" << 1));
+    auto indexInfo = std::move(entryProjUpdatePair.first);
+    indexInfo.filterExpr = filterExpr.get();
+
+    PlanCache planCache;
+    planCache.notifyOfIndexUpdates({indexInfo});
+
+    {
+        // The discriminators have the format <x><(x.y)(x.y)<y>. All predicates are compatible
+        auto key =
+            planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, 'x.y': {$eq: 3}}"));
+        ASSERT_EQ(key.getUnstablePart(), "<1><11><1>");
+    }
+
+    {
+        // Here, the predicate on "x.y" is not compatible with the partial filter expression.
+        auto key =
+            planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, 'x.y': {$eq: -3}}"));
+        ASSERT_EQ(key.getUnstablePart(), "<1><01><1>");
+    }
+}
+
+TEST(PlanCacheTest, ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndWildcardProjection) {
+    BSONObj filterObj = BSON("x" << BSON("$gt" << 0));
+    std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
+
+    auto entryProjUpdatePair = makeWildcardUpdate(BSON("y.$**" << 1));
+    auto indexInfo = std::move(entryProjUpdatePair.first);
+    indexInfo.filterExpr = filterExpr.get();
+
+    PlanCache planCache;
+    planCache.notifyOfIndexUpdates({indexInfo});
+
+    {
+        // The discriminators have the format <x><y>. The discriminator for 'x' indicates whether
+        // the predicate is compatible with the partial filter expression, whereas the disciminator
+        // for 'y' is about compatibility with the wildcard index.
+        auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, z: {$eq: 3}}"));
+        ASSERT_EQ(key.getUnstablePart(), "<1><1>");
+    }
+
+    {
+        // Similar to the previous case, except with an 'x' predicate that is incompatible with the
+        // partial filter expression.
+        auto key = planCache.computeKey(*canonicalize("{x: {$eq: -1}, y: {$eq: 2}, z: {$eq: 3}}"));
+        ASSERT_EQ(key.getUnstablePart(), "<0><1>");
+    }
+
+    {
+        // Case where the 'y' predicate is not compatible with the wildcard index.
+        auto key =
+            planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: null}, z: {$eq: 3}}"));
+        ASSERT_EQ(key.getUnstablePart(), "<1><0>");
+    }
 }
 
 TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {

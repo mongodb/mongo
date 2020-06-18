@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
 
 #define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
@@ -56,10 +57,12 @@ using ExpressionContextTest = ServiceContextTest;
 TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
     auto opCtx = makeOperationContext();
     auto logicalClock = std::make_unique<LogicalClock>(opCtx->getServiceContext());
-    auto t1 = logicalClock->reserveTicks(1);
-    t1.addTicks(100);
-    ASSERT_OK(logicalClock->advanceClusterTime(t1));
     LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
+    auto t1 = VectorClockMutable::get(opCtx->getServiceContext())
+                  ->tick(VectorClock::Component::ClusterTime, 1);
+    t1.addTicks(100);
+    VectorClockMutable::get(opCtx->getServiceContext())
+        ->tickTo(VectorClock::Component::ClusterTime, t1);
     {
         const auto expCtx = ExpressionContext{opCtx.get(),
                                               {},     // explain

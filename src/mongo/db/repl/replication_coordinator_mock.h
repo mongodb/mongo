@@ -320,6 +320,8 @@ public:
 
     virtual bool setContainsArbiter() const override;
 
+    virtual bool replSetContainsNewlyAddedMembers() const override;
+
     virtual void attemptToAdvanceStableTimestamp() override;
 
     virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;
@@ -362,19 +364,24 @@ private:
     ServiceContext* const _service;
     ReplSettings _settings;
     StorageInterface* _storage = nullptr;
-    MemberState _memberState;
-    OpTime _myLastDurableOpTime;
-    Date_t _myLastDurableWallTime;
-    OpTime _myLastAppliedOpTime;
-    Date_t _myLastAppliedWallTime;
-    ReplSetConfig _getConfigReturnValue;
     AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [](OperationContext*,
                                                                                   const OpTime&) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     };
-    bool _alwaysAllowWrites = false;
-    bool _resetLastOpTimesCalled = false;
+
+    // Guards all the variables below
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateMock::_mutex");
+
+    MemberState _memberState;
+    ReplSetConfig _getConfigReturnValue;
+    OpTime _myLastDurableOpTime;
+    Date_t _myLastDurableWallTime;
+    OpTime _myLastAppliedOpTime;
+    Date_t _myLastAppliedWallTime;
+
     long long _term = OpTime::kInitialTerm;
+    bool _resetLastOpTimesCalled = false;
+    bool _alwaysAllowWrites = false;
     bool _canAcceptNonLocalWrites = false;
 };
 

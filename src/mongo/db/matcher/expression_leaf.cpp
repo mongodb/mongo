@@ -199,11 +199,17 @@ constexpr StringData GTEMatchExpression::kName;
 
 const std::set<char> RegexMatchExpression::kValidRegexFlags = {'i', 'm', 's', 'x'};
 
+std::unique_ptr<pcrecpp::RE> RegexMatchExpression::makeRegex(const std::string& regex,
+                                                             const std::string& flags) {
+    return std::make_unique<pcrecpp::RE>(regex.c_str(),
+                                         regex_util::flagsToPcreOptions(flags, true));
+}
+
 RegexMatchExpression::RegexMatchExpression(StringData path, const BSONElement& e)
     : LeafMatchExpression(REGEX, path),
       _regex(e.regex()),
       _flags(e.regexFlags()),
-      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flagsToPcreOptions(_flags, true))) {
+      _re(makeRegex(_regex, _flags)) {
     uassert(ErrorCodes::BadValue, "regex not a regex", e.type() == RegEx);
     _init();
 }

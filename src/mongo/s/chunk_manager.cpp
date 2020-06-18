@@ -43,7 +43,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_writes_tracker.h"
-#include "mongo/s/mongos_server_parameters_gen.h"
+#include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
 
 namespace mongo {
@@ -65,16 +65,6 @@ void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Not all elements of " << o << " are of type " << typeName(type),
             allElementsAreOfType(type, o));
-}
-
-std::string extractKeyStringInternal(const BSONObj& shardKeyValue, Ordering ordering) {
-    BSONObjBuilder strippedKeyValue;
-    for (const auto& elem : shardKeyValue) {
-        strippedKeyValue.appendAs(elem, ""_sd);
-    }
-
-    KeyString::Builder ks(KeyString::Version::V1, strippedKeyValue.done(), ordering);
-    return {ks.getBuffer(), ks.getSize()};
 }
 
 }  // namespace
@@ -123,22 +113,18 @@ ShardVersionMap ChunkMap::constructShardVersionMap(const OID& epoch) const {
         if (lastMax && !SimpleBSONObjComparator::kInstance.evaluate(*lastMax == rangeMin)) {
             if (SimpleBSONObjComparator::kInstance.evaluate(*lastMax < rangeMin))
                 uasserted(ErrorCodes::ConflictingOperationInProgress,
-                          str::stream()
-                              << "Gap exists in the routing table between chunks "
-                              << _chunkMap
-                                     .at(extractKeyStringInternal(*lastMax, _shardKeyOrdering))
-                                     ->getRange()
-                                     .toString()
-                              << " and " << rangeLast->second->getRange().toString());
+                          str::stream() << "Gap exists in the routing table between chunks "
+                                        << _chunkMap.at(ShardKeyPattern::toKeyString(*lastMax))
+                                               ->getRange()
+                                               .toString()
+                                        << " and " << rangeLast->second->getRange().toString());
             else
                 uasserted(ErrorCodes::ConflictingOperationInProgress,
-                          str::stream()
-                              << "Overlap exists in the routing table between chunks "
-                              << _chunkMap
-                                     .at(extractKeyStringInternal(*lastMax, _shardKeyOrdering))
-                                     ->getRange()
-                                     .toString()
-                              << " and " << rangeLast->second->getRange().toString());
+                          str::stream() << "Overlap exists in the routing table between chunks "
+                                        << _chunkMap.at(ShardKeyPattern::toKeyString(*lastMax))
+                                               ->getRange()
+                                               .toString()
+                                        << " and " << rangeLast->second->getRange().toString());
         }
 
         if (!firstMin)
@@ -164,8 +150,8 @@ ShardVersionMap ChunkMap::constructShardVersionMap(const OID& epoch) const {
 }
 
 void ChunkMap::addChunk(const ChunkType& chunk) {
-    const auto chunkMinKeyString = extractKeyStringInternal(chunk.getMin(), _shardKeyOrdering);
-    const auto chunkMaxKeyString = extractKeyStringInternal(chunk.getMax(), _shardKeyOrdering);
+    const auto chunkMinKeyString = ShardKeyPattern::toKeyString(chunk.getMin());
+    const auto chunkMaxKeyString = ShardKeyPattern::toKeyString(chunk.getMax());
 
     // Returns the first chunk with a max key that is > min - implies that the chunk overlaps
     // min
@@ -215,16 +201,15 @@ std::shared_ptr<ChunkInfo> ChunkMap::findIntersectingChunk(const BSONObj& shardK
 
 ChunkMap::ChunkInfoMap::const_iterator ChunkMap::_findIntersectingChunk(
     const BSONObj& shardKey) const {
-    return _chunkMap.upper_bound(extractKeyStringInternal(shardKey, _shardKeyOrdering));
+    return _chunkMap.upper_bound(ShardKeyPattern::toKeyString(shardKey));
 }
 
 std::pair<ChunkMap::ChunkInfoMap::const_iterator, ChunkMap::ChunkInfoMap::const_iterator>
 ChunkMap::_overlappingBounds(const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const {
-    const auto itMin = _chunkMap.upper_bound(extractKeyStringInternal(min, _shardKeyOrdering));
+    const auto itMin = _chunkMap.upper_bound(ShardKeyPattern::toKeyString(min));
     const auto itMax = [&]() {
-        auto it = isMaxInclusive
-            ? _chunkMap.upper_bound(extractKeyStringInternal(max, _shardKeyOrdering))
-            : _chunkMap.lower_bound(extractKeyStringInternal(max, _shardKeyOrdering));
+        auto it = isMaxInclusive ? _chunkMap.upper_bound(ShardKeyPattern::toKeyString(max))
+                                 : _chunkMap.lower_bound(ShardKeyPattern::toKeyString(max));
         return it == _chunkMap.end() ? it : ++it;
     }();
 
@@ -303,22 +288,26 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
     return chunkInfo->getShardIdAt(_clusterTime) == shardId;
 }
 
-void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
+void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds) const {
     auto qr = std::make_unique<QueryRequest>(_rt->getns());
     qr->setFilter(query);
 
+    if (auto uuid = getUUID())
+        expCtx->uuid = uuid;
+
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
     } else if (_rt->getDefaultCollator()) {
-        qr->setCollation(_rt->getDefaultCollator()->getSpec().toBSON());
+        auto defaultCollator = _rt->getDefaultCollator();
+        qr->setCollation(defaultCollator->getSpec().toBSON());
+        expCtx->setCollator(defaultCollator->clone());
     }
 
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto cq = uassertStatusOK(
-        CanonicalQuery::canonicalize(opCtx,
+        CanonicalQuery::canonicalize(expCtx->opCtx,
                                      std::move(qr),
                                      expCtx,
                                      ExtensionsCallbackNoop(),
@@ -637,13 +626,12 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeNew(
     bool unique,
     OID epoch,
     const std::vector<ChunkType>& chunks) {
-    auto ordering = Ordering::make(shardKeyPattern.toBSON());
     return RoutingTableHistory(std::move(nss),
                                std::move(uuid),
                                std::move(shardKeyPattern),
                                std::move(defaultCollator),
                                std::move(unique),
-                               {std::move(ordering)},
+                               ChunkMap{},
                                {0, 0, epoch})
         .makeUpdated(chunks);
 }

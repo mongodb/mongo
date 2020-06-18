@@ -36,7 +36,7 @@
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
-#include "mongo/db/query/projection_ast_walker.h"
+#include "mongo/db/query/tree_walker.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo::projection_executor {
@@ -76,15 +76,17 @@ using ProjectionExecutorVisitorContext =
 
 template <typename Executor>
 auto makeProjectionPreImageExpression(const ProjectionExecutorVisitorData<Executor>& data) {
-    return ExpressionFieldPath::parse(data.expCtx, "$$ROOT", data.expCtx->variablesParseState);
+    return ExpressionFieldPath::parse(
+        data.expCtx.get(), "$$ROOT", data.expCtx->variablesParseState);
 }
 
 template <typename Executor>
 auto makeProjectionPostImageExpression(const ProjectionExecutorVisitorData<Executor>& data) {
     return data.rootReplacementExpression
         ? data.rootReplacementExpression
-        : ExpressionFieldPath::parse(
-              data.expCtx, "$$" + kProjectionPostImageVarName, data.expCtx->variablesParseState);
+        : ExpressionFieldPath::parse(data.expCtx.get(),
+                                     "$$" + kProjectionPostImageVarName,
+                                     data.expCtx->variablesParseState);
 }
 
 /**
@@ -106,7 +108,7 @@ auto createFindPositionalExpression(const projection_ast::ProjectionPositionalAS
         exact_pointer_cast<projection_ast::MatchExpressionASTNode*>(children[0].get());
     invariant(matchExprNode);
 
-    return make_intrusive<ExpressionInternalFindPositional>(data.expCtx,
+    return make_intrusive<ExpressionInternalFindPositional>(data.expCtx.get(),
                                                             makeProjectionPreImageExpression(data),
                                                             makeProjectionPostImageExpression(data),
                                                             path,
@@ -125,8 +127,11 @@ auto createFindSliceExpression(const projection_ast::ProjectionSliceASTNode* nod
                                const FieldPath& path) {
     invariant(node);
 
-    return make_intrusive<ExpressionInternalFindSlice>(
-        data.expCtx, makeProjectionPostImageExpression(data), path, node->skip(), node->limit());
+    return make_intrusive<ExpressionInternalFindSlice>(data.expCtx.get(),
+                                                       makeProjectionPostImageExpression(data),
+                                                       path,
+                                                       node->skip(),
+                                                       node->limit());
 }
 
 /**
@@ -146,7 +151,7 @@ auto createFindElemMatchExpression(const projection_ast::ProjectionElemMatchASTN
         exact_pointer_cast<projection_ast::MatchExpressionASTNode*>(children[0].get());
     invariant(matchExprNode);
 
-    return make_intrusive<ExpressionInternalFindElemMatch>(data.expCtx,
+    return make_intrusive<ExpressionInternalFindElemMatch>(data.expCtx.get(),
                                                            makeProjectionPreImageExpression(data),
                                                            path,
                                                            matchExprNode->matchExpression());
@@ -249,7 +254,7 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
         {std::make_unique<Executor>(expCtx, policies, params[kAllowFastPath]), expCtx}};
     ProjectionExecutorVisitor<Executor> executorVisitor{&context};
     projection_ast::PathTrackingWalker walker{&context, {&executorVisitor}, {}};
-    projection_ast_walker::walk(&walker, root);
+    tree_walker::walk<true, projection_ast::ASTNode>(root, &walker);
     if (params[kOptimizeExecutor]) {
         context.data().executor->optimize();
     }

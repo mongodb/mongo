@@ -55,9 +55,7 @@ executor:
         enableTestCommands: 1
         writePeriodicNoops: 1
         periodicNoopIntervalSecs: 1
-        # TODO (SERVER-47890): Unblacklist report_post_batch_resume_token.js from
-        # change_streams_sharded_collections_passthrough suites.
-        # coordinateCommitReturnImmediatelyAfterPersistingDecision: true
+        coordinateCommitReturnImmediatelyAfterPersistingDecision: true
     num_shards: 2
     enable_sharding:
     - test

@@ -32,11 +32,16 @@ var $config = extendWorkload($config, function($config, $super) {
             const res = db[this.collName].createIndex(
                 {x: 1}, {unique: true, background: Random.rand() < 0.5});
             if (TestData.runInsideTransaction) {
-                assertWhenOwnColl.commandWorkedOrFailedWithCode(
-                    res, [ErrorCodes.IndexBuildAborted, ErrorCodes.IndexBuildAlreadyInProgress]);
+                assertWhenOwnColl.commandWorkedOrFailedWithCode(res, [
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.IndexBuildAlreadyInProgress,
+                    ErrorCodes.NoMatchingDocument,
+                ]);
             } else {
-                assertWhenOwnColl.commandWorkedOrFailedWithCode(res,
-                                                                [ErrorCodes.IndexBuildAborted]);
+                assertWhenOwnColl.commandWorkedOrFailedWithCode(res, [
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.NoMatchingDocument,
+                ]);
             }
         }
     };

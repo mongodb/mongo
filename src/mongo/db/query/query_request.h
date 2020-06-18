@@ -52,41 +52,42 @@ class StatusWith;
  */
 class QueryRequest {
 public:
-    static const char kFilterField[];
-    static const char kProjectionField[];
-    static const char kSortField[];
-    static const char kHintField[];
-    static const char kCollationField[];
-    static const char kSkipField[];
-    static const char kLimitField[];
-    static const char kBatchSizeField[];
-    static const char kNToReturnField[];
-    static const char kSingleBatchField[];
-    static const char kMaxField[];
-    static const char kMinField[];
-    static const char kReturnKeyField[];
-    static const char kShowRecordIdField[];
-    static const char kTailableField[];
-    static const char kOplogReplayField[];
-    static const char kNoCursorTimeoutField[];
-    static const char kAwaitDataField[];
-    static const char kPartialResultsField[];
-    static const char kRuntimeConstantsField[];
-    static const char kLetField[];
-    static const char kTermField[];
-    static const char kOptionsField[];
-    static const char kReadOnceField[];
-    static const char kAllowSpeculativeMajorityReadField[];
-    static const char kInternalReadAtClusterTimeField[];
-    static const char kRequestResumeTokenField[];
-    static const char kResumeAfterField[];
-    static const char kUse44SortKeys[];
-    static const char kMaxTimeMSOpOnlyField[];
+    // Find command field names.
+    static constexpr auto kFilterField = "filter";
+    static constexpr auto kProjectionField = "projection";
+    static constexpr auto kSortField = "sort";
+    static constexpr auto kHintField = "hint";
+    static constexpr auto kCollationField = "collation";
+    static constexpr auto kSkipField = "skip";
+    static constexpr auto kLimitField = "limit";
+    static constexpr auto kBatchSizeField = "batchSize";
+    static constexpr auto kNToReturnField = "ntoreturn";
+    static constexpr auto kSingleBatchField = "singleBatch";
+    static constexpr auto kMaxField = "max";
+    static constexpr auto kMinField = "min";
+    static constexpr auto kReturnKeyField = "returnKey";
+    static constexpr auto kShowRecordIdField = "showRecordId";
+    static constexpr auto kTailableField = "tailable";
+    static constexpr auto kOplogReplayField = "oplogReplay";
+    static constexpr auto kNoCursorTimeoutField = "noCursorTimeout";
+    static constexpr auto kAwaitDataField = "awaitData";
+    static constexpr auto kPartialResultsField = "allowPartialResults";
+    static constexpr auto kRuntimeConstantsField = "runtimeConstants";
+    static constexpr auto kLetField = "let";
+    static constexpr auto kTermField = "term";
+    static constexpr auto kOptionsField = "options";
+    static constexpr auto kReadOnceField = "readOnce";
+    static constexpr auto kAllowSpeculativeMajorityReadField = "allowSpeculativeMajorityRead";
+    static constexpr auto kRequestResumeTokenField = "$_requestResumeToken";
+    static constexpr auto kResumeAfterField = "$_resumeAfter";
+    static constexpr auto kUse44SortKeys = "_use44SortKeys";
+    static constexpr auto kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
 
-    static const char kNaturalSortField[];
+    // Field names for sorting options.
+    static constexpr auto kNaturalSortField = "$natural";
 
-    static const char kFindCommandName[];
-    static const char kShardVersionField[];
+    static constexpr auto kFindCommandName = "find";
+    static constexpr auto kShardVersionField = "shardVersion";
 
     explicit QueryRequest(NamespaceStringOrUUID nss);
 
@@ -148,23 +149,23 @@ public:
     // However, mongos internally "unwraps" the read preference and adds it as a parameter to the
     // command, e.g.
     //  { <cmd>: ... , <kUnwrappedReadPrefField>: { <kWrappedReadPrefField>: { ... } } }
-    static const std::string kWrappedReadPrefField;
-    static const std::string kUnwrappedReadPrefField;
+    static constexpr auto kWrappedReadPrefField = "$readPreference";
+    static constexpr auto kUnwrappedReadPrefField = "$queryOptions";
 
     // Names of the maxTimeMS command and query option.
     // Char arrays because they are used in static initialization.
-    static const char cmdOptionMaxTimeMS[];
-    static const char queryOptionMaxTimeMS[];
+    static constexpr auto cmdOptionMaxTimeMS = "maxTimeMS";
+    static constexpr auto queryOptionMaxTimeMS = "$maxTimeMS";
 
     // Names of the $meta projection values.
-    static const std::string metaGeoNearDistance;
-    static const std::string metaGeoNearPoint;
-    static const std::string metaRecordId;
-    static const std::string metaSortKey;
-    static const std::string metaTextScore;
+    static constexpr auto metaGeoNearDistance = "geoNearDistance";
+    static constexpr auto metaGeoNearPoint = "geoNearPoint";
+    static constexpr auto metaRecordId = "recordId";
+    static constexpr auto metaSortKey = "sortKey";
+    static constexpr auto metaTextScore = "textScore";
 
     // Allow using disk during the find command.
-    static const std::string kAllowDiskUseField;
+    static constexpr auto kAllowDiskUseField = "allowDiskUse";
 
     const NamespaceString& nss() const {
         return _nss;
@@ -223,7 +224,7 @@ public:
         _collation = collation.getOwned();
     }
 
-    static const long long kDefaultBatchSize;
+    static constexpr auto kDefaultBatchSize = 101ll;
 
     boost::optional<long long> getSkip() const {
         return _skip;
@@ -432,10 +433,6 @@ public:
         return _allowSpeculativeMajorityRead;
     }
 
-    boost::optional<Timestamp> getReadAtClusterTime() const {
-        return _internalReadAtClusterTime;
-    }
-
     bool getRequestResumeToken() const {
         return _requestResumeToken;
     }
@@ -588,10 +585,6 @@ private:
     bool _allowSpeculativeMajorityRead = false;
 
     boost::optional<long long> _replicationTerm;
-
-    // The Timestamp that RecoveryUnit::setTimestampReadSource() should be called with. The optional
-    // should only ever be engaged when testing commands are enabled.
-    boost::optional<Timestamp> _internalReadAtClusterTime;
 };
 
 }  // namespace mongo

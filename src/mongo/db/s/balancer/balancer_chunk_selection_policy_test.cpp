@@ -38,6 +38,8 @@
 namespace mongo {
 namespace {
 
+using executor::RemoteCommandRequest;
+
 const std::string kDbName = "TestDb";
 const NamespaceString kNamespace(kDbName, "TestColl");
 const int kSizeOnDisk = 1;
@@ -60,7 +62,7 @@ protected:
 
         onCommand([&resultBuilder](const RemoteCommandRequest& request) {
             ASSERT(request.cmdObj["listDatabases"]);
-            vector<BSONObj> dbInfos;
+            std::vector<BSONObj> dbInfos;
             BSONObjBuilder b;
             b.append("name", kDbName);
             b.append("sizeOnDisk", kSizeOnDisk);

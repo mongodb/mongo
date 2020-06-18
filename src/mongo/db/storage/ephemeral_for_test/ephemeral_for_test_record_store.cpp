@@ -39,10 +39,13 @@
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(ephemeralForTestReturnIncorrectNumRecords);
 
 using std::shared_ptr;
 
@@ -558,6 +561,13 @@ int64_t EphemeralForTestRecordStore::storageSize(OperationContext* opCtx,
     // Note: not making use of extraInfo or infoLevel since we don't have extents
     const int64_t recordOverhead = numRecords(opCtx) * sizeof(EphemeralForTestRecord);
     return _data->dataSize + recordOverhead;
+}
+
+long long EphemeralForTestRecordStore::numRecords(OperationContext* opCtx) const {
+    if (MONGO_unlikely(ephemeralForTestReturnIncorrectNumRecords.shouldFail())) {
+        return _data->records.size() + 1;
+    }
+    return _data->records.size();
 }
 
 RecordId EphemeralForTestRecordStore::allocateLoc(WithLock) {

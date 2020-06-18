@@ -1,7 +1,7 @@
 Source: mongodb-org
 Section: database
 Priority: optional
-Maintainer: Ernie Hershey <ernie.hershey@mongodb.com>
+Maintainer: MongoDB Packaging <packaging@mongodb.com>
 Build-Depends: 
 Standards-Version: 3.8.0
 Homepage: http://www.mongodb.org

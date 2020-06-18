@@ -353,7 +353,7 @@ public:
 
         if (scope->hasOutOfMemoryException()) {
             // make some room
-            LOGV2(22777, "Clearing all idle JS contexts due to out of memory");
+            LOGV2_INFO(22777, "Clearing all idle JS contexts due to out of memory");
             _pools.clear();
             return;
         }
@@ -577,7 +577,7 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
     return p;
 }
 
-void (*ScriptEngine::_connectCallback)(DBClientBase&) = nullptr;
+void (*ScriptEngine::_connectCallback)(DBClientBase&, StringData) = nullptr;
 
 ScriptEngine* getGlobalScriptEngine() {
     if (hasGlobalServiceContext())

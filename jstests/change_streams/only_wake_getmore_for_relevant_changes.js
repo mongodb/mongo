@@ -70,11 +70,11 @@ function assertEventDoesNotWakeCursor({collection, awaitDataCursorId, identifyin
         collection: collection,
         awaitDataCursorId: awaitDataCursorId,
         identifyingComment: identifyingComment,
-        maxTimeMS: 1000,
+        maxTimeMS: (10 * 1000),
         event: event,
     });
     // Should have waited for at least 'maxTimeMS'.
-    assert.gt(elapsedMs, 900, "getMore returned before waiting for maxTimeMS");
+    assert.gt(elapsedMs, 9500, "getMore returned before waiting for maxTimeMS");
     const cursorResponse = result.cursor;
     // Cursor should be valid with no data.
     assert.neq(cursorResponse.id, 0);

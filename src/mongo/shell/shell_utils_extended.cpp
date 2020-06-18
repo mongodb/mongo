@@ -37,6 +37,7 @@
 #endif
 
 #include <boost/filesystem.hpp>
+#include <fmt/format.h>
 #include <fstream>
 
 #include "mongo/bson/bson_validate.h"
@@ -57,6 +58,7 @@ namespace mongo {
 using std::ifstream;
 using std::string;
 using std::stringstream;
+using namespace fmt::literals;
 
 /**
  * These utilities are thread safe but do not provide mutually exclusive access to resources
@@ -176,20 +178,21 @@ BSONObj cat(const BSONObj& args, void* data) {
             mode |= std::ios::binary;
     }
 
-    stringstream ss;
     ifstream f(filePath.valuestrsafe(), mode);
-    uassert(CANT_OPEN_FILE, "couldn't open file", f.is_open());
+    uassert(CANT_OPEN_FILE, "couldn't open file {}"_format(filePath.valuestrsafe()), f.is_open());
+    std::streamsize fileSize = 0;
+    // will throw on filesystem error
+    fileSize = boost::filesystem::file_size(filePath.valuestrsafe());
+    static constexpr auto kFileSizeLimit = 1024 * 1024 * 16;
+    uassert(
+        13301,
+        "cat() : file {} too big to load as a variable (file is {} bytes, limit is {} bytes.)"_format(
+            filePath.valuestrsafe(), fileSize, kFileSizeLimit),
+        fileSize < kFileSizeLimit);
 
-    std::streamsize sz = 0;
-    while (1) {
-        char ch = 0;
-        f.get(ch);
-        if (ch == 0)
-            break;
-        ss << ch;
-        sz += 1;
-        uassert(13301, "cat() : file too big to load as a variable", sz < 1024 * 1024 * 16);
-    }
+    std::ostringstream ss;
+    ss << f.rdbuf();
+
     return BSON("" << ss.str());
 }
 
@@ -197,7 +200,7 @@ BSONObj md5sumFile(const BSONObj& args, void* data) {
     BSONElement e = singleArg(args);
     stringstream ss;
     FILE* f = fopen(e.valuestrsafe(), "rb");
-    uassert(CANT_OPEN_FILE, "couldn't open file", f);
+    uassert(CANT_OPEN_FILE, str::stream() << "couldn't open file " << e.valuestrsafe(), f);
     ON_BLOCK_EXIT([&] { fclose(f); });
 
     md5digest d;

@@ -658,9 +658,8 @@ int main(const int argc, const char* const* const argv) {
         return EXIT_FAILURE;
     }
 
-    std::map<std::string, std::string> env;
     ret = moe::OptionsParser().run(
-        options, std::vector<std::string>(argv, argv + argc), env, &environment);
+        options, std::vector<std::string>(argv, argv + argc), &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
         return EXIT_FAILURE;
@@ -683,8 +682,7 @@ int main(const int argc, const char* const* const argv) {
     // The reason this works is that the unittest system relies on other systems being initialized
     // through global init and deinitialize just deinitializes systems that explicitly supports
     // deinit leaving the systems unittest needs initialized.
-    const char* null_argv[1] = {nullptr};
-    ret = mongo::runGlobalInitializers(0, null_argv, nullptr);
+    ret = mongo::runGlobalInitializers(std::vector<std::string>{});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
         return EXIT_FAILURE;

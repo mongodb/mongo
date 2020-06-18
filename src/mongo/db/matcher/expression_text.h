@@ -64,6 +64,14 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
 private:
     fts::FTSQueryImpl _ftsQuery;
 };

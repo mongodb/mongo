@@ -256,8 +256,13 @@ int runTests() {
         int (*func)();
     } static constexpr kTests[] = {
         {"stackLocationTest", &stackLocationTest},
-// These tests violate the memory space deliberately, so they generate false positives from ASAN.
-#if !__has_feature(address_sanitizer)
+// These tests violate the memory space deliberately, so they generate false
+// positives from ASAN. TSAN also fails because we rescue a thread from a
+// SIGSEGV due to intentional thread exhaustion with creative use of a longjmp.
+// TSAN is more clever than we want here and intercepts the SIGSEGV before we
+// can do the thread necromancy that lets us verify it died for the right reasons
+// without killing the test harness.
+#if !__has_feature(address_sanitizer) && !__has_feature(thread_sanitizer)
         {"recursionTest", &recursionTest},
         {"recursionDeathTest", &recursionDeathTest},
 #endif

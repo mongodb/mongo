@@ -128,7 +128,8 @@ public:
      * Returns whether a constant value for 'id' has been defined using setConstantValue().
      */
     bool hasConstantValue(Variables::Id id) const {
-        if (auto it = _values.find(id); it != _values.end() && it->second.isConstant) {
+        if (auto it = _letParametersMap.find(id);
+            it != _letParametersMap.end() && it->second.isConstant) {
             return true;
         }
         return false;
@@ -162,14 +163,9 @@ public:
     void setDefaultRuntimeConstants(OperationContext* opCtx);
 
     /**
-     * Return an object which represents the variables which are considered let parameters.
-     */
-    BSONObj serializeLetParameters(const VariablesParseState& vps) const;
-
-    /**
      * Seed let parameters with the given BSONObj.
      */
-    void seedVariablesWithLetParameters(boost::intrusive_ptr<ExpressionContext> expCtx,
+    void seedVariablesWithLetParameters(ExpressionContext* const expCtx,
                                         const BSONObj letParameters);
 
     bool hasValue(Variables::Id id) const {
@@ -218,9 +214,8 @@ private:
     }
 
     IdGenerator _idGenerator;
-    stdx::unordered_map<Id, ValueAndState> _values;
+    stdx::unordered_map<Id, ValueAndState> _letParametersMap;
     stdx::unordered_map<Id, Value> _runtimeConstantsMap;
-    stdx::unordered_map<Id, Value> _letParametersMap;
 
     // Populated after construction. Should not be set more than once.
     boost::optional<RuntimeConstants> _runtimeConstants;
@@ -267,7 +262,11 @@ public:
      */
     std::set<Variables::Id> getDefinedVariableIDs() const;
 
-    BSONObj serialize(const Variables& vars) const;
+    /**
+     * Serializes the IDs and associated values of user-defined variables that are currently in
+     * scope.
+     */
+    BSONObj serializeUserVariables(const Variables& vars) const;
 
     /**
      * Return a copy of this VariablesParseState. Will replace the copy's '_idGenerator' pointer

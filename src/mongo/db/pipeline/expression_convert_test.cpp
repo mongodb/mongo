@@ -64,7 +64,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithoutOptionalArguments) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
                     convertExp->serialize(false));
@@ -81,7 +81,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
                                         << "to"
                                         << "int"
                                         << "onError" << 0));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onError: {$const: 0}}}")),
@@ -100,7 +100,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
                                         << "to"
                                         << "int"
                                         << "onNull" << 0));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onNull: {$const: 0}}}")),
@@ -117,13 +117,13 @@ TEST_F(ExpressionConvertTest, ConvertWithoutInputFailsToParse) {
     auto spec = BSON("$convert" << BSON("to"
                                         << "int"
                                         << "onError" << 0));
-    ASSERT_THROWS_WITH_CHECK(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
-                             AssertionException,
-                             [](const AssertionException& exception) {
-                                 ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
-                                 ASSERT_STRING_CONTAINS(exception.reason(),
-                                                        "Missing 'input' parameter to $convert");
-                             });
+    ASSERT_THROWS_WITH_CHECK(
+        Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Missing 'input' parameter to $convert");
+        });
 }
 
 TEST_F(ExpressionConvertTest, ConvertWithoutToFailsToParse) {
@@ -132,13 +132,13 @@ TEST_F(ExpressionConvertTest, ConvertWithoutToFailsToParse) {
     auto spec = BSON("$convert" << BSON("input"
                                         << "$path1"
                                         << "onError" << 0));
-    ASSERT_THROWS_WITH_CHECK(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
-                             AssertionException,
-                             [](const AssertionException& exception) {
-                                 ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
-                                 ASSERT_STRING_CONTAINS(exception.reason(),
-                                                        "Missing 'to' parameter to $convert");
-                             });
+    ASSERT_THROWS_WITH_CHECK(
+        Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Missing 'to' parameter to $convert");
+        });
 }
 
 TEST_F(ExpressionConvertTest, InvalidTypeNameFails) {
@@ -150,7 +150,7 @@ TEST_F(ExpressionConvertTest, InvalidTypeNameFails) {
                                         << "dinosaur"
                                         << "onError" << 0));
 
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(Document(), &expCtx->variables),
                              AssertionException,
@@ -167,7 +167,7 @@ TEST_F(ExpressionConvertTest, NonIntegralTypeFails) {
                                         << "$path1"
                                         << "to" << 3.6 << "onError" << 0));
 
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(Document(), &expCtx->variables),
                              AssertionException,
@@ -189,7 +189,7 @@ TEST_F(ExpressionConvertTest, NonStringNonNumericalTypeFails) {
                                                 << "Tyrannosaurus rex")
                                         << "onError" << 0));
 
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(Document(), &expCtx->variables),
                              AssertionException,
@@ -208,7 +208,7 @@ TEST_F(ExpressionConvertTest, InvalidNumericTargetTypeFails) {
                                         << "$path1"
                                         << "to" << 100 << "onError" << 0));
 
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate(Document(), &expCtx->variables),
@@ -228,7 +228,7 @@ TEST_F(ExpressionConvertTest, NegativeNumericTargetTypeFails) {
                                         << "$path1"
                                         << "to" << -2 << "onError" << 0));
 
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate(Document(), &expCtx->variables),
@@ -286,7 +286,8 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvi
 
         Document input{{"path1", inputValue}};
 
-        auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+        auto convertExp =
+            Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
         ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input, &expCtx->variables),
                                  AssertionException,
@@ -309,7 +310,8 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvi
 
         Document input{{"path1", inputValue}};
 
-        auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+        auto convertExp =
+            Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
         ASSERT_VALUE_CONTENTS_AND_TYPE(
             convertExp->evaluate(input, &expCtx->variables), "X"_sd, BSONType::String);
@@ -323,7 +325,7 @@ TEST_F(ExpressionConvertTest, ConvertNullishInput) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document nullInput{{"path1", BSONNULL}};
     Document undefinedInput{{"path1", BSONUndefined}};
@@ -345,7 +347,7 @@ TEST_F(ExpressionConvertTest, ConvertNullishInputWithOnNull) {
                                         << "B)"
                                         << "onError"
                                         << "Should not be used here"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document nullInput{{"path1", BSONNULL}};
     Document undefinedInput{{"path1", BSONUndefined}};
@@ -367,7 +369,7 @@ TEST_F(ExpressionConvertTest, NullishToReturnsNull) {
                                         << "Should not be used here"
                                         << "onError"
                                         << "Also should not be used"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document nullInput{{"path1", BSONNULL}};
     Document undefinedInput{{"path1", BSONUndefined}};
@@ -384,7 +386,7 @@ TEST_F(ExpressionConvertTest, NullInputOverridesNullTo) {
     auto spec =
         BSON("$convert" << BSON("input" << Value(BSONNULL) << "to" << Value(BSONNULL) << "onNull"
                                         << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(Document{}, &expCtx->variables), "X"_sd, BSONType::String);
@@ -395,7 +397,7 @@ TEST_F(ExpressionConvertTest, ConvertOptimizesToExpressionConstant) {
 
     auto spec = BSON("$convert" << BSON("input" << 0 << "to"
                                                 << "double"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     convertExp = convertExp->optimize();
 
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
@@ -410,7 +412,7 @@ TEST_F(ExpressionConvertTest, ConvertWithOnErrorOptimizesToExpressionConstant) {
                                                 << "objectId"
                                                 << "onError"
                                                 << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     convertExp = convertExp->optimize();
 
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
@@ -425,7 +427,7 @@ TEST_F(ExpressionConvertTest, DoubleIdentityConversion) {
                                         << "$path1"
                                         << "to"
                                         << "double"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document doubleInput{{"path1", 2.4}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -455,7 +457,7 @@ TEST_F(ExpressionConvertTest, BoolIdentityConversion) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueBoolInput{{"path1", true}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -473,7 +475,7 @@ TEST_F(ExpressionConvertTest, StringIdentityConversion) {
                                         << "$path1"
                                         << "to"
                                         << "string"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document stringInput{{"path1", "More cowbell"_sd}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -487,7 +489,7 @@ TEST_F(ExpressionConvertTest, ObjectIdIdentityConversion) {
                                         << "$path1"
                                         << "to"
                                         << "objectId"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document oidInput{{"path1", OID("0123456789abcdef01234567")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(oidInput, &expCtx->variables),
@@ -502,7 +504,7 @@ TEST_F(ExpressionConvertTest, DateIdentityConversion) {
                                         << "$path1"
                                         << "to"
                                         << "date"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document dateInput{{"path1", Date_t{}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -516,7 +518,7 @@ TEST_F(ExpressionConvertTest, IntIdentityConversion) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document intInput{{"path1", int{123}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -530,7 +532,7 @@ TEST_F(ExpressionConvertTest, LongIdentityConversion) {
                                         << "$path1"
                                         << "to"
                                         << "long"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document longInput{{"path1", 123LL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -544,7 +546,7 @@ TEST_F(ExpressionConvertTest, DecimalIdentityConversion) {
                                         << "$path1"
                                         << "to"
                                         << "decimal"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document decimalInput{{"path1", Decimal128("2.4")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalInput, &expCtx->variables),
@@ -575,7 +577,7 @@ TEST_F(ExpressionConvertTest, ConvertDateToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     // All date inputs evaluate as true.
     Document dateInput{{"path1", Date_t{}}};
@@ -590,7 +592,7 @@ TEST_F(ExpressionConvertTest, ConvertIntToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueIntInput{{"path1", int{1}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -608,7 +610,7 @@ TEST_F(ExpressionConvertTest, ConvertLongToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueLongInput{{"path1", -1LL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -626,7 +628,7 @@ TEST_F(ExpressionConvertTest, ConvertDoubleToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueDoubleInput{{"path1", 2.4}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -656,7 +658,7 @@ TEST_F(ExpressionConvertTest, ConvertDecimalToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueDecimalInput{{"path1", Decimal128(5)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -698,7 +700,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document stringInput{{"path1", "str"_sd}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -716,7 +718,7 @@ TEST_F(ExpressionConvertTest, ConvertObjectIdToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document oidInput{{"path1", OID("59E8A8D8FEDCBA9876543210")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -730,7 +732,7 @@ TEST_F(ExpressionConvertTest, ConvertMinKeyToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document minKeyInput{{"path1", MINKEY}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -744,7 +746,7 @@ TEST_F(ExpressionConvertTest, ConvertObjectToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document objectInput{{"path1", Document{{"foo", 1}}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -758,7 +760,7 @@ TEST_F(ExpressionConvertTest, ConvertArrayToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document arrayInput{{"path1", BSON_ARRAY(1)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -772,7 +774,7 @@ TEST_F(ExpressionConvertTest, ConvertBinDataToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     char data[] = "(^_^)";
     Document binInput{{"path1", BSONBinData(data, sizeof(data), BinDataType::BinDataGeneral)}};
@@ -787,7 +789,7 @@ TEST_F(ExpressionConvertTest, ConvertRegexToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document regexInput{{"path1", BSONRegEx("ab*a"_sd)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -801,7 +803,7 @@ TEST_F(ExpressionConvertTest, ConvertDBRefToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document refInput{{"path1", BSONDBRef("db.coll"_sd, OID("aaaaaaaaaaaaaaaaaaaaaaaa"))}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -815,7 +817,7 @@ TEST_F(ExpressionConvertTest, ConvertCodeToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document codeInput{{"path1", BSONCode("print('Hello world!');"_sd)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -829,7 +831,7 @@ TEST_F(ExpressionConvertTest, ConvertSymbolToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document symbolInput{{"path1", BSONSymbol("print"_sd)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -843,7 +845,7 @@ TEST_F(ExpressionConvertTest, ConvertCodeWScopeToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document codeWScopeInput{
         {"path1", BSONCodeWScope("print('Hello again, world!')"_sd, BSONObj())}};
@@ -858,7 +860,7 @@ TEST_F(ExpressionConvertTest, ConvertTimestampToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document timestampInput{{"path1", Timestamp()}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -872,7 +874,7 @@ TEST_F(ExpressionConvertTest, ConvertMaxKeyToBool) {
                                         << "$path1"
                                         << "to"
                                         << "bool"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document maxKeyInput{{"path1", MAXKEY}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -886,7 +888,7 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDouble) {
                                         << "$path1"
                                         << "to"
                                         << "double"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document intInput{{"path1", int{1}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -949,7 +951,7 @@ TEST_F(ExpressionConvertTest, ConvertDateToDouble) {
                                         << "$path1"
                                         << "to"
                                         << "double"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -970,7 +972,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToDouble) {
                                         << "$path1"
                                         << "to"
                                         << "double"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document overflowInput{{"path1", Decimal128("1e309")}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput, &expCtx->variables),
@@ -1000,7 +1002,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToDoubleWithOnError) {
                                         << "double"
                                         << "onError"
                                         << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document overflowInput{{"path1", Decimal128("1e309")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1018,7 +1020,7 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDecimal) {
                                         << "$path1"
                                         << "to"
                                         << "decimal"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document intInput{{"path1", int{1}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1073,7 +1075,7 @@ TEST_F(ExpressionConvertTest, ConvertDateToDecimal) {
                                         << "$path1"
                                         << "to"
                                         << "decimal"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput, &expCtx->variables),
@@ -1093,7 +1095,7 @@ TEST_F(ExpressionConvertTest, ConvertDoubleToInt) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", 1.0}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1134,7 +1136,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToInt) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     int maxInt = std::numeric_limits<int>::max();
     double overflowInt =
@@ -1199,7 +1201,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToIntWithOnError) {
                                         << "int"
                                         << "onError"
                                         << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     int maxInt = std::numeric_limits<int>::max();
     double overflowInt =
@@ -1235,7 +1237,7 @@ TEST_F(ExpressionConvertTest, ConvertDoubleToLong) {
                                         << "$path1"
                                         << "to"
                                         << "long"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", 1.0}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1280,7 +1282,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLong) {
                                         << "$path1"
                                         << "to"
                                         << "long"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     double overflowLong = BSONElement::kLongLongMaxPlusOneAsDouble;
     Document overflowInput{{"path1", overflowLong}};
@@ -1343,7 +1345,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLongWithOnError) {
                                         << "long"
                                         << "onError"
                                         << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     double overflowLong = BSONElement::kLongLongMaxPlusOneAsDouble;
     Document overflowInput{{"path1", overflowLong}};
@@ -1377,7 +1379,7 @@ TEST_F(ExpressionConvertTest, ConvertDecimalToInt) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", Decimal128("1.0")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1418,7 +1420,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToInt) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     int maxInt = std::numeric_limits<int>::max();
     Document overflowInput{{"path1", Decimal128(maxInt).add(Decimal128(1))}};
@@ -1488,7 +1490,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToIntWithOnError) {
                                         << "int"
                                         << "onError"
                                         << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     int maxInt = std::numeric_limits<int>::max();
     Document overflowInput{{"path1", Decimal128(maxInt).add(Decimal128(1))}};
@@ -1526,7 +1528,7 @@ TEST_F(ExpressionConvertTest, ConvertDecimalToLong) {
                                         << "$path1"
                                         << "to"
                                         << "long"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", Decimal128("1.0")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1567,7 +1569,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToLong) {
                                         << "$path1"
                                         << "to"
                                         << "long"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     long long maxVal = std::numeric_limits<long long>::max();
     Document overflowInput{{"path1", Decimal128(std::int64_t{maxVal}).add(Decimal128(1))}};
@@ -1638,7 +1640,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToLongWithOnError) {
                                         << "long"
                                         << "onError"
                                         << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     long long maxVal = std::numeric_limits<long long>::max();
     Document overflowInput{{"path1", Decimal128(std::int64_t{maxVal}).add(Decimal128(1))}};
@@ -1677,7 +1679,7 @@ TEST_F(ExpressionConvertTest, ConvertDateToLong) {
                                         << "$path1"
                                         << "to"
                                         << "long"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123LL)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1691,7 +1693,7 @@ TEST_F(ExpressionConvertTest, ConvertIntToLong) {
                                         << "$path1"
                                         << "to"
                                         << "long"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", 1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1715,7 +1717,7 @@ TEST_F(ExpressionConvertTest, ConvertLongToInt) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document simpleInput{{"path1", 1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1739,7 +1741,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsLongToInt) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     long long maxInt = std::numeric_limits<int>::max();
     Document overflowInput{{"path1", maxInt + 1}};
@@ -1771,7 +1773,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsLongToIntWithOnError) {
                                         << "int"
                                         << "onError"
                                         << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     long long maxInt = std::numeric_limits<int>::max();
     Document overflowInput{{"path1", maxInt + 1}};
@@ -1791,7 +1793,7 @@ TEST_F(ExpressionConvertTest, ConvertBoolToInt) {
                                         << "$path1"
                                         << "to"
                                         << "int"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document boolFalse{{"path1", false}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1809,7 +1811,7 @@ TEST_F(ExpressionConvertTest, ConvertBoolToLong) {
                                         << "$path1"
                                         << "to"
                                         << "long"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document boolFalse{{"path1", false}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -1827,7 +1829,7 @@ TEST_F(ExpressionConvertTest, ConvertNumberToDate) {
                                         << "$path1"
                                         << "to"
                                         << "date"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document longInput{{"path1", 0LL}};
     ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(longInput, &expCtx->variables).getDate()),
@@ -1859,7 +1861,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDate) {
                                         << "$path1"
                                         << "to"
                                         << "date"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document doubleOverflowInput{{"path1", 1.0e100}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleOverflowInput, &expCtx->variables),
@@ -1977,7 +1979,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDateWithOnError) {
                                         << "date"
                                         << "onError"
                                         << "X"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     // Int is explicitly disallowed for date conversions. Clients must use 64-bit long instead.
     Document intInput{{"path1", int{0}}};
@@ -2042,7 +2044,7 @@ TEST_F(ExpressionConvertTest, ConvertObjectIdToDate) {
                                         << "$path1"
                                         << "to"
                                         << "date"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document oidInput{{"path1", OID("59E8A8D8FEDCBA9876543210")}};
 
@@ -2054,12 +2056,12 @@ TEST_F(ExpressionConvertTest, ConvertStringToInt) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '5', to: 'int'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 5, BSONType::NumberInt);
 
     spec = fromjson("{$convert: {input: '" + std::to_string(kIntMax) + "', to: 'int'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), kIntMax, BSONType::NumberInt);
 }
@@ -2068,7 +2070,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToIntOverflow) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '" + std::to_string(kIntMax + 1) + "', to: 'int'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2077,7 +2079,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToIntOverflow) {
                              });
 
     spec = fromjson("{$convert: {input: '" + std::to_string(kIntMin - 1) + "', to: 'int'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2092,13 +2094,13 @@ TEST_F(ExpressionConvertTest, ConvertStringToIntOverflowWithOnError) {
 
     auto spec = fromjson("{$convert: {input: '" + std::to_string(kIntMax + 1) +
                          "', to: 'int', onError: '" + onErrorValue + "'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec = fromjson("{$convert: {input: '" + std::to_string(kIntMin - 1) +
                     "', to: 'int', onError: '" + onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 }
@@ -2107,12 +2109,12 @@ TEST_F(ExpressionConvertTest, ConvertStringToLong) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '5', to: 'long'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 5LL, BSONType::NumberLong);
 
     spec = fromjson("{$convert: {input: '" + std::to_string(kLongMax) + "', to: 'long'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), kLongMax, BSONType::NumberLong);
 }
@@ -2124,7 +2126,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongOverflow) {
     longMaxPlusOneAsString = longMaxPlusOneAsString.substr(0, longMaxPlusOneAsString.find('.'));
 
     auto spec = fromjson("{$convert: {input: '" + longMaxPlusOneAsString + "', to: 'long'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2136,7 +2138,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongOverflow) {
     longMinMinusOneAsString = longMinMinusOneAsString.substr(0, longMinMinusOneAsString.find('.'));
 
     spec = fromjson("{$convert: {input: '" + longMinMinusOneAsString + "', to: 'long'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2149,7 +2151,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongFailsForFloats) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '5.5', to: 'long'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2159,7 +2161,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongFailsForFloats) {
                              });
 
     spec = fromjson("{$convert: {input: '5.0', to: 'long'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2178,7 +2180,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongWithOnError) {
 
     auto spec = fromjson("{$convert: {input: '" + longMaxPlusOneAsString +
                          "', to: 'long', onError: '" + onErrorValue + "'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
@@ -2187,17 +2189,17 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongWithOnError) {
 
     spec = fromjson("{$convert: {input: '" + longMinMinusOneAsString + "', to: 'long', onError: '" +
                     onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec = fromjson("{$convert: {input: '5.5', to: 'long', onError: '" + onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec = fromjson("{$convert: {input: '5.0', to: 'long', onError: '" + onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 }
@@ -2206,27 +2208,27 @@ TEST_F(ExpressionConvertTest, ConvertStringToDouble) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '5', to: 'double'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 5.0, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '5.5', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 5.5, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '.5', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 0.5, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '+5', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 5.0, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '+5.0e42', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 5.0e42, BSONType::NumberDouble);
 }
@@ -2237,13 +2239,13 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleWithPrecisionLoss) {
     // Note that the least significant bits get lost, because the significand of a double is not
     // wide enough for the given input string in its entirety.
     auto spec = fromjson("{$convert: {input: '10000000000000000001', to: 'double'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 1e19, BSONType::NumberDouble);
 
     // Again, some precision is lost in the conversion to double.
     spec = fromjson("{$convert: {input: '1.125000000000000000005', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 1.125, BSONType::NumberDouble);
 }
@@ -2252,7 +2254,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleFailsForInvalidFloats) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '.5.', to: 'double'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2262,7 +2264,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleFailsForInvalidFloats) {
                              });
 
     spec = fromjson("{$convert: {input: '5.5f', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2277,47 +2279,47 @@ TEST_F(ExpressionConvertTest, ConvertInfinityStringsToDouble) {
     auto infValue = std::numeric_limits<double>::infinity();
 
     auto spec = fromjson("{$convert: {input: 'Infinity', to: 'double'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), infValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: 'INF', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), infValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: 'infinity', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), infValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '+InFiNiTy', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), infValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '-Infinity', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), -infValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '-INF', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), -infValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '-InFiNiTy', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), -infValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '-inf', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), -infValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: '-infinity', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), -infValue, BSONType::NumberDouble);
 }
@@ -2326,25 +2328,25 @@ TEST_F(ExpressionConvertTest, ConvertZeroStringsToDouble) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '-0', to: 'double'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     auto result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, 0, BSONType::NumberDouble);
     ASSERT_TRUE(std::signbit(result.getDouble()));
 
     spec = fromjson("{$convert: {input: '-0.0', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, 0, BSONType::NumberDouble);
     ASSERT_TRUE(std::signbit(result.getDouble()));
 
     spec = fromjson("{$convert: {input: '+0', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, 0, BSONType::NumberDouble);
     ASSERT_FALSE(std::signbit(result.getDouble()));
 
     spec = fromjson("{$convert: {input: '+0.0', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, 0, BSONType::NumberDouble);
     ASSERT_FALSE(std::signbit(result.getDouble()));
@@ -2355,29 +2357,29 @@ TEST_F(ExpressionConvertTest, ConvertNanStringsToDouble) {
     auto nanValue = std::numeric_limits<double>::quiet_NaN();
 
     auto spec = fromjson("{$convert: {input: 'nan', to: 'double'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     auto result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_TRUE(std::isnan(result.getDouble()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), nanValue, BSONType::NumberDouble);
 
     spec = fromjson("{$convert: {input: 'Nan', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_TRUE(std::isnan(result.getDouble()));
 
     spec = fromjson("{$convert: {input: 'NaN', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_TRUE(std::isnan(result.getDouble()));
 
     spec = fromjson("{$convert: {input: '-NAN', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_TRUE(std::isnan(result.getDouble()));
 
     spec = fromjson("{$convert: {input: '+NaN', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_TRUE(std::isnan(result.getDouble()));
 }
@@ -2386,7 +2388,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleOverflow) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '" + kDoubleOverflow.toString() + "', to: 'double'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2396,7 +2398,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleOverflow) {
 
     spec =
         fromjson("{$convert: {input: '" + kDoubleNegativeOverflow.toString() + "', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2409,7 +2411,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleUnderflow) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '1E-1000', to: 'double'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate({}, &expCtx->variables),
         AssertionException,
@@ -2421,7 +2423,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleUnderflow) {
         });
 
     spec = fromjson("{$convert: {input: '-1E-1000', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate({}, &expCtx->variables),
         AssertionException,
@@ -2439,23 +2441,23 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleWithOnError) {
 
     auto spec = fromjson("{$convert: {input: '" + kDoubleOverflow.toString() +
                          "', to: 'double', onError: '" + onErrorValue + "'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec = fromjson("{$convert: {input: '" + kDoubleNegativeOverflow.toString() +
                     "', to: 'double', onError: '" + onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec = fromjson("{$convert: {input: '.5.', to: 'double', onError: '" + onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec = fromjson("{$convert: {input: '5.5f', to: 'double', onError: '" + onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 }
@@ -2464,31 +2466,31 @@ TEST_F(ExpressionConvertTest, ConvertStringToDecimal) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '5', to: 'decimal'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), 5, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '2.02', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), Decimal128("2.02"), BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '2.02E200', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate({}, &expCtx->variables),
                                    Decimal128("2.02E200"),
                                    BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '" + Decimal128::kLargestPositive.toString() +
                     "', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate({}, &expCtx->variables),
                                    Decimal128::kLargestPositive,
                                    BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '" + Decimal128::kLargestNegative.toString() +
                     "', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate({}, &expCtx->variables),
                                    Decimal128::kLargestNegative,
                                    BSONType::NumberDecimal);
@@ -2500,47 +2502,47 @@ TEST_F(ExpressionConvertTest, ConvertInfinityStringsToDecimal) {
     auto negInfValue = Decimal128::kNegativeInfinity;
 
     auto spec = fromjson("{$convert: {input: 'Infinity', to: 'decimal'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), infValue, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: 'INF', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), infValue, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: 'infinity', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), infValue, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '+InFiNiTy', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), infValue, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '-Infinity', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), negInfValue, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '-INF', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), negInfValue, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '-InFiNiTy', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), negInfValue, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '-inf', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), negInfValue, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '-infinity', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), negInfValue, BSONType::NumberDecimal);
 }
@@ -2551,37 +2553,37 @@ TEST_F(ExpressionConvertTest, ConvertNanStringsToDecimal) {
     auto negativeNan = Decimal128::kNegativeNaN;
 
     auto spec = fromjson("{$convert: {input: 'nan', to: 'decimal'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), positiveNan, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: 'Nan', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), positiveNan, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: 'NaN', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), positiveNan, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '+NaN', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), positiveNan, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '-NAN', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), negativeNan, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '-nan', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), negativeNan, BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '-NaN', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), negativeNan, BSONType::NumberDecimal);
 }
@@ -2590,28 +2592,28 @@ TEST_F(ExpressionConvertTest, ConvertZeroStringsToDecimal) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '-0', to: 'decimal'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     auto result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, 0, BSONType::NumberDecimal);
     ASSERT_TRUE(result.getDecimal().isZero());
     ASSERT_TRUE(result.getDecimal().isNegative());
 
     spec = fromjson("{$convert: {input: '-0.0', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, 0, BSONType::NumberDecimal);
     ASSERT_TRUE(result.getDecimal().isZero());
     ASSERT_TRUE(result.getDecimal().isNegative());
 
     spec = fromjson("{$convert: {input: '+0', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, 0, BSONType::NumberDecimal);
     ASSERT_TRUE(result.getDecimal().isZero());
     ASSERT_FALSE(result.getDecimal().isNegative());
 
     spec = fromjson("{$convert: {input: '+0.0', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, 0, BSONType::NumberDecimal);
     ASSERT_TRUE(result.getDecimal().isZero());
@@ -2622,7 +2624,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDecimalOverflow) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '1E6145', to: 'decimal'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2633,7 +2635,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDecimalOverflow) {
                              });
 
     spec = fromjson("{$convert: {input: '-1E6145', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2648,7 +2650,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDecimalUnderflow) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '1E-6178', to: 'decimal'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2659,7 +2661,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDecimalUnderflow) {
                              });
 
     spec = fromjson("{$convert: {input: '-1E-6177', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2675,12 +2677,12 @@ TEST_F(ExpressionConvertTest, ConvertStringToDecimalWithPrecisionLoss) {
 
     auto spec =
         fromjson("{$convert: {input: '10000000000000000000000000000000001', to: 'decimal'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), Decimal128("1e34"), BSONType::NumberDecimal);
 
     spec = fromjson("{$convert: {input: '1.1250000000000000000000000000000001', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), Decimal128("1.125"), BSONType::NumberDecimal);
 }
@@ -2691,13 +2693,13 @@ TEST_F(ExpressionConvertTest, ConvertStringToDecimalWithOnError) {
 
     auto spec =
         fromjson("{$convert: {input: '1E6145', to: 'decimal', onError: '" + onErrorValue + "'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec =
         fromjson("{$convert: {input: '-1E-6177', to: 'decimal', onError: '" + onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 }
@@ -2710,37 +2712,37 @@ TEST_F(ExpressionConvertTest, ConvertStringToNumberFailsForHexStrings) {
     };
 
     auto spec = fromjson("{$convert: {input: '0xFF', to: 'int'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate({}, &expCtx->variables), AssertionException, invalidHexFailure);
 
     spec = fromjson("{$convert: {input: '0xFF', to: 'long'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate({}, &expCtx->variables), AssertionException, invalidHexFailure);
 
     spec = fromjson("{$convert: {input: '0xFF', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate({}, &expCtx->variables), AssertionException, invalidHexFailure);
 
     spec = fromjson("{$convert: {input: '0xFF', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate({}, &expCtx->variables), AssertionException, invalidHexFailure);
 
     spec = fromjson("{$convert: {input: '0x00', to: 'int'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate({}, &expCtx->variables), AssertionException, invalidHexFailure);
 
     spec = fromjson("{$convert: {input: '0x00', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(
         convertExp->evaluate({}, &expCtx->variables), AssertionException, invalidHexFailure);
 
     spec = fromjson("{$convert: {input: 'FF', to: 'double'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2750,7 +2752,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToNumberFailsForHexStrings) {
                              });
 
     spec = fromjson("{$convert: {input: 'FF', to: 'decimal'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2765,12 +2767,12 @@ TEST_F(ExpressionConvertTest, ConvertStringToOID) {
     auto oid = OID::gen();
 
     auto spec = fromjson("{$convert: {input: '" + oid.toString() + "', to: 'objectId'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), oid, BSONType::jstOID);
 
     spec = fromjson("{$convert: {input: '123456789abcdef123456789', to: 'objectId'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate({}, &expCtx->variables),
                                    OID("123456789abcdef123456789"),
                                    BSONType::jstOID);
@@ -2780,7 +2782,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToOIDFailsForInvalidHexStrings) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: 'InvalidHexButSizeCorrect', to: 'objectId'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2790,7 +2792,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToOIDFailsForInvalidHexStrings) {
                              });
 
     spec = fromjson("{$convert: {input: 'InvalidSize', to: 'objectId'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2800,7 +2802,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToOIDFailsForInvalidHexStrings) {
                              });
 
     spec = fromjson("{$convert: {input: '0x123456789abcdef123456789', to: 'objectId'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate({}, &expCtx->variables),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -2817,19 +2819,19 @@ TEST_F(ExpressionConvertTest, ConvertStringToOIDWithOnError) {
     auto spec =
         fromjson("{$convert: {input: 'InvalidHexButSizeCorrect', to: 'objectId', onError: '" +
                  onErrorValue + "'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec = fromjson("{$convert: {input: 'InvalidSize', to: 'objectId', onError: '" + onErrorValue +
                     "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 
     spec = fromjson("{$convert: {input: '0x123456789abcdef123456789', to: 'objectId', onError: '" +
                     onErrorValue + "'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate({}, &expCtx->variables), onErrorValue, BSONType::String);
 }
@@ -2838,13 +2840,13 @@ TEST_F(ExpressionConvertTest, ConvertStringToDateRejectsUnparsableString) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '60.Monday1770/06:59', to: 'date'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_CODE(convertExp->evaluate({}, &expCtx->variables),
                        AssertionException,
                        ErrorCodes::ConversionFailure);
 
     spec = fromjson("{$convert: {input: 'Definitely not a date', to: 'date'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_CODE(convertExp->evaluate({}, &expCtx->variables),
                        AssertionException,
                        ErrorCodes::ConversionFailure);
@@ -2854,13 +2856,13 @@ TEST_F(ExpressionConvertTest, ConvertStringToDateRejectsTimezoneNameInString) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '2017-07-13T10:02:57 Europe/London', to: 'date'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_CODE(convertExp->evaluate({}, &expCtx->variables),
                        AssertionException,
                        ErrorCodes::ConversionFailure);
 
     spec = fromjson("{$convert: {input: 'July 4, 2017 Europe/London', to: 'date'}}");
-    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_CODE(convertExp->evaluate({}, &expCtx->variables),
                        AssertionException,
                        ErrorCodes::ConversionFailure);
@@ -2870,7 +2872,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDate) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'date'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto result =
         convertExp->evaluate({{"path1", Value("2017-07-06T12:35:37Z"_sd)}}, &expCtx->variables);
@@ -2891,7 +2893,7 @@ TEST_F(ExpressionConvertTest, ConvertStringWithTimezoneToDate) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'date'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto result = convertExp->evaluate({{"path1", Value("2017-07-14T12:02:44.771 GMT+02:00"_sd)}},
                                        &expCtx->variables);
@@ -2908,7 +2910,7 @@ TEST_F(ExpressionConvertTest, ConvertVerbalStringToDate) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'date'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto result = convertExp->evaluate({{"path1", Value("July 4th, 2017"_sd)}}, &expCtx->variables);
     ASSERT_EQ(result.getType(), BSONType::Date);
@@ -2929,7 +2931,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDateWithOnError) {
 
     auto spec =
         fromjson("{$convert: {input: '$path1', to: 'date', onError: '" + onErrorValue + "'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto result = convertExp->evaluate({{"path1", Value("Not a date"_sd)}}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, onErrorValue, BSONType::String);
@@ -2948,7 +2950,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDateWithOnNull) {
 
     auto spec =
         fromjson("{$convert: {input: '$path1', to: 'date', onNull: '" + onNullValue + "'}}");
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto result = convertExp->evaluate({}, &expCtx->variables);
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, onNullValue, BSONType::String);
@@ -2964,7 +2966,7 @@ TEST_F(ExpressionConvertTest, FormatDouble) {
                                         << "$path1"
                                         << "to"
                                         << "string"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", 0.0}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -3037,7 +3039,7 @@ TEST_F(ExpressionConvertTest, FormatObjectId) {
                                         << "$path1"
                                         << "to"
                                         << "string"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", OID("000000000000000000000000")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(zeroInput, &expCtx->variables),
@@ -3057,7 +3059,7 @@ TEST_F(ExpressionConvertTest, FormatBool) {
                                         << "$path1"
                                         << "to"
                                         << "string"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document trueInput{{"path1", true}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -3075,7 +3077,7 @@ TEST_F(ExpressionConvertTest, FormatDate) {
                                         << "$path1"
                                         << "to"
                                         << "string"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document epochInput{{"path1", Date_t::fromMillisSinceEpoch(0LL)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(epochInput, &expCtx->variables),
@@ -3095,7 +3097,7 @@ TEST_F(ExpressionConvertTest, FormatInt) {
                                         << "$path1"
                                         << "to"
                                         << "string"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", int{0}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -3117,7 +3119,7 @@ TEST_F(ExpressionConvertTest, FormatLong) {
                                         << "$path1"
                                         << "to"
                                         << "string"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", 0LL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -3141,7 +3143,7 @@ TEST_F(ExpressionConvertTest, FormatDecimal) {
                                         << "$path1"
                                         << "to"
                                         << "string"));
-    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     Document zeroInput{{"path1", Decimal128("0")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
@@ -3253,15 +3255,15 @@ TEST_F(ExpressionConvertShortcutsTest, RejectsMoreThanOneInput) {
     auto expCtx = getExpCtx();
 
     BSONObj spec = BSON("$toInt" << BSON_ARRAY(1 << 3));
-    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
                        50723);
     spec = BSON("$toLong" << BSON_ARRAY(1 << 3));
-    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
                        50723);
     spec = BSON("$toDouble" << BSON_ARRAY(1 << 3));
-    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
                        50723);
 }
@@ -3270,15 +3272,15 @@ TEST_F(ExpressionConvertShortcutsTest, RejectsZeroInputs) {
     auto expCtx = getExpCtx();
 
     BSONObj spec = BSON("$toInt" << BSONArray());
-    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
                        50723);
     spec = BSON("$toLong" << BSONArray());
-    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
                        50723);
     spec = BSON("$toDouble" << BSONArray());
-    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
                        AssertionException,
                        50723);
 }
@@ -3288,15 +3290,15 @@ TEST_F(ExpressionConvertShortcutsTest, AcceptsSingleArgumentInArrayOrByItself) {
 
     BSONObj spec = BSON("$toInt"
                         << "1");
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
 
     spec = BSON("$toInt" << BSON_ARRAY("1"));
-    convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
 
     spec = BSON("$toInt" << BSON_ARRAY(BSON_ARRAY("1")));
-    convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_THROWS_CODE(convert->evaluate({}, &expCtx->variables),
                        AssertionException,
                        ErrorCodes::ConversionFailure);
@@ -3307,7 +3309,7 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToInts) {
 
     BSONObj spec = BSON("$toInt"
                         << "1");
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(1), BSONType::NumberInt);
@@ -3318,7 +3320,7 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToLongs) {
 
     BSONObj spec = BSON("$toLong"
                         << "1");
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(1), BSONType::NumberLong);
@@ -3329,7 +3331,7 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToDoubles) {
 
     BSONObj spec = BSON("$toDouble"
                         << "1");
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(1), BSONType::NumberDouble);
@@ -3340,7 +3342,7 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToDecimals) {
 
     BSONObj spec = BSON("$toDecimal"
                         << "1");
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(1), BSONType::NumberDecimal);
@@ -3350,7 +3352,7 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToDates) {
     auto expCtx = getExpCtx();
 
     BSONObj spec = BSON("$toDate" << 0LL);
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}, &expCtx->variables),
                                    Value(Date_t::fromMillisSinceEpoch(0)),
@@ -3362,7 +3364,7 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToObjectIds) {
 
     const auto hexString = "deadbeefdeadbeefdeadbeef"_sd;
     BSONObj spec = BSON("$toObjectId" << hexString);
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}, &expCtx->variables),
                                    Value(OID::createFromString(hexString)),
@@ -3373,7 +3375,7 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToString) {
     auto expCtx = getExpCtx();
 
     BSONObj spec = BSON("$toString" << 1);
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value("1"_sd), BSONType::String);
@@ -3383,7 +3385,7 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToBool) {
     auto expCtx = getExpCtx();
 
     BSONObj spec = BSON("$toBool" << 1);
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(true), BSONType::Bool);
@@ -3393,14 +3395,14 @@ TEST_F(ExpressionConvertShortcutsTest, ReturnsNullOnNullishInput) {
     auto expCtx = getExpCtx();
 
     BSONObj spec = BSON("$toBool" << BSONNULL);
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(BSONNULL), BSONType::jstNULL);
 
     spec = BSON("$toInt"
                 << "$missing");
-    convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(BSONNULL), BSONType::jstNULL);
@@ -3411,7 +3413,7 @@ TEST_F(ExpressionConvertShortcutsTest, ThrowsOnConversionFailure) {
 
     BSONObj spec = BSON("$toInt"
                         << "not an int");
-    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_THROWS_CODE(convert->evaluate({}, &expCtx->variables),
                        AssertionException,
@@ -3419,7 +3421,7 @@ TEST_F(ExpressionConvertShortcutsTest, ThrowsOnConversionFailure) {
 
     spec = BSON("$toObjectId"
                 << "not all hex values");
-    convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convert = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_THROWS_CODE(convert->evaluate({}, &expCtx->variables),
                        AssertionException,

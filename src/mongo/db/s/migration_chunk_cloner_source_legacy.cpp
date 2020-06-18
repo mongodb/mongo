@@ -242,8 +242,7 @@ MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
 Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
                                                     const UUID& migrationId,
                                                     const LogicalSessionId& lsid,
-                                                    TxnNumber txnNumber,
-                                                    bool resumableRangeDeleterDisabled) {
+                                                    TxnNumber txnNumber) {
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());
 
@@ -296,8 +295,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
                                             _args.getMinKey(),
                                             _args.getMaxKey(),
                                             _shardKeyPattern.toBSON(),
-                                            _args.getSecondaryThrottle(),
-                                            resumableRangeDeleterDisabled);
+                                            _args.getSecondaryThrottle());
 
     // Commands sent to shards that accept writeConcern, must always have writeConcern. So if the
     // StartChunkCloneRequest didn't add writeConcern (from secondaryThrottle), then we add the
@@ -602,46 +600,50 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
         _jumboChunkCloneState->clonerExec->restoreState();
     }
 
-    BSONObj obj;
-    RecordId recordId;
     PlanExecutor::ExecState execState;
+    try {
+        BSONObj obj;
+        RecordId recordId;
+        while (PlanExecutor::ADVANCED ==
+               (execState = _jumboChunkCloneState->clonerExec->getNext(
+                    &obj, _jumboChunkCloneState->stashedRecordId ? nullptr : &recordId))) {
 
-    while (PlanExecutor::ADVANCED ==
-           (execState = _jumboChunkCloneState->clonerExec->getNext(
-                &obj, _jumboChunkCloneState->stashedRecordId ? nullptr : &recordId))) {
+            stdx::unique_lock<Latch> lk(_mutex);
+            _jumboChunkCloneState->clonerState = execState;
+            lk.unlock();
 
-        stdx::unique_lock<Latch> lk(_mutex);
-        _jumboChunkCloneState->clonerState = execState;
-        lk.unlock();
+            opCtx->checkForInterrupt();
 
-        opCtx->checkForInterrupt();
+            // Use the builder size instead of accumulating the document sizes directly so
+            // that we take into consideration the overhead of BSONArray indices.
+            if (arrBuilder->arrSize() &&
+                (arrBuilder->len() + obj.objsize() + 1024) > BSONObjMaxUserSize) {
+                _jumboChunkCloneState->clonerExec->enqueue(obj);
 
-        // Use the builder size instead of accumulating the document sizes directly so
-        // that we take into consideration the overhead of BSONArray indices.
-        if (arrBuilder->arrSize() &&
-            (arrBuilder->len() + obj.objsize() + 1024) > BSONObjMaxUserSize) {
-            _jumboChunkCloneState->clonerExec->enqueue(obj);
+                // Stash the recordId we just read to add to the next batch.
+                if (!recordId.isNull()) {
+                    invariant(!_jumboChunkCloneState->stashedRecordId);
+                    _jumboChunkCloneState->stashedRecordId = std::move(recordId);
+                }
 
-            // Stash the recordId we just read to add to the next batch.
-            if (!recordId.isNull()) {
-                invariant(!_jumboChunkCloneState->stashedRecordId);
-                _jumboChunkCloneState->stashedRecordId = std::move(recordId);
+                break;
             }
 
-            break;
+            Snapshotted<BSONObj> doc;
+            invariant(collection->findDoc(
+                opCtx, _jumboChunkCloneState->stashedRecordId.value_or(recordId), &doc));
+            arrBuilder->append(doc.value());
+            _jumboChunkCloneState->stashedRecordId = boost::none;
+
+            lk.lock();
+            _jumboChunkCloneState->docsCloned++;
+            lk.unlock();
+
+            ShardingStatistics::get(opCtx).countDocsClonedOnDonor.addAndFetch(1);
         }
-
-        Snapshotted<BSONObj> doc;
-        invariant(collection->findDoc(
-            opCtx, _jumboChunkCloneState->stashedRecordId.value_or(recordId), &doc));
-        arrBuilder->append(doc.value());
-        _jumboChunkCloneState->stashedRecordId = boost::none;
-
-        lk.lock();
-        _jumboChunkCloneState->docsCloned++;
-        lk.unlock();
-
-        ShardingStatistics::get(opCtx).countDocsClonedOnDonor.addAndFetch(1);
+    } catch (DBException& exception) {
+        exception.addContext("Executor error while scanning for documents belonging to chunk");
+        throw;
     }
 
     stdx::unique_lock<Latch> lk(_mutex);
@@ -650,10 +652,6 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
 
     _jumboChunkCloneState->clonerExec->saveState();
     _jumboChunkCloneState->clonerExec->detachFromOperationContext();
-
-    if (PlanExecutor::FAILURE == execState)
-        uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-            "Executor error while scanning for documents belonging to chunk"));
 }
 
 void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromCloneLocs(OperationContext* opCtx,
@@ -831,7 +829,7 @@ MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(OperationContext* opCtx,
                                       min,
                                       max,
                                       BoundInclusion::kIncludeStartKeyOnly,
-                                      PlanExecutor::YIELD_AUTO);
+                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 }
 
 Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opCtx) {
@@ -876,33 +874,32 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     bool isLargeChunk = false;
     unsigned long long recCount = 0;
 
-    BSONObj obj;
-    RecordId recordId;
-    PlanExecutor::ExecState state;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &recordId))) {
-        Status interruptStatus = opCtx->checkForInterruptNoAssert();
-        if (!interruptStatus.isOK()) {
-            return interruptStatus;
-        }
+    try {
+        BSONObj obj;
+        RecordId recordId;
+        while (PlanExecutor::ADVANCED == exec->getNext(&obj, &recordId)) {
+            Status interruptStatus = opCtx->checkForInterruptNoAssert();
+            if (!interruptStatus.isOK()) {
+                return interruptStatus;
+            }
 
-        if (!isLargeChunk) {
-            stdx::lock_guard<Latch> lk(_mutex);
-            _cloneLocs.insert(recordId);
-        }
+            if (!isLargeChunk) {
+                stdx::lock_guard<Latch> lk(_mutex);
+                _cloneLocs.insert(recordId);
+            }
 
-        if (++recCount > maxRecsWhenFull) {
-            isLargeChunk = true;
+            if (++recCount > maxRecsWhenFull) {
+                isLargeChunk = true;
 
-            if (_forceJumbo) {
-                _cloneLocs.clear();
-                break;
+                if (_forceJumbo) {
+                    _cloneLocs.clear();
+                    break;
+                }
             }
         }
-    }
-
-    if (PlanExecutor::FAILURE == state) {
-        return WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-            "Executor error while scanning for documents belonging to chunk");
+    } catch (DBException& exception) {
+        exception.addContext("Executor error while scanning for documents belonging to chunk");
+        throw;
     }
 
     const uint64_t collectionAverageObjectSize = collection->averageObjectSize(opCtx);

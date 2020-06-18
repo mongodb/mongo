@@ -34,27 +34,53 @@ static inline int
 read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
 {
     WT_DECL_RET;
+    uint64_t start, now;
 
     /*
      * Read operations wait out prepare-conflicts. (As part of the snapshot isolation checks, we
      * repeat reads that succeeded before, they should be repeatable.)
      */
+    __wt_seconds(NULL, &start);
     switch (op) {
     case NEXT:
-        while ((ret = cursor->next(cursor)) == WT_PREPARE_CONFLICT)
+        while ((ret = cursor->next(cursor)) == WT_PREPARE_CONFLICT) {
             __wt_yield();
+
+            /* Ignore clock reset. */
+            __wt_seconds(NULL, &now);
+            testutil_assertfmt(now < start || now - start < 60,
+              "%s: timed out with prepare-conflict", "WT_CURSOR.next");
+        }
         break;
     case PREV:
-        while ((ret = cursor->prev(cursor)) == WT_PREPARE_CONFLICT)
+        while ((ret = cursor->prev(cursor)) == WT_PREPARE_CONFLICT) {
             __wt_yield();
+
+            /* Ignore clock reset. */
+            __wt_seconds(NULL, &now);
+            testutil_assertfmt(now < start || now - start < 60,
+              "%s: timed out with prepare-conflict", "WT_CURSOR.prev");
+        }
         break;
     case SEARCH:
-        while ((ret = cursor->search(cursor)) == WT_PREPARE_CONFLICT)
+        while ((ret = cursor->search(cursor)) == WT_PREPARE_CONFLICT) {
             __wt_yield();
+
+            /* Ignore clock reset. */
+            __wt_seconds(NULL, &now);
+            testutil_assertfmt(now < start || now - start < 60,
+              "%s: timed out with prepare-conflict", "WT_CURSOR.search");
+        }
         break;
     case SEARCH_NEAR:
-        while ((ret = cursor->search_near(cursor, exactp)) == WT_PREPARE_CONFLICT)
+        while ((ret = cursor->search_near(cursor, exactp)) == WT_PREPARE_CONFLICT) {
             __wt_yield();
+
+            /* Ignore clock reset. */
+            __wt_seconds(NULL, &now);
+            testutil_assertfmt(now < start || now - start < 60,
+              "%s: timed out with prepare-conflict", "WT_CURSOR.search_near");
+        }
         break;
     }
     return (ret);
@@ -71,12 +97,7 @@ rng(WT_RAND_STATE *rnd)
     if (rnd == NULL)
         rnd = &g.rnd;
 
-    /*
-     * Multithreaded runs log/replay until they get to the operations phase, then turn off logging
-     * and replay because threaded operation order can't be replayed. Do that check inline so it's a
-     * cheap call once thread performance starts to matter.
-     */
-    return (g.randfp == NULL || g.rand_log_stop ? __wt_random(rnd) : rng_slow(rnd));
+    return (__wt_random(rnd));
 }
 
 /*
@@ -210,3 +231,39 @@ lock_writeunlock(WT_SESSION *session, RWLOCK *lock)
         testutil_check(pthread_rwlock_unlock(&lock->l.pthread));
     }
 }
+
+#define trace_msg(fmt, ...)                                                                        \
+    do {                                                                                           \
+        if (g.trace) {                                                                             \
+            struct timespec __ts;                                                                  \
+            WT_SESSION *__s = g.trace_session;                                                     \
+            __wt_epoch((WT_SESSION_IMPL *)__s, &__ts);                                             \
+            testutil_check(                                                                        \
+              __s->log_printf(__s, "[%" PRIuMAX ":%" PRIuMAX "][%s] " fmt, (uintmax_t)__ts.tv_sec, \
+                (uintmax_t)__ts.tv_nsec / WT_THOUSAND, g.tidbuf, __VA_ARGS__));                    \
+        }                                                                                          \
+    } while (0)
+#define trace_op(tinfo, fmt, ...)                                                                  \
+    do {                                                                                           \
+        if (g.trace) {                                                                             \
+            struct timespec __ts;                                                                  \
+            WT_SESSION *__s = (tinfo)->trace;                                                      \
+            __wt_epoch((WT_SESSION_IMPL *)__s, &__ts);                                             \
+            testutil_check(                                                                        \
+              __s->log_printf(__s, "[%" PRIuMAX ":%" PRIuMAX "][%s] " fmt, (uintmax_t)__ts.tv_sec, \
+                (uintmax_t)__ts.tv_nsec / WT_THOUSAND, tinfo->tidbuf, __VA_ARGS__));               \
+        }                                                                                          \
+    } while (0)
+
+/*
+ * trace_bytes --
+ *     Return a byte string formatted for display.
+ */
+static inline const char *
+trace_bytes(TINFO *tinfo, const uint8_t *data, size_t size)
+{
+    testutil_check(
+      __wt_raw_to_esc_hex((WT_SESSION_IMPL *)tinfo->session, data, size, &tinfo->vprint));
+    return (tinfo->vprint.mem);
+}
+#define trace_item(tinfo, buf) trace_bytes(tinfo, (buf)->data, (buf)->size)

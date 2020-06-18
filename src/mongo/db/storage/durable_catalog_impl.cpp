@@ -220,11 +220,12 @@ public:
         // index, we should never see it again anyway.
         if (_engine->getStorageEngine()->supportsPendingDrops() && commitTimestamp) {
             LOGV2(22206,
-                  "Deferring table drop for index '{indexName}' on collection "
-                  "'{indexNss}{uuid_uuid}. Ident: '{ident}', commit timestamp: '{commitTimestamp}'",
-                  "indexName"_attr = _indexName,
-                  "indexNss"_attr = _indexNss,
-                  "uuid_uuid"_attr = (_uuid ? " (" + _uuid->toString() + ")'" : ""),
+                  "Deferring table drop for index '{index}' on collection "
+                  "'{namespace}{uuid}. Ident: '{ident}', commit timestamp: '{commitTimestamp}'",
+                  "Deferring table drop for index",
+                  "index"_attr = _indexName,
+                  logAttrs(_indexNss),
+                  "uuid"_attr = _uuid,
                   "ident"_attr = _ident,
                   "commitTimestamp"_attr = commitTimestamp);
             _engine->addDropPendingIdent(*commitTimestamp, _indexNss, _ident);
@@ -352,7 +353,9 @@ DurableCatalogImpl::FeatureTracker::FeatureBits DurableCatalogImpl::FeatureTrack
     if (!nonRepairableFeaturesStatus.isOK()) {
         LOGV2_ERROR(22215,
                     "error: exception extracting typed field with obj:{obj}",
-                    "obj"_attr = redact(obj));
+                    "Exception extracting typed field from obj",
+                    "obj"_attr = redact(obj),
+                    "fieldName"_attr = kNonRepairableFeaturesFieldName);
         fassert(40111, nonRepairableFeaturesStatus);
     }
 
@@ -362,7 +365,9 @@ DurableCatalogImpl::FeatureTracker::FeatureBits DurableCatalogImpl::FeatureTrack
     if (!repairableFeaturesStatus.isOK()) {
         LOGV2_ERROR(22216,
                     "error: exception extracting typed field with obj:{obj}",
-                    "obj"_attr = redact(obj));
+                    "Exception extracting typed field from obj",
+                    "obj"_attr = redact(obj),
+                    "fieldName"_attr = kRepairableFeaturesFieldName);
         fassert(40112, repairableFeaturesStatus);
     }
 
@@ -882,10 +887,11 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId cata
             auto storageEngine = engine->getStorageEngine();
             if (storageEngine->supportsPendingDrops() && commitTimestamp) {
                 LOGV2(22214,
-                      "Deferring table drop for collection '{entry_nss}'. Ident: {entry_ident}, "
+                      "Deferring table drop for collection '{namespace}'. Ident: {ident}, "
                       "commit timestamp: {commitTimestamp}",
-                      "entry_nss"_attr = entry.nss,
-                      "entry_ident"_attr = entry.ident,
+                      "Deferring table drop for collection",
+                      logAttrs(entry.nss),
+                      "ident"_attr = entry.ident,
                       "commitTimestamp"_attr = commitTimestamp);
                 engine->addDropPendingIdent(*commitTimestamp, entry.nss, entry.ident);
             } else {

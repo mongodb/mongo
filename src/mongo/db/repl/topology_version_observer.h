@@ -93,6 +93,16 @@ public:
 
     std::string toString() const;
 
+    /**
+     * Returns true if this TopologyVersionObserver background thread has stopped.
+     *
+     * Note that this funtion only returns true after _thread has started and ended, thus implies
+     * that getCached() will never return a valid IsMasterResponse again.
+     */
+    bool isShutdown() const noexcept {
+        return _state.loadRelaxed() == State::kShutdown;
+    }
+
 private:
     enum class State {
         kUninitialized,
@@ -100,7 +110,7 @@ private:
         kShutdown,
     };
 
-    void _cacheIsMasterResponse(OperationContext*, boost::optional<TopologyVersion>) noexcept;
+    void _cacheIsMasterResponse(OperationContext*, boost::optional<TopologyVersion>);
 
     void _workerThreadBody() noexcept;
 

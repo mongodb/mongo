@@ -66,12 +66,11 @@ private:
                        CursorId id) const final {
         boost::optional<AutoStatsTracker> statsTracker;
         if (!nss.isCollectionlessCursorNamespace()) {
-            const boost::optional<int> dbProfilingLevel = boost::none;
             statsTracker.emplace(opCtx,
                                  nss,
                                  Top::LockType::NotLocked,
                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                 dbProfilingLevel);
+                                 CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nss.db()));
         }
 
         auto cursorManager = CursorManager::get(opCtx);

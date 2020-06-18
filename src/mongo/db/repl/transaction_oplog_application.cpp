@@ -33,7 +33,6 @@
 
 #include "mongo/db/repl/transaction_oplog_application.h"
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"

@@ -53,9 +53,10 @@ struct __wt_track_shared {
     /*
      * Physical information about the file block.
      */
-    WT_ADDR addr;  /* Page address */
-    uint32_t size; /* Page size */
-    uint64_t gen;  /* Page generation */
+    WT_TIME_AGGREGATE ta; /* Timestamp information */
+    WT_ADDR addr;         /* Page address */
+    uint32_t size;        /* Page size */
+    uint64_t gen;         /* Page generation */
 
     /*
      * Pages that reference overflow pages contain a list of the overflow pages they reference. We
@@ -81,6 +82,7 @@ struct __wt_track {
 #define trk_ovfl_cnt shared->ovfl_cnt
 #define trk_ovfl_slot shared->ovfl_slot
 #define trk_size shared->size
+#define trk_ta shared->ta
     WT_TRACK_SHARED *shared; /* Shared information */
 
     WT_STUFF *ss; /* Enclosing stuff */
@@ -186,8 +188,6 @@ __slvg_checkpoint(WT_SESSION_IMPL *session, WT_REF *root)
     __wt_seconds(session, &ckptbase->sec);
     WT_ERR(__wt_metadata_search(session, dhandle->name, &config));
     WT_ERR(__wt_meta_block_metadata(session, config, ckptbase));
-    __wt_time_aggregate_init(&ckptbase->ta);
-    ckptbase->write_gen = btree->write_gen;
     F_SET(ckptbase, WT_CKPT_ADD);
 
     /*
@@ -596,6 +596,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
           trk->col_stop);
         break;
     case WT_PAGE_COL_VAR:
+        WT_TIME_AGGREGATE_INIT_MAX(&trk->trk_ta);
+
         /*
          * Column-store variable-length format: the start key can be taken from the block's header,
          * stop key requires walking the page.
@@ -603,6 +605,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
         stop_recno = dsk->recno;
         WT_CELL_FOREACH_KV (session, dsk, unpack) {
             stop_recno += __wt_cell_rle(&unpack);
+
+            WT_TIME_AGGREGATE_UPDATE(&trk->trk_ta, &unpack.tw);
         }
         WT_CELL_FOREACH_END;
 
@@ -617,6 +621,12 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
         WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
         break;
     case WT_PAGE_ROW_LEAF:
+        WT_TIME_AGGREGATE_INIT_MAX(&trk->trk_ta);
+        WT_CELL_FOREACH_KV (session, dsk, unpack) {
+            WT_TIME_AGGREGATE_UPDATE(&trk->trk_ta, &unpack.tw);
+        }
+        WT_CELL_FOREACH_END;
+
         /*
          * Row-store format: copy the first and last keys on the page. Keys are prefix-compressed,
          * the simplest and slowest thing to do is instantiate the in-memory page, then instantiate
@@ -1159,12 +1169,8 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
         ref->home = page;
         ref->page = NULL;
 
-        /*
-         * Salvage doesn't read tree internal pages, so all pages are immediately durable,
-         * regardless of a value's timestamps or transaction IDs.
-         */
         WT_ERR(__wt_calloc_one(session, &addr));
-        __wt_time_aggregate_init(&addr->ta);
+        WT_TIME_AGGREGATE_COPY(&addr->ta, &trk->trk_ta);
         WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
         addr->size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
@@ -1762,12 +1768,8 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
         ref->home = page;
         ref->page = NULL;
 
-        /*
-         * Salvage doesn't read tree internal pages, so all pages are immediately durable,
-         * regardless of a value's timestamps or transaction IDs.
-         */
         WT_ERR(__wt_calloc_one(session, &addr));
-        __wt_time_aggregate_init(&addr->ta);
+        WT_TIME_AGGREGATE_COPY(&addr->ta, &trk->trk_ta);
         WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
         addr->size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;

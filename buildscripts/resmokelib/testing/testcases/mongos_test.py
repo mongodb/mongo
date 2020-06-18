@@ -1,9 +1,9 @@
 """The unittest.TestCase for mongos --test."""
 
-from . import interface
-from ... import config
-from ... import core
-from ... import utils
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.testcases import interface
 
 
 class MongosTestCase(interface.ProcessTestCase):

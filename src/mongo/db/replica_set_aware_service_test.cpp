@@ -42,6 +42,7 @@ public:
     int numCallsOnStepUpBegin{0};
     int numCallsOnStepUpComplete{0};
     int numCallsOnStepDown{0};
+    int numCallsOnBecomeArbiter{0};
 
 protected:
     void onStepUpBegin(OperationContext* opCtx) override {
@@ -54,6 +55,10 @@ protected:
 
     void onStepDown() override {
         numCallsOnStepDown++;
+    }
+
+    void onBecomeArbiter() override {
+        numCallsOnBecomeArbiter++;
     }
 };
 
@@ -131,6 +136,12 @@ private:
         ASSERT_EQ(numCallsOnStepDown, ServiceB::get(getServiceContext())->numCallsOnStepDown - 1);
         TestService::onStepDown();
     }
+
+    void onBecomeArbiter() final {
+        ASSERT_EQ(numCallsOnBecomeArbiter,
+                  ServiceB::get(getServiceContext())->numCallsOnBecomeArbiter - 1);
+        TestService::onBecomeArbiter();
+    }
 };
 
 const auto getServiceC = ServiceContext::declareDecoration<ServiceC>();
@@ -160,14 +171,17 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
+    ASSERT_EQ(0, a->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(0, b->numCallsOnStepUpBegin);
     ASSERT_EQ(0, b->numCallsOnStepUpComplete);
     ASSERT_EQ(0, b->numCallsOnStepDown);
+    ASSERT_EQ(0, b->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(0, c->numCallsOnStepUpBegin);
     ASSERT_EQ(0, c->numCallsOnStepUpComplete);
     ASSERT_EQ(0, c->numCallsOnStepDown);
+    ASSERT_EQ(0, c->numCallsOnBecomeArbiter);
 
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx);
@@ -175,18 +189,22 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onStepDown();
+    ReplicaSetAwareServiceRegistry::get(sc).onBecomeArbiter();
 
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
+    ASSERT_EQ(0, a->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(3, b->numCallsOnStepUpBegin);
     ASSERT_EQ(2, b->numCallsOnStepUpComplete);
     ASSERT_EQ(1, b->numCallsOnStepDown);
+    ASSERT_EQ(1, b->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(3, c->numCallsOnStepUpBegin);
     ASSERT_EQ(2, c->numCallsOnStepUpComplete);
     ASSERT_EQ(1, c->numCallsOnStepDown);
+    ASSERT_EQ(1, c->numCallsOnBecomeArbiter);
 }
 
 }  // namespace

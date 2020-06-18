@@ -48,7 +48,7 @@ rst.awaitReplication();
 failPoint.off();
 
 if (isJsonLog(primary)) {
-    checkLog.contains(primary, `dropDatabase - finished","attr":{"db":"${dbNameUpper}"}}`);
+    checkLog.containsJson(primary, 20336, {"db": dbNameUpper});
 } else {
     checkLog.contains(primary, "dropDatabase " + dbNameUpper + " - finished");
 }

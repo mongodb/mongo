@@ -156,7 +156,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
         getOpCtx(), getCollection(), std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(indexer->insert(getOpCtx(), {}, {}));
-    indexer->abortWithoutCleanup(getOpCtx());
+    indexer->abortWithoutCleanupForRollback(getOpCtx());
 }
 
 }  // namespace

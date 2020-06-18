@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression.h"
@@ -129,8 +127,9 @@ struct AccumulationExpression {
  * the expression to be evaluated by the accumulator and an AccumulatorState::Factory.
  */
 template <class AccName>
-AccumulationExpression genericParseSingleExpressionAccumulator(
-    boost::intrusive_ptr<ExpressionContext> expCtx, BSONElement elem, VariablesParseState vps) {
+AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext* const expCtx,
+                                                               BSONElement elem,
+                                                               VariablesParseState vps) {
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = Expression::parseOperand(expCtx, elem, vps);
     return {initializer, argument, [expCtx]() { return AccName::create(expCtx); }};
@@ -144,7 +143,7 @@ AccumulationExpression genericParseSingleExpressionAccumulator(
 class AccumulationStatement {
 public:
     using Parser = std::function<AccumulationExpression(
-        boost::intrusive_ptr<ExpressionContext>, BSONElement, VariablesParseState)>;
+        ExpressionContext* const, BSONElement, VariablesParseState)>;
 
     AccumulationStatement(std::string fieldName, AccumulationExpression expr)
         : fieldName(std::move(fieldName)), expr(std::move(expr)) {}
@@ -155,10 +154,9 @@ public:
      *
      * Throws an AssertionException if parsing fails.
      */
-    static AccumulationStatement parseAccumulationStatement(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const BSONElement& elem,
-        const VariablesParseState& vps);
+    static AccumulationStatement parseAccumulationStatement(ExpressionContext* const expCtx,
+                                                            const BSONElement& elem,
+                                                            const VariablesParseState& vps);
 
     /**
      * Registers an AccumulatorState with a parsing function, so that when an accumulator with the

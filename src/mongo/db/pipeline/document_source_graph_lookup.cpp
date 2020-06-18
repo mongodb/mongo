@@ -525,7 +525,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
         const auto argName = argument.fieldNameStringData();
 
         if (argName == "startWith") {
-            startWith = Expression::parseOperand(expCtx, argument, vps);
+            startWith = Expression::parseOperand(expCtx.get(), argument, vps);
             continue;
         } else if (argName == "maxDepth") {
             uassert(40100,

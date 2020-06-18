@@ -47,25 +47,6 @@
 
 namespace mongo {
 
-using std::string;
-using std::unique_ptr;
-
-const std::string QueryRequest::kUnwrappedReadPrefField("$queryOptions");
-const std::string QueryRequest::kWrappedReadPrefField("$readPreference");
-
-const char QueryRequest::cmdOptionMaxTimeMS[] = "maxTimeMS";
-const char QueryRequest::queryOptionMaxTimeMS[] = "$maxTimeMS";
-
-const string QueryRequest::metaGeoNearDistance("geoNearDistance");
-const string QueryRequest::metaGeoNearPoint("geoNearPoint");
-const string QueryRequest::metaRecordId("recordId");
-const string QueryRequest::metaSortKey("sortKey");
-const string QueryRequest::metaTextScore("textScore");
-
-const string QueryRequest::kAllowDiskUseField("allowDiskUse");
-
-const long long QueryRequest::kDefaultBatchSize = 101;
-
 namespace {
 
 Status checkFieldType(const BSONElement& el, BSONType type) {
@@ -80,44 +61,6 @@ Status checkFieldType(const BSONElement& el, BSONType type) {
 }
 
 }  // namespace
-
-// Find command field names.
-const char QueryRequest::kFilterField[] = "filter";
-const char QueryRequest::kProjectionField[] = "projection";
-const char QueryRequest::kSortField[] = "sort";
-const char QueryRequest::kHintField[] = "hint";
-const char QueryRequest::kCollationField[] = "collation";
-const char QueryRequest::kSkipField[] = "skip";
-const char QueryRequest::kLimitField[] = "limit";
-const char QueryRequest::kBatchSizeField[] = "batchSize";
-const char QueryRequest::kNToReturnField[] = "ntoreturn";
-const char QueryRequest::kSingleBatchField[] = "singleBatch";
-const char QueryRequest::kMaxField[] = "max";
-const char QueryRequest::kMinField[] = "min";
-const char QueryRequest::kReturnKeyField[] = "returnKey";
-const char QueryRequest::kShowRecordIdField[] = "showRecordId";
-const char QueryRequest::kTailableField[] = "tailable";
-const char QueryRequest::kOplogReplayField[] = "oplogReplay";
-const char QueryRequest::kNoCursorTimeoutField[] = "noCursorTimeout";
-const char QueryRequest::kAwaitDataField[] = "awaitData";
-const char QueryRequest::kPartialResultsField[] = "allowPartialResults";
-const char QueryRequest::kRuntimeConstantsField[] = "runtimeConstants";
-const char QueryRequest::kLetField[] = "let";
-const char QueryRequest::kTermField[] = "term";
-const char QueryRequest::kOptionsField[] = "options";
-const char QueryRequest::kReadOnceField[] = "readOnce";
-const char QueryRequest::kAllowSpeculativeMajorityReadField[] = "allowSpeculativeMajorityRead";
-const char QueryRequest::kInternalReadAtClusterTimeField[] = "$_internalReadAtClusterTime";
-const char QueryRequest::kRequestResumeTokenField[] = "$_requestResumeToken";
-const char QueryRequest::kResumeAfterField[] = "$_resumeAfter";
-const char QueryRequest::kUse44SortKeys[] = "_use44SortKeys";
-const char QueryRequest::kMaxTimeMSOpOnlyField[] = "maxTimeMSOpOnly";
-
-// Field names for sorting options.
-const char QueryRequest::kNaturalSortField[] = "$natural";
-
-const char QueryRequest::kFindCommandName[] = "find";
-const char QueryRequest::kShardVersionField[] = "shardVersion";
 
 QueryRequest::QueryRequest(NamespaceStringOrUUID nssOrUuid)
     : _nss(nssOrUuid.nss() ? *nssOrUuid.nss() : NamespaceString()), _uuid(nssOrUuid.uuid()) {}
@@ -136,9 +79,8 @@ void QueryRequest::refreshNSS(OperationContext* opCtx) {
 }
 
 // static
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_ptr<QueryRequest> qr,
-                                                                        const BSONObj& cmdObj,
-                                                                        bool isExplain) {
+StatusWith<std::unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(
+    std::unique_ptr<QueryRequest> qr, const BSONObj& cmdObj, bool isExplain) {
     qr->_explain = isExplain;
     bool tailable = false;
     bool awaitData = false;
@@ -402,12 +344,6 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
                 return status;
             }
             qr->_allowSpeculativeMajorityRead = el.boolean();
-        } else if (fieldName == kInternalReadAtClusterTimeField) {
-            Status status = checkFieldType(el, BSONType::bsonTimestamp);
-            if (!status.isOK()) {
-                return status;
-            }
-            qr->_internalReadAtClusterTime = el.timestamp();
         } else if (fieldName == kResumeAfterField) {
             Status status = checkFieldType(el, Object);
             if (!status.isOK()) {
@@ -425,6 +361,12 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
             if (!status.isOK()) {
                 return status;
             }
+        } else if (isMongocryptdArgument(fieldName)) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "Failed to parse: " << cmdObj.toString()
+                              << ". Unrecognized field '" << fieldName
+                              << "'. This command may be meant for a mongocryptd process.");
 
             // TODO SERVER-47065: A 4.6 node still has to accept the '_use44SortKeys' field, since
             // it could be included in a command sent from a 4.4 mongos. In 4.7 development, this
@@ -451,9 +393,9 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
     return std::move(qr);
 }
 
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(NamespaceString nss,
-                                                                       const BSONObj& cmdObj,
-                                                                       bool isExplain) {
+StatusWith<std::unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(NamespaceString nss,
+                                                                            const BSONObj& cmdObj,
+                                                                            bool isExplain) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
         auto uuid = uassertStatusOK(UUID::parse(first));
@@ -600,10 +542,6 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
 
     if (_allowSpeculativeMajorityRead) {
         cmdBuilder->append(kAllowSpeculativeMajorityReadField, true);
-    }
-
-    if (_internalReadAtClusterTime) {
-        cmdBuilder->append(kInternalReadAtClusterTimeField, *_internalReadAtClusterTime);
     }
 
     if (_requestResumeToken) {
@@ -753,7 +691,7 @@ bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     if (mongo::String != metaElt.type()) {
         return false;
     }
-    if (QueryRequest::metaTextScore != metaElt.valuestr()) {
+    if (StringData{metaElt.valuestr()} != QueryRequest::metaTextScore) {
         return false;
     }
     // must have exactly 1 element
@@ -768,7 +706,8 @@ bool QueryRequest::isTextScoreMeta(BSONElement elt) {
 //
 
 // static
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryMessage(const QueryMessage& qm) {
+StatusWith<std::unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryMessage(
+    const QueryMessage& qm) {
     auto qr = std::make_unique<QueryRequest>(NamespaceString(qm.ns));
 
     Status status = qr->init(qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query, qm.fields, true);
@@ -779,12 +718,13 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryMessage(const 
     return std::move(qr);
 }
 
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQuery(NamespaceStringOrUUID nsOrUuid,
-                                                                   const BSONObj& queryObj,
-                                                                   const BSONObj& proj,
-                                                                   int ntoskip,
-                                                                   int ntoreturn,
-                                                                   int queryOptions) {
+StatusWith<std::unique_ptr<QueryRequest>> QueryRequest::fromLegacyQuery(
+    NamespaceStringOrUUID nsOrUuid,
+    const BSONObj& queryObj,
+    const BSONObj& proj,
+    int ntoskip,
+    int ntoreturn,
+    int queryOptions) {
     auto qr = std::make_unique<QueryRequest>(nsOrUuid);
 
     Status status = qr->init(ntoskip, ntoreturn, queryOptions, queryObj, proj, true);
@@ -1051,12 +991,6 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (_allowSpeculativeMajorityRead) {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kAllowSpeculativeMajorityReadField
-                              << " not supported in aggregation."};
-    }
-
-    if (_internalReadAtClusterTime) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << kInternalReadAtClusterTimeField
                               << " not supported in aggregation."};
     }
 

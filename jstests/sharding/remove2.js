@@ -3,10 +3,7 @@
  *
  * This test is labeled resource intensive because its total io_write is 59MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
- * @tags: [
- *   resource_intensive,
- *   need_fixing_for_46
- * ]
+ * @tags: [resource_intensive]
  */
 
 // The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
@@ -24,9 +21,19 @@ function seedString(replTest) {
     return replTest.name + '/' + members.join(',');
 }
 
-function awaitReplicaSetMonitorTimeout() {
-    print("Sleeping for 60 seconds to let the other shard's ReplicaSetMonitor time out");
-    sleep(60000);  // 60s should be plenty since the ReplicaSetMonitor refreshes every 30s.
+// Await that each node in @nodes drop the RSM for @rsName
+function awaitReplicaSetMonitorRemoval(nodes, rsName) {
+    nodes.forEach(function(node) {
+        jsTest.log("Awaiting ReplicaSetMonitor removal for " + rsName + " on " + node);
+        assert.soon(
+            function() {
+                var replicaSets =
+                    assert.commandWorked(node.adminCommand('connPoolStats')).replicaSets;
+                return !(rsName in replicaSets);
+            },
+            "Failed waiting for node " + node +
+                "to remove ReplicaSetMonitor of replica set: " + rsName);
+    });
 }
 
 function setupInitialData(st, coll) {
@@ -61,8 +68,7 @@ function setupInitialData(st, coll) {
 }
 
 function removeShard(st, coll, replTest) {
-    jsTest.log("Removing shard with name: " + replTest.name);
-
+    jsTest.log("Moving chunk from shard1 to shard0");
     assert.commandWorked(st.moveChunk(coll.getFullName(), {i: 6}, st.shard0.shardName));
 
     assert.eq(
@@ -72,10 +78,12 @@ function removeShard(st, coll, replTest) {
         0,
         st.s0.getDB('config').chunks.count({ns: coll.getFullName(), shard: st.shard1.shardName}));
 
+    jsTest.log("Removing shard with name: " + replTest.name);
     var res = st.s.adminCommand({removeShard: replTest.name});
     assert.commandWorked(res);
     assert.eq('started', res.state);
     assert.soon(function() {
+        jsTest.log("Removing shard in assert soon: " + replTest.name);
         res = st.s.adminCommand({removeShard: replTest.name});
         assert.commandWorked(res);
         return ('completed' === res.state);
@@ -87,11 +95,11 @@ function removeShard(st, coll, replTest) {
 
 function addShard(st, coll, replTest) {
     var seed = seedString(replTest);
-    print("Adding shard with seed: " + seed);
+    jsTest.log("Adding shard with seed: " + seed);
     assert.eq(true, st.adminCommand({addshard: seed}));
-    awaitRSClientHosts(
-        new Mongo(st.s.host), replTest.getSecondaries(), {ok: true, secondary: true});
+    awaitRSClientHosts(st.s, replTest.getPrimary(), {ok: true, ismaster: true});
 
+    jsTest.log("Moving chunk from shard0 to shard1");
     assert.commandWorked(st.moveChunk(coll.getFullName(), {i: 6}, st.shard1.shardName));
     assert.eq(
         1,
@@ -101,12 +109,11 @@ function addShard(st, coll, replTest) {
         st.s0.getDB('config').chunks.count({ns: coll.getFullName(), shard: st.shard1.shardName}));
 
     assert.eq(300, coll.find().itcount());
-    print("Shard added successfully");
+    jsTest.log("Shard added successfully");
 }
 
 let st = new ShardingTest({shards: {rs0: {nodes: 2}, rs1: {nodes: 2}}});
-let conn = new Mongo(st.s.host);
-let coll = conn.getCollection("test.remove2");
+let coll = st.s.getCollection("test.remove2");
 
 setupInitialData(st, coll);
 
@@ -122,6 +129,10 @@ const originalSeed = seedString(rst1);
 
 removeShard(st, coll, rst1);
 rst1.stopSet();
+
+// Await that both mongos and rs0 remove RSM for removed replicaset
+awaitReplicaSetMonitorRemoval([st.s, st.rs0.getPrimary()], rst1.name);
+
 rst1.startSet({restart: true});
 rst1.initiate();
 rst1.awaitReplication();
@@ -135,7 +146,8 @@ jsTestLog(
 removeShard(st, coll, rst1);
 rst1.stopSet();
 
-awaitReplicaSetMonitorTimeout();
+// Await that both mongos and rs0 remove RSM for removed replicaset
+awaitReplicaSetMonitorRemoval([st.s, st.rs0.getPrimary()], rst1.name);
 
 let rst2 = new ReplSetTest({name: rst1.name, nodes: 2, useHostName: true});
 rst2.startSet({shardsvr: ""});
@@ -146,9 +158,9 @@ addShard(st, coll, rst2);
 assert.eq(300, coll.find().itcount());
 
 jsTestLog("Verify that a database can be moved to the added shard.");
-conn.getDB('test2').foo.insert({a: 1});
+st.s.getDB('test2').foo.insert({a: 1});
 assert.commandWorked(st.admin.runCommand({movePrimary: 'test2', to: rst2.name}));
-assert.eq(1, conn.getDB('test2').foo.find().itcount());
+assert.eq(1, st.s.getDB('test2').foo.find().itcount());
 
 // Can't shut down with rst2 in the set or ShardingTest will fail trying to cleanup on shutdown.
 // Have to take out rst2 and put rst1 back into the set so that it can clean up.
@@ -157,7 +169,8 @@ assert.commandWorked(st.admin.runCommand({movePrimary: 'test2', to: st.rs0.name}
 removeShard(st, coll, rst2);
 rst2.stopSet();
 
-awaitReplicaSetMonitorTimeout();
+// Await that both mongos and rs0 remove RSM for removed replicaset
+awaitReplicaSetMonitorRemoval([st.s, st.rs0.getPrimary()], rst2.name);
 
 rst1.startSet({restart: true});
 rst1.initiate();

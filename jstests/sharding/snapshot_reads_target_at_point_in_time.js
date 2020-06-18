@@ -35,8 +35,13 @@ const st = new ShardingTest({
         // Disable expiring old chunk history to ensure the transactions are able to read from a
         // shard that has donated a chunk, even if the migration takes longer than the amount of
         // time for which a chunk's history is normally stored (see SERVER-39763).
-        configOptions:
-            {setParameter: {"failpoint.skipExpiringOldChunkHistory": "{mode: 'alwaysOn'}"}}
+        configOptions: {
+            setParameter: {
+                "failpoint.skipExpiringOldChunkHistory": "{mode: 'alwaysOn'}",
+                minSnapshotHistoryWindowInSeconds: 600
+            }
+        },
+        rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: 600}}
     }
 });
 

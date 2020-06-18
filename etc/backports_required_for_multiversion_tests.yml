@@ -26,6 +26,8 @@
 change_streams_multiversion:
 
 change_streams_sharded_collections_multiversion_passthrough:
+- ticket: SERVER-47810
+  test_file: jstests/change_streams/report_post_batch_resume_token.js
 
 concurrency_replication_multiversion:
 
@@ -34,11 +36,23 @@ concurrency_sharded_replication_multiversion:
 replica_sets_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
+- ticket: SERVER-47469
+  test_file: jstests/core/apply_ops_system_dot_views.js
+- ticket: SERVER-48614
+  test_file: jstests/core/wildcard_index_partial_index.js
 
 sharding_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
+- ticket: SERVER-47469
+  test_file: jstests/core/apply_ops_system_dot_views.js
+- ticket: SERVER-48614
+  test_file: jstests/core/wildcard_index_partial_index.js
 
 sharded_collections_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
   test_file: jstests/core/geo_near_tailable.js
+- ticket: SERVER-47469
+  test_file: jstests/core/apply_ops_system_dot_views.js
+- ticket: SERVER-48614
+  test_file: jstests/core/wildcard_index_partial_index.js

@@ -48,7 +48,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
@@ -130,7 +129,7 @@ struct Cloner::Fun {
                 if (now - lastLog >= 60) {
                     // report progress
                     if (lastLog)
-                        LOGV2(20412, "clone", "ns"_attr = nss, "numSeen"_attr = numSeen);
+                        LOGV2(20412, "clone", logAttrs(nss), "numSeen"_attr = numSeen);
                     lastLog = now;
                 }
                 opCtx->checkForInterrupt();
@@ -167,12 +166,15 @@ struct Cloner::Fun {
             // decimal data even if decimal is disabled.
             const Status status = validateBSON(tmp.objdata(), tmp.objsize(), BSONVersion::kLatest);
             if (!status.isOK()) {
-                str::stream ss;
-                ss << "Cloner: found corrupt document in " << nss << ": " << redact(status);
                 if (gSkipCorruptDocumentsWhenCloning.load()) {
-                    LOGV2_WARNING(20423, "{ss_ss_str}; skipping", "ss_ss_str"_attr = ss.ss.str());
+                    LOGV2_WARNING(20423,
+                                  "Cloner: found corrupt document; skipping",
+                                  logAttrs(nss),
+                                  "error"_attr = redact(status));
                     continue;
                 }
+                str::stream ss;
+                ss << "Cloner: found corrupt document in " << nss << ": " << redact(status);
                 msgasserted(28531, ss);
             }
 
@@ -191,9 +193,10 @@ struct Cloner::Fun {
                 if (!status.isOK() && status.code() != ErrorCodes::DuplicateKey) {
                     LOGV2_ERROR(20424,
                                 "error: exception cloning object",
-                                "ns"_attr = nss,
-                                "status"_attr = redact(status),
-                                "doc"_attr = redact(doc));
+                                "Exception cloning document",
+                                logAttrs(nss),
+                                "error"_attr = redact(status),
+                                "document"_attr = redact(doc));
                     uassertStatusOK(status);
                 }
                 if (status.isOK()) {
@@ -204,9 +207,9 @@ struct Cloner::Fun {
             static Rarely sampler;
             if (sampler.tick() && (time(nullptr) - saveLast > 60)) {
                 LOGV2(20413,
-                      "objects cloned so far from collection",
-                      "numSeen"_attr = numSeen,
-                      "ns"_attr = nss);
+                      "Number of objects cloned so far from collection",
+                      "number"_attr = numSeen,
+                      logAttrs(nss));
                 saveLast = time(nullptr);
             }
         }
@@ -360,7 +363,7 @@ Status Cloner::_createCollectionsForDb(
 
         const NamespaceString nss(dbName, params.collectionName);
 
-        uassertStatusOK(userAllowedCreateNS(dbName, params.collectionName));
+        uassertStatusOK(userAllowedCreateNS(nss));
         Status status = writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
@@ -541,8 +544,9 @@ Status Cloner::copyDb(OperationContext* opCtx,
     // now build the secondary indexes
     for (auto&& params : createCollectionParams) {
         LOGV2(20422,
-              "copying indexes for: {params_collectionInfo}",
-              "params_collectionInfo"_attr = params.collectionInfo);
+              "copying indexes for: {collectionInfo}",
+              "Copying indexes",
+              "collectionInfo"_attr = params.collectionInfo);
 
         const NamespaceString nss(dBName, params.collectionName);
 

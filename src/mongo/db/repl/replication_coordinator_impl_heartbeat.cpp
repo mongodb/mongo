@@ -44,8 +44,6 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -57,6 +55,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
+#include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
@@ -285,38 +284,45 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         _wakeReadyWaiters(lk);
     }
 
-    if (enableAutomaticReconfig) {
-        // When receiving a heartbeat response indicating that the remote is in a state past
-        // STARTUP_2, the primary will initiate a reconfig to remove the 'newlyAdded' field for that
-        // node (if present). This field is normally set when we add new members with votes:1 to the
-        // set.
-        if (_getMemberState_inlock().primary() && hbStatusResponse.isOK() &&
-            hbStatusResponse.getValue().hasState()) {
-            auto remoteState = hbStatusResponse.getValue().getState();
-            if (remoteState == MemberState::RS_SECONDARY ||
-                remoteState == MemberState::RS_RECOVERING ||
-                remoteState == MemberState::RS_ROLLBACK) {
-                const auto mem = _rsConfig.getMemberAt(targetIndex);
-                const auto memId = mem.getId();
-                if (mem.isNewlyAdded()) {
-                    auto status = _replExecutor->scheduleWork(
-                        [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                            _reconfigToRemoveNewlyAddedField(
-                                cbData, memId, _rsConfig.getConfigVersionAndTerm());
-                        });
+    // When receiving a heartbeat response indicating that the remote is in a state past
+    // STARTUP_2, the primary will initiate a reconfig to remove the 'newlyAdded' field for that
+    // node (if present). This field is normally set when we add new members with votes:1 to the
+    // set.
+    if (_getMemberState_inlock().primary() && hbStatusResponse.isOK() &&
+        hbStatusResponse.getValue().hasState()) {
+        auto remoteState = hbStatusResponse.getValue().getState();
+        if (remoteState == MemberState::RS_SECONDARY || remoteState == MemberState::RS_RECOVERING ||
+            remoteState == MemberState::RS_ROLLBACK) {
+            const auto mem = _rsConfig.findMemberByHostAndPort(target);
+            if (mem && mem->isNewlyAdded()) {
+                // 'NewlyAdded' field can only exist if automatic reconfig is supported, with the
+                // exception of upgrading/downgrading fcv document. And, it's safe to have that
+                // exception because a node can't downgrade the binary version until its FCV
+                // document is fully downgraded. So, its impossible for a node with downgraded
+                // binaries to have on-disk repl config with 'newlyAdded' fields.
+                invariant(
+                    _supportsAutomaticReconfig() ||
+                    serverGlobalParams.featureCompatibility.getVersion() >
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44);
 
-                    if (!status.isOK()) {
-                        LOGV2_DEBUG(4634500,
-                                    1,
-                                    "Failed to schedule work for removing 'newlyAdded' field.",
-                                    "memberId"_attr = memId.getData(),
-                                    "error"_attr = status.getStatus());
-                    } else {
-                        LOGV2_DEBUG(4634501,
-                                    1,
-                                    "Scheduled automatic reconfig to remove 'newlyAdded' field.",
-                                    "memberId"_attr = memId.getData());
-                    }
+                const auto memId = mem->getId();
+                auto status = _replExecutor->scheduleWork(
+                    [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                        _reconfigToRemoveNewlyAddedField(
+                            cbData, memId, _rsConfig.getConfigVersionAndTerm());
+                    });
+
+                if (!status.isOK()) {
+                    LOGV2_DEBUG(4634500,
+                                1,
+                                "Failed to schedule work for removing 'newlyAdded' field.",
+                                "memberId"_attr = memId.getData(),
+                                "error"_attr = status.getStatus());
+                } else {
+                    LOGV2_DEBUG(4634501,
+                                1,
+                                "Scheduled automatic reconfig to remove 'newlyAdded' field.",
+                                "memberId"_attr = memId.getData());
                 }
             }
         }
@@ -583,26 +589,17 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
             "cannot accept writes yet.");
         return;
     }
+
+    // Prevent heartbeat reconfigs from running concurrently with an election.
+    if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
+        LOGV2_FOR_HEARTBEATS(
+            482570, 1, "Not scheduling a heartbeat reconfig when running for election");
+        return;
+    }
+
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm());
-    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
-        LOGV2_FOR_HEARTBEATS(
-            4615624,
-            2,
-            "Rescheduling heartbeat reconfig to config with {newConfigVersionAndTerm} to "
-            "be processed after election is cancelled.",
-            "Rescheduling heartbeat reconfig to be processed after election is cancelled",
-            "newConfigVersionAndTerm"_attr = newConfig.getConfigVersionAndTerm());
-
-        _replExecutor
-            ->onEvent(electionFinishedEvent,
-                      [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                          _heartbeatReconfigStore(cbData, newConfig);
-                      })
-            .status_with_transitional_ignore();
-        return;
-    }
     _replExecutor
         ->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& cbData) {
             _heartbeatReconfigStore(cbData, newConfig);
@@ -690,10 +687,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
 
         if (isArbiter) {
-            LogicalClock::get(getGlobalServiceContext())->disable();
-            if (auto validator = LogicalTimeValidator::get(getGlobalServiceContext())) {
-                validator->stopKeyManager();
-            }
+            ReplicaSetAwareServiceRegistry::get(_service).onBecomeArbiter();
         }
 
         if (!isArbiter && isFirstConfig) {
@@ -851,9 +845,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-
-    // Inform the index builds coordinator of the replica set reconfig.
-    IndexBuildsCoordinator::get(opCtx.get())->onReplicaSetReconfig();
 }
 
 void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(

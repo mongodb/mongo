@@ -192,7 +192,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setIsMapReduceCommand(true);
     const auto letParamsObj = BSON("foo"
                                    << "bar");
-    request.letParameters = letParamsObj;
+    request.setLetParameters(letParamsObj);
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
@@ -208,8 +208,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
                  {QueryRequest::kUnwrappedReadPrefField, readPrefObj},
                  {QueryRequest::cmdOptionMaxTimeMS, 10},
-                 {AggregationRequest::kIsMapReduceCommand, true},
-                 {AggregationRequest::kLet, letParamsObj}};
+                 {AggregationRequest::kIsMapReduceCommandName, true},
+                 {AggregationRequest::kLetName, letParamsObj}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 

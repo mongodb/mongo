@@ -86,7 +86,6 @@ public:
      */
     struct IndexBuildOptions {
         boost::optional<CommitQuorumOptions> commitQuorum;
-        bool replSetAndNotPrimaryAtStart = false;
         ApplicationMode applicationMode = ApplicationMode::kNormal;
     };
 
@@ -232,6 +231,17 @@ public:
                                   const std::string& reason);
 
     /**
+     * Signals all of the index builds to abort and then waits until the index builds are no longer
+     * running. The provided 'reason' will be used in the error message that the index builders
+     * return to their callers.
+     *
+     * Does not require holding locks.
+     *
+     * Does not stop new index builds from starting. Caller must make that guarantee.
+     */
+    void abortAllIndexBuildsForInitialSync(OperationContext* opCtx, const std::string& reason);
+
+    /**
      * Aborts an index build by index build UUID. Returns when the index build thread exits.
      *
      * Returns true if the index build was aborted or the index build is already in the process of
@@ -303,11 +313,6 @@ public:
                                    const CommitQuorumOptions& newCommitQuorum) = 0;
 
     /**
-     * TODO: This is not yet implemented.
-     */
-    void recoverIndexBuilds();
-
-    /**
      * Returns the number of index builds that are running on the specified database.
      */
     int numInProgForDb(StringData db) const;
@@ -359,13 +364,10 @@ public:
     void awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db);
 
     /**
-     * Called by the replication coordinator when a replica set reconfig occurs, which could affect
-     * any index build to make their commit quorum unachievable.
-     *
-     * Checks if the commit quorum is still satisfiable for each index build, if it is no longer
-     * satisfiable, then those index builds are aborted.
+     * Waits until an index build completes. If there are no index builds in progress, returns
+     * immediately.
      */
-    void onReplicaSetReconfig();
+    void waitUntilAnIndexBuildFinishes(OperationContext* opCtx);
 
     //
     // Helper functions for creating indexes that do not have to be managed by the
@@ -373,18 +375,15 @@ public:
     //
 
     /**
-     * Creates indexes in collection.
+     * Creates index in collection.
      * Assumes callers has necessary locks.
-     * For two phase index builds, writes both startIndexBuild and commitIndexBuild oplog entries
-     * on success. No two phase index build oplog entries, including abortIndexBuild, will be
-     * written on failure.
      * Throws exception on error.
      */
-    void createIndexes(OperationContext* opCtx,
-                       UUID collectionUUID,
-                       const std::vector<BSONObj>& specs,
-                       IndexBuildsManager::IndexConstraints indexConstraints,
-                       bool fromMigrate);
+    void createIndex(OperationContext* opCtx,
+                     UUID collectionUUID,
+                     const BSONObj& spec,
+                     IndexBuildsManager::IndexConstraints indexConstraints,
+                     bool fromMigrate);
 
     /**
      * Creates indexes on an empty collection.
@@ -453,6 +452,8 @@ public:
         OperationContext* opCtx,
         std::shared_ptr<ReplIndexBuildState> replState,
         IndexBuildAction signal) = 0;
+
+    bool supportsResumableIndexBuilds() const;
 
 private:
     /**
@@ -636,7 +637,7 @@ protected:
     /**
      * Signals the primary to commit the index build by sending "voteCommitIndexBuild" command
      * request to it with write concern 'majority', then waits for that command's response. And,
-     * command gets retried on error. This function gets called after the second draining phase of
+     * command gets retried on error. This function gets called after the first draining phase of
      * index build.
      */
     virtual void _signalPrimaryForCommitReadiness(
@@ -734,6 +735,7 @@ protected:
     void _awaitNoBgOpInProgForDb(stdx::unique_lock<Latch>& lk,
                                  OperationContext* opCtx,
                                  StringData db);
+
     // Protects the below state.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");
 
@@ -742,6 +744,10 @@ protected:
 
     // Waiters are notified whenever one of the three maps above has something added or removed.
     stdx::condition_variable _indexBuildsCondVar;
+
+    // Generation counter of completed index builds. Used in conjuction with the condition variable
+    // to receive notifications when an index build completes.
+    uint32_t _indexBuildsCompletedGen;
 
     // Handles actually building the indexes.
     IndexBuildsManager _indexBuildsManager;

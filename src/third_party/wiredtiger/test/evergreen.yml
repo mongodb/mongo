@@ -171,8 +171,8 @@ functions:
       script: |
         set -o errexit
         set -o verbose
+        ${format_test_setting|}
         for i in $(seq ${times|1}); do
-          ${format_test_setting|}
           ${test_env_vars|} ./format.sh ${smp_command|} ${format_test_script_args|} 2>&1
         done
   "many dbs test":
@@ -297,9 +297,98 @@ functions:
           done
 
           for t in $(seq ${no_of_procs|1}); do
-            wait -n || exit $?
+            ret=0
+            wait -n || ret=$?
+            if [ $ret -ne 0 ]; then
+              # Skip the below lines from nohup output file because they are very verbose and
+              # print only the errors to evergreen log file.
+              grep -v "Finished verifying" nohup.out.* | grep -v "Finished a checkpoint" | grep -v "thread starting"
+            fi
+            exit $ret
           done
         done
+
+#########################################################################################
+# VARIABLES
+#
+# The following stress tests are configured to run for six hours via the "-t 360"
+# argument to format.sh: format-stress-test, format-stress-sanitizer-test, and
+# race-condition-stress-sanitizer-test. The smoke and recovery tests run in a loop,
+# with the number of runs adjusted to provide aproximately six hours of testing.
+#########################################################################################
+variables:
+
+  - &format-stress-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "format test script"
+        vars:
+          format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 360
+
+  - &format-stress-sanitizer-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger address sanitizer"
+      - func: "format test script"
+        vars:
+          format_test_script_args: -t 360
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+
+  - &format-stress-smoke-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "format test script"
+        vars:
+          format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -S
+          times: 30
+
+  - &format-stress-sanitizer-smoke-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger address sanitizer"
+      - func: "format test script"
+        vars:
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+          format_test_script_args: -S
+          times: 20
+
+  - &race-condition-stress-sanitizer-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars:
+            CC="/opt/mongodbtoolchain/v3/bin/clang -fsanitize=address"
+            PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fno-omit-frame-pointer"
+          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
+      - func: "format test script"
+        vars:
+          format_test_script_args: -R -t 360
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+
+  - &recovery-stress-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
+      - func: "recovery stress test script"
+        vars:
+          times: 40
 
 pre:
   - func: "cleanup"
@@ -553,17 +642,16 @@ tasks:
         vars:
           directory: test/bloom
 
-  # Temporarily disabled
-  # - name: checkpoint-test
-  #   tags: ["pull_request"]
-  #   depends_on:
-  #     - name: compile
-  #   commands:
-  #     - func: "fetch artifacts"
-  #     - func: "compile wiredtiger"
-  #     - func: "make check directory"
-  #       vars:
-  #         directory: test/checkpoint
+  - name: checkpoint-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - func: "make check directory"
+        vars:
+          directory: test/checkpoint
 
   - name: cursor-order-test
     tags: ["pull_request"]
@@ -587,17 +675,16 @@ tasks:
         vars:
           directory: test/fops
 
-  # Temporarily disabled
-  # - name: format-test
-  #   tags: ["pull_request"]
-  #   depends_on:
-  #     - name: compile
-  #   commands:
-  #     - func: "fetch artifacts"
-  #     - func: "compile wiredtiger"
-  #     - func: "make check directory"
-  #       vars:
-  #         directory: test/format
+  - name: format-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - func: "make check directory"
+        vars:
+          directory: test/format
 
   - name: huge-test
     tags: ["pull_request"]
@@ -1080,6 +1167,21 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4891_meta_ckptlist_get_alloc 2>&1
 
+  - name: csuite-wt6185-modify-ts-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt6185_modify_ts 2>&1
+
   - name: csuite-rwlock-test
     tags: ["pull_request"]
     depends_on:
@@ -1508,6 +1610,17 @@ tasks:
             ulimit -n 1000000
             ulimit -c unlimited
             largescale/run-million-collection-test.sh .
+
+  - name: compatibility-test-for-releases-full
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/evergreen/compatibility_test_for_releases.sh -l
 
   - name: compatibility-test-for-releases
     commands:
@@ -1965,8 +2078,6 @@ tasks:
   - name: time-shift-sensitivity-test
     depends_on:
     - name: compile
-      vars:
-        posix_configure_flags: --enable-strict
     commands:
       - func: "fetch artifacts"
         vars:
@@ -1980,139 +2091,16 @@ tasks:
 
             ./time_shift_test.sh /usr/local/lib/faketime/libfaketimeMT.so.1 0-1 2>&1
 
-  - name: format-stress-sanitizer-test
-    #set a 25 hours (25*60*60 = 90000 seconds) timeout
-    exec_timeout_secs: 90000
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger address sanitizer"
-      - func: "format test script"
-        vars:
-          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
-          # run for 24 hours ( 24 * 60 = 1440 minutes), skip known errors, don't stop at failed tests, use default config
-          format_test_script_args: -E -t 1440
-
-  - name: format-stress-sanitizer-lsm-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger address sanitizer"
-      - func: "format test script"
-        vars:
-          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
-          # Run for 30 mins, and explicitly set data_source to LSM with a large cache
-          format_test_script_args: -t 30 data_source=lsm cache_minimum=5000
-
-  - name: format-stress-sanitizer-smoke-test
-    #set a 7 hours timeout
-    exec_timeout_secs: 25200
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger address sanitizer"
-      - func: "format test script"
-        # to emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
-        # run smoke tests, skip known errors, don't stop at failed tests, use default config
-        vars:
-          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
-          format_test_script_args: -E -S
-          times: 16
-
-  - name: race-condition-stress-sanitizer-test
-    # set an evergreen timeout of 25 hours
-    exec_timeout_secs: 90000
+  - name: format-stress-pull-request-test
+    tags: ["pull_request"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC="/opt/mongodbtoolchain/v3/bin/clang -fsanitize=address" PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fno-omit-frame-pointer"
-          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         vars:
-          # set a format.sh timeout of 24 hours, skip known errors, don't stop at failed tests, use default config
-          format_test_script_args: -E -R -t 1440
-          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
-
-  - name: recovery-stress-test
-    #set a 25 hours timeout
-    exec_timeout_secs: 90000
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
-      - func: "recovery stress test script"
-        vars:
-          # Repeat this script enough times to make this task run for 24 hours
-          # At the time of writing this script, one call to underlying scripts takes about ~15 mins to finish in worst case.
-          # We are giving an extra ~20% room for vairance in execution time.
-          times: 80
-
-  - name: split-stress-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/bench/workgen/runner"
-          script: |
-            set -o errexit
-            set -o verbose
-            for i in {1..10}; do ${python_binary|python} split_stress.py; done
-
-  - name: format-stress-test
-    # Set 25 hours timeout
-    exec_timeout_secs: 90000
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger with builtins"
-      - func: "format test script"
-        vars:
-          #run for 24 hours ( 24 * 60 = 1440 minutes), use default config
-          format_test_script_args: -b "SEGFAULT_SIGNALS=all catchsegv ./t" -t 1440
-
-  - name: format-stress-smoke-test
-    # Set 7 hours timeout
-    exec_timeout_secs: 25200
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger with builtins"
-      - func: "format test script"
-        vars:
-          # to emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
-          # run smoke tests, use default config (-S)
-          format_test_script_args: -b "SEGFAULT_SIGNALS=all catchsegv ./t" -S
-          times: 16
-
-  - name: checkpoint-stress-test
-    commands:
-      - command: timeout.update
-        params:
-          # set 24 hour timeout for the task and command
-          exec_timeout_secs: 86400
-          timeout_secs: 86400
-      - func: "get project"
-      - func: "compile wiredtiger with builtins"
-      - func: "checkpoint stress test"
-        vars:
-          # No of times to run the loop
-          times: 1
-          # No of processes to run in the background
-          no_of_procs: 8
-
-  # The task name is ppc-zseries because this task will be used in both buildVariants
-  - name: format-stress-ppc-zseries-test
-    # Set 2.5 hours timeout (60 * 60 * 2.5)
-    exec_timeout_secs: 9000
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger with builtins"
-      - func: "format test script"
-        vars:
-          # Make sure we dump core on failure
-          format_test_setting: ulimit -c unlimited
-          #run for 2 hours ( 2 * 60 = 120 minutes), use default config
-          format_test_script_args: -b "SEGFAULT_SIGNALS=all catchsegv ./t" -t 120
+          smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+          # run for 10 minutes.
+          format_test_script_args: -t 10 rows=10000 ops=50000
 
   - name: format-wtperf-test
     commands:
@@ -2161,43 +2149,175 @@ tasks:
               exit 1
             fi
 
+  - name: format-stress-sanitizer-lsm-test
+    # Temporarily disabled (WT-6255)
+    # tags: ["stress-test-1"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger address sanitizer"
+      - func: "format test script"
+        vars:
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+          # Run for 30 mins, and explicitly set data_source to LSM with a large cache
+          format_test_script_args: -t 30 data_source=lsm cache_minimum=5000
+
+  - name: checkpoint-stress-test
+    tags: ["stress-test-1"]
+    exec_timeout_secs: 86400
+    commands:
+      - command: timeout.update
+        params:
+          timeout_secs: 86400
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "checkpoint stress test"
+        vars:
+          times: 1       # No of times to run the loop
+          no_of_procs: 8 # No of processes to run in the background
+
+  - name: split-stress-test
+    tags: ["stress-test-1", "stress-test-zseries-1"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          configure_env_vars:
+            CXX=/opt/mongodbtoolchain/v3/bin/g++
+            PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/bench/workgen/runner"
+          script: |
+            set -o errexit
+            set -o verbose
+            for i in {1..10}; do ${python_binary|python} split_stress.py; done
+
+  # The task name is ppc-zseries because this task will be used in both buildVariants
+  - name: format-stress-ppc-zseries-test
+    tags: ["stress-test-ppc-1", "stress-test-zseries-1"]
+    # Set 2.5 hours timeout (60 * 60 * 2.5)
+    exec_timeout_secs: 9000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "format test script"
+        vars:
+          #run for 2 hours ( 2 * 60 = 120 minutes), use default config
+          format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 120
+
+  # Replace this test with format-stress-sanitizer-test after BUILD-10248 fix.
   - name: format-stress-sanitizer-ppc-test
+    tags: ["stress-test-ppc-1"]
     # Set 2.5 hours timeout (60 * 60 * 2.5)
     exec_timeout_secs: 9000
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          # CC is set to the system default "clang" binary here as a workaround. Change it back to mongodbtoolchain "clang" binary after BUILD-10248 fix.
-          configure_env_vars: CCAS=/opt/mongodbtoolchain/v3/bin/gcc CC=/usr/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
+          # CC is set to the system default "clang" binary here as a workaround. Change it back
+          # to mongodbtoolchain "clang" binary after BUILD-10248 fix.
+          configure_env_vars:
+            CCAS=/opt/mongodbtoolchain/v3/bin/gcc CC=/usr/bin/clang
+            CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+            CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer
+            -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
           posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         vars:
-          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=`ls /usr/bin/llvm-symbolizer* | tail -1`
-          # run for 2 hours ( 2 * 60 = 120 minutes), don't stop at failed tests, use default config
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
+            ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer
+          # Run for 2 hours (2 * 60 = 120 minutes), don't stop at failed tests, use default config
           format_test_script_args: -t 120
 
+  # Replace this test with format-stress-sanitizer-smoke-test after BUILD-10248 fix.
   - name: format-stress-sanitizer-smoke-ppc-test
+    tags: ["stress-test-ppc-1"]
     # Set 7 hours timeout (60 * 60 * 7)
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          # CC is set to the system default "clang" binary here as a workaround. Change it back to mongodbtoolchain "clang" binary after BUILD-10248 fix.
-          configure_env_vars: CCAS=/opt/mongodbtoolchain/v3/bin/gcc CC=/usr/bin/clang CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
+          # CC is set to the system default "clang" binary here as a workaround. Change it back
+          # to mongodbtoolchain "clang" binary after BUILD-10248 fix.
+          configure_env_vars:
+            CCAS=/opt/mongodbtoolchain/v3/bin/gcc CC=/usr/bin/clang
+            CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+            CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer
+            -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
           posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
-        # to emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
-        # run smoke tests, don't stop at failed tests, use default config
+        # To emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
+        # Run smoke tests, don't stop at failed tests, use default config
         vars:
-          test_env_vars: ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0" ASAN_SYMBOLIZER_PATH=`ls /usr/bin/llvm-symbolizer* | tail -1`
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
+            ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer
           format_test_script_args: -S
           times: 16
 
+  - <<: *format-stress-test
+    name: format-stress-test-1
+    tags: ["stress-test-1"]
+  - <<: *format-stress-test
+    name: format-stress-test-2
+    tags: ["stress-test-2"]
+  - <<: *format-stress-test
+    name: format-stress-test-3
+    tags: ["stress-test-3"]
+  - <<: *format-stress-test
+    name: format-stress-test-4
+    tags: ["stress-test-4"]
+  - <<: *format-stress-sanitizer-test
+    name: format-stress-sanitizer-test-1
+    tags: ["stress-test-1"]
+  - <<: *format-stress-sanitizer-test
+    name: format-stress-sanitizer-test-2
+    tags: ["stress-test-2"]
+  - <<: *format-stress-sanitizer-test
+    name: format-stress-sanitizer-test-3
+    tags: ["stress-test-3"]
+  - <<: *format-stress-sanitizer-test
+    name: format-stress-sanitizer-test-4
+    tags: ["stress-test-4"]
+  - <<: *format-stress-smoke-test
+    name: format-stress-smoke-test-1
+    tags: ["stress-test-1", "stress-test-ppc-1", "stress-test-zseries-1"]
+  - <<: *format-stress-smoke-test
+    name: format-stress-smoke-test-2
+    tags: ["stress-test-2", "stress-test-ppc-2", "stress-test-zseries-2"]
+  - <<: *format-stress-sanitizer-smoke-test
+    name: format-stress-sanitizer-smoke-test-1
+    tags: ["stress-test-1"]
+  - <<: *format-stress-sanitizer-smoke-test
+    name: format-stress-sanitizer-smoke-test-2
+    tags: ["stress-test-2"]
+  - <<: *race-condition-stress-sanitizer-test
+    name: race-condition-stress-sanitizer-test-1
+    tags: ["stress-test-1"]
+  - <<: *race-condition-stress-sanitizer-test
+    name: race-condition-stress-sanitizer-test-2
+    tags: ["stress-test-2"]
+  - <<: *race-condition-stress-sanitizer-test
+    name: race-condition-stress-sanitizer-test-3
+    tags: ["stress-test-3"]
+  - <<: *race-condition-stress-sanitizer-test
+    name: race-condition-stress-sanitizer-test-4
+    tags: ["stress-test-4"]
+  - <<: *recovery-stress-test
+    name: recovery-stress-test-1
+    tags: ["stress-test-1", "stress-test-zseries-1"]
+  - <<: *recovery-stress-test
+    name: recovery-stress-test-2
+    tags: ["stress-test-2", "stress-test-zseries-2"]
+
 buildvariants:
+
 - name: ubuntu1804
-  display_name: Ubuntu 18.04
+  display_name: "! Ubuntu 18.04"
   run_on:
   - ubuntu1804-test
   expansions:
@@ -2228,7 +2348,7 @@ buildvariants:
     - name: static-wt-build-test
 
 - name: ubuntu1804-compilers
-  display_name: Ubuntu 18.04 Compilers
+  display_name: "! Ubuntu 18.04 Compilers"
   run_on:
   - ubuntu1804-wt-build
   expansions:
@@ -2239,7 +2359,7 @@ buildvariants:
     - name: ".pull_request_compilers"
 
 - name: ubuntu1804-python3
-  display_name: Ubuntu 18.04 (Python3)
+  display_name: "! Ubuntu 18.04 (Python3)"
   run_on:
   - ubuntu1804-test
   expansions:
@@ -2259,23 +2379,22 @@ buildvariants:
   run_on:
   - ubuntu1804-test
   expansions:
-    test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    test_env_vars:
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so LD_LIBRARY_PATH=$(pwd)/.libs
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    posix_configure_flags:
+      --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy
+      --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
   tasks:
-    - name: recovery-stress-test
-    - name: format-stress-sanitizer-test
-    - name: format-stress-sanitizer-smoke-test
-    - name: format-stress-sanitizer-lsm-test
-    - name: split-stress-test
-    - name: format-stress-test
-    - name: format-stress-smoke-test
-    - name: race-condition-stress-sanitizer-test
-    - name: checkpoint-stress-test
+    - name: ".stress-test-1"
+    - name: ".stress-test-2"
+    - name: ".stress-test-3"
+    - name: ".stress-test-4"
 
 - name: package
-  display_name: Package
+  display_name: "~ Package"
   batchtime: 1440 # 1 day
   run_on:
   - ubuntu1804-test
@@ -2332,23 +2451,30 @@ buildvariants:
     # - name: coverage-report
 
 - name: large-scale-tests
-  display_name: Large scale tests
+  display_name: "~ Large scale tests"
   batchtime: 1440 # 1 day
   run_on:
   - rhel80-build
   tasks:
     - name: million-collection-test
 
+- name: compatibility-tests-full
+  display_name: Compatibility tests full
+  batchtime: 10080 # 7 days
+  run_on:
+  - ubuntu1804-test
+  tasks:
+    - name: compatibility-test-for-releases-full
+
 - name: compatibility-tests
   display_name: Compatibility tests
-  batchtime: 10080 # 7 days
   run_on:
   - ubuntu1804-test
   tasks:
     - name: compatibility-test-for-releases
 
 - name: windows-64
-  display_name: Windows 64-bit
+  display_name: "! Windows 64-bit"
   run_on:
   - windows-64-vs2017-test
   tasks:
@@ -2374,7 +2500,7 @@ buildvariants:
     - name: fops
 
 - name: little-endian
-  display_name: Little-endian (x86)
+  display_name: "~ Little-endian (x86)"
   run_on:
   - ubuntu1804-test
   batchtime: 10080 # 7 days
@@ -2388,7 +2514,7 @@ buildvariants:
   # - name: verify-datafile-from-big-endian
 
 - name: big-endian
-  display_name: Big-endian (s390x/zSeries)
+  display_name: "~ Big-endian (s390x/zSeries)"
   modules:
   - enterprise
   run_on:
@@ -2404,37 +2530,41 @@ buildvariants:
   # - name: verify-datafile-from-little-endian
 
 - name: ubuntu1804-ppc
-  display_name: Ubuntu 18.04 PPC
+  display_name: "~ Ubuntu 18.04 PPC"
   run_on:
   - ubuntu1804-power8-test
   expansions:
+    format_test_setting: ulimit -c unlimited
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+      top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    posix_configure_flags:
+      --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy
+      --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
   tasks:
   - name: compile
   - name: unit-test
-  - name: format-stress-ppc-zseries-test
-  - name: format-stress-smoke-test
   - name: format-wtperf-test
-  # Replace the below two tests with format-stress-sanitizer-ppc-test and format-stress-sanitizer-smoke-test after BUILD-10248 fix.
-  - name: format-stress-sanitizer-ppc-test
-  - name: format-stress-sanitizer-smoke-ppc-test
+  - name: ".stress-test-ppc-1"
+  - name: ".stress-test-ppc-2"
 
 - name: ubuntu1804-zseries
-  display_name: Ubuntu 18.04 zSeries
+  display_name: "~ Ubuntu 18.04 zSeries"
   run_on:
   - ubuntu1804-zseries-test
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs:$(pwd)/lang/python top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs:$(pwd)/lang/python
+      top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+    posix_configure_flags:
+      --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy
+      --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
   tasks:
   - name: compile
   - name: unit-test
-  - name: recovery-stress-test
-  - name: split-stress-test
-  - name: format-stress-ppc-zseries-test
-  - name: format-stress-smoke-test
+  - name: ".stress-test-zseries-1"
+  - name: ".stress-test-zseries-2"

@@ -108,20 +108,16 @@ auto FailPoint::setMode(Mode mode, ValType val, BSONObj extra) -> EntryCountT {
 }
 
 auto FailPoint::waitForTimesEntered(EntryCountT targetTimesEntered) const noexcept -> EntryCountT {
-    auto timesEntered = _timesEntered.load();
-    for (; timesEntered < targetTimesEntered; timesEntered = _timesEntered.load()) {
-        sleepmillis(duration_cast<Milliseconds>(kWaitGranularity).count());
-    };
-    return timesEntered;
+    return waitForTimesEntered(Interruptible::notInterruptible(), targetTimesEntered);
 }
 
-auto FailPoint::waitForTimesEntered(OperationContext* opCtx, EntryCountT targetTimesEntered) const
-    -> EntryCountT {
-    auto timesEntered = _timesEntered.load();
-    for (; timesEntered < targetTimesEntered; timesEntered = _timesEntered.load()) {
-        opCtx->sleepFor(kWaitGranularity);
-    };
-    return timesEntered;
+auto FailPoint::waitForTimesEntered(Interruptible* interruptible,
+                                    EntryCountT targetTimesEntered) const -> EntryCountT {
+    while (true) {
+        if (auto entries = _timesEntered.load(); entries >= targetTimesEntered)
+            return entries;
+        interruptible->sleepFor(kWaitGranularity);
+    }
 }
 
 const BSONObj& FailPoint::_getData() const {

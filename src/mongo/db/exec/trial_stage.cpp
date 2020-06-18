@@ -76,11 +76,11 @@ Status TrialStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     while (!_specificStats.trialCompleted) {
         WorkingSetID id = WorkingSet::INVALID_ID;
         const bool mustYield = (work(&id) == PlanStage::NEED_YIELD);
-        if (mustYield || yieldPolicy->shouldYieldOrInterrupt()) {
+        if (mustYield || yieldPolicy->shouldYieldOrInterrupt(expCtx()->opCtx)) {
             if (mustYield && !yieldPolicy->canAutoYield()) {
                 throw WriteConflictException();
             }
-            auto yieldStatus = yieldPolicy->yieldOrInterrupt();
+            auto yieldStatus = yieldPolicy->yieldOrInterrupt(expCtx()->opCtx);
             if (!yieldStatus.isOK()) {
                 return yieldStatus;
             }
@@ -140,18 +140,6 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
             // the active plan and return NEED_TIME so that the caller will consume the cache.
             _specificStats.trialCompleted = _specificStats.trialSucceeded = true;
             _replaceCurrentPlan(_queuedData);
-            return NEED_TIME;
-        case PlanStage::FAILURE:
-            // Either of these cause us to immediately end the trial phase and switch to the backup.
-            auto statusDoc = WorkingSetCommon::getStatusMemberDocument(*_ws, *out);
-            BSONObj statusObj = statusDoc ? statusDoc->toBson() : BSONObj();
-            LOGV2_DEBUG(20604,
-                        1,
-                        "Trial plan failed; switching to backup plan. Status: {statusObj}",
-                        "statusObj"_attr = redact(statusObj));
-            _specificStats.trialCompleted = true;
-            _replaceCurrentPlan(_backupPlan);
-            *out = WorkingSet::INVALID_ID;
             return NEED_TIME;
     }
 

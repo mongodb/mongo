@@ -650,7 +650,16 @@ class NinjaState:
             # use for the "real" builder and multiple phony targets that
             # match the file names of the remaining outputs. This way any
             # build can depend on any output from any build.
-            build["outputs"].sort()
+            #
+            # We assume that the first listed output is the 'key'
+            # output and is stably presented to us by SCons. For
+            # instance if -gsplit-dwarf is in play and we are
+            # producing foo.o and foo.dwo, we expect that outputs[0]
+            # from SCons will be the foo.o file and not the dwo
+            # file. If instead we just sorted the whole outputs array,
+            # we would find that the dwo file becomes the
+            # first_output, and this breaks, for instance, header
+            # dependency scanning.
             if rule is not None and (rule.get("deps") or rule.get("rspfile")):
                 first_output, remaining_outputs = (
                     build["outputs"][0],
@@ -659,7 +668,7 @@ class NinjaState:
 
                 if remaining_outputs:
                     ninja.build(
-                        outputs=remaining_outputs, rule="phony", implicit=first_output,
+                        outputs=sorted(remaining_outputs), rule="phony", implicit=first_output,
                     )
 
                 build["outputs"] = first_output
@@ -1348,6 +1357,16 @@ def generate(env):
     SCons.Node.FS.File.get_csig = ninja_csig(SCons.Node.FS.File.get_csig)
     SCons.Node.FS.Dir.get_csig = ninja_csig(SCons.Node.FS.Dir.get_csig)
     SCons.Node.Alias.Alias.get_csig = ninja_csig(SCons.Node.Alias.Alias.get_csig)
+
+    # Ignore CHANGED_SOURCES and CHANGED_TARGETS. We don't want those
+    # to have effect in a generation pass because the generator
+    # shouldn't generate differently depending on the current local
+    # state. Without this, when generating on Windows, if you already
+    # had a foo.obj, you would omit foo.cpp from the response file. Do the same for UNCHANGED.
+    SCons.Executor.Executor._get_changed_sources = SCons.Executor.Executor._get_sources
+    SCons.Executor.Executor._get_changed_targets = SCons.Executor.Executor._get_targets
+    SCons.Executor.Executor._get_unchanged_sources = SCons.Executor.Executor._get_sources
+    SCons.Executor.Executor._get_unchanged_targets = SCons.Executor.Executor._get_targets
 
     # Replace false action messages with nothing.
     env["PRINT_CMD_LINE_FUNC"] = ninja_noop

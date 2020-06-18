@@ -146,8 +146,9 @@ public:
             getSocket().shutdown(GenericSocket::shutdown_both, ec);
             if ((ec) && (ec != asio::error::not_connected)) {
                 LOGV2_ERROR(23841,
-                            "Error shutting down socket: {ec_message}",
-                            "ec_message"_attr = ec.message());
+                            "Error shutting down socket: {error}",
+                            "Error shutting down socket",
+                            "error"_attr = ec.message());
             }
         }
     }
@@ -188,6 +189,7 @@ public:
         LOGV2_DEBUG(4615608,
                     3,
                     "Cancelling outstanding I/O operations on connection to {remote}",
+                    "Cancelling outstanding I/O operations on connection to remote",
                     "remote"_attr = _remote);
         if (baton && baton->networking() && baton->networking()->cancelSession(*this)) {
             // If we have a baton, it was for networking, and it owned our session, then we're done.
@@ -212,8 +214,9 @@ public:
         if (!swPollEvents.isOK()) {
             if (swPollEvents != ErrorCodes::NetworkTimeout) {
                 LOGV2_WARNING(4615609,
-                              "Failed to poll socket for connectivity check: {reason}",
-                              "reason"_attr = swPollEvents.getStatus());
+                              "Failed to poll socket for connectivity check: {error}",
+                              "Failed to poll socket for connectivity check",
+                              "error"_attr = swPollEvents.getStatus());
                 return false;
             }
             return true;
@@ -227,8 +230,9 @@ public:
                 return true;
             } else if (size == -1) {
                 LOGV2_WARNING(4615610,
-                              "Failed to check socket connectivity: {errDesc}",
-                              "errDesc"_attr = errnoWithDescription(errno));
+                              "Failed to check socket connectivity: {error}",
+                              "Failed to check socket connectivity",
+                              "error"_attr = errnoWithDescription(errno));
             }
             // If size == 0 then we got disconnected and we should return false.
         }
@@ -394,6 +398,7 @@ private:
                     const auto str = sb.str();
                     LOGV2(4615638,
                           "recv(): message msgLen {msgLen} is invalid. Min: {min} Max: {max}",
+                          "recv(): message mstLen is invalid.",
                           "msgLen"_attr = msgLen,
                           "min"_attr = kHeaderSize,
                           "max"_attr = MaxMessageSizeBytes);
@@ -488,12 +493,17 @@ private:
                 localBuffer = asio::mutable_buffer(buffers.data(), 1);
             }
 
-            size = asio::read(stream, localBuffer, ec);
+            do {
+                size = asio::read(stream, localBuffer, ec);
+            } while (ec == asio::error::interrupted);  // retry syscall EINTR
+
             if (!ec && buffers.size() > 1) {
                 ec = asio::error::would_block;
             }
         } else {
-            size = asio::read(stream, buffers, ec);
+            do {
+                size = asio::read(stream, buffers, ec);
+            } while (ec == asio::error::interrupted);  // retry syscall EINTR
         }
 
         if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
@@ -581,12 +591,16 @@ private:
                 localBuffer = asio::const_buffer(buffers.data(), 1);
             }
 
-            size = asio::write(stream, localBuffer, ec);
+            do {
+                size = asio::write(stream, localBuffer, ec);
+            } while (ec == asio::error::interrupted);  // retry syscall EINTR
             if (!ec && buffers.size() > 1) {
                 ec = asio::error::would_block;
             }
         } else {
-            size = asio::write(stream, buffers, ec);
+            do {
+                size = asio::write(stream, buffers, ec);
+            } while (ec == asio::error::interrupted);  // retry syscall EINTR
         }
 
         if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
@@ -697,9 +711,10 @@ private:
             if (!sslGlobalParams.disableNonSSLConnectionLogging &&
                 _tl->_sslMode() == SSLParams::SSLMode_preferSSL) {
                 LOGV2(23838,
-                      "SSL mode is set to 'preferred' and connection {id} to {remote} is not using "
-                      "SSL.",
-                      "id"_attr = id(),
+                      "SSL mode is set to 'preferred' and connection {connectionId} to {remote} is "
+                      "not using SSL.",
+                      "SSL mode is set to 'preferred' and connection to remote is not using SSL.",
+                      "connectionId"_attr = id(),
                       "remote"_attr = remote());
             }
             return Future<bool>::makeReady(false);

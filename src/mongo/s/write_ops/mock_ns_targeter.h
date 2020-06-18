@@ -74,18 +74,18 @@ public:
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    std::vector<ShardEndpoint> targetUpdate(
-        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateOp) const override {
-        return _targetQuery(updateOp.getQ());
+    std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
+                                            const BatchItemRef& itemRef) const override {
+        return _targetQuery(itemRef.getUpdate().getQ());
     }
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    std::vector<ShardEndpoint> targetDelete(
-        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteOp) const override {
-        return _targetQuery(deleteOp.getQ());
+    std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
+                                            const BatchItemRef& itemRef) const override {
+        return _targetQuery(itemRef.getDelete().getQ());
     }
 
     std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const override {

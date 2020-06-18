@@ -1,14 +1,9 @@
-// Basic test of sharding with a hashed shard key and other unique index
-// Does 2 things and checks for consistent error:
-//  1.) shard collection on hashed "a", ensure unique index {a:1, b:1}
-//  2.) reverse order
-
-// This test triggers a compiler bug that causes a crash when compiling with optimizations on, see
-// SERVER-36321.
-// @tags: [
-//   blacklist_from_rhel_67_s390x,
-//   need_fixing_for_46
-// ]
+/**
+ * Basic test of sharding with a hashed shard key and other unique index. Does 2 things and checks
+ * for consistent error:
+ * 1. shard collection on hashed "a", ensure unique index {a:1, b:1}
+ * 2. reverse order
+ */
 (function() {
 'use strict';
 

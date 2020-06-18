@@ -2,7 +2,7 @@
 
 import time
 
-from . import interface
+from buildscripts.resmokelib.testing.testcases import interface
 
 
 class SleepTestCase(interface.TestCase):

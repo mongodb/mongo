@@ -136,15 +136,10 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
 
     // Should the modifiers validate their embedded docs via storage_validation::storageValid()?
     // Only user updates should be checked. Any system or replication stuff should pass through.
-    // Config db docs also do not get checked.
     const auto request = _params.request;
-    _enforceOkForStorage = !(request->isFromOplogApplication() || request->isFromMigration());
 
-    // We should only check for an update to the shard key if the update is coming from a user and
-    // the request is versioned.
-    _shouldCheckForShardKeyUpdate =
-        !(request->isFromOplogApplication() || request->isFromMigration()) &&
-        OperationShardingState::isOperationVersioned(expCtx->opCtx);
+    _isUserInitiatedWrite = opCtx()->writesAreReplicated() &&
+        !(request->isFromOplogApplication() || request->isFromMigration());
 
     _specificStats.isModUpdate = params.driver->type() == UpdateDriver::UpdateType::kOperator;
 }
@@ -173,16 +168,15 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     bool docWasModified = false;
 
     Status status = Status::OK();
-    // A user-initiated write is one which is not caused by oplog application and
-    // is not part of a chunk migration. The resulting document should be validated for storage.
-    // It is safe to access the CollectionShardingState in this write context and
-    // to throw SSV if the sharding metadata has not been initialized.
-    const bool isUserInitiatedWrite = opCtx()->writesAreReplicated() && _enforceOkForStorage;
     const bool isInsert = false;
     FieldRefSet immutablePaths;
-    if (isUserInitiatedWrite) {
-        const auto collDesc =
-            CollectionShardingState::get(opCtx(), collection()->ns())->getCollectionDescription();
+
+    if (_isUserInitiatedWrite) {
+        // Documents coming directly from users should be validated for storage. It is safe to
+        // access the CollectionShardingState in this write context and to throw SSV if the sharding
+        // metadata has not been initialized.
+        const auto collDesc = CollectionShardingState::get(opCtx(), collection()->ns())
+                                  ->getCollectionDescription(opCtx());
         if (collDesc.isSharded() && !OperationShardingState::isOperationVersioned(opCtx())) {
             immutablePaths.fillFrom(collDesc.getKeyPatternFields());
         }
@@ -192,7 +186,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         // If we don't need match details, avoid doing the rematch
         status = driver->update(StringData(),
                                 &_doc,
-                                isUserInitiatedWrite,
+                                _isUserInitiatedWrite,
                                 immutablePaths,
                                 isInsert,
                                 &logObj,
@@ -211,7 +205,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
         status = driver->update(matchedField,
                                 &_doc,
-                                isUserInitiatedWrite,
+                                _isUserInitiatedWrite,
                                 immutablePaths,
                                 isInsert,
                                 &logObj,
@@ -250,12 +244,12 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         RecordId newRecordId;
         CollectionUpdateArgs args;
 
-        if (!request->isExplain()) {
+        if (!request->explain()) {
             args.stmtId = request->getStmtId();
             args.update = logObj;
-            if (isUserInitiatedWrite) {
+            if (_isUserInitiatedWrite) {
                 args.criteria = CollectionShardingState::get(opCtx(), collection()->ns())
-                                    ->getCollectionDescription()
+                                    ->getCollectionDescription(opCtx())
                                     .extractDocumentKey(newObj);
             } else {
                 const auto docId = newObj[idFieldName];
@@ -272,13 +266,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         }
 
         if (inPlace) {
-            if (!request->isExplain()) {
+            if (!request->explain()) {
                 newObj = oldObj.value();
                 const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
-                if (_shouldCheckForShardKeyUpdate && checkUpdateChangesShardKeyFields(oldObj) &&
+                if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(oldObj) &&
                     !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
                 }
@@ -302,8 +296,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                                   << BSONObjMaxUserSize,
                     newObj.objsize() <= BSONObjMaxUserSize);
 
-            if (!request->isExplain()) {
-                if (_shouldCheckForShardKeyUpdate && checkUpdateChangesShardKeyFields(oldObj) &&
+            if (!request->explain()) {
+                if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(oldObj) &&
                     !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
                 }
@@ -336,7 +330,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
     // Only record doc modifications if they wrote (exclude no-ops). Explains get
     // recorded as if they wrote.
-    if (docWasModified || request->isExplain()) {
+    if (docWasModified || request->explain()) {
         _specificStats.nModified++;
     }
 
@@ -593,17 +587,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     } else if (PlanStage::IS_EOF == status) {
         // The child is out of results, and therefore so are we.
         return PlanStage::IS_EOF;
-    } else if (PlanStage::FAILURE == status) {
-        *out = id;
-        // If a stage fails, it may create a status WSM to indicate why it failed, in which case
-        // 'id' is valid.  If ID is invalid, we create our own error message.
-        if (WorkingSet::INVALID_ID == id) {
-            const std::string errmsg = "update stage failed to read in results from child";
-            *out = WorkingSetCommon::allocateStatusMember(
-                _ws, Status(ErrorCodes::InternalError, errmsg));
-            return PlanStage::FAILURE;
-        }
-        return status;
     } else if (PlanStage::NEED_YIELD == status) {
         *out = id;
     }
@@ -705,7 +688,7 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
 
 bool UpdateStage::checkUpdateChangesShardKeyFields(const Snapshotted<BSONObj>& oldObj) {
     auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-    const auto collDesc = css->getCollectionDescription();
+    const auto collDesc = css->getCollectionDescription(opCtx());
     if (!collDesc.isSharded()) {
         return false;
     }

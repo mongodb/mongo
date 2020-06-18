@@ -44,8 +44,7 @@ assert.neq(undefined, initialAggPBRT);
 for (let i = 0; i < 5; ++i) {
     assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
     const getMorePBRT = csCursor.getResumeToken();
-    // TODO SERVER-47810: this should also be true on mongoS.
-    assert.eqIfNotMongos(bsonWoCompare(initialAggPBRT, getMorePBRT), 0);
+    assert.eq(bsonWoCompare(initialAggPBRT, getMorePBRT), 0);
     assert.commandWorked(testCollection.insert({_id: docId++}));
 }
 
@@ -116,7 +115,7 @@ let previousGetMorePBRT = csCursor.getResumeToken();
 assert.neq(undefined, previousGetMorePBRT);
 
 // ... then test that it advances on an insert to an unrelated collection.
-assert.commandWorked(otherCollection.insert({}));
+assert.commandWorked(otherCollection.insert({_id: docId}));
 assert.soon(() => {
     assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
     getMorePBRT = csCursor.getResumeToken();
@@ -162,7 +161,6 @@ if (FixtureHelpers.isSharded(testCollection) &&
 }
 
 // Test that the PBRT is correctly updated when reading events from within a transaction.
-csCursor = testCollection.watch([], {cursor: {batchSize: batchSize}});
 const session = db.getMongo().startSession();
 const sessionDB = session.getDatabase(db.getName());
 
@@ -174,14 +172,24 @@ session.startTransaction();
 for (let i = 0; i < 3; ++i) {
     assert.commandWorked(sessionColl.insert({_id: docId++}));
 }
-assert.commandWorked(sessionOtherColl.insert({}));
+assert.commandWorked(sessionOtherColl.insert({_id: docId}));
 assert.commandWorked(session.commitTransaction_forTesting());
 session.endSession();
 
-// Grab the next 2 events, which should be the first 2 events in the transaction.
+// Grab the next 2 events, which should be the first 2 events in the transaction. As of SERVER-37364
+// the co-ordinator of a distributed transaction returns before all participants have acknowledged
+// the decision, and so not all events may yet be majority-visible. We therefore wait until we see
+// both expected events in the first set of results retrieved from the transaction.
 previousGetMorePBRT = getMorePBRT;
-assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
-assert.eq(csCursor.objsLeftInBatch(), 2);
+assert.soon(() => {
+    // Start a new stream from the most recent resume token we retrieved.
+    csCursor = testCollection.watch(
+        [], {resumeAfter: previousGetMorePBRT, cursor: {batchSize: batchSize}});
+    // Wait until we see the first results from the stream.
+    assert.soon(() => csCursor.hasNext());
+    // There should be two distinct events in the batch.
+    return csCursor.objsLeftInBatch() === 2;
+});
 
 // The clusterTime should be the same on each, but the resume token keeps advancing.
 const txnEvent1 = csCursor.next(), txnEvent2 = csCursor.next();

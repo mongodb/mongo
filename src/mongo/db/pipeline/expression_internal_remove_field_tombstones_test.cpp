@@ -42,8 +42,8 @@ class ExpressionInternalRemoveFieldTombstonesTest : public AggregationContextFix
 public:
     auto createExpression() {
         auto expr = make_intrusive<ExpressionInternalRemoveFieldTombstones>(
-            getExpCtx(),
-            ExpressionFieldPath::parse(getExpCtx(), "$$ROOT", getExpCtx()->variablesParseState));
+            getExpCtxRaw(),
+            ExpressionFieldPath::parse(getExpCtxRaw(), "$$ROOT", getExpCtx()->variablesParseState));
         return expr;
     }
 };

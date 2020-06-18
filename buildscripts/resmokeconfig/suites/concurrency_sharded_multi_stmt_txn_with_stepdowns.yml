@@ -172,9 +172,6 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_merge_when_not_matched_insert.js
   - jstests/concurrency/fsm_workloads/agg_merge_when_matched_replace_with_new.js
 
-  # Uses the collMod command, which isn't considered to be retryable.
-  - jstests/concurrency/fsm_workloads/random_moveChunk_index_operations.js
-
   # JS engine interruptions on mongos return ErrorCodes::Interrupted, which isn't
   # considered a retryable or transient transaction error.
   - jstests/concurrency/fsm_workloads/indexed_insert_where.js
@@ -254,6 +251,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         enableElectionHandoff: 0
+        roleGraphInvalidationIsFatal: 1
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

@@ -96,7 +96,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     const char *file;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
-    btree = cb->incr_cursor == NULL ? NULL : ((WT_CURSOR_BTREE *)cb->incr_cursor)->btree;
+    btree = cb->incr_cursor == NULL ? NULL : CUR2BT(cb->incr_cursor);
     raw = F_MASK(cursor, WT_CURSTD_RAW);
     CURSOR_API_CALL(cursor, session, get_value, btree);
     F_CLR(cursor, WT_CURSTD_RAW);
@@ -169,13 +169,17 @@ err:
  * __wt_curbackup_free_incr --
  *     Free the duplicate backup cursor for a file-based incremental backup.
  */
-void
+int
 __wt_curbackup_free_incr(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
+    WT_DECL_RET;
+
     __wt_free(session, cb->incr_file);
     if (cb->incr_cursor != NULL)
-        cb->incr_cursor->close(cb->incr_cursor);
+        ret = cb->incr_cursor->close(cb->incr_cursor);
     __wt_buf_free(session, &cb->bitstring);
+
+    return (ret);
 }
 
 /*
@@ -233,7 +237,7 @@ __wt_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *o
 
 err:
     if (ret != 0)
-        __wt_curbackup_free_incr(session, cb);
+        WT_TRET(__wt_curbackup_free_incr(session, cb));
     __wt_scr_free(session, &open_uri);
     return (ret);
 }

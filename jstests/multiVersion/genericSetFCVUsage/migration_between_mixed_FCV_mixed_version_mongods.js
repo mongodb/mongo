@@ -8,6 +8,13 @@
 
 // TODO: SERVER-43881 Make migration_between_mixed_FCV_mixed_version_mongods.js start shards as
 // replica sets.
+
+// Test is not replSet so cannot clean up migration coordinator docs properly.
+// Making it replSet will also make the moveChunk get stuck forever because the migration
+// coordinator will retry forever and never succeeds because recipient shard has incompatible
+// version.
+TestData.skipCheckOrphans = true;
+
 let st = new ShardingTest({
     shards: [{binVersion: "latest"}, {binVersion: "last-stable"}],
     mongos: {binVersion: "latest"},

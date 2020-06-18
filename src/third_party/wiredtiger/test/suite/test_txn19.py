@@ -69,7 +69,7 @@ def copy_for_crash_restart(olddir, newdir):
 
 class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
     base_config = 'log=(archive=false,enabled,file_max=100K),' + \
-                  'transaction_sync=(enabled,method=none)'
+                  'transaction_sync=(enabled,method=none),cache_size=1GB'
     conn_config = base_config
     corruption_type = [
         ('removal', dict(kind='removal', f=lambda fname:
@@ -354,7 +354,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
 
 class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
     base_config = 'log=(archive=false,enabled,file_max=100K),' + \
-                  'transaction_sync=(enabled,method=none)'
+                  'transaction_sync=(enabled,method=none),cache_size=1GB'
     conn_config = base_config
 
     # The type of corruption to be applied

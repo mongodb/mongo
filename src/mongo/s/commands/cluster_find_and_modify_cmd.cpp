@@ -81,12 +81,36 @@ BSONObj getCollation(const BSONObj& cmdObj) {
     return BSONObj();
 }
 
+boost::optional<BSONObj> getLet(const BSONObj& cmdObj) {
+    if (auto letElem = cmdObj.getField("let"_sd); letElem.type() == BSONType::Object) {
+        auto bob = BSONObjBuilder();
+        bob.appendElementsUnique(letElem.embeddedObject());
+        return bob.obj();
+    }
+    return boost::none;
+}
+
+boost::optional<RuntimeConstants> getRuntimeConstants(const BSONObj& cmdObj) {
+    if (auto rcElem = cmdObj.getField("runtimeConstants"_sd); rcElem.type() == BSONType::Object) {
+        IDLParserErrorContext ctx("internalRuntimeConstants");
+        return RuntimeConstants::parse(ctx, rcElem.embeddedObject());
+    }
+    return boost::none;
+}
+
 BSONObj getShardKey(OperationContext* opCtx,
                     const ChunkManager& chunkMgr,
                     const NamespaceString& nss,
-                    const BSONObj& query) {
+                    const BSONObj& query,
+                    const BSONObj& collation,
+                    const boost::optional<ExplainOptions::Verbosity> verbosity,
+                    const boost::optional<BSONObj>& let,
+                    const boost::optional<RuntimeConstants>& runtimeConstants) {
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+        opCtx, nss, collation, verbosity, let, runtimeConstants);
+
     BSONObj shardKey =
-        uassertStatusOK(chunkMgr.getShardKeyPattern().extractShardKeyFromQuery(opCtx, nss, query));
+        uassertStatusOK(chunkMgr.getShardKeyPattern().extractShardKeyFromQuery(expCtx, query));
     uassert(ErrorCodes::ShardKeyNotFound,
             "Query for sharded findAndModify must contain the shard key",
             !shardKey.isEmpty());
@@ -191,7 +215,10 @@ public:
 
             const BSONObj query = cmdObj.getObjectField("query");
             const BSONObj collation = getCollation(cmdObj);
-            const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, nss, query);
+            const auto let = getLet(cmdObj);
+            const auto rc = getRuntimeConstants(cmdObj);
+            const BSONObj shardKey =
+                getShardKey(opCtx, *chunkMgr, nss, query, collation, verbosity, let, rc);
             const auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
             shard = uassertStatusOK(
@@ -266,7 +293,10 @@ public:
 
         const BSONObj query = cmdObjForShard.getObjectField("query");
         const BSONObj collation = getCollation(cmdObjForShard);
-        const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, nss, query);
+        const auto let = getLet(cmdObjForShard);
+        const auto rc = getRuntimeConstants(cmdObjForShard);
+        const BSONObj shardKey =
+            getShardKey(opCtx, *chunkMgr, nss, query, collation, boost::none, let, rc);
         auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
         _runCommand(opCtx,

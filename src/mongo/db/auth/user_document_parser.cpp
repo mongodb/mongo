@@ -478,7 +478,7 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
             LOGV2_WARNING(23745,
                           "Could not parse privilege element in user document",
                           "user"_attr = user->getName(),
-                          "status"_attr = causedBy(status));
+                          "error"_attr = causedBy(status));
             continue;
         }
         if (unrecognizedActions.size()) {
@@ -487,6 +487,7 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
             LOGV2_WARNING(23746,
                           "Encountered unrecognized actions \"{action}\" while "
                           "parsing user document for {user}",
+                          "Encountered unrecognized actions while parsing user document",
                           "action"_attr = unrecognizedActionsString,
                           "user"_attr = user->getName());
         }

@@ -39,6 +39,7 @@
 #include "mongo/db/auth/user_set.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
@@ -184,32 +185,39 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
     invariant(!opCtx->shouldParticipateInFlowControl());
 
     const auto dbProfilingNS = NamespaceString(db->name(), "system.profile");
-    Collection* const collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
-    if (collection) {
-        if (!collection->isCapped()) {
-            return Status(ErrorCodes::NamespaceExists,
-                          str::stream() << dbProfilingNS << " exists but isn't capped");
+
+    // Checking the collection exists must also be done in the WCE retry loop. Only retrying
+    // collection creation would endlessly throw errors because the collection exists: must check
+    // and see the collection exists in order to break free.
+    return writeConflictRetry(opCtx, "createProfileCollection", dbProfilingNS.ns(), [&] {
+        Collection* const collection =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
+        if (collection) {
+            if (!collection->isCapped()) {
+                return Status(ErrorCodes::NamespaceExists,
+                              str::stream() << dbProfilingNS << " exists but isn't capped");
+            }
+
+            return Status::OK();
         }
 
+        // system.profile namespace doesn't exist; create it
+        LOGV2(20701,
+              "Creating profile collection: {namespace}",
+              "Creating profile collection",
+              "namespace"_attr = dbProfilingNS);
+
+        CollectionOptions collectionOptions;
+        collectionOptions.capped = true;
+        collectionOptions.cappedSize = 1024 * 1024;
+
+        WriteUnitOfWork wunit(opCtx);
+        repl::UnreplicatedWritesBlock uwb(opCtx);
+        invariant(db->createCollection(opCtx, dbProfilingNS, collectionOptions));
+        wunit.commit();
+
         return Status::OK();
-    }
-
-    // system.profile namespace doesn't exist; create it
-    LOGV2(20701,
-          "Creating profile collection: {dbProfilingNS}",
-          "dbProfilingNS"_attr = dbProfilingNS);
-
-    CollectionOptions collectionOptions;
-    collectionOptions.capped = true;
-    collectionOptions.cappedSize = 1024 * 1024;
-
-    WriteUnitOfWork wunit(opCtx);
-    repl::UnreplicatedWritesBlock uwb(opCtx);
-    invariant(db->createCollection(opCtx, dbProfilingNS, collectionOptions));
-    wunit.commit();
-
-    return Status::OK();
+    });
 }
 
 }  // namespace mongo

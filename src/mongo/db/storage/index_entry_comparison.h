@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
@@ -261,14 +262,20 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                               const BSONObj& keyPattern,
                               const BSONObj& indexCollation);
 
-/**
- * Returns the formatted error status about the duplicate KeyString.
- */
 Status buildDupKeyErrorStatus(const KeyString::Value& keyString,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
                               const BSONObj& indexCollation,
                               const Ordering& ordering);
+
+Status buildDupKeyErrorStatus(OperationContext* opCtx,
+                              const BSONObj& key,
+                              const IndexDescriptor* desc);
+
+Status buildDupKeyErrorStatus(OperationContext* opCtx,
+                              const KeyString::Value& keyString,
+                              const Ordering& ordering,
+                              const IndexDescriptor* desc);
 
 }  // namespace mongo

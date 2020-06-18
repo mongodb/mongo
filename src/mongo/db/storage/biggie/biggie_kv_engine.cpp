@@ -44,6 +44,10 @@
 namespace mongo {
 namespace biggie {
 
+KVEngine::KVEngine()
+    : mongo::KVEngine(), _visibilityManager(std::make_unique<VisibilityManager>()) {}
+KVEngine::~KVEngine() {}
+
 mongo::RecoveryUnit* KVEngine::newRecoveryUnit() {
     return new RecoveryUnit(this, nullptr);
 }
@@ -52,6 +56,7 @@ Status KVEngine::createRecordStore(OperationContext* opCtx,
                                    StringData ns,
                                    StringData ident,
                                    const CollectionOptions& options) {
+    stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
     return Status::OK();
 }
@@ -60,6 +65,7 @@ std::unique_ptr<mongo::RecordStore> KVEngine::makeTemporaryRecordStore(Operation
                                                                        StringData ident) {
     std::unique_ptr<mongo::RecordStore> recordStore =
         std::make_unique<RecordStore>("", ident, false);
+    stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
     return recordStore;
 };
@@ -71,8 +77,6 @@ std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* o
                                                              const CollectionOptions& options) {
     std::unique_ptr<mongo::RecordStore> recordStore;
     if (options.capped) {
-        if (NamespaceString::oplog(ns))
-            _visibilityManager = std::make_unique<VisibilityManager>();
         recordStore = std::make_unique<RecordStore>(
             ns,
             ident,
@@ -84,6 +88,7 @@ std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* o
     } else {
         recordStore = std::make_unique<RecordStore>(ns, ident, options.capped);
     }
+    stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
     return recordStore;
 }
@@ -103,22 +108,29 @@ Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
                                            const CollectionOptions& collOptions,
                                            StringData ident,
                                            const IndexDescriptor* desc) {
+    stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = false;
     return Status::OK();  // I don't think we actually need to do anything here
 }
 
 std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
     OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
-    _idents[ident.toString()] = false;
+    {
+        stdx::lock_guard lock(_identsLock);
+        _idents[ident.toString()] = false;
+    }
     return std::make_unique<SortedDataInterface>(opCtx, ident, desc);
 }
 
 Status KVEngine::dropIdent(OperationContext* opCtx, mongo::RecoveryUnit* ru, StringData ident) {
     Status dropStatus = Status::OK();
+    stdx::unique_lock lock(_identsLock);
     if (_idents.count(ident.toString()) > 0) {
         // Check if the ident is a RecordStore or a SortedDataInterface then call the corresponding
         // truncate. A true value in the map means it is a RecordStore, false a SortedDataInterface.
-        if (_idents[ident.toString()] == true) {  // ident is RecordStore.
+        bool isRecordStore = _idents[ident.toString()] == true;
+        lock.unlock();
+        if (isRecordStore) {  // ident is RecordStore.
             CollectionOptions s;
             auto rs = getRecordStore(/*unused*/ opCtx, ""_sd, ident, s);
             dropStatus =
@@ -128,6 +140,7 @@ Status KVEngine::dropIdent(OperationContext* opCtx, mongo::RecoveryUnit* ru, Str
                 std::make_unique<SortedDataInterface>(Ordering::make(BSONObj()), true, ident);
             dropStatus = sdi->truncate(ru);
         }
+        lock.lock();
         _idents.erase(ident.toString());
     }
     return dropStatus;

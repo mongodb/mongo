@@ -40,7 +40,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -262,9 +261,20 @@ public:
      * not perform any storage engine writes. May delete internal tables, but this is not
      * transactional.
      *
-     * This should only be used during shutdown or rollback.
+     * This should only be used during rollback.
      */
-    void abortWithoutCleanup(OperationContext* opCtx);
+    void abortWithoutCleanupForRollback(OperationContext* opCtx);
+
+    /**
+     * May be called at any time after construction but before a successful commit(). Suppresses
+     * the default behavior on destruction of removing all traces of uncommitted index builds. If
+     * this is a two-phase hybrid index build and resumable index builds are supported, writes the
+     * current state of the index build to disk using the storage engine. May delete internal
+     * tables, but this is not transactional.
+     *
+     * This should only be used during shutdown.
+     */
+    void abortWithoutCleanupForShutdown(OperationContext* opCtx);
 
     /**
      * Returns true if this build block supports background writes while building an index. This is
@@ -285,12 +295,22 @@ private:
         InsertDeleteOptions options;
     };
 
+    enum class Phase { kCollectionScan, kBulkLoad, kDrainWrites };
+
+    void _abortWithoutCleanup(OperationContext* opCtx, bool shutdown);
+
+    bool _shouldWriteStateToDisk(OperationContext* opCtx, bool shutdown) const;
+
+    void _writeStateToDisk(OperationContext* opCtx) const;
+
+    BSONObj _constructStateObject() const;
+
+    std::string _phaseToString(Phase phase) const;
+
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;
 
     std::vector<IndexToBuild> _indexes;
-
-    std::unique_ptr<BackgroundOperation> _backgroundOperation;
 
     IndexBuildMethod _method = IndexBuildMethod::kHybrid;
 
@@ -303,5 +323,12 @@ private:
     // A unique identifier associating this index build with a two-phase index build within a
     // replica set.
     boost::optional<UUID> _buildUUID;
+
+    // The RecordId corresponding to the object most recently inserted using this MultiIndexBlock,
+    // or boost::none if nothing has been inserted.
+    boost::optional<RecordId> _lastRecordIdInserted;
+
+    // The current phase of the index build.
+    Phase _phase = Phase::kCollectionScan;
 };
 }  // namespace mongo

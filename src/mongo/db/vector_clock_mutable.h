@@ -44,22 +44,41 @@ public:
     // clock implementation.
     static VectorClockMutable* get(ServiceContext* service);
     static VectorClockMutable* get(OperationContext* ctx);
-
     static void registerVectorClockOnServiceContext(ServiceContext* service,
                                                     VectorClockMutable* vectorClockMutable);
 
-    // Ticking
+    /**
+     * Returns the next time value for this Component, and provides a guarantee that any future call
+     * to tick() (for this Component) will return a value at least 'nTicks' ticks in the future from
+     * the current time.
+     */
     virtual LogicalTime tick(Component component, uint64_t nTicks) = 0;
+
+    /**
+     * Authoritatively ticks the current time of the Component to newTime.
+     *
+     * For ClusterTime, this should only be used for initializing from a trusted source, eg. from an
+     * oplog timestamp.
+     */
     virtual void tickTo(Component component, LogicalTime newTime) = 0;
 
 protected:
-    static bool _lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks);
-
     VectorClockMutable();
     virtual ~VectorClockMutable();
 
-    // Internal Ticking API
+    /**
+     * Called by sub-classes in order to actually tick a Component time, once they have determined
+     * that doing so is permissible.
+     *
+     * Returns as per tick(), ie. returns the next time value, and guarantees that future calls will
+     * return at least nTicks later.
+     */
     LogicalTime _advanceComponentTimeByTicks(Component component, uint64_t nTicks);
+
+    /**
+     * Called by sub-classes in order to actually tickTo a Component time, once they have determined
+     * that doing so is permissible.
+     */
     void _advanceComponentTimeTo(Component component, LogicalTime&& newTime);
 };
 

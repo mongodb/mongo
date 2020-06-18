@@ -79,7 +79,7 @@ __read_col_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, W
     WT_CELL_UNPACK_KV unpack;
 
     __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-    __wt_time_window_copy(tw, &unpack.tw);
+    WT_TIME_WINDOW_COPY(tw, &unpack.tw);
 }
 
 /*
@@ -91,21 +91,21 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
 {
     WT_CELL_UNPACK_KV unpack;
 
-    __wt_time_window_init(tw);
+    WT_TIME_WINDOW_INIT(tw);
     /*
      * If a value is simple and is globally visible at the time of reading a page into cache, we set
-     * the time pairs as globally visible.
+     * the start time point as globally visible.
      */
     if (__wt_row_leaf_value_exists(rip))
         return;
 
     __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
-    __wt_time_window_copy(tw, &unpack.tw);
+    WT_TIME_WINDOW_COPY(tw, &unpack.tw);
 }
 
 /*
  * __wt_read_cell_time_window --
- *     Read the time pairs from the cell.
+ *     Read the time window from the cell.
  */
 void
 __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_WINDOW *tw)
@@ -124,8 +124,8 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_WINDOW *tw
     } else if (page->type == WT_PAGE_COL_VAR) {
         __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
     } else {
-        /* WT_PAGE_COL_FIX: return the default time pairs. */
-        __wt_time_window_init(tw);
+        /* WT_PAGE_COL_FIX: return the default time window. */
+        WT_TIME_WINDOW_INIT(tw);
     }
 }
 
@@ -160,14 +160,14 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
          */
         if (__wt_row_leaf_value(page, rip, buf)) {
             if (tw != NULL)
-                __wt_time_window_init(tw);
+                WT_TIME_WINDOW_INIT(tw);
             return (0);
         }
 
         /* Take the value from the original page cell. */
         __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
         if (tw != NULL)
-            __wt_time_window_copy(tw, &unpack.tw);
+            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));
     }
 
@@ -176,7 +176,7 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
         cell = WT_COL_PTR(page, &page->pg_var[cbt->slot]);
         __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
         if (tw != NULL)
-            __wt_time_window_copy(tw, &unpack.tw);
+            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));
     }
 
@@ -186,7 +186,7 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
      * FIXME-WT-6126: Should also check visibility here
      */
     if (tw != NULL)
-        __wt_time_window_init(tw);
+        WT_TIME_WINDOW_INIT(tw);
     v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
     return (__wt_buf_set(session, buf, &v, 1));
 }
@@ -249,7 +249,7 @@ __wt_value_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
          * still required for fixed length column store as we have issues with this table type in
          * durable history which we're planning to address in PM-1814.
          */
-        WT_ASSERT(session, cbt->btree->type == BTREE_COL_FIX);
+        WT_ASSERT(session, CUR2BT(cbt)->type == BTREE_COL_FIX);
         WT_RET(__value_return(cbt));
     } else {
         /*

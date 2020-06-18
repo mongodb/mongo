@@ -345,11 +345,21 @@ wt_open_corrupt(const char *sfx)
     WT_DECL_RET;
     char buf[1024];
 
+    /* The child should not abort the test in the message handler. Set it here, don't inherit. */
+    test_abort = false;
     if (sfx != NULL)
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s", home, sfx));
     else
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", home));
-    ret = wiredtiger_open(buf, &event_handler, NULL, &conn);
+
+    /*
+     * Opening the database may cause a panic and core dump. Change dir to database directory so the
+     * core will be left someplace we will clean up.
+     */
+    if (chdir(buf) != 0)
+        testutil_die(errno, "Child chdir: %s", home);
+
+    ret = wiredtiger_open(NULL, &event_handler, NULL, &conn);
     /*
      * Not all out of sync combinations lead to corruption. We keep the previous checkpoint in the
      * file so some combinations of future or old turtle files and metadata files will succeed.
@@ -494,7 +504,7 @@ main(int argc, char *argv[])
     printf("corrupt metadata\n");
     corrupt_file(WT_METAFILE, CORRUPT);
     testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "cp -p %s/WiredTiger.wt ./%s.SAVE/WiredTiger.wt.CORRUPT", home, home));
+      buf, sizeof(buf), "cp -p %s/WiredTiger.wt ./%s.%s/WiredTiger.wt.CORRUPT", home, home, SAVE));
     printf("copy: %s\n", buf);
     if ((ret = system(buf)) < 0)
         testutil_die(ret, "system: %s", buf);
@@ -506,26 +516,23 @@ main(int argc, char *argv[])
     printf("corrupt turtle\n");
     corrupt_file(WT_METADATA_TURTLE, WT_METAFILE_URI);
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "cp -p %s/WiredTiger.turtle ./%s.SAVE/WiredTiger.turtle.CORRUPT", home, home));
+      "cp -p %s/WiredTiger.turtle ./%s.%s/WiredTiger.turtle.CORRUPT", home, home, SAVE));
     printf("copy: %s\n", buf);
     if ((ret = system(buf)) < 0)
         testutil_die(ret, "system: %s", buf);
     run_all_verification(NULL, &table_data[0]);
 
-    /*
-     * We need to set up the string before we clean up the structure. Then after the clean up we
-     * will run this command.
-     */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf core* %s*", home));
-    testutil_cleanup(opts);
-
-    /*
-     * We've created a lot of extra directories and possibly some core files from child process
-     * aborts. Manually clean them up.
-     */
+    /* Remove saved copy of the original database directory. */
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf %s.%s", home, SAVE));
     printf("cleanup and remove: %s\n", buf);
     if ((ret = system(buf)) < 0)
         testutil_die(ret, "system: %s", buf);
+
+    /*
+     * Cleanup from test. This will delete the database directory along with the core files left
+     * there by our children.
+     */
+    testutil_cleanup(opts);
 
     return (EXIT_SUCCESS);
 }

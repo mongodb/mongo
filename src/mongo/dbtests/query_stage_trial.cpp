@@ -32,11 +32,11 @@
 #include <boost/optional.hpp>
 #include <memory>
 
-#include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -53,19 +53,19 @@ public:
           _expCtx(make_intrusive<ExpressionContext>(_opCtx.get(), nullptr, kTestNss)) {}
 
 protected:
-    // Pushes BSONObjs from the given vector into the given QueuedDataStage. Each empty BSONObj in
+    // Pushes BSONObjs from the given vector into the given MockStage. Each empty BSONObj in
     // the vector causes a NEED_TIME to be queued up at that point instead of a result.
-    void queueData(const std::vector<BSONObj>& results, QueuedDataStage* queuedData) {
+    void queueData(const std::vector<BSONObj>& results, MockStage* mockStage) {
         for (auto result : results) {
             if (result.isEmpty()) {
-                queuedData->pushBack(PlanStage::NEED_TIME);
+                mockStage->enqueueStateCode(PlanStage::NEED_TIME);
                 continue;
             }
             const auto id = _ws.allocate();
             auto* member = _ws.get(id);
             member->doc.setValue(Document{result});
             _ws.transitionToOwnedObj(id);
-            queuedData->pushBack(id);
+            mockStage->enqueueAdvanced(id);
         }
     }
 
@@ -87,8 +87,8 @@ protected:
     }
 
     std::unique_ptr<PlanYieldPolicy> yieldPolicy() {
-        return std::make_unique<PlanYieldPolicy>(
-            PlanExecutor::NO_YIELD, opCtx()->getServiceContext()->getFastClockSource());
+        return std::make_unique<NoopYieldPolicy>(
+            opCtx()->getServiceContext()->getFastClockSource());
     }
 
     OperationContext* opCtx() {
@@ -108,8 +108,8 @@ protected:
 };
 
 TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialSucceeds) {
-    auto trialPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
-    auto backupPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
+    auto trialPlan = std::make_unique<MockStage>(_expCtx.get(), ws());
+    auto backupPlan = std::make_unique<MockStage>(_expCtx.get(), ws());
 
     // Seed the trial plan with 20 results and no NEED_TIMEs.
     std::vector<BSONObj> trialResults;
@@ -138,8 +138,8 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialSucceeds) {
 }
 
 TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialPlanHitsEOF) {
-    auto trialPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
-    auto backupPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
+    auto trialPlan = std::make_unique<MockStage>(_expCtx.get(), ws());
+    auto backupPlan = std::make_unique<MockStage>(_expCtx.get(), ws());
 
     // Seed the trial plan with 5 results and no NEED_TIMEs.
     std::vector<BSONObj> trialResults;
@@ -173,8 +173,8 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialPlanHitsEOF) {
 }
 
 TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialDoesNotSucceed) {
-    auto trialPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
-    auto backupPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
+    auto trialPlan = std::make_unique<MockStage>(_expCtx.get(), ws());
+    auto backupPlan = std::make_unique<MockStage>(_expCtx.get(), ws());
 
     // Seed the trial plan with 20 results. Every second result will produce a NEED_TIME.
     std::vector<BSONObj> trialResults;
@@ -201,46 +201,6 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialDoesNotSucceed) {
     // The trial phase completed and we picked the backup plan.
     ASSERT_TRUE(trialStage->isTrialPhaseComplete());
     ASSERT_TRUE(trialStage->pickedBackupPlan());
-
-    // Confirm that we see the full backupPlan results when we iterate the trialStage.
-    for (auto result : backupResults) {
-        ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
-    }
-    ASSERT_FALSE(nextResult(trialStage.get()));
-    ASSERT_TRUE(trialStage->isEOF());
-}
-
-TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialPlanDies) {
-    auto trialPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
-    auto backupPlan = std::make_unique<QueuedDataStage>(_expCtx.get(), ws());
-
-    // Seed the trial plan with 2 results followed by a PlanStage::FAILURE.
-    queueData({BSON("_id" << 0), BSON("_id" << 1)}, trialPlan.get());
-    trialPlan->pushBack(PlanStage::FAILURE);
-
-    // Seed the backup plan with 20 different results, so that we can validate that we see the
-    // correct dataset once the trial phase is complete.
-    std::vector<BSONObj> backupResults;
-    for (auto i = 0; i < 20; ++i) {
-        backupResults.push_back(BSON("_id" << (-i)));
-    }
-    queueData(backupResults, backupPlan.get());
-
-    // We schedule the trial to run for 10 works. Because we will encounter a PlanStage::FAILURE
-    // before this point, the trial will complete early and the backup plan will be adopted.
-    auto trialStage = std::make_unique<TrialStage>(
-        _expCtx.get(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
-
-    ASSERT_OK(trialStage->pickBestPlan(yieldPolicy().get()));
-
-    // The trial phase completed and we picked the backup plan.
-    ASSERT_TRUE(trialStage->isTrialPhaseComplete());
-    ASSERT_TRUE(trialStage->pickedBackupPlan());
-
-    // Get the specific stats for the stage and confirm that the trial completed early.
-    auto* stats = static_cast<const TrialStats*>(trialStage->getSpecificStats());
-    ASSERT_EQ(stats->trialPeriodMaxWorks, 10U);
-    ASSERT_EQ(stats->trialWorks, 2U);
 
     // Confirm that we see the full backupPlan results when we iterate the trialStage.
     for (auto result : backupResults) {

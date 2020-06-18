@@ -58,7 +58,7 @@ protected:
 
     auto parseExpression(std::string expressionString) {
         return Expression::parseExpression(
-            getExpCtx(), fromjson(expressionString), getExpCtx()->variablesParseState);
+            getExpCtxRaw(), fromjson(expressionString), getExpCtx()->variablesParseState);
     }
 };
 

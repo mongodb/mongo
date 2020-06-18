@@ -36,9 +36,12 @@ namespace mongo {
 class ServiceContext;
 class OperationContext;
 
+
 /**
- * LogicalClock maintain the clusterTime for a clusterNode. Every cluster node in a replica set has
- * an instance of the LogicalClock installed as a ServiceContext decoration.
+ * LogicalClock provides a legacy interface to the cluster time, which is now provided by the
+ * VectorClock class.
+ *
+ * TODO SERVER-48433: Remove this legacy LogicalClock interface.
  */
 class LogicalClock {
 public:
@@ -46,8 +49,6 @@ public:
     static LogicalClock* get(ServiceContext* service);
     static LogicalClock* get(OperationContext* ctx);
     static void set(ServiceContext* service, std::unique_ptr<LogicalClock> logicalClock);
-
-    static const uint32_t kMaxSignedInt = ((1U << 31) - 1);
 
     /**
      * Returns the current cluster time if this is a replica set node, otherwise returns a null
@@ -62,55 +63,12 @@ public:
     LogicalClock(ServiceContext*);
 
     /**
-     * The method sets current time to newTime if the newTime > current time and it passes the rate
-     * check.
-     *
-     * Returns an error if the newTime does not pass the rate check.
-     */
-    Status advanceClusterTime(const LogicalTime newTime);
-
-    /**
      * Returns the current clusterTime.
      */
     LogicalTime getClusterTime();
 
-    /**
-     * Returns the next clusterTime value and provides a guarantee that any future call to
-     * reserveTicks() will return a value at least 'nTicks' ticks in the future from the current
-     * clusterTime.
-     */
-    LogicalTime reserveTicks(uint64_t nTicks);
-
-    /**
-     * Resets current time to newTime. Should only be used for initializing this clock from an
-     * oplog timestamp.
-     */
-    void setClusterTimeFromTrustedSource(LogicalTime newTime);
-
-    /**
-     * Returns true if the clock is enabled and can be used. Defaults to true.
-     */
-    bool isEnabled() const;
-
-    /**
-     * Disables the logical clock. A disabled clock won't process logical times and can't be
-     * re-enabled.
-     */
-    void disable();
-
 private:
-    /**
-     * Rate limiter for advancing cluster time. Rejects newTime if its seconds value is more than
-     * kMaxAcceptableLogicalClockDriftSecs seconds ahead of this node's wall clock.
-     */
-    Status _passesRateLimiter_inlock(LogicalTime newTime);
-
     ServiceContext* const _service;
-
-    // The mutex protects _clusterTime and _isEnabled.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("LogicalClock::_mutex");
-    LogicalTime _clusterTime;
-    bool _isEnabled{true};
 };
 
 }  // namespace mongo

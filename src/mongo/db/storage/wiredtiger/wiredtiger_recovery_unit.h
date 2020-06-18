@@ -234,6 +234,12 @@ private:
     Timestamp _beginTransactionAtNoOverlapTimestamp(WT_SESSION* session);
 
     /**
+     * Starts a transaction at the lastApplied timestamp. Returns the timestamp at which the
+     * transaction was started.
+     */
+    Timestamp _beginTransactionAtLastAppliedTimestamp(WT_SESSION* session);
+
+    /**
      * Returns the timestamp at which the current transaction is reading.
      */
     Timestamp _getTransactionReadTimestamp(WT_SESSION* session);

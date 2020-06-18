@@ -2,10 +2,10 @@
 
 import sys
 
-from ..testcases import interface as testcase
-from ... import errors
-from ...logging import loggers
-from ...utils import registry
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.logging import loggers
+from buildscripts.resmokelib.testing.testcases import interface as testcase
+from buildscripts.resmokelib.utils import registry
 
 _HOOKS = {}  # type: ignore
 
@@ -26,9 +26,6 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):
 
     def __init__(self, hook_logger, fixture, description):
         """Initialize the Hook with the specified fixture."""
-
-        if not isinstance(hook_logger, loggers.HookLogger):
-            raise TypeError("logger must be a HookLogger instance")
 
         self.logger = hook_logger
         self.fixture = fixture

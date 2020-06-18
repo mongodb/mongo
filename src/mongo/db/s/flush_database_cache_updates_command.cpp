@@ -141,7 +141,7 @@ public:
                 forceDatabaseRefresh(opCtx, _dbName());
             }
 
-            getCatalogCacheLoaderForFiltering(opCtx).waitForDatabaseFlush(opCtx, _dbName());
+            CatalogCacheLoader::get(opCtx).waitForDatabaseFlush(opCtx, _dbName());
 
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }

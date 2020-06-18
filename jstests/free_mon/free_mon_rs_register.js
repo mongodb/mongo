@@ -30,6 +30,7 @@ mock_web.waitRegisters(2);
 
 WaitForRegistration(rst.getPrimary());
 WaitForRegistration(rst.getSecondary());
+ValidateFreeMonReplicaSet(rst);
 
 const last_register = mock_web.query("last_register");
 print(tojson(last_register));

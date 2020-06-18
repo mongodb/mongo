@@ -37,7 +37,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -161,7 +160,6 @@ public:
     }
 
     void setUp() override {
-        setTestCommandsEnabled(true);
         startNet(std::make_unique<WaitForIsMasterHook>(this));
     }
 
@@ -645,6 +643,12 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
 }
 
 TEST_F(NetworkInterfaceTest, StartCommandOnAny) {
+    // The echo command below uses hedging so after a response is returned, we will issue
+    // a _killOperations command to kill the pending operation. As a result, the number of
+    // successful commands can sometimes be 2 (echo and _killOperations) instead 1 when the
+    // num ops assertion below runs.
+    FailPointEnableBlock fpb("networkInterfaceShouldNotKillPendingRequests");
+
     auto commandRequest = makeEchoCmdObj();
     auto request = [&] {
         auto cs = fixture();

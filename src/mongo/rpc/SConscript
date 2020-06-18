@@ -95,7 +95,6 @@ env.Library(
         'metadata.cpp',
         'metadata/config_server_metadata.cpp',
         'metadata/egress_metadata_hook_list.cpp',
-        'metadata/logical_time_metadata.cpp',
         'metadata/sharding_metadata.cpp',
         'metadata/repl_set_metadata.cpp',
         'metadata/oplog_query_metadata.cpp',
@@ -108,10 +107,11 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/logical_time_validator',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/signed_logical_time',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/vector_clock',
     ],
 )
 
@@ -159,7 +159,6 @@ env.CppUnitTest(
         'metadata/client_metadata_test.cpp',
         'metadata/config_server_metadata_test.cpp',
         'metadata/egress_metadata_hook_list_test.cpp',
-        'metadata/logical_time_metadata_test.cpp',
         'metadata/oplog_query_metadata_test.cpp',
         'metadata/repl_set_metadata_test.cpp',
         'metadata/sharding_metadata_test.cpp',

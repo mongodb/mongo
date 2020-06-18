@@ -191,6 +191,7 @@ ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryValidatio
             if (it == supportedMechanisms.end()) {
                 LOGV2_ERROR(47429001,
                             "SASL Mechanism '{mechanism}' is not supported",
+                            "Unsupported SASL mechanism",
                             "mechanism"_attr = mech);
 
                 // Quick Exit since we are in the middle of setting up ServiceContext

@@ -94,16 +94,6 @@ PlanStage::StageState TextMatchStage::doWork(WorkingSetID* out) {
             ++_specificStats.docsRejected;
             stageState = PlanStage::NEED_TIME;
         }
-    } else if (stageState == PlanStage::FAILURE) {
-        // If a stage fails, it may create a status WSM to indicate why it
-        // failed, in which case '*out' is valid.  If ID is invalid, we
-        // create our own error message.
-        if (WorkingSet::INVALID_ID == *out) {
-            str::stream ss;
-            ss << "TEXT_MATCH stage failed to read in results from child";
-            Status status(ErrorCodes::InternalError, ss);
-            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
-        }
     }
 
     return stageState;

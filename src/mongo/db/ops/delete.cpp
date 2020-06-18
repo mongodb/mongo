@@ -60,7 +60,7 @@ long long deleteObjects(OperationContext* opCtx,
     auto exec = uassertStatusOK(getExecutorDelete(
         &CurOp::get(opCtx)->debug(), collection, &parsedDelete, boost::none /* verbosity */));
 
-    uassertStatusOK(exec->executePlan());
+    exec->executePlan();
 
     return DeleteStage::getNumDeleted(*exec);
 }

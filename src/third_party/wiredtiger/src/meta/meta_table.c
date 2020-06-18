@@ -71,7 +71,7 @@ __wt_metadata_cursor_open(WT_SESSION_IMPL *session, const char *config, WT_CURSO
      * Retrieve the btree from the cursor, rather than the session because we don't always switch
      * the metadata handle in to the session before entering this function.
      */
-    btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
+    btree = CUR2BT(*cursorp);
 
 /*
  * Special settings for metadata: skew eviction so metadata almost always stays in cache and make

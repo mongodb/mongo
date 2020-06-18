@@ -677,11 +677,11 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                     LOGV2_DEBUG(22479,
                                 3,
                                 "{sessionId}:{txnNumber} Coordinator shard received "
-                                "{status} from shard {shardId} for {command}",
+                                "{error} from shard {shardId} for {command}",
                                 "Coordinator shard received response from shard",
                                 "sessionId"_attr = lsid.getId(),
                                 "txnNumber"_attr = txnNumber,
-                                "status"_attr = status,
+                                "error"_attr = status,
                                 "shardId"_attr = shardId,
                                 "command"_attr = commandObj);
 

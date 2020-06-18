@@ -2,7 +2,7 @@
 
 import os
 
-from . import interface
+from buildscripts.resmokelib.testing.hooks import interface
 
 
 class CleanEveryN(interface.Hook):
@@ -34,8 +34,7 @@ class CleanEveryN(interface.Hook):
         if self.tests_run < self.n:
             return
 
-        hook_test_case = CleanEveryNTestCase.create_after_test(self.logger.test_case_logger, test,
-                                                               self)
+        hook_test_case = CleanEveryNTestCase.create_after_test(self.logger, test, self)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 

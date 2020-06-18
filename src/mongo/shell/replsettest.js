@@ -138,16 +138,21 @@ var ReplSetTest = function(opts) {
         self._slaves = [];
 
         var twoPrimaries = false;
+        let isMaster = false;
+        // Ensure that only one node is in primary state.
         self.nodes.forEach(function(node) {
             try {
                 node.setSlaveOk();
                 var n = node.getDB('admin').runCommand({ismaster: 1});
                 self._liveNodes.push(node);
-                if (n.ismaster == true) {
+                // We verify that the node has a valid config by checking if n.me exists. Then, we
+                // check to see if the node is in primary state.
+                if (n.me && n.me == n.primary) {
                     if (self._master) {
                         twoPrimaries = true;
                     } else {
                         self._master = node;
+                        isMaster = n.ismaster;
                     }
                 } else {
                     self._slaves.push(node);
@@ -157,11 +162,11 @@ var ReplSetTest = function(opts) {
                 self._slaves.push(node);
             }
         });
-        if (twoPrimaries) {
+        if (twoPrimaries || !self._master || !isMaster) {
             return false;
         }
 
-        return self._master || false;
+        return self._master;
     }
 
     /**
@@ -884,6 +889,44 @@ var ReplSetTest = function(opts) {
         assert(highPriorityNodes.includes(primary),
                "Primary switched away from highest priority node.  Found primary: " +
                    tojson(primary) + ", but expected one of: " + tojson(highPriorityNodes));
+    };
+
+    /**
+     * Blocks until all nodes agree on who the primary is.
+     * Unlike awaitNodesAgreeOnPrimary, this does not require that all nodes are authenticated.
+     */
+    this.awaitNodesAgreeOnPrimaryNoAuth = function(timeout, nodes) {
+        timeout = timeout || self.kDefaultTimeoutMS;
+        nodes = nodes || self.nodes;
+
+        print("AwaitNodesAgreeOnPrimaryNoAuth: Waiting for nodes to agree on any primary.");
+
+        assert.soonNoExcept(function() {
+            var primary;
+
+            for (var i = 0; i < nodes.length; i++) {
+                var isMaster = assert.commandWorked(nodes[i].adminCommand({isMaster: 1}));
+                var nodesPrimary = isMaster.primary;
+                // Node doesn't see a primary.
+                if (!nodesPrimary) {
+                    print("AwaitNodesAgreeOnPrimaryNoAuth: Retrying because " + nodes[i].name +
+                          " does not see a primary.");
+                    return false;
+                }
+
+                if (!primary) {
+                    // If we haven't seen a primary yet, set it to this.
+                    primary = nodesPrimary;
+                } else if (primary !== nodesPrimary) {
+                    print("AwaitNodesAgreeOnPrimaryNoAuth: Retrying because " + nodes[i].name +
+                          " thinks the primary is " + nodesPrimary + " instead of " + primary);
+                    return false;
+                }
+            }
+
+            print("AwaitNodesAgreeOnPrimaryNoAuth: Nodes agreed on primary " + primary);
+            return true;
+        }, "Awaiting nodes to agree on primary", timeout);
     };
 
     /**
@@ -1918,11 +1961,21 @@ var ReplSetTest = function(opts) {
     } = {}) {
         return sessions.map(session => {
             const commandObj = {dbHash: 1};
+            const db = session.getDatabase(dbName);
+            // If eMRC=false or we are in binary version 4.4, we use the old behavior using
+            // $_internalReadAtClusterTime. Otherwise, we use snapshot read concern for dbhash.
             if (readAtClusterTime !== undefined) {
-                commandObj.$_internalReadAtClusterTime = readAtClusterTime;
+                // TODO (SERVER-48959): Remove 4.4 version check to see which point-in-time read
+                // behavior to use.
+                const version = db.runCommand({buildinfo: 1}).versionArray;
+                if (jsTest.options().enableMajorityReadConcern !== false &&
+                    ((version[0] > 4) || ((version[0] == 4) && (version[1] > 4)))) {
+                    commandObj.readConcern = {level: "snapshot", atClusterTime: readAtClusterTime};
+                } else {
+                    commandObj.$_internalReadAtClusterTime = readAtClusterTime;
+                }
             }
 
-            const db = session.getDatabase(dbName);
             const res = assert.commandWorked(db.runCommand(commandObj));
 
             // The "capped" field in the dbHash command response is new as of MongoDB 4.0.
@@ -1947,7 +2000,7 @@ var ReplSetTest = function(opts) {
     };
 
     this.getCollectionDiffUsingSessions = function(
-        primarySession, secondarySession, dbName, collNameOrUUID, readAtClusterTime) {
+        primarySession, secondarySession, dbName, collNameOrUUID) {
         function PeekableCursor(cursor) {
             let _stashedDoc;
 
@@ -1977,10 +2030,6 @@ var ReplSetTest = function(opts) {
         const secondaryDB = secondarySession.getDatabase(dbName);
 
         const commandObj = {find: collNameOrUUID, sort: {_id: 1}};
-        if (readAtClusterTime !== undefined) {
-            commandObj.$_internalReadAtClusterTime = readAtClusterTime;
-        }
-
         const primaryCursor =
             new PeekableCursor(new DBCommandCursor(primaryDB, primaryDB.runCommand(commandObj)));
 
@@ -2177,6 +2226,9 @@ var ReplSetTest = function(opts) {
             var primary = rst._master;
             var combinedDBs = new Set(primary.getDBNames());
             const replSetConfig = rst.getReplSetConfigFromNode();
+
+            print("checkDBHashesForReplSet waiting for secondaries to be ready: " + tojson(slaves));
+            this.awaitSecondaryNodes(self.kDefaultTimeoutMS, slaves);
 
             print("checkDBHashesForReplSet checking data hashes against primary: " + primary.host);
 
@@ -2624,6 +2676,10 @@ var ReplSetTest = function(opts) {
         }
 
         function checkCollectionCountsForReplSet(rst) {
+            print("checkCollectionCountsForReplSet waiting for secondaries to be ready: " +
+                  tojson(rst.nodes));
+            this.awaitSecondaryNodes();
+
             rst.nodes.forEach(node => {
                 // Arbiters have no replicated collections.
                 if (isNodeArbiter(node)) {
@@ -2655,7 +2711,7 @@ var ReplSetTest = function(opts) {
         let node = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
         let pid = node.pid;
         let port = node.port;
-        let conn = MongoRunner.awaitConnection(pid, port);
+        let conn = MongoRunner.awaitConnection({pid, port});
         if (!conn) {
             throw new Error("Failed to connect to node " + n);
         }
@@ -3039,15 +3095,20 @@ var ReplSetTest = function(opts) {
         if (_callIsMaster()) {
             asCluster(this._liveNodes, () => {
                 for (let node of this._liveNodes) {
+                    let res;
                     try {
-                        print(
-                            "ReplSetTest stopSet disabling 'waitForStepDownOnNonCommandShutdown' on " +
-                            node.host);
-                        assert.commandWorked(node.adminCommand({
+                        res = node.adminCommand({
                             setParameter: 1,
                             waitForStepDownOnNonCommandShutdown: false,
-                        }));
+                        });
                     } catch (e) {
+                        print("Failed to set waitForStepDownOnNonCommandShutdown.");
+                        print(e);
+                    }
+                    if (res && res.ok === 0 &&
+                        !res.errmsg.includes("attempted to set unrecognized parameter")) {
+                        print("Failed to set waitForStepDownOnNonCommandShutdown.");
+                        printjson(res);
                     }
                 }
             });

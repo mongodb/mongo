@@ -21,13 +21,21 @@ const collName = "coll";
 const mongosDB = mongos.getDB(dbName);
 assert.commandWorked(mongosDB.coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}]));
 
+function checkTopologyVersion(res, topologyVersionField) {
+    assert(res.hasOwnProperty("topologyVersion"), res);
+    assert.eq(res.topologyVersion.counter, topologyVersionField.counter + 1);
+}
+
 function runAwaitableIsMaster(topologyVersionField) {
-    assert.commandFailedWithCode(db.runCommand({
+    let res = assert.commandFailedWithCode(db.runCommand({
         isMaster: 1,
         topologyVersion: topologyVersionField,
         maxAwaitTimeMS: 99999999,
     }),
-                                 ErrorCodes.ShutdownInProgress);
+                                           ErrorCodes.ShutdownInProgress);
+
+    assert(res.hasOwnProperty("topologyVersion"), res);
+    assert.eq(res.topologyVersion.counter, topologyVersionField.counter + 1);
 }
 
 function runFind() {
@@ -74,6 +82,11 @@ quiesceModeFailPoint.wait();
 jsTestLog("The waiting isMaster returns a ShutdownInProgress error.");
 isMaster();
 
+jsTestLog("New isMaster command returns a ShutdownInProgress error.");
+checkTopologyVersion(
+    assert.commandFailedWithCode(mongos.adminCommand({isMaster: 1}), ErrorCodes.ShutdownInProgress),
+    topologyVersionField);
+
 // Test operation behavior during quiesce mode.
 jsTestLog("The running read operation is allowed to finish.");
 findCmdFailPoint.off();
@@ -93,8 +106,30 @@ assert.eq(5, mongosDB.coll.find().itcount());
 jsTestLog("New writes are allowed.");
 assert.commandWorked(mongosDB.coll.insert({_id: 5}));
 
-// Restart mongos
+jsTestLog("Let shutdown progress to start killing operations.");
+let pauseWhileKillingOperationsFailPoint =
+    configureFailPoint(mongos, "pauseWhileKillingOperationsAtShutdown");
+
+// Exit quiesce mode so we can hit the pauseWhileKillingOperationsFailPoint failpoint.
 quiesceModeFailPoint.off();
+
+// This throws because the configureFailPoint command is killed by the shutdown.
+try {
+    pauseWhileKillingOperationsFailPoint.wait();
+} catch (e) {
+    if (e.code === ErrorCodes.InterruptedAtShutdown) {
+        jsTestLog(
+            "Ignoring InterruptedAtShutdown error because configureFailPoint is killed by shutdown");
+    } else {
+        throw e;
+    }
+}
+
+jsTestLog("Operations fail with a shutdown error and append the topologyVersion.");
+checkTopologyVersion(assert.commandFailedWithCode(mongosDB.runCommand({find: collName}),
+                                                  ErrorCodes.InterruptedAtShutdown),
+                     topologyVersionField);
+// Restart mongos.
 st.restartMongos(0);
 
 st.stop();

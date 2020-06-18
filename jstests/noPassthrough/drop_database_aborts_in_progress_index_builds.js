@@ -62,7 +62,7 @@ try {
 
     checkLog.contains(
         testDB.getMongo(),
-        "dropDatabase - fail point dropDatabaseHangAfterWaitingForIndexBuilds enabled.");
+        "dropDatabase - fail point dropDatabaseHangAfterWaitingForIndexBuilds enabled");
 
     // Cannot create a collection on the database while it is drop pending.
     assert.commandFailedWithCode(testDB.createCollection("third"), ErrorCodes.DatabaseDropPending);

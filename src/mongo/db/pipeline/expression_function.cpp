@@ -33,7 +33,7 @@ namespace mongo {
 
 REGISTER_EXPRESSION(function, ExpressionFunction::parse);
 
-ExpressionFunction::ExpressionFunction(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
                                        boost::intrusive_ptr<Expression> passedArgs,
                                        bool assignFirstArgToThis,
                                        std::string funcSource,
@@ -60,10 +60,9 @@ void ExpressionFunction::_doAddDependencies(mongo::DepsTracker* deps) const {
     _children[0]->addDependencies(deps);
 }
 
-boost::intrusive_ptr<Expression> ExpressionFunction::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* const expCtx,
+                                                           BSONElement expr,
+                                                           const VariablesParseState& vps) {
 
     uassert(4660800,
             str::stream() << kExpressionName << " cannot be used inside a validator.",

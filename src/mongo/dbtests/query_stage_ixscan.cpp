@@ -85,10 +85,7 @@ public:
         PlanStage::StageState state = PlanStage::NEED_TIME;
         while (PlanStage::ADVANCED != state) {
             state = ixscan->work(&out);
-
-            // There are certain states we shouldn't get.
             ASSERT_NE(PlanStage::IS_EOF, state);
-            ASSERT_NE(PlanStage::FAILURE, state);
         }
 
         return _ws.get(out);
@@ -111,7 +108,7 @@ public:
 
         // This child stage gets owned and freed by the caller.
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), _coll, params, &_ws, filter);
     }
 
     IndexScan* createIndexScan(BSONObj startKey,
@@ -135,7 +132,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), _coll, params, &_ws, filter);
     }
 
     static const char* ns() {

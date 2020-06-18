@@ -41,9 +41,10 @@ namespace {
 static constexpr StringData kRecordIdField = "recordId"_sd;
 }
 
-void SkippedRecordTracker::deleteTemporaryTable(OperationContext* opCtx) {
+void SkippedRecordTracker::finalizeTemporaryTable(OperationContext* opCtx,
+                                                  TemporaryRecordStore::FinalizationAction action) {
     if (_skippedRecordsTable) {
-        _skippedRecordsTable->deleteTemporaryTable(opCtx);
+        _skippedRecordsTable->finalizeTemporaryTable(opCtx, action);
     }
 }
 
@@ -88,7 +89,10 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
 
     InsertDeleteOptions options;
     collection->getIndexCatalog()->prepareInsertDeleteOptions(
-        opCtx, _indexCatalogEntry->descriptor(), &options);
+        opCtx,
+        _indexCatalogEntry->getNSSFromCatalog(opCtx),
+        _indexCatalogEntry->descriptor(),
+        &options);
     options.fromIndexBuilder = true;
 
     // This should only be called when constraints are being enforced, on a primary. It does not
@@ -131,7 +135,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                 // normally happen if constraints were relaxed.
                 InsertResult result;
                 auto status = _indexCatalogEntry->accessMethod()->insert(
-                    opCtx, skippedDoc, skippedRecordId, options, &result);
+                    opCtx, collection, skippedDoc, skippedRecordId, options, &result);
                 if (!status.isOK()) {
                     return status;
                 }

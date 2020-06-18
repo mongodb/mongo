@@ -132,8 +132,8 @@ const DeleteRequest* ParsedDelete::getRequest() const {
     return _request;
 }
 
-PlanExecutor::YieldPolicy ParsedDelete::yieldPolicy() const {
-    return _request->getGod() ? PlanExecutor::NO_YIELD : _request->getYieldPolicy();
+PlanYieldPolicy::YieldPolicy ParsedDelete::yieldPolicy() const {
+    return _request->getGod() ? PlanYieldPolicy::YieldPolicy::NO_YIELD : _request->getYieldPolicy();
 }
 
 bool ParsedDelete::hasParsedQuery() const {

@@ -70,6 +70,7 @@ typedef std::string MallocExtensionWriter;
 namespace base {
 struct MallocRange;
 struct MallocSizeClass;
+struct PageHeapSizeClass;
 }
 
 // Interface to a pluggable system allocator.
@@ -409,7 +410,8 @@ class PERFTOOLS_DLL_DECL MallocExtension {
   // Invokes func(arg, classinfo) for every size class.
   // *classinfo is filled in with information about the size class.
   typedef void (SizeClassFunction)(void*, const base::MallocSizeClass*);
-  virtual void SizeClasses(void* arg, SizeClassFunction func);
+  typedef void (PageHeapSizeClassFunction)(void*, const base::PageHeapSizeClass*);
+  virtual void SizeClasses(void* arg, SizeClassFunction func, PageHeapSizeClassFunction pageFunc);
 };
 
 namespace base {
@@ -444,6 +446,14 @@ struct MallocSizeClass {
     size_t num_transfer_objs;
     size_t free_bytes;
     size_t alloc_bytes;
+};
+
+struct PageHeapSizeClass {
+    size_t pages;
+    size_t normal_spans;
+    size_t unmapped_spans;
+    size_t normal_bytes;
+    size_t unmapped_bytes;
 };
 
 } // namespace base

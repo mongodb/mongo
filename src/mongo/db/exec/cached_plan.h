@@ -90,14 +90,6 @@ public:
 
 private:
     /**
-     * Passes stats from the trial period run of the cached plan to the plan cache.
-     *
-     * If the plan cache entry is deleted before we get a chance to update it, then this
-     * is a no-op.
-     */
-    void updatePlanCache();
-
-    /**
      * Uses the QueryPlanner and the MultiPlanStage to re-generate candidate plans for this
      * query and select a new winner.
      *

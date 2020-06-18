@@ -71,13 +71,12 @@ static std::string toCoveringString(const GeoHashConverter& hashConverter,
 std::vector<GeoHash> ExpressionMapping::get2dCovering(const R2Region& region,
                                                       const BSONObj& indexInfoObj,
                                                       int maxCoveringCells) {
-    GeoHashConverter::Parameters hashParams;
-    Status paramStatus = GeoHashConverter::parseParameters(indexInfoObj, &hashParams);
-    verify(paramStatus.isOK());  // We validated the parameters when creating the index
+    auto result = GeoHashConverter::createFromDoc(indexInfoObj);
+    verify(result.isOK());  // We validated the parameters when creating the index.
 
-    GeoHashConverter hashConverter(hashParams);
-    R2RegionCoverer coverer(&hashConverter);
-    coverer.setMaxLevel(hashConverter.getBits());
+    const auto bits = result.getValue()->getBits();
+    R2RegionCoverer coverer(std::move(result.getValue()));
+    coverer.setMaxLevel(bits);
     coverer.setMaxCells(maxCoveringCells);
 
     // TODO: Maybe slightly optimize by returning results in order

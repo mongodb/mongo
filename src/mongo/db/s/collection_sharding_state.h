@@ -76,7 +76,7 @@ public:
     /**
      * Reports all collections which have filtering information associated.
      */
-    static void report(OperationContext* opCtx, BSONObjBuilder* builder);
+    static void appendInfoForShardingStateCommand(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
      * Attaches info for server status.
@@ -87,9 +87,11 @@ public:
      * If the shard currently doesn't know whether the collection is sharded or not, it will throw
      * StaleShardVersion.
      *
+     * If the request doesn't have a shard version all collections will be treated as UNSHARDED.
+     *
      * The returned object *is not safe* to access after the collection lock has been dropped.
      */
-    virtual ScopedCollectionDescription getCollectionDescription() = 0;
+    virtual ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) = 0;
 
     // TODO (SERVER-32198): This method must not be used in any new code because it does not provide
     // the necessary guarantees that getCollectionDescription above does. Specifically, it silently
@@ -113,6 +115,8 @@ public:
      * destroyed. The intended users of this mode are read operations, which need to yield the
      * collection lock, but still perform filtering.
      *
+     * If the request doesn't have a shard version all collections will be treated as UNSHARDED.
+     *
      * Use 'getCollectionDescription' for other cases, like obtaining information about
      * sharding-related properties of the collection are necessary that won't change under
      * collection IX/IS lock (e.g., isSharded or the shard key).
@@ -127,6 +131,8 @@ public:
      * Checks whether the shard version in the operation context is compatible with the shard
      * version of the collection and if not, throws StaleConfigException populated with the received
      * and wanted versions.
+     *
+     * If the request is not versioned all collections will be treated as UNSHARDED.
      */
     virtual void checkShardVersionOrThrow(OperationContext* opCtx) = 0;
 

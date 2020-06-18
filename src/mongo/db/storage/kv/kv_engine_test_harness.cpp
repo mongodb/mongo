@@ -185,7 +185,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     }
 
 
-    std::unique_ptr<CollectionImpl> collection;
+    std::unique_ptr<Collection> collection;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);

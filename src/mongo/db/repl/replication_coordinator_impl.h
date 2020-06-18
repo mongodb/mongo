@@ -341,6 +341,8 @@ public:
 
     virtual bool setContainsArbiter() const override;
 
+    virtual bool replSetContainsNewlyAddedMembers() const override;
+
     virtual void attemptToAdvanceStableTimestamp() override;
 
     virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;
@@ -1435,20 +1437,17 @@ private:
     int64_t _nextRandomInt64_inlock(int64_t limit);
 
     /**
-     * Runs the command using DBDirectClient and returns the response received for that command.
-     * Callers of this function should not hold any locks.
-     */
-    BSONObj _runCmdOnSelfOnAlternativeClient(OperationContext* opCtx,
-                                             const std::string& dbName,
-                                             const BSONObj& cmdObj);
-
-    /**
      * This is called by a primary when they become aware that a node has completed initial sync.
      * That primary initiates a reconfig to remove the 'newlyAdded' for that node, if it was set.
      */
     void _reconfigToRemoveNewlyAddedField(const executor::TaskExecutor::CallbackArgs& cbData,
                                           MemberId memberId,
                                           ConfigVersionAndTerm versionAndTerm);
+
+    /**
+     * Checks whether replication coordinator supports automatic reconfig.
+     */
+    bool _supportsAutomaticReconfig() const;
 
     /*
      * Calculates and returns the read preference for the node.

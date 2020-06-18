@@ -7,8 +7,8 @@ import threading
 
 import requests
 
-from . import handlers
-from .. import config as _config
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib.logging import handlers
 
 CREATE_BUILD_ENDPOINT = "/build"
 APPEND_GLOBAL_LOGS_ENDPOINT = "/build/%(build_id)s"

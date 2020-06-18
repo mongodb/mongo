@@ -33,7 +33,6 @@
 
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/projection_ast_walker.h"
 
 namespace mongo::projection_executor {
 /**

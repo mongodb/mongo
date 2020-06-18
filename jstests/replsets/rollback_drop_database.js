@@ -40,7 +40,7 @@ let waitForDropDatabaseToFinish = startParallelShell(dropDatabaseFn, rollbackNod
 
 // Ensure that we've hit the failpoint before moving on.
 checkLog.contains(rollbackNode,
-                  "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled.");
+                  "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
 
 // Wait for the secondary to finish dropping the collection (the last replicated entry).
 // We use the default 10-minute timeout for this.

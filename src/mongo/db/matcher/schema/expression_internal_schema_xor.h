@@ -61,5 +61,13 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
     void serialize(BSONObjBuilder* out, bool includePath) const final;
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
 };
 }  // namespace mongo

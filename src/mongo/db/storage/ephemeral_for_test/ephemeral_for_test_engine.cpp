@@ -101,9 +101,13 @@ Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx
 std::unique_ptr<SortedDataInterface> EphemeralForTestEngine::getSortedDataInterface(
     OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
     stdx::lock_guard<Latch> lk(_mutex);
+    NamespaceString collNss;
+    // Some unit tests don't have actual index entries.
+    if (auto entry = desc->getEntry())
+        collNss = entry->getNSSFromCatalog(opCtx);
     return getEphemeralForTestBtreeImpl(Ordering::make(desc->keyPattern()),
                                         desc->unique(),
-                                        desc->parentNS(),
+                                        collNss,
                                         desc->indexName(),
                                         desc->keyPattern(),
                                         desc->collation(),

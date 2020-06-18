@@ -41,6 +41,7 @@
 #include "mongo/db/logical_clock_test_fixture.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -51,6 +52,9 @@ const NamespaceString kDummyNamespaceString("test", "foo");
 
 using LogicalClockTest = LogicalClockTestFixture;
 
+constexpr auto ClusterTime = VectorClock::Component::ClusterTime;
+constexpr unsigned maxVal = std::numeric_limits<int32_t>::max();
+
 LogicalTime buildLogicalTime(unsigned secs, unsigned inc) {
     return LogicalTime(Timestamp(secs, inc));
 }
@@ -60,7 +64,7 @@ TEST_F(LogicalClockTest, roundtrip) {
     Timestamp tX(1);
     auto time = LogicalTime(tX);
 
-    getClock()->setClusterTimeFromTrustedSource(time);
+    VectorClockMutable::get(getServiceContext())->tickTo(ClusterTime, time);
     auto storedTime(getClock()->getClusterTime());
 
     ASSERT_TRUE(storedTime == time);
@@ -71,37 +75,37 @@ TEST_F(LogicalClockTest, reserveTicks) {
     // Set clock to a non-zero time, so we can verify wall clock synchronization.
     setMockClockSourceTime(Date_t::fromMillisSinceEpoch(10 * 1000));
 
-    auto t1 = getClock()->reserveTicks(1);
+    auto t1 = VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     auto t2(getClock()->getClusterTime());
     ASSERT_TRUE(t1 == t2);
 
     // Make sure we synchronized with the wall clock.
     ASSERT_TRUE(t2.asTimestamp().getSecs() == 10);
 
-    auto t3 = getClock()->reserveTicks(1);
+    auto t3 = VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     t1.addTicks(1);
     ASSERT_TRUE(t3 == t1);
 
-    t3 = getClock()->reserveTicks(100);
+    t3 = VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 100);
     t1.addTicks(1);
     ASSERT_TRUE(t3 == t1);
 
-    t3 = getClock()->reserveTicks(1);
+    t3 = VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     t1.addTicks(100);
     ASSERT_TRUE(t3 == t1);
 
     // Ensure overflow to a new second.
     auto initTimeSecs = getClock()->getClusterTime().asTimestamp().getSecs();
-    getClock()->reserveTicks((1U << 31) - 1);
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, (1U << 31) - 1);
     auto newTimeSecs = getClock()->getClusterTime().asTimestamp().getSecs();
     ASSERT_TRUE(newTimeSecs == initTimeSecs + 1);
 }
 
 // Verify the advanceClusterTime functionality.
 TEST_F(LogicalClockTest, advanceClusterTime) {
-    auto t1 = getClock()->reserveTicks(1);
+    auto t1 = VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     t1.addTicks(100);
-    ASSERT_OK(getClock()->advanceClusterTime(t1));
+    advanceClusterTime(t1);
     ASSERT_TRUE(t1 == getClock()->getClusterTime());
 }
 
@@ -116,7 +120,8 @@ TEST_F(LogicalClockTest, RateLimiterRejectsLogicalTimesTooFarAhead) {
         1);
     LogicalTime t1(tooFarAheadTimestamp);
 
-    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter, getClock()->advanceClusterTime(t1));
+    ASSERT_THROWS_CODE(
+        advanceClusterTime(t1), DBException, ErrorCodes::ClusterTimeFailsRateLimiter);
 }
 
 // Verify cluster time can be initialized to a very old time.
@@ -128,7 +133,7 @@ TEST_F(LogicalClockTest, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
         durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) -
         (kMaxAcceptableLogicalClockDriftSecsDefault * 5));
     auto veryOldTime = LogicalTime(veryOldTimestamp);
-    getClock()->setClusterTimeFromTrustedSource(veryOldTime);
+    VectorClockMutable::get(getServiceContext())->tickTo(ClusterTime, veryOldTime);
 
     ASSERT_TRUE(getClock()->getClusterTime() == veryOldTime);
 }
@@ -138,7 +143,7 @@ TEST_F(LogicalClockTest, WritesToOplogAdvanceClusterTime) {
     Timestamp tX(1, 0);
     auto initialTime = LogicalTime(tX);
 
-    getClock()->setClusterTimeFromTrustedSource(initialTime);
+    VectorClockMutable::get(getServiceContext())->tickTo(ClusterTime, initialTime);
     ASSERT_TRUE(getClock()->getClusterTime() == initialTime);
 
     getDBClient()->insert(kDummyNamespaceString.ns(), BSON("x" << 1));
@@ -176,7 +181,7 @@ TEST_F(LogicalClockTest, WallClockSetTooFarInPast) {
 
     // Verify that maxAcceptableLogicalClockDriftSecs parameter does not need to be increased to
     // advance cluster time through metadata back to the current time.
-    ASSERT_OK(getClock()->advanceClusterTime(currentTime));
+    advanceClusterTime(currentTime);
     ASSERT_TRUE(getClock()->getClusterTime() == currentTime);
 }
 
@@ -210,117 +215,113 @@ TEST_F(LogicalClockTest, WallClockSetTooFarInFuture) {
     auto nextTime = getClock()->getClusterTime();
     nextTime.addTicks(1);  // The next lowest cluster time.
 
-    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter, getClock()->advanceClusterTime(nextTime));
+    ASSERT_THROWS_CODE(
+        advanceClusterTime(nextTime), DBException, ErrorCodes::ClusterTimeFailsRateLimiter);
 
     // Set wall clock to the current time + 1 day to simulate increasing the
     // maxAcceptableLogicalClockDriftSecs parameter, which can only be set at startup, and verify
     // time can be advanced through metadata again.
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(currentSecs + oneDay));
 
-    ASSERT_OK(getClock()->advanceClusterTime(nextTime));
+    advanceClusterTime(nextTime);
     ASSERT_TRUE(getClock()->getClusterTime() == nextTime);
 }
 
 // Verify the behavior of advancing cluster time around the max allowed values.
 TEST_F(LogicalClockTest, ReserveTicksBehaviorAroundMaxTime) {
-    unsigned maxVal = LogicalClock::kMaxSignedInt;
-
     // Verify clock can be advanced near the max values.
 
     // Can always advance to the max value for the inc field.
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, maxVal - 1));
-    getClock()->reserveTicks(1);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal - 1, maxVal - 1));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal - 1, maxVal));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, maxVal - 5));
-    getClock()->reserveTicks(5);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal - 1, maxVal - 5));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 5);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal - 1, maxVal));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(0, maxVal - 1));
-    getClock()->reserveTicks(1);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(0, maxVal - 1));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(0, maxVal));
 
     // Can overflow inc into seconds to reach max seconds value.
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, maxVal));
-    getClock()->reserveTicks(1);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal - 1, maxVal));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, 1));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, maxVal - 5));
-    getClock()->reserveTicks(10);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal - 1, maxVal - 5));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 10);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, 10));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal - 1, 1));
-    getClock()->reserveTicks(maxVal);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal - 1, 1));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, maxVal);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, maxVal));
 
     // Can advance inc field when seconds field is at the max value.
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, 1));
-    getClock()->reserveTicks(1);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal, 1));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, 2));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, 1));
-    getClock()->reserveTicks(100);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal, 1));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 100);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, 101));
 
     // Can advance to the max value for both the inc and seconds fields.
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal - 1));
-    getClock()->reserveTicks(1);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal, maxVal - 1));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, maxVal));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal - 5));
-    getClock()->reserveTicks(5);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal, maxVal - 5));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 5);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, maxVal));
 
     // Verify scenarios where the clock cannot be advanced.
 
     // Can't overflow inc into seconds when seconds field is at the max value.
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal));
-    ASSERT_THROWS(getClock()->reserveTicks(1), std::exception);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal, maxVal));
+    ASSERT_THROWS(VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1), DBException);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, maxVal));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal));
-    ASSERT_THROWS(getClock()->reserveTicks(5), std::exception);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal, maxVal));
+    ASSERT_THROWS(VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 5), DBException);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, maxVal));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal - 1));
-    ASSERT_THROWS(getClock()->reserveTicks(2), std::exception);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal, maxVal - 1));
+    ASSERT_THROWS(VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 2), DBException);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, maxVal - 1));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(maxVal, maxVal - 11));
-    ASSERT_THROWS(getClock()->reserveTicks(12), std::exception);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(maxVal, maxVal - 11));
+    ASSERT_THROWS(VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 12), DBException);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, maxVal - 11));
 }
 
 // Verify behavior of advancing cluster time when the wall clock is near the max allowed value.
 TEST_F(LogicalClockTest, ReserveTicksBehaviorWhenWallClockNearMaxTime) {
-    unsigned maxVal = LogicalClock::kMaxSignedInt;
-
     // Can be set to the max possible time by catching up to the wall clock.
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(Seconds(maxVal)));
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(1, 1));
-    getClock()->reserveTicks(1);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(1, 1));
+    VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(maxVal, 1));
 
     // Should fail when wall clock would advance cluster time beyond the max allowed time.
     setMockClockSourceTime(Date_t::max());
 
-    resetClock()->setClusterTimeFromTrustedSource(buildLogicalTime(1, 1));
-    ASSERT_THROWS(getClock()->reserveTicks(1), std::exception);
+    resetClock()->tickTo(ClusterTime, buildLogicalTime(1, 1));
+    ASSERT_THROWS(VectorClockMutable::get(getServiceContext())->tick(ClusterTime, 1), DBException);
     ASSERT_EQ(getClock()->getClusterTime(), buildLogicalTime(1, 1));
 }
 
 // Verify the clock rejects cluster times greater than the max allowed time.
 TEST_F(LogicalClockTest, RejectsLogicalTimesGreaterThanMaxTime) {
-    unsigned maxVal = LogicalClock::kMaxSignedInt;
-
     // A cluster time can be greater than the maximum value allowed because the signed integer
     // maximum is used for legacy compatibility, but these fields are stored as unsigned integers.
     auto beyondMaxTime = buildLogicalTime(maxVal + 1, maxVal + 1);
 
     // The clock can't be initialized to a time greater than the max possible.
     resetClock();
-    ASSERT_THROWS(getClock()->setClusterTimeFromTrustedSource(beyondMaxTime), std::exception);
+    ASSERT_THROWS(VectorClockMutable::get(getServiceContext())->tickTo(ClusterTime, beyondMaxTime),
+                  DBException);
     ASSERT_TRUE(getClock()->getClusterTime() == LogicalTime());
 
     // The time can't be advanced through metadata to a time greater than the max possible.
@@ -328,7 +329,7 @@ TEST_F(LogicalClockTest, RejectsLogicalTimesGreaterThanMaxTime) {
     auto almostMaxSecs =
         Seconds(maxVal) - Seconds(kMaxAcceptableLogicalClockDriftSecsDefault) + Seconds(10);
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(almostMaxSecs));
-    ASSERT_THROWS(getClock()->advanceClusterTime(beyondMaxTime), std::exception);
+    ASSERT_THROWS(advanceClusterTime(beyondMaxTime), DBException);
     ASSERT_TRUE(getClock()->getClusterTime() == LogicalTime());
 }
 

@@ -522,6 +522,14 @@ connection_runtime_config = [
             is not limited to not skewing newest, not favoring leaf pages,
             and modifying the eviction score mechanism.''',
             type='boolean'),
+        Config('log_retention', '0', r'''
+            adjust log archiving to retain at least this number of log files, ignored if set to 0.
+            (Warning: this option can remove log files required for recovery if no checkpoints
+            have yet been done and the number of log files exceeds the configured value. As
+            WiredTiger cannot detect the difference between a system that has not yet checkpointed
+            and one that will never checkpoint, it might discard log files before any checkpoint is
+            done.)''',
+            min='0', max='1024'),
         Config('realloc_exact', 'false', r'''
             if true, reallocation of memory will only provide the exact
             amount requested. This will help with spotting memory allocation
@@ -584,14 +592,29 @@ connection_runtime_config = [
         perform eviction in worker threads when the cache contains at least
         this much content. It is a percentage of the cache size if the value is
         within the range of 10 to 100 or an absolute size when greater than 100.
-        The value is not allowed to exceed the \c cache_size.''',
+        The value is not allowed to exceed the \c cache_size''',
         min=10, max='10TB'),
     Config('eviction_trigger', '95', r'''
         trigger application threads to perform eviction when the cache contains
         at least this much content. It is a percentage of the cache size if the
         value is within the range of 10 to 100 or an absolute size when greater
-        than 100.  The value is not allowed to exceed the \c cache_size.''',
+        than 100.  The value is not allowed to exceed the \c cache_size''',
         min=10, max='10TB'),
+    Config('eviction_updates_target', '0', r'''
+        perform eviction in worker threads when the cache contains at least
+        this many bytes of updates. It is a percentage of the cache size if the
+        value is within the range of 0 to 100 or an absolute size when greater
+        than 100. Calculated as half of \c eviction_dirty_target by default.
+        The value is not allowed to exceed the \c cache_size''',
+        min=0, max='10TB'),
+    Config('eviction_updates_trigger', '0', r'''
+        trigger application threads to perform eviction when the cache contains
+        at least this many bytes of updates. It is a percentage of the cache size
+        if the value is within the range of 1 to 100 or an absolute size when
+        greater than 100. Calculated as half of \c eviction_dirty_trigger by default.
+        The value is not allowed to exceed the \c cache_size. This setting only
+        alters behavior if it is lower than eviction_trigger''',
+        min=0, max='10TB'),
     Config('file_manager', '', r'''
         control how file handles are managed''',
         type='category', subconfig=[
@@ -699,9 +722,9 @@ connection_runtime_config = [
         intended for use with internal stress testing of WiredTiger.''',
         type='list', undoc=True,
         choices=[
-        'aggressive_sweep', 'checkpoint_slow', 'history_store_sweep_race',
-        'split_1', 'split_2', 'split_3', 'split_4', 'split_5', 'split_6',
-        'split_7', 'split_8']),
+        'aggressive_sweep', 'checkpoint_slow', 'history_store_checkpoint_delay',
+        'history_store_sweep_race', 'split_1', 'split_2', 'split_3', 'split_4', 'split_5',
+        'split_6', 'split_7', 'split_8']),
     Config('verbose', '', r'''
         enable messages for various events. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -1001,7 +1024,8 @@ wiredtiger_open_common =\
         Use memory mapping when accessing files in a read-only mode''',
         type='boolean'),
     Config('mmap_all', 'false', r'''
-        Use memory mapping to read and write all data files''',
+        Use memory mapping to read and write all data files, may not be configured with direct
+        I/O''',
         type='boolean'),
     Config('multiprocess', 'false', r'''
         permit sharing between processes (will automatically start an
@@ -1251,10 +1275,11 @@ methods = {
         configure the cursor for dump format inputs and outputs: "hex"
         selects a simple hexadecimal format, "json" selects a JSON format
         with each record formatted as fields named by column names if
-        available, and "print" selects a format where only non-printing
-        characters are hexadecimal encoded.  These formats are compatible
-        with the @ref util_dump and @ref util_load commands''',
-        choices=['hex', 'json', 'print']),
+        available, "pretty" selects a human-readable format (making it
+        incompatible with the "load") and "print" selects a format where only
+        non-printing characters are hexadecimal encoded.  These formats are
+        compatible with the @ref util_dump and @ref util_load commands''',
+        choices=['hex', 'json', 'pretty', 'print']),
     Config('incremental', '', r'''
         configure the cursor for block incremental backup usage. These formats
         are only compatible with the backup data source; see @ref backup''',
@@ -1276,7 +1301,7 @@ methods = {
             this setting manages the granularity of how WiredTiger maintains modification
             maps internally. The larger the granularity, the smaller amount of information
             WiredTiger need to maintain''',
-            min='1MB', max='2GB'),
+            min='4KB', max='2GB'),
         Config('src_id', '', r'''
             a string that identifies a previous checkpoint backup source as the source
             of this incremental backup. This identifier must have already been created
@@ -1377,18 +1402,13 @@ methods = {
 'WT_SESSION.upgrade' : Method([]),
 'WT_SESSION.verify' : Method([
     Config('dump_address', 'false', r'''
-        Display page addresses, start and stop time pairs and page types as
+        Display page addresses, time windows, and page types as
         pages are verified, using the application's message handler,
         intended for debugging''',
         type='boolean'),
     Config('dump_blocks', 'false', r'''
         Display the contents of on-disk blocks as they are verified,
         using the application's message handler, intended for debugging''',
-        type='boolean'),
-    Config('dump_history', 'false', r'''
-        Display a key's values along with its start and stop time pairs as
-        they are verified against the history store, using the application's
-        message handler, intended for debugging''',
         type='boolean'),
     Config('dump_layout', 'false', r'''
         Display the layout of the files as they are verified, using the

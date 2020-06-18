@@ -270,6 +270,7 @@ struct __wt_page_modify {
 
     /* Dirty bytes added to the cache. */
     size_t bytes_dirty;
+    size_t bytes_updates;
 
     /*
      * When pages are reconciled, the result is one or more replacement blocks. A replacement block
@@ -626,17 +627,16 @@ struct __wt_page {
     uint8_t type;               /* Page type */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_PAGE_BUILD_KEYS 0x001u                 /* Keys have been built in memory */
-#define WT_PAGE_DISK_ALLOC 0x002u                 /* Disk image in allocated memory */
-#define WT_PAGE_DISK_MAPPED 0x004u                /* Disk image in mapped memory */
-#define WT_PAGE_EVICT_LRU 0x008u                  /* Page is on the LRU queue */
-#define WT_PAGE_EVICT_NO_PROGRESS 0x010u          /* Eviction doesn't count as progress */
-#define WT_PAGE_INSTANTIATE_PREPARE_UPDATE 0x020u /* Instantiate prepared updates */
-#define WT_PAGE_OVERFLOW_KEYS 0x040u              /* Page has overflow keys */
-#define WT_PAGE_SPLIT_INSERT 0x080u               /* A leaf page was split for append */
-#define WT_PAGE_UPDATE_IGNORE 0x100u              /* Ignore updates on page discard */
-                                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
-    uint8_t flags_atomic;                         /* Atomic flags, use F_*_ATOMIC */
+#define WT_PAGE_BUILD_KEYS 0x01u        /* Keys have been built in memory */
+#define WT_PAGE_DISK_ALLOC 0x02u        /* Disk image in allocated memory */
+#define WT_PAGE_DISK_MAPPED 0x04u       /* Disk image in mapped memory */
+#define WT_PAGE_EVICT_LRU 0x08u         /* Page is on the LRU queue */
+#define WT_PAGE_EVICT_NO_PROGRESS 0x10u /* Eviction doesn't count as progress */
+#define WT_PAGE_OVERFLOW_KEYS 0x20u     /* Page has overflow keys */
+#define WT_PAGE_SPLIT_INSERT 0x40u      /* A leaf page was split for append */
+#define WT_PAGE_UPDATE_IGNORE 0x80u     /* Ignore updates on page discard */
+                                        /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint8_t flags_atomic;               /* Atomic flags, use F_*_ATOMIC */
 
     uint8_t unused[2]; /* Unused padding */
 
@@ -1074,9 +1074,12 @@ struct __wt_update {
     volatile uint8_t prepare_state; /* prepare state */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_UPDATE_HS 0x1u                    /* Update has been written to history store. */
-#define WT_UPDATE_RESTORED_FOR_ROLLBACK 0x2u /* Update restored for rollback to stable. */
-                                             /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_UPDATE_HS 0x01u                       /* Update has been written to history store. */
+#define WT_UPDATE_MASKED_BY_NON_TS_UPDATE 0x02u  /* Update masked by updates without timestamp. */
+#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x04u /* Prepared update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_DS 0x08u         /* Update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_HS 0x10u         /* Update restored from history store. */
+                                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 
     /*
@@ -1111,10 +1114,8 @@ struct __wt_update {
  */
 struct __wt_update_value {
     WT_ITEM buf;
-    wt_timestamp_t durable_ts;
-    uint64_t txnid;
+    WT_TIME_WINDOW tw;
     uint8_t type;
-    uint8_t prepare_state;
     bool skip_buf;
 };
 

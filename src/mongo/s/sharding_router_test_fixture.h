@@ -61,9 +61,7 @@ public:
 
     ShardingCatalogClient* catalogClient() const;
     ShardRegistry* shardRegistry() const;
-    RemoteCommandTargeterFactoryMock* targeterFactory() const;
     std::shared_ptr<executor::TaskExecutor> executor() const;
-    DistLockManagerMock* distLock() const;
     RemoteCommandTargeterMock* configTargeter() const;
 
     OperationContext* operationContext() const;
@@ -175,11 +173,12 @@ public:
     }
 
 private:
-    ServiceContext::UniqueClient _client;
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
+        std::unique_ptr<DistLockManager> distLockManager) override;
+
     ServiceContext::UniqueOperationContext _opCtx;
     transport::SessionHandle _transportSession;
 
-    RemoteCommandTargeterFactoryMock* _targeterFactory;
     RemoteCommandTargeterMock* _configTargeter;
 
     // For the Grid's fixed executor.
@@ -187,8 +186,6 @@ private:
 
     // For the Grid's arbitrary executor in its executorPool.
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnvForPool;
-
-    DistLockManagerMock* _distLockManager = nullptr;
 };
 
 }  // namespace mongo

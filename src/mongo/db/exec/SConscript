@@ -7,6 +7,7 @@ env = env.Clone()
 env.SConscript(
     dirs=[
         "document_value",
+        "sbe",
     ],
     exports=[
         "env",

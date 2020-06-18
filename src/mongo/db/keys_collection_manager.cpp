@@ -182,7 +182,7 @@ void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doE
             opCtx, [this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
     }
 } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& ex) {
-    LOGV2(518091, "{ex}, doEnable = {doEnable}", "ex"_attr = ex, "doEnable"_attr = doEnable);
+    LOGV2(518091, "Exception during key generation", "error"_attr = ex, "enable"_attr = doEnable);
     return;
 }
 

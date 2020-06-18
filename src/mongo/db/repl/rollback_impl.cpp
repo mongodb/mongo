@@ -37,7 +37,6 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
@@ -361,19 +360,15 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     std::vector<StringData> dbNames(dbs.begin(), dbs.end());
     LOGV2(21595, "Waiting for all background operations to complete before starting rollback");
     for (auto db : dbNames) {
-        auto numInProg = BackgroundOperation::numInProgForDb(db);
-        auto numInProgInCoordinator = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(db);
-        if (numInProg > 0 || numInProgInCoordinator > 0) {
-            LOGV2_DEBUG(
-                21596,
-                1,
-                "Waiting for {numBackgroundOperationsInProgress} "
-                "background operations to complete on database '{db}'",
-                "Waiting for background operations to complete",
-                "numBackgroundOperationsInProgress"_attr =
-                    (numInProg > numInProgInCoordinator ? numInProg : numInProgInCoordinator),
-                "db"_attr = db);
-            BackgroundOperation::awaitNoBgOpInProgForDb(db);
+        auto numInProg = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(db);
+        if (numInProg > 0) {
+            LOGV2_DEBUG(21596,
+                        1,
+                        "Waiting for {numBackgroundOperationsInProgress} "
+                        "background operations to complete on database '{db}'",
+                        "Waiting for background operations to complete",
+                        "numBackgroundOperationsInProgress"_attr = numInProg,
+                        "db"_attr = db);
             IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, db);
         }
     }
@@ -613,8 +608,9 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
             invariant(coll == collToScan,
                       str::stream() << "Catalog returned invalid collection: " << nss.ns() << " ("
                                     << uuid.toString() << ")");
-            auto exec = collToScan->makePlanExecutor(
-                opCtx, PlanExecutor::INTERRUPT_ONLY, Collection::ScanDirection::kForward);
+            auto exec = collToScan->makePlanExecutor(opCtx,
+                                                     PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                     Collection::ScanDirection::kForward);
             long long countFromScan = 0;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED ==

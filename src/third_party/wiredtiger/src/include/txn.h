@@ -98,11 +98,10 @@ struct __wt_txn_shared {
     wt_timestamp_t pinned_durable_timestamp;
 
     /*
-     * Set to the first read timestamp used in the transaction. As part of our history store
-     * mechanism, we can move the read timestamp forward so we need to keep track of the original
-     * read timestamp to know what history should be pinned in front of oldest.
+     * The read timestamp used for this transaction. Determines what updates can be read and
+     * prevents the oldest timestamp moving past this point.
      */
-    wt_timestamp_t pinned_read_timestamp;
+    wt_timestamp_t read_timestamp;
 
     TAILQ_ENTRY(__wt_txn_shared) read_timestampq;
     TAILQ_ENTRY(__wt_txn_shared) durable_timestampq;
@@ -291,9 +290,6 @@ struct __wt_txn {
      */
     wt_timestamp_t prepare_timestamp;
 
-    /* Read updates committed as of this timestamp. */
-    wt_timestamp_t read_timestamp;
-
     /* Array of modifications by this transaction. */
     WT_TXN_OP *mod;
     size_t mod_alloc;
@@ -336,23 +332,22 @@ struct __wt_txn {
 #define WT_TXN_HAS_TS_COMMIT 0x000010u
 #define WT_TXN_HAS_TS_DURABLE 0x000020u
 #define WT_TXN_HAS_TS_PREPARE 0x000040u
-#define WT_TXN_HAS_TS_READ 0x000080u
-#define WT_TXN_IGNORE_PREPARE 0x000100u
-#define WT_TXN_PREPARE 0x000200u
-#define WT_TXN_READONLY 0x000400u
-#define WT_TXN_RUNNING 0x000800u
-#define WT_TXN_SHARED_TS_DURABLE 0x001000u
-#define WT_TXN_SHARED_TS_READ 0x002000u
-#define WT_TXN_SYNC_SET 0x004000u
-#define WT_TXN_TS_COMMIT_ALWAYS 0x008000u
-#define WT_TXN_TS_COMMIT_KEYS 0x010000u
-#define WT_TXN_TS_COMMIT_NEVER 0x020000u
-#define WT_TXN_TS_DURABLE_ALWAYS 0x040000u
-#define WT_TXN_TS_DURABLE_KEYS 0x080000u
-#define WT_TXN_TS_DURABLE_NEVER 0x100000u
-#define WT_TXN_TS_ROUND_PREPARED 0x200000u
-#define WT_TXN_TS_ROUND_READ 0x400000u
-#define WT_TXN_UPDATE 0x800000u
+#define WT_TXN_IGNORE_PREPARE 0x000080u
+#define WT_TXN_PREPARE 0x000100u
+#define WT_TXN_READONLY 0x000200u
+#define WT_TXN_RUNNING 0x000400u
+#define WT_TXN_SHARED_TS_DURABLE 0x000800u
+#define WT_TXN_SHARED_TS_READ 0x001000u
+#define WT_TXN_SYNC_SET 0x002000u
+#define WT_TXN_TS_COMMIT_ALWAYS 0x004000u
+#define WT_TXN_TS_COMMIT_KEYS 0x008000u
+#define WT_TXN_TS_COMMIT_NEVER 0x010000u
+#define WT_TXN_TS_DURABLE_ALWAYS 0x020000u
+#define WT_TXN_TS_DURABLE_KEYS 0x040000u
+#define WT_TXN_TS_DURABLE_NEVER 0x080000u
+#define WT_TXN_TS_ROUND_PREPARED 0x100000u
+#define WT_TXN_TS_ROUND_READ 0x200000u
+#define WT_TXN_UPDATE 0x400000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 

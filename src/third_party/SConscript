@@ -14,7 +14,7 @@ Import("wiredtiger")
 boostSuffix = "-1.70.0"
 snappySuffix = '-1.1.7'
 zlibSuffix = '-1.2.11'
-zstdSuffix = '-1.4.3'
+zstdSuffix = '-1.4.4'
 pcreSuffix = "-8.42"
 mozjsSuffix = '-60'
 yamlSuffix = '-0.6.2'
@@ -158,7 +158,7 @@ if wiredtiger and not use_system_version_of_library('wiredtiger'):
 
 if not use_system_version_of_library('yaml'):
     thirdPartyEnvironmentModifications['yaml'] = {
-        'CPPPATH' : ['#/src/third_party/yaml-cpp' + yamlSuffix + '/include'],
+        'CPPPATH' : ['#/src/third_party/yaml-cpp' + yamlSuffix + '/yaml-cpp/include'],
         'CPPDEFINES' : ['_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING'] if env.ToolchainIs('msvc') else [],
     }
 

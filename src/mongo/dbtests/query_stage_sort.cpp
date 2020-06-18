@@ -131,7 +131,7 @@ public:
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            _expCtx, std::move(ws), std::move(ss), coll, PlanExecutor::YIELD_AUTO);
+            _expCtx, std::move(ws), std::move(ss), coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -173,8 +173,11 @@ public:
             _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            _expCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
+        auto statusWithPlanExecutor = PlanExecutor::make(_expCtx,
+                                                         std::move(ws),
+                                                         std::move(fetchStage),
+                                                         coll,
+                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -412,7 +415,6 @@ public:
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = ss->work(&id);
             if (PlanStage::ADVANCED != status) {
-                ASSERT_NE(status, PlanStage::FAILURE);
                 continue;
             }
             WorkingSetMember* member = exec->getWorkingSet()->get(id);
@@ -506,7 +508,6 @@ public:
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = ss->work(&id);
             if (PlanStage::ADVANCED != status) {
-                ASSERT_NE(status, PlanStage::FAILURE);
                 continue;
             }
             WorkingSetMember* member = exec->getWorkingSet()->get(id);
@@ -589,13 +590,16 @@ public:
             _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
 
         // We don't get results back since we're sorting some parallel arrays.
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            _expCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
+        auto statusWithPlanExecutor = PlanExecutor::make(_expCtx,
+                                                         std::move(ws),
+                                                         std::move(fetchStage),
+                                                         coll,
+                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
-        PlanExecutor::ExecState runnerState =
-            exec->getNext(static_cast<BSONObj*>(nullptr), nullptr);
-        ASSERT_EQUALS(PlanExecutor::FAILURE, runnerState);
+        ASSERT_THROWS_CODE(exec->getNext(static_cast<BSONObj*>(nullptr), nullptr),
+                           DBException,
+                           ErrorCodes::BadValue);
     }
 };
 

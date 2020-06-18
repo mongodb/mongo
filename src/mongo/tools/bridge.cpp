@@ -453,7 +453,7 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
     }
 }
 
-int bridgeMain(int argc, char** argv, char** envp) {
+int bridgeMain(int argc, char** argv) {
 
     registerShutdownTask([&] {
         // NOTE: This function may be called at any time. It must not
@@ -472,7 +472,7 @@ int bridgeMain(int argc, char** argv, char** envp) {
     });
 
     setupSignalHandlers();
-    runGlobalInitializersOrDie(argc, argv, envp);
+    runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     startSignalProcessingThread(LogFileStatus::kNoLogFileToRotate);
 
     setGlobalServiceContext(ServiceContext::make());
@@ -512,14 +512,11 @@ int bridgeMain(int argc, char** argv, char** envp) {
 // WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
 // and makes them available through the argv() and envp() members.  This enables bridgeMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    int exitCode = mongo::bridgeMain(argc, wcl.argv(), wcl.envp());
-    mongo::quickExit(exitCode);
+int wmain(int argc, wchar_t* argvW[]) {
+    mongo::quickExit(mongo::bridgeMain(argc, mongo::WindowsCommandLine(argc, argvW).argv()));
 }
 #else
-int main(int argc, char* argv[], char** envp) {
-    int exitCode = mongo::bridgeMain(argc, argv, envp);
-    mongo::quickExit(exitCode);
+int main(int argc, char* argv[]) {
+    mongo::quickExit(mongo::bridgeMain(argc, argv));
 }
 #endif

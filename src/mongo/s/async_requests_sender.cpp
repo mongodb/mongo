@@ -58,6 +58,7 @@ namespace {
 const int kMaxNumFailedHostRetryAttempts = 3;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeSchedulingRemoteCommand);
+MONGO_FAIL_POINT_DEFINE(hangBeforePollResponse);
 
 }  // namespace
 
@@ -88,6 +89,17 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
 
 AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
     invariant(!done());
+
+    hangBeforePollResponse.executeIf(
+        [&](const BSONObj& data) {
+            while (MONGO_unlikely(hangBeforePollResponse.shouldFail())) {
+                LOGV2(4840900, "Hanging in ARS::next due to 'hangBeforePollResponse' failpoint");
+                sleepmillis(100);
+            }
+        },
+        [&](const BSONObj& data) {
+            return MONGO_unlikely(_remotesLeft == (size_t)data.getIntField("remotesLeft"));
+        });
 
     _remotesLeft--;
 

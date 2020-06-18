@@ -282,20 +282,12 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
 
 void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx) const {
     auto client = opCtx->getClient();
-    if (client->session()) {
-        _numCurrentOps.subtractAndFetch(1);
-    }
+    invariant(client);
+
     auto service = client->getServiceContext();
+    invariant(service);
 
-    {
-        stdx::lock_guard lk(service->_mutex);
-        service->_clientByOperationId.erase(opCtx->getOpID());
-    }
-
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->resetOperationContext();
-    }
+    service->_delistOperation(opCtx);
     opCtx->getBaton()->detach();
 
     onDestroy(opCtx, service->_clientObservers);
@@ -367,6 +359,49 @@ void ServiceContext::killOperation(WithLock, OperationContext* opCtx, ErrorCodes
             std::terminate();
         }
     }
+}
+
+void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
+    // Removing `opCtx` from `_clientByOperationId` must always precede removing the `opCtx` from
+    // its client to prevent situations that another thread could use the service context to get a
+    // hold of an `opCtx` that has been removed from its client.
+    {
+        stdx::lock_guard lk(_mutex);
+        if (_clientByOperationId.erase(opCtx->getOpID()) != 1) {
+            // Another thread has already delisted this `opCtx`.
+            return;
+        }
+    }
+
+    auto client = opCtx->getClient();
+    stdx::lock_guard clientLock(*client);
+    // Reaching here implies this call was able to remove the `opCtx` from ServiceContext.
+
+    // Assigning a new opCtx to the client must never precede the destruction of any existing opCtx
+    // that references the client.
+    invariant(client->getOperationContext() == opCtx);
+    client->resetOperationContext();
+
+    if (client->session()) {
+        _numCurrentOps.subtractAndFetch(1);
+    }
+
+    opCtx->releaseOperationKey();
+}
+
+void ServiceContext::killAndDelistOperation(OperationContext* opCtx,
+                                            ErrorCodes::Error killCode) noexcept {
+
+    auto client = opCtx->getClient();
+    invariant(client);
+
+    auto service = client->getServiceContext();
+    invariant(service == this);
+
+    _delistOperation(opCtx);
+
+    stdx::lock_guard clientLock(*client);
+    killOperation(clientLock, opCtx, killCode);
 }
 
 void ServiceContext::unsetKillAllOperations() {

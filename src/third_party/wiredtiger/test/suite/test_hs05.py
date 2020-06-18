@@ -38,8 +38,10 @@ def timestamp_str(t):
 # Verify hs_score reflects cache pressure due to history
 # even if we're not yet actively pushing into the history store file.
 class test_hs05(wttest.WiredTigerTestCase):
-    # Force a small cache.
-    conn_config = 'cache_size=50MB,statistics=(fast)'
+    # Force a small cache, but disable eviction of dirty pages until the cache is full.
+    conn_config = 'cache_size=50MB,statistics=(fast),'
+    conn_config += 'eviction_dirty_target=100,eviction_dirty_trigger=100,'
+    conn_config += 'eviction_updates_target=100,eviction_updates_trigger=100'
     session_config = 'isolation=snapshot'
     stable = 1
 

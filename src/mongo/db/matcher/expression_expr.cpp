@@ -43,7 +43,7 @@ ExprMatchExpression::ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
 
 ExprMatchExpression::ExprMatchExpression(BSONElement elem,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : ExprMatchExpression(Expression::parseOperand(expCtx, elem, expCtx->variablesParseState),
+    : ExprMatchExpression(Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState),
                           expCtx) {}
 
 bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
@@ -108,8 +108,8 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
     // TODO SERVER-31003: Replace Expression clone via serialization with Expression::clone().
     BSONObjBuilder bob;
     bob << "" << _expression->serialize(false);
-    boost::intrusive_ptr<Expression> clonedExpr =
-        Expression::parseOperand(_expCtx, bob.obj().firstElement(), _expCtx->variablesParseState);
+    boost::intrusive_ptr<Expression> clonedExpr = Expression::parseOperand(
+        _expCtx.get(), bob.obj().firstElement(), _expCtx->variablesParseState);
 
     auto clone = std::make_unique<ExprMatchExpression>(std::move(clonedExpr), _expCtx);
     if (_rewriteResult) {

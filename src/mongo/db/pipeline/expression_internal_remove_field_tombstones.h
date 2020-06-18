@@ -44,9 +44,8 @@ namespace mongo {
  */
 class ExpressionInternalRemoveFieldTombstones final : public Expression {
 public:
-    explicit ExpressionInternalRemoveFieldTombstones(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        boost::intrusive_ptr<Expression> child)
+    explicit ExpressionInternalRemoveFieldTombstones(ExpressionContext* const expCtx,
+                                                     boost::intrusive_ptr<Expression> child)
         : Expression{expCtx, {std::move(child)}} {}
 
     Value evaluate(const Document& root, Variables* variables) const final {

@@ -59,7 +59,7 @@ bulk_commit_transaction(WT_SESSION *session)
     testutil_check(session->commit_transaction(session, buf));
 
     /* Update the oldest timestamp, otherwise updates are pinned in memory. */
-    timestamp_once(session);
+    timestamp_once(session, false);
 }
 
 /*
@@ -80,14 +80,14 @@ wts_load(void)
     WT_DECL_RET;
     WT_ITEM key, value;
     WT_SESSION *session;
-    uint32_t keyno;
+    uint32_t committed_keyno, keyno, v;
     bool is_bulk;
 
     conn = g.wts_conn;
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    logop(session, "%s", "=============== bulk load start");
+    trace_msg("%s", "=============== bulk load start");
 
     /*
      * No bulk load with custom collators, the order of insertion will not match the collation
@@ -112,19 +112,7 @@ wts_load(void)
     if (g.c_txn_timestamps)
         bulk_begin_transaction(session);
 
-    for (keyno = 0; ++keyno <= g.c_rows;) {
-        /* Do some checking every 10K operations. */
-        if (keyno % 10000 == 0) {
-            /* Report on progress. */
-            track("bulk load", keyno, NULL);
-
-            /* Restart the enclosing transaction so we don't overflow the cache. */
-            if (g.c_txn_timestamps) {
-                bulk_commit_transaction(session);
-                bulk_begin_transaction(session);
-            }
-        }
-
+    for (committed_keyno = keyno = 0; ++keyno <= g.c_rows;) {
         key_gen(&key, keyno);
         val_gen(NULL, &value, keyno);
 
@@ -133,21 +121,22 @@ wts_load(void)
             if (!is_bulk)
                 cursor->set_key(cursor, keyno);
             cursor->set_value(cursor, *(uint8_t *)value.data);
-            logop(session, "%-10s %" PRIu32 " {0x%02" PRIx8 "}", "bulk", keyno,
-              ((uint8_t *)value.data)[0]);
+            if (g.trace_all)
+                trace_msg("bulk %" PRIu32 " {0x%02" PRIx8 "}", keyno, ((uint8_t *)value.data)[0]);
             break;
         case VAR:
             if (!is_bulk)
                 cursor->set_key(cursor, keyno);
             cursor->set_value(cursor, &value);
-            logop(session, "%-10s %" PRIu32 " {%.*s}", "bulk", keyno, (int)value.size,
-              (char *)value.data);
+            if (g.trace_all)
+                trace_msg("bulk %" PRIu32 " {%.*s}", keyno, (int)value.size, (char *)value.data);
             break;
         case ROW:
             cursor->set_key(cursor, &key);
             cursor->set_value(cursor, &value);
-            logop(session, "%-10s %" PRIu32 " {%.*s}, {%.*s}", "bulk", keyno, (int)key.size,
-              (char *)key.data, (int)value.size, (char *)value.data);
+            if (g.trace_all)
+                trace_msg("bulk %" PRIu32 " {%.*s}, {%.*s}", keyno, (int)key.size, (char *)key.data,
+                  (int)value.size, (char *)value.data);
             break;
         }
 
@@ -175,19 +164,34 @@ wts_load(void)
                 g.c_delete_pct += g.c_insert_pct - 5;
                 g.c_insert_pct = 5;
             }
-            g.c_delete_pct += g.c_write_pct / 2;
-            g.c_write_pct = g.c_write_pct / 2;
+            v = g.c_write_pct / 2;
+            g.c_delete_pct += v;
+            g.c_write_pct -= v;
+
+            break;
+        }
+
+        /* Restart the enclosing transaction every 5K operations so we don't overflow the cache. */
+        if (keyno % 5000 == 0) {
+            /* Report on progress. */
+            track("bulk load", keyno, NULL);
+
+            if (g.c_txn_timestamps) {
+                bulk_commit_transaction(session);
+                committed_keyno = keyno;
+                bulk_begin_transaction(session);
+            }
         }
     }
 
     /*
-     * We may have exited the loop early, reset our counters to match our insert count. If the count
-     * changed, rewrite the CONFIG file so reopens aren't surprised.
+     * Ideally, the insert loop runs until the number of rows plus one, in which case row counts are
+     * correct. If the loop exited early, reset the counters and rewrite the CONFIG file (so reopens
+     * aren't surprised).
      */
-    --keyno;
-    if (g.rows != keyno) {
-        g.rows = keyno;
-        g.c_rows = (uint32_t)keyno;
+    if (keyno != g.c_rows + 1) {
+        g.rows = committed_keyno;
+        g.c_rows = (uint32_t)committed_keyno;
         config_print(false);
     }
 
@@ -196,7 +200,7 @@ wts_load(void)
 
     testutil_check(cursor->close(cursor));
 
-    logop(session, "%s", "=============== bulk load stop");
+    trace_msg("%s", "=============== bulk load stop");
 
     testutil_check(session->close(session, NULL));
 

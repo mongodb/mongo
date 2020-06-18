@@ -93,8 +93,7 @@ public:
     Status startClone(OperationContext* opCtx,
                       const UUID& migrationId,
                       const LogicalSessionId& lsid,
-                      TxnNumber txnNumber,
-                      bool resumableRangeDeleterDisabled) override;
+                      TxnNumber txnNumber) override;
 
     Status awaitUntilCriticalSectionIsAppropriate(OperationContext* opCtx,
                                                   Milliseconds maxTimeToWait) override;

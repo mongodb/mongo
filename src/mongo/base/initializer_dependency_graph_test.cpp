@@ -37,6 +37,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer_dependency_graph.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #define STRIP_PARENS_(...) __VA_ARGS__
@@ -361,6 +362,43 @@ TEST(InitializerDependencyGraphTest, TopSortShufflesChildren) {
         ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
         return nodeNames;
     });
+}
+
+TEST(InitializerDependencyGraphTest, FreezeCausesFrozen) {
+    InitializerDependencyGraph graph;
+    ASSERT_FALSE(graph.frozen());
+    graph.freeze();
+    ASSERT_TRUE(graph.frozen());
+    graph.freeze();
+    ASSERT_TRUE(graph.frozen());
+}
+
+TEST(InitializerDependencyGraphTest, TopSortEmptyGraphWhileFrozen) {
+    InitializerDependencyGraph graph;
+    std::vector<std::string> nodeNames;
+    graph.freeze();
+    ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
+    ASSERT_EQUALS(0U, nodeNames.size());
+}
+
+TEST(InitializerDependencyGraphTest, TopSortGraphNoDepsWhileFrozen) {
+    InitializerDependencyGraph graph;
+    std::vector<std::string> nodeNames;
+    ASSERT_ADD_INITIALIZER(graph, "A", doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);
+    ASSERT_ADD_INITIALIZER(graph, "B", doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);
+    ASSERT_ADD_INITIALIZER(graph, "C", doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);
+    graph.freeze();
+    ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
+    ASSERT_EQUALS(3U, nodeNames.size());
+    ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "A");
+    ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "B");
+    ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "C");
+}
+
+DEATH_TEST(InitializerDependencyGraphTest, CannotAddWhenFrozen, "!frozen()") {
+    InitializerDependencyGraph graph;
+    graph.freeze();
+    ASSERT_ADD_INITIALIZER(graph, "A", doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);
 }
 
 }  // namespace

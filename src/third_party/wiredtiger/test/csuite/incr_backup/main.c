@@ -59,7 +59,7 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static bool slow_incremental = false;
 
 static bool do_drop = true;
-static bool do_rename = true;
+static bool do_rename = false;
 
 #define VERBOSE(level, fmt, ...)      \
     do {                              \
@@ -479,6 +479,7 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
     int nfiles, ret;
     char buf[4096];
     char *filename;
+    char granularity_unit;
 
     nfiles = 0;
 
@@ -493,14 +494,18 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     tinfo->full_backup_number = tinfo->incr_backup_number++;
 
-    /* Half of the runs with a low granularity: 1M */
-    if (__wt_random(rand) % 2 == 0)
-        granularity = 1;
-    else
-        granularity = 1 + __wt_random(rand) % 20;
+    /* Half of the runs with very low granularity to stress bitmaps */
+    granularity = __wt_random(rand) % 20;
+    if (__wt_random(rand) % 2 == 0) {
+        granularity_unit = 'K';
+        granularity += 4;
+    } else {
+        granularity_unit = 'M';
+        granularity += 1;
+    }
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "incremental=(granularity=%" PRIu32 "M,enabled=true,this_id=ID%d)", granularity,
-      (int)tinfo->full_backup_number));
+      "incremental=(granularity=%" PRIu32 "%c,enabled=true,this_id=ID%d)", granularity,
+      granularity_unit, (int)tinfo->full_backup_number));
     VERBOSE(3, "open_cursor(session, \"backup:\", NULL, \"%s\", &cursor)\n", buf);
     testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
 

@@ -81,6 +81,9 @@ namespace mongo {
  *     void onStepDown() final {
  *         // ...
  *     }
+ *     void onBecomeArbiter() final {
+ *         // ...
+ *     }
  * };
  *
  * namespace {
@@ -116,6 +119,11 @@ public:
      * could also be into ROLLBACK or REMOVED.
      */
     virtual void onStepDown() = 0;
+
+    /**
+     * Called when the node commences being an arbiter.
+     */
+    virtual void onBecomeArbiter() = 0;
 };
 
 
@@ -166,6 +174,7 @@ public:
     void onStepUpBegin(OperationContext* opCtx) final;
     void onStepUpComplete(OperationContext* opCtx) final;
     void onStepDown() final;
+    void onBecomeArbiter() final;
 
 private:
     void _registerService(ReplicaSetAwareInterface* service);

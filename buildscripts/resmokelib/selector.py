@@ -7,18 +7,17 @@ on whether they apply to C++ unit tests, dbtests, or JS tests.
 import collections
 import errno
 import fnmatch
-import math
 import os.path
 import random
 import subprocess
 import sys
 
 import buildscripts.ciconfig.tags as _tags
-from . import config
-from . import errors
-from . import utils
-from .utils import globstar
-from .utils import jscomment
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.utils import globstar
+from buildscripts.resmokelib.utils import jscomment
 
 ########################
 #  Test file explorer  #

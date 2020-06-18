@@ -177,34 +177,30 @@ std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIs
     return statusWithIsMaster.getValue();
 }
 
-void MongosTopologyCoordinator::enterQuiesceMode() {
-    stdx::lock_guard lk(_mutex);
-    _inQuiesceMode = true;
+void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
+                                                        Milliseconds quiesceTime) {
+    {
+        stdx::lock_guard lk(_mutex);
+        _inQuiesceMode = true;
 
-    // Increment the topology version and respond to any waiting isMaster request with an error.
-    auto counter = _topologyVersion.getCounter();
-    _topologyVersion.setCounter(counter + 1);
-    _promise->setError(
-        {ErrorCodes::ShutdownInProgress, "Mongos is in quiesce mode and will shut down"});
+        // Increment the topology version and respond to any waiting isMaster request with an error.
+        auto counter = _topologyVersion.getCounter();
+        _topologyVersion.setCounter(counter + 1);
+        _promise->setError(
+            {ErrorCodes::ShutdownInProgress, "Mongos is in quiesce mode and will shut down"});
 
-    // Reset counter to 0 since we will respond to all waiting isMaster requests with an error.
-    // All new isMaster requests will immediately fail with ShutdownInProgress.
-    IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
-}
-
-void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx) {
-    enterQuiesceMode();
+        // Reset counter to 0 since we will respond to all waiting isMaster requests with an error.
+        // All new isMaster requests will immediately fail with ShutdownInProgress.
+        IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
+    }
 
     if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {
         LOGV2(4695700, "hangDuringQuiesceMode failpoint enabled");
         hangDuringQuiesceMode.pauseWhileSet(opCtx);
     }
 
-    // TODO SERVER-46958: Determine what the quiesce time should be by checking the
-    // shutdownTimeoutMillisForSignaledShutdown mongos server parameter.
-    auto timeout = Milliseconds(100);
-    LOGV2(4695701, "Entering quiesce mode for mongos shutdown", "quiesceTime"_attr = timeout);
-    opCtx->sleepFor(timeout);
+    LOGV2(4695701, "Entering quiesce mode for mongos shutdown", "quiesceTime"_attr = quiesceTime);
+    opCtx->sleepFor(quiesceTime);
     LOGV2(4695702, "Exiting quiesce mode for mongos shutdown");
 }
 

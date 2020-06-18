@@ -10,9 +10,6 @@ selector:
   - requires_fcv_46
   - need_fixing_for_46
   exclude_files:
-  # Enable when 4.4 becomes last stable
-  - jstests/sharding/killop.js
-  - jstests/sharding/verify_sessions_expiration_sharded.js
   # TODO SERVER-46040: Enable when SERVER-46040 is backported
   - jstests/sharding/drop_indexes_with_stale_config_error.js
   # TODO SERVER-31368: Enable when SERVER-31368 is backported to v4.4.
@@ -26,5 +23,3 @@ executor:
         TestData:
           useRandomBinVersionsWithinReplicaSet: true
           mongosBinVersion: 'last-stable'
-          # TODO: SERVER-45959 remove after v4.4
-          skipCheckOrphans: true

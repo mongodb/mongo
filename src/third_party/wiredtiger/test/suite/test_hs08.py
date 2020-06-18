@@ -140,7 +140,7 @@ class test_hs08(wttest.WiredTigerTestCase):
         # Call checkpoint again.
         self.session.checkpoint('use_timestamp=true')
 
-        # Validate that we squashed two modifies. Note that we cant count the exact number
+        # Validate that we squashed two modifies. Note we can't count the exact number
         # we squashed, just that we did squash.
         hs_writes = self.get_stat(stat.conn.cache_write_hs)
         squashed_write = self.get_stat(stat.conn.cache_hs_write_squash)

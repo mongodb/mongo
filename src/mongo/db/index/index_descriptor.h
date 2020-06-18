@@ -155,9 +155,6 @@ public:
         return _indexName;
     }
 
-    // Return the name of the indexed collection.
-    const NamespaceString& parentNS() const;
-
     // Return the name of the access method we must use to access this index's data.
     const std::string& getAccessMethodName() const {
         return _accessMethodName;
@@ -166,6 +163,13 @@ public:
     // Returns the type of the index associated with this descriptor.
     IndexType getIndexType() const {
         return _indexType;
+    }
+
+    /**
+     * Return a pointer to the IndexCatalogEntry that owns this descriptor, or null if orphaned.
+     */
+    IndexCatalogEntry* getEntry() const {
+        return _entry;
     }
 
     //
@@ -196,11 +200,6 @@ public:
         return _partial;
     }
 
-    // Is this index multikey?
-    bool isMultikey() const;
-
-    MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const;
-
     bool isIdIndex() const {
         return _isIdIndex;
     }
@@ -219,18 +218,14 @@ public:
         return _infoObj;
     }
 
-    // Both the collection and the catalog must outlive the IndexDescriptor
-    const Collection* getCollection() const {
-        return _collection;
-    }
-    const IndexCatalog* getIndexCatalog() const;
-
     /**
      * Compares the current IndexDescriptor against the given index entry. Returns kIdentical if all
      * index options are logically identical, kEquivalent if all options which uniquely identify an
      * index are logically identical, and kDifferent otherwise.
      */
-    Comparison compareIndexOptions(OperationContext* opCtx, const IndexCatalogEntry* other) const;
+    Comparison compareIndexOptions(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const IndexCatalogEntry* other) const;
 
     const BSONObj& collation() const {
         return _collation;
@@ -252,9 +247,6 @@ public:
     }
 
 private:
-    // Related catalog information of the parent collection
-    Collection* _collection;
-
     // What access method should we use for this index?
     std::string _accessMethodName;
 
@@ -278,9 +270,9 @@ private:
     BSONObj _collation;
     BSONObj _partialFilterExpression;
 
-    // only used by IndexCatalogEntryContainer to do caching for perf
-    // users not allowed to touch, and not part of API
-    IndexCatalogEntry* _cachedEntry;
+    // Many query stages require going from an IndexDescriptor to its IndexCatalogEntry, so for
+    // now we need this.
+    IndexCatalogEntry* _entry = nullptr;
 
     friend class IndexCatalog;
     friend class IndexCatalogEntryImpl;

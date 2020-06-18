@@ -140,6 +140,7 @@ bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, Recor
 }
 
 void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
+    _initHighestIdIfNeeded(opCtx);
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     SizeAdjuster adjuster(opCtx, this);
@@ -172,7 +173,7 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
                 thisRecordId = status.getValue().repr();
                 _visibilityManager->addUncommittedRecord(opCtx, this, RecordId(thisRecordId));
             } else {
-                thisRecordId = _nextRecordId();
+                thisRecordId = _nextRecordId(opCtx);
             }
             workingCopy->insert(
                 StringStore::value_type{createKey(_ident, thisRecordId),
@@ -333,6 +334,37 @@ boost::optional<RecordId> RecordStore::oplogStartHack(OperationContext* opCtx,
     return rid;
 }
 
+void RecordStore::_initHighestIdIfNeeded(OperationContext* opCtx) {
+    // In the normal case, this will already be initialized, so use a weak load. Since this value
+    // will only change from 0 to a positive integer, the only risk is reading an outdated value, 0,
+    // and having to take the mutex.
+    if (_highestRecordId.loadRelaxed() > 0) {
+        return;
+    }
+
+    // Only one thread needs to do this.
+    stdx::lock_guard<Latch> lk(_initHighestIdMutex);
+    if (_highestRecordId.load() > 0) {
+        return;
+    }
+
+    // Need to start at 1 so we are always higher than RecordId::min()
+    int64_t nextId = 1;
+
+    // Find the largest RecordId currently in use.
+    std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
+    if (auto record = cursor->next()) {
+        nextId = record->id.repr() + 1;
+    }
+
+    _highestRecordId.store(nextId);
+};
+
+int64_t RecordStore::_nextRecordId(OperationContext* opCtx) {
+    _initHighestIdIfNeeded(opCtx);
+    return _highestRecordId.fetchAndAdd(1);
+}
+
 bool RecordStore::_cappedAndNeedDelete(OperationContext* opCtx, StringStore* workingCopy) {
     if (!_isCapped)
         return false;
@@ -385,20 +417,14 @@ void RecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* wo
 RecordStore::Cursor::Cursor(OperationContext* opCtx,
                             const RecordStore& rs,
                             VisibilityManager* visibilityManager)
-    : opCtx(opCtx), _visibilityManager(visibilityManager) {
-    _ident = rs._ident;
-    _prefix = rs._prefix;
-    _postfix = rs._postfix;
-    _isCapped = rs._isCapped;
-    _isOplog = rs._isOplog;
-}
+    : opCtx(opCtx), _rs(rs), _visibilityManager(visibilityManager) {}
 
 boost::optional<Record> RecordStore::Cursor::next() {
     _savedPosition = boost::none;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     if (_needFirstSeek) {
         _needFirstSeek = false;
-        it = workingCopy->lower_bound(_prefix);
+        it = workingCopy->lower_bound(_rs._prefix);
     } else if (it != workingCopy->end() && !_lastMoveWasRestore) {
         ++it;
     }
@@ -409,7 +435,7 @@ boost::optional<Record> RecordStore::Cursor::next() {
         nextRecord.id = RecordId(extractRecordId(it->first));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
 
-        if (_isOplog && nextRecord.id > _visibilityManager->getAllCommittedRecord())
+        if (_rs._isOplog && nextRecord.id > _visibilityManager->getAllCommittedRecord())
             return boost::none;
         return nextRecord;
     }
@@ -420,13 +446,13 @@ boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
     _savedPosition = boost::none;
     _lastMoveWasRestore = false;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    std::string key = createKey(_ident, id.repr());
+    std::string key = createKey(_rs._ident, id.repr());
     it = workingCopy->find(key);
 
     if (it == workingCopy->end() || !inPrefix(it->first))
         return boost::none;
 
-    if (_isOplog && id > _visibilityManager->getAllCommittedRecord())
+    if (_rs._isOplog && id > _visibilityManager->getAllCommittedRecord())
         return boost::none;
 
     _needFirstSeek = false;
@@ -444,7 +470,7 @@ bool RecordStore::Cursor::restore() {
     _lastMoveWasRestore = it == workingCopy->end() || it->first != _savedPosition.value();
 
     // Capped iterators die on invalidation rather than advancing.
-    return !(_isCapped && _lastMoveWasRestore);
+    return !(_rs._isCapped && _lastMoveWasRestore);
 }
 
 void RecordStore::Cursor::detachFromOperationContext() {
@@ -458,19 +484,14 @@ void RecordStore::Cursor::reattachToOperationContext(OperationContext* opCtx) {
 }
 
 bool RecordStore::Cursor::inPrefix(const std::string& key_string) {
-    return (key_string > _prefix) && (key_string < _postfix);
+    return (key_string > _rs._prefix) && (key_string < _rs._postfix);
 }
 
 RecordStore::ReverseCursor::ReverseCursor(OperationContext* opCtx,
                                           const RecordStore& rs,
                                           VisibilityManager* visibilityManager)
-    : opCtx(opCtx), _visibilityManager(visibilityManager) {
+    : opCtx(opCtx), _rs(rs), _visibilityManager(visibilityManager) {
     _savedPosition = boost::none;
-    _ident = rs._ident;
-    _prefix = rs._prefix;
-    _postfix = rs._postfix;
-    _isCapped = rs._isCapped;
-    _isOplog = rs._isOplog;
 }
 
 boost::optional<Record> RecordStore::ReverseCursor::next() {
@@ -478,7 +499,7 @@ boost::optional<Record> RecordStore::ReverseCursor::next() {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     if (_needFirstSeek) {
         _needFirstSeek = false;
-        it = StringStore::const_reverse_iterator(workingCopy->upper_bound(_postfix));
+        it = StringStore::const_reverse_iterator(workingCopy->upper_bound(_rs._postfix));
     } else if (it != workingCopy->rend() && !_lastMoveWasRestore) {
         ++it;
     }
@@ -490,8 +511,6 @@ boost::optional<Record> RecordStore::ReverseCursor::next() {
         nextRecord.id = RecordId(extractRecordId(it->first));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
 
-        if (_isOplog && nextRecord.id > _visibilityManager->getAllCommittedRecord())
-            return boost::none;
         return nextRecord;
     }
     return boost::none;
@@ -501,15 +520,12 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
     _needFirstSeek = false;
     _savedPosition = boost::none;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    std::string key = createKey(_ident, id.repr());
+    std::string key = createKey(_rs._ident, id.repr());
     StringStore::const_iterator canFind = workingCopy->find(key);
     if (canFind == workingCopy->end() || !inPrefix(canFind->first)) {
         it = workingCopy->rend();
         return boost::none;
     }
-
-    if (_isOplog && id > _visibilityManager->getAllCommittedRecord())
-        return boost::none;
 
     it = StringStore::const_reverse_iterator(++canFind);  // reverse iterator returns item 1 before
     _savedPosition = it->first;
@@ -527,7 +543,7 @@ bool RecordStore::ReverseCursor::restore() {
     _lastMoveWasRestore = (it == workingCopy->rend() || it->first != _savedPosition.value());
 
     // Capped iterators die on invalidation rather than advancing.
-    return !(_isCapped && _lastMoveWasRestore);
+    return !(_rs._isCapped && _lastMoveWasRestore);
 }
 
 void RecordStore::ReverseCursor::detachFromOperationContext() {
@@ -541,7 +557,7 @@ void RecordStore::ReverseCursor::reattachToOperationContext(OperationContext* op
 }
 
 bool RecordStore::ReverseCursor::inPrefix(const std::string& key_string) {
-    return (key_string > _prefix) && (key_string < _postfix);
+    return (key_string > _rs._prefix) && (key_string < _rs._postfix);
 }
 
 RecordStore::SizeAdjuster::SizeAdjuster(OperationContext* opCtx, RecordStore* rs)

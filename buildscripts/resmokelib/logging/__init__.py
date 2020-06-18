@@ -4,6 +4,6 @@
 # constructing a new Logger instance should use the loggers.new_logger() function instead.
 from logging import Logger
 
-from . import buildlogger
-from . import flush
-from . import loggers
+from buildscripts.resmokelib.logging import buildlogger
+from buildscripts.resmokelib.logging import flush
+from buildscripts.resmokelib.logging import loggers

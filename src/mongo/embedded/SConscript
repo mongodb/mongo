@@ -29,7 +29,13 @@ def mongo_export_file_generator(target, source, env, for_signature):
         return script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
     else:
         pass
-frameworksEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = mongo_export_file_generator
+
+# We really only want to use the mapfile if we are doing an SDK build. In an ordinary
+# dynamic build, we would end up building the normal library with an export map
+# but many of its symbols should in fact be coming from other libraries, and we
+# get odd ODR-esque violations. UBSAN caught this. Thanks UBSAN!
+if get_option('link-model') == 'dynamic-sdk':
+    frameworksEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = mongo_export_file_generator
 
 # We need to set our bundle version in the plist file, but the format
 # is contrained to major.minor.patch. So trim off any '-pre' or '-rc'

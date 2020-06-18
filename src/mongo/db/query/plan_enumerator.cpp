@@ -340,7 +340,7 @@ PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
     stdx::unordered_map<MatchExpression*, MemoID>::iterator it = _nodeToId.find(node);
 
     if (_nodeToId.end() == it) {
-        LOGV2_ERROR(20945, "Trying to look up memo entry for node, none found.");
+        LOGV2_ERROR(20945, "Trying to look up memo entry for node, none found");
         MONGO_UNREACHABLE;
     }
 
@@ -359,8 +359,11 @@ unique_ptr<MatchExpression> PlanEnumerator::getNext() {
     tagForSort(tree.get());
 
     _root->resetTag();
-    LOGV2_DEBUG(
-        20943, 5, "Enumerator: memo just before moving:\n{dumpMemo}", "dumpMemo"_attr = dumpMemo());
+    LOGV2_DEBUG(20943,
+                5,
+                "Enumerator: memo just before moving:\n{memo}",
+                "Enumerator: memo just before moving",
+                "memo"_attr = dumpMemo());
     _done = nextMemo(memoIDForNode(_root));
     return tree;
 }
@@ -1569,7 +1572,7 @@ void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
 //
 
 void PlanEnumerator::tagMemo(size_t id) {
-    LOGV2_DEBUG(20944, 5, "Tagging memoID {id}", "id"_attr = id);
+    LOGV2_DEBUG(20944, 5, "Tagging memoID {id}", "Tagging memoID", "id"_attr = id);
     NodeAssignment* assign = _memo[id];
     verify(nullptr != assign);
 

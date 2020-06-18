@@ -595,15 +595,44 @@ TEST(PlanCacheIndexabilityTest, WildcardPartialIndexDiscriminator) {
     ASSERT_EQ(1U, discriminatorsA.size());
     ASSERT(discriminatorsA.find("indexName") != discriminatorsA.end());
 
-    const auto disc = discriminatorsA["indexName"];
+    const auto wildcardDiscriminators = discriminatorsA["indexName"];
 
-    // Match expression which queries for a value not included by the filter expression cannot use
-    // the index.
-    ASSERT_FALSE(disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 0}")).get()));
+    // Since the fields in the partialFilterExpression are known a priori, they are _not_ part of
+    // the wildcard-discriminators, but rather the regular discriminators. Here we show that the
+    // wildcard discriminators consider all expressions on fields 'a' or 'b' to be compatible.
+    ASSERT_TRUE(wildcardDiscriminators.isMatchCompatibleWithIndex(
+        parseMatchExpression(fromjson("{a: 0}")).get()));
+    ASSERT_TRUE(wildcardDiscriminators.isMatchCompatibleWithIndex(
+        parseMatchExpression(fromjson("{a: 6}")).get()));
+    ASSERT_TRUE(wildcardDiscriminators.isMatchCompatibleWithIndex(
+        parseMatchExpression(fromjson("{b: 0}")).get()));
+    ASSERT_TRUE(wildcardDiscriminators.isMatchCompatibleWithIndex(
+        parseMatchExpression(fromjson("{b: 6}")).get()));
 
-    // Match expression which queries for a value included by the filter expression does not get
-    // discriminated out.
-    ASSERT_TRUE(disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 6}")).get()));
+    // The regular (non-wildcard) set of discriminators for the path "a" should reflect whether a
+    // predicate on "a" is compatible with the partial filter expression.
+    {
+        discriminatorsA = state.getDiscriminators("a");
+        auto discriminatorsIt = discriminatorsA.find("indexName");
+        ASSERT(discriminatorsIt != discriminatorsA.end());
+        auto disc = discriminatorsIt->second;
+
+        ASSERT_FALSE(
+            disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 0}")).get()));
+        ASSERT_TRUE(
+            disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 6}")).get()));
+
+        ASSERT_FALSE(
+            disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{b: 0}")).get()));
+        ASSERT_FALSE(
+            disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{b: 6}")).get()));
+    }
+
+    // There shouldn't be any regular discriminators associated with path "b".
+    {
+        auto&& discriminatorsB = state.getDiscriminators("b");
+        ASSERT_FALSE(discriminatorsB.count("indexName"));
+    }
 }
 
 TEST(PlanCacheIndexabilityTest,

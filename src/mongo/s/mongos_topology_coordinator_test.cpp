@@ -227,8 +227,10 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorInQuiesceMode) {
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
     auto deadline = now() + maxAwaitTime;
+    // Use 0 ms for quiesce time so that we can immediately return from enterQuiesceModeAndWait.
+    auto quiesceTime = Milliseconds(0);
 
-    getTopoCoord().enterQuiesceMode();
+    getTopoCoord().enterQuiesceModeAndWait(opCtx.get(), quiesceTime);
 
     ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
                   getTopoCoord().getTopologyVersion().getCounter());
@@ -268,15 +270,16 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorInQuiesceMode) {
 TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
     auto opCtx = makeOperationContext();
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
-    auto maxAwaitTime = Milliseconds(5000);
-    auto deadline = now() + maxAwaitTime;
+    // Use 0 ms for quiesce time so that we can immediately return from enterQuiesceModeAndWait.
+    auto quiesceTime = Milliseconds(0);
 
     // This will cause the isMaster request to hang.
-    auto waitForIsMasterFailPoint =
-        globalFailPointRegistry().find("hangWhileWaitingForIsMasterResponse");
+    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn);
     ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
     stdx::thread getIsMasterThread([&] {
+        auto maxAwaitTime = Milliseconds(5000);
+        auto deadline = now() + maxAwaitTime;
         ASSERT_THROWS_CODE(
             getTopoCoord().awaitIsMasterResponse(opCtx.get(), currentTopologyVersion, deadline),
             AssertionException,
@@ -285,11 +288,10 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
 
     // Ensure that awaitIsMasterResponse() is called before entering quiesce mode.
     waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-    getTopoCoord().enterQuiesceMode();
+    getTopoCoord().enterQuiesceModeAndWait(opCtx.get(), quiesceTime);
     ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
                   getTopoCoord().getTopologyVersion().getCounter());
     waitForIsMasterFailPoint->setMode(FailPoint::off);
-    advanceTime(maxAwaitTime);
     getIsMasterThread.join();
 }
 

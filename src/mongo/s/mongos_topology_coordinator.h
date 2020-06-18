@@ -63,24 +63,25 @@ public:
         boost::optional<Date_t> deadline) const;
 
     /**
-     * We only enter quiesce mode during the shutdown process, which means the
-     * MongosTopologyCoordinator will never need to exit quiesce mode. This function causes us to
-     * increment the topologyVersion and start failing isMaster requests with ShutdownInProgress.
+     * We only enter quiesce mode during the shutdown process, which means that the
+     * MongosTopologyCoordinator will never need to reset _inQuiesceMode. This function causes us
+     * to increment the topologyVersion and start failing isMaster requests with ShutdownInProgress.
+     * This will inform clients to route new operations to another mongos.
+     *
+     * We also sleep for quiesceTime, which allows short running operations to finish.
      */
-    void enterQuiesceMode();
-
-    /**
-     * While in quiesce mode, we will sleep for 100ms. This allows short running operations to
-     * continue. We will also accept new operations, but we fail isMaster requests with
-     * ShutdownInProgress.
-     * TODO SERVER-46958: Modify comment with correct timeout value.
-     */
-    void enterQuiesceModeAndWait(OperationContext* opCtx);
+    void enterQuiesceModeAndWait(OperationContext* opCtx, Milliseconds quiesceTime);
 
     TopologyVersion getTopologyVersion() const {
         stdx::lock_guard lk(_mutex);
         return _topologyVersion;
     }
+
+    bool inQuiesceMode() const {
+        stdx::lock_guard lk(_mutex);
+        return _inQuiesceMode;
+    }
+
 
 private:
     using SharedPromiseOfMongosIsMasterResponse =

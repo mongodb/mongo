@@ -51,7 +51,10 @@ assertCollDoesNotExist(cName, "explaining a remove should not create a new colle
 assert.commandWorked(db.runCommand(explainUpsert));
 assertCollDoesNotExist(cName, "explaining an upsert should not create a new collection.");
 
-assert.commandWorked(db.runCommand(Object.merge(explainUpsert, {fields: {x: 1}})));
+explainUpsert.explain.fields = {
+    x: 1
+};
+assert.commandWorked(db.runCommand(explainUpsert));
 assertCollDoesNotExist(cName, "explaining an upsert should not create a new collection.");
 
 // 3. Explaining findAndModify should not work with an invalid findAndModify command object.

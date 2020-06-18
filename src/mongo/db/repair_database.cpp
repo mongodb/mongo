@@ -40,7 +40,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_validation.h"
@@ -163,13 +162,14 @@ Status repairCollections(OperationContext* opCtx,
         ValidateResults validateResults;
         BSONObjBuilder output;
 
-        // Set options to exclude FullRecordStoreValidation because we have already validated the
-        // underlying record store in the call to repairRecordStore above.
-        auto options = CollectionValidation::ValidateOptions::kFullIndexValidation;
-
-        const bool background = false;
+        // Exclude full record store validation because we have already validated the underlying
+        // record store in the call to repairRecordStore above.
         status = CollectionValidation::validate(
-            opCtx, nss, options, background, &validateResults, &output);
+            opCtx,
+            nss,
+            CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
+            &validateResults,
+            &output);
         if (!status.isOK()) {
             return status;
         }
@@ -196,7 +196,6 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
 
     LOGV2(21029, "repairDatabase", "db"_attr = dbName);
 
-    BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
     opCtx->checkForInterrupt();
 

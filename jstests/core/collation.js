@@ -5,6 +5,7 @@
 //   does_not_support_stepdowns,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   requires_capped,
 // ]
 
 // Integration tests for the collation feature.

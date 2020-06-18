@@ -190,11 +190,11 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
 }
 
 /*
- * __logmgr_config --
+ * __wt_logmgr_config --
  *     Parse and setup the logging server options.
  */
-static int
-__logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool reconfig)
+int
+__wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -245,7 +245,10 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
               "log=(enabled=true)");
     }
 
-    *runp = enabled;
+    if (enabled)
+        FLD_SET(conn->log_flags, WT_CONN_LOG_CONFIG_ENABLED);
+    else
+        FLD_CLR(conn->log_flags, WT_CONN_LOG_CONFIG_ENABLED);
 
     /*
      * Setup a log path and compression even if logging is disabled in case we are going to print a
@@ -258,12 +261,13 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
         WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
         WT_RET(__wt_compressor_config(session, &cval, &conn->log_compressor));
 
+        conn->log_path = NULL;
         WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
         WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
     }
 
     /* We are done if logging isn't enabled. */
-    if (!*runp)
+    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_CONFIG_ENABLED))
         return (0);
 
     WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
@@ -336,9 +340,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
 int
 __wt_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 {
-    bool dummy;
-
-    WT_RET(__logmgr_config(session, cfg, &dummy, true));
+    WT_RET(__wt_logmgr_config(session, cfg, true));
     return (__logmgr_version(session, true));
 }
 
@@ -386,18 +388,28 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
      * backup or the checkpoint LSN. Otherwise we want the minimum of the last log file written to
      * disk and the checkpoint LSN.
      */
-    if (backup_file != 0)
-        min_lognum = WT_MIN(log->ckpt_lsn.l.file, backup_file);
-    else {
+    min_lognum = backup_file == 0 ? WT_MIN(log->ckpt_lsn.l.file, log->sync_lsn.l.file) :
+                                    WT_MIN(log->ckpt_lsn.l.file, backup_file);
+
+    /* Adjust the number of log files to retain based on debugging options. */
+    if (conn->debug_ckpt_cnt != 0)
+        min_lognum = WT_MIN(conn->debug_ckpt[conn->debug_ckpt_cnt - 1].l.file, min_lognum);
+    if (conn->debug_log_cnt != 0) {
         /*
-         * Figure out the minimum log file to archive. Use the LSN in the debugging array if
-         * necessary.
+         * If we're performing checkpoints, apply the retain value as a minimum, increasing the
+         * number the log files we keep. If not performing checkpoints, it's an absolute number of
+         * log files to keep. This means we can potentially remove log files required for recovery
+         * if the number of log files exceeds the configured value and the system has yet to be
+         * checkpointed.
+         *
+         * Check for N+1, that is, we retain N full log files, and one partial.
          */
-        if (conn->debug_ckpt_cnt == 0)
-            min_lognum = WT_MIN(log->ckpt_lsn.l.file, log->sync_lsn.l.file);
+        if ((conn->debug_log_cnt + 1) >= log->fileid)
+            return (0);
+        if (log->ckpt_lsn.l.file == 1 && log->ckpt_lsn.l.offset == 0)
+            min_lognum = log->fileid - (conn->debug_log_cnt + 1);
         else
-            min_lognum =
-              WT_MIN(conn->debug_ckpt[conn->debug_ckpt_cnt - 1].l.file, log->sync_lsn.l.file);
+            min_lognum = WT_MIN(log->fileid - (conn->debug_log_cnt + 1), min_lognum);
     }
     __wt_verbose(session, WT_VERB_LOG, "log_archive: archive to log number %" PRIu32, min_lognum);
 
@@ -957,19 +969,18 @@ err:
  *     Initialize the log subsystem (before running recovery).
  */
 int
-__wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_logmgr_create(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
-    bool run;
 
     conn = S2C(session);
 
-    /* Handle configuration. */
-    WT_RET(__logmgr_config(session, cfg, &run, false));
-
-    /* If logging is not configured, we're done. */
-    if (!run)
+    /*
+     * Logging configuration is parsed early on for compatibility checking. It is separated from
+     * turning on the subsystem. We only need to proceed here if logging is enabled.
+     */
+    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_CONFIG_ENABLED))
         return (0);
 
     FLD_SET(conn->log_flags, WT_CONN_LOG_ENABLED);

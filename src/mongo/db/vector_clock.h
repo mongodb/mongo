@@ -93,40 +93,154 @@ public:
         const LogicalTimeArray _time;
     };
 
+    static constexpr char kClusterTimeFieldName[] = "$clusterTime";
+    static constexpr char kConfigTimeFieldName[] = "$configTime";
+
     // Decorate ServiceContext with VectorClock* which points to the actual vector clock
     // implementation.
     static VectorClock* get(ServiceContext* service);
     static VectorClock* get(OperationContext* ctx);
-
     static void registerVectorClockOnServiceContext(ServiceContext* service,
                                                     VectorClock* vectorClock);
 
+    /**
+     * Returns an instantaneous snapshot of the current time of all components.
+     */
     VectorTime getTime() const;
 
-    // Gossipping
-    void gossipOut(BSONObjBuilder* outMessage,
-                   const transport::Session::TagMask clientSessionTags) const;
-    void gossipIn(const BSONObj& inMessage, const transport::Session::TagMask clientSessionTags);
+    /**
+     * Adds the necessary fields to outMessage to gossip the current time to another node, taking
+     * into account if the gossiping is to an internal or external client (based on the session
+     * tags).  Returns true if the ClusterTime was output into outMessage, or false otherwise.
+     */
+    bool gossipOut(OperationContext* opCtx,
+                   BSONObjBuilder* outMessage,
+                   const transport::Session::TagMask defaultClientSessionTags = 0) const;
+    /**
+     * Read the necessary fields from inMessage in order to update the current time, based on this
+     * message received from another node, taking into account if the gossiping is from an internal
+     * or external client (based on the session tags).
+     */
+    void gossipIn(OperationContext* opCtx,
+                  const BSONObj& inMessage,
+                  bool couldBeUnauthenticated,
+                  const transport::Session::TagMask defaultClientSessionTags = 0);
 
+    /**
+     * Returns true if the clock is enabled and can be used. Defaults to true.
+     */
     bool isEnabled() const;
-    void disable();
+
+    void resetVectorClock_forTest();
+    void advanceClusterTime_forTest(LogicalTime newClusterTime);
 
 protected:
     VectorClock();
     virtual ~VectorClock();
 
+    /**
+     * The maximum permissible value for each part of a LogicalTime's Timestamp (ie. "secs" and
+     * "inc").
+     */
+    static constexpr uint32_t kMaxValue = std::numeric_limits<int32_t>::max();
+
+    /**
+     * The "name" of the given component, for user-facing error messages. The name used is the
+     * field name used when gossiping.
+     */
     static std::string _componentName(Component component);
 
-    // Internal Gossipping API
-    virtual void _gossipOutInternal(BSONObjBuilder* out) const = 0;
-    virtual void _gossipOutExternal(BSONObjBuilder* out) const = 0;
-    virtual LogicalTimeArray _gossipInInternal(const BSONObj& in) = 0;
-    virtual LogicalTimeArray _gossipInExternal(const BSONObj& in) = 0;
+    /**
+     * Disables the clock. A disabled clock won't process logical times and can't be re-enabled.
+     */
+    void _disable();
 
-    void _gossipOutComponent(BSONObjBuilder* out, VectorTime time, Component component) const;
-    void _gossipInComponent(const BSONObj& in, LogicalTimeArray* newTime, Component component);
+    /**
+     * "Rate limiter" for advancing logical times. Rejects newTime if any of its Components have a
+     * seconds value that's more than gMaxAcceptableLogicalClockDriftSecs ahead of this node's wall
+     * clock.
+     */
+    static void _ensurePassesRateLimiter(ServiceContext* service, const LogicalTimeArray& newTime);
 
-    // Used to atomically advance the time of several components (eg. during gossip-in).
+    /**
+     * Used to ensure that gossiped or ticked times never overflow the maximum possible LogicalTime.
+     */
+    static bool _lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks);
+
+
+    /**
+     * Adds the necessary fields to outMessage to gossip the given time to a node internal to the
+     * cluster.  Returns true if the ClusterTime was output into outMessage, or false otherwise.
+     */
+    virtual bool _gossipOutInternal(OperationContext* opCtx,
+                                    BSONObjBuilder* out,
+                                    const LogicalTimeArray& time) const = 0;
+
+    /**
+     * As for _gossipOutInternal, except for an outMessage to be sent to a client external to the
+     * cluster, eg. a driver or user client.
+     */
+    virtual bool _gossipOutExternal(OperationContext* opCtx,
+                                    BSONObjBuilder* out,
+                                    const LogicalTimeArray& time) const = 0;
+
+    /**
+     * Reads the necessary fields from the BSONObj, which has come from a node internal to the
+     * cluster, and returns an array of LogicalTimes for each component present in the BSONObj.
+     *
+     * This array is suitable for passing to _advanceTime(), in order to monotonically increase
+     * any Component times that are larger than the current time.  Since the times in
+     * LogicalTimeArray are default constructed (ie. to Timestamp(0, 0)), any fields not present
+     * in the input BSONObj won't be advanced.
+     *
+     * The couldBeUnauthenticated parameter is used to indicate if the source of the input BSONObj
+     * is an incoming request for a command that can be run by an unauthenticated client.
+     */
+    virtual LogicalTimeArray _gossipInInternal(OperationContext* opCtx,
+                                               const BSONObj& in,
+                                               bool couldBeUnauthenticated) = 0;
+
+    /**
+     * As for _gossipInInternal, except for an input BSONObj from a client external to the cluster,
+     * eg. a driver or user client.
+     */
+    virtual LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
+                                               const BSONObj& in,
+                                               bool couldBeUnauthenticated) = 0;
+
+    /**
+     * Whether or not it's permissable to refresh external state (eg. updating gossip signing keys)
+     * during gossip out.
+     */
+    virtual bool _permitRefreshDuringGossipOut() const = 0;
+
+    /**
+     * Called by sub-classes in order to actually output a Component time to the output
+     * BSONObjBuilder, using the appropriate field name and representation for that Component.
+     *
+     * Returns true if the component is ClusterTime and it was output, or false otherwise.
+     */
+    bool _gossipOutComponent(OperationContext* opCtx,
+                             BSONObjBuilder* out,
+                             const LogicalTimeArray& time,
+                             Component component) const;
+
+    /**
+     * Called by sub-classes in order to actually input a Component time into the given
+     * LogicalTimeArray from the given BSONObj, using the appropriate field name and representation
+     * for that Component.
+     */
+    void _gossipInComponent(OperationContext* opCtx,
+                            const BSONObj& in,
+                            bool couldBeUnauthenticated,
+                            LogicalTimeArray* newTime,
+                            Component component);
+
+    /**
+     * For each component in the LogicalTimeArray, sets the current time to newTime if the newTime >
+     * current time and it passes the rate check.  If any component fails the rate check, then this
+     * function uasserts on the first such component (without setting any current times).
+     */
     void _advanceTime(LogicalTimeArray&& newTime);
 
     ServiceContext* _service{nullptr};

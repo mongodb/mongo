@@ -45,7 +45,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -458,7 +457,8 @@ public:
         AutoGetCollectionForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
 
-        const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+        const auto collDesc =
+            CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
 
         if (collDesc.isSharded()) {
             const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
@@ -501,7 +501,8 @@ public:
                 result.append("millis", timer.millis());
                 return 1;
             }
-            exec = InternalPlanner::collectionScan(opCtx, ns, collection, PlanExecutor::NO_YIELD);
+            exec = InternalPlanner::collectionScan(
+                opCtx, ns, collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         } else if (min.isEmpty() || max.isEmpty()) {
             errmsg = "only one of min or max specified";
             return false;
@@ -531,7 +532,7 @@ public:
                                               min,
                                               max,
                                               BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanExecutor::NO_YIELD);
+                                              PlanYieldPolicy::YieldPolicy::NO_YIELD);
         }
 
         long long avgObjSize = collection->dataSize(opCtx) / numRecords;
@@ -542,30 +543,28 @@ public:
         long long size = 0;
         long long numObjects = 0;
 
-        RecordId loc;
-        BSONObj obj;
-        PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
-            if (estimate)
-                size += avgObjSize;
-            else
-                size += collection->getRecordStore()->dataFor(opCtx, loc).size();
+        try {
+            RecordId loc;
+            while (PlanExecutor::ADVANCED == exec->getNext(static_cast<BSONObj*>(nullptr), &loc)) {
+                if (estimate)
+                    size += avgObjSize;
+                else
+                    size += collection->getRecordStore()->dataFor(opCtx, loc).size();
 
-            numObjects++;
+                numObjects++;
 
-            if ((maxSize && size > maxSize) || (maxObjects && numObjects > maxObjects)) {
-                result.appendBool("maxReached", true);
-                break;
+                if ((maxSize && size > maxSize) || (maxObjects && numObjects > maxObjects)) {
+                    result.appendBool("maxReached", true);
+                    break;
+                }
             }
-        }
-
-        if (PlanExecutor::FAILURE == state) {
+        } catch (DBException& exception) {
             LOGV2_WARNING(23801,
                           "Internal error while reading {namespace}",
                           "Internal error while reading",
                           "namespace"_attr = ns);
-            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                "Executor error while reading during dataSize command"));
+            exception.addContext("Executor error while reading during dataSize command");
+            throw;
         }
 
         ostringstream os;
@@ -753,7 +752,8 @@ public:
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 // TODO: OldClientContext legacy, needs to be removed
-                CurOp::get(opCtx)->enter_inlock(dbname.c_str(), db->getProfilingLevel());
+                CurOp::get(opCtx)->enter_inlock(
+                    dbname.c_str(), CollectionCatalog::get(opCtx).getDatabaseProfileLevel(dbname));
             }
 
             db->getStats(opCtx, &result, scale);

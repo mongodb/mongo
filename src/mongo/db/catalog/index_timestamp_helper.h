@@ -44,16 +44,6 @@ namespace IndexTimestampHelper {
 bool requiresGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, NamespaceString nss);
 
 /**
- * If required, sets a timestamp on an active WriteUnitOfWork. A ghost write is when the
- * operation is not committed with an oplog entry, which may be necessary for certain index
- * build operations not associated with a unique optime. This implementation uses the
- * lastApplied OpTime.
- *
- * May throw a WriteConflictException if the timestamp chosen is too old.
- */
-void setGhostCommitTimestampForWrite(OperationContext* opCtx, const NamespaceString& nss);
-
-/**
  * If required, sets a timestamp on an active WriteUnitOfWork for a catalog write. A ghost write
  * is when the operation is not committed with an oplog entry, which may be necessary for
  * certain index catalog operations not associated with a unique optime. This implementation

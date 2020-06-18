@@ -205,7 +205,7 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
      * can know if statistics are enabled or not.
      */
     WT_RET(__wt_statlog_create(session, cfg));
-    WT_RET(__wt_logmgr_create(session, cfg));
+    WT_RET(__wt_logmgr_create(session));
 
     /*
      * Run recovery. NOTE: This call will start (and stop) eviction if recovery is required.
@@ -218,8 +218,13 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_meta_track_init(session));
 
     /*
-     * Create the history store file. This will only actually create it on upgrade or when creating
-     * a new database.
+     * Drop the lookaside file if it still exists.
+     */
+    WT_RET(__wt_hs_cleanup_las(session));
+
+    /*
+     * Create the history store file. This will only actually create it on a clean upgrade or when
+     * creating a new database.
      */
     WT_RET(__wt_hs_create(session, cfg));
 

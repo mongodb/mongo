@@ -96,11 +96,12 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_PAGE *page;
     uint64_t time_start, time_stop;
     uint32_t session_flags;
-    bool clean_page, closing, inmem_split, is_owner, local_gen, tree_dead;
+    bool clean_page, closing, force_evict_hs, inmem_split, is_owner, local_gen, tree_dead;
 
     conn = S2C(session);
     page = ref->page;
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
+    force_evict_hs = false;
     local_gen = false;
     time_start = time_stop = 0; /* [-Werror=maybe-uninitialized] */
 
@@ -153,6 +154,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
         time_start = __wt_clock(session);
         WT_STAT_CONN_INCR(session, cache_eviction_force);
+
+        /*
+         * Track history store pages being force evicted while holding a history store cursor open.
+         */
+        if (session->hs_cursor != NULL && WT_IS_HS(S2BT(session))) {
+            force_evict_hs = true;
+            WT_STAT_CONN_INCR(session, cache_eviction_force_hs);
+        }
     }
 
     /*
@@ -191,7 +200,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
 
     /*
      * Track the largest page size seen at eviction, it tells us something about our ability to
-     * force pages out before they're larger than the cache.
+     * force pages out before they're larger than the cache. We don't care about races, it's just a
+     * statistic.
      */
     if (page->memory_footprint > conn->cache->evict_max_page_size)
         conn->cache->evict_max_page_size = page->memory_footprint;
@@ -221,6 +231,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
 
     if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
         time_stop = __wt_clock(session);
+        if (force_evict_hs)
+            WT_STAT_CONN_INCR(session, cache_eviction_force_hs_success);
         if (clean_page) {
             WT_STAT_CONN_INCR(session, cache_eviction_force_clean);
             WT_STAT_CONN_INCRV(
@@ -246,6 +258,8 @@ err:
 
         if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
             time_stop = __wt_clock(session);
+            if (force_evict_hs)
+                WT_STAT_CONN_INCR(session, cache_eviction_force_hs_fail);
             WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
             WT_STAT_CONN_INCRV(
               session, cache_eviction_force_fail_time, WT_CLOCKDIFF_US(time_stop, time_start));
@@ -320,15 +334,6 @@ static int
 __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
     WT_DECL_RET;
-
-    /*
-     * Before discarding a page, assert that all updates are globally visible unless the tree is
-     * closing or dead.
-     */
-    WT_ASSERT(session, LF_ISSET(WT_EVICT_CALL_CLOSING) || ref->page->modify == NULL ||
-        F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
-        __wt_txn_visible_all(session, ref->page->modify->rec_max_txn,
-                         ref->page->modify->rec_max_timestamp));
 
     /*
      * Discard the page and update the reference structure. A page with a disk address is an on-disk

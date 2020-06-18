@@ -269,12 +269,10 @@ void encodeGeoMatchExpression(const GeoMatchExpression* tree, StringBuilder* key
         *keyBuilder << "ss";
     } else {
         LOGV2_ERROR(23849,
-                    "unknown CRS type {int_geoQuery_getGeometry_getNativeCRS} in geometry of type "
-                    "{geoQuery_getGeometry_getDebugType}",
-                    "int_geoQuery_getGeometry_getNativeCRS"_attr =
-                        (int)geoQuery.getGeometry().getNativeCRS(),
-                    "geoQuery_getGeometry_getDebugType"_attr =
-                        geoQuery.getGeometry().getDebugType());
+                    "Unknown CRS type {crsType} in geometry of type {geometryType}",
+                    "Unknown CRS type in geometry",
+                    "crsType"_attr = (int)geoQuery.getGeometry().getNativeCRS(),
+                    "geometryType"_attr = geoQuery.getGeometry().getDebugType());
         MONGO_UNREACHABLE;
     }
 }
@@ -303,10 +301,10 @@ void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree, StringBuil
             *keyBuilder << "ss";
             break;
         case UNSET:
-            LOGV2_ERROR(
-                23850,
-                "unknown CRS type {int_nearQuery_centroid_crs} in point geometry for near query",
-                "int_nearQuery_centroid_crs"_attr = (int)nearQuery.centroid->crs);
+            LOGV2_ERROR(23850,
+                        "Unknown CRS type {crsType} in point geometry for near query",
+                        "Unknown CRS type in point geometry for near query",
+                        "crsType"_attr = (int)nearQuery.centroid->crs);
             MONGO_UNREACHABLE;
             break;
     }

@@ -40,27 +40,21 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_asio.h"
 
-using namespace mongo::repl;
-
+namespace mongo {
+namespace repl {
 namespace ReplTests {
 
-using mongo::logger::globalLogDomain;
-using mongo::logv2::LogComponent;
-using mongo::logv2::LogSeverity;
-using std::endl;
 using std::string;
-using std::stringstream;
 using std::unique_ptr;
 using std::vector;
 
@@ -105,32 +99,30 @@ public:
     Base()
         : _client(&_opCtx),
           _defaultReplSettings(
-              ReplicationCoordinator::get(getGlobalServiceContext())->getSettings()) {
+              ReplicationCoordinator::get(_opCtx.getServiceContext())->getSettings()) {
+        auto* const sc = _opCtx.getServiceContext();
+
         transport::TransportLayerASIO::Options opts;
         opts.mode = transport::TransportLayerASIO::Options::kEgress;
-        auto sc = getGlobalServiceContext();
-
         sc->setTransportLayer(std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
         ASSERT_OK(sc->getTransportLayer()->setup());
         ASSERT_OK(sc->getTransportLayer()->start());
 
         ReplSettings replSettings;
         replSettings.setReplSetString("rs0/host1");
-        ReplicationCoordinator::set(
-            getGlobalServiceContext(),
-            std::unique_ptr<repl::ReplicationCoordinator>(
-                new repl::ReplicationCoordinatorMock(_opCtx.getServiceContext(), replSettings)));
-        ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
-                      ->setFollowerMode(MemberState::RS_PRIMARY));
+        ReplicationCoordinator::set(sc,
+                                    std::unique_ptr<repl::ReplicationCoordinator>(
+                                        new repl::ReplicationCoordinatorMock(sc, replSettings)));
+        ASSERT_OK(ReplicationCoordinator::get(sc)->setFollowerMode(MemberState::RS_PRIMARY));
 
         // Since the Client object persists across tests, even though the global
         // ReplicationCoordinator does not, we need to clear the last op associated with the client
         // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
         repl::ReplClientInfo::forClient(_opCtx.getClient()).clearLastOp_forTest();
 
-        getGlobalServiceContext()->setOpObserver(std::make_unique<OpObserverShardingImpl>());
+        sc->setOpObserver(std::make_unique<OpObserverImpl>());
 
-        setOplogCollectionName(getGlobalServiceContext());
+        setOplogCollectionName(sc);
         createOplog(&_opCtx);
 
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
@@ -149,20 +141,21 @@ public:
         // Start with a fresh oplog.
         deleteAll(cllNS());
     }
+
     ~Base() {
+        auto* const sc = _opCtx.getServiceContext();
         try {
             deleteAll(ns());
             deleteAll(cllNS());
             repl::ReplicationCoordinator::set(
-                getGlobalServiceContext(),
-                std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
-                    _opCtx.getServiceContext(), _defaultReplSettings)));
-            repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                sc,
+                std::unique_ptr<repl::ReplicationCoordinator>(
+                    new repl::ReplicationCoordinatorMock(sc, _defaultReplSettings)));
+            repl::ReplicationCoordinator::get(sc)
                 ->setFollowerMode(repl::MemberState::RS_PRIMARY)
                 .ignore();
 
-            getGlobalServiceContext()->getTransportLayer()->shutdown();
-
+            sc->getTransportLayer()->shutdown();
         } catch (...) {
             FAIL("Exception while cleaning up test");
         }
@@ -286,7 +279,7 @@ protected:
             coll = db->createCollection(&_opCtx, nss());
         }
 
-        auto lastApplied = repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
                                ->getMyLastAppliedOpTime()
                                .getTimestamp();
         // The oplog collection may already have some oplog entries for writes prior to this insert.
@@ -772,7 +765,7 @@ protected:
 class MultiInc : public Recovering {
 public:
     string s() const {
-        stringstream ss;
+        StringBuilder ss;
         unique_ptr<DBClientCursor> cc =
             _client.query(NamespaceString(ns()), Query().sort(BSON("_id" << 1)));
         bool first = true;
@@ -1386,3 +1379,5 @@ public:
 OldStyleSuiteInitializer<All> myall;
 
 }  // namespace ReplTests
+}  // namespace repl
+}  // namespace mongo

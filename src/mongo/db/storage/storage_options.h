@@ -95,8 +95,8 @@ struct StorageGlobalParams {
     // via an fsync operation.
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
-    static constexpr double kMaxSyncdelaySecs = 9.0 * 1000.0 * 1000.0;
-    AtomicDouble syncdelay;  // seconds between fsyncs
+    static constexpr double kMaxSyncdelaySecs = 60 * 60;  // 1hr
+    AtomicDouble syncdelay;                               // seconds between fsyncs
 
     // --queryableBackupMode
     // Puts MongoD into "read-only" mode. MongoD will not write any data to the underlying

@@ -53,7 +53,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/mock_yield_policies.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -80,24 +80,25 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
 MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
+MONGO_FAIL_POINT_DEFINE(planExecutorHangWhileYieldedInWaitForInserts);
 
 /**
  * Constructs a PlanYieldPolicy based on 'policy'.
  */
 std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutor* exec,
-                                                 PlanExecutor::YieldPolicy policy) {
+                                                 PlanYieldPolicy::YieldPolicy policy) {
     switch (policy) {
-        case PlanExecutor::YieldPolicy::YIELD_AUTO:
-        case PlanExecutor::YieldPolicy::YIELD_MANUAL:
-        case PlanExecutor::YieldPolicy::NO_YIELD:
-        case PlanExecutor::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
-        case PlanExecutor::YieldPolicy::INTERRUPT_ONLY: {
-            return std::make_unique<PlanYieldPolicy>(exec, policy);
+        case PlanYieldPolicy::YieldPolicy::YIELD_AUTO:
+        case PlanYieldPolicy::YieldPolicy::YIELD_MANUAL:
+        case PlanYieldPolicy::YieldPolicy::NO_YIELD:
+        case PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
+        case PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY: {
+            return std::make_unique<PlanYieldPolicyImpl>(exec, policy);
         }
-        case PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT: {
+        case PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT: {
             return std::make_unique<AlwaysTimeOutYieldPolicy>(exec);
         }
-        case PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED: {
+        case PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED: {
             return std::make_unique<AlwaysPlanKilledYieldPolicy>(exec);
         }
         default:
@@ -131,7 +132,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rt,
     const Collection* collection,
-    YieldPolicy yieldPolicy,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs) {
     auto expCtx = cq->getExpCtx();
@@ -151,7 +152,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rt,
     const Collection* collection,
-    YieldPolicy yieldPolicy,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs) {
     return PlanExecutorImpl::make(expCtx->opCtx,
@@ -174,7 +175,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutorImpl::ma
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const Collection* collection,
     NamespaceString nss,
-    YieldPolicy yieldPolicy) {
+    PlanYieldPolicy::YieldPolicy yieldPolicy) {
 
     auto execImpl = new PlanExecutorImpl(opCtx,
                                          std::move(ws),
@@ -205,7 +206,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    const Collection* collection,
                                    NamespaceString nss,
-                                   YieldPolicy yieldPolicy)
+                                   PlanYieldPolicy::YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _expCtx(_cq ? _cq->getExpCtx() : expCtx),
@@ -214,7 +215,8 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _root(std::move(rt)),
       _nss(std::move(nss)),
       // There's no point in yielding if the collection doesn't exist.
-      _yieldPolicy(makeYieldPolicy(this, collection ? yieldPolicy : NO_YIELD)) {
+      _yieldPolicy(makeYieldPolicy(
+          this, collection ? yieldPolicy : PlanYieldPolicy::YieldPolicy::NO_YIELD)) {
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
@@ -284,15 +286,14 @@ PlanExecutorImpl::~PlanExecutorImpl() {
     invariant(_currentState == kDisposed);
 }
 
-string PlanExecutor::statestr(ExecState s) {
-    if (PlanExecutor::ADVANCED == s) {
-        return "ADVANCED";
-    } else if (PlanExecutor::IS_EOF == s) {
-        return "IS_EOF";
-    } else {
-        verify(PlanExecutor::FAILURE == s);
-        return "FAILURE";
+std::string PlanExecutor::statestr(ExecState execState) {
+    switch (execState) {
+        case PlanExecutor::ADVANCED:
+            return "ADVANCED";
+        case PlanExecutor::IS_EOF:
+            return "IS_EOF";
     }
+    MONGO_UNREACHABLE;
 }
 
 WorkingSet* PlanExecutorImpl::getWorkingSet() const {
@@ -336,7 +337,7 @@ void PlanExecutorImpl::restoreState() {
             throw;
 
         // Handles retries by calling restoreStateWithoutRetrying() in a loop.
-        uassertStatusOK(_yieldPolicy->yieldOrInterrupt());
+        uassertStatusOK(_yieldPolicy->yieldOrInterrupt(getOpCtx()));
     }
 }
 
@@ -463,8 +464,7 @@ std::shared_ptr<CappedInsertNotifier> PlanExecutorImpl::_getCappedInsertNotifier
     return collection->getCappedInsertNotifier();
 }
 
-PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierData* notifierData,
-                                                          Snapshotted<Document>* errorObj) {
+void PlanExecutorImpl::_waitForInserts(CappedInsertNotifierData* notifierData) {
     invariant(notifierData->notifier);
 
     // The notifier wait() method will not wait unless the version passed to it matches the
@@ -477,42 +477,31 @@ PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierDa
     ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
     auto opCtx = _opCtx;
     uint64_t currentNotifierVersion = notifierData->notifier->getVersion();
-    auto yieldResult = _yieldPolicy->yieldOrInterrupt([opCtx, notifierData] {
+    auto yieldResult = _yieldPolicy->yieldOrInterrupt(opCtx, [opCtx, notifierData] {
         const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
         notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
+        if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
+            LOGV2(4452903,
+                  "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point enabled. "
+                  "Blocking until fail point is disabled");
+            planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
+        }
     });
     notifierData->lastEOFVersion = currentNotifierVersion;
 
-    if (yieldResult.isOK()) {
-        // There may be more results, try to get more data.
-        return ADVANCED;
-    }
-
-    if (errorObj) {
-        *errorObj = Snapshotted<Document>(SnapshotId(),
-                                          WorkingSetCommon::buildMemberStatusObject(yieldResult));
-    }
-    return FAILURE;
+    uassertStatusOK(yieldResult);
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* objOut,
                                                        RecordId* dlOut) {
     if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
-        Status status(ErrorCodes::InternalError,
-                      str::stream() << "PlanExecutor hit planExecutorAlwaysFails fail point");
-        *objOut =
-            Snapshotted<Document>(SnapshotId(), WorkingSetCommon::buildMemberStatusObject(status));
-
-        return PlanExecutor::FAILURE;
+        uasserted(ErrorCodes::Error(4382101),
+                  "PlanExecutor hit planExecutorAlwaysFails fail point");
     }
 
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {
-        if (nullptr != objOut) {
-            *objOut = Snapshotted<Document>(SnapshotId(),
-                                            WorkingSetCommon::buildMemberStatusObject(_killStatus));
-        }
-        return PlanExecutor::FAILURE;
+        uassertStatusOK(_killStatus);
     }
 
     if (!_stash.empty()) {
@@ -539,15 +528,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
         //   2) some stage requested a yield, or
         //   3) we need to yield and retry due to a WriteConflictException.
         // In all cases, the actual yielding happens here.
-        if (_yieldPolicy->shouldYieldOrInterrupt()) {
-            auto yieldStatus = _yieldPolicy->yieldOrInterrupt();
-            if (!yieldStatus.isOK()) {
-                if (objOut) {
-                    *objOut = Snapshotted<Document>(
-                        SnapshotId(), WorkingSetCommon::buildMemberStatusObject(yieldStatus));
-                }
-                return PlanExecutor::FAILURE;
-            }
+        if (_yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(_opCtx));
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;
@@ -617,7 +599,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             }
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
-        } else if (PlanStage::IS_EOF == code) {
+        } else {
+            invariant(PlanStage::IS_EOF == code);
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
                         if (data.hasField("namespace") &&
@@ -628,28 +611,15 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                     }))) {
                 LOGV2(20946,
                       "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
-                      "enabled. Blocking until fail point is disabled.");
+                      "enabled. Blocking until fail point is disabled");
                 planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
             }
             if (!_shouldWaitForInserts()) {
                 return PlanExecutor::IS_EOF;
             }
-            const ExecState waitResult = _waitForInserts(&cappedInsertNotifierData, objOut);
-            if (waitResult == PlanExecutor::ADVANCED) {
-                // There may be more results, keep going.
-                continue;
-            }
-            return waitResult;
-        } else {
-            invariant(PlanStage::FAILURE == code);
-
-            if (nullptr != objOut) {
-                invariant(WorkingSet::INVALID_ID != id);
-                auto statusObj = WorkingSetCommon::getStatusMemberDocument(*_workingSet, id);
-                *objOut = Snapshotted<Document>(SnapshotId(), *statusObj);
-            }
-
-            return PlanExecutor::FAILURE;
+            _waitForInserts(&cappedInsertNotifierData);
+            // There may be more results, keep going.
+            continue;
         }
     }
 }
@@ -676,7 +646,7 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx) {
     _currentState = kDisposed;
 }
 
-Status PlanExecutorImpl::executePlan() {
+void PlanExecutorImpl::executePlan() {
     invariant(_currentState == kUsable);
     Document obj;
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
@@ -684,22 +654,13 @@ Status PlanExecutorImpl::executePlan() {
         state = this->getNext(&obj, nullptr);
     }
 
-    if (PlanExecutor::FAILURE == state) {
-        if (isMarkedAsKilled()) {
-            return _killStatus;
-        }
-
-        auto errorStatus = getMemberObjectStatus(obj);
-        invariant(!errorStatus.isOK());
-        return errorStatus.withContext(str::stream() << "Exec error resulting in state "
-                                                     << PlanExecutor::statestr(state));
+    if (isMarkedAsKilled()) {
+        uassertStatusOK(_killStatus);
     }
 
     invariant(!isMarkedAsKilled());
     invariant(PlanExecutor::IS_EOF == state);
-    return Status::OK();
 }
-
 
 void PlanExecutorImpl::enqueue(const Document& obj) {
     _stash.push(obj.getOwned());
@@ -757,11 +718,22 @@ BSONObj PlanExecutorImpl::getPostBatchResumeToken() const {
     }
 }
 
-Status PlanExecutorImpl::getMemberObjectStatus(const Document& memberObj) const {
-    return WorkingSetCommon::getMemberObjectStatus(memberObj);
+PlanExecutor::LockPolicy PlanExecutorImpl::lockPolicy() const {
+    if (isPipelineExecutor()) {
+        return LockPolicy::kLocksInternally;
+    }
+
+    // If this PlanExecutor is simply unspooling queued data, then there is no need to acquire
+    // locks.
+    if (_root->stageType() == StageType::STAGE_QUEUED_DATA) {
+        return LockPolicy::kLocksInternally;
+    }
+
+    return LockPolicy::kLockExternally;
 }
 
-Status PlanExecutorImpl::getMemberObjectStatus(const BSONObj& memberObj) const {
-    return WorkingSetCommon::getMemberObjectStatus(memberObj);
+bool PlanExecutorImpl::isPipelineExecutor() const {
+    return _root->stageType() == StageType::STAGE_PIPELINE_PROXY ||
+        _root->stageType() == StageType::STAGE_CHANGE_STREAM_PROXY;
 }
 }  // namespace mongo

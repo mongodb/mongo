@@ -88,7 +88,7 @@ public:
          * This constructor is private, all CollatorStashes should be created by calling
          * ExpressionContext::temporarilyChangeCollator().
          */
-        CollatorStash(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        CollatorStash(ExpressionContext* const expCtx,
                       std::unique_ptr<CollatorInterface> newCollator);
 
         friend class ExpressionContext;
@@ -142,7 +142,8 @@ public:
                       const NamespaceString& ns,
                       const boost::optional<RuntimeConstants>& runtimeConstants = boost::none,
                       const boost::optional<BSONObj>& letParameters = boost::none,
-                      bool mayDbProfile = true);
+                      bool mayDbProfile = true,
+                      boost::optional<ExplainOptions::Verbosity> explain = boost::none);
 
     /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if

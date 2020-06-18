@@ -161,8 +161,11 @@ public:
             // Scan backwards through the collection to find the document to start truncating from.
             // We will remove 'n' documents, so start truncating from the (n + 1)th document to the
             // end.
-            auto exec = InternalPlanner::collectionScan(
-                opCtx, fullNs.ns(), collection, PlanExecutor::NO_YIELD, InternalPlanner::BACKWARD);
+            auto exec = InternalPlanner::collectionScan(opCtx,
+                                                        fullNs.ns(),
+                                                        collection,
+                                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                        InternalPlanner::BACKWARD);
 
             for (int i = 0; i < n + 1; ++i) {
                 PlanExecutor::ExecState state = exec->getNext(static_cast<BSONObj*>(nullptr), &end);
@@ -174,7 +177,6 @@ public:
             }
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(fullNs.ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             collection->uuid());
 

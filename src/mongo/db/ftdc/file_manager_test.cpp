@@ -116,6 +116,7 @@ TEST_F(FTDCFileManagerTest, TestFull) {
         ASSERT_TRUE(fs < c.maxFileSizeBytes * 1.10);
         LOGV2(20632,
               "File {fileName} has size {fileSize}",
+              "File size",
               "fileName"_attr = file.generic_string(),
               "fileSize"_attr = fs);
         if (file.generic_string().find("interim") == std::string::npos) {

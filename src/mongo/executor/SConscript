@@ -134,7 +134,7 @@ env.Library(
         'hedging_metrics',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
         'connection_pool_executor',
         'network_interface',
@@ -275,7 +275,6 @@ env.CppIntegrationTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_thread_pool',

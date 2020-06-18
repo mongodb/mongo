@@ -92,7 +92,7 @@ public:
             std::move(ws),
             std::move(scan),
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss),
-            PlanExecutor::YIELD_MANUAL);
+            PlanYieldPolicy::YieldPolicy::YIELD_MANUAL);
 
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
@@ -110,7 +110,7 @@ public:
                                           startKey,
                                           endKey,
                                           BoundInclusion::kIncludeBothStartAndEndKeys,
-                                          PlanExecutor::YIELD_MANUAL);
+                                          PlanYieldPolicy::YieldPolicy::YIELD_MANUAL);
     }
 
     int N() {

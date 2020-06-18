@@ -106,7 +106,9 @@ auto translateSort(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj
 
 auto translateMap(boost::intrusive_ptr<ExpressionContext> expCtx, std::string code) {
     auto emitExpression = ExpressionInternalJsEmit::create(
-        expCtx, ExpressionFieldPath::parse(expCtx, "$$ROOT", expCtx->variablesParseState), code);
+        expCtx.get(),
+        ExpressionFieldPath::parse(expCtx.get(), "$$ROOT", expCtx->variablesParseState),
+        code);
     auto node = std::make_unique<projection_executor::InclusionNode>(
         ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kExcludeId});
     node->addExpressionForPath(FieldPath{"emits"s}, std::move(emitExpression));
@@ -120,17 +122,17 @@ auto translateMap(boost::intrusive_ptr<ExpressionContext> expCtx, std::string co
 }
 
 auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string code) {
-    auto initializer = ExpressionArray::create(expCtx, {});
-    auto argument = ExpressionFieldPath::parse(expCtx, "$emits", expCtx->variablesParseState);
+    auto initializer = ExpressionArray::create(expCtx.get(), {});
+    auto argument = ExpressionFieldPath::parse(expCtx.get(), "$emits", expCtx->variablesParseState);
     auto reduceFactory = [expCtx, funcSource = std::move(code)]() {
-        return AccumulatorInternalJsReduce::create(expCtx, funcSource);
+        return AccumulatorInternalJsReduce::create(expCtx.get(), funcSource);
     };
     AccumulationStatement jsReduce("value",
                                    AccumulationExpression(std::move(initializer),
                                                           std::move(argument),
                                                           std::move(reduceFactory)));
     auto groupKeyExpression =
-        ExpressionFieldPath::parse(expCtx, "$emits.k", expCtx->variablesParseState);
+        ExpressionFieldPath::parse(expCtx.get(), "$emits.k", expCtx->variablesParseState);
     return DocumentSourceGroup::create(expCtx,
                                        std::move(groupKeyExpression),
                                        make_vector<AccumulationStatement>(std::move(jsReduce)),
@@ -141,12 +143,13 @@ auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx,
                        MapReduceJavascriptCodeOrNull codeObj) {
     return codeObj.getCode().map([&](auto&& code) {
         auto jsExpression = ExpressionFunction::create(
-            expCtx,
+            expCtx.get(),
             ExpressionArray::create(
-                expCtx,
+                expCtx.get(),
                 make_vector<boost::intrusive_ptr<Expression>>(
-                    ExpressionFieldPath::parse(expCtx, "$_id", expCtx->variablesParseState),
-                    ExpressionFieldPath::parse(expCtx, "$value", expCtx->variablesParseState))),
+                    ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState),
+                    ExpressionFieldPath::parse(
+                        expCtx.get(), "$value", expCtx->variablesParseState))),
             code,
             ExpressionFunction::kJavaScript);
         auto node = std::make_unique<projection_executor::InclusionNode>(

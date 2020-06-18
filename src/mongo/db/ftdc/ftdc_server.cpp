@@ -44,6 +44,7 @@
 #include "mongo/db/ftdc/ftdc_server_gen.h"
 #include "mongo/db/ftdc/ftdc_system_stats.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/mirror_maestro.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/synchronized_value.h"
 
@@ -207,18 +208,24 @@ public:
         // of active migrations.
         // "timing" is filtered out because it triggers frequent schema changes.
         // "defaultRWConcern" is excluded because it changes rarely and instead included in rotation
+        // "mirroredReads" is included to append the number of mirror-able operations observed and
+        // mirrored by this process in FTDC collections.
 
         BSONObjBuilder commandBuilder;
         commandBuilder.append(kCommand, 1);
-        commandBuilder.append("tcMalloc", true);
         commandBuilder.append("sharding", false);
         commandBuilder.append("timing", false);
         commandBuilder.append("defaultRWConcern", false);
+        commandBuilder.append(MirrorMaestro::kServerStatusSectionName, true);
 
         if (gDiagnosticDataCollectionEnableLatencyHistograms.load()) {
             BSONObjBuilder subObjBuilder(commandBuilder.subobjStart("opLatencies"));
             subObjBuilder.append("histograms", true);
             subObjBuilder.append("slowBuckets", true);
+        }
+
+        if (gDiagnosticDataCollectionVerboseTCMalloc.load()) {
+            commandBuilder.append("tcmalloc", 2);
         }
 
         commandBuilder.done();

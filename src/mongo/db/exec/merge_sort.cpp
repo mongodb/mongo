@@ -130,12 +130,6 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
             // anymore.
             _noResultToMerge.pop();
             return PlanStage::NEED_TIME;
-        } else if (PlanStage::FAILURE == code) {
-            // The stage which produces a failure is responsible for allocating a working set member
-            // with error details.
-            invariant(WorkingSet::INVALID_ID != id);
-            *out = id;
-            return code;
         } else if (PlanStage::NEED_YIELD == code) {
             *out = id;
             return code;

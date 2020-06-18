@@ -26,7 +26,22 @@
 "use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
 
-const replTest = new ReplSetTest({nodes: 2});
+// This test completes with a prepared transaction still active, so we cannot enforce an accurate
+// fast count.
+TestData.skipEnforceFastCountOnValidate = true;
+// Snapshot read concern for the dbHash command is only available when enableTestCommands=true.
+// To test correctly client behavior with dbHash, we set enableTestCommands=false. We modify the
+// values of roleGraphInvalidationIsFatal and authenticationDatabase in order for this test to work
+// on inMemory build variants.
+TestData.enableTestCommands = false;
+TestData.roleGraphInvalidationIsFatal = false;
+TestData.authenticationDatabase = "local";
+const replTest = new ReplSetTest({
+    nodes: {
+        node0: {setParameter: "enableTestCommands=1"},
+        node1: {setParameter: "enableTestCommands=0"}
+    }
+});
 replTest.startSet();
 replTest.initiate();
 

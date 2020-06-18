@@ -48,10 +48,6 @@ namespace {
 
 class BiggieSortedDataInterfaceTestHarnessHelper final
     : public virtual SortedDataInterfaceHarnessHelper {
-private:
-    KVEngine _kvEngine{};
-    Ordering _order;
-
 public:
     BiggieSortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
 
@@ -88,14 +84,18 @@ public:
         }
 
         auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
-        IndexDescriptor desc(collection.get(), "", spec);
-
-        return std::make_unique<SortedDataInterface>(&opCtx, "ident"_sd, &desc);
+        _descs.emplace_back(collection.get(), "", spec);
+        return std::make_unique<SortedDataInterface>(&opCtx, "ident"_sd, &_descs.back());
     }
 
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
         return std::make_unique<RecoveryUnit>(&_kvEngine);
     }
+
+private:
+    KVEngine _kvEngine{};
+    Ordering _order;
+    std::list<IndexDescriptor> _descs;
 };
 
 std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper>

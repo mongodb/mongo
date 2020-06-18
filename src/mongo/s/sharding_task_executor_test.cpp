@@ -31,68 +31,58 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/sharding_task_executor.h"
-
-#include "mongo/executor/network_interface.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_test_common.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/s/shard_server_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/sharding_task_executor.h"
 
 namespace mongo {
 namespace {
+
+const HostAndPort kTestConfigShardHost("FakeConfigHost", 12345);
 
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::TaskExecutor;
 
-class ShardingTaskExecutorTest : public ShardServerTestFixture {
-private:
-    void setUp() final;
-    void tearDown() final;
-
-protected:
-    LogicalSessionId constructFullLsid();
-    void assertOpCtxLsidEqualsCmdObjLsid(const BSONObj& cmdObj);
-
-    executor::NetworkInterfaceMock* _network{nullptr};
-
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> _threadPool;
-};
-
-void ShardingTaskExecutorTest::setUp() {
-    ShardServerTestFixture::setUp();
-
-    auto netForFixedTaskExecutor = std::make_unique<executor::NetworkInterfaceMock>();
-    _network = netForFixedTaskExecutor.get();
-
-    _threadPool = makeThreadPoolTestExecutor(std::move(netForFixedTaskExecutor));
-}
-
-void ShardingTaskExecutorTest::tearDown() {
-    ShardServerTestFixture::tearDown();
-}
-
-LogicalSessionId ShardingTaskExecutorTest::constructFullLsid() {
+LogicalSessionId constructFullLsid() {
     auto id = UUID::gen();
     auto uid = SHA256Block{};
 
     return LogicalSessionId(id, uid);
 }
 
-void ShardingTaskExecutorTest::assertOpCtxLsidEqualsCmdObjLsid(const BSONObj& cmdObj) {
-    auto opCtxLsid = operationContext()->getLogicalSessionId();
+class ShardingTaskExecutorTest : public ShardingTestFixture {
+protected:
+    ShardingTaskExecutorTest() {
+        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
-    ASSERT(opCtxLsid);
+        auto netForFixedTaskExecutor = std::make_unique<executor::NetworkInterfaceMock>();
+        _network = netForFixedTaskExecutor.get();
 
-    auto cmdObjLsid = LogicalSessionFromClient::parse("lsid"_sd, cmdObj["lsid"].Obj());
+        _threadPool = makeThreadPoolTestExecutor(std::move(netForFixedTaskExecutor));
+    }
 
-    ASSERT_EQ(opCtxLsid->getId(), cmdObjLsid.getId());
-    ASSERT_EQ(opCtxLsid->getUid(), *cmdObjLsid.getUid());
-}
+    void assertOpCtxLsidEqualsCmdObjLsid(const BSONObj& cmdObj) {
+        auto opCtxLsid = operationContext()->getLogicalSessionId();
+
+        ASSERT(opCtxLsid);
+
+        auto cmdObjLsid = LogicalSessionFromClient::parse("lsid"_sd, cmdObj["lsid"].Obj());
+
+        ASSERT_EQ(opCtxLsid->getId(), cmdObjLsid.getId());
+        ASSERT_EQ(opCtxLsid->getUid(), *cmdObjLsid.getUid());
+    }
+
+    executor::NetworkInterfaceMock* _network{nullptr};
+
+    std::unique_ptr<executor::ThreadPoolTaskExecutor> _threadPool;
+};
 
 TEST_F(ShardingTaskExecutorTest, MissingLsidAddsLsidInCommand) {
     operationContext()->setLogicalSessionId(constructFullLsid());

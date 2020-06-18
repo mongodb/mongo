@@ -43,7 +43,6 @@ const char kSkipField[] = "skip";
 const char kHintField[] = "hint";
 const char kCollationField[] = "collation";
 const char kExplainField[] = "explain";
-const char kCommentField[] = "comment";
 const char kMaxTimeMSField[] = "maxTimeMS";
 const char kReadConcernField[] = "readConcern";
 }  // namespace
@@ -87,10 +86,6 @@ StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommand& cmd,
     }
 
     aggregationBuilder.append(kHintField, cmd.getHint());
-
-    if (auto comment = cmd.getComment()) {
-        aggregationBuilder.append(kCommentField, comment.get());
-    }
 
     if (auto maxTime = cmd.getMaxTimeMS()) {
         if (maxTime.get() > 0) {

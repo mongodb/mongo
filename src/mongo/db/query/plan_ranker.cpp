@@ -31,272 +31,129 @@
 
 #include "mongo/platform/basic.h"
 
-#include <algorithm>
-#include <cmath>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/query/plan_ranker.h"
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 
-namespace {
-
-/**
- * Comparator for (scores, candidateIndex) in pickBestPlan().
- */
-bool scoreComparator(const std::pair<double, size_t>& lhs, const std::pair<double, size_t>& rhs) {
-    // Just compare score in lhs.first and rhs.first;
-    // Ignore candidate array index in lhs.second and rhs.second.
-    return lhs.first > rhs.first;
+namespace mongo::plan_ranker {
+namespace log_detail {
+void logScoreFormula(std::function<std::string()> formula,
+                     double score,
+                     double baseScore,
+                     double productivity,
+                     double noFetchBonus,
+                     double noSortBonus,
+                     double noIxisectBonus,
+                     double tieBreakers) {
+    LOGV2_DEBUG(20961, 2, "{sb_str}", "sb_str"_attr = [&]() {
+        StringBuilder sb;
+        sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
+           << str::convertDoubleToString(baseScore) << ")"
+           << " + productivity(" << formula() << " = " << str::convertDoubleToString(productivity)
+           << ")"
+           << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus) << " noFetchBonus + "
+           << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
+           << str::convertDoubleToString(noIxisectBonus)
+           << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
+        return sb.str();
+    }());
 }
 
-}  // namespace
+void logScoreBoost(double score) {
+    LOGV2_DEBUG(20962,
+                5,
+                "Score boosted to {newScore} due to intersection forcing",
+                "Score boosted due to intersection forcing",
+                "newScore"_attr = score);
+}
 
-namespace mongo {
+void logScoringPlan(std::function<std::string()> solution,
+                    std::function<std::string()> explain,
+                    std::function<std::string()> planSummary,
+                    size_t planIndex,
+                    bool isEOF) {
+    LOGV2_DEBUG(20956,
+                5,
+                "Scoring plan {planIndex}:\n{querySolution}Stats:\n{stats}",
+                "Scoring plan",
+                "planIndex"_attr = planIndex,
+                "querySolution"_attr = [solution]() { return redact(solution()); }(),
+                "stats"_attr = [explain]() { return redact(explain()); }());
+    LOGV2_DEBUG(20957,
+                2,
+                "Scoring query plan: {planSummary} planHitEOF={planHitEOF}",
+                "Scoring query plan",
+                "planSummary"_attr = [planSummary]() { return planSummary(); }(),
+                "planHitEOF"_attr = isEOF);
+}
 
-using std::endl;
-using std::vector;
+void logScore(double score) {
+    LOGV2_DEBUG(20958, 5, "Basic plan score: {score}", "Basic plan score", "score"_attr = score);
+}
 
-// static
-StatusWith<std::unique_ptr<PlanRankingDecision>> PlanRanker::pickBestPlan(
-    const vector<CandidatePlan>& candidates) {
-    invariant(!candidates.empty());
-    // A plan that hits EOF is automatically scored above
-    // its peers. If multiple plans hit EOF during the same
-    // set of round-robin calls to work(), then all such plans
-    // receive the bonus.
-    double eofBonus = 1.0;
+void logEOFBonus(double eofBonus) {
+    LOGV2_DEBUG(20959,
+                5,
+                "Adding +{eofBonus} EOF bonus to score",
+                "Adding EOF bonus to score",
+                "eofBonus"_attr = eofBonus);
+}
 
-    // Each plan will have a stat tree.
-    std::vector<std::unique_ptr<PlanStageStats>> statTrees;
+void logFailedPlan(std::function<std::string()> planSummary) {
+    LOGV2_DEBUG(20960,
+                2,
+                "Not scoring plan: {planSummary} because the plan failed",
+                "Not scoring a plan because the plan failed",
+                "planSummary"_attr = [&]() { return planSummary(); }());
+}
+}  // namespace log_detail
 
-    // Get stat trees from each plan.
-    // Copy stats trees instead of transferring ownership
-    // because multi plan runner will need its own stats
-    // trees for explain.
-    for (size_t i = 0; i < candidates.size(); ++i) {
-        statTrees.push_back(candidates[i].root->getStats());
+namespace {
+/**
+ * A plan scorer for the classic plan stage tree. Defines the plan productivity as a number
+ * of intermediate results returned, or advanced, by the root stage, divided by the "unit of works"
+ * which the plan performed. Each call to work(...) counts as one unit.
+ */
+class DefaultPlanScorer final : public PlanScorer<PlanStageStats> {
+protected:
+    double calculateProductivity(const PlanStageStats* stats) const final {
+        invariant(stats->common.works != 0);
+        return static_cast<double>(stats->common.advanced) /
+            static_cast<double>(stats->common.works);
     }
 
-    // Holds (score, candidateInndex).
-    // Used to derive scores and candidate ordering.
-    vector<std::pair<double, size_t>> scoresAndCandidateindices;
-    vector<size_t> failed;
+    std::string getProductivityFormula(const PlanStageStats* stats) const {
+        StringBuilder sb;
+        sb << "(" << stats->common.advanced << " advanced)/(" << stats->common.works << " works)";
+        return sb.str();
+    }
 
-    // Compute score for each tree.  Record the best.
-    for (size_t i = 0; i < statTrees.size(); ++i) {
-        if (!candidates[i].failed) {
-            LOGV2_DEBUG(
-                20956,
-                5,
-                "Scoring plan "
-                "{i}:\n{candidates_i_solution}Stats:\n{Explain_statsToBSON_statTrees_i_jsonString_"
-                "ExtendedRelaxedV2_0_0_true}",
-                "i"_attr = i,
-                "candidates_i_solution"_attr = redact(candidates[i].solution->toString()),
-                "Explain_statsToBSON_statTrees_i_jsonString_ExtendedRelaxedV2_0_0_true"_attr =
-                    redact(Explain::statsToBSON(*statTrees[i])
-                               .jsonString(ExtendedRelaxedV2_0_0, true)));
-            LOGV2_DEBUG(20957,
-                        2,
-                        "Scoring query plan: {Explain_getPlanSummary_candidates_i_root} "
-                        "planHitEOF={statTrees_i_common_isEOF}",
-                        "Explain_getPlanSummary_candidates_i_root"_attr =
-                            Explain::getPlanSummary(candidates[i].root),
-                        "statTrees_i_common_isEOF"_attr = statTrees[i]->common.isEOF);
+    double getNumberOfAdvances(const PlanStageStats* stats) const final {
+        return stats->common.works;
+    }
 
-            double score = scoreTree(statTrees[i].get());
-            LOGV2_DEBUG(20958, 5, "score = {score}", "score"_attr = score);
-            if (statTrees[i]->common.isEOF) {
-                LOGV2_DEBUG(
-                    20959, 5, "Adding +{eofBonus} EOF bonus to score.", "eofBonus"_attr = eofBonus);
-                score += 1;
+    bool hasStage(StageType type, const PlanStageStats* root) const final {
+        std::queue<const PlanStageStats*> remaining;
+        remaining.push(root);
+
+        while (!remaining.empty()) {
+            auto stats = remaining.front();
+            remaining.pop();
+
+            if (stats->stageType == type) {
+                return true;
             }
 
-            scoresAndCandidateindices.push_back(std::make_pair(score, i));
-        } else {
-            failed.push_back(i);
-            LOGV2_DEBUG(20960,
-                        2,
-                        "Not scording plan: {Explain_getPlanSummary_candidates_i_root} because the "
-                        "plan failed.",
-                        "Explain_getPlanSummary_candidates_i_root"_attr =
-                            Explain::getPlanSummary(candidates[i].root));
+            for (auto&& child : stats->children) {
+                remaining.push(child.get());
+            }
         }
+        return false;
     }
+};
+}  // namespace
 
-    // If there isn't a viable plan we should error.
-    if (scoresAndCandidateindices.size() == 0U) {
-        return {ErrorCodes::Error(31157),
-                "No viable plan was found because all candidate plans failed."};
-    }
-
-    // Sort (scores, candidateIndex). Get best child and populate candidate ordering.
-    std::stable_sort(
-        scoresAndCandidateindices.begin(), scoresAndCandidateindices.end(), scoreComparator);
-
-    auto why = std::make_unique<PlanRankingDecision>();
-
-    // Determine whether plans tied for the win.
-    if (scoresAndCandidateindices.size() > 1U) {
-        double bestScore = scoresAndCandidateindices[0].first;
-        double runnerUpScore = scoresAndCandidateindices[1].first;
-        const double epsilon = 1e-10;
-        why->tieForBest = std::abs(bestScore - runnerUpScore) < epsilon;
-    }
-
-    // Update results in 'why'
-    // Stats and scores in 'why' are sorted in descending order by score.
-    why->stats.clear();
-    why->scores.clear();
-    why->candidateOrder.clear();
-    why->failedCandidates = std::move(failed);
-    for (size_t i = 0; i < scoresAndCandidateindices.size(); ++i) {
-        double score = scoresAndCandidateindices[i].first;
-        size_t candidateIndex = scoresAndCandidateindices[i].second;
-
-        // We shouldn't cache the scores with the EOF bonus included,
-        // as this is just a tie-breaking measure for plan selection.
-        // Plans not run through the multi plan runner will not receive
-        // the bonus.
-        //
-        // An example of a bad thing that could happen if we stored scores
-        // with the EOF bonus included:
-        //
-        //   Let's say Plan A hits EOF, is the highest ranking plan, and gets
-        //   cached as such. On subsequent runs it will not receive the bonus.
-        //   Eventually the plan cache feedback mechanism will evict the cache
-        //   entry---the scores will appear to have fallen due to the missing
-        //   EOF bonus.
-        //
-        // This begs the question, why don't we include the EOF bonus in
-        // scoring of cached plans as well? The problem here is that the cached
-        // plan runner always runs plans to completion before scoring. Queries
-        // that don't get the bonus in the multi plan runner might get the bonus
-        // after being run from the plan cache.
-        if (statTrees[candidateIndex]->common.isEOF) {
-            score -= eofBonus;
-        }
-
-        why->stats.push_back(std::move(statTrees[candidateIndex]));
-        why->scores.push_back(score);
-        why->candidateOrder.push_back(candidateIndex);
-    }
-    for (auto& i : why->failedCandidates) {
-        why->stats.push_back(std::move(statTrees[i]));
-    }
-
-    return StatusWith<std::unique_ptr<PlanRankingDecision>>(std::move(why));
+std::unique_ptr<PlanScorer<PlanStageStats>> makePlanScorer() {
+    return std::make_unique<DefaultPlanScorer>();
 }
-
-// TODO: Move this out.  This is a signal for ranking but will become its own complicated
-// stats-collecting beast.
-double computeSelectivity(const PlanStageStats* stats) {
-    if (STAGE_IXSCAN == stats->stageType) {
-        IndexScanStats* iss = static_cast<IndexScanStats*>(stats->specific.get());
-        return iss->keyPattern.nFields();
-    } else {
-        double sum = 0;
-        for (size_t i = 0; i < stats->children.size(); ++i) {
-            sum += computeSelectivity(stats->children[i].get());
-        }
-        return sum;
-    }
-}
-
-bool hasStage(const StageType type, const PlanStageStats* stats) {
-    if (type == stats->stageType) {
-        return true;
-    }
-    for (size_t i = 0; i < stats->children.size(); ++i) {
-        if (hasStage(type, stats->children[i].get())) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// static
-double PlanRanker::scoreTree(const PlanStageStats* stats) {
-    // We start all scores at 1.  Our "no plan selected" score is 0 and we want all plans to
-    // be greater than that.
-    double baseScore = 1;
-
-    // How many "units of work" did the plan perform. Each call to work(...)
-    // counts as one unit.
-    size_t workUnits = stats->common.works;
-    invariant(workUnits != 0);
-
-    // How much did a plan produce?
-    // Range: [0, 1]
-    double productivity =
-        static_cast<double>(stats->common.advanced) / static_cast<double>(workUnits);
-
-    // Just enough to break a tie. Must be small enough to ensure that a more productive
-    // plan doesn't lose to a less productive plan due to tie breaking.
-    const double epsilon = std::min(1.0 / static_cast<double>(10 * workUnits), 1e-4);
-
-    // We prefer queries that don't require a fetch stage.
-    double noFetchBonus = epsilon;
-    if (hasStage(STAGE_FETCH, stats)) {
-        noFetchBonus = 0;
-    }
-
-    // In the case of ties, prefer solutions without a blocking sort
-    // to solutions with a blocking sort.
-    double noSortBonus = epsilon;
-    if (hasStage(STAGE_SORT_DEFAULT, stats) || hasStage(STAGE_SORT_SIMPLE, stats)) {
-        noSortBonus = 0;
-    }
-
-    // In the case of ties, prefer single index solutions to ixisect. Index
-    // intersection solutions are often slower than single-index solutions
-    // because they require examining a superset of index keys that would be
-    // examined by a single index scan.
-    //
-    // On the other hand, index intersection solutions examine the same
-    // number or fewer of documents. In the case that index intersection
-    // allows us to examine fewer documents, the penalty given to ixisect
-    // can be made up via the no fetch bonus.
-    double noIxisectBonus = epsilon;
-    if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
-        noIxisectBonus = 0;
-    }
-
-    double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
-    double score = baseScore + productivity + tieBreakers;
-
-    StringBuilder sb;
-    sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
-       << str::convertDoubleToString(baseScore) << ")"
-       << " + productivity((" << stats->common.advanced << " advanced)/(" << stats->common.works
-       << " works) = " << str::convertDoubleToString(productivity) << ")"
-       << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus) << " noFetchBonus + "
-       << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
-       << str::convertDoubleToString(noIxisectBonus)
-       << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
-    LOGV2_DEBUG(20961, 2, "{sb_str}", "sb_str"_attr = sb.str());
-
-    if (internalQueryForceIntersectionPlans.load()) {
-        if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
-            // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
-            // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.
-            score += 3;
-            LOGV2_DEBUG(20962,
-                        5,
-                        "Score boosted to {score} due to intersection forcing.",
-                        "score"_attr = score);
-        }
-    }
-
-    return score;
-}
-
-}  // namespace mongo
+}  // namespace mongo::plan_ranker

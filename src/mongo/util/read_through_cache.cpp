@@ -31,7 +31,6 @@
 
 #include "mongo/util/read_through_cache.h"
 
-#include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
@@ -70,19 +69,13 @@ void ReadThroughCacheBase::CancelToken::tryCancel() {
     }
 }
 
-ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(WorkWithOpContext work) {
+ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
+    WorkWithOpContext work) noexcept {
     auto taskInfo = std::make_shared<CancelToken::TaskInfo>(_serviceContext, _cancelTokenMutex);
 
-    // This is workaround for the fact that the ThreadPool can execute inline. This variable is
-    // local to the function and will only be accessed if the call to 'schedule' below executes
-    // inline, therefore there is no need for synchronisation around it.
-    boost::optional<Status> inlineExecutionStatus;
-
-    _threadPool.schedule([work = std::move(work),
-                          taskInfo,
-                          inlineExecutionStatus = &inlineExecutionStatus](Status status) mutable {
+    _threadPool.schedule([work = std::move(work), taskInfo](Status status) mutable {
         if (!status.isOK()) {
-            inlineExecutionStatus->emplace(std::move(status));
+            work(nullptr, status);
             return;
         }
 
@@ -103,10 +96,11 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(WorkWithOpCon
         work(taskInfo->opCtxToCancel, cancelStatusAtTaskBegin);
     });
 
-    if (inlineExecutionStatus)
-        uassertStatusOK(*inlineExecutionStatus);
-
     return CancelToken(std::move(taskInfo));
+}
+
+Date_t ReadThroughCacheBase::_now() {
+    return _serviceContext->getFastClockSource()->now();
 }
 
 }  // namespace mongo

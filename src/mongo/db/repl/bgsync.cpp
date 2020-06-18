@@ -41,7 +41,6 @@
 #include "mongo/client/connection_pool.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
@@ -62,6 +61,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -338,7 +338,7 @@ void BackgroundSync::_produce() {
 
     numSyncSourceSelections.increment(1);
 
-    if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
+    if (syncSourceResp.syncSourceStatus == ErrorCodes::TooStaleToSyncFromSource) {
         // All (accessible) sync sources are too far ahead of us.
         if (_replCoord->getMemberState().primary()) {
             LOGV2_WARNING(21115,
@@ -525,7 +525,7 @@ void BackgroundSync::_produce() {
         fassertFailedWithStatus(34440, exceptionToStatus());
     }
 
-    const auto logLevel = getTestCommandsEnabled() ? 0 : 1;
+    const auto logLevel = TestingProctor::instance().isEnabled() ? 0 : 1;
     LOGV2_DEBUG(21092,
                 logLevel,
                 "scheduling fetcher to read remote oplog on {syncSource} starting at "
@@ -560,12 +560,13 @@ void BackgroundSync::_produce() {
         return;
     }
 
+    Seconds blacklistDuration(60);
     if (fetcherReturnStatus.code() == ErrorCodes::OplogOutOfOrder) {
         // This is bad because it means that our source
         // has not returned oplog entries in ascending ts order, and they need to be.
 
         LOGV2_WARNING(
-            21120, "{error}", "Fetcher returned error", "error"_attr = redact(fetcherReturnStatus));
+            21120, "Oplog fetcher returned error", "error"_attr = redact(fetcherReturnStatus));
         // Do not blacklist the server here, it will be blacklisted when we try to reuse it,
         // if it can't return a matching oplog start from the last fetch oplog ts field.
         return;
@@ -581,19 +582,27 @@ void BackgroundSync::_produce() {
                 mongo::sleepmillis(100);
             }
         }
+    } else if (fetcherReturnStatus.code() == ErrorCodes::TooStaleToSyncFromSource) {
+        LOGV2_WARNING(
+            2806800,
+            "Oplog fetcher discovered we are too stale to sync from sync source. Blacklisting "
+            "sync source",
+            "syncSource"_attr = source,
+            "blacklistDuration"_attr = blacklistDuration);
+        _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
-        Seconds blacklistDuration(60);
-        LOGV2_WARNING(21121,
-                      "Fetcher got invalid BSON while querying oplog. Blacklisting sync source "
-                      "{syncSource} for {blacklistDuration}.",
-                      "Fetcher got invalid BSON while querying oplog. Blacklisting sync source",
-                      "syncSource"_attr = source,
-                      "blacklistDuration"_attr = blacklistDuration);
+        LOGV2_WARNING(
+            21121,
+            "Oplog fetcher got invalid BSON while querying oplog. Blacklisting sync source "
+            "{syncSource} for {blacklistDuration}.",
+            "Oplog fetcher got invalid BSON while querying oplog. Blacklisting sync source",
+            "syncSource"_attr = source,
+            "blacklistDuration"_attr = blacklistDuration);
         _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
     } else if (!fetcherReturnStatus.isOK()) {
         LOGV2_WARNING(21122,
-                      "Fetcher stopped querying remote oplog with error: {error}",
-                      "Fetcher stopped querying remote oplog with error",
+                      "Oplog fetcher stopped querying remote oplog with error: {error}",
+                      "Oplog fetcher stopped querying remote oplog with error",
                       "error"_attr = redact(fetcherReturnStatus));
     }
 }

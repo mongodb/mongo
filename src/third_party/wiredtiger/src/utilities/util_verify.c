@@ -11,13 +11,13 @@
 static int
 usage(void)
 {
-    static const char *options[] = {"-a", "verify the history store", "-d config",
+    static const char *options[] = {"-d config",
       "display underlying information during verification", "-s",
       "verify against the specified timestamp", NULL, NULL};
 
     util_usage(
-      "verify [-as] [-d dump_address | dump_blocks | dump_history | dump_layout | dump_offsets=#,# "
-      "| dump_pages] [uri]",
+      "verify [-s] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# | dump_pages] "
+      "[uri]",
       "options:", options);
 
     return (1);
@@ -30,9 +30,9 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     size_t size;
     int ch;
     char *config, *dump_offsets, *uri;
-    bool dump_address, dump_blocks, dump_layout, dump_pages, dump_history, stable_timestamp;
+    bool dump_address, dump_blocks, dump_layout, dump_pages, stable_timestamp;
 
-    dump_address = dump_blocks = dump_history = dump_layout = dump_pages = stable_timestamp = false;
+    dump_address = dump_blocks = dump_layout = dump_pages = stable_timestamp = false;
     config = dump_offsets = uri = NULL;
     while ((ch = __wt_getopt(progname, argc, argv, "d:s")) != EOF)
         switch (ch) {
@@ -41,8 +41,6 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
                 dump_address = true;
             else if (strcmp(__wt_optarg, "dump_blocks") == 0)
                 dump_blocks = true;
-            else if (strcmp(__wt_optarg, "dump_history") == 0)
-                dump_history = true;
             else if (strcmp(__wt_optarg, "dump_layout") == 0)
                 dump_layout = true;
             else if (WT_PREFIX_MATCH(__wt_optarg, "dump_offsets=")) {
@@ -78,20 +76,19 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     if ((uri = util_uri(session, *argv, "table")) == NULL)
         return (1);
 
-    if (dump_address || dump_blocks || dump_history || dump_layout || dump_offsets != NULL ||
-      dump_pages || stable_timestamp) {
-        size = strlen("dump_address,") + strlen("dump_blocks,") + strlen("dump_history") +
-          strlen("dump_layout,") + strlen("dump_pages,") + strlen("dump_offsets[],") +
+    if (dump_address || dump_blocks || dump_layout || dump_offsets != NULL || dump_pages ||
+      stable_timestamp) {
+        size = strlen("dump_address,") + strlen("dump_blocks,") + strlen("dump_layout,") +
+          strlen("dump_pages,") + strlen("dump_offsets[],") +
           (dump_offsets == NULL ? 0 : strlen(dump_offsets)) + strlen("history_store") +
           strlen("stable_timestamp,") + 20;
         if ((config = malloc(size)) == NULL) {
             ret = util_err(session, errno, NULL);
             goto err;
         }
-        if ((ret = __wt_snprintf(config, size, "%s%s%s%s%s%s%s%s%s",
+        if ((ret = __wt_snprintf(config, size, "%s%s%s%s%s%s%s%s",
                dump_address ? "dump_address," : "", dump_blocks ? "dump_blocks," : "",
-               dump_history ? "dump_history," : "", dump_layout ? "dump_layout," : "",
-               dump_offsets != NULL ? "dump_offsets=[" : "",
+               dump_layout ? "dump_layout," : "", dump_offsets != NULL ? "dump_offsets=[" : "",
                dump_offsets != NULL ? dump_offsets : "", dump_offsets != NULL ? "]," : "",
                dump_pages ? "dump_pages," : "", stable_timestamp ? "stable_timestamp," : "")) !=
           0) {

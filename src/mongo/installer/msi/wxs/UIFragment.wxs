@@ -2,11 +2,44 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"  xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
     <Fragment>
         <UI Id="MongoWixUI">
-            <!-- Base our MSI on the FeatureTree based Wix set, and add our custom dialog boxes -->
-            <UIRef Id="WixUI_FeatureTree" />
+          <!-- Copy of relevant parts from WixUI_FeatureTree (https://github.com/wixtoolset/wix3/blob/develop/src/ext/UIExtension/wixlib/WixUI_FeatureTree.wxs), with our custom dialog boxes -->
+          <UIRef Id="WixUI_Common" />
+          <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+          <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+          <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
 
-            <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="LicenseAgreementDlg" Control="Next">LicenseAccepted = "1"</Publish>
-            <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="CustomizeDlg" Control="Back">WixUI_InstallMode = "InstallCustom"</Publish>
+          <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+          <Property Id="WixUI_Mode" Value="FeatureTree" />
+
+          <DialogRef Id="ErrorDlg" />
+          <DialogRef Id="FatalError" />
+          <DialogRef Id="FilesInUse" />
+          <DialogRef Id="MsiRMFilesInUse" />
+          <DialogRef Id="PrepareDlg" />
+          <DialogRef Id="ProgressDlg" />
+          <DialogRef Id="ResumeDlg" />
+          <DialogRef Id="UserExit" />
+
+          <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+
+          <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg">NOT Installed</Publish>
+          <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">Installed AND PATCH</Publish>
+
+          <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+          <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="MongoSetupTypeDlg">LicenseAccepted = "1"</Publish>
+
+          <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CompassDlg" Order="1">NOT Installed OR WixUI_InstallMode = "Change"</Publish>
+          <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2">Installed AND NOT PATCH</Publish>
+          <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3">Installed AND PATCH</Publish>
+
+          <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+
+          <Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="CustomizeDlg">1</Publish>
+          <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+          <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+          <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
+
+          <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="CustomizeDlg" Control="Back">WixUI_InstallMode = "InstallCustom"</Publish>
             <Publish Event="NewDialog" Value="ServiceDlg" Dialog="CustomizeDlg" Control="Next">
                 <![CDATA[&Server = 3]]>
             </Publish>
@@ -71,9 +104,10 @@
                     <Text>&amp;Next &gt;</Text>
                     <Publish Event="AddLocal" Value="ServerNoService">NOT MONGO_SERVICE_INSTALL</Publish>
                     <Publish Event="AddLocal" Value="ServerService">MONGO_SERVICE_INSTALL</Publish>
-                    <Publish Event="DoAction" Value="ValidateServiceLogon" Order="1"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Publish>
-                    <Publish Event="SpawnDialog" Value="InvalidServiceAccount" Order="2">MONGO_SERVICE_ACCOUNT_VALID = "0"</Publish>
-                    <Publish Event="NewDialog" Value="CompassDlg" Order="2">NOT MONGO_SERVICE_INSTALL OR (MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork" OR MONGO_SERVICE_ACCOUNT_VALID)</Publish>
+                    <Publish Property="MONGO_SERVICE_ACCOUNT_VALID" Value="1" Order="1"><![CDATA[MONGO_SERVICE_ACCOUNT_TYPE ~= "ServiceLocalNetwork"]]></Publish>
+                    <Publish Event="DoAction" Value="ValidateServiceLogon" Order="2"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Publish>
+                    <Publish Event="SpawnDialog" Value="InvalidServiceAccount" Order="3">MONGO_SERVICE_ACCOUNT_VALID = "0"</Publish>
+                    <Publish Event="NewDialog" Value="CompassDlg" Order="3">NOT MONGO_SERVICE_INSTALL OR (MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork" OR MONGO_SERVICE_ACCOUNT_VALID)</Publish>
                 </Control>
                 <Control Id="Cancel" Type="PushButton" X="309" Y="244" Width="56" Height="17" TabSkip="no">
                     <Text>Cancel</Text>

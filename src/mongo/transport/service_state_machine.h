@@ -244,6 +244,10 @@ private:
     boost::optional<MessageCompressorId> _compressorId;
     Message _inMessage;
 
+    // Allows delegating destruction of opCtx to another function to potentially remove its cost
+    // from the critical path. This is currently only used in `_processMessage()`.
+    ServiceContext::UniqueOperationContext _killedOpCtx;
+
     AtomicWord<Ownership> _owned{Ownership::kUnowned};
 #if MONGO_CONFIG_DEBUG_BUILD
     AtomicWord<stdx::thread::id> _owningThread;

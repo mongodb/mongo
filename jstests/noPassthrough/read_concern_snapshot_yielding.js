@@ -5,6 +5,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+
 // Skip this test if running with --nojournal and WiredTiger.
 if (jsTest.options().noJournal &&
     (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
@@ -27,42 +29,6 @@ TestData.numDocs = 4;
 // Set 'internalQueryExecYieldIterations' to 2 to ensure that commands yield on the second try
 // (i.e. after they have established a snapshot but before they have returned any documents).
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 2}));
-
-function waitForOpId(curOpFilter) {
-    let opId;
-    // Wait until we know the failpoint 'setInterruptOnlyPlansCheckForInterruptHang' has been
-    // reached.
-    assert.soon(
-        function() {
-            const res =
-                adminDB
-                    .aggregate([
-                        {$currentOp: {}},
-                        {
-                            $match: {
-                                $and: [
-                                    {ns: coll.getFullName()},
-                                    curOpFilter,
-                                    {"failpointMsg": "setInterruptOnlyPlansCheckForInterruptHang"}
-                                ]
-                            }
-                        }
-                    ])
-                    .toArray();
-
-            if (res.length === 1) {
-                opId = res[0].opid;
-                return true;
-            }
-            return false;
-        },
-        function() {
-            return "Failed to find operation in $currentOp output: " +
-                tojson(adminDB.aggregate([{$currentOp: {}}, {$match: {ns: coll.getFullName()}}])
-                           .toArray());
-        });
-    return opId;
-}
 
 function assertKillPending(opId) {
     const res =
@@ -105,7 +71,11 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict) {
     let awaitCommand = startParallelShell(awaitCommandFn, rst.ports[0]);
 
     // Kill the command, and check that it is set to killPending.
-    let opId = waitForOpId(curOpFilter);
+    const curOps = waitForCurOpByFailPoint(
+        db, coll.getFullName(), "setInterruptOnlyPlansCheckForInterruptHang", curOpFilter);
+
+    const opId = curOps[0].opid;
+
     assert.commandWorked(db.killOp(opId));
     assertKillPending(opId);
 
@@ -126,7 +96,8 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict) {
     assert.commandWorked(db.adminCommand(
         {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
     awaitCommand = startParallelShell(awaitCommandFn, rst.ports[0]);
-    waitForOpId(curOpFilter);
+    waitForCurOpByFailPoint(
+        db, coll.getFullName(), "setInterruptOnlyPlansCheckForInterruptHang", curOpFilter);
 
     // Start a drop. This should block behind the command, since the command does not yield
     // locks.
@@ -155,7 +126,8 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict) {
     assert.commandWorked(db.adminCommand(
         {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
     awaitCommand = startParallelShell(awaitCommandFn, rst.ports[0]);
-    waitForOpId(curOpFilter);
+    waitForCurOpByFailPoint(
+        db, coll.getFullName(), "setInterruptOnlyPlansCheckForInterruptHang", curOpFilter);
 
     // Insert data that should not be read by the command.
     assert.commandWorked(db.coll.insert({_id: TestData.numDocs, x: 1, new: 1, location: [0, 0]},
@@ -183,7 +155,8 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict) {
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
         awaitCommand = startParallelShell(awaitCommandFn, rst.ports[0]);
-        waitForOpId(curOpFilter);
+        waitForCurOpByFailPoint(
+            db, coll.getFullName(), "setInterruptOnlyPlansCheckForInterruptHang", curOpFilter);
 
         // Update the document that the command will write to.
         assert.commandWorked(db.coll.update(

@@ -182,8 +182,11 @@ public:
         unique_ptr<PlanStage> rootFetch = std::make_unique<FetchStage>(
             expCtx.get(), ws.get(), std::move(userRoot), nullptr, collection);
 
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            expCtx, std::move(ws), std::move(rootFetch), collection, PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor = PlanExecutor::make(expCtx,
+                                                         std::move(ws),
+                                                         std::move(rootFetch),
+                                                         collection,
+                                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         fassert(28536, statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -196,18 +199,6 @@ public:
         }
 
         resultBuilder.done();
-
-        if (PlanExecutor::FAILURE == state) {
-            LOGV2_ERROR(23795,
-                        "Plan executor error during StageDebug command: FAILURE, stats: "
-                        "{Explain_getWinningPlanStats_exec_get}",
-                        "Explain_getWinningPlanStats_exec_get"_attr =
-                            redact(Explain::getWinningPlanStats(exec.get())));
-
-            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                "Executor error during StageDebug command"));
-        }
-
         return true;
     }
 
@@ -299,9 +290,9 @@ public:
             params.bounds.boundInclusion = IndexBounds::makeBoundInclusionFromBoundBools(
                 nodeArgs["startKeyInclusive"].Bool(), nodeArgs["endKeyInclusive"].Bool());
             params.direction = nodeArgs["direction"].numberInt();
-            params.shouldDedup = desc->isMultikey();
+            params.shouldDedup = desc->getEntry()->isMultikey();
 
-            return new IndexScan(expCtx.get(), params, workingSet, matcher);
+            return new IndexScan(expCtx.get(), collection, params, workingSet, matcher);
         } else if ("andHash" == nodeName) {
             uassert(
                 16921, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());
@@ -478,7 +469,7 @@ public:
                 return nullptr;
             }
 
-            return new TextStage(expCtx.get(), params, workingSet, matcher);
+            return new TextStage(expCtx.get(), collection, params, workingSet, matcher);
         } else if ("delete" == nodeName) {
             uassert(18636,
                     "Delete stage doesn't have a filter (put it on the child)",

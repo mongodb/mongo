@@ -59,6 +59,13 @@ public:
                                          std::unique_ptr<RecordStore> rs) const final;
     };
 
+    SharedCollectionDecorations* getSharedDecorations() const final;
+
+    void init(OperationContext* opCtx) final;
+    bool isInitialized() const final;
+    bool isCommitted() const final;
+    void setCommitted(bool val) final;
+
     const NamespaceString& ns() const final {
         return _ns;
     }
@@ -344,17 +351,12 @@ public:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
-        PlanExecutor::YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         ScanDirection scanDirection) final;
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 
     void establishOplogCollectionForLogging(OperationContext* opCtx) final;
-
-    void init(OperationContext* opCtx) final;
-    bool isInitialized() const final;
-    bool isCommitted() const final;
-    void setCommitted(bool val) final;
 
 private:
     /**
@@ -375,6 +377,12 @@ private:
                             std::vector<InsertStatement>::const_iterator begin,
                             std::vector<InsertStatement>::const_iterator end,
                             OpDebug* opDebug);
+
+    // This object is decorable and decorated with unversioned data related to the collection. Not
+    // associated with any particular Collection instance for the collection, but shared across all
+    // all instances for the same collection. This is a vehicle for users of a collection to cache
+    // unversioned state for a collection that is accessible across all of the Collection instances.
+    std::shared_ptr<SharedCollectionDecorations> _sharedDecorations;
 
     NamespaceString _ns;
     RecordId _catalogId;

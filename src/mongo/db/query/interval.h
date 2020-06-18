@@ -140,6 +140,11 @@ struct Interval {
      */
     bool isMinToMax() const;
 
+    /**
+     * Returns true if the interval is from MaxKey to MinKey.
+     */
+    bool isMaxToMin() const;
+
     /** Returns how 'this' compares to 'other' */
     enum IntervalComparison {
         //

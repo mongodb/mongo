@@ -51,7 +51,7 @@ ArgParser::ArgParser(int argc, char* argv[]) {
         MONGO_UNREACHABLE;
     }
 
-    ret = parser.run(options, toStringVector(argc, argv), {}, &environment);
+    ret = parser.run(options, toStringVector(argc, argv), &environment);
     if (argc <= 1 || !ret.isOK() || environment.count("help")) {
         if (!ret.isOK()) {
             std::cerr << "An error occurred: " << ret.toString() << std::endl;

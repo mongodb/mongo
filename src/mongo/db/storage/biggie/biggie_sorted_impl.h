@@ -44,7 +44,7 @@ public:
                                Ordering order,
                                const std::string& prefix,
                                const std::string& identEnd,
-                               const NamespaceString& collectionNamespace,
+                               const IndexDescriptor* _desc,
                                const std::string& indexName,
                                const BSONObj& keyPattern,
                                const BSONObj& collation);
@@ -61,7 +61,7 @@ private:
     std::string _prefix;
     std::string _identEnd;
     // Index metadata.
-    const NamespaceString _collectionNamespace;
+    const IndexDescriptor* _desc;
     const std::string _indexName;
     const BSONObj _keyPattern;
     const BSONObj _collation;
@@ -194,7 +194,7 @@ private:
     std::string _prefix;
     std::string _identEnd;
     // Index metadata.
-    const NamespaceString _collectionNamespace;
+    const IndexDescriptor* _desc;
     const std::string _indexName;
     const BSONObj _keyPattern;
     const BSONObj _collation;

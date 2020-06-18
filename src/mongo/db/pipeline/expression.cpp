@@ -88,10 +88,9 @@ string Expression::removeFieldPrefix(const string& prefixedField) {
     return string(pPrefixedField + 1);
 }
 
-intrusive_ptr<Expression> Expression::parseObject(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONObj obj,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> Expression::parseObject(ExpressionContext* const expCtx,
+                                                  BSONObj obj,
+                                                  const VariablesParseState& vps) {
     if (obj.isEmpty()) {
         return ExpressionObject::create(expCtx, {});
     }
@@ -124,10 +123,9 @@ void Expression::registerExpression(
     parserMap[key] = {parser, requiredMinVersion};
 }
 
-intrusive_ptr<Expression> Expression::parseExpression(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONObj obj,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const expCtx,
+                                                      BSONObj obj,
+                                                      const VariablesParseState& vps) {
     uassert(15983,
             str::stream() << "An object representing an expression must have exactly one "
                              "field: "
@@ -157,10 +155,9 @@ intrusive_ptr<Expression> Expression::parseExpression(
     return entry.parser(expCtx, obj.firstElement(), vps);
 }
 
-Expression::ExpressionVector ExpressionNary::parseArguments(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement exprElement,
-    const VariablesParseState& vps) {
+Expression::ExpressionVector ExpressionNary::parseArguments(ExpressionContext* const expCtx,
+                                                            BSONElement exprElement,
+                                                            const VariablesParseState& vps) {
     ExpressionVector out;
     if (exprElement.type() == Array) {
         BSONForEach(elem, exprElement.Obj()) {
@@ -173,10 +170,9 @@ Expression::ExpressionVector ExpressionNary::parseArguments(
     return out;
 }
 
-intrusive_ptr<Expression> Expression::parseOperand(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement exprElement,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> Expression::parseOperand(ExpressionContext* const expCtx,
+                                                   BSONElement exprElement,
+                                                   const VariablesParseState& vps) {
     BSONType type = exprElement.type();
 
     if (type == String && exprElement.valuestr()[0] == '$') {
@@ -755,11 +751,11 @@ const char* ExpressionCeil::getOpName() const {
 /* -------------------- ExpressionCoerceToBool ------------------------- */
 
 intrusive_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
-    const intrusive_ptr<ExpressionContext>& expCtx, intrusive_ptr<Expression> pExpression) {
+    ExpressionContext* const expCtx, intrusive_ptr<Expression> pExpression) {
     return new ExpressionCoerceToBool(expCtx, std::move(pExpression));
 }
 
-ExpressionCoerceToBool::ExpressionCoerceToBool(const intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionCoerceToBool::ExpressionCoerceToBool(ExpressionContext* const expCtx,
                                                intrusive_ptr<Expression> pExpression)
     : Expression(expCtx, {std::move(pExpression)}), pExpression(_children[0]) {}
 
@@ -802,7 +798,7 @@ namespace {
 struct BoundOp {
     ExpressionCompare::CmpOp op;
 
-    auto operator()(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    auto operator()(ExpressionContext* const expCtx,
                     BSONElement bsonExpr,
                     const VariablesParseState& vps) const {
         return ExpressionCompare::parse(expCtx, std::move(bsonExpr), vps, op);
@@ -818,11 +814,10 @@ REGISTER_EXPRESSION(lt, BoundOp{ExpressionCompare::LT});
 REGISTER_EXPRESSION(lte, BoundOp{ExpressionCompare::LTE});
 REGISTER_EXPRESSION(ne, BoundOp{ExpressionCompare::NE});
 
-intrusive_ptr<Expression> ExpressionCompare::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement bsonExpr,
-    const VariablesParseState& vps,
-    CmpOp op) {
+intrusive_ptr<Expression> ExpressionCompare::parse(ExpressionContext* const expCtx,
+                                                   BSONElement bsonExpr,
+                                                   const VariablesParseState& vps,
+                                                   CmpOp op) {
     intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(expCtx, op);
     ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
     expr->validateArguments(args);
@@ -831,7 +826,7 @@ intrusive_ptr<Expression> ExpressionCompare::parse(
 }
 
 boost::intrusive_ptr<ExpressionCompare> ExpressionCompare::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    ExpressionContext* const expCtx,
     CmpOp cmpOp,
     const boost::intrusive_ptr<Expression>& exprLeft,
     const boost::intrusive_ptr<Expression>& exprRight) {
@@ -949,10 +944,9 @@ Value ExpressionCond::evaluate(const Document& root, Variables* variables) const
     return _children[idx]->evaluate(root, variables);
 }
 
-intrusive_ptr<Expression> ExpressionCond::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
+                                                BSONElement expr,
+                                                const VariablesParseState& vps) {
     if (expr.type() != Object) {
         return Base::parse(expCtx, expr, vps);
     }
@@ -989,22 +983,20 @@ const char* ExpressionCond::getOpName() const {
 
 /* ---------------------- ExpressionConstant --------------------------- */
 
-intrusive_ptr<Expression> ExpressionConstant::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement exprElement,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionConstant::parse(ExpressionContext* const expCtx,
+                                                    BSONElement exprElement,
+                                                    const VariablesParseState& vps) {
     return new ExpressionConstant(expCtx, Value(exprElement));
 }
 
 
-intrusive_ptr<ExpressionConstant> ExpressionConstant::create(
-    const intrusive_ptr<ExpressionContext>& expCtx, const Value& value) {
+intrusive_ptr<ExpressionConstant> ExpressionConstant::create(ExpressionContext* const expCtx,
+                                                             const Value& value) {
     intrusive_ptr<ExpressionConstant> pEC(new ExpressionConstant(expCtx, value));
     return pEC;
 }
 
-ExpressionConstant::ExpressionConstant(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const Value& value)
+ExpressionConstant::ExpressionConstant(ExpressionContext* const expCtx, const Value& value)
     : Expression(expCtx), _value(value) {}
 
 
@@ -1065,10 +1057,9 @@ boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
 
 
 REGISTER_EXPRESSION(dateFromParts, ExpressionDateFromParts::parse);
-intrusive_ptr<Expression> ExpressionDateFromParts::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionDateFromParts::parse(ExpressionContext* const expCtx,
+                                                         BSONElement expr,
+                                                         const VariablesParseState& vps) {
 
     uassert(40519,
             "$dateFromParts only supports an object as its argument",
@@ -1146,19 +1137,18 @@ intrusive_ptr<Expression> ExpressionDateFromParts::parse(
         timeZoneElem ? parseOperand(expCtx, timeZoneElem, vps) : nullptr);
 }
 
-ExpressionDateFromParts::ExpressionDateFromParts(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    intrusive_ptr<Expression> year,
-    intrusive_ptr<Expression> month,
-    intrusive_ptr<Expression> day,
-    intrusive_ptr<Expression> hour,
-    intrusive_ptr<Expression> minute,
-    intrusive_ptr<Expression> second,
-    intrusive_ptr<Expression> millisecond,
-    intrusive_ptr<Expression> isoWeekYear,
-    intrusive_ptr<Expression> isoWeek,
-    intrusive_ptr<Expression> isoDayOfWeek,
-    intrusive_ptr<Expression> timeZone)
+ExpressionDateFromParts::ExpressionDateFromParts(ExpressionContext* const expCtx,
+                                                 intrusive_ptr<Expression> year,
+                                                 intrusive_ptr<Expression> month,
+                                                 intrusive_ptr<Expression> day,
+                                                 intrusive_ptr<Expression> hour,
+                                                 intrusive_ptr<Expression> minute,
+                                                 intrusive_ptr<Expression> second,
+                                                 intrusive_ptr<Expression> millisecond,
+                                                 intrusive_ptr<Expression> isoWeekYear,
+                                                 intrusive_ptr<Expression> isoWeek,
+                                                 intrusive_ptr<Expression> isoDayOfWeek,
+                                                 intrusive_ptr<Expression> timeZone)
     : Expression(expCtx,
                  {std::move(year),
                   std::move(month),
@@ -1405,10 +1395,9 @@ void ExpressionDateFromParts::_doAddDependencies(DepsTracker* deps) const {
 /* ---------------------- ExpressionDateFromString --------------------- */
 
 REGISTER_EXPRESSION(dateFromString, ExpressionDateFromString::parse);
-intrusive_ptr<Expression> ExpressionDateFromString::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionDateFromString::parse(ExpressionContext* const expCtx,
+                                                          BSONElement expr,
+                                                          const VariablesParseState& vps) {
 
     uassert(40540,
             str::stream() << "$dateFromString only supports an object as an argument, found: "
@@ -1449,13 +1438,12 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
         onErrorElem ? parseOperand(expCtx, onErrorElem, vps) : nullptr);
 }
 
-ExpressionDateFromString::ExpressionDateFromString(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    intrusive_ptr<Expression> dateString,
-    intrusive_ptr<Expression> timeZone,
-    intrusive_ptr<Expression> format,
-    intrusive_ptr<Expression> onNull,
-    intrusive_ptr<Expression> onError)
+ExpressionDateFromString::ExpressionDateFromString(ExpressionContext* const expCtx,
+                                                   intrusive_ptr<Expression> dateString,
+                                                   intrusive_ptr<Expression> timeZone,
+                                                   intrusive_ptr<Expression> format,
+                                                   intrusive_ptr<Expression> onNull,
+                                                   intrusive_ptr<Expression> onError)
     : Expression(expCtx,
                  {std::move(dateString),
                   std::move(timeZone),
@@ -1588,10 +1576,9 @@ void ExpressionDateFromString::_doAddDependencies(DepsTracker* deps) const {
 /* ---------------------- ExpressionDateToParts ----------------------- */
 
 REGISTER_EXPRESSION(dateToParts, ExpressionDateToParts::parse);
-intrusive_ptr<Expression> ExpressionDateToParts::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionDateToParts::parse(ExpressionContext* const expCtx,
+                                                       BSONElement expr,
+                                                       const VariablesParseState& vps) {
 
     uassert(40524,
             "$dateToParts only supports an object as its argument",
@@ -1627,7 +1614,7 @@ intrusive_ptr<Expression> ExpressionDateToParts::parse(
         isoDateElem ? parseOperand(expCtx, isoDateElem, vps) : nullptr);
 }
 
-ExpressionDateToParts::ExpressionDateToParts(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionDateToParts::ExpressionDateToParts(ExpressionContext* const expCtx,
                                              intrusive_ptr<Expression> date,
                                              intrusive_ptr<Expression> timeZone,
                                              intrusive_ptr<Expression> iso8601)
@@ -1737,10 +1724,9 @@ void ExpressionDateToParts::_doAddDependencies(DepsTracker* deps) const {
 /* ---------------------- ExpressionDateToString ----------------------- */
 
 REGISTER_EXPRESSION(dateToString, ExpressionDateToString::parse);
-intrusive_ptr<Expression> ExpressionDateToString::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionDateToString::parse(ExpressionContext* const expCtx,
+                                                        BSONElement expr,
+                                                        const VariablesParseState& vps) {
     verify(expr.fieldNameStringData() == "$dateToString");
 
     uassert(18629,
@@ -1776,12 +1762,11 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
                                       onNullElem ? parseOperand(expCtx, onNullElem, vps) : nullptr);
 }
 
-ExpressionDateToString::ExpressionDateToString(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    intrusive_ptr<Expression> date,
-    intrusive_ptr<Expression> format,
-    intrusive_ptr<Expression> timeZone,
-    intrusive_ptr<Expression> onNull)
+ExpressionDateToString::ExpressionDateToString(ExpressionContext* const expCtx,
+                                               intrusive_ptr<Expression> date,
+                                               intrusive_ptr<Expression> format,
+                                               intrusive_ptr<Expression> timeZone,
+                                               intrusive_ptr<Expression> onNull)
     : Expression(expCtx,
                  {std::move(format), std::move(date), std::move(timeZone), std::move(onNull)}),
       _format(_children[0]),
@@ -1858,10 +1843,12 @@ Value ExpressionDateToString::evaluate(const Document& root, Variables* variable
             return Value(BSONNULL);
         }
 
-        return Value(timeZone->formatDate(formatValue.getStringData(), date.coerceToDate()));
+        return Value(uassertStatusOK(
+            timeZone->formatDate(formatValue.getStringData(), date.coerceToDate())));
     }
 
-    return Value(timeZone->formatDate(Value::kISOFormatString, date.coerceToDate()));
+    return Value(
+        uassertStatusOK(timeZone->formatDate(Value::kISOFormatString, date.coerceToDate())));
 }
 
 void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
@@ -1932,13 +1919,13 @@ const char* ExpressionExp::getOpName() const {
 
 /* ---------------------- ExpressionObject --------------------------- */
 
-ExpressionObject::ExpressionObject(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionObject::ExpressionObject(ExpressionContext* const expCtx,
                                    std::vector<boost::intrusive_ptr<Expression>> _children,
                                    vector<pair<string, intrusive_ptr<Expression>&>>&& expressions)
     : Expression(expCtx, std::move(_children)), _expressions(std::move(expressions)) {}
 
 boost::intrusive_ptr<ExpressionObject> ExpressionObject::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    ExpressionContext* const expCtx,
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&&
         expressionsWithChildrenInPlace) {
     std::vector<boost::intrusive_ptr<Expression>> children;
@@ -1956,10 +1943,9 @@ boost::intrusive_ptr<ExpressionObject> ExpressionObject::create(
     return new ExpressionObject(expCtx, std::move(children), std::move(expressions));
 }
 
-intrusive_ptr<ExpressionObject> ExpressionObject::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONObj obj,
-    const VariablesParseState& vps) {
+intrusive_ptr<ExpressionObject> ExpressionObject::parse(ExpressionContext* const expCtx,
+                                                        BSONObj obj,
+                                                        const VariablesParseState& vps) {
     // Make sure we don't have any duplicate field names.
     stdx::unordered_set<string> specifiedFields;
 
@@ -2046,16 +2032,15 @@ Expression::ComputedPaths ExpressionObject::getComputedPaths(const std::string& 
 /* --------------------- ExpressionFieldPath --------------------------- */
 
 // this is the old deprecated version only used by tests not using variables
-intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const string& fieldPath) {
+intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(ExpressionContext* const expCtx,
+                                                               const string& fieldPath) {
     return new ExpressionFieldPath(expCtx, "CURRENT." + fieldPath, Variables::kRootId);
 }
 
 // this is the new version that supports every syntax
-intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const string& raw,
-    const VariablesParseState& vps) {
+intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext* const expCtx,
+                                                              const string& raw,
+                                                              const VariablesParseState& vps) {
     uassert(16873,
             str::stream() << "FieldPath '" << raw << "' doesn't start with $",
             raw.c_str()[0] == '$');  // c_str()[0] is always a valid reference.
@@ -2078,7 +2063,7 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(
     }
 }
 
-ExpressionFieldPath::ExpressionFieldPath(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionFieldPath::ExpressionFieldPath(ExpressionContext* const expCtx,
                                          const string& theFieldPath,
                                          Variables::Id variable)
     : Expression(expCtx), _fieldPath(theFieldPath), _variable(variable) {}
@@ -2215,10 +2200,9 @@ Expression::ComputedPaths ExpressionFieldPath::getComputedPaths(const std::strin
 /* ------------------------- ExpressionFilter ----------------------------- */
 
 REGISTER_EXPRESSION(filter, ExpressionFilter::parse);
-intrusive_ptr<Expression> ExpressionFilter::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vpsIn) {
+intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vpsIn) {
     verify(expr.fieldNameStringData() == "$filter");
 
     uassert(28646, "$filter only supports an object as its argument", expr.type() == Object);
@@ -2262,7 +2246,7 @@ intrusive_ptr<Expression> ExpressionFilter::parse(
         expCtx, std::move(varName), varId, std::move(input), std::move(cond));
 }
 
-ExpressionFilter::ExpressionFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionFilter::ExpressionFilter(ExpressionContext* const expCtx,
                                    string varName,
                                    Variables::Id varId,
                                    intrusive_ptr<Expression> input,
@@ -2342,10 +2326,9 @@ const char* ExpressionFloor::getOpName() const {
 /* ------------------------- ExpressionLet ----------------------------- */
 
 REGISTER_EXPRESSION(let, ExpressionLet::parse);
-intrusive_ptr<Expression> ExpressionLet::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vpsIn) {
+intrusive_ptr<Expression> ExpressionLet::parse(ExpressionContext* const expCtx,
+                                               BSONElement expr,
+                                               const VariablesParseState& vpsIn) {
     verify(expr.fieldNameStringData() == "$let");
 
     uassert(16874, "$let only supports an object as its argument", expr.type() == Object);
@@ -2380,10 +2363,13 @@ intrusive_ptr<Expression> ExpressionLet::parse(
     auto& inPtr = children.emplace_back(nullptr);
 
     std::vector<boost::intrusive_ptr<Expression>>::size_type index = 0;
+    std::vector<Variables::Id> orderedVariableIds;
     for (auto&& varElem : varsObj) {
         const string varName = varElem.fieldName();
         Variables::validateNameForUserWrite(varName);
         Variables::Id id = vpsSub.defineVariable(varName);
+
+        orderedVariableIds.push_back(id);
 
         vars.emplace(id, NameAndExpression{varName, children[index]});  // only has outer vars
         ++index;
@@ -2392,14 +2378,17 @@ intrusive_ptr<Expression> ExpressionLet::parse(
     // parse "in"
     inPtr = parseOperand(expCtx, inElem, vpsSub);  // has our vars
 
-    return new ExpressionLet(expCtx, std::move(vars), std::move(children));
+    return new ExpressionLet(
+        expCtx, std::move(vars), std::move(children), std::move(orderedVariableIds));
 }
 
-ExpressionLet::ExpressionLet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionLet::ExpressionLet(ExpressionContext* const expCtx,
                              VariableMap&& vars,
-                             std::vector<boost::intrusive_ptr<Expression>> children)
+                             std::vector<boost::intrusive_ptr<Expression>> children,
+                             std::vector<Variables::Id> orderedVariableIds)
     : Expression(expCtx, std::move(children)),
       _variables(std::move(vars)),
+      _orderedVariableIds(std::move(orderedVariableIds)),
       _subExpression(_children.back()) {}
 
 intrusive_ptr<Expression> ExpressionLet::optimize() {
@@ -2451,10 +2440,9 @@ void ExpressionLet::_doAddDependencies(DepsTracker* deps) const {
 /* ------------------------- ExpressionMap ----------------------------- */
 
 REGISTER_EXPRESSION(map, ExpressionMap::parse);
-intrusive_ptr<Expression> ExpressionMap::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vpsIn) {
+intrusive_ptr<Expression> ExpressionMap::parse(ExpressionContext* const expCtx,
+                                               BSONElement expr,
+                                               const VariablesParseState& vpsIn) {
     verify(expr.fieldNameStringData() == "$map");
 
     uassert(16878, "$map only supports an object as its argument", expr.type() == Object);
@@ -2500,7 +2488,7 @@ intrusive_ptr<Expression> ExpressionMap::parse(
     return new ExpressionMap(expCtx, varName, varId, input, in);
 }
 
-ExpressionMap::ExpressionMap(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionMap::ExpressionMap(ExpressionContext* const expCtx,
                              const string& varName,
                              Variables::Id varId,
                              intrusive_ptr<Expression> input,
@@ -2629,10 +2617,9 @@ const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTyp
 
 }  // namespace
 
-intrusive_ptr<Expression> ExpressionMeta::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vpsIn) {
+intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
+                                                BSONElement expr,
+                                                const VariablesParseState& vpsIn) {
     uassert(17307, "$meta only supports string arguments", expr.type() == String);
 
     const auto iter = kMetaNameToMetaType.find(expr.valueStringData());
@@ -2643,8 +2630,7 @@ intrusive_ptr<Expression> ExpressionMeta::parse(
     }
 }
 
-ExpressionMeta::ExpressionMeta(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               MetaType metaType)
+ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaType)
     : Expression(expCtx), _metaType(metaType) {}
 
 Value ExpressionMeta::serialize(bool explain) const {
@@ -2937,7 +2923,7 @@ ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArg
  */
 class ExpressionIndexOfArray::Optimized : public ExpressionIndexOfArray {
 public:
-    Optimized(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Optimized(ExpressionContext* const expCtx,
               const ValueUnorderedMap<vector<int>>& indexMap,
               const ExpressionVector& operands)
         : ExpressionIndexOfArray(expCtx), _indexMap(std::move(indexMap)) {
@@ -3544,8 +3530,9 @@ bool representableAsLong(long long base, long long exp) {
 
 /* ----------------------- ExpressionPow ---------------------------- */
 
-intrusive_ptr<Expression> ExpressionPow::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Value base, Value exp) {
+intrusive_ptr<Expression> ExpressionPow::create(ExpressionContext* const expCtx,
+                                                Value base,
+                                                Value exp) {
     intrusive_ptr<ExpressionPow> expr(new ExpressionPow(expCtx));
     expr->_children.push_back(
         ExpressionConstant::create(expr->getExpressionContext(), std::move(base)));
@@ -3735,10 +3722,9 @@ const char* ExpressionRange::getOpName() const {
 /* ------------------------ ExpressionReduce ------------------------------ */
 
 REGISTER_EXPRESSION(reduce, ExpressionReduce::parse);
-intrusive_ptr<Expression> ExpressionReduce::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* const expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps) {
     uassert(40075,
             str::stream() << "$reduce requires an object as an argument, found: "
                           << typeName(expr.type()),
@@ -3837,7 +3823,7 @@ Value ExpressionReplaceBase::serialize(bool explain) const {
 namespace {
 std::tuple<intrusive_ptr<Expression>, intrusive_ptr<Expression>, intrusive_ptr<Expression>>
 parseExpressionReplaceBase(const char* opName,
-                           const intrusive_ptr<ExpressionContext>& expCtx,
+                           ExpressionContext* const expCtx,
                            BSONElement expr,
                            const VariablesParseState& vps) {
 
@@ -3913,10 +3899,9 @@ intrusive_ptr<Expression> ExpressionReplaceBase::optimize() {
 
 REGISTER_EXPRESSION(replaceOne, ExpressionReplaceOne::parse);
 
-intrusive_ptr<Expression> ExpressionReplaceOne::parse(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionReplaceOne::parse(ExpressionContext* const expCtx,
+                                                      BSONElement expr,
+                                                      const VariablesParseState& vps) {
     auto [input, find, replacement] = parseExpressionReplaceBase(opName, expCtx, expr, vps);
     return make_intrusive<ExpressionReplaceOne>(
         expCtx, std::move(input), std::move(find), std::move(replacement));
@@ -3945,10 +3930,9 @@ Value ExpressionReplaceOne::_doEval(StringData input,
 
 REGISTER_EXPRESSION(replaceAll, ExpressionReplaceAll::parse);
 
-intrusive_ptr<Expression> ExpressionReplaceAll::parse(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionReplaceAll::parse(ExpressionContext* const expCtx,
+                                                      BSONElement expr,
+                                                      const VariablesParseState& vps) {
     auto [input, find, replacement] = parseExpressionReplaceBase(opName, expCtx, expr, vps);
     return make_intrusive<ExpressionReplaceAll>(
         expCtx, std::move(input), std::move(find), std::move(replacement));
@@ -4189,7 +4173,7 @@ Value ExpressionSetIsSubset::evaluate(const Document& root, Variables* variables
  */
 class ExpressionSetIsSubset::Optimized : public ExpressionSetIsSubset {
 public:
-    Optimized(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Optimized(ExpressionContext* const expCtx,
               const ValueSet& cachedRhsSet,
               const ExpressionVector& operands)
         : ExpressionSetIsSubset(expCtx), _cachedRhsSet(cachedRhsSet) {
@@ -4760,10 +4744,9 @@ Value ExpressionSwitch::evaluate(const Document& root, Variables* variables) con
     return _default->evaluate(root, variables);
 }
 
-boost::intrusive_ptr<Expression> ExpressionSwitch::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* const expCtx,
+                                                         BSONElement expr,
+                                                         const VariablesParseState& vps) {
     uassert(40060,
             str::stream() << "$switch requires an object as an argument, found: "
                           << typeName(expr.type()),
@@ -4912,10 +4895,9 @@ REGISTER_EXPRESSION(trim, ExpressionTrim::parse);
 REGISTER_EXPRESSION(ltrim, ExpressionTrim::parse);
 REGISTER_EXPRESSION(rtrim, ExpressionTrim::parse);
 
-intrusive_ptr<Expression> ExpressionTrim::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionTrim::parse(ExpressionContext* const expCtx,
+                                                BSONElement expr,
+                                                const VariablesParseState& vps) {
     const auto name = expr.fieldNameStringData();
     TrimType trimType = TrimType::kBoth;
     if (name == "$ltrim"_sd) {
@@ -5231,7 +5213,7 @@ Value ExpressionTrunc::evaluate(const Document& root, Variables* variables) cons
         root, _children, getOpName(), Decimal128::kRoundTowardZero, &std::trunc, variables);
 }
 
-intrusive_ptr<Expression> ExpressionTrunc::parse(const intrusive_ptr<ExpressionContext>& expCtx,
+intrusive_ptr<Expression> ExpressionTrunc::parse(ExpressionContext* const expCtx,
                                                  BSONElement elem,
                                                  const VariablesParseState& vps) {
     return ExpressionRangedArity<ExpressionTrunc, 1, 2>::parse(expCtx, elem, vps);
@@ -5270,10 +5252,9 @@ const char* ExpressionIsNumber::getOpName() const {
 /* -------------------------- ExpressionZip ------------------------------ */
 
 REGISTER_EXPRESSION(zip, ExpressionZip::parse);
-intrusive_ptr<Expression> ExpressionZip::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
+                                               BSONElement expr,
+                                               const VariablesParseState& vps) {
     uassert(34460,
             str::stream() << "$zip only supports an object as an argument, found "
                           << typeName(expr.type()),
@@ -5458,8 +5439,7 @@ namespace {
  */
 class ConversionTable {
 public:
-    using ConversionFunc =
-        std::function<Value(const boost::intrusive_ptr<ExpressionContext>&, Value)>;
+    using ConversionFunc = std::function<Value(ExpressionContext* const, Value)>;
 
     ConversionTable() {
         //
@@ -5467,17 +5447,17 @@ public:
         //
         table[BSONType::NumberDouble][BSONType::NumberDouble] = &performIdentityConversion;
         table[BSONType::NumberDouble][BSONType::String] = &performFormatDouble;
-        table[BSONType::NumberDouble][BSONType::Bool] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToBool());
-            };
+        table[BSONType::NumberDouble][BSONType::Bool] = [](ExpressionContext* const expCtx,
+                                                           Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
         table[BSONType::NumberDouble][BSONType::Date] = &performCastNumberToDate;
         table[BSONType::NumberDouble][BSONType::NumberInt] = &performCastDoubleToInt;
         table[BSONType::NumberDouble][BSONType::NumberLong] = &performCastDoubleToLong;
-        table[BSONType::NumberDouble][BSONType::NumberDecimal] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToDecimal());
-            };
+        table[BSONType::NumberDouble][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
+                                                                    Value inputValue) {
+            return Value(inputValue.coerceToDecimal());
+        };
 
         //
         // Conversions from String
@@ -5486,11 +5466,11 @@ public:
         table[BSONType::String][BSONType::String] = &performIdentityConversion;
         table[BSONType::String][BSONType::jstOID] = &parseStringToOID;
         table[BSONType::String][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::String][BSONType::Date] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(expCtx->timeZoneDatabase->fromString(
-                    inputValue.getStringData(), mongo::TimeZoneDatabase::utcZone()));
-            };
+        table[BSONType::String][BSONType::Date] = [](ExpressionContext* const expCtx,
+                                                     Value inputValue) {
+            return Value(expCtx->timeZoneDatabase->fromString(inputValue.getStringData(),
+                                                              mongo::TimeZoneDatabase::utcZone()));
+        };
         table[BSONType::String][BSONType::NumberInt] = &parseStringToNumber<int, 10>;
         table[BSONType::String][BSONType::NumberLong] = &parseStringToNumber<long long, 10>;
         table[BSONType::String][BSONType::NumberDecimal] = &parseStringToNumber<Decimal128, 0>;
@@ -5498,139 +5478,139 @@ public:
         //
         // Conversions from jstOID
         //
-        table[BSONType::jstOID][BSONType::String] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.getOid().toString());
-            };
+        table[BSONType::jstOID][BSONType::String] = [](ExpressionContext* const expCtx,
+                                                       Value inputValue) {
+            return Value(inputValue.getOid().toString());
+        };
         table[BSONType::jstOID][BSONType::jstOID] = &performIdentityConversion;
         table[BSONType::jstOID][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::jstOID][BSONType::Date] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.getOid().asDateT());
-            };
+        table[BSONType::jstOID][BSONType::Date] = [](ExpressionContext* const expCtx,
+                                                     Value inputValue) {
+            return Value(inputValue.getOid().asDateT());
+        };
 
         //
         // Conversions from Bool
         //
-        table[BSONType::Bool][BSONType::NumberDouble] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return inputValue.getBool() ? Value(1.0) : Value(0.0);
-            };
-        table[BSONType::Bool][BSONType::String] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return inputValue.getBool() ? Value("true"_sd) : Value("false"_sd);
-            };
+        table[BSONType::Bool][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,
+                                                           Value inputValue) {
+            return inputValue.getBool() ? Value(1.0) : Value(0.0);
+        };
+        table[BSONType::Bool][BSONType::String] = [](ExpressionContext* const expCtx,
+                                                     Value inputValue) {
+            return inputValue.getBool() ? Value("true"_sd) : Value("false"_sd);
+        };
         table[BSONType::Bool][BSONType::Bool] = &performIdentityConversion;
-        table[BSONType::Bool][BSONType::NumberInt] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return inputValue.getBool() ? Value(int{1}) : Value(int{0});
-            };
-        table[BSONType::Bool][BSONType::NumberLong] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return inputValue.getBool() ? Value(1LL) : Value(0LL);
-            };
-        table[BSONType::Bool][BSONType::NumberDecimal] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return inputValue.getBool() ? Value(Decimal128(1)) : Value(Decimal128(0));
-            };
+        table[BSONType::Bool][BSONType::NumberInt] = [](ExpressionContext* const expCtx,
+                                                        Value inputValue) {
+            return inputValue.getBool() ? Value(int{1}) : Value(int{0});
+        };
+        table[BSONType::Bool][BSONType::NumberLong] = [](ExpressionContext* const expCtx,
+                                                         Value inputValue) {
+            return inputValue.getBool() ? Value(1LL) : Value(0LL);
+        };
+        table[BSONType::Bool][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
+                                                            Value inputValue) {
+            return inputValue.getBool() ? Value(Decimal128(1)) : Value(Decimal128(0));
+        };
 
         //
         // Conversions from Date
         //
-        table[BSONType::Date][BSONType::NumberDouble] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(static_cast<double>(inputValue.getDate().toMillisSinceEpoch()));
-            };
-        table[BSONType::Date][BSONType::String] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                auto dateString = TimeZoneDatabase::utcZone().formatDate(Value::kISOFormatString,
-                                                                         inputValue.getDate());
-                return Value(dateString);
-            };
-        table[BSONType::Date][BSONType::Bool] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToBool());
-            };
+        table[BSONType::Date][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,
+                                                           Value inputValue) {
+            return Value(static_cast<double>(inputValue.getDate().toMillisSinceEpoch()));
+        };
+        table[BSONType::Date][BSONType::String] = [](ExpressionContext* const expCtx,
+                                                     Value inputValue) {
+            auto dateString = uassertStatusOK(TimeZoneDatabase::utcZone().formatDate(
+                Value::kISOFormatString, inputValue.getDate()));
+            return Value(dateString);
+        };
+        table[BSONType::Date][BSONType::Bool] = [](ExpressionContext* const expCtx,
+                                                   Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
         table[BSONType::Date][BSONType::Date] = &performIdentityConversion;
-        table[BSONType::Date][BSONType::NumberLong] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.getDate().toMillisSinceEpoch());
-            };
-        table[BSONType::Date][BSONType::NumberDecimal] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(
-                    Decimal128(static_cast<int64_t>(inputValue.getDate().toMillisSinceEpoch())));
-            };
+        table[BSONType::Date][BSONType::NumberLong] = [](ExpressionContext* const expCtx,
+                                                         Value inputValue) {
+            return Value(inputValue.getDate().toMillisSinceEpoch());
+        };
+        table[BSONType::Date][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
+                                                            Value inputValue) {
+            return Value(
+                Decimal128(static_cast<int64_t>(inputValue.getDate().toMillisSinceEpoch())));
+        };
 
         //
         // Conversions from NumberInt
         //
-        table[BSONType::NumberInt][BSONType::NumberDouble] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToDouble());
-            };
-        table[BSONType::NumberInt][BSONType::String] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(static_cast<std::string>(str::stream() << inputValue.getInt()));
-            };
-        table[BSONType::NumberInt][BSONType::Bool] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToBool());
-            };
+        table[BSONType::NumberInt][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,
+                                                                Value inputValue) {
+            return Value(inputValue.coerceToDouble());
+        };
+        table[BSONType::NumberInt][BSONType::String] = [](ExpressionContext* const expCtx,
+                                                          Value inputValue) {
+            return Value(static_cast<std::string>(str::stream() << inputValue.getInt()));
+        };
+        table[BSONType::NumberInt][BSONType::Bool] = [](ExpressionContext* const expCtx,
+                                                        Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
         table[BSONType::NumberInt][BSONType::NumberInt] = &performIdentityConversion;
-        table[BSONType::NumberInt][BSONType::NumberLong] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(static_cast<long long>(inputValue.getInt()));
-            };
-        table[BSONType::NumberInt][BSONType::NumberDecimal] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToDecimal());
-            };
+        table[BSONType::NumberInt][BSONType::NumberLong] = [](ExpressionContext* const expCtx,
+                                                              Value inputValue) {
+            return Value(static_cast<long long>(inputValue.getInt()));
+        };
+        table[BSONType::NumberInt][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
+                                                                 Value inputValue) {
+            return Value(inputValue.coerceToDecimal());
+        };
 
         //
         // Conversions from NumberLong
         //
-        table[BSONType::NumberLong][BSONType::NumberDouble] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToDouble());
-            };
-        table[BSONType::NumberLong][BSONType::String] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(static_cast<std::string>(str::stream() << inputValue.getLong()));
-            };
-        table[BSONType::NumberLong][BSONType::Bool] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToBool());
-            };
+        table[BSONType::NumberLong][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,
+                                                                 Value inputValue) {
+            return Value(inputValue.coerceToDouble());
+        };
+        table[BSONType::NumberLong][BSONType::String] = [](ExpressionContext* const expCtx,
+                                                           Value inputValue) {
+            return Value(static_cast<std::string>(str::stream() << inputValue.getLong()));
+        };
+        table[BSONType::NumberLong][BSONType::Bool] = [](ExpressionContext* const expCtx,
+                                                         Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
         table[BSONType::NumberLong][BSONType::Date] = &performCastNumberToDate;
         table[BSONType::NumberLong][BSONType::NumberInt] = &performCastLongToInt;
         table[BSONType::NumberLong][BSONType::NumberLong] = &performIdentityConversion;
-        table[BSONType::NumberLong][BSONType::NumberDecimal] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToDecimal());
-            };
+        table[BSONType::NumberLong][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
+                                                                  Value inputValue) {
+            return Value(inputValue.coerceToDecimal());
+        };
 
         //
         // Conversions from NumberDecimal
         //
         table[BSONType::NumberDecimal][BSONType::NumberDouble] = &performCastDecimalToDouble;
-        table[BSONType::NumberDecimal][BSONType::String] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.getDecimal().toString());
-            };
-        table[BSONType::NumberDecimal][BSONType::Bool] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return Value(inputValue.coerceToBool());
-            };
+        table[BSONType::NumberDecimal][BSONType::String] = [](ExpressionContext* const expCtx,
+                                                              Value inputValue) {
+            return Value(inputValue.getDecimal().toString());
+        };
+        table[BSONType::NumberDecimal][BSONType::Bool] = [](ExpressionContext* const expCtx,
+                                                            Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
         table[BSONType::NumberDecimal][BSONType::Date] = &performCastNumberToDate;
-        table[BSONType::NumberDecimal][BSONType::NumberInt] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return performCastDecimalToInt(BSONType::NumberInt, inputValue);
-            };
-        table[BSONType::NumberDecimal][BSONType::NumberLong] =
-            [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
-                return performCastDecimalToInt(BSONType::NumberLong, inputValue);
-            };
+        table[BSONType::NumberDecimal][BSONType::NumberInt] = [](ExpressionContext* const expCtx,
+                                                                 Value inputValue) {
+            return performCastDecimalToInt(BSONType::NumberInt, inputValue);
+        };
+        table[BSONType::NumberDecimal][BSONType::NumberLong] = [](ExpressionContext* const expCtx,
+                                                                  Value inputValue) {
+            return performCastDecimalToInt(BSONType::NumberLong, inputValue);
+        };
         table[BSONType::NumberDecimal][BSONType::NumberDecimal] = &performIdentityConversion;
 
         //
@@ -5686,8 +5666,7 @@ private:
             std::isfinite(inputDouble));
     }
 
-    static Value performCastDoubleToInt(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Value inputValue) {
+    static Value performCastDoubleToInt(ExpressionContext* const expCtx, Value inputValue) {
         double inputDouble = inputValue.getDouble();
         validateDoubleValueIsFinite(inputDouble);
 
@@ -5701,8 +5680,7 @@ private:
         return Value(static_cast<int>(inputDouble));
     }
 
-    static Value performCastDoubleToLong(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Value inputValue) {
+    static Value performCastDoubleToLong(ExpressionContext* const expCtx, Value inputValue) {
         double inputDouble = inputValue.getDouble();
         validateDoubleValueIsFinite(inputDouble);
 
@@ -5757,8 +5735,7 @@ private:
         return result;
     }
 
-    static Value performCastDecimalToDouble(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            Value inputValue) {
+    static Value performCastDecimalToDouble(ExpressionContext* const expCtx, Value inputValue) {
         Decimal128 inputDecimal = inputValue.getDecimal();
 
         std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
@@ -5775,8 +5752,7 @@ private:
         return Value(result);
     }
 
-    static Value performCastLongToInt(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      Value inputValue) {
+    static Value performCastLongToInt(ExpressionContext* const expCtx, Value inputValue) {
         long long longValue = inputValue.getLong();
 
         uassert(ErrorCodes::ConversionFailure,
@@ -5788,8 +5764,7 @@ private:
         return Value(static_cast<int>(longValue));
     }
 
-    static Value performCastNumberToDate(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Value inputValue) {
+    static Value performCastNumberToDate(ExpressionContext* const expCtx, Value inputValue) {
         long long millisSinceEpoch;
 
         switch (inputValue.getType()) {
@@ -5810,8 +5785,7 @@ private:
         return Value(Date_t::fromMillisSinceEpoch(millisSinceEpoch));
     }
 
-    static Value performFormatDouble(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     Value inputValue) {
+    static Value performFormatDouble(ExpressionContext* const expCtx, Value inputValue) {
         double doubleValue = inputValue.getDouble();
 
         if (std::isinf(doubleValue)) {
@@ -5826,8 +5800,7 @@ private:
     }
 
     template <class targetType, int base>
-    static Value parseStringToNumber(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     Value inputValue) {
+    static Value parseStringToNumber(ExpressionContext* const expCtx, Value inputValue) {
         auto stringValue = inputValue.getStringData();
         targetType result;
 
@@ -5848,8 +5821,7 @@ private:
         return Value(result);
     }
 
-    static Value parseStringToOID(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  Value inputValue) {
+    static Value parseStringToOID(ExpressionContext* const expCtx, Value inputValue) {
         try {
             return Value(OID::createFromString(inputValue.getStringData()));
         } catch (const DBException& ex) {
@@ -5861,19 +5833,17 @@ private:
         }
     }
 
-    static Value performConvertToTrue(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      Value inputValue) {
+    static Value performConvertToTrue(ExpressionContext* const expCtx, Value inputValue) {
         return Value(true);
     }
 
-    static Value performIdentityConversion(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           Value inputValue) {
+    static Value performIdentityConversion(ExpressionContext* const expCtx, Value inputValue) {
         return inputValue;
     }
 };
 
 Expression::Parser makeConversionAlias(const StringData shortcutName, BSONType toType) {
-    return [=](const intrusive_ptr<ExpressionContext>& expCtx,
+    return [=](ExpressionContext* const expCtx,
                BSONElement elem,
                const VariablesParseState& vps) -> intrusive_ptr<Expression> {
         // Use parseArguments to allow for a singleton array, or the unwrapped version.
@@ -5902,10 +5872,9 @@ REGISTER_EXPRESSION(toLong, makeConversionAlias("$toLong"_sd, BSONType::NumberLo
 REGISTER_EXPRESSION(toDecimal, makeConversionAlias("$toDecimal"_sd, BSONType::NumberDecimal));
 REGISTER_EXPRESSION(toBool, makeConversionAlias("$toBool"_sd, BSONType::Bool));
 
-boost::intrusive_ptr<Expression> ExpressionConvert::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::intrusive_ptr<Expression> input,
-    BSONType toType) {
+boost::intrusive_ptr<Expression> ExpressionConvert::create(ExpressionContext* const expCtx,
+                                                           boost::intrusive_ptr<Expression> input,
+                                                           BSONType toType) {
     return new ExpressionConvert(
         expCtx,
         std::move(input),
@@ -5914,7 +5883,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::create(
         nullptr);
 }
 
-ExpressionConvert::ExpressionConvert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
                                      boost::intrusive_ptr<Expression> input,
                                      boost::intrusive_ptr<Expression> to,
                                      boost::intrusive_ptr<Expression> onError,
@@ -5925,10 +5894,9 @@ ExpressionConvert::ExpressionConvert(const boost::intrusive_ptr<ExpressionContex
       _onError(_children[2]),
       _onNull(_children[3]) {}
 
-intrusive_ptr<Expression> ExpressionConvert::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expCtx,
+                                                   BSONElement expr,
+                                                   const VariablesParseState& vps) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$convert expects an object of named arguments but found: "
                           << typeName(expr.type()),
@@ -6072,7 +6040,7 @@ Value ExpressionConvert::performConversion(BSONType targetType, Value inputValue
 
 namespace {
 
-auto CommonRegexParse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+auto CommonRegexParse(ExpressionContext* const expCtx,
                       BSONElement expr,
                       const VariablesParseState& vpsIn,
                       StringData opName) {
@@ -6366,10 +6334,9 @@ void ExpressionRegex::_doAddDependencies(DepsTracker* deps) const {
 /* -------------------------- ExpressionRegexFind ------------------------------ */
 
 REGISTER_EXPRESSION(regexFind, ExpressionRegexFind::parse);
-boost::intrusive_ptr<Expression> ExpressionRegexFind::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vpsIn) {
+boost::intrusive_ptr<Expression> ExpressionRegexFind::parse(ExpressionContext* const expCtx,
+                                                            BSONElement expr,
+                                                            const VariablesParseState& vpsIn) {
     auto opName = "$regexFind"_sd;
     auto [input, regex, options] = CommonRegexParse(expCtx, expr, vpsIn, opName);
     return new ExpressionRegexFind(
@@ -6387,10 +6354,9 @@ Value ExpressionRegexFind::evaluate(const Document& root, Variables* variables) 
 /* -------------------------- ExpressionRegexFindAll ------------------------------ */
 
 REGISTER_EXPRESSION(regexFindAll, ExpressionRegexFindAll::parse);
-boost::intrusive_ptr<Expression> ExpressionRegexFindAll::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vpsIn) {
+boost::intrusive_ptr<Expression> ExpressionRegexFindAll::parse(ExpressionContext* const expCtx,
+                                                               BSONElement expr,
+                                                               const VariablesParseState& vpsIn) {
     auto opName = "$regexFindAll"_sd;
     auto [input, regex, options] = CommonRegexParse(expCtx, expr, vpsIn, opName);
     return new ExpressionRegexFindAll(
@@ -6448,10 +6414,9 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
 /* -------------------------- ExpressionRegexMatch ------------------------------ */
 
 REGISTER_EXPRESSION(regexMatch, ExpressionRegexMatch::parse);
-boost::intrusive_ptr<Expression> ExpressionRegexMatch::parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONElement expr,
-    const VariablesParseState& vpsIn) {
+boost::intrusive_ptr<Expression> ExpressionRegexMatch::parse(ExpressionContext* const expCtx,
+                                                             BSONElement expr,
+                                                             const VariablesParseState& vpsIn) {
     auto opName = "$regexMatch"_sd;
     auto [input, regex, options] = CommonRegexParse(expCtx, expr, vpsIn, opName);
     return new ExpressionRegexMatch(
@@ -6464,4 +6429,46 @@ Value ExpressionRegexMatch::evaluate(const Document& root, Variables* variables)
     return executionState.nullish() ? Value(false) : Value(execute(&executionState) > 0);
 }
 
+/* -------------------------- ExpressionRandom ------------------------------ */
+REGISTER_EXPRESSION(rand, ExpressionRandom::parse);
+
+static thread_local PseudoRandom threadLocalRNG(SecureRandom().nextInt64());
+
+ExpressionRandom::ExpressionRandom(ExpressionContext* const expCtx) : Expression(expCtx) {}
+
+intrusive_ptr<Expression> ExpressionRandom::parse(ExpressionContext* const expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps) {
+    uassert(3040500,
+            "$rand not allowed inside collection validators",
+            !expCtx->isParsingCollectionValidator);
+
+    uassert(3040501, "$rand does not currently accept arguments", exprElement.Obj().isEmpty());
+
+    return new ExpressionRandom(expCtx);
+}
+
+const char* ExpressionRandom::getOpName() const {
+    return "$rand";
+}
+
+double ExpressionRandom::getRandomValue() const {
+    return kMinValue + (kMaxValue - kMinValue) * threadLocalRNG.nextCanonicalDouble();
+}
+
+Value ExpressionRandom::evaluate(const Document& root, Variables* variables) const {
+    return Value(getRandomValue());
+}
+
+intrusive_ptr<Expression> ExpressionRandom::optimize() {
+    return intrusive_ptr<Expression>(this);
+}
+
+void ExpressionRandom::_doAddDependencies(DepsTracker* deps) const {
+    // Nothing to do.
+}
+
+Value ExpressionRandom::serialize(const bool explain) const {
+    return Value(DOC(getOpName() << Document()));
+}
 }  // namespace mongo

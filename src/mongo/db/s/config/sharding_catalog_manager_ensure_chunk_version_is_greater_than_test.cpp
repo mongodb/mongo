@@ -29,8 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/s/config_server_test_fixture.h"
 
 namespace mongo {
 namespace {

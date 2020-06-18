@@ -39,15 +39,15 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/cached_plan.h"
-#include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/dbtests/dbtests.h"
@@ -132,8 +132,6 @@ public:
             WorkingSetID id = WorkingSet::INVALID_ID;
             state = cachedPlanStage->work(&id);
 
-            ASSERT_NE(state, PlanStage::FAILURE);
-
             if (state == PlanStage::ADVANCED) {
                 auto member = ws.get(id);
                 ASSERT(cq->root()->matchesBSON(member->doc.value().toBson()));
@@ -152,9 +150,9 @@ public:
         const size_t decisionWorks = 10;
         const size_t mockWorks =
             1U + static_cast<size_t>(internalQueryCacheEvictionRatio * decisionWorks);
-        auto mockChild = std::make_unique<QueuedDataStage>(_expCtx.get(), &_ws);
+        auto mockChild = std::make_unique<MockStage>(_expCtx.get(), &_ws);
         for (size_t i = 0; i < mockWorks; i++) {
-            mockChild->pushBack(PlanStage::NEED_TIME);
+            mockChild->enqueueStateCode(PlanStage::NEED_TIME);
         }
 
         CachedPlanStage cachedPlanStage(_expCtx.get(),
@@ -166,8 +164,7 @@ public:
                                         std::move(mockChild));
 
         // This should succeed after triggering a replan.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
-                                    _opCtx.getServiceContext()->getFastClockSource());
+        NoopYieldPolicy yieldPolicy(_opCtx.getServiceContext()->getFastClockSource());
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
     }
 
@@ -182,10 +179,10 @@ protected:
 };
 
 /**
- * Test that on failure, the cached plan stage replans the query but does not create a new cache
- * entry.
+ * Test that on a memory limit exceeded failure, the cached plan stage replans the query but does
+ * not create a new cache entry.
  */
-TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailure) {
+TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
     Collection* collection = ctx.getCollection();
     ASSERT(collection);
@@ -206,9 +203,10 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailure) {
     QueryPlannerParams plannerParams;
     fillOutPlannerParams(&_opCtx, collection, cq.get(), &plannerParams);
 
-    // Queued data stage will return a failure during the cached plan trial period.
-    auto mockChild = std::make_unique<QueuedDataStage>(_expCtx.get(), &_ws);
-    mockChild->pushBack(PlanStage::FAILURE);
+    // Mock stage will return a failure during the cached plan trial period.
+    auto mockChild = std::make_unique<MockStage>(_expCtx.get(), &_ws);
+    mockChild->enqueueError(
+        Status{ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed, "mock error"});
 
     // High enough so that we shouldn't trigger a replan based on works.
     const size_t decisionWorks = 50;
@@ -221,8 +219,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailure) {
                                     std::move(mockChild));
 
     // This should succeed after triggering a replan.
-    PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
-                                _opCtx.getServiceContext()->getFastClockSource());
+    NoopYieldPolicy yieldPolicy(_opCtx.getServiceContext()->getFastClockSource());
     ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
     ASSERT_EQ(getNumResultsForStage(_ws, &cachedPlanStage, cq.get()), 2U);
@@ -262,9 +259,9 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     const size_t decisionWorks = 10;
     const size_t mockWorks =
         1U + static_cast<size_t>(internalQueryCacheEvictionRatio * decisionWorks);
-    auto mockChild = std::make_unique<QueuedDataStage>(_expCtx.get(), &_ws);
+    auto mockChild = std::make_unique<MockStage>(_expCtx.get(), &_ws);
     for (size_t i = 0; i < mockWorks; i++) {
-        mockChild->pushBack(PlanStage::NEED_TIME);
+        mockChild->enqueueStateCode(PlanStage::NEED_TIME);
     }
 
     CachedPlanStage cachedPlanStage(_expCtx.get(),
@@ -276,8 +273,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
                                     std::move(mockChild));
 
     // This should succeed after triggering a replan.
-    PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
-                                _opCtx.getServiceContext()->getFastClockSource());
+    NoopYieldPolicy yieldPolicy(_opCtx.getServiceContext()->getFastClockSource());
     ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
     ASSERT_EQ(getNumResultsForStage(_ws, &cachedPlanStage, cq.get()), 2U);
@@ -477,7 +473,7 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
                                     cq.get(),
                                     plannerParams,
                                     decisionWorks,
-                                    std::make_unique<QueuedDataStage>(_expCtx.get(), &_ws));
+                                    std::make_unique<MockStage>(_expCtx.get(), &_ws));
 
     // Drop an index while the CachedPlanStage is in a saved state. Restoring should fail, since we
     // may still need the dropped index for plan selection.
@@ -519,10 +515,9 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
                                     cq.get(),
                                     plannerParams,
                                     decisionWorks,
-                                    std::make_unique<QueuedDataStage>(_expCtx.get(), &_ws));
+                                    std::make_unique<MockStage>(_expCtx.get(), &_ws));
 
-    PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL,
-                                _opCtx.getServiceContext()->getFastClockSource());
+    NoopYieldPolicy yieldPolicy(_opCtx.getServiceContext()->getFastClockSource());
     ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
     // Drop an index while the CachedPlanStage is in a saved state. We should be able to restore

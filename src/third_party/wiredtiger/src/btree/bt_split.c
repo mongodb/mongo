@@ -249,7 +249,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home, WT_REF **from_ref
     if (ref_addr != NULL && !__wt_off_page(from_home, ref_addr)) {
         __wt_cell_unpack_addr(session, from_home->dsk, (WT_CELL *)ref_addr, &unpack);
         WT_RET(__wt_calloc_one(session, &addr));
-        __wt_time_aggregate_copy(&addr->ta, &unpack.ta);
+        WT_TIME_AGGREGATE_COPY(&addr->ta, &unpack.ta);
         WT_ERR(__wt_memdup(session, unpack.data, unpack.size, &addr->addr));
         addr->size = (uint8_t)unpack.size;
         switch (unpack.raw) {
@@ -1383,7 +1383,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     WT_SAVE_UPD *supd;
     WT_UPDATE *prev_onpage, *upd;
     uint64_t recno;
-    uint32_t i, page_flags, slot;
+    uint32_t i, slot;
 
     /*
      * In 04/2016, we removed column-store record numbers from the WT_PAGE structure, leading to
@@ -1405,8 +1405,10 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
      * our caller will not discard the disk image when discarding the original page, and our caller
      * will discard the allocated page on error, when discarding the allocated WT_REF.
      */
-    page_flags = WT_PAGE_DISK_ALLOC | WT_PAGE_INSTANTIATE_PREPARE_UPDATE;
-    WT_RET(__wt_page_inmem(session, ref, multi->disk_image, page_flags, &page));
+    F_SET(session, WT_SESSION_INSTANTIATE_PREPARE);
+    ret = __wt_page_inmem(session, ref, multi->disk_image, WT_PAGE_DISK_ALLOC, &page);
+    F_CLR(session, WT_SESSION_INSTANTIATE_PREPARE);
+    WT_RET(ret);
     multi->disk_image = NULL;
 
     /*
@@ -1697,7 +1699,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_R
     if (multi->addr.addr != NULL) {
         WT_RET(__wt_calloc_one(session, &addr));
         ref->addr = addr;
-        __wt_time_aggregate_copy(&addr->ta, &multi->addr.ta);
+        WT_TIME_AGGREGATE_COPY(&addr->ta, &multi->addr.ta);
         WT_RET(__wt_memdup(session, multi->addr.addr, multi->addr.size, &addr->addr));
         addr->size = multi->addr.size;
         addr->type = multi->addr.type;

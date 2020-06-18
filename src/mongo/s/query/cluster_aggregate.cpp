@@ -116,14 +116,14 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
 
     // Create the expression context, and set 'inMongos' to true. We explicitly do *not* set
     // mergeCtx->tempDir.
-    auto mergeCtx =
-        new ExpressionContext(opCtx,
-                              request,
-                              std::move(collation),
-                              std::make_shared<MongosProcessInterface>(
-                                  Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
-                              std::move(resolvedNamespaces),
-                              uuid);
+    auto mergeCtx = make_intrusive<ExpressionContext>(
+        opCtx,
+        request,
+        std::move(collation),
+        std::make_shared<MongosProcessInterface>(
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
+        std::move(resolvedNamespaces),
+        uuid);
 
     mergeCtx->inMongos = true;
     return mergeCtx;

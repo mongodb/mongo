@@ -92,5 +92,18 @@ TEST(ExplainOptionsTest, ParsingFailsIfFirstElementIsNotAnObject) {
               ErrorCodes::FailedToParse);
 }
 
+TEST(ExplainOptionsTest, ParsingFailsIfUnknownFieldInCommandObject) {
+    ASSERT_EQ(ExplainOptions::parseCmdBSON(
+                  fromjson("{explain: {}, verbosity: 'queryPlanner', unknownField: true}"))
+                  .getStatus(),
+              ErrorCodes::InvalidOptions);
+}
+
+TEST(ExplainOptionsTest, CanParseGenericCommandArguments) {
+    ASSERT_OK(ExplainOptions::parseCmdBSON(
+                  fromjson("{explain: {}, verbosity: 'queryPlanner', comment: true, $db: 'test'}"))
+                  .getStatus());
+}
+
 }  // namespace
 }  // namespace mongo

@@ -8,8 +8,7 @@
 load("jstests/libs/fail_point_util.js");
 
 const testName = "initial_sync_fails_when_source_resyncs";
-const rst = new ReplSetTest(
-    {name: testName, nodes: [{}, {rsConfig: {priority: 0, votes: 0}}], allowChaining: true});
+const rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
 const nodes = rst.startSet();
 rst.initiateWithHighElectionTimeout();
 

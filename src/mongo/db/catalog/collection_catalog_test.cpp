@@ -41,7 +41,8 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-using namespace mongo;
+namespace mongo {
+namespace {
 
 /**
  * A test fixture that creates a CollectionCatalog and Collection* pointer to store in it.
@@ -313,8 +314,6 @@ protected:
     OperationContextNoop opCtx;
     CollectionCatalog catalog;
 };
-
-namespace {
 
 TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
     catalog.deregisterAllCollections();
@@ -617,6 +616,25 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     catalog.deregisterAllCollections();
 }
 
+// Test setting and fetching the profile level for a database.
+TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
+    std::string testDBNameFirst = "testdbfirst";
+    std::string testDBNameSecond = "testdbsecond";
+
+    // Requesting a profile level that is not in the _databaseProfileLevel map should return the
+    // default server-wide setting
+    ASSERT_EQ(catalog.getDatabaseProfileLevel(testDBNameFirst), serverGlobalParams.defaultProfile);
+
+    // Setting the default profile level should have not change the result.
+    catalog.setDatabaseProfileLevel(testDBNameFirst, serverGlobalParams.defaultProfile);
+    ASSERT_EQ(catalog.getDatabaseProfileLevel(testDBNameFirst), serverGlobalParams.defaultProfile);
+
+    // Changing the profile level should make fetching it different.
+    catalog.setDatabaseProfileLevel(testDBNameSecond, serverGlobalParams.defaultProfile + 1);
+    ASSERT_EQ(catalog.getDatabaseProfileLevel(testDBNameSecond),
+              serverGlobalParams.defaultProfile + 1);
+}
+
 TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommittedCollections) {
     NamespaceString aColl("dbA", "collA");
     NamespaceString b1Coll("dbB", "collB1");
@@ -789,3 +807,4 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
 }
 
 }  // namespace
+}  // namespace mongo

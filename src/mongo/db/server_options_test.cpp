@@ -116,9 +116,8 @@ TEST_F(Verbosity, Default) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -139,9 +138,8 @@ TEST_F(Verbosity, CommandLineImplicit) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("--verbose");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -163,9 +161,8 @@ TEST_F(Verbosity, CommandLineString) {
     argv.push_back("binaryname");
     argv.push_back("--verbose");
     argv.push_back("vvvv");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -187,9 +184,8 @@ TEST_F(Verbosity, CommandLineStringDisguisedLongForm) {
     argv.push_back("binaryname");
     argv.push_back("-verbose");
     argv.push_back("vvvv");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -211,9 +207,8 @@ TEST_F(Verbosity, CommandLineEmptyString) {
     argv.push_back("binaryname");
     argv.push_back("--verbose");
     argv.push_back("");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
 TEST_F(Verbosity, CommandLineBadString) {
@@ -227,9 +222,8 @@ TEST_F(Verbosity, CommandLineBadString) {
     argv.push_back("binaryname");
     argv.push_back("--verbose");
     argv.push_back("beloud");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
 }
@@ -244,9 +238,8 @@ TEST_F(Verbosity, CommandLineBadStringOnlyDash) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("-");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
 TEST_F(Verbosity, CommandLineBadStringOnlyTwoDashes) {
@@ -259,9 +252,8 @@ TEST_F(Verbosity, CommandLineBadStringOnlyTwoDashes) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     argv.push_back("--");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 }
 
 TEST_F(Verbosity, INIConfigString) {
@@ -275,11 +267,10 @@ TEST_F(Verbosity, INIConfigString) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini", "verbose=vvvv");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -301,11 +292,10 @@ TEST_F(Verbosity, INIConfigBadString) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini", "verbose=beloud");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
 }
@@ -321,11 +311,10 @@ TEST_F(Verbosity, INIConfigEmptyString) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini", "verbose=");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -347,11 +336,10 @@ TEST_F(Verbosity, JSONConfigString) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ \"systemLog.verbosity\" : 4 }");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -375,11 +363,10 @@ TEST_F(Verbosity, MultipleSourcesMultipleOptions) {
     argv.push_back("config.json");
     argv.push_back("--verbose");
     argv.push_back("vvv");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ \"systemLog.verbosity\" : 4 }");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -405,7 +392,6 @@ TEST_F(Verbosity, YAMLConfigStringLogComponent) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml",
                      "systemLog:\n"
@@ -418,7 +404,7 @@ TEST_F(Verbosity, YAMLConfigStringLogComponent) {
                      "            journal:\n"
                      "                verbosity: 2\n");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -515,9 +501,8 @@ TEST(SetupOptions, SlowMsCommandLineParamParsesSuccessfully) {
     argv.push_back("binaryname");
     argv.push_back("--slowms");
     argv.push_back("300");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -539,11 +524,10 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini", "slowms=300");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -565,13 +549,12 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml",
                      "operationProfiling:\n"
                      "    slowOpThresholdMs: 300\n");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -592,9 +575,8 @@ TEST(SetupOptions, NonNumericSlowMsCommandLineOptionFailsToParse) {
     argv.push_back("binaryname");
     argv.push_back("--slowms");
     argv.push_back("invalid");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
 TEST(SetupOptions, NonNumericSlowMsYAMLConfigOptionFailsToParse) {
@@ -608,13 +590,12 @@ TEST(SetupOptions, NonNumericSlowMsYAMLConfigOptionFailsToParse) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml",
                      "operationProfiling:\n"
                      "    slowOpThresholdMs: invalid\n");
 
-    ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
 TEST(SetupOptions, SampleRateCommandLineParamParsesSuccessfully) {
@@ -628,9 +609,8 @@ TEST(SetupOptions, SampleRateCommandLineParamParsesSuccessfully) {
     argv.push_back("binaryname");
     argv.push_back("--slowOpSampleRate");
     argv.push_back("0.5");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -652,11 +632,10 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.ini");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.ini", "slowOpSampleRate=0.5");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -678,13 +657,12 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml",
                      "operationProfiling:\n"
                      "    slowOpSampleRate: 0.5\n");
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_OK(parser.run(options, argv, &environment));
 
     ASSERT_OK(::mongo::validateServerOptions(environment));
     ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
@@ -705,9 +683,8 @@ TEST(SetupOptions, NonNumericSampleRateCommandLineOptionFailsToParse) {
     argv.push_back("binaryname");
     argv.push_back("--slowOpSampleRate");
     argv.push_back("invalid");
-    std::map<std::string, std::string> env_map;
 
-    ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
 TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
@@ -722,13 +699,12 @@ TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.yaml");
-    std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.yaml",
                      "operationProfiling:\n"
                      "    slowOpSampleRate: invalid\n");
 
-    ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)

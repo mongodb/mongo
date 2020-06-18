@@ -34,7 +34,6 @@
 #include "mongo/db/repl/apply_ops.h"
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -231,7 +230,8 @@ Status _applyOps(OperationContext* opCtx,
                             return Status::OK();
                         }
 
-                        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                        AutoGetCollection autoColl(
+                            opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
                         if (!autoColl.getCollection()) {
                             // For idempotency reasons, return success on delete operations.
                             if (*opType == 'd') {

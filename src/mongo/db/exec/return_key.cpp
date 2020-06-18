@@ -45,22 +45,7 @@ PlanStage::StageState ReturnKeyStage::doWork(WorkingSetID* out) {
 
     if (PlanStage::ADVANCED == status) {
         WorkingSetMember* member = _ws.get(id);
-        Status indexKeyStatus = _extractIndexKey(member);
-
-        if (!indexKeyStatus.isOK()) {
-            LOGV2_WARNING(4615602,
-                          "Couldn't execute {stage}, status = {indexKeyStatus}",
-                          "stage"_attr = kStageName,
-                          "indexKeyStatus"_attr = redact(indexKeyStatus));
-            *out = WorkingSetCommon::allocateStatusMember(&_ws, indexKeyStatus);
-            return PlanStage::FAILURE;
-        }
-
-        *out = id;
-    } else if (PlanStage::FAILURE == status) {
-        // The stage which produces a failure is responsible for allocating a working set member
-        // with error details.
-        invariant(WorkingSet::INVALID_ID != id);
+        _extractIndexKey(member);
         *out = id;
     } else if (PlanStage::NEED_YIELD == status) {
         *out = id;
@@ -78,7 +63,7 @@ std::unique_ptr<PlanStageStats> ReturnKeyStage::getStats() {
     return ret;
 }
 
-Status ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
+void ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
     if (!_sortKeyMetaFields.empty()) {
         invariant(member->metadata().hasSortKey());
     }
@@ -107,7 +92,5 @@ Status ReturnKeyStage::_extractIndexKey(WorkingSetMember* member) {
     member->recordId = {};
     member->doc = {{}, md.freeze()};
     member->transitionToOwnedObj();
-
-    return Status::OK();
 }
 }  // namespace mongo

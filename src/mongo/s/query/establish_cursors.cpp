@@ -75,8 +75,9 @@ void killOpOnShards(std::shared_ptr<executor::TaskExecutor> executor,
                 if (!args.response.isOK()) {
                     LOGV2_DEBUG(4625504,
                                 2,
-                                "killOperations for {remote} failed with {status}",
-                                "remote"_attr = host.toString(),
+                                "killOperations for {remoteHost} failed with {error}",
+                                "killOperations failed",
+                                "remoteHost"_attr = host.toString(),
                                 "error"_attr = args.response);
                     return;
                 }
@@ -86,6 +87,7 @@ void killOpOnShards(std::shared_ptr<executor::TaskExecutor> executor,
         LOGV2_DEBUG(4625503,
                     2,
                     "Failed to cleanup remote operations: {error}",
+                    "Failed to cleanup remote operations",
                     "error"_attr = ex.toStatus());
     }
 }
@@ -115,12 +117,14 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
         requests.emplace_back(remote.first, requestWithOpKey.obj());
     }
 
-    LOGV2_DEBUG(4625502,
-                3,
-                "Establishing cursors on {opId} for {nRemotes} remotes with operation key {opKey}",
-                "opId"_attr = opCtx->getOpID(),
-                "nRemotes"_attr = remotes.size(),
-                "opKey"_attr = opKey);
+    LOGV2_DEBUG(
+        4625502,
+        3,
+        "Establishing cursors on {opId} for {numRemotes} remotes with operation key {opKey}",
+        "Establishing cursors on remotes",
+        "opId"_attr = opCtx->getOpID(),
+        "numRemotes"_attr = remotes.size(),
+        "opKey"_attr = opKey);
 
     // Send the requests
     MultiStatementTransactionRequestsSender ars(
@@ -220,8 +224,9 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
             }
 
             LOGV2(4625501,
-                  "ARS failed with {status}, attempting to clean up {nRemotes} remote operations",
-                  "status"_attr = ex.toStatus(),
+                  "ARS failed with {error}, attempting to clean up {nRemotes} remote operations",
+                  "ARS failed. Attempting to clean up remote operations",
+                  "error"_attr = ex.toStatus(),
                   "nRemotes"_attr = remotesToClean.size());
 
             // Check whether we have any remote operations to kill.
@@ -236,8 +241,15 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                             remotesToClean{std::move(remotesToClean)},
                                             opKey{std::move(opKey)}](
                                                const executor::TaskExecutor::CallbackArgs& args) {
-                        uassertStatusOKWithContext(args.status,
-                                                   "Failed to schedule remote cursor cleanup");
+                        if (!args.status.isOK()) {
+                            invariant(0);
+                            uasserted(ErrorCodes::CallbackCanceled, "YOOO");
+                            LOGV2_WARNING(48038,
+                                          "Failed to schedule remote cursor cleanup: {error}",
+                                          "Failed to schedule remote cursor cleanup",
+                                          "error"_attr = args.status);
+                            return;
+                        }
                         killOpOnShards(
                             executor, nss, std::move(remotesToClean), readPref, std::move(opKey));
                     }));

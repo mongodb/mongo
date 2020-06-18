@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_indexes.h"
@@ -144,13 +143,13 @@ public:
         AutoGetCollection autoColl(opCtx, toReIndexNss, MODE_X);
         Collection* collection = autoColl.getCollection();
         if (!collection) {
-            if (ViewCatalog::get(autoColl.getDb())->lookup(opCtx, toReIndexNss.ns()))
+            auto db = autoColl.getDb();
+            if (db && ViewCatalog::get(db)->lookup(opCtx, toReIndexNss.ns()))
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "can't re-index a view");
             else
                 uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNss.ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             collection->uuid());
 

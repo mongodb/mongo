@@ -61,7 +61,6 @@ TEST(CountCommandTest, ParserDealsWithMissingFieldsCorrectly) {
     ASSERT_FALSE(countCmd.getCollation());
     ASSERT_FALSE(countCmd.getReadConcern());
     ASSERT_FALSE(countCmd.getQueryOptions());
-    ASSERT_FALSE(countCmd.getComment());
 }
 
 TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
@@ -88,7 +87,6 @@ TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
     ASSERT_EQ(countCmd.getLimit().get(), 100);
     ASSERT_EQ(countCmd.getSkip().get(), 1000);
     ASSERT_EQ(countCmd.getMaxTimeMS().get(), 10000u);
-    ASSERT_EQ(countCmd.getComment().get(), "aComment");
     ASSERT_BSONOBJ_EQ(countCmd.getHint(), fromjson("{ b : 5 }"));
     ASSERT_BSONOBJ_EQ(countCmd.getCollation().get(), fromjson("{ locale : 'en_US' }"));
     ASSERT_BSONOBJ_EQ(countCmd.getReadConcern().get(), fromjson("{ level: 'linearizable' }"));

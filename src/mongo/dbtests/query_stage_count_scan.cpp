@@ -54,20 +54,20 @@ public:
     CountBase() : _client(&_opCtx) {}
 
     virtual ~CountBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
-        _client.dropCollection(ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
+        _client.dropCollection(ns().ns());
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns().ns(), obj));
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(ns(), obj);
+        _client.insert(ns().ns(), obj);
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(ns(), obj);
+        _client.remove(ns().ns(), obj);
     }
 
     /*
@@ -89,11 +89,13 @@ public:
         return countWorks;
     }
 
+    const Collection* getCollection() {
+        return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, ns());
+    }
+
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        Collection* collection = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(
-            &_opCtx, NamespaceString(ns()));
         std::vector<const IndexDescriptor*> indexes;
-        collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
+        getCollection()->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
     }
 
@@ -102,8 +104,8 @@ public:
         return {opCtx, descriptor};
     }
 
-    static const char* ns() {
-        return "unittests.QueryStageCountScanScan";
+    static NamespaceString ns() {
+        return {"unittests", "QueryStageCountScanScan"};
     }
 
 protected:
@@ -111,7 +113,7 @@ protected:
     OperationContext& _opCtx = *_txnPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, NamespaceString(ns()));
+        make_intrusive<ExpressionContext>(&_opCtx, nullptr, ns());
 
 private:
     DBDirectClient _client;
@@ -124,7 +126,7 @@ private:
 class QueryStageCountScanDups : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert some docs
         insert(BSON("a" << BSON_ARRAY(5 << 7)));
@@ -141,7 +143,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(2, numCounted);
@@ -154,7 +156,7 @@ public:
 class QueryStageCountScanInclusiveBounds : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert some docs
         for (int i = 0; i < 10; ++i) {
@@ -172,7 +174,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(5, numCounted);
@@ -185,7 +187,7 @@ public:
 class QueryStageCountScanExclusiveBounds : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert some docs
         for (int i = 0; i < 10; ++i) {
@@ -203,7 +205,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(3, numCounted);
@@ -216,7 +218,7 @@ public:
 class QueryStageCountScanLowerBound : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert doc, add index
         insert(BSON("a" << 2));
@@ -230,7 +232,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -243,7 +245,7 @@ public:
 class QueryStageCountScanNothingInInterval : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert documents, add index
         insert(BSON("a" << 2));
@@ -258,7 +260,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -272,7 +274,7 @@ public:
 class QueryStageCountScanNothingInIntervalFirstMatchTooHigh : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert some documents, add index
         insert(BSON("a" << 2));
@@ -287,7 +289,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -301,7 +303,7 @@ public:
 class QueryStageCountScanNoChangeDuringYield : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -317,7 +319,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -353,7 +355,7 @@ public:
 class QueryStageCountScanDeleteDuringYield : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -369,7 +371,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -408,7 +410,7 @@ public:
 class QueryStageCountScanInsertNewDocsDuringYield : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -424,7 +426,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -465,7 +467,7 @@ public:
 class QueryStageCountScanUnusedKeys : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert docs, add index
         for (int i = 0; i < 10; ++i) {
@@ -486,7 +488,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(7, numCounted);
@@ -499,7 +501,7 @@ public:
 class QueryStageCountScanUnusedEndKey : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert docs, add index
         for (int i = 0; i < 10; ++i) {
@@ -518,7 +520,7 @@ public:
         params.endKeyInclusive = true;  // yes?
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(9, numCounted);
@@ -531,7 +533,7 @@ public:
 class QueryStageCountScanKeyBecomesUnusedDuringYield : public CountBase {
 public:
     void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -547,7 +549,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), params, &ws);
+        CountScan count(_expCtx.get(), getCollection(), params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;

@@ -268,6 +268,11 @@ jsTestOptions = function() {
             // TestData
             enableTestCommands:
                 TestData.hasOwnProperty('enableTestCommands') ? TestData.enableTestCommands : true,
+            // Testing diagnostics should be enabled by default if no testingDiagnosticsEnabled was
+            // present in TestData
+            testingDiagnosticsEnabled: TestData.hasOwnProperty('testingDiagnosticsEnabled')
+                ? TestData.testingDiagnosticsEnabled
+                : true,
             serviceExecutor: TestData.serviceExecutor,
             setParameters: TestData.setParameters,
             setParametersMongos: TestData.setParametersMongos,
@@ -358,8 +363,10 @@ jsTestOptions = function() {
             // is shut down.
             alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
             skipCheckOrphans: TestData.skipCheckOrphans || false,
-            isAsanBuild: TestData.isAsanBuild,
             inEvergreen: TestData.inEvergreen || false,
+
+            undoRecorderPath: TestData.undoRecorderPath,
+            backupOnRestartDir: TestData.backupOnRestartDir || false,
         });
     }
     return _jsTestOptions;
@@ -862,6 +869,8 @@ shellHelper.show = function(what) {
     what = args[0];
     args = args.splice(1);
 
+    var messageIndent = "        ";
+
     if (what == "profile") {
         if (db.system.profile.count() == 0) {
             print("db.system.profile is empty");
@@ -1013,10 +1022,27 @@ shellHelper.show = function(what) {
                 if (res.log.length == 0) {
                     return "";
                 }
-                print("Server has startup warnings: ");
+                print("---");
+                print("The server generated these startup warnings when booting: ");
                 for (var i = 0; i < res.log.length; i++) {
-                    print(res.log[i]);
+                    var logOut;
+                    try {
+                        var parsedLog = JSON.parse(res.log[i]);
+                        var linePrefix = messageIndent + parsedLog.t["$date"] + ": ";
+                        logOut = linePrefix + parsedLog.msg + "\n";
+                        if (parsedLog.attr) {
+                            for (var attr in parsedLog.attr) {
+                                logOut += linePrefix + messageIndent + attr + ": " +
+                                    parsedLog.attr[attr] + "\n";
+                            }
+                        }
+                    } catch (err) {
+                        // err is intentionally unused here
+                        logOut = res.log[i];
+                    }
+                    print(logOut);
                 }
+                print("---");
                 return "";
             } else if (res.errmsg == "no such cmd: getLog") {
                 // Don't print if the command is not available
@@ -1089,15 +1115,19 @@ shellHelper.show = function(what) {
                     print("---");
                 } else if (freemonStatus.state === 'undecided') {
                     print(
-                        "---\n" +
+                        "---\n" + messageIndent +
                         "Enable MongoDB's free cloud-based monitoring service, which will then receive and display\n" +
+                        messageIndent +
                         "metrics about your deployment (disk utilization, CPU, operation statistics, etc).\n" +
-                        "\n" +
+                        "\n" + messageIndent +
                         "The monitoring data will be available on a MongoDB website with a unique URL accessible to you\n" +
+                        messageIndent +
                         "and anyone you share the URL with. MongoDB may use this information to make product\n" +
+                        messageIndent +
                         "improvements and to suggest MongoDB products and deployment options to you.\n" +
-                        "\n" +
+                        "\n" + messageIndent +
                         "To enable free monitoring, run the following command: db.enableFreeMonitoring()\n" +
+                        messageIndent +
                         "To permanently disable this reminder, run the following command: db.disableFreeMonitoring()\n" +
                         "---\n");
                 }
@@ -1496,34 +1526,65 @@ rs.reconfig = function(cfg, options) {
     return this._runCmd(cmd);
 };
 rs.add = function(hostport, arb) {
-    var cfg = hostport;
+    let res;
+    let self = this;
 
-    var local = db.getSisterDB("local");
-    assert(local.system.replset.count() <= 1,
-           "error: local.system.replset has unexpected contents");
-    var c = local.system.replset.findOne();
-    assert(c, "no config object retrievable from local.system.replset");
+    assert.soon(function() {
+        var cfg = hostport;
 
-    c.version++;
+        var local = db.getSisterDB("local");
+        assert(local.system.replset.count() <= 1,
+               "error: local.system.replset has unexpected contents");
+        var c = local.system.replset.findOne();
+        assert(c, "no config object retrievable from local.system.replset");
 
-    var max = 0;
-    for (var i in c.members)
-        if (c.members[i]._id > max)
-            max = c.members[i]._id;
-    if (isString(hostport)) {
-        cfg = {_id: max + 1, host: hostport};
-        if (arb)
-            cfg.arbiterOnly = true;
-    } else if (arb == true) {
-        throw Error("Expected first parameter to be a host-and-port string of arbiter, but got " +
-                    tojson(hostport));
-    }
+        const attemptedVersion = c.version++;
 
-    if (cfg._id == null) {
-        cfg._id = max + 1;
-    }
-    c.members.push(cfg);
-    return this._runCmd({replSetReconfig: c});
+        var max = 0;
+        for (var i in c.members) {
+            // Omit 'newlyAdded' field if it exists in the config.
+            delete c.members[i].newlyAdded;
+            if (c.members[i]._id > max)
+                max = c.members[i]._id;
+        }
+        if (isString(hostport)) {
+            cfg = {_id: max + 1, host: hostport};
+            if (arb)
+                cfg.arbiterOnly = true;
+        } else if (arb == true) {
+            throw Error(
+                "Expected first parameter to be a host-and-port string of arbiter, but got " +
+                tojson(hostport));
+        }
+
+        if (cfg._id == null) {
+            cfg._id = max + 1;
+        }
+        c.members.push(cfg);
+
+        res = self._runCmd({replSetReconfig: c});
+        if (res === "") {
+            // _runCmd caught an exception.
+            return true;
+        }
+        if (res.ok) {
+            return true;
+        }
+        if (res.code === ErrorCodes.ConfigurationInProgress) {
+            return false;  // keep retrying
+        }
+        if (res.code === ErrorCodes.NewReplicaSetConfigurationIncompatible) {
+            // We will retry only if this error was due to our config version being too low.
+            const cfgState = local.system.replset.findOne();
+            if (cfgState.version >= attemptedVersion) {
+                return false;  // keep retrying
+            }
+        }
+        // Take no action on other errors.
+        return true;
+    }, () => tojson(res), 10 * 60 * 1000 /* timeout */, 200 /* interval */);
+
+    return res;
 };
 rs.syncFrom = function(host) {
     return db._adminCommand({replSetSyncFrom: host});

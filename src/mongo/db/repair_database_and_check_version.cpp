@@ -119,8 +119,8 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
               "document with version "
               "{FeatureCompatibilityVersionParser_kVersion44}.",
-              "FeatureCompatibilityVersionParser_kVersion44"_attr =
-                  FeatureCompatibilityVersionParser::kVersion44);
+              "Re-creating featureCompatibilityVersion document that was deleted",
+              "version"_attr = FeatureCompatibilityVersionParser::kVersion44);
 
         BSONObj fcvObj = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName
                                     << FeatureCompatibilityVersionParser::kVersionField
@@ -232,13 +232,15 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                 !checkIdIndexExists(opCtx, coll->getCatalogId())) {
                 LOGV2(21001,
                       "collection {coll_ns} is missing an _id index; building it now",
-                      "coll_ns"_attr = coll->ns());
+                      "Collection is missing an _id index; building it now",
+                      logAttrs(*coll));
                 auto status = buildMissingIdIndex(opCtx, coll);
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
-                                "could not build an _id index on collection {coll_ns}: {status}",
-                                "coll_ns"_attr = coll->ns(),
-                                "status"_attr = status);
+                                "could not build an _id index on collection {coll_ns}: {error}",
+                                "Could not build an _id index on collection",
+                                logAttrs(*coll),
+                                "error"_attr = status);
                     return downgradeError;
                 }
             }
@@ -269,10 +271,13 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
     Collection* oplogCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {
-        LOGV2_FATAL_NOTRACE(40115,
-                            "The oplog collection {oplogNss} is not capped; a capped oplog is a "
-                            "requirement for replication to function.",
-                            "oplogNss"_attr = oplogNss);
+        LOGV2_FATAL_NOTRACE(
+            40115,
+            "The oplog collection {oplogNamespace} is not capped; a capped oplog is a "
+            "requirement for replication to function.",
+            "The oplog collection is not capped; a capped oplog is a "
+            "requirement for replication to function.",
+            "oplogNamespace"_attr = oplogNss);
     }
 }
 
@@ -534,9 +539,12 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             LOGV2_FATAL_CONTINUE(
                 21023,
                 "Unable to start mongod due to an incompatibility with the data files and"
-                " this version of mongod: {status}. Please consult our documentation when trying "
+                " this version of mongod: {error}. Please consult our documentation when trying "
                 "to downgrade to a previous major release",
-                "status"_attr = redact(status));
+                "Unable to start mongod due to an incompatibility with the data files and"
+                " this version of mongod. Please consult our documentation when trying "
+                "to downgrade to a previous major release",
+                "error"_attr = redact(status));
             quickExit(EXIT_NEED_UPGRADE);
             MONGO_UNREACHABLE;
         }
@@ -577,39 +585,33 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                     // warning.
                     if (version ==
                         ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo46) {
-                        LOGV2_OPTIONS(
+                        LOGV2_WARNING_OPTIONS(
                             21011,
                             {logv2::LogTag::kStartupWarnings},
-                            "** WARNING: A featureCompatibilityVersion upgrade did not complete. ");
-                        LOGV2_OPTIONS(21012,
-                                      {logv2::LogTag::kStartupWarnings},
-                                      "**          The current featureCompatibilityVersion is "
-                                      "{FeatureCompatibilityVersionParser_version}.",
-                                      "FeatureCompatibilityVersionParser_version"_attr =
-                                          FeatureCompatibilityVersionParser::toString(version));
-                        LOGV2_OPTIONS(
-                            21013,
-                            {logv2::LogTag::kStartupWarnings},
-                            "**          To fix this, use the setFeatureCompatibilityVersion "
-                            "command to resume upgrade to 4.6.");
+                            "A featureCompatibilityVersion upgrade did not complete. The current "
+                            "featureCompatibilityVersion is "
+                            "{currentfeatureCompatibilityVersion}. To fix this, use the "
+                            "setFeatureCompatibilityVersion command to resume upgrade to 4.6.",
+                            "A featureCompatibilityVersion upgrade did not complete. To fix this, "
+                            "use the "
+                            "setFeatureCompatibilityVersion command to resume upgrade to 4.6",
+                            "currentfeatureCompatibilityVersion"_attr =
+                                FeatureCompatibilityVersionParser::toString(version));
                     } else if (version ==
                                ServerGlobalParams::FeatureCompatibility::Version::
                                    kDowngradingTo44) {
-                        LOGV2_OPTIONS(21014,
-                                      {logv2::LogTag::kStartupWarnings},
-                                      "** WARNING: A featureCompatibilityVersion downgrade did not "
-                                      "complete. ");
-                        LOGV2_OPTIONS(21015,
-                                      {logv2::LogTag::kStartupWarnings},
-                                      "**          The current featureCompatibilityVersion is "
-                                      "{FeatureCompatibilityVersionParser_version}.",
-                                      "FeatureCompatibilityVersionParser_version"_attr =
-                                          FeatureCompatibilityVersionParser::toString(version));
-                        LOGV2_OPTIONS(
-                            21016,
+                        LOGV2_WARNING_OPTIONS(
+                            21014,
                             {logv2::LogTag::kStartupWarnings},
-                            "**          To fix this, use the setFeatureCompatibilityVersion "
-                            "command to resume downgrade to 4.4.");
+                            "A featureCompatibilityVersion downgrade did not complete. The current "
+                            "featureCompatibilityVersion is "
+                            "{currentfeatureCompatibilityVersion}. To fix this, use the "
+                            "setFeatureCompatibilityVersion command to resume downgrade to 4.4.",
+                            "A featureCompatibilityVersion downgrade did not complete. To fix "
+                            "this, use the setFeatureCompatibilityVersion command to resume "
+                            "downgrade to 4.4",
+                            "currentfeatureCompatibilityVersion"_attr =
+                                FeatureCompatibilityVersionParser::toString(version));
                     }
                 }
             }

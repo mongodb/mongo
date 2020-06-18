@@ -27,14 +27,7 @@ const rst = new ReplSetTest({
     useBridge: true
 });
 rst.startSet();
-
-// TODO (SERVER-47142): Replace with initiateWithHighElectionTimeout. The automatic reconfig will
-// dropAllSnapshots asynchronously, precluding waiting on a stable recovery timestamp.
-const cfg = rst.getReplSetConfig();
-cfg.settings = cfg.settings || {};
-cfg.settings["electionTimeoutMillis"] = ReplSetTest.kForeverMillis;
-rst.initiateWithAnyNodeAsPrimary(
-    cfg, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
@@ -85,7 +78,8 @@ assertVoteCount(primary, {
     votingMembersCount: 3,
     majorityVoteCount: 2,
     writableVotingMembersCount: 3,
-    writeMajorityCount: 2
+    writeMajorityCount: 2,
+    totalMembersCount: 4,
 });
 assert.commandWorked(primaryColl.insert({a: 0}, {writeConcern: {w: 3}}));
 assert.commandWorked(primaryColl.insert({a: 1}, {writeConcern: {w: "majority"}}));
@@ -144,7 +138,8 @@ assertVoteCount(primary, {
     votingMembersCount: 3,
     majorityVoteCount: 2,
     writableVotingMembersCount: 3,
-    writeMajorityCount: 2
+    writeMajorityCount: 2,
+    totalMembersCount: 4,
 });
 
 // Voting isn't required for satisfying numerical write concerns.
@@ -199,7 +194,8 @@ assertVoteCount(primary, {
     votingMembersCount: 4,
     majorityVoteCount: 3,
     writableVotingMembersCount: 4,
-    writeMajorityCount: 3
+    writeMajorityCount: 3,
+    totalMembersCount: 4,
 });
 
 jsTestLog("Checking that the metric for removal of 'newlyAdded' fields was incremented");

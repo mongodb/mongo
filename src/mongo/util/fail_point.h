@@ -35,11 +35,11 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
 
 namespace mongo {
 
@@ -272,11 +272,11 @@ public:
     EntryCountT waitForTimesEntered(EntryCountT targetTimesEntered) const noexcept;
 
     /**
-     * Like `waitForTimesEntered`, but interruptible via the `opCtx->sleepFor` mechanism.  See
-     * `mongo::Interruptible::sleepFor` (Interruptible is a base class of
-     * OperationContext).
+     * Like `waitForTimesEntered`, but interruptible via the `interruptible->sleepFor` mechanism.
+     * See `mongo::Interruptible::sleepFor`.
      */
-    EntryCountT waitForTimesEntered(OperationContext* opCtx, EntryCountT targetTimesEntered) const;
+    EntryCountT waitForTimesEntered(Interruptible* interruptible,
+                                    EntryCountT targetTimesEntered) const;
 
     /**
      * @returns a BSON object showing the current mode and data stored.
@@ -326,26 +326,22 @@ public:
     }
 
     /**
-     * Take 100msec pauses for as long as the FailPoint is active.
+     * Take 'kWaitGranularity' pauses for as long as the FailPoint is active.
      * This calls `shouldFail()` with kFirstTimeEntered once and with kEnteredAlready thereafter, so
      * affects FailPoint counters once.
      */
     void pauseWhileSet() {
-        for (auto entryMode = kFirstTimeEntered; MONGO_unlikely(shouldFail(entryMode));
-             entryMode = kEnteredAlready) {
-            sleepmillis(100);
-        }
+        pauseWhileSet(Interruptible::notInterruptible());
     }
 
     /**
-     * Like `pauseWhileSet`, but interruptible via the `opCtx->sleepFor` mechanism.  See
-     * `mongo::Interruptible::sleepFor` (Interruptible is a base class of
-     * OperationContext).
+     * Like `pauseWhileSet`, but interruptible via the `interruptible->sleepFor` mechanism.  See
+     * `mongo::Interruptible::sleepFor`.
      */
-    void pauseWhileSet(OperationContext* opCtx) {
+    void pauseWhileSet(Interruptible* interruptible) {
         for (auto entryMode = kFirstTimeEntered; MONGO_unlikely(shouldFail(entryMode));
              entryMode = kEnteredAlready) {
-            opCtx->sleepFor(Milliseconds(100));
+            interruptible->sleepFor(Milliseconds(100));
         }
     }
 

@@ -374,7 +374,7 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
 
             _letVariables->emplace(
                 varName.toString(),
-                Expression::parseOperand(expCtx, varElem, expCtx->variablesParseState));
+                Expression::parseOperand(expCtx.get(), varElem, expCtx->variablesParseState));
         }
     }
 }

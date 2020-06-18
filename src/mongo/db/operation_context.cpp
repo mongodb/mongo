@@ -87,9 +87,7 @@ OperationContext::OperationContext(Client* client, OperationId opId)
                           : SystemTickSource::get()) {}
 
 OperationContext::~OperationContext() {
-    if (_opKey) {
-        OperationKeyManager::get(_client).remove(*_opKey);
-    }
+    releaseOperationKey();
 }
 
 void OperationContext::setDeadlineAndMaxTime(Date_t when,
@@ -398,6 +396,13 @@ void OperationContext::setOperationKey(OperationKey opKey) {
 
     _opKey.emplace(std::move(opKey));
     OperationKeyManager::get(_client).add(*_opKey, _opId);
+}
+
+void OperationContext::releaseOperationKey() {
+    if (_opKey) {
+        OperationKeyManager::get(_client).remove(*_opKey);
+    }
+    _opKey = boost::none;
 }
 
 void OperationContext::setTxnNumber(TxnNumber txnNumber) {

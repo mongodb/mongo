@@ -140,6 +140,9 @@ public:
                 Milliseconds(maxAwaitTimeMS);
 
             LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
+
+            // Awaitable isMaster commands have high latency by design. Ignore them.
+            opCtx->setShouldIncrementLatencyStats(false);
         } else {
             uassert(51760,
                     (topologyVersionElement

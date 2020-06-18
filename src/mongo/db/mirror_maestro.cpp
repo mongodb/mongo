@@ -68,7 +68,6 @@ constexpr auto kMirrorMaestroConnPoolMaxSize = 4ull;       // Never use more tha
 
 constexpr auto kMirroredReadsParamName = "mirrorReads"_sd;
 
-constexpr auto kMirroredReadsName = "mirroredReads"_sd;
 constexpr auto kMirroredReadsSeenKey = "seen"_sd;
 constexpr auto kMirroredReadsSentKey = "sent"_sd;
 constexpr auto kMirroredReadsResolvedKey = "resolved"_sd;
@@ -170,7 +169,8 @@ class MirroredReadsSection final : public ServerStatusSection {
 public:
     using CounterT = long long;
 
-    MirroredReadsSection() : ServerStatusSection(kMirroredReadsName.toString()) {}
+    MirroredReadsSection()
+        : ServerStatusSection(MirrorMaestro::kServerStatusSectionName.toString()) {}
 
     bool includeByDefault() const override {
         return false;

@@ -163,32 +163,6 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableError) {
     future.default_timed_get();
 }
 
-TEST_F(EstablishCursorsTest, SingleRemoteInterruptedBeforeCommandSent) {
-    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
-        {kTestShardIds[0], cmdObj},
-    };
-
-    auto future = launchAsync([&] {
-        ASSERT_THROWS(establishCursors(operationContext(),
-                                       executor(),
-                                       _nss,
-                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                       remotes,
-                                       false),  // allowPartialResults
-                      ExceptionFor<ErrorCodes::CursorKilled>);
-    });
-
-    // Now interrupt the opCtx which the cursor is running under.
-    {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
-        operationContext()->getServiceContext()->killOperation(
-            lk, operationContext(), ErrorCodes::CursorKilled);
-    }
-
-    future.default_timed_get();
-}
-
 TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
@@ -198,7 +172,8 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     // Hang before sending the command but after resolving the host to send it to.
     auto fp = globalFailPointRegistry().find("hangBeforeSchedulingRemoteCommand");
     invariant(fp);
-    fp->setMode(FailPoint::alwaysOn, 0, BSON("hostAndPort" << kTestShardHosts[0].toString()));
+    auto startCount =
+        fp->setMode(FailPoint::alwaysOn, 0, BSON("hostAndPort" << kTestShardHosts[0].toString()));
 
     auto future = launchAsync([&] {
         ASSERT_THROWS(establishCursors(operationContext(),
@@ -211,7 +186,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     });
 
     // Verify that the failpoint is hit.
-    fp->waitForTimesEntered(2ULL);
+    fp->waitForTimesEntered(startCount + 1);
 
     // Now interrupt the opCtx which the cursor is running under.
     {
@@ -224,8 +199,27 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     // killOperations for the two remotes.
     fp->setMode(FailPoint::off);
 
-    // Expect a killOperation for the outstanding remote request.
-    expectKillOperations(1);
+    // The OperationContext was marked as killed before the request was scheduled, however the exact
+    // timing of when the interrupt condition is detected is not deterministic in this test.
+    // However, since the failpoint is in a position where the remote hostAndPort is resolved, we
+    // are guaranteed to get a killOperation for it but we may first see the original remote
+    // request.
+    auto killOpSeen = false;
+    onCommand([&](const RemoteCommandRequest& request) {
+        if (request.dbname == "admin" && request.cmdObj.hasField("_killOperations")) {
+            killOpSeen = true;
+            return BSON("ok" << 1);
+        }
+
+        // Otherwise expect the original request and mock the response.
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+        CursorResponse cursorResponse(_nss, CursorId(123), {});
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    if (!killOpSeen) {
+        expectKillOperations(1);
+    }
 
     future.default_timed_get();
 }
@@ -723,10 +717,18 @@ TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
         {kTestShardIds[1], cmdObj},
     };
 
-    // Hang before sending the command to shard 1.
-    auto fp = globalFailPointRegistry().find("hangBeforeSchedulingRemoteCommand");
-    invariant(fp);
-    fp->setMode(FailPoint::alwaysOn, 0, BSON("hostAndPort" << kTestShardHosts[1].toString()));
+    // Hang in ARS before it sends the request to remotes[1].
+    auto fpSend = globalFailPointRegistry().find("hangBeforeSchedulingRemoteCommand");
+    invariant(fpSend);
+    auto timesHitSend = fpSend->setMode(
+        FailPoint::alwaysOn, 0, BSON("hostAndPort" << kTestShardHosts[1].toString()));
+
+    // Also hang in ARS::next when there is exactly 1 remote that hasn't replied yet.
+    // This failpoint is important to ensure establishCursors' check for _interruptStatus.isOK()
+    // happens after this unittest does opCtx->killOperation().
+    auto fpNext = globalFailPointRegistry().find("hangBeforePollResponse");
+    invariant(fpNext);
+    auto timesHitNext = fpNext->setMode(FailPoint::alwaysOn, 0, BSON("remotesLeft" << 1));
 
     auto future = launchAsync([&] {
         ASSERT_THROWS(establishCursors(operationContext(),
@@ -738,16 +740,6 @@ TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
                       ExceptionFor<ErrorCodes::CursorKilled>);
     });
 
-    // Verify that the failpoint is hit.
-    fp->waitForTimesEntered(5ULL);
-
-    // Mark the OperationContext as killed.
-    {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
-        operationContext()->getServiceContext()->killOperation(
-            lk, operationContext(), ErrorCodes::CursorKilled);
-    }
-
     // First remote responds.
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
@@ -756,27 +748,31 @@ TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
         return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
-    // Disable the failpoint to enable the ARS to continue. Once interrupted, it will then trigger a
-    // killOperations for the two remotes.
-    fp->setMode(FailPoint::off);
+    // Wait for ars._remotes[1] to try to send its request. We want to test the case where the
+    // opCtx is killed after this happens.
+    fpSend->waitForTimesEntered(timesHitSend + 1);
 
-    // The second remote operation may be in flight before the killOperations cleanup, so relax the
-    // assertions on the mocked responses.
-    auto killsReceived = 0;
-    while (killsReceived < 2) {
-        onCommand([&](const RemoteCommandRequest& request) {
-            if (request.dbname == "admin" && request.cmdObj.hasField("_killOperations")) {
-                killsReceived++;
-                return BSON("ok" << 1);
-            }
-
-            // Its not a killOperations, so expect a normal remote command.
-            ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
-
-            CursorResponse cursorResponse(_nss, CursorId(123), {});
-            return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
-        });
+    // Mark the OperationContext as killed.
+    {
+        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        operationContext()->getServiceContext()->killOperation(
+            lk, operationContext(), ErrorCodes::CursorKilled);
     }
+
+    // Allow ars._remotes[1] to send its request.
+    fpSend->setMode(FailPoint::off);
+
+    // Wait for establishCursors to call ars.next.
+    fpNext->waitForTimesEntered(timesHitNext + 1);
+
+    // Disable the ARS::next failpoint to allow establishCursors to handle that response.
+    // Now ARS::next should check that the opCtx has been marked killed, and return a
+    // failing response to establishCursors, which should clean up by sending kill commands.
+    fpNext->setMode(FailPoint::off);
+
+    // Because we paused the ARS using hangBeforePollResponse, we know the ARS will detect the
+    // killed opCtx before sending any more requests. So we know only _killOperations will be sent.
+    expectKillOperations(2);
 
     future.default_timed_get();
 }

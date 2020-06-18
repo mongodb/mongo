@@ -71,7 +71,12 @@ using rpc::ReplSetMetadata;
 using std::vector;
 using unittest::assertGet;
 
-using ShardingCatalogClientTest = ShardingTestFixture;
+class ShardingCatalogClientTest : public ShardingTestFixture {
+protected:
+    DistLockManagerMock* distLock() const {
+        return dynamic_cast<DistLockManagerMock*>(ShardingTestFixture::distLock());
+    }
+};
 
 const int kMaxCommandRetry = 3;
 const NamespaceString kNamespace("TestDB", "TestColl");

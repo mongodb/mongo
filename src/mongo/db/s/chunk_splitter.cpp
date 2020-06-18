@@ -326,15 +326,15 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                     "maxChunkSizeBytes"_attr = maxChunkSizeBytes);
 
         chunkSplitStateDriver->prepareSplit();
-        auto splitPoints = uassertStatusOK(splitVector(opCtx.get(),
-                                                       nss,
-                                                       shardKeyPattern.toBSON(),
-                                                       chunk.getMin(),
-                                                       chunk.getMax(),
-                                                       false,
-                                                       boost::none,
-                                                       boost::none,
-                                                       maxChunkSizeBytes));
+        auto splitPoints = splitVector(opCtx.get(),
+                                       nss,
+                                       shardKeyPattern.toBSON(),
+                                       chunk.getMin(),
+                                       chunk.getMax(),
+                                       false,
+                                       boost::none,
+                                       boost::none,
+                                       maxChunkSizeBytes);
 
         if (splitPoints.empty()) {
             LOGV2_DEBUG(21907,
@@ -408,7 +408,7 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
         // stale metadata and so will not trigger a chunk split. If we force metadata refresh here,
         // we can limit the amount of time that the op observer is tracking writes on the parent
         // chunk rather than on its child chunks.
-        forceShardFilteringMetadataRefresh(opCtx.get(), nss, false);
+        onShardVersionMismatch(opCtx.get(), nss, boost::none);
 
         // Balance the resulting chunks if the autobalance option is enabled and if we split at the
         // first or last chunk on the collection as part of top chunk optimization.

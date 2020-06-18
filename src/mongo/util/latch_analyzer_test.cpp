@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/source_location.h"
@@ -41,17 +40,7 @@ namespace {
 
 using Level = HierarchicalAcquisitionLevel;
 
-class LatchAnalyzerTest : public ServiceContextTest {
-    void setUp() override {
-        ServiceContextTest::setUp();
-        setTestCommandsEnabled(true);
-    }
-
-    void tearDown() override {
-        setTestCommandsEnabled(false);
-        ServiceContextTest::tearDown();
-    }
-};
+class LatchAnalyzerTest : public ServiceContextTest {};
 
 DEATH_TEST_REGEX_F(LatchAnalyzerTest, AddInvalidWasAbsent, "Fatal assertion.*31360") {
 

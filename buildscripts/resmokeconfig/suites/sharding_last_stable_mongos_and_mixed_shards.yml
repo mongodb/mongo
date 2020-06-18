@@ -28,10 +28,10 @@ selector:
   - jstests/sharding/migration_coordinator_killop_in_critical_section.js
   - jstests/sharding/migration_coordinator_shutdown_in_critical_section.js
   - jstests/sharding/test_stacked_migration_cleanup.js
+  - jstests/sharding/kill_pinned_cursor.js
   - jstests/sharding/killop.js
   - jstests/sharding/verify_sessions_expiration_sharded.js
   # Enable when 4.6 becomes last stable
-  - jstests/sharding/disable_resumable_range_deleter_flag.js
   - jstests/sharding/mongos_dataSize.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
@@ -50,6 +50,4 @@ executor:
           mongosBinVersion: 'last-stable'
           shardMixedBinVersions: true
           skipCheckingUUIDsConsistentAcrossCluster: true
-          # TODO: SERVER-45959 remove after v4.4
-          skipCheckOrphans: true
       nodb: ''

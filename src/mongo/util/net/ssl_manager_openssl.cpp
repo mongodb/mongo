@@ -796,7 +796,6 @@ StatusWith<std::pair<OCSPCertIDSet, Date_t>> parseAndValidateOCSPResponse(
                                  << "Response Status: " << responseStatus);
         case OCSP_RESPONSE_STATUS_TRYLATER:
         case OCSP_RESPONSE_STATUS_INTERNALERROR:
-            // TODO: SERVER-42936 Add support for tlsAllowInvalidCertificates
             return getSSLFailure(str::stream()
                                  << "Error querying the OCSP responder, an error occured in the "
                                  << "responder itself. Response Status: " << responseStatus);
@@ -950,18 +949,17 @@ public:
     }
 
 private:
-    static boost::optional<OCSPFetchResponse> _lookup(OperationContext* opCtx,
-                                                      const OCSPCacheKey& key) {
+    static LookupResult _lookup(OperationContext* opCtx, const OCSPCacheKey& key) {
         // If there is a CRL file, we expect the CRL file to cover the certificate status
         // information, and therefore we don't need to make a roundtrip.
         if (!getSSLGlobalParams().sslCRLFile.empty()) {
-            return boost::none;
+            return LookupResult(boost::none);
         }
 
         auto swOCSPContext =
             extractOcspUris(key.context, key.peerCert.get(), key.intermediateCerts.get());
         if (!swOCSPContext.isOK()) {
-            return boost::none;
+            return LookupResult(boost::none);
         }
 
         auto ocspContext = std::move(swOCSPContext.getValue());
@@ -971,10 +969,10 @@ private:
                 key.context, key.intermediateCerts, ocspContext, OCSPPurpose::kClientVerify)
                 .getNoThrow();
         if (!swResponse.isOK()) {
-            return boost::none;
+            return LookupResult(boost::none);
         }
 
-        return std::move(swResponse.getValue());
+        return LookupResult(std::move(swResponse.getValue()));
     }
 
     static const ServiceContext::Decoration<boost::optional<OCSPCache>> getOCSPCache;
@@ -1394,9 +1392,9 @@ int SSLManagerOpenSSL::password_cb(char* buf, int num, int rwflag, void* userdat
     auto swPassword = pwFetcher->fetchPassword();
     if (!swPassword.isOK()) {
         LOGV2_ERROR(23239,
-                    "Unable to fetch password: {status}",
+                    "Unable to fetch password: {error}",
                     "Unable to fetch password",
-                    "status"_attr = swPassword.getStatus());
+                    "error"_attr = swPassword.getStatus());
         return -1;
     }
     StringData password = std::move(swPassword.getValue());

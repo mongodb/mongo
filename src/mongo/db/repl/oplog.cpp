@@ -45,7 +45,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
@@ -121,39 +120,6 @@ MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 // are visible, but before we have advanced 'lastApplied' for the write.
 MONGO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);
 
-bool shouldBuildInForeground(OperationContext* opCtx,
-                             const BSONObj& index,
-                             const NamespaceString& indexNss,
-                             repl::OplogApplication::Mode mode) {
-    if (mode == OplogApplication::Mode::kRecovering) {
-        LOGV2_DEBUG(
-            21241,
-            3,
-            "apply op: building background index {index} in the foreground because the "
-            "node is in recovery",
-            "Apply op: building background index in the foreground because the node is in recovery",
-            "index"_attr = index);
-        return true;
-    }
-
-    // Primaries should build indexes in the foreground because failures cannot be handled
-    // by the background thread.
-    const bool isPrimary =
-        repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, indexNss);
-    if (isPrimary) {
-        LOGV2_DEBUG(21242,
-                    3,
-                    "apply op: not building background index {index} in a background thread "
-                    "because this is a primary",
-                    "Apply op: not building background index in a background thread because this "
-                    "is a primary",
-                    "index"_attr = index);
-        return true;
-    }
-
-    return false;
-}
-
 void abortIndexBuilds(OperationContext* opCtx,
                       const OplogEntry::CommandType& commandType,
                       const NamespaceString& nss,
@@ -200,41 +166,21 @@ void createIndexForApplyOps(OperationContext* opCtx,
             opCtx->getWriteConcern());
     }
 
+    // TODO(SERVER-48593): Add invariant on shouldRelaxIndexConstraints(opCtx, indexNss) and
+    // set constraints to kRelax.
     const auto constraints =
         ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss)
         ? IndexBuildsManager::IndexConstraints::kRelax
         : IndexBuildsManager::IndexConstraints::kEnforce;
 
+    // Run single-phase builds synchronously with oplog batch application. This enables them to
+    // stop using ghost timestamps. Single phase builds are only used for empty collections, and
+    // to rebuild indexes admin.system collections. See SERVER-47439.
+    IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
     auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-
-    if (shouldBuildInForeground(opCtx, indexSpec, indexNss, mode)) {
-        IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
-        auto fromMigrate = false;
-        indexBuildsCoordinator->createIndexes(
-            opCtx, indexCollection->uuid(), {indexSpec}, constraints, fromMigrate);
-    } else {
-        Lock::TempRelease release(opCtx->lockState());
-        // TempRelease cannot fail because no recursive locks should be taken.
-        invariant(!opCtx->lockState()->isLocked());
-        auto collUUID = indexCollection->uuid();
-        auto indexBuildUUID = UUID::gen();
-
-        // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of
-        // it.
-        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
-        invariant(!indexBuildOptions.commitQuorum);
-        indexBuildOptions.replSetAndNotPrimaryAtStart = true;
-
-        // This spawns a new thread and returns immediately.
-        MONGO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(
-            indexBuildsCoordinator->startIndexBuild(opCtx,
-                                                    indexNss.db().toString(),
-                                                    collUUID,
-                                                    {indexSpec},
-                                                    indexBuildUUID,
-                                                    IndexBuildProtocol::kSinglePhase,
-                                                    indexBuildOptions));
-    }
+    auto collUUID = indexCollection->uuid();
+    auto fromMigrate = false;
+    indexBuildsCoordinator->createIndex(opCtx, collUUID, indexSpec, constraints, fromMigrate);
 
     opCtx->recoveryUnit()->abandonSnapshot();
 }
@@ -1476,8 +1422,14 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
     // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
     // won't ever change the server configuration collection.
-    std::vector<std::string> whitelistedOps{
-        "dropDatabase", "applyOps", "dbCheck", "commitTransaction", "abortTransaction"};
+    std::vector<std::string> whitelistedOps{"dropDatabase",
+                                            "applyOps",
+                                            "dbCheck",
+                                            "commitTransaction",
+                                            "abortTransaction",
+                                            "startIndexBuild",
+                                            "commitIndexBuild",
+                                            "abortIndexBuild"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
          whitelistedOps.end()) &&
@@ -1573,7 +1525,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 Lock::TempRelease release(opCtx->lockState());
 
-                BackgroundOperation::awaitNoBgOpInProgForDb(nss.db());
                 IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, nss.db());
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
@@ -1617,7 +1568,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                 "command"_attr = redact(o),
                                 "namespace"_attr = ns);
                 }
-                BackgroundOperation::awaitNoBgOpInProgForNs(ns);
                 IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
                     opCtx, swUUID.get());
 

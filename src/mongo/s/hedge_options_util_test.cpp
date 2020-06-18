@@ -41,6 +41,11 @@ namespace {
 
 class HedgeOptionsUtilTestFixture : public unittest::Test {
 protected:
+    void setUp() {
+        // Reset all the hedging server parameters.
+        setParameters(kDefaultParameters);
+    }
+
     /**
      * Set the given server parameters.
      */
@@ -54,24 +59,6 @@ protected:
 
             ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);
             uassertStatusOK(foundParameter->second->set(parameter));
-        }
-    }
-
-    /**
-     * Unset the given server parameters by setting them back to the default.
-     */
-    void unsetParameters(const BSONObj& parameters) {
-        const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
-        BSONObjIterator parameterIterator(parameters);
-
-        while (parameterIterator.more()) {
-            BSONElement parameter = parameterIterator.next();
-            std::string parameterName = parameter.fieldName();
-            const auto defaultParameter = kDefaultParameters[parameterName];
-            ASSERT_FALSE(defaultParameter.eoo());
-
-            ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);
-            uassertStatusOK(foundParameter->second->set(defaultParameter));
         }
     }
 
@@ -97,8 +84,6 @@ protected:
         } else {
             ASSERT_FALSE(hedgeOptions.has_value());
         }
-
-        unsetParameters(serverParameters);
     }
 
     static inline const std::string kCollName = "testColl";

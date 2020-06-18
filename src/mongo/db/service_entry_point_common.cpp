@@ -43,7 +43,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -87,7 +86,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
@@ -390,7 +388,7 @@ LogicalTime getClientOperationTime(OperationContext* opCtx) {
     }
 
     return LogicalTime(
-        repl::ReplClientInfo::forClient(opCtx->getClient()).getMaxKnownOpTime().getTimestamp());
+        repl::ReplClientInfo::forClient(opCtx->getClient()).getMaxKnownOperationTime());
 }
 
 /**
@@ -439,54 +437,20 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
                                    LogicalTime startTime) {
     if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
             repl::ReplicationCoordinator::modeReplSet ||
-        !LogicalClock::get(opCtx)->isEnabled()) {
+        !VectorClock::get(opCtx)->isEnabled()) {
         return;
     }
 
-    VectorClock::get(opCtx)->gossipOut(metadataBob, opCtx->getClient()->getSessionTags());
-
-    // Authorized clients always receive operationTime and dummy signed $clusterTime.
-    if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-        auto operationTime = computeOperationTime(opCtx, startTime);
-        auto signedTime = SignedLogicalTime(
-            LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
-
-        dassert(signedTime.getTime() >= operationTime);
-        rpc::LogicalTimeMetadata(signedTime).writeToMetadata(metadataBob);
-
-        LOGV2_DEBUG(
-            21957,
-            5,
-            "Appending operationTime to cmd response for authorized client: {operationTime}",
-            "operationTime"_attr = operationTime);
-        operationTime.appendAsOperationTime(commandBodyFieldsBob);
-
-        return;
-    }
-
-    // Servers without validators (e.g. a shard server not yet added to a cluster) do not return
-    // logical times to unauthorized clients.
-    auto validator = LogicalTimeValidator::get(opCtx);
-    if (!validator) {
-        return;
-    }
-
+    // The appended operationTime must always be <= the appended $clusterTime, so first compute the
+    // operationTime.
     auto operationTime = computeOperationTime(opCtx, startTime);
-    auto signedTime = validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
 
-    // If there were no keys, do not return $clusterTime or operationTime to unauthorized clients.
-    if (signedTime.getKeyId() == 0) {
-        return;
+    bool clusterTimeWasOutput = VectorClock::get(opCtx)->gossipOut(opCtx, metadataBob);
+
+    // Ensure that either both operationTime and $clusterTime are output, or neither.
+    if (clusterTimeWasOutput) {
+        operationTime.appendAsOperationTime(metadataBob);
     }
-
-    dassert(signedTime.getTime() >= operationTime);
-    rpc::LogicalTimeMetadata(signedTime).writeToMetadata(metadataBob);
-
-    LOGV2_DEBUG(21958,
-                5,
-                "Appending operationTime to cmd response: {operationTime}",
-                "operationTime"_attr = operationTime);
-    operationTime.appendAsOperationTime(commandBodyFieldsBob);
 }
 
 void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
@@ -514,7 +478,7 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     const auto shouldAppendTopologyVersion =
         (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
          isNotMasterError) ||
-        (replCoord->inQuiesceMode() && isShutdownError);
+        (isShutdownError && replCoord->inQuiesceMode());
 
     if (!shouldAppendTopologyVersion) {
         return;
@@ -1720,7 +1684,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         if (auto command = currentOp.getCommand();
             command && (command->getName() == "ismaster" || command->getName() == "isMaster")) {
             slowMsOverride =
-                2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTimeMs);
+                2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
         }
     } else if (op == dbQuery) {
         invariant(!isCommand);

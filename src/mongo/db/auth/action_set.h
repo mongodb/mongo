@@ -46,7 +46,7 @@ namespace mongo {
  */
 class ActionSet {
 public:
-    ActionSet() : _actions(0) {}
+    ActionSet() = default;
     ActionSet(std::initializer_list<ActionType> actions);
 
     void addAction(const ActionType& action);
@@ -91,13 +91,13 @@ public:
                                                  ActionSet* result,
                                                  std::vector<std::string>* unrecognizedActions);
 
+    friend bool operator==(const ActionSet& lhs, const ActionSet& rhs) {
+        return lhs.equals(rhs);
+    }
+
 private:
     // bitmask of actions this privilege grants
-    std::bitset<ActionType::NUM_ACTION_TYPES> _actions;
+    std::bitset<kNumActionTypes> _actions;
 };
-
-static inline bool operator==(const ActionSet& lhs, const ActionSet& rhs) {
-    return lhs.equals(rhs);
-}
 
 }  // namespace mongo

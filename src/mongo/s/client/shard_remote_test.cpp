@@ -202,5 +202,31 @@ TEST_F(ShardRemoteTest, ScatterGatherRepliesWithLastCommittedOpTime) {
     }
 }
 
+TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigStepdown) {
+    auto targetedNode = ShardId("config");
+
+    ASSERT_EQ(0UL, configTargeter()->getAndClearMarkedDownHosts().size());
+    auto future = launchAsync([&] { runDummyCommandOnShard(targetedNode); });
+
+    auto error = Status(ErrorCodes::PrimarySteppedDown, "Config stepped down");
+    onCommand([&](const executor::RemoteCommandRequest& request) { return error; });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::PrimarySteppedDown);
+    ASSERT_EQ(1UL, configTargeter()->getAndClearMarkedDownHosts().size());
+}
+
+TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigShuttingDown) {
+    auto targetedNode = ShardId("config");
+
+    ASSERT_EQ(0UL, configTargeter()->getAndClearMarkedDownHosts().size());
+    auto future = launchAsync([&] { runDummyCommandOnShard(targetedNode); });
+
+    auto error = Status(ErrorCodes::InterruptedAtShutdown, "Interrupted at shutdown");
+    onCommand([&](const executor::RemoteCommandRequest& request) { return error; });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::InterruptedAtShutdown);
+    ASSERT_EQ(1UL, configTargeter()->getAndClearMarkedDownHosts().size());
+}
+
 }  // namespace
 }  // namespace mongo

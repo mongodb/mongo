@@ -65,7 +65,7 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 // Verify wrong arguments errors.
 assert.commandFailed(mongos.adminCommand({shardCollection: 'foo', key: {_id: 1}}));
 
-assert.commandFailed(mongos.adminCommand({shardCollection: 'foo', key: "aaa"}));
+assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: "aaa"}));
 
 // shardCollection may only be run against admin database.
 assert.commandFailed(

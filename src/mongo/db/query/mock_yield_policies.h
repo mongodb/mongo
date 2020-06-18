@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
 
@@ -38,19 +38,22 @@ namespace mongo {
  * A custom yield policy that always reports the plan should yield, and always returns
  * ErrorCodes::ExceededTimeLimit from yield().
  */
-class AlwaysTimeOutYieldPolicy : public PlanYieldPolicy {
+class AlwaysTimeOutYieldPolicy final : public PlanYieldPolicy {
 public:
     AlwaysTimeOutYieldPolicy(PlanExecutor* exec)
-        : PlanYieldPolicy(exec, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT) {}
+        : PlanYieldPolicy(PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
+                          exec->getOpCtx()->getServiceContext()->getFastClockSource(),
+                          0,
+                          Milliseconds{0}) {}
 
     AlwaysTimeOutYieldPolicy(ClockSource* cs)
-        : PlanYieldPolicy(PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, cs) {}
+        : PlanYieldPolicy(PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT, cs, 0, Milliseconds{0}) {}
 
-    bool shouldYieldOrInterrupt() override {
+    bool shouldYieldOrInterrupt(OperationContext*) override {
         return true;
     }
 
-    Status yieldOrInterrupt(std::function<void()> whileYieldingFn) override {
+    Status yield(OperationContext*, std::function<void()> whileYieldingFn) override {
         return {ErrorCodes::ExceededTimeLimit, "Using AlwaysTimeOutYieldPolicy"};
     }
 };
@@ -59,20 +62,39 @@ public:
  * A custom yield policy that always reports the plan should yield, and always returns
  * ErrorCodes::QueryPlanKilled from yield().
  */
-class AlwaysPlanKilledYieldPolicy : public PlanYieldPolicy {
+class AlwaysPlanKilledYieldPolicy final : public PlanYieldPolicy {
 public:
     AlwaysPlanKilledYieldPolicy(PlanExecutor* exec)
-        : PlanYieldPolicy(exec, PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED) {}
+        : PlanYieldPolicy(PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED,
+                          exec->getOpCtx()->getServiceContext()->getFastClockSource(),
+                          0,
+                          Milliseconds{0}) {}
 
     AlwaysPlanKilledYieldPolicy(ClockSource* cs)
-        : PlanYieldPolicy(PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED, cs) {}
+        : PlanYieldPolicy(
+              PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED, cs, 0, Milliseconds{0}) {}
 
-    bool shouldYieldOrInterrupt() override {
+    bool shouldYieldOrInterrupt(OperationContext*) override {
         return true;
     }
 
-    Status yieldOrInterrupt(std::function<void()> whileYieldingFn) override {
+    Status yield(OperationContext*, std::function<void()> whileYieldingFn) override {
         return {ErrorCodes::QueryPlanKilled, "Using AlwaysPlanKilledYieldPolicy"};
+    }
+};
+
+class NoopYieldPolicy final : public PlanYieldPolicy {
+public:
+    NoopYieldPolicy(ClockSource* clockSource)
+        : PlanYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD, clockSource, 0, Milliseconds{0}) {
+    }
+
+    bool shouldYieldOrInterrupt(OperationContext*) override {
+        return false;
+    }
+
+    Status yield(OperationContext*, std::function<void()> whileYieldingFn) override {
+        MONGO_UNREACHABLE;
     }
 };
 

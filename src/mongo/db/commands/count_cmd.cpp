@@ -259,13 +259,12 @@ public:
             curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
         }
 
-        Status execPlanStatus = exec->executePlan();
-        uassertStatusOK(execPlanStatus);
+        exec->executePlan();
 
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);
         if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, summaryStats);
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 

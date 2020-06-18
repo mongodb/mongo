@@ -35,6 +35,7 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -42,15 +43,9 @@
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/database_version_helpers.h"
 
 namespace mongo {
-
-using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-using std::vector;
-using unittest::assertGet;
 
 class MigrationTestFixture : public ConfigServerTestFixture {
 protected:

@@ -58,8 +58,8 @@ struct CountScanParams {
         : CountScanParams(descriptor,
                           descriptor->indexName(),
                           descriptor->keyPattern(),
-                          descriptor->getMultikeyPaths(opCtx),
-                          descriptor->isMultikey()) {}
+                          descriptor->getEntry()->getMultikeyPaths(opCtx),
+                          descriptor->getEntry()->isMultikey()) {}
 
     const IndexDescriptor* indexDescriptor;
     std::string name;
@@ -87,7 +87,10 @@ struct CountScanParams {
  */
 class CountScan final : public RequiresIndexStage {
 public:
-    CountScan(ExpressionContext* expCtx, CountScanParams params, WorkingSet* workingSet);
+    CountScan(ExpressionContext* expCtx,
+              const Collection* collection,
+              CountScanParams params,
+              WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;

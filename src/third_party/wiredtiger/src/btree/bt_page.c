@@ -220,8 +220,9 @@ __wt_page_inmem(
 
     /* Update the page's cache statistics. */
     __wt_cache_page_inmem_incr(session, page, size);
+
     if (LF_ISSET(WT_PAGE_DISK_ALLOC))
-        __wt_cache_page_image_incr(session, dsk->mem_size);
+        __wt_cache_page_image_incr(session, page);
 
     /* Link the new internal page to the parent. */
     if (ref != NULL) {
@@ -532,22 +533,24 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_BTREE *btree;
     WT_CELL_UNPACK_KV unpack;
-    WT_ITEM buf;
+    WT_DECL_ITEM(value);
+    WT_DECL_RET;
     WT_ROW *rip;
-    WT_UPDATE **upd_array, *upd;
+    WT_UPDATE *tombstone, *upd, **upd_array;
     size_t size, total_size;
     uint32_t i;
     bool instantiate_prepared, prepare;
 
     btree = S2BT(session);
+    tombstone = upd = NULL;
     prepare = false;
 
-    instantiate_prepared = F_ISSET_ATOMIC(page, WT_PAGE_INSTANTIATE_PREPARE_UPDATE);
+    instantiate_prepared = F_ISSET(session, WT_SESSION_INSTANTIATE_PREPARE);
 
     /* Walk the page, building indices. */
     rip = page->pg_row;
     WT_CELL_FOREACH_KV (session, page->dsk, unpack) {
-        if (instantiate_prepared && !prepare && F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE))
+        if (instantiate_prepared && !prepare && unpack.tw.prepare)
             prepare = true;
         switch (unpack.type) {
         case WT_CELL_KEY_OVFL:
@@ -573,9 +576,9 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
              * The visibility information is not referenced on the page so we need to ensure that
              * the value is globally visible at the point in time where we read the page into cache.
              */
-            if (!btree->huffman_value && unpack.tw.stop_txn == WT_TXN_MAX &&
-              unpack.tw.stop_ts == WT_TS_MAX && !F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE) &&
-              __wt_txn_visible_all(session, unpack.tw.start_txn, unpack.tw.durable_start_ts))
+            if (!btree->huffman_value && (WT_TIME_WINDOW_IS_EMPTY(&unpack.tw) ||
+                                           (!WT_TIME_WINDOW_HAS_STOP(&unpack.tw) &&
+                                             __wt_txn_tw_start_visible_all(session, &unpack.tw))))
                 __wt_row_leaf_value_set(page, rip - 1, &unpack);
             break;
         case WT_CELL_VALUE_OVFL:
@@ -597,7 +600,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 
         /* Allocate the per-page update array if one doesn't already exist. */
         if (page->entries != 0 && page->modify->mod_row_update == NULL)
-            WT_RET(__wt_calloc_def(session, page->entries, &page->modify->mod_row_update));
+            WT_PAGE_ALLOC_AND_SWAP(
+              session, page, page->modify->mod_row_update, upd_array, page->entries);
 
         /* For each entry in the page */
         size = total_size = 0;
@@ -605,29 +609,52 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
         WT_ROW_FOREACH (page, rip, i) {
             /* Unpack the on-page value cell. */
             __wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
-            if (F_ISSET(&unpack, WT_CELL_UNPACK_PREPARE)) {
-                if (unpack.tw.stop_ts == WT_TS_MAX && unpack.tw.stop_txn == WT_TXN_MAX) {
-                    /* Take the value from the original page cell. */
-                    WT_RET(__wt_page_cell_data_ref(session, page, &unpack, &buf));
+            if (unpack.tw.prepare) {
+                /* Take the value from the original page cell. */
+                if (value == NULL)
+                    WT_ERR(__wt_scr_alloc(session, 0, &value));
+                WT_ERR(__wt_page_cell_data_ref(session, page, &unpack, value));
 
-                    WT_RET(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, &size));
-                    upd->durable_ts = WT_TS_NONE;
-                    upd->start_ts = unpack.tw.start_ts;
-                    upd->txnid = unpack.tw.start_txn;
-                } else {
-                    WT_RET(__wt_upd_alloc_tombstone(session, &upd, &size));
-                    upd->durable_ts = WT_TS_NONE;
-                    upd->start_ts = unpack.tw.stop_ts;
-                    upd->txnid = unpack.tw.stop_txn;
-                }
-                upd->prepare_state = WT_PREPARE_INPROGRESS;
-                upd_array[WT_ROW_SLOT(page, rip)] = upd;
+                WT_ERR(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, &size));
                 total_size += size;
+                upd->durable_ts = unpack.tw.durable_start_ts;
+                upd->start_ts = unpack.tw.start_ts;
+                upd->txnid = unpack.tw.start_txn;
+
+                /*
+                 * Instantiating both update and tombstone if the prepared update is a tombstone.
+                 * This is required to ensure that written prepared delete operation must be removed
+                 * from the data store, when the prepared transaction gets rollback.
+                 */
+                if (WT_TIME_WINDOW_HAS_STOP(&unpack.tw)) {
+                    WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &size));
+                    total_size += size;
+                    tombstone->durable_ts = WT_TS_NONE;
+                    tombstone->start_ts = unpack.tw.stop_ts;
+                    tombstone->txnid = unpack.tw.stop_txn;
+                    tombstone->prepare_state = WT_PREPARE_INPROGRESS;
+                    F_SET(tombstone, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+                    F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
+                    tombstone->next = upd;
+                } else {
+                    upd->durable_ts = WT_TS_NONE;
+                    upd->prepare_state = WT_PREPARE_INPROGRESS;
+                    F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+                    tombstone = upd;
+                }
+
+                upd_array[WT_ROW_SLOT(page, rip)] = tombstone;
+                tombstone = upd = NULL;
             }
         }
 
         __wt_cache_page_inmem_incr(session, page, total_size);
     }
 
-    return (0);
+err:
+    __wt_free(session, tombstone);
+    __wt_free(session, upd);
+    __wt_scr_free(session, &value);
+
+    return (ret);
 }

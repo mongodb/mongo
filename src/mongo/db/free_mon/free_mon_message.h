@@ -342,7 +342,7 @@ struct FreeMonWaitablePayloadForMessage {
 
 template <>
 struct FreeMonWaitablePayloadForMessage<FreeMonMessageType::RegisterCommand> {
-    using payload_type = std::vector<std::string>;
+    using payload_type = std::pair<std::vector<std::string>, boost::optional<std::string>>;
 };
 
 template <>

@@ -35,25 +35,35 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
 TemporaryKVRecordStore::~TemporaryKVRecordStore() {
-    invariant(_recordStoreHasBeenDeleted);
+    invariant(_recordStoreHasBeenFinalized);
 }
 
-void TemporaryKVRecordStore::deleteTemporaryTable(OperationContext* opCtx) {
+void TemporaryKVRecordStore::finalizeTemporaryTable(OperationContext* opCtx,
+                                                    FinalizationAction action) {
+    invariant(!_recordStoreHasBeenFinalized);
+
+    _recordStoreHasBeenFinalized = true;
+
+    if (action == FinalizationAction::kKeep)
+        return;
+
     // Need at least Global IS before calling into the storage engine, to protect against it being
     // destructed while we're using it.
     invariant(opCtx->lockState()->isReadLocked());
 
     auto status = _kvEngine->dropIdent(opCtx, opCtx->recoveryUnit(), _rs->getIdent());
-    fassert(
-        51032,
-        status.withContext(str::stream() << "failed to drop temporary ident: " << _rs->getIdent()));
-    _recordStoreHasBeenDeleted = true;
+
+    if (!status.isOK()) {
+        LOGV2_ERROR(4841503, "Failed to drop temporary table", "ident"_attr = _rs->getIdent());
+    }
+    dassert(status, str::stream() << "Failed to drop temporary table. Ident: " << _rs->getIdent());
 }
 
 }  // namespace mongo

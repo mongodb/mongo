@@ -110,7 +110,9 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
         ('basecfg_true', dict(basecfg='true')),
         ('basecfg_false', dict(basecfg='false')),
     ]
-    scenarios = make_scenarios(compat_create, compat_release, compat_min, compat_max, base_config)
+
+    scenarios = make_scenarios(compat_create, compat_release, compat_min, compat_max, base_config,
+                               prune=100, prunelong=100000)
 
     def conn_config(self):
         # Set archive false on the home directory.

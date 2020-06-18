@@ -477,7 +477,7 @@ size_t QueryPlannerTest::getNumSolutions() const {
 void QueryPlannerTest::dumpSolutions() const {
     str::stream ost;
     dumpSolutions(ost);
-    LOGV2(20985, "{std_string_ost}", "std_string_ost"_attr = std::string(ost));
+    LOGV2(20985, "{value}", "Solutions", "value"_attr = std::string(ost));
 }
 
 void QueryPlannerTest::dumpSolutions(str::stream& ost) const {

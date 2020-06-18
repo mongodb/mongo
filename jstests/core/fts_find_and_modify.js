@@ -1,9 +1,18 @@
 /**
  * Test that findAndModify works with $text search predicates.
  *
- * Cannot run when collections are implicitly sharded, since findAndModify requires the query
- * predicate to contain the shard key.
- * @tags: [assumes_unsharded_collection]
+ * @tags: [
+ *   # Cannot run when collections are implicitly sharded, since findAndModify requires the query
+ *   # predicate to contain the shard key.
+ *   assumes_unsharded_collection,
+ *   # We chose not to backport the bug fix for $text + findAndModify to the 4.4 branch, so all
+ *   # nodes must be at least binary version 4.6.
+ *   requires_fcv_46,
+ *   # Ban in any configurations that require retryable writes. Although findAndModify is a
+ *   # retryable write command, the 'fields' option does not currently work with retryable writes.
+ *   # See SERVER-31242.
+ *   requires_non_retryable_writes,
+ * ]
  */
 (function() {
 "use strict";

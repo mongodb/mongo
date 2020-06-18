@@ -193,15 +193,19 @@ public:
                     AutoGetCollection::ViewMode::kViewsPermitted);
         const auto& nss = ctx->getNss();
 
-        // Distinct doesn't filter orphan documents so it is not allowed to run on sharded
-        // collections in multi-document transactions.
-        uassert(
-            ErrorCodes::OperationNotSupportedInTransaction,
-            "Cannot run 'distinct' on a sharded collection in a multi-document transaction. "
-            "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
-            "alternative.",
-            !opCtx->inMultiDocumentTransaction() ||
-                !CollectionShardingState::get(opCtx, nss)->getCollectionDescription().isSharded());
+        if (!ctx->getView()) {
+            // Distinct doesn't filter orphan documents so it is not allowed to run on sharded
+            // collections in multi-document transactions.
+            uassert(
+                ErrorCodes::OperationNotSupportedInTransaction,
+                "Cannot run 'distinct' on a sharded collection in a multi-document transaction. "
+                "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
+                "alternative.",
+                !opCtx->inMultiDocumentTransaction() ||
+                    !CollectionShardingState::get(opCtx, nss)
+                         ->getCollectionDescription(opCtx)
+                         .isSharded());
+        }
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         auto defaultCollation =
@@ -245,53 +249,49 @@ public:
         BSONElementSet values(executor.getValue()->getCanonicalQuery()->getCollator());
 
         const int kMaxResponseSize = BSONObjMaxUserSize - 4096;
-        size_t listApproxBytes = 0;
-        BSONObj obj;
-        PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = executor.getValue()->getNext(&obj, nullptr))) {
-            // Distinct expands arrays.
-            //
-            // If our query is covered, each value of the key should be in the index key and
-            // available to us without this.  If a collection scan is providing the data, we may
-            // have to expand an array.
-            BSONElementSet elts;
-            dps::extractAllElementsAlongPath(obj, key, elts);
 
-            for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
-                BSONElement elt = *it;
-                if (values.count(elt)) {
-                    continue;
+        try {
+            size_t listApproxBytes = 0;
+            BSONObj obj;
+            while (PlanExecutor::ADVANCED == executor.getValue()->getNext(&obj, nullptr)) {
+                // Distinct expands arrays.
+                //
+                // If our query is covered, each value of the key should be in the index key and
+                // available to us without this.  If a collection scan is providing the data, we may
+                // have to expand an array.
+                BSONElementSet elts;
+                dps::extractAllElementsAlongPath(obj, key, elts);
+
+                for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
+                    BSONElement elt = *it;
+                    if (values.count(elt)) {
+                        continue;
+                    }
+
+                    // This is an approximate size check which safeguards against use of unbounded
+                    // memory by the distinct command. We perform a more precise check at the end of
+                    // this method to confirm that the response size is less than 16MB.
+                    listApproxBytes += elt.size();
+                    uassert(
+                        17217, "distinct too big, 16mb cap", listApproxBytes < kMaxResponseSize);
+
+                    auto distinctObj = elt.wrap();
+                    values.insert(distinctObj.firstElement());
+                    distinctValueHolder.push_back(std::move(distinctObj));
                 }
-
-                // This is an approximate size check which safeguards against use of unbounded
-                // memory by the distinct command. We perform a more precise check at the end of
-                // this method to confirm that the response size is less than 16MB.
-                listApproxBytes += elt.size();
-                uassert(17217, "distinct too big, 16mb cap", listApproxBytes < kMaxResponseSize);
-
-                auto distinctObj = elt.wrap();
-                values.insert(distinctObj.firstElement());
-                distinctValueHolder.push_back(std::move(distinctObj));
             }
-        }
-
-        // Return an error if execution fails for any reason.
-        if (PlanExecutor::FAILURE == state) {
-            // We should always have a valid status member object at this point.
-            auto status = WorkingSetCommon::getMemberObjectStatus(obj);
-            invariant(!status.isOK());
+        } catch (DBException& exception) {
             LOGV2_WARNING(23797,
-                          "Plan executor error during distinct command: {state}, status: {error}, "
+                          "Plan executor error during distinct command: {error}, "
                           "stats: {stats}",
                           "Plan executor error during distinct command",
-                          "state"_attr = redact(PlanExecutor::statestr(state)),
-                          "error"_attr = status,
+                          "error"_attr = exception.toStatus(),
                           "stats"_attr =
                               redact(Explain::getWinningPlanStats(executor.getValue().get())));
 
-            uassertStatusOK(status.withContext("Executor error during distinct command"));
+            exception.addContext("Executor error during distinct command");
+            throw;
         }
-
 
         auto curOp = CurOp::get(opCtx);
 
@@ -299,7 +299,7 @@ public:
         PlanSummaryStats stats;
         Explain::getSummaryStats(*executor.getValue(), &stats);
         if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, stats);
+            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, stats);
         }
         curOp->debug().setPlanSummaryMetrics(stats);
 
@@ -315,7 +315,8 @@ public:
         }
         valueListBuilder.doneFast();
 
-        if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+        if (!opCtx->inMultiDocumentTransaction() &&
+            repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
             result.append("atClusterTime"_sd,
                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()->asTimestamp());
         }

@@ -98,15 +98,6 @@ server_parameters:
     validator:
       gte: 0
 
-  internalQueryCacheFeedbacksStored:
-    description: "How many feedback entries do we collect before possibly evicting from the cache based on bad performance?"
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryCacheFeedbacksStored"
-    cpp_vartype: AtomicWord<int>
-    default: 20
-    validator:
-      gte: 0
-
   internalQueryCacheEvictionRatio:
     description: "How many times more works must we perform in order to justify plan cache eviction and replanning?"
     set_at: [ startup, runtime ]
@@ -355,3 +346,21 @@ server_parameters:
     cpp_varname: "internalQueryDesugarWhereToFunction"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  internalQueryEnableSlotBasedExecutionEngine:
+    description: "If true, activates the slot-based execution engine to execute queries."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryEnableSlotBasedExecutionEngine"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalQueryDefaultDOP:
+    description: "Default degree of parallelism. This an internal experimental parameter and should not be changed on live systems."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryDefaultDOP"
+    cpp_vartype: AtomicWord<int>
+    default: 1
+    test_only: true
+    validator:
+      gt: 0
+

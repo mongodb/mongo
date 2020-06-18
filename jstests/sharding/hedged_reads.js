@@ -60,7 +60,8 @@ const st = new ShardingTest({
             "failpoint.sdamServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
             // Force the mongos to send requests to hosts in alphabetical order of host names.
             "failpoint.networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder":
-                tojson({mode: "alwaysOn"})
+                tojson({mode: "alwaysOn"}),
+            maxTimeMSForHedgedReads: 10
         }
     }],
     shards: 1,

@@ -77,28 +77,32 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
-    const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, "local");
+    const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, NamespaceString::kLocalDb);
     invariant(localDb);
-    AutoStatsTracker statsTracker(opCtx,
-                                  NamespaceString::kRsOplogNamespace,
-                                  Top::LockType::ReadLocked,
-                                  AutoStatsTracker::LogMode::kUpdateTop,
-                                  localDb->getProfilingLevel(),
-                                  Date_t::max());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        NamespaceString::kRsOplogNamespace,
+        Top::LockType::ReadLocked,
+        AutoStatsTracker::LogMode::kUpdateTop,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(NamespaceString::kLocalDb),
+        Date_t::max());
 
     auto exec = uassertStatusOK(
         getExecutorFind(opCtx, oplogRead.getCollection(), std::move(cq), permitYield));
 
-    auto getNextResult = exec->getNext(&oplogBSON, nullptr);
+    PlanExecutor::ExecState getNextResult;
+    try {
+        getNextResult = exec->getNext(&oplogBSON, nullptr);
+    } catch (DBException& exception) {
+        exception.addContext("PlanExecutor error in TransactionHistoryIterator");
+        throw;
+    }
+
     uassert(ErrorCodes::IncompleteTransactionHistory,
             str::stream() << "oplog no longer contains the complete write history of this "
                              "transaction, log with opTime "
                           << opTime.toBSON() << " cannot be found",
             getNextResult != PlanExecutor::IS_EOF);
-    if (getNextResult != PlanExecutor::ADVANCED) {
-        uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(oplogBSON),
-                                   "PlanExecutor error in TransactionHistoryIterator");
-    }
 
     return oplogBSON.getOwned();
 }

@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -428,13 +429,33 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
     return ret;
 }
 
+void CollectionCatalog::setDatabaseProfileLevel(StringData dbName, int newProfileLevel) {
+    stdx::lock_guard<Latch> lock(_profileLevelsLock);
+    _databaseProfileLevels[dbName] = newProfileLevel;
+}
+
+int CollectionCatalog::getDatabaseProfileLevel(StringData dbName) const {
+    stdx::lock_guard<Latch> lock(_profileLevelsLock);
+    auto it = _databaseProfileLevels.find(dbName);
+    if (it != _databaseProfileLevels.end()) {
+        return it->second;
+    }
+
+    return serverGlobalParams.defaultProfile;
+}
+
+void CollectionCatalog::clearDatabaseProfileLevel(StringData dbName) {
+    stdx::lock_guard<Latch> lock(_profileLevelsLock);
+    _databaseProfileLevels.erase(dbName);
+}
+
 void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<Collection>* coll) {
     auto ns = (*coll)->ns();
     stdx::lock_guard<Latch> lock(_catalogLock);
     if (_collections.find(ns) != _collections.end()) {
         LOGV2(20279,
               "Conflicted creating a collection. ns: {coll_ns} ({coll_uuid}).",
-              "Conflicted creating a collection.",
+              "Conflicted creating a collection",
               "namespace"_attr = (*coll)->ns(),
               "uuid"_attr = (*coll)->uuid());
         throw WriteConflictException();

@@ -3,11 +3,11 @@
 import os
 import os.path
 
-from . import interface
-from ... import core
-from ... import errors
-from ... import utils
-from ...utils import globstar
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.testcases import interface
+from buildscripts.resmokelib.utils import globstar
 
 
 class MqlModelHaskellTestCase(interface.ProcessTestCase):

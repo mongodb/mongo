@@ -12,7 +12,16 @@ load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplicat
 const name = "change_stream_stepdown";
 const replTest = new ReplSetTest({name: name, nodes: [{}, {}]});
 replTest.startSet();
-replTest.initiate();
+// Initiate with high election timeout to prevent any election races.
+replTest.initiateWithHighElectionTimeout();
+
+function stepUp(conn) {
+    assert.commandWorked(conn.adminCommand({replSetFreeze: 0}));
+    assert.commandWorked(conn.adminCommand({replSetStepUp: 1, skipDryRun: true}));
+
+    // Waits for the new primary to accept new writes.
+    return replTest.getPrimary();
+}
 
 const dbName = name;
 const collName = "change_stream_stepdown";
@@ -23,9 +32,6 @@ const secondary = replTest.getSecondary();
 const primaryDb = primary.getDB(dbName);
 const secondaryDb = secondary.getDB(dbName);
 const primaryColl = primaryDb[collName];
-
-// Tell the secondary to stay secondary until we say otherwise.
-assert.commandWorked(secondaryDb.adminCommand({replSetFreeze: 999999}));
 
 // Open a change stream.
 let res = primaryDb.runCommand({
@@ -58,8 +64,7 @@ assert.eq(changes[0]["operationType"], "insert");
 
 jsTestLog("Testing that changestream survives step-up");
 // Step back up and wait for primary.
-assert.commandWorked(primaryDb.adminCommand({replSetFreeze: 0}));
-replTest.getPrimary();
+stepUp(primary);
 
 // Get the next one.  This tests that changestreams survives a step-up.
 res = assert.commandWorked(
@@ -83,8 +88,7 @@ assert.eq(changes[0]["fullDocument"], {_id: 3});
 assert.eq(changes[0]["operationType"], "insert");
 
 // Step back up and wait for primary.
-assert.commandWorked(primaryDb.adminCommand({replSetFreeze: 0}));
-replTest.getPrimary();
+stepUp(primary);
 
 jsTestLog("Testing that changestream waiting on old primary sees docs inserted on new primary");
 

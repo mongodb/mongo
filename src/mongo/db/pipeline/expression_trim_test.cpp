@@ -53,67 +53,67 @@ using std::string;
  * and returns the result.
  */
 static Value evaluateNamedArgExpression(const string& expressionName, const Document& operand) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    VariablesParseState vps = expCtx->variablesParseState;
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
     const BSONObj obj = BSON(expressionName << operand);
-    auto expression = Expression::parseExpression(expCtx, obj, vps);
-    Value result = expression->evaluate({}, &expCtx->variables);
+    auto expression = Expression::parseExpression(&expCtx, obj, vps);
+    Value result = expression->evaluate({}, &expCtx.variables);
     return result;
 }
 
 namespace Trim {
 
 TEST(ExpressionTrimParsingTest, ThrowsIfSpecIsNotAnObject) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
     ASSERT_THROWS(
-        Expression::parseExpression(expCtx, BSON("$trim" << 1), expCtx->variablesParseState),
+        Expression::parseExpression(&expCtx, BSON("$trim" << 1), expCtx.variablesParseState),
         AssertionException);
     ASSERT_THROWS(Expression::parseExpression(
-                      expCtx, BSON("$trim" << BSON_ARRAY(1 << 2)), expCtx->variablesParseState),
+                      &expCtx, BSON("$trim" << BSON_ARRAY(1 << 2)), expCtx.variablesParseState),
                   AssertionException);
     ASSERT_THROWS(Expression::parseExpression(
-                      expCtx, BSON("$ltrim" << BSONNULL), expCtx->variablesParseState),
+                      &expCtx, BSON("$ltrim" << BSONNULL), expCtx.variablesParseState),
                   AssertionException);
-    ASSERT_THROWS(Expression::parseExpression(expCtx,
+    ASSERT_THROWS(Expression::parseExpression(&expCtx,
                                               BSON("$rtrim"
                                                    << "string"),
-                                              expCtx->variablesParseState),
+                                              expCtx.variablesParseState),
                   AssertionException);
 }
 
 TEST(ExpressionTrimParsingTest, ThrowsIfSpecDoesNotSpecifyInput) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
     ASSERT_THROWS(Expression::parseExpression(
-                      expCtx, BSON("$trim" << BSONObj()), expCtx->variablesParseState),
+                      &expCtx, BSON("$trim" << BSONObj()), expCtx.variablesParseState),
                   AssertionException);
-    ASSERT_THROWS(Expression::parseExpression(expCtx,
+    ASSERT_THROWS(Expression::parseExpression(&expCtx,
                                               BSON("$ltrim" << BSON("chars"
                                                                     << "xyz")),
-                                              expCtx->variablesParseState),
+                                              expCtx.variablesParseState),
                   AssertionException);
 }
 
 TEST(ExpressionTrimParsingTest, ThrowsIfSpecContainsUnrecognizedField) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
     ASSERT_THROWS(Expression::parseExpression(
-                      expCtx, BSON("$trim" << BSON("other" << 1)), expCtx->variablesParseState),
+                      &expCtx, BSON("$trim" << BSON("other" << 1)), expCtx.variablesParseState),
                   AssertionException);
-    ASSERT_THROWS(Expression::parseExpression(expCtx,
+    ASSERT_THROWS(Expression::parseExpression(&expCtx,
                                               BSON("$ltrim" << BSON("chars"
                                                                     << "xyz"
                                                                     << "other" << 1)),
-                                              expCtx->variablesParseState),
+                                              expCtx.variablesParseState),
                   AssertionException);
-    ASSERT_THROWS(Expression::parseExpression(expCtx,
+    ASSERT_THROWS(Expression::parseExpression(&expCtx,
                                               BSON("$rtrim" << BSON("input"
                                                                     << "$x"
                                                                     << "chars"
                                                                     << "xyz"
                                                                     << "other" << 1)),
-                                              expCtx->variablesParseState),
+                                              expCtx.variablesParseState),
                   AssertionException);
 }
 
@@ -446,19 +446,19 @@ TEST(ExpressionTrimTest, DoesNotTrimAnyThingWithEmptyChars) {
 }
 
 TEST(ExpressionTrimTest, TrimComparisonsShouldNotRespectCollation) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto caseInsensitive =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
-    expCtx->setCollator(std::move(caseInsensitive));
+    expCtx.setCollator(std::move(caseInsensitive));
 
-    auto trim = Expression::parseExpression(expCtx,
+    auto trim = Expression::parseExpression(&expCtx,
                                             BSON("$trim" << BSON("input"
                                                                  << "xxXXxx"
                                                                  << "chars"
                                                                  << "x")),
-                                            expCtx->variablesParseState);
+                                            expCtx.variablesParseState);
 
-    ASSERT_VALUE_EQ(trim->evaluate({}, &expCtx->variables), Value("XX"_sd));
+    ASSERT_VALUE_EQ(trim->evaluate({}, &expCtx.variables), Value("XX"_sd));
 }
 
 TEST(ExpressionTrimTest, ShouldRejectInvalidUTFInCharsArgument) {
@@ -590,11 +590,11 @@ TEST(ExpressionTrimTest, ShouldReturnNullIfBothCharsAndCharsAreNullish) {
 }
 
 TEST(ExpressionTrimTest, DoesOptimizeToConstantWithNoChars) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto trim = Expression::parseExpression(expCtx,
+    auto expCtx = ExpressionContextForTest{};
+    auto trim = Expression::parseExpression(&expCtx,
                                             BSON("$trim" << BSON("input"
                                                                  << " abc ")),
-                                            expCtx->variablesParseState);
+                                            expCtx.variablesParseState);
     auto optimized = trim->optimize();
     auto constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
@@ -602,10 +602,10 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithNoChars) {
 
     // Test that it optimizes to a constant if the input also optimizes to a constant.
     trim = Expression::parseExpression(
-        expCtx,
+        &expCtx,
         BSON("$trim" << BSON("input" << BSON("$concat" << BSON_ARRAY(" "
                                                                      << "abc ")))),
-        expCtx->variablesParseState);
+        expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
@@ -613,13 +613,13 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithNoChars) {
 }
 
 TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto trim = Expression::parseExpression(expCtx,
+    auto expCtx = ExpressionContextForTest{};
+    auto trim = Expression::parseExpression(&expCtx,
                                             BSON("$trim" << BSON("input"
                                                                  << " abc "
                                                                  << "chars"
                                                                  << " ")),
-                                            expCtx->variablesParseState);
+                                            expCtx.variablesParseState);
     auto optimized = trim->optimize();
     auto constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
@@ -627,11 +627,11 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
 
     // Test that it optimizes to a constant if the chars argument optimizes to a constant.
     trim = Expression::parseExpression(
-        expCtx,
+        &expCtx,
         BSON("$trim" << BSON("input"
                              << "  abc "
                              << "chars" << BSON("$substrCP" << BSON_ARRAY("  " << 1 << 1)))),
-        expCtx->variablesParseState);
+        expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
@@ -639,12 +639,12 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
 
     // Test that it optimizes to a constant if both arguments optimize to a constant.
     trim = Expression::parseExpression(
-        expCtx,
+        &expCtx,
         BSON("$trim" << BSON("input" << BSON("$concat" << BSON_ARRAY(" "
                                                                      << "abc "))
                                      << "chars"
                                      << BSON("$substrCP" << BSON_ARRAY("  " << 1 << 1)))),
-        expCtx->variablesParseState);
+        expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(constant);
@@ -652,47 +652,47 @@ TEST(ExpressionTrimTest, DoesOptimizeToConstantWithCustomChars) {
 }
 
 TEST(ExpressionTrimTest, DoesNotOptimizeToConstantWithFieldPaths) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
     // 'input' is field path.
-    auto trim = Expression::parseExpression(expCtx,
+    auto trim = Expression::parseExpression(&expCtx,
                                             BSON("$trim" << BSON("input"
                                                                  << "$inputField")),
-                                            expCtx->variablesParseState);
+                                            expCtx.variablesParseState);
     auto optimized = trim->optimize();
     auto constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_FALSE(constant);
 
     // 'chars' is field path.
-    trim = Expression::parseExpression(expCtx,
+    trim = Expression::parseExpression(&expCtx,
                                        BSON("$trim" << BSON("input"
                                                             << " abc "
                                                             << "chars"
                                                             << "$secondInput")),
-                                       expCtx->variablesParseState);
+                                       expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_FALSE(constant);
 
     // Both are field paths.
-    trim = Expression::parseExpression(expCtx,
+    trim = Expression::parseExpression(&expCtx,
                                        BSON("$trim" << BSON("input"
                                                             << "$inputField"
                                                             << "chars"
                                                             << "$secondInput")),
-                                       expCtx->variablesParseState);
+                                       expCtx.variablesParseState);
     optimized = trim->optimize();
     constant = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_FALSE(constant);
 }
 
 TEST(ExpressionTrimTest, DoesAddInputDependencies) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
-    auto trim = Expression::parseExpression(expCtx,
+    auto trim = Expression::parseExpression(&expCtx,
                                             BSON("$trim" << BSON("input"
                                                                  << "$inputField")),
-                                            expCtx->variablesParseState);
+                                            expCtx.variablesParseState);
     DepsTracker deps;
     trim->addDependencies(&deps);
     ASSERT_EQ(deps.fields.count("inputField"), 1u);
@@ -700,14 +700,14 @@ TEST(ExpressionTrimTest, DoesAddInputDependencies) {
 }
 
 TEST(ExpressionTrimTest, DoesAddCharsDependencies) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
-    auto trim = Expression::parseExpression(expCtx,
+    auto trim = Expression::parseExpression(&expCtx,
                                             BSON("$trim" << BSON("input"
                                                                  << "$inputField"
                                                                  << "chars"
                                                                  << "$$CURRENT.a")),
-                                            expCtx->variablesParseState);
+                                            expCtx.variablesParseState);
     DepsTracker deps;
     trim->addDependencies(&deps);
     ASSERT_EQ(deps.fields.count("inputField"), 1u);
@@ -716,12 +716,12 @@ TEST(ExpressionTrimTest, DoesAddCharsDependencies) {
 }
 
 TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
 
-    auto trim = Expression::parseExpression(expCtx,
+    auto trim = Expression::parseExpression(&expCtx,
                                             BSON("$trim" << BSON("input"
                                                                  << " abc ")),
-                                            expCtx->variablesParseState);
+                                            expCtx.variablesParseState);
     ASSERT_VALUE_EQ(trim->serialize(false), trim->serialize(true));
     ASSERT_VALUE_EQ(
         trim->serialize(false),
@@ -729,25 +729,25 @@ TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
 
     // Make sure we can re-parse it and evaluate it.
     auto reparsedTrim = Expression::parseExpression(
-        expCtx, trim->serialize(false).getDocument().toBson(), expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(reparsedTrim->evaluate({}, &expCtx->variables), Value("abc"_sd));
+        &expCtx, trim->serialize(false).getDocument().toBson(), expCtx.variablesParseState);
+    ASSERT_VALUE_EQ(reparsedTrim->evaluate({}, &expCtx.variables), Value("abc"_sd));
 
     // Use $ltrim, and specify the 'chars' option.
-    trim = Expression::parseExpression(expCtx,
+    trim = Expression::parseExpression(&expCtx,
                                        BSON("$ltrim" << BSON("input"
                                                              << "$inputField"
                                                              << "chars"
                                                              << "$$CURRENT.a")),
-                                       expCtx->variablesParseState);
+                                       expCtx.variablesParseState);
     ASSERT_VALUE_EQ(
         trim->serialize(false),
         Value(Document{{"$ltrim", Document{{"input", "$inputField"_sd}, {"chars", "$a"_sd}}}}));
 
     // Make sure we can re-parse it and evaluate it.
     reparsedTrim = Expression::parseExpression(
-        expCtx, trim->serialize(false).getDocument().toBson(), expCtx->variablesParseState);
+        &expCtx, trim->serialize(false).getDocument().toBson(), expCtx.variablesParseState);
     ASSERT_VALUE_EQ(reparsedTrim->evaluate(Document{{"inputField", " , 4"_sd}, {"a", " ,"_sd}},
-                                           &expCtx->variables),
+                                           &expCtx.variables),
                     Value("4"_sd));
 }
 }  // namespace Trim

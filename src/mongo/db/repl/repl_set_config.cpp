@@ -454,7 +454,7 @@ int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     return -1;
 }
 
-int ReplSetConfig::findMemberIndexByConfigId(long long configId) const {
+int ReplSetConfig::findMemberIndexByConfigId(int configId) const {
     int x = 0;
     for (const auto& member : getMembers()) {
         if (member.getId() == MemberId(configId)) {
@@ -645,6 +645,15 @@ int ReplSetConfig::calculatePriorityRank(double priority) const {
 bool ReplSetConfig::containsArbiter() const {
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
         if (mem->isArbiter()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ReplSetConfig::containsNewlyAddedMembers() const {
+    for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
+        if (mem->isNewlyAdded()) {
             return true;
         }
     }

@@ -104,8 +104,11 @@ public:
         unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
             _expCtx.get(), collection, params, ws.get(), filterExpr.get());
 
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            _expCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+        auto statusWithPlanExecutor = PlanExecutor::make(_expCtx,
+                                                         std::move(ws),
+                                                         std::move(ps),
+                                                         collection,
+                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -195,7 +198,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
     auto statusWithPlanExecutor = PlanExecutor::make(
-        _expCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+        _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -224,7 +227,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
     auto statusWithPlanExecutor = PlanExecutor::make(
-        _expCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+        _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -377,7 +380,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
 
     // Run the rest of the scan and verify the results.
     auto statusWithPlanExecutor = PlanExecutor::make(
-        _expCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+        _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -422,7 +425,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
     WorkingSetID id = WorkingSet::INVALID_ID;
 
     // Check that failed seek causes the entire resume to fail.
-    ASSERT_EQUALS(PlanStage::FAILURE, ps->work(&id));
+    ASSERT_THROWS_CODE(ps->work(&id), DBException, ErrorCodes::KeyNotFound);
 }
 
 }  // namespace query_stage_collection_scan

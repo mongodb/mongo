@@ -43,15 +43,17 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
-#include "mongo/db/query/stage_builder.h"
+#include "mongo/db/query/stage_builder_util.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
@@ -111,7 +113,7 @@ public:
      *
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
-    QuerySolution* pickBestPlan(CanonicalQuery* cq) {
+    const QuerySolution* pickBestPlan(CanonicalQuery* cq) {
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
 
@@ -130,12 +132,12 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the MPR.
         for (size_t i = 0; i < solutions.size(); ++i) {
-            auto root = StageBuilder::build(&_opCtx, collection, *cq, *solutions[i], ws.get());
+            auto&& root = stage_builder::buildClassicExecutableTree(
+                &_opCtx, collection, *cq, *solutions[i], ws.get());
             _mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
         }
         // This is what sets a backup plan, should we test for it.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
-                                    _opCtx.getServiceContext()->getFastClockSource());
+        NoopYieldPolicy yieldPolicy(_opCtx.getServiceContext()->getFastClockSource());
         _mps->pickBestPlan(&yieldPolicy).transitional_ignore();
         ASSERT(_mps->bestPlanChosen());
 
@@ -143,7 +145,7 @@ public:
         ASSERT_LESS_THAN(bestPlanIdx, solutions.size());
 
         // And return a pointer to the best solution.
-        return _mps->bestSolution();
+        return static_cast<const MultiPlanStage*>(_mps.get())->bestSolution();
     }
 
     /**
@@ -212,7 +214,7 @@ public:
         // We get the number of works done during the trial period in order to make sure that there
         // are more documents in the collection than works done in the trial period. This ensures
         // neither of the plans reach EOF or produce results.
-        size_t numWorks = MultiPlanStage::getTrialPeriodWorks(opCtx(), nullptr);
+        size_t numWorks = trial_period::getTrialPeriodMaxWorks(opCtx(), nullptr);
         size_t smallNumber = 10;
         // The following condition must be met in order for the following test to work. Specifically
         // this condition guarantees that the score of the plan using the index on d will score
@@ -237,7 +239,7 @@ public:
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(cq);
 
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         ASSERT(
             QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
                                                  "{ixscan: {filter: null, pattern: {d:1}}}}}",
@@ -292,7 +294,7 @@ public:
         }
 
         // {a:100} is super selective so choose that.
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
 
@@ -348,7 +350,7 @@ public:
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
         internalQueryForceIntersectionPlans.store(true);
 
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         ASSERT(
             QueryPlannerTestLib::solutionMatches("{fetch: {node: {andHash: {nodes: ["
                                                  "{ixscan: {filter: null, pattern: {a:1}}},"
@@ -385,7 +387,7 @@ public:
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
 
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
 
         // Prefer the fully covered plan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
@@ -419,7 +421,7 @@ public:
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
 
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
 
         // Anti-prefer the intersection plan.
         bool bestIsScanOverA = QueryPlannerTestLib::solutionMatches(
@@ -458,7 +460,7 @@ public:
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
 
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         // Prefer the fully covered plan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}",
@@ -492,7 +494,7 @@ public:
         ASSERT(nullptr != cq.get());
 
         // {a: 100} is super selective so choose that.
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
     }
@@ -528,7 +530,7 @@ public:
         ASSERT(nullptr != cq.get());
 
         // {a: 100} is super selective so choose that.
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
     }
@@ -556,7 +558,7 @@ public:
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
 
         // The best must not be a collscan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
@@ -586,7 +588,7 @@ public:
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
 
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
 
         // The best must be a collscan.
         ASSERT(QueryPlannerTestLib::solutionMatches("{cscan: {dir: 1, filter: {foo: 2001}}}",
@@ -623,7 +625,7 @@ public:
         // No results will be returned during the trial period,
         // so we expect to choose {d: 1, e: 1}, as it allows us
         // to avoid the sort stage.
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         ASSERT(
             QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
                                                  "{ixscan: {filter: null, pattern: {d:1,e:1}}}}}",
@@ -658,7 +660,7 @@ public:
         ASSERT(nullptr != cq.get());
 
         // Use index on 'b'.
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {ixscan: {pattern: {b: 1}}}}}",
                                                     soln->root.get()));
     }
@@ -690,7 +692,7 @@ public:
         ASSERT(nullptr != cq.get());
 
         // Expect to use index {a: 1, b: 1}.
-        QuerySolution* soln = pickBestPlan(cq.get());
+        auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}",
                                                     soln->root.get()));
     }

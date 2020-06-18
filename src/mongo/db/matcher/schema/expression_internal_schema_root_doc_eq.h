@@ -89,6 +89,14 @@ public:
         return MatchCategory::kOther;
     }
 
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final {
         deps->needWholeDocument = true;

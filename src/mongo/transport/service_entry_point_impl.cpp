@@ -94,10 +94,11 @@ ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(s
 
         LOGV2_DEBUG(22940,
                     1,
-                    "fd limit hard:{limit_rlim_max} soft:{limit_rlim_cur} max conn: {max}",
-                    "limit_rlim_max"_attr = limit.rlim_max,
-                    "limit_rlim_cur"_attr = limit.rlim_cur,
-                    "max"_attr = max);
+                    "fd limit hard:{hard} soft:{soft} max conn: {conn}",
+                    "file descriptor and connection resource limits",
+                    "hard"_attr = limit.rlim_max,
+                    "soft"_attr = limit.rlim_cur,
+                    "conn"_attr = max);
 
         return std::min(max, serverGlobalParams.maxConns);
 #endif
@@ -107,8 +108,9 @@ ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(s
     if (supportedMax < serverGlobalParams.maxConns &&
         serverGlobalParams.maxConns != DEFAULT_MAX_CONN) {
         LOGV2(22941,
-              " --maxConns too high, can only handle {supportedMax}",
-              "supportedMax"_attr = supportedMax);
+              " --maxConns too high, can only handle {limit}",
+              " --maxConns too high",
+              "limit"_attr = supportedMax);
     }
 
     _maxNumConnections = supportedMax;
@@ -237,8 +239,9 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     while (timeSpent < timeout &&
            !_shutdownCondition.wait_for(lk, checkInterval.toSystemDuration(), noWorkersLeft)) {
         LOGV2(22945,
-              "shutdown: still waiting on {numOpenSessions} active workers to drain... ",
-              "numOpenSessions"_attr = numOpenSessions());
+              "shutdown: still waiting on {workers} active workers to drain... ",
+              "shutdown: still waiting on active workers to drain... ",
+              "workers"_attr = numOpenSessions());
         timeSpent += checkInterval;
     }
 
@@ -246,10 +249,12 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     if (result) {
         LOGV2(22946, "shutdown: no running workers found...");
     } else {
-        LOGV2(22947,
-              "shutdown: exhausted grace period for{numOpenSessions} active workers to "
-              "drain; continuing with shutdown... ",
-              "numOpenSessions"_attr = numOpenSessions());
+        LOGV2(
+            22947,
+            "shutdown: exhausted grace period for {workers} active workers to "
+            "drain; continuing with shutdown...",
+            "shutdown: exhausted grace period active workers to drain; continuing with shutdown...",
+            "workers"_attr = numOpenSessions());
     }
     return result;
 }

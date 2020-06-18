@@ -4,10 +4,10 @@ import collections
 import optparse
 import os
 
-from . import config as _config
-from . import errors
-from . import utils
-from .testing import suite as _suite
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing import suite as _suite
 
 
 def get_named_suites():

@@ -49,14 +49,9 @@ Status parseCommandLineOptions(int argc,
     // different options format and we therefore need to have parsed the command line options before
     // embedded::initialize() is called. However, as long as we store the options in the same place
     // they will be valid for embedded too.
-    std::vector<std::string> args;
-    std::map<std::string, std::string> env;
-
-    args.reserve(argc);
-    std::copy(argv, argv + argc, std::back_inserter(args));
-
-    optionenvironment::OptionsParser parser;
-    return parser.run(startupOptions, args, env, &optionenvironment::startupOptionsParsed);
+    return optionenvironment::OptionsParser{}.run(startupOptions,
+                                                  std::vector<std::string>(argv, argv + argc),
+                                                  &optionenvironment::startupOptionsParsed);
 }
 
 }  // namespace embedded_integration_helpers

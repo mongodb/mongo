@@ -308,3 +308,22 @@ function WaitForFreeMonServerStatusState(conn, state) {
             "', actual: " + tojson(FreeMonGetServerStatus(conn)),
         20 * 1000);
 }
+
+/**
+ * Validate Free Monitoring Replica Set consistency
+ * WARNING: Not valid if secondary is started with enableFreeMonitoring since it registers before it
+ * joins the replica set.
+ *
+ * @param {object} rst
+ */
+function ValidateFreeMonReplicaSet(rst) {
+    'use strict';
+
+    const primary_status = FreeMonGetStatus(rst.getPrimary());
+    const primary_url = primary_status.url;
+    const secondary_status = FreeMonGetStatus(rst.getSecondary());
+    const secondary_url = secondary_status.url;
+    assert.eq(primary_url,
+              secondary_url,
+              `DUMP ${tojson(primary_status)} == ${tojson(secondary_status)}`);
+}

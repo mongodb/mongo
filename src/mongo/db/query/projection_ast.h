@@ -98,6 +98,22 @@ protected:
     ASTNodeVector _children;
 };
 
+inline auto begin(ASTNode& node) {
+    return node.children().begin();
+}
+
+inline auto begin(const ASTNode& node) {
+    return node.children().begin();
+}
+
+inline auto end(ASTNode& node) {
+    return node.children().end();
+}
+
+inline auto end(const ASTNode& node) {
+    return node.children().end();
+}
+
 class MatchExpressionASTNode final : public ASTNode {
 public:
     MatchExpressionASTNode(CopyableMatchExpression matchExpr) : _matchExpr{matchExpr} {}

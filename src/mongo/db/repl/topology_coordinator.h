@@ -272,14 +272,14 @@ public:
                                 Date_t now) const;
 
     /**
-     * Returns true if we find an eligible sync source that is considered to be within the same data
-     * center as us and our current sync source is not in the same data center as us.
+     * Returns true if we find an eligible sync source that is significantly closer than our current
+     * sync source.
      */
     bool shouldChangeSyncSourceDueToPingTime(const HostAndPort& currentSource,
                                              const MemberState& memberState,
                                              const OpTime& lastOpTimeFetched,
                                              Date_t now,
-                                             const ReadPreference readPreference) const;
+                                             const ReadPreference readPreference);
 
     /**
      * Sets the reported mode of this node to one of RS_SECONDARY, RS_STARTUP2, RS_ROLLBACK or
@@ -912,6 +912,17 @@ private:
                                         const OpTime& lastOpTimeFetched,
                                         ReadPreference readPreference);
 
+    /*
+     * Clear this node's sync source.
+     */
+    void _clearSyncSource();
+
+    /**
+     * Sets this node's sync source. It will also update whether the sync source was forced and add
+     * a new entry to recent sync source changes.
+     */
+    void _setSyncSource(HostAndPort newSyncSource, Date_t now, bool forced = false);
+
     // Returns the oldest acceptable OpTime that a node must have for us to choose it as our sync
     // source.
     const OpTime _getOldestSyncOpTime() const;
@@ -975,13 +986,14 @@ private:
     MemberData* _findMemberDataByMemberId(const int memberId);
 
     /**
-     * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse(), and determines if an
-     * election or stepdown should commence.
+     * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse().
      */
-    HeartbeatResponseAction _updatePrimaryFromHBDataV1(int updatedConfigIndex,
-                                                       const MemberState& originalState,
-                                                       Date_t now);
+    void _updatePrimaryFromHBDataV1(Date_t now);
 
+    /**
+     * Determine if the node should run PriorityTakeover or CatchupTakeover.
+     */
+    HeartbeatResponseAction _shouldTakeOverPrimary(int updatedConfigIndex);
     /**
      * Updates _memberData based on the newConfig, ensuring that every member in the newConfig
      * has an entry in _memberData.  If any nodes in the newConfig are also present in
@@ -1042,6 +1054,9 @@ private:
     std::map<HostAndPort, Date_t> _syncSourceBlacklist;
     // The next sync source to be chosen, requested via a replSetSyncFrom command
     int _forceSyncSourceIndex;
+    // Whether the current sync source has been set via a replSetSyncFrom command or
+    // forceSyncSourceCandidate failpoint.
+    bool _syncSourceCurrentlyForced;
 
     // Options for this TopologyCoordinator
     Options _options;

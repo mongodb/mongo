@@ -16,9 +16,9 @@ load('jstests/libs/parallelTester.js');     // For Thread.
  * Returns true if the error code is transient.
  */
 function isIgnorableError(codeName) {
-    if (codeName == "ConfigurationInProgress" || codeName == "NotMaster" ||
-        codeName == "InterruptedDueToReplStateChange" || codeName == "PrimarySteppedDown" ||
-        codeName === "NodeNotFound" || codeName === "ShutdownInProgress") {
+    if (codeName == "NotMaster" || codeName == "InterruptedDueToReplStateChange" ||
+        codeName == "PrimarySteppedDown" || codeName === "NodeNotFound" ||
+        codeName === "ShutdownInProgress") {
         return true;
     }
     return false;
@@ -78,6 +78,8 @@ function reconfigBackground(primary, numNodes) {
     const primaryHostIndex = (cfg, pHost) => cfg.members.findIndex(m => m.host === pHost);
     const primaryIndex = primaryHostIndex(config, primary);
     jsTestLog("primaryIndex is " + primaryIndex);
+    jsTestLog("primary's config: (configVersion: " + config.version +
+              ", configTerm: " + config.term + ")");
 
     // Calculate the total number of voting nodes in this set so that we make sure we
     // always have at least two voting nodes. This is so that the primary can always
@@ -92,7 +94,7 @@ function reconfigBackground(primary, numNodes) {
         indexToChange = Random.randInt(numNodes);
     }
 
-    jsTestLog("Running reconfig to change votes of node at index" + indexToChange);
+    jsTestLog("Running reconfig to change votes of node at index " + indexToChange);
 
     // Change the priority to correspond to the votes. If the member's current votes field
     // is 1, only change it to 0 if there are more than 3 voting members in this set.
@@ -136,6 +138,11 @@ try {
         jsTestLog("Ignoring network error" + tojson(e));
     } else if (e.message.match(kReplicaSetMonitorError)) {
         jsTestLog("Ignoring read preference primary error" + tojson(e));
+    } else if (e.code === ErrorCodes.ShutdownInProgress) {
+        // When a node is being shutdown, it is possible to fail isMaster requests with
+        // ShutdownInProgress. If we encounter this error, ignore it and find a new
+        // primary.
+        jsTestLog("Ignoring ShutdownInProgress error" + tojson(e));
     } else {
         throw e;
     }

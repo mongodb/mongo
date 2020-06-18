@@ -2,8 +2,8 @@
 
 import json
 
-from . import config
-from .testing import report as _report
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib.testing import report as _report
 
 
 def write(suites):

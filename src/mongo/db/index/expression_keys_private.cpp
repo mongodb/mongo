@@ -266,7 +266,8 @@ using std::string;
 using std::vector;
 
 // static
-void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
+void ExpressionKeysPrivate::get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                      const BSONObj& obj,
                                       const TwoDIndexingParams& params,
                                       KeyStringSet* keys,
                                       KeyString::Version keyStringVersion,
@@ -281,6 +282,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
     if (bSet.empty())
         return;
 
+    auto keysSequence = keys->extract_sequence();
     for (BSONElementMultiSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI) {
         BSONElement geo = *setI;
 
@@ -323,15 +325,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                     continue;
             }
 
-            // Stop if we don't need to get anything but location objects
-            if (!keys) {
-                if (singleElement)
-                    break;
-                else
-                    continue;
-            }
-
-            KeyString::Builder keyString(keyStringVersion, ordering);
+            KeyString::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
             params.geoHashConverter->hash(locObj, &obj).appendHashMin(&keyString);
 
             // Go through all the other index keys
@@ -355,11 +349,12 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
             if (id) {
                 keyString.appendRecordId(*id);
             }
-            keys->insert(keyString.getValueCopy());
+            keysSequence.push_back(keyString.release());
             if (singleElement)
                 break;
         }
     }
+    keys->adopt_sequence(std::move(keysSequence));
 }
 
 // static
@@ -375,7 +370,8 @@ void ExpressionKeysPrivate::getFTSKeys(SharedBufferFragmentBuilder& pooledBuffer
 }
 
 // static
-void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
+void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                        const BSONObj& obj,
                                         const BSONObj& keyPattern,
                                         HashSeed seed,
                                         int hashVersion,
@@ -388,7 +384,7 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         boost::optional<RecordId> id) {
     static const BSONObj nullObj = BSON("" << BSONNULL);
     auto hasFieldValue = false;
-    KeyString::HeapBuilder keyString(keyStringVersion, ordering);
+    KeyString::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
     for (auto&& indexEntry : keyPattern) {
         auto indexPath = indexEntry.fieldNameStringData();
         auto* cstr = indexPath.rawData();
@@ -451,7 +447,8 @@ long long int ExpressionKeysPrivate::makeSingleHashKey(const BSONElement& e, Has
 }
 
 // static
-void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
+void ExpressionKeysPrivate::getHaystackKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                            const BSONObj& obj,
                                             const std::string& geoField,
                                             const std::vector<std::string>& otherFields,
                                             double bucketSize,
@@ -491,7 +488,7 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
         // We're indexing a document that doesn't have the secondary non-geo field present.
         // XXX: do we want to add this even if all.size() > 0?  result:empty search terms
         // match everything instead of only things w/empty search terms)
-        KeyString::HeapBuilder keyString(keyStringVersion, ordering);
+        KeyString::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
         keyString.appendString(root);
         keyString.appendNull();
         if (id) {
@@ -503,15 +500,17 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
         // all.size()==1.  We can query on the complete field.
         // Ex: If our secondary field is type: ["A", "B"] all.size()==2 and all has values
         // "A" and "B".  The query looks for any of the fields in the array.
+        auto keysSequence = keys->extract_sequence();
         for (const auto& elem : all) {
-            KeyString::HeapBuilder keyString(keyStringVersion, ordering);
+            KeyString::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
             keyString.appendString(root);
             keyString.appendBSONElement(elem);
             if (id) {
                 keyString.appendRecordId(*id);
             }
-            keys->insert(keyString.release());
+            keysSequence.push_back(keyString.release());
         }
+        keys->adopt_sequence(std::move(keysSequence));
     }
 }
 
@@ -531,7 +530,8 @@ std::string ExpressionKeysPrivate::makeHaystackString(int hashedX, int hashedY) 
     return ss;
 }
 
-void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
+void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                      const BSONObj& obj,
                                       const BSONObj& keyPattern,
                                       const S2IndexingParams& params,
                                       KeyStringSet* keys,
@@ -639,18 +639,21 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
     if (keysToAdd.size() > params.maxKeysPerInsert) {
         LOGV2_WARNING(23755,
                       "Insert of geo object generated a high number of keys. num keys: "
-                      "{keysToAdd_size} obj inserted: {obj}",
-                      "keysToAdd_size"_attr = keysToAdd.size(),
-                      "obj"_attr = redact(obj));
+                      "{numKeys} obj inserted: {obj}",
+                      "Insert of geo object generated a large number of keys",
+                      "obj"_attr = redact(obj),
+                      "numKeys"_attr = keysToAdd.size());
     }
 
     invariant(keys->empty());
+    auto keysSequence = keys->extract_sequence();
     for (auto& ks : keysToAdd) {
         if (id) {
             ks.appendRecordId(*id);
         }
-        keys->insert(ks.release());
+        keysSequence.push_back(ks.release());
     }
+    keys->adopt_sequence(std::move(keysSequence));
 }
 
 }  // namespace mongo

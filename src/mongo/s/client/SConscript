@@ -81,6 +81,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/query/async_results_merger',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/mongo/s/vector_clock_mongos',
         'sharding_client',
     ],
 )

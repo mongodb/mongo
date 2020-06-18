@@ -834,7 +834,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::InternalError, errmsg);
     }
 
-    ScriptEngine::runConnectCallback(*conn);
+    ScriptEngine::runConnectCallback(*conn, host);
 
     JS::RootedObject thisv(cx);
     scope->getProto<MongoExternalInfo>().newObject(&thisv);

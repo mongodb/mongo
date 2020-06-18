@@ -106,7 +106,10 @@ function MongoBridge(options) {
             },
         });
 
-        controlConn = new Mongo(hostName + ':' + this.port);
+        assert.soonNoExcept(() => {
+            controlConn = new Mongo(hostName + ':' + this.port);
+            return true;
+        }, 'failed to make control connection to the mongobridge on port ' + this.port);
     };
 
     /**

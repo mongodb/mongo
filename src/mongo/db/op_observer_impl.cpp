@@ -260,7 +260,7 @@ OpObserverImpl::DocumentKey OpObserverImpl::getDocumentKey(OperationContext* opC
     // if running on standalone or primary. Skip this completely on secondaries since they are
     // not expected to have the collection metadata cached.
     if (opCtx->writesAreReplicated()) {
-        auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+        auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             shardKey =
                 dotted_path_support::extractElementsBasedOnTemplate(doc, collDesc.getKeyPattern())
@@ -347,10 +347,12 @@ void OpObserverImpl::onStartIndexBuildSinglePhase(OperationContext* opCtx,
     // 4. All other cases, we generate a timestamp by writing a no-op oplog entry.  This is
     // better than using a ghost timestamp.  Writing an oplog entry ensures this node is
     // primary.
-    auto msg = BSON("msg"
-                    << "Creating indexes"
-                    << "coll" << nss.ns());
-    onOpMessage(opCtx, msg);
+    onInternalOpMessage(
+        opCtx,
+        {},
+        boost::none,
+        BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << nss)),
+        boost::none);
 }
 
 void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,

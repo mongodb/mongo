@@ -35,7 +35,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/vector_clock_mutable.h"
 
 namespace mongo {
 namespace repl {
@@ -131,7 +131,8 @@ void OplogApplierImplTest::setUp() {
 
     // This is necessary to generate ghost timestamps for index builds that are not 0, since 0 is an
     // invalid timestamp.
-    ASSERT_OK(LogicalClock::get(_opCtx.get())->advanceClusterTime(LogicalTime(Timestamp(1, 0))));
+    VectorClockMutable::get(_opCtx.get())
+        ->tickTo(VectorClock::Component::ClusterTime, LogicalTime(Timestamp(1, 0)));
 }
 
 void OplogApplierImplTest::tearDown() {
@@ -269,11 +270,17 @@ Status OplogApplierImplTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
     // its own batch and update oplog visibility after each batch to make sure all previously
     // applied entries are visible to subsequent batches.
     for (auto& op : ops) {
-        auto status = oplogApplier.applyOplogBatch(_opCtx.get(), {op});
-        if (!status.isOK()) {
-            return status.getStatus();
+        auto applyResult = oplogApplier.applyOplogBatch(_opCtx.get(), {op});
+        if (!applyResult.isOK()) {
+            std::vector<BSONObj> docsFromOps;
+            for (const auto& opForContext : ops) {
+                docsFromOps.push_back(opForContext.toBSON());
+            }
+            auto status = applyResult.getStatus();
+            return status.withContext(str::stream() << "failed to apply operation: " << op.toBSON()
+                                                    << ". " << BSON("ops" << docsFromOps));
         }
-        auto lastApplied = status.getValue();
+        auto lastApplied = applyResult.getValue();
         const bool orderedCommit = true;
         // Update oplog visibility by notifying the storage engine of the new oplog entries.
         storageInterface->oplogDiskLocRegister(
@@ -316,7 +323,7 @@ CollectionReader::CollectionReader(OperationContext* opCtx, const NamespaceStrin
       _exec(InternalPlanner::collectionScan(opCtx,
                                             nss.ns(),
                                             _collToScan.getCollection(),
-                                            PlanExecutor::NO_YIELD,
+                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                             InternalPlanner::FORWARD)) {}
 
 StatusWith<BSONObj> CollectionReader::next() {

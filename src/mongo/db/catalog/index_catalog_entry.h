@@ -45,6 +45,7 @@
 
 namespace mongo {
 class CollatorInterface;
+class Collection;
 class CollectionCatalogEntry;
 class IndexAccessMethod;
 class IndexBuildInterceptor;
@@ -52,15 +53,13 @@ class IndexDescriptor;
 class MatchExpression;
 class OperationContext;
 
-class IndexCatalogEntry {
+class IndexCatalogEntry : public std::enable_shared_from_this<IndexCatalogEntry> {
 public:
     IndexCatalogEntry() = default;
     virtual ~IndexCatalogEntry() = default;
 
     inline IndexCatalogEntry(IndexCatalogEntry&&) = delete;
     inline IndexCatalogEntry& operator=(IndexCatalogEntry&&) = delete;
-
-    virtual const NamespaceString& ns() const = 0;
 
     virtual void init(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
 
@@ -87,6 +86,11 @@ public:
     virtual const MatchExpression* getFilterExpression() const = 0;
 
     virtual const CollatorInterface* getCollator() const = 0;
+
+    /**
+     *  Looks up the namespace name in the durable catalog. May do I/O.
+     */
+    virtual NamespaceString getNSSFromCatalog(OperationContext* opCtx) const = 0;
 
     /// ---------------------
 
@@ -128,7 +132,9 @@ public:
      * namespace, index name, and multikey paths on the OperationContext rather than set the index
      * as multikey here.
      */
-    virtual void setMultikey(OperationContext* const opCtx, const MultikeyPaths& multikeyPaths) = 0;
+    virtual void setMultikey(OperationContext* const opCtx,
+                             const Collection* coll,
+                             const MultikeyPaths& multikeyPaths) = 0;
 
     // if this ready is ready for queries
     virtual bool isReady(OperationContext* const opCtx) const = 0;
@@ -170,19 +176,6 @@ public:
     iterator end() {
         return _entries.end();
     }
-
-    // TODO: these have to be SUPER SUPER FAST
-    // maybe even some pointer trickery is in order
-    const IndexCatalogEntry* find(const IndexDescriptor* desc) const;
-    IndexCatalogEntry* find(const IndexDescriptor* desc);
-
-    IndexCatalogEntry* find(const std::string& name);
-
-    /**
-     * Returns a pointer to the IndexCatalogEntry corresponding to 'desc', where the caller assumes
-     * shared ownership of the catalog object. Returns null if the entry does not exist.
-     */
-    std::shared_ptr<IndexCatalogEntry> findShared(const IndexDescriptor* desc) const;
 
     unsigned size() const {
         return _entries.size();

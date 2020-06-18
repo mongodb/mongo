@@ -48,6 +48,10 @@ public:
         : _ns(ns), _catalogId(catalogId) {}
     ~CollectionMock() = default;
 
+    SharedCollectionDecorations* getSharedDecorations() const {
+        return nullptr;
+    }
+
     void init(OperationContext* opCtx) {
         std::abort();
     }
@@ -266,7 +270,7 @@ public:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
-        PlanExecutor::YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         ScanDirection scanDirection) {
         std::abort();
     }

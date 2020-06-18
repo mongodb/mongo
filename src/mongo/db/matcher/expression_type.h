@@ -140,6 +140,14 @@ public:
     StringData name() const final {
         return kName;
     }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
 };
 
 /**
@@ -164,6 +172,14 @@ public:
 
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
+    }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
     }
 };
 
@@ -227,6 +243,14 @@ public:
         return _binDataSubType == realOther->_binDataSubType;
     }
 
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
@@ -286,6 +310,14 @@ public:
                           str::stream() << "unexpected subtype " << static_cast<int>(fleBlobSubType)
                                         << " of encrypted binary data (0, 1 and 2 are allowed)");
         }
+    }
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
     }
 };
 }  // namespace mongo

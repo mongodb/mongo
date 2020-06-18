@@ -71,6 +71,8 @@ public:
      * This function will noop if the MirrorMaestro is currently being initialized or shutdown.
      */
     static void tryMirrorRequest(OperationContext* opCtx) noexcept;
+
+    static constexpr auto kServerStatusSectionName = "mirroredReads"_sd;
 };
 
 }  // namespace mongo

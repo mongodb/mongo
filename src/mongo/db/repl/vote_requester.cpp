@@ -219,6 +219,9 @@ void VoteRequester::cancel() {
 }
 
 VoteRequester::Result VoteRequester::getResult() const {
+    if (_isCanceled)
+        return Result::kCancelled;
+
     return _algorithm->getResult();
 }
 

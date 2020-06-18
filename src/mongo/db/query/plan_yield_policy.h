@@ -31,8 +31,8 @@
 
 #include <functional>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
@@ -41,23 +41,116 @@ class ClockSource;
 
 class PlanYieldPolicy {
 public:
-    virtual ~PlanYieldPolicy() {}
+    enum class YieldPolicy {
+        // Any call to getNext() may yield. In particular, the executor may die on any call to
+        // getNext() due to a required index or collection becoming invalid during yield. If this
+        // occurs, getNext() will produce an error during yield recovery and will return FAILURE.
+        // Additionally, this will handle all WriteConflictExceptions that occur while processing
+        // the query.  With this yield policy, it is possible for getNext() to return FAILURE with
+        // locks released, if the operation is killed while yielding.
+        YIELD_AUTO,
 
-    PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
+        // This will handle WriteConflictExceptions that occur while processing the query, but will
+        // not yield locks. abandonSnapshot() will be called if a WriteConflictException occurs so
+        // callers must be prepared to get a new snapshot. The caller must hold their locks
+        // continuously from construction to destruction. Callers which do not want auto-yielding,
+        // but may release their locks during query execution must use the YIELD_MANUAL policy.
+        WRITE_CONFLICT_RETRY_ONLY,
+
+        // Use this policy if you want to disable auto-yielding, but will release locks while using
+        // the PlanExecutor. Any WriteConflictExceptions will be raised to the caller of getNext().
+        //
+        // With this policy, an explicit call must be made to saveState() before releasing locks,
+        // and an explicit call to restoreState() must be made after reacquiring locks.
+        // restoreState() will throw if the PlanExecutor is now invalid due to a catalog operation
+        // (e.g. collection drop) during yield.
+        YIELD_MANUAL,
+
+        // Can be used in one of the following scenarios:
+        //  - The caller will hold a lock continuously for the lifetime of this PlanExecutor.
+        //  - This PlanExecutor doesn't logically belong to a Collection, and so does not need to be
+        //    locked during execution. For example, a PlanExecutor containing a PipelineProxyStage
+        //    which is being used to execute an aggregation pipeline.
+        NO_YIELD,
+
+        // Will not yield locks or storage engine resources, but will check for interrupt.
+        INTERRUPT_ONLY,
+
+        // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
+        // yield, returning FAILURE with an error object encoding a ErrorCodes::ExceededTimeLimit
+        // message.
+        ALWAYS_TIME_OUT,
+
+        // Used for testing, this yield policy will cause the PlanExecutor to be marked as killed on
+        // the first yield, returning FAILURE with an error object encoding a
+        // ErrorCodes::QueryPlanKilled message.
+        ALWAYS_MARK_KILLED,
+    };
+
+    static std::string serializeYieldPolicy(YieldPolicy yieldPolicy) {
+        switch (yieldPolicy) {
+            case YieldPolicy::YIELD_AUTO:
+                return "YIELD_AUTO";
+            case YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
+                return "WRITE_CONFLICT_RETRY_ONLY";
+            case YieldPolicy::YIELD_MANUAL:
+                return "YIELD_MANUAL";
+            case YieldPolicy::NO_YIELD:
+                return "NO_YIELD";
+            case YieldPolicy::INTERRUPT_ONLY:
+                return "INTERRUPT_ONLY";
+            case YieldPolicy::ALWAYS_TIME_OUT:
+                return "ALWAYS_TIME_OUT";
+            case YieldPolicy::ALWAYS_MARK_KILLED:
+                return "ALWAYS_MARK_KILLED";
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    static YieldPolicy parseFromBSON(const StringData& element) {
+        const std::string& yieldPolicy = element.toString();
+        if (yieldPolicy == "YIELD_AUTO") {
+            return YieldPolicy::YIELD_AUTO;
+        }
+        if (yieldPolicy == "WRITE_CONFLICT_RETRY_ONLY") {
+            return YieldPolicy::WRITE_CONFLICT_RETRY_ONLY;
+        }
+        if (yieldPolicy == "YIELD_MANUAL") {
+            return YieldPolicy::YIELD_MANUAL;
+        }
+        if (yieldPolicy == "NO_YIELD") {
+            return YieldPolicy::NO_YIELD;
+        }
+        if (yieldPolicy == "INTERRUPT_ONLY") {
+            return YieldPolicy::INTERRUPT_ONLY;
+        }
+        if (yieldPolicy == "ALWAYS_TIME_OUT") {
+            return YieldPolicy::ALWAYS_TIME_OUT;
+        }
+        if (yieldPolicy == "ALWAYS_MARK_KILLED") {
+            return YieldPolicy::ALWAYS_MARK_KILLED;
+        }
+        MONGO_UNREACHABLE;
+    }
 
     /**
-     * Only used in dbtests since we don't have access to a PlanExecutor. Since we don't have
-     * access to the PlanExecutor to grab a ClockSource from, we pass in a ClockSource directly
-     * in the constructor instead.
+     * Constructs a PlanYieldPolicy of the given 'policy' type. This class uses an ElapsedTracker
+     * to keep track of elapsed time, which is initialized from the parameters 'cs',
+     * 'yieldIterations' and 'yieldPeriod'.
      */
-    PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* cs);
+    PlanYieldPolicy(YieldPolicy policy,
+                    ClockSource* cs,
+                    int yieldIterations,
+                    Milliseconds yieldPeriod);
+
+    virtual ~PlanYieldPolicy() = default;
 
     /**
      * Periodically returns true to indicate that it is time to check for interrupt (in the case of
      * YIELD_AUTO and INTERRUPT_ONLY) or release locks or storage engine state (in the case of
      * auto-yielding plans).
      */
-    virtual bool shouldYieldOrInterrupt();
+    virtual bool shouldYieldOrInterrupt(OperationContext* opCtx);
 
     /**
      * Resets the yield timer so that we wait for a while before yielding/interrupting again.
@@ -77,7 +170,8 @@ public:
      * Calls 'whileYieldingFn' after relinquishing locks and before reacquiring the locks that have
      * been relinquished.
      */
-    virtual Status yieldOrInterrupt(std::function<void()> whileYieldingFn = nullptr);
+    Status yieldOrInterrupt(OperationContext* opCtx,
+                            std::function<void()> whileYieldingFn = nullptr);
 
     /**
      * All calls to shouldYieldOrInterrupt() will return true until the next call to
@@ -95,15 +189,15 @@ public:
      */
     bool canReleaseLocksDuringExecution() const {
         switch (_policy) {
-            case PlanExecutor::YIELD_AUTO:
-            case PlanExecutor::YIELD_MANUAL:
-            case PlanExecutor::ALWAYS_TIME_OUT:
-            case PlanExecutor::ALWAYS_MARK_KILLED: {
+            case YieldPolicy::YIELD_AUTO:
+            case YieldPolicy::YIELD_MANUAL:
+            case YieldPolicy::ALWAYS_TIME_OUT:
+            case YieldPolicy::ALWAYS_MARK_KILLED: {
                 return true;
             }
-            case PlanExecutor::NO_YIELD:
-            case PlanExecutor::WRITE_CONFLICT_RETRY_ONLY:
-            case PlanExecutor::INTERRUPT_ONLY: {
+            case YieldPolicy::NO_YIELD:
+            case YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
+            case YieldPolicy::INTERRUPT_ONLY: {
                 return false;
             }
         }
@@ -117,45 +211,41 @@ public:
      */
     bool canAutoYield() const {
         switch (_policy) {
-            case PlanExecutor::YIELD_AUTO:
-            case PlanExecutor::WRITE_CONFLICT_RETRY_ONLY:
-            case PlanExecutor::ALWAYS_TIME_OUT:
-            case PlanExecutor::ALWAYS_MARK_KILLED: {
+            case YieldPolicy::YIELD_AUTO:
+            case YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
+            case YieldPolicy::ALWAYS_TIME_OUT:
+            case YieldPolicy::ALWAYS_MARK_KILLED: {
                 return true;
             }
-            case PlanExecutor::NO_YIELD:
-            case PlanExecutor::YIELD_MANUAL:
-            case PlanExecutor::INTERRUPT_ONLY:
+            case YieldPolicy::NO_YIELD:
+            case YieldPolicy::YIELD_MANUAL:
+            case YieldPolicy::INTERRUPT_ONLY:
                 return false;
         }
         MONGO_UNREACHABLE;
     }
 
-    PlanExecutor::YieldPolicy getPolicy() const {
+    PlanYieldPolicy::YieldPolicy getPolicy() const {
         return _policy;
     }
 
 private:
-    const PlanExecutor::YieldPolicy _policy;
-
-    bool _forceYield;
-    ElapsedTracker _elapsedTracker;
-
-    // The plan executor which this yield policy is responsible for yielding. Must
-    // not outlive the plan executor.
-    PlanExecutor* const _planYielding;
+    /**
+     * Yields locks and calls 'abandonSnapshot()'. Calls 'whileYieldingFn()', if provided, while
+     * locks are not held.
+     */
+    virtual Status yield(OperationContext* opCtx,
+                         std::function<void()> whileYieldingFn = nullptr) = 0;
 
     /**
-     * If not in a nested context, unlocks all locks, suggests to the operating system to
-     * switch to another thread, and then reacquires all locks.
-     *
-     * If in a nested context (eg DBDirectClient), does nothing.
-     *
-     * The whileYieldingFn will be executed after unlocking the locks and before re-acquiring them.
+     * If the yield policy is INTERRUPT_ONLY, this is called prior to checking for interrupt.
      */
-    void _yieldAllLocks(OperationContext* opCtx,
-                        std::function<void()> whileYieldingFn,
-                        const NamespaceString& planExecNS);
+    virtual void preCheckInterruptOnly(OperationContext* opCtx) {}
+
+    const YieldPolicy _policy;
+
+    bool _forceYield = false;
+    ElapsedTracker _elapsedTracker;
 };
 
 }  // namespace mongo

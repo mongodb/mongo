@@ -569,9 +569,9 @@ TEST(ProjectionExecutorType, ShouldCoerceNumericsToBools) {
 }
 
 TEST(ProjectionExecutorType, GetExpressionForPathGetsTopLevelExpression) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto projectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
-    auto expr = Expression::parseObject(expCtx, projectObj, expCtx->variablesParseState);
+    auto expr = Expression::parseObject(&expCtx, projectObj, expCtx.variablesParseState);
     ProjectionPolicies defaultPolicies;
     auto node = InclusionNode(defaultPolicies);
     node.addExpressionForPath(FieldPath("key"), expr);
@@ -580,11 +580,11 @@ TEST(ProjectionExecutorType, GetExpressionForPathGetsTopLevelExpression) {
 }
 
 TEST(ProjectionExecutorType, GetExpressionForPathGetsCorrectTopLevelExpression) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto correctObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
     auto incorrectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 2) << BSON("$const" << 4)));
-    auto correctExpr = Expression::parseObject(expCtx, correctObj, expCtx->variablesParseState);
-    auto incorrectExpr = Expression::parseObject(expCtx, incorrectObj, expCtx->variablesParseState);
+    auto correctExpr = Expression::parseObject(&expCtx, correctObj, expCtx.variablesParseState);
+    auto incorrectExpr = Expression::parseObject(&expCtx, incorrectObj, expCtx.variablesParseState);
     ProjectionPolicies defaultPolicies;
     auto node = InclusionNode(defaultPolicies);
     node.addExpressionForPath(FieldPath("key"), correctExpr);
@@ -594,9 +594,9 @@ TEST(ProjectionExecutorType, GetExpressionForPathGetsCorrectTopLevelExpression) 
 }
 
 TEST(ProjectionExecutorType, GetExpressionForPathGetsNonTopLevelExpression) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = ExpressionContextForTest{};
     auto projectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
-    auto expr = Expression::parseObject(expCtx, projectObj, expCtx->variablesParseState);
+    auto expr = Expression::parseObject(&expCtx, projectObj, expCtx.variablesParseState);
     ProjectionPolicies defaultPolicies;
     auto node = InclusionNode(defaultPolicies);
     node.addExpressionForPath(FieldPath("key.second"), expr);

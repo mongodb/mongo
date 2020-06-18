@@ -7,7 +7,6 @@ import os.path
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import jsfile
-from buildscripts.resmokelib.testing.testcases import interface as testcase
 from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob, _ContinuousDynamicJSTestCase
 
 
@@ -43,7 +42,7 @@ class DoReconfigInBackground(jsfile.JSHook):
             return
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            self.logger.test_case_logger, test, self, self._js_filename, self._shell_options)
+            self.logger, test, self, self._js_filename, self._shell_options)
         hook_test_case.configure(self.fixture)
 
         self.logger.info("Resuming the background reconfig thread.")

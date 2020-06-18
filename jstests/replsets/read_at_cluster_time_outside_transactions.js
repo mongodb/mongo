@@ -1,8 +1,12 @@
 /**
- * Tests that the "find" and "dbHash" commands support reading at a Timestamp by using the
+ * Tests that the "dbHash" command support reading at a Timestamp by using the
  * $_internalReadAtClusterTime option.
  *
- * @tags: [requires_document_locking, uses_transactions]
+ * @tags: [
+ *   requires_document_locking,
+ *   requires_fcv_46,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";
@@ -31,6 +35,9 @@ rst.nodes.forEach(conn => {
 // insert.
 assert.commandWorked(collection.insert({_id: 1, comment: "should be seen by find command"}));
 assert.commandWorked(collection.insert({_id: 3, comment: "should be seen by find command"}));
+
+const earlierClusterTime = db.getSession().getOperationTime();
+
 assert.commandWorked(collection.insert({_id: 5, comment: "should be seen by getMore command"}));
 
 const clusterTime = db.getSession().getOperationTime();
@@ -56,24 +63,7 @@ assert.eq({_id: 4, comment: "should be seen by non-snapshot getMore command"}, c
 assert.eq({_id: 5, comment: "should be seen by getMore command"}, cursor.next());
 assert(!cursor.hasNext());
 
-// When using the $_internalReadAtClusterTime option with a clusterTime from after the
-// original 3 documents were inserted, the document with _id=2 shouldn't be visible to the find
-// command because it was inserted afterwards. The same applies to the document with _id=4 and
-// the getMore command.
-res = collection.runCommand("find", {
-    batchSize: 2,
-    sort: {_id: 1},
-    $_internalReadAtClusterTime: clusterTime,
-});
-
-const batchSize = 2;
-cursor = new DBCommandCursor(db, res, batchSize);
-assert.eq({_id: 1, comment: "should be seen by find command"}, cursor.next());
-assert.eq({_id: 3, comment: "should be seen by find command"}, cursor.next());
-assert.eq({_id: 5, comment: "should be seen by getMore command"}, cursor.next());
-assert(!cursor.hasNext());
-
-// Using the $_internalReadAtClusterTime option to read at the opTime of the last of the 3
+// Using snapshot read concern with dbHash to read at the opTime of the last of the 3
 // original inserts should return the same md5sum as it did originally.
 res = assert.commandWorked(db.runCommand({
     dbHash: 1,
@@ -86,14 +76,6 @@ const hashAtClusterTime = {
 };
 assert.eq(hashAtClusterTime, hashAfterOriginalInserts);
 
-// Attempting to read at a null timestamp should return an error.
-assert.commandFailedWithCode(collection.runCommand("find", {
-    batchSize: 2,
-    sort: {_id: 1},
-    $_internalReadAtClusterTime: new Timestamp(0, 0),
-}),
-                             ErrorCodes.InvalidOptions);
-
 assert.commandFailedWithCode(db.runCommand({
     dbHash: 1,
     $_internalReadAtClusterTime: new Timestamp(0, 1),
@@ -102,13 +84,6 @@ assert.commandFailedWithCode(db.runCommand({
 
 // Attempting to read at a clusterTime in the future should return an error.
 const futureClusterTime = new Timestamp(clusterTime.getTime() + 1000, 1);
-
-assert.commandFailedWithCode(collection.runCommand("find", {
-    batchSize: 2,
-    sort: {_id: 1},
-    $_internalReadAtClusterTime: futureClusterTime,
-}),
-                             ErrorCodes.InvalidOptions);
 
 assert.commandFailedWithCode(db.runCommand({
     dbHash: 1,
@@ -119,16 +94,6 @@ assert.commandFailedWithCode(db.runCommand({
 // $_internalReadAtClusterTime is not supported in transactions.
 const session = primary.startSession();
 const sessionDB = session.getDatabase("test");
-const sessionColl = sessionDB[collName];
-
-session.startTransaction();
-assert.commandFailedWithCode(sessionColl.runCommand("find", {
-    batchSize: 2,
-    sort: {_id: 1},
-    $_internalReadAtClusterTime: clusterTime,
-}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
-assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 // dbHash is not supported in transactions at all.
 session.startTransaction();
@@ -136,17 +101,6 @@ assert.commandFailedWithCode(
     sessionDB.runCommand({dbHash: 1, $_internalReadAtClusterTime: clusterTime}),
     ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
-
-// Create a new collection to move the minimum visible snapshot to that operation time. Then
-// read at a cluster time behind the minimum visible snapshot which should fail.
-let newCollName = "newColl";
-assert.commandWorked(db.createCollection(newCollName));
-let createCollClusterTime = db.getSession().getOperationTime();
-res = db[newCollName].runCommand("find", {
-    $_internalReadAtClusterTime:
-        Timestamp(createCollClusterTime.getTime() - 1, createCollClusterTime.getInc()),
-});
-assert.commandFailedWithCode(res, ErrorCodes.SnapshotUnavailable);
 
 rst.stopSet();
 })();

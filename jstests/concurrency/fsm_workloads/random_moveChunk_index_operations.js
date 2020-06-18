@@ -4,9 +4,7 @@
  * Performs a series of index operations while chunk migrations are running in the background
  * and verifies that indexes are not left in an inconsistent state.
  *
- * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
- *  requires_non_retryable_writes, requires_non_retryable_commands, # for moveChunk and collMod.
- * ];
+ * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off]
  */
 
 load("jstests/concurrency/fsm_workload_helpers/chunks.js");  // for chunk helpers
@@ -63,9 +61,7 @@ var $config = (function() {
             const targetThreadColl = threadCollectionName(collName, tid);
 
             // Pick a chunk from that thread's collection
-            const configServer = ChunkHelper.getPrimary(connCache.config);
-            const chunkColl = configServer.getDB("config").chunks;
-
+            const chunkColl = db.getSiblingDB("config").chunks;
             const targetNs = db.getName() + "." + targetThreadColl;
             const randomChunk =
                 chunkColl.aggregate([{$match: {ns: targetNs}}, {$sample: {size: 1}}]).toArray()[0];
@@ -76,23 +72,21 @@ var $config = (function() {
             const shardNames = Object.keys(connCache.shards);
             const destinationShards = shardNames.filter(shard => shard !== fromShard);
             const toShard = destinationShards[Random.randInt(destinationShards.length)];
+
             // Issue a moveChunk command.
             try {
-                assertAlways.commandWorked(
-                    db.adminCommand({moveChunk: targetNs, bounds: bounds, to: toShard}));
+                const waitForDelete = Random.rand() < 0.5;
+                ChunkHelper.moveChunk(db, targetThreadColl, bounds, toShard, waitForDelete);
             } catch (e) {
-                // The only acceptable error for a moveChunk in the context of index operations is
-                // Interrupted as index operations should interrupt any concurrent migrations.
-                //
-                // Additionally, we ignore any ConflictingOperationInProgress, DuplicateKey, or
-                // CannotCreateCollection errors as two separate threads can potentially issue a
-                // moveChunk command against the same collection or any inconsistent state could
-                // be transient.
-                if (e.code === ErrorCodes.Interrupted ||
-                    e.code === ErrorCodes.ConflictingOperationInProgress ||
+                // Ignore Interrupted errors, which come when a moveChunk is interrupted by a
+                // concurrent index operation, and DuplicateKey errors, which come when multiple
+                // moveChunks attempt to write to the config.migrations collection at once.
+                const acceptableCodes = [ErrorCodes.Interrupted, ErrorCodes.DuplicateKey];
+                if (e.code && acceptableCodes.includes(e.code) ||
+                    // Indexes may be transiently inconsistent across shards, which can lead a
+                    // concurrent migration to abort if the recipient's collection is non-empty.
                     (e.code === ErrorCodes.OperationFailed &&
-                     e.message.includes("CannotCreateCollection")) ||
-                    e.code === ErrorCodes.DuplicateKey) {
+                     e.message.includes("CannotCreateCollection"))) {
                     print("Ignoring acceptable moveChunk error: " + tojson(e));
                     return;
                 }

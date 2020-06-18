@@ -65,7 +65,6 @@ class UUID {
 
     // Make the IDL generated parser a friend
     friend class ConfigsvrShardCollectionResponse;
-    friend class ConfigsvrCommitShardCollection;
     friend class ShardsvrShardCollectionResponse;
     friend class ShardsvrRenameCollection;
     friend class DatabaseVersion;

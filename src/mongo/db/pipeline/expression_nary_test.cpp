@@ -78,16 +78,15 @@ public:
         return visitor->visit(this);
     }
 
-    static intrusive_ptr<Testable> create(bool associative, bool commutative) {
-        return new Testable(associative, commutative);
+    static intrusive_ptr<Testable> create(ExpressionContext* const expCtx,
+                                          bool associative,
+                                          bool commutative) {
+        return new Testable(expCtx, associative, commutative);
     }
 
 private:
-    Testable(bool isAssociative, bool isCommutative)
-        : ExpressionNary(
-              boost::intrusive_ptr<ExpressionContextForTest>(new ExpressionContextForTest())),
-          _isAssociative(isAssociative),
-          _isCommutative(isCommutative) {}
+    Testable(ExpressionContext* const expCtx, bool isAssociative, bool isCommutative)
+        : ExpressionNary(expCtx), _isAssociative(isAssociative), _isCommutative(isCommutative) {}
     bool _isAssociative;
     bool _isCommutative;
 };
@@ -123,9 +122,11 @@ static BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
 class ExpressionBaseTest : public unittest::Test {
 public:
     void addOperand(intrusive_ptr<ExpressionNary> expr, Value arg) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        expr->addOperand(ExpressionConstant::create(expCtx, arg));
+        expr->addOperand(ExpressionConstant::create(&expCtx, arg));
     }
+
+protected:
+    ExpressionContextForTest expCtx;
 };
 
 class ExpressionNaryTestOneArg : public ExpressionBaseTest {
@@ -161,9 +162,9 @@ public:
 class ExpressionNaryTest : public unittest::Test {
 public:
     virtual void setUp() override {
-        _notAssociativeNorCommutative = Testable::create(false, false);
-        _associativeOnly = Testable::create(true, false);
-        _associativeAndCommutative = Testable::create(true, true);
+        _notAssociativeNorCommutative = Testable::create(&expCtx, false, false);
+        _associativeOnly = Testable::create(&expCtx, true, false);
+        _associativeAndCommutative = Testable::create(&expCtx, true, true);
     }
 
 protected:
@@ -187,29 +188,27 @@ protected:
     }
 
     void addOperandArrayToExpr(const intrusive_ptr<Testable>& expr, const BSONArray& operands) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        VariablesParseState vps = expCtx->variablesParseState;
+        VariablesParseState vps = expCtx.variablesParseState;
         BSONObjIterator i(operands);
         while (i.more()) {
             BSONElement element = i.next();
-            expr->addOperand(Expression::parseOperand(expCtx, element, vps));
+            expr->addOperand(Expression::parseOperand(&expCtx, element, vps));
         }
     }
 
+    ExpressionContextForTest expCtx;
     intrusive_ptr<Testable> _notAssociativeNorCommutative;
     intrusive_ptr<Testable> _associativeOnly;
     intrusive_ptr<Testable> _associativeAndCommutative;
 };
 
 TEST_F(ExpressionNaryTest, AddedConstantOperandIsSerialized) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(expCtx, Value(9)));
+    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(9)));
     assertContents(_notAssociativeNorCommutative, BSON_ARRAY(9));
 }
 
 TEST_F(ExpressionNaryTest, AddedFieldPathOperandIsSerialized) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::create(expCtx, "ab.c"));
+    _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::create(&expCtx, "ab.c"));
     assertContents(_notAssociativeNorCommutative, BSON_ARRAY("$ab.c"));
 }
 
@@ -218,14 +217,12 @@ TEST_F(ExpressionNaryTest, ValidateEmptyDependencies) {
 }
 
 TEST_F(ExpressionNaryTest, ValidateConstantExpressionDependency) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(expCtx, Value(1)));
+    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(1)));
     assertDependencies(_notAssociativeNorCommutative, BSONArray());
 }
 
 TEST_F(ExpressionNaryTest, ValidateFieldPathExpressionDependency) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::create(expCtx, "ab.c"));
+    _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::create(&expCtx, "ab.c"));
     assertDependencies(_notAssociativeNorCommutative, BSON_ARRAY("ab.c"));
 }
 
@@ -234,26 +231,23 @@ TEST_F(ExpressionNaryTest, ValidateObjectExpressionDependency) {
                                    << "$x"
                                    << "q"
                                    << "$r"));
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     BSONElement specElement = spec.firstElement();
-    VariablesParseState vps = expCtx->variablesParseState;
+    VariablesParseState vps = expCtx.variablesParseState;
     _notAssociativeNorCommutative->addOperand(
-        Expression::parseObject(expCtx, specElement.Obj(), vps));
+        Expression::parseObject(&expCtx, specElement.Obj(), vps));
     assertDependencies(_notAssociativeNorCommutative,
                        BSON_ARRAY("r"
                                   << "x"));
 }
 
 TEST_F(ExpressionNaryTest, SerializationToBsonObj) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(expCtx, Value(5)));
+    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(5)));
     ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(BSON("$const" << 5)))),
                       BSON("foo" << _notAssociativeNorCommutative->serialize(false)));
 }
 
 TEST_F(ExpressionNaryTest, SerializationToBsonArr) {
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(expCtx, Value(5)));
+    _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(5)));
     ASSERT_BSONOBJ_EQ(constify(BSON_ARRAY(BSON("$testable" << BSON_ARRAY(5)))),
                       BSON_ARRAY(_notAssociativeNorCommutative->serialize(false)));
 }
@@ -366,7 +360,7 @@ TEST_F(ExpressionNaryTest, FlattenOptimizationNotDoneOnOtherExpressionsForAssoci
 TEST_F(ExpressionNaryTest, FlattenOptimizationNotDoneOnSameButNotAssociativeExpression) {
     BSONArrayBuilder specBuilder;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(false, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, false, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
@@ -389,7 +383,7 @@ TEST_F(ExpressionNaryTest, FlattenOptimizationNotDoneOnSameButNotAssociativeExpr
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnNotCommutativeNorAssociative) {
     BSONArrayBuilder specBuilder;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(false, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, false, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
     specBuilder.append(expressionToBson(innerOperand));
     _notAssociativeNorCommutative->addOperand(innerOperand);
@@ -413,7 +407,7 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnNotCommutativeNorAs
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyFrontOperandNoGroup) {
     BSONArrayBuilder specBuilder;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
@@ -438,7 +432,7 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyFron
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyFrontOperandAndGroup) {
     BSONArrayBuilder specBuilder;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
@@ -466,7 +460,7 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyMidd
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(200 << "$path3"));
     specBuilder << 200 << "$path3";
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
@@ -494,7 +488,7 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyMidd
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(200 << "$path3" << 201));
     specBuilder << 200 << "$path3" << 201;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
@@ -523,7 +517,7 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyBack
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(200 << "$path3"));
     specBuilder << 200 << "$path3";
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
@@ -548,7 +542,7 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyBack
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(200 << "$path3" << 201));
     specBuilder << 200 << "$path3" << 201;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
@@ -571,12 +565,12 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyBack
 TEST_F(ExpressionNaryTest, FlattenConsecutiveInnerOperandsOptimizationOnAssociativeOnlyNoGroup) {
     BSONArrayBuilder specBuilder;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
-    intrusive_ptr<Testable> innerOperand2 = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand2 = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand2, BSON_ARRAY(200 << "$path2"));
     specBuilder.append(expressionToBson(innerOperand2));
     _associativeOnly->addOperand(innerOperand2);
@@ -598,12 +592,12 @@ TEST_F(ExpressionNaryTest, FlattenConsecutiveInnerOperandsOptimizationOnAssociat
 TEST_F(ExpressionNaryTest, FlattenConsecutiveInnerOperandsOptimizationOnAssociativeAndGroup) {
     BSONArrayBuilder specBuilder;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
-    intrusive_ptr<Testable> innerOperand2 = Testable::create(true, false);
+    intrusive_ptr<Testable> innerOperand2 = Testable::create(&expCtx, true, false);
     addOperandArrayToExpr(innerOperand2, BSON_ARRAY(200 << "$path2"));
     specBuilder.append(expressionToBson(innerOperand2));
     _associativeOnly->addOperand(innerOperand2);
@@ -627,7 +621,7 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnCommutativeAndAssoc
     addOperandArrayToExpr(_associativeAndCommutative, BSON_ARRAY(200 << "$path3" << 201));
     specBuilder << 200 << "$path3" << 201;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, true);
+    intrusive_ptr<Testable> innerOperand = Testable::create(&expCtx, true, true);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
     specBuilder.append(expressionToBson(innerOperand));
     _associativeAndCommutative->addOperand(innerOperand);
@@ -653,8 +647,7 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnCommutativeAndAssoc
 class ExpressionTruncOneArgTest : public ExpressionNaryTestOneArg {
 public:
     void assertEval(ImplicitValue input, ImplicitValue output) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionTrunc(expCtx);
+        _expr = new ExpressionTrunc(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
 };
@@ -662,8 +655,7 @@ public:
 class ExpressionTruncTwoArgTest : public ExpressionNaryTestTwoArg {
 public:
     void assertEval(ImplicitValue input1, ImplicitValue input2, ImplicitValue output) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionTrunc(expCtx);
+        _expr = new ExpressionTrunc(&expCtx);
         ExpressionNaryTestTwoArg::assertEvaluates(input1, input2, output);
     }
 };
@@ -820,8 +812,7 @@ TEST_F(ExpressionTruncTwoArgTest, NullArg2) {
 class ExpressionSqrtTest : public ExpressionNaryTestOneArg {
 public:
     virtual void assertEvaluates(Value input, Value output) override {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionSqrt(expCtx);
+        _expr = new ExpressionSqrt(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
 };
@@ -866,8 +857,7 @@ TEST_F(ExpressionSqrtTest, SqrtNaNArg) {
 class ExpressionExpTest : public ExpressionNaryTestOneArg {
 public:
     virtual void assertEvaluates(Value input, Value output) override {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionExp(expCtx);
+        _expr = new ExpressionExp(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
 
@@ -908,8 +898,7 @@ TEST_F(ExpressionExpTest, ExpNaNArg) {
 class ExpressionCeilTest : public ExpressionNaryTestOneArg {
 public:
     virtual void assertEvaluates(Value input, Value output) override {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionCeil(expCtx);
+        _expr = new ExpressionCeil(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
 };
@@ -967,8 +956,7 @@ TEST_F(ExpressionCeilTest, NullArg) {
 class ExpressionFloorTest : public ExpressionNaryTestOneArg {
 public:
     virtual void assertEvaluates(Value input, Value output) override {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionFloor(expCtx);
+        _expr = new ExpressionFloor(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
 };
@@ -1026,8 +1014,7 @@ TEST_F(ExpressionFloorTest, NullArg) {
 class ExpressionRoundOneArgTest : public ExpressionNaryTestOneArg {
 public:
     void assertEval(ImplicitValue input, ImplicitValue output) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionRound(expCtx);
+        _expr = new ExpressionRound(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
 };
@@ -1035,8 +1022,7 @@ public:
 class ExpressionRoundTwoArgTest : public ExpressionNaryTestTwoArg {
 public:
     void assertEval(ImplicitValue input1, ImplicitValue input2, ImplicitValue output) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionRound(expCtx);
+        _expr = new ExpressionRound(&expCtx);
         ExpressionNaryTestTwoArg::assertEvaluates(input1, input2, output);
     }
 };
@@ -1196,8 +1182,7 @@ TEST_F(ExpressionRoundTwoArgTest, NullArg2) {
 class ExpressionBinarySizeTest : public ExpressionNaryTestOneArg {
 public:
     void assertEval(ImplicitValue input, ImplicitValue output) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionBinarySize(expCtx);
+        _expr = new ExpressionBinarySize(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
 };
@@ -1227,13 +1212,11 @@ TEST_F(ExpressionBinarySizeTest, HandlesNullish) {
 class ExpressionFirstTest : public ExpressionNaryTestOneArg {
 public:
     void assertEval(ImplicitValue input, ImplicitValue output) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionFirst(expCtx);
+        _expr = new ExpressionFirst(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
     void assertEvalFails(ImplicitValue input) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionFirst(expCtx);
+        _expr = new ExpressionFirst(&expCtx);
         ASSERT_THROWS_CODE(eval(input), DBException, 28689);
     }
 };
@@ -1264,13 +1247,11 @@ TEST_F(ExpressionFirstTest, RejectsNonArrays) {
 class ExpressionLastTest : public ExpressionNaryTestOneArg {
 public:
     void assertEval(ImplicitValue input, ImplicitValue output) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionLast(expCtx);
+        _expr = new ExpressionLast(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
     void assertEvalFails(ImplicitValue input) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _expr = new ExpressionLast(expCtx);
+        _expr = new ExpressionLast(&expCtx);
         ASSERT_THROWS_CODE(eval(input), DBException, 28689);
     }
 };

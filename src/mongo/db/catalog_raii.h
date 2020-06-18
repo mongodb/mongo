@@ -161,6 +161,11 @@ private:
 };
 
 /**
+ * Writes to system.views need to use a stronger lock to prevent inconsistencies like view cycles.
+ */
+LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode);
+
+/**
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
  * obtains a reference to the database, creating it was non-existing. Used as a shortcut for
  * calls to DatabaseHolder::get(opCtx)->openDb(), taking care of locking details. The

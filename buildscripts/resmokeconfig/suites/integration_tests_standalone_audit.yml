@@ -20,5 +20,7 @@ executor:
     mongod_options:
       auditDestination: console
       set_parameters:
+        logComponentVerbosity:
+          command: 2
         enableTestCommands: 1
         auditAuthorizationSuccess: 1

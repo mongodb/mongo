@@ -54,11 +54,10 @@ protected:
     virtual ~ReadThroughCacheBase();
 
     /**
-     * This method is an extension of ThreadPoolInterface::schedule, which in addition creates a
-     * client and an operation context and executes the specified 'work' under that environment. The
-     * difference is that instead of passing a status to 'work' in order to indicate an in-line
-     * execution, the function will throw without actually calling 'work' (see 'schedule' for more
-     * details on in-line execution).
+     * This method is an extension of ThreadPoolInterface::schedule, with the following additions:
+     *  - Creates a client and an operation context and executes the specified 'work' under that
+     * environment
+     *  - Returns a CancelToken, which can be used to attempt to cancel 'work'
      *
      * If the task manages to get canceled before it is executed (through a call to tryCancel),
      * 'work' will be invoked out-of-line with a non-OK status, set to error code
@@ -77,7 +76,9 @@ protected:
         std::shared_ptr<TaskInfo> _info;
     };
     using WorkWithOpContext = unique_function<void(OperationContext*, const Status&)>;
-    CancelToken _asyncWork(WorkWithOpContext work);
+    CancelToken _asyncWork(WorkWithOpContext work) noexcept;
+
+    Date_t _now();
 
     // Service context under which this cache has been instantiated (used for access to service-wide
     // functionality, such as client/operation context creation)
@@ -97,9 +98,13 @@ protected:
 };
 
 /**
- * Implements a generic read-through cache built on top of InvalidatingLRUCache.
+ * Implements an (optionally) causally consistent read-through cache from Key to Value, built on top
+ * of InvalidatingLRUCache.
+ *
+ * Causal consistency is provided by requiring the backing store to asociate every Value it returns
+ * with a logical timestamp of type Time.
  */
-template <typename Key, typename Value>
+template <typename Key, typename Value, typename Time = CacheNotCausallyConsistent>
 class ReadThroughCache : public ReadThroughCacheBase {
     /**
      * Data structure wrapping and expanding on the values stored in the cache.
@@ -112,7 +117,7 @@ class ReadThroughCache : public ReadThroughCacheBase {
         // relied on to perform any recency comparisons for example).
         Date_t updateWallClockTime;
     };
-    using Cache = InvalidatingLRUCache<Key, StoredValue>;
+    using Cache = InvalidatingLRUCache<Key, StoredValue, Time>;
 
 public:
     /**
@@ -179,14 +184,40 @@ public:
      *
      * The implementation must throw a uassertion to indicate an error while looking up the value,
      * return boost::none if the key is not found, or return an actual value.
+     *
+     * See the comments on 'advanceTimeInStore' for additional requirements that this function must
+     * fulfill with respect to causal consistency.
      */
-    using LookupFn = unique_function<boost::optional<Value>(OperationContext*, const Key&)>;
+    struct LookupResult {
+        // The 't' parameter is mandatory for causally-consistent caches, but not needed otherwise
+        // (since the time never changes). Using a default of '= CacheNotCausallyConsistent()'
+        // allows non-causally-consistent users to not have to pass a second parameter, but would
+        // fail compilation if causally-consistent users forget to pass it.
+        explicit LookupResult(boost::optional<Value>&& v, Time t = CacheNotCausallyConsistent())
+            : v(std::move(v)), t(std::move(t)) {}
+        LookupResult(LookupResult&&) = default;
+        LookupResult& operator=(LookupResult&&) = default;
+
+        // If boost::none, it means the '_lookupFn' did not find the key in the store
+        boost::optional<Value> v;
+
+        // If value is boost::none, specifies the time which was passed to '_lookupFn', effectively
+        // meaning, at least as of 'time', there was no entry in the store for the key. Otherwise
+        // contains the time that the store returned for the 'value'.
+        Time t;
+    };
+    using LookupFn = unique_function<LookupResult(OperationContext*, const Key&)>;
+
+    // Exposed publicly so it can be unit-tested indepedently of the usages in this class. Must not
+    // be used independently.
+    class InProgressLookup;
 
     /**
-     * If 'key' is found in the cache, returns a set ValueHandle (its operator bool will be true).
-     * Otherwise, either causes the blocking 'lookup' below to be asynchronously invoked to fetch
-     * 'key' from the backing store (or joins an already scheduled invocation) and returns a future
-     * which will be signaled when the lookup completes.
+     * If 'key' is found in the cache and it fulfills the requested 'causalConsistency', returns a
+     * set ValueHandle (its operator bool will be true). Otherwise, either causes the blocking
+     * 'LookupFn' to be asynchronously invoked to fetch 'key' from the backing store or joins an
+     * already scheduled invocation) and returns a future which will be signaled when the lookup
+     * completes.
      *
      * If the lookup is successful and 'key' is found in the store, it will be cached (so subsequent
      * lookups won't have to re-fetch it) and the future will be set. If 'key' is not found in the
@@ -195,70 +226,36 @@ public:
      * meaning that subsequent calls to 'acquireAsync' will kick-off 'lookup' again.
      *
      * NOTES:
-     *  The returned value may be invalid by the time the caller gets access to it if invalidate is
-     *  called for 'key'.
+     *  The returned value may be invalid by the time the caller gets to access it, if 'invalidate'
+     *  is called for 'key'.
      */
-    SharedSemiFuture<ValueHandle> acquireAsync(const Key& key) {
+    SharedSemiFuture<ValueHandle> acquireAsync(
+        const Key& key,
+        CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
         // Fast path
-        if (auto cachedValue = _cache.get(key))
+        if (auto cachedValue = _cache.get(key, causalConsistency))
             return {std::move(cachedValue)};
 
         stdx::unique_lock ul(_mutex);
 
         // Re-check the cache under a mutex, before kicking-off the asynchronous lookup
-        if (auto cachedValue = _cache.get(key))
+        if (auto cachedValue = _cache.get(key, causalConsistency))
             return {std::move(cachedValue)};
 
         // Join an in-progress lookup if one has already been scheduled
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            return it->second->sharedPromise.getFuture();
+            return it->second->addWaiter(ul);
 
-        // Schedule an asynchronous lookup for the key and then loop around and wait for it to
-        // complete
+        // Schedule an asynchronous lookup for the key
+        auto [it, emplaced] = _inProgressLookups.emplace(
+            key, std::make_unique<InProgressLookup>(*this, key, _cache.getTimeInStore(key)));
+        invariant(emplaced);
+        auto& inProgressLookup = *it->second;
+        auto sharedFutureToReturn = inProgressLookup.addWaiter(ul);
 
-        auto [kickOffAsyncLookupPromise, f] = makePromiseFuture<void>();
-
-        auto emplaceResult =
-            _inProgressLookups.emplace(key, std::make_unique<InProgressLookup>(key));
-        invariant(emplaceResult.second /* emplaced */);
-        auto& inProgressLookup = *emplaceResult.first->second;
-        auto sharedFutureToReturn = inProgressLookup.sharedPromise.getFuture();
         ul.unlock();
 
-        // Construct the future chain before scheduling the async work so it doesn't execute inline
-        // if it so happens that the async work completes by the time the future is constructed, or
-        // if it executes inline due to the task executor being shut down.
-        std::move(f)
-            .then([this, &inProgressLookup] {
-                stdx::unique_lock ul(_mutex);
-                return _asyncLookupWhileInvalidated(std::move(ul), inProgressLookup);
-            })
-            .getAsync([this, key](StatusWith<Value> swValue) {
-                stdx::unique_lock ul(_mutex);
-                auto it = _inProgressLookups.find(key);
-                invariant(it != _inProgressLookups.end());
-                auto inProgressLookup = std::move(it->second);
-                _inProgressLookups.erase(it);
-
-                StatusWith<ValueHandle> swValueHandle(ErrorCodes::InternalError,
-                                                      "ReadThroughCache");
-                if (swValue.isOK()) {
-                    swValueHandle = ValueHandle(_cache.insertOrAssignAndGet(
-                        key,
-                        {std::move(swValue.getValue()),
-                         _serviceContext->getFastClockSource()->now()}));
-                } else if (swValue == ErrorCodes::ReadThroughCacheKeyNotFound) {
-                    swValueHandle = ValueHandle();
-                } else {
-                    swValueHandle = swValue.getStatus();
-                }
-
-                ul.unlock();
-
-                inProgressLookup->sharedPromise.setFromStatusWith(std::move(swValueHandle));
-            });
-
-        kickOffAsyncLookupPromise.emplaceValue();
+        _doLookupWhileNotValid(key, Status(ErrorCodes::Error(461540), "")).getAsync([](auto) {});
 
         return sharedFutureToReturn;
     }
@@ -269,8 +266,11 @@ public:
      * NOTES:
      *  This is a potentially blocking method.
      */
-    ValueHandle acquire(OperationContext* opCtx, const Key& key) {
-        return acquireAsync(key).get(opCtx);
+    ValueHandle acquire(
+        OperationContext* opCtx,
+        const Key& key,
+        CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
+        return acquireAsync(key, causalConsistency).get(opCtx);
     }
 
     /**
@@ -279,8 +279,24 @@ public:
     ValueHandle insertOrAssignAndGet(const Key& key, Value&& newValue, Date_t updateWallClockTime) {
         stdx::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            it->second->invalidate(lg);
+            it->second->invalidateAndCancelCurrentLookupRound(lg);
         return _cache.insertOrAssignAndGet(key, {std::move(newValue), updateWallClockTime});
+    }
+
+    /**
+     * Indicates to the cache that the backing store has a newer version of 'key', corresponding to
+     * 'newTime'. Subsequent calls to 'acquireAsync' with a causal consistency set to 'LatestKnown'
+     * will block and perform refresh until the cached value reaches 'newTime'.
+     *
+     * With respect to causal consistency, the 'LookupFn' used for this cache must provide the
+     * guarantee that if 'advanceTimeInStore' is called with a 'newTime', a subsequent call to
+     * 'LookupFn' for 'key' must return at least 'newTime' or later.
+     */
+    void advanceTimeInStore(const Key& key, const Time& newTime) {
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->advanceTimeInStore(lg, newTime);
+        _cache.advanceTimeInStore(key, newTime);
     }
 
     /**
@@ -296,7 +312,7 @@ public:
     void invalidate(const Key& key) {
         stdx::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            it->second->invalidate(lg);
+            it->second->invalidateAndCancelCurrentLookupRound(lg);
         _cache.invalidate(key);
     }
 
@@ -305,7 +321,7 @@ public:
         stdx::lock_guard lg(_mutex);
         for (auto& entry : _inProgressLookups) {
             if (predicate(entry.first))
-                entry.second->invalidate(lg);
+                entry.second->invalidateAndCancelCurrentLookupRound(lg);
         }
         _cache.invalidateIf([&](const Key& key, const StoredValue*) { return predicate(key); });
     }
@@ -354,86 +370,86 @@ protected:
     }
 
 private:
-    // Refer to the comments on '_asyncLookupWhileInvalidated' for more detail on how this structure
-    // is used.
-    struct InProgressLookup {
-        InProgressLookup(Key key) : key(std::move(key)) {}
-
-        void invalidate(WithLock) {
-            invalidated = true;
-            if (cancelToken)
-                cancelToken->tryCancel();
-        }
-
-        Key key;
-        SharedPromise<ValueHandle> sharedPromise;
-
-        bool invalidated;
-        boost::optional<CancelToken> cancelToken;
-    };
     using InProgressLookupsMap = stdx::unordered_map<Key, std::unique_ptr<InProgressLookup>>;
 
     /**
-     * This method is expected to be called with a constructed InProgressLookup object, emplaced on
-     * '_inProgressLookups' (represented by the 'inProgressLookup' argument). It implements an
-     * asynchronous "while (invalidated)" loop over the in-progress key referenced by
-     * 'inProgressLookup', which *must* be kept valid by the caller until the returned Future
-     * completes.
-     *
-     * The returned Future will be complete when that loop exists and will contain the latest value
-     * (or error) returned by 'lookup'.
-     *
-     * If thought of sequentially, the loop looks like this:
-     *
-     * while (true) {
-     *     inProgressLookup.invalidated = false;
-     *     inProgressLookup.cancelToken.reset();
-     *     valueOrError = lookup(key);
-     *     if (!inProgressLookup.invalidated)
-     *          return valueOrError;    // signals the future
-     * }
+     * This method implements an asynchronous "while (!valid)" loop over 'key', which must be on the
+     * in-progress map.
      */
-    Future<Value> _asyncLookupWhileInvalidated(stdx::unique_lock<Mutex> ul,
-                                               InProgressLookup& inProgressLookup) noexcept {
-        auto [promise, f] = makePromiseFuture<Value>();
-        auto p = std::make_shared<Promise<Value>>(std::move(promise));
+    Future<LookupResult> _doLookupWhileNotValid(Key key, StatusWith<LookupResult> sw) {
+        stdx::unique_lock ul(_mutex);
+        auto it = _inProgressLookups.find(key);
+        invariant(it != _inProgressLookups.end());
+        auto& inProgressLookup = *it->second;
+        auto [promisesToSet, result, mustDoAnotherLoop] = [&] {
+            // The thread pool is shutting down, so terminate the loop
+            if (ErrorCodes::isCancelationError(sw.getStatus()))
+                return std::make_tuple(inProgressLookup.getAllPromisesOnError(ul),
+                                       StatusWith<ValueHandle>(sw.getStatus()),
+                                       false);
 
-        // Construct the future chain before scheduling the async work so it doesn't execute inline
-        auto future =
-            std::move(f).onCompletion([this, &inProgressLookup](StatusWith<Value> swValue) {
-                stdx::unique_lock ul(_mutex);
-                if (!inProgressLookup.invalidated)
-                    return Future<Value>::makeReady(uassertStatusOK(std::move(swValue)));
+            // There was a concurrent call to 'invalidate', so start all over
+            if (!inProgressLookup.valid(ul))
+                return std::make_tuple(
+                    std::vector<std::unique_ptr<SharedPromise<ValueHandle>>>{},
+                    StatusWith<ValueHandle>(Status(ErrorCodes::Error(461541), "")),
+                    true);
 
-                inProgressLookup.cancelToken.reset();
-                return _asyncLookupWhileInvalidated(std::move(ul), inProgressLookup);
-            });
+            // Lookup resulted in an error, which is not cancelation
+            if (!sw.isOK())
+                return std::make_tuple(inProgressLookup.getAllPromisesOnError(ul),
+                                       StatusWith<ValueHandle>(sw.getStatus()),
+                                       false);
 
-        invariant(!inProgressLookup.cancelToken);
-        inProgressLookup.invalidated = false;
-        try {
-            inProgressLookup.cancelToken.emplace(_asyncWork([ this, p, &inProgressLookup ](
-                OperationContext * opCtx, const Status& status) mutable noexcept {
-                p->setWith([&]() mutable {
-                    uassertStatusOK(status);
-                    auto value = _lookupFn(opCtx, inProgressLookup.key);
-                    uassert(ErrorCodes::ReadThroughCacheKeyNotFound,
-                            "Internal only: key not found",
-                            value);
-                    return std::move(*value);
-                });
-            }));
-        } catch (const ExceptionForCat<ErrorCategory::CancelationError>& ex) {
-            // The thread pool is being shut down, so this is an inline execution
-            invariant(!inProgressLookup.invalidated);
-            invariant(!inProgressLookup.cancelToken);
+            // Value (or boost::none) was returned by lookup and there was no concurrent call to
+            // 'invalidate'. Place the value on the cache and return the necessary promises to
+            // signal (those which are waiting for time < time at the store).
+            auto& result = sw.getValue();
+            auto promisesToSet = inProgressLookup.getPromisesLessThanTime(ul, result.t);
 
-            ul.unlock();
-            p->setError(ex.toStatus());
+            auto valueHandleToSet = [&] {
+                if (result.v) {
+                    ValueHandle valueHandle(
+                        _cache.insertOrAssignAndGet(key, {std::move(*result.v), _now()}, result.t));
+                    // In the case that 'key' was not present in the store up to this lookup's
+                    // completion, it is possible that concurrent callers advanced the time in store
+                    // further than what was returned by the lookup. Because of this, the time in
+                    // the cache must be synchronised with that of the InProgressLookup.
+                    _cache.advanceTimeInStore(key, inProgressLookup.minTimeInStore(ul));
+                    return valueHandle;
+                }
+
+                _cache.invalidate(key);
+                return ValueHandle();
+            }();
+
+            return std::make_tuple(std::move(promisesToSet),
+                                   StatusWith<ValueHandle>(std::move(valueHandleToSet)),
+                                   !inProgressLookup.empty(ul));
+        }();
+
+        if (!mustDoAnotherLoop)
+            _inProgressLookups.erase(it);
+        ul.unlock();
+
+        // The only reason this loop pops the values as it goes and std::moves into the last value
+        // is to support the CacheSizeZero unit-test, which requires that once the future it waits
+        // on is set, it contains the last reference on the returned ValueHandle
+        while (!promisesToSet.empty()) {
+            auto p(std::move(promisesToSet.back()));
+            promisesToSet.pop_back();
+
+            if (promisesToSet.empty())
+                p->setFromStatusWith(std::move(result));
+            else
+                p->setFromStatusWith(result);
         }
 
-        return std::move(future);
-    };
+        return mustDoAnotherLoop
+            ? inProgressLookup.asyncLookupRound().onCompletion(
+                  [this, key](auto sw) { return _doLookupWhileNotValid(key, std::move(sw)); })
+            : Future<LookupResult>::makeReady(Status(ErrorCodes::Error(461542), ""));
+    }
 
     // Blocking function which will be invoked to retrieve entries from the backing store
     const LookupFn _lookupFn;
@@ -448,10 +464,126 @@ private:
 
     // Keeps track of all the keys, which were attempted to be 'acquireAsync'-ed, weren't found in
     // the cache and are currently in the process of being looked up from the backing store. A
-    // single key may only be on this map or in '_cache', but never in both.
+    // single key may be missing from '_cache', or contain an old 'kLatestCached' and have an active
+    // lookup on this map for 'kLatestKnown'.
     //
     // This map is protected by '_mutex'.
     InProgressLookupsMap _inProgressLookups;
+};
+
+/**
+ * This class represents an in-progress lookup for a specific key and implements the guarantees of
+ * the invalidation logic as described in the comments of 'ReadThroughCache::invalidate'.
+ *
+ * It is intended to be used in conjunction with the 'ReadThroughCache', which operates on it under
+ * its '_mutex' and ensures there is always at most a single active instance at a time active for
+ * each 'key'.
+ *
+ * The methods of this class are not thread-safe, unless indicated in the comments.
+ *
+ * Its lifecycle is intended to be like this:
+ *
+ * inProgressLookups.emplace(inProgress);
+ * while (true) {
+ *      result = inProgress.asyncLookupRound();
+ *      if (!inProgress.valid()) {
+ *          continue;
+ *      }
+ *
+ *      inProgressLookups.remove(inProgress)
+ *      cachedValues.insert(result);
+ *      inProgress.signalWaiters(result);
+ * }
+ */
+template <typename Key, typename Value, typename Time>
+class ReadThroughCache<Key, Value, Time>::InProgressLookup {
+public:
+    InProgressLookup(ReadThroughCache& cache, Key key, Time minTimeInStore)
+        : _cache(cache), _key(std::move(key)), _minTimeInStore(std::move(minTimeInStore)) {}
+
+    Future<LookupResult> asyncLookupRound() {
+        auto [promise, future] = makePromiseFuture<LookupResult>();
+
+        stdx::lock_guard lg(_cache._mutex);
+        _valid = true;
+        _cancelToken.emplace(_cache._asyncWork([ this, promise = std::move(promise) ](
+            OperationContext * opCtx, const Status& status) mutable noexcept {
+            promise.setWith([&] {
+                uassertStatusOK(status);
+                return _cache._lookupFn(opCtx, _key);
+            });
+        }));
+
+        return std::move(future);
+    }
+
+    SharedSemiFuture<ValueHandle> addWaiter(WithLock) {
+        auto [it, unusedEmplaced] = _outstanding.try_emplace(
+            _minTimeInStore, std::make_unique<SharedPromise<ValueHandle>>());
+        return it->second->getFuture();
+    }
+
+    Time minTimeInStore(WithLock) const {
+        return _minTimeInStore;
+    }
+
+    bool valid(WithLock) const {
+        return _valid;
+    }
+
+    std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> getAllPromisesOnError(WithLock) {
+        invariant(_valid);
+        std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> ret;
+        for (auto it = _outstanding.begin(); it != _outstanding.end();) {
+            ret.emplace_back(std::move(it->second));
+            it = _outstanding.erase(it);
+        }
+        return ret;
+    }
+
+    std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> getPromisesLessThanTime(WithLock,
+                                                                                     Time time) {
+        invariant(_valid);
+        std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> ret;
+        for (auto it = _outstanding.begin(); it != _outstanding.end();) {
+            if (it->first > time)
+                break;
+            ret.emplace_back(std::move(it->second));
+            it = _outstanding.erase(it);
+        }
+        return ret;
+    }
+
+    bool empty(WithLock) const {
+        invariant(_valid);
+        return _outstanding.empty();
+    }
+
+    void advanceTimeInStore(WithLock, const Time& newTime) {
+        if (newTime > _minTimeInStore)
+            _minTimeInStore = newTime;
+    }
+
+    void invalidateAndCancelCurrentLookupRound(WithLock) {
+        _valid = false;
+        if (_cancelToken)
+            _cancelToken->tryCancel();
+    }
+
+private:
+    // The owning cache, from which mutex, lookupFn, async task scheduling, etc. will be used. It is
+    // the responsibility of the owning cache to join all outstanding lookups at destruction time.
+    ReadThroughCache& _cache;
+
+    const Key _key;
+
+    bool _valid{false};
+    boost::optional<CancelToken> _cancelToken;
+
+    Time _minTimeInStore;
+
+    using TimeAndPromiseMap = std::map<Time, std::unique_ptr<SharedPromise<ValueHandle>>>;
+    TimeAndPromiseMap _outstanding;
 };
 
 }  // namespace mongo

@@ -18,10 +18,11 @@ env.Library(
     ],
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
-    PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
-        '$BUILD_DIR/mongo/mongos',
+    LIBDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongod_initializers',
+        '$BUILD_DIR/mongo/mongos_initializers',
     ],
+
 )
 
 if wiredtiger:
@@ -54,7 +55,6 @@ if wiredtiger:
         LIBDEPS= [
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
             '$BUILD_DIR/mongo/db/catalog/collection',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
             '$BUILD_DIR/mongo/db/concurrency/lock_manager',

@@ -57,6 +57,7 @@
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
+#include "mongo/util/system_tick_source.h"
 #include <mongo/db/stats/timer_stats.h>
 
 namespace mongo {
@@ -348,6 +349,8 @@ CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {
 }
 
 CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
+    _tickSource = SystemTickSource::get();
+
     if (opCtx) {
         _stack->push(opCtx, this);
     } else {
@@ -408,16 +411,14 @@ void CurOp::setNS_inlock(StringData ns) {
 
 void CurOp::ensureStarted() {
     if (_start == 0) {
-        _start = curTimeMicros64();
+        _start = _tickSource->getTicks();
     }
 }
 
-void CurOp::enter_inlock(const char* ns, boost::optional<int> dbProfileLevel) {
+void CurOp::enter_inlock(const char* ns, int dbProfileLevel) {
     ensureStarted();
     _ns = ns;
-    if (dbProfileLevel) {
-        raiseDbProfileLevel(*dbProfileLevel);
-    }
+    raiseDbProfileLevel(dbProfileLevel);
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
@@ -437,12 +438,12 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     }
 
     // Obtain the total execution time of this operation.
-    _end = curTimeMicros64();
-    _debug.executionTimeMicros = durationCount<Microseconds>(elapsedTimeExcludingPauses());
+    _end = _tickSource->getTicks();
+    _debug.executionTime = duration_cast<Microseconds>(elapsedTimeExcludingPauses());
 
-    const auto executionTimeMillis = _debug.executionTimeMicros / 1000;
+    const auto executionTimeMillis = durationCount<Milliseconds>(_debug.executionTime);
 
-    if (_debug.isReplOplogFetching) {
+    if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(executionTimeMillis);
     }
 
@@ -480,7 +481,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                         "Failed to gather storage statistics for {opId} due to {reason}",
                         "Failed to gather storage statistics for slow operation",
                         "opId"_attr = opCtx->getOpID(),
-                        "reason"_attr = "lock acquire timeout"_sd);
+                        "error"_attr = "lock acquire timeout"_sd);
                 }
             } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
                 LOGV2_WARNING_OPTIONS(
@@ -489,7 +490,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                     "Failed to gather storage statistics for {opId} due to {reason}",
                     "Failed to gather storage statistics for slow operation",
                     "opId"_attr = opCtx->getOpID(),
-                    "reason"_attr = redact(ex));
+                    "error"_attr = redact(ex));
             }
         }
 
@@ -843,7 +844,7 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
         s << " remoteOpWaitMillis:" << durationCount<Milliseconds>(*remoteOpWaitTime);
     }
 
-    s << " " << (executionTimeMicros / 1000) << "ms";
+    s << " " << durationCount<Milliseconds>(executionTime) << "ms";
 
     return s.str();
 }
@@ -970,7 +971,7 @@ void OpDebug::report(OperationContext* opCtx,
         if (!errInfo.reason().empty()) {
             pAttrs->add("errMsg", redact(errInfo.reason()));
         }
-        pAttrs->add("errName", errInfo.code());
+        pAttrs->addDeepCopy("errName", errInfo.codeString());
         pAttrs->add("errCode", static_cast<int>(errInfo.code()));
     }
 
@@ -1012,7 +1013,7 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    pAttrs->add("durationMillis", (executionTimeMicros / 1000));
+    pAttrs->add("durationMillis", durationCount<Milliseconds>(executionTime));
 }
 
 
@@ -1134,7 +1135,7 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    b.appendIntOrLL("millis", executionTimeMicros / 1000);
+    b.appendIntOrLL("millis", durationCount<Milliseconds>(executionTime));
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());

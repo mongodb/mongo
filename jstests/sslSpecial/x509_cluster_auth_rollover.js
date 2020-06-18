@@ -50,11 +50,9 @@ const rolloverConfig = function(newConfig) {
         assert(newNode.getDB("admin").auth("root", "root"));
     };
 
-    rst.getSecondaries().forEach(function(secondary) {
-        restart(secondary);
+    rst.nodes.forEach(function(node) {
+        restart(node);
     });
-
-    restart(rst.getPrimary());
 
     assert.soon(() => {
         let primary = rst.getPrimary();

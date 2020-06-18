@@ -3,7 +3,7 @@
  *  1) Active transactional operations (like read and write) are killed and the transaction is
  * aborted, but the connection not closed.
  *  2) Inactive transaction is aborted.
- * @tags: [uses_transactions, requires_fcv_46]
+ * @tags: [uses_transactions]
  */
 (function() {
 "use strict";
@@ -31,20 +31,17 @@ TestData.dbName = dbName;
 TestData.collName = collName;
 TestData.skipRetryOnNetworkError = true;
 
-function startTxn({parallel: parallel = true}) {
-    var txnFunc = () => {
-        jsTestLog("Starting a new transaction.");
-        const session = db.getMongo().startSession();
-        const sessionDb = session.getDatabase(TestData.dbName);
-        const sessionColl = sessionDb[TestData.collName];
-        session.startTransaction({writeConcern: {w: "majority"}});
-        print(TestData.cmd);
-        eval(TestData.cmd);
+function txnFunc() {
+    jsTestLog("Starting a new transaction.");
+    const session = db.getMongo().startSession();
+    const sessionDb = session.getDatabase(TestData.dbName);
+    const sessionColl = sessionDb[TestData.collName];
+    session.startTransaction({writeConcern: {w: "majority"}});
+    print(TestData.cmd);
+    eval(TestData.cmd);
 
-        // Validate that the connection is not closed on step down.
-        assert.commandWorked(db.adminCommand({ping: 1}));
-    };
-    return parallel ? startParallelShell(txnFunc, primary.port) : txnFunc();
+    // Validate that the connection is not closed on step down.
+    assert.commandWorked(db.adminCommand({ping: 1}));
 }
 
 function runStepDown() {
@@ -78,7 +75,7 @@ function testTxnFailsWithCode({
     // Start transaction.
     TestData.cmd =
         preOp + `assert.commandFailedWithCode(${op}, ErrorCodes.InterruptedDueToReplStateChange);`;
-    const waitForTxnShell = startTxn({});
+    const waitForTxnShell = startParallelShell(txnFunc, primary.port);
 
     jsTestLog("Waiting for primary to reach failPoint '" + failPoint + "'.");
     waitForCurOpByFailPoint(primaryAdmin, nss, failPoint);
@@ -120,15 +117,22 @@ testAbortOrCommitTxnFailsWithCode(
     {failPoint: "hangBeforeAbortingTxn", op: "session.abortTransaction_forTesting()"});
 
 jsTestLog("Testing stepdown during running transaction in inactive state.");
-TestData.cmd = "assert.commandWorked(sessionColl.insert({_id: 'inactiveTxnOp'}))";
 // Do not start the transaction in parallel shell because when the parallel
 // shell work is done, implicit call to "endSessions" and "abortTransaction"
 // cmds are made. So, during step down we might not have any running
-// transaction to interrupt.
-startTxn({parallel: false});
+jsTestLog("Starting a new transaction.");
+const session = db.getMongo().startSession();
+const sessionDb = session.getDatabase(TestData.dbName);
+const sessionColl = sessionDb[TestData.collName];
+session.startTransaction({writeConcern: {w: "majority"}});
+assert.commandWorked(sessionColl.insert({_id: 'inactiveTxnOp'}));
 
 // Call step down & validate data.
 runStepDown();
+
+// Even though the transaction was aborted by the stepdown, we must still update the shell's
+// transaction state to aborted.
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 rst.stopSet();
 })();

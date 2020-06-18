@@ -118,12 +118,6 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
         }
 
         return returnIfMatches(member, id, out);
-    } else if (PlanStage::FAILURE == status) {
-        // The stage which produces a failure is responsible for allocating a working set member
-        // with error details.
-        invariant(WorkingSet::INVALID_ID != id);
-        *out = id;
-        return status;
     } else if (PlanStage::NEED_YIELD == status) {
         *out = id;
     }

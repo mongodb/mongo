@@ -23,6 +23,9 @@
 // also manually simulates a session, which is not compatible with implicit sessions.
 TestData.disableImplicitSessions = true;
 
+// TODO (SERVER-24266): Once fast counts are tolerant to rollbacks, remove this guard.
+TestData.skipEnforceFastCountOnValidate = true;
+
 load("jstests/libs/retryable_writes_util.js");
 
 if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {

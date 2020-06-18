@@ -29,8 +29,8 @@
 #include "format.h"
 #include "config.h"
 
-static void config(void);
 static void config_backup_incr(void);
+static void config_backup_incr_granularity(void);
 static void config_backward_compatible(void);
 static void config_cache(void);
 static void config_checkpoint(void);
@@ -68,8 +68,6 @@ static void config_transaction(void);
 void
 config_final(void)
 {
-    config(); /* Finish up configuration and review it. */
-
     config_print(false);
 
     g.rows = g.c_rows; /* Set the key count. */
@@ -82,8 +80,8 @@ config_final(void)
  * config --
  *     Initialize the configuration itself.
  */
-static void
-config(void)
+void
+config_run(void)
 {
     CONFIG *cp;
     char buf[128];
@@ -283,6 +281,8 @@ config_backup_incr(void)
             if (g.c_logging_archive)
                 config_single("logging.archive=0", false);
         }
+        if (g.c_backup_incr_flag == INCREMENTAL_BLOCK)
+            config_backup_incr_granularity();
         return;
     }
 
@@ -311,8 +311,53 @@ config_backup_incr(void)
     case 9:
     case 10:
         config_single("backup.incremental=block", false);
+        config_backup_incr_granularity();
         break;
     }
+}
+
+/*
+ * config_backup_incr_granularity --
+ *     Configuration of block granularity for incremental backup
+ */
+static void
+config_backup_incr_granularity(void)
+{
+    uint32_t granularity, i;
+    char confbuf[128];
+
+    if (config_is_perm("backup.incr_granularity"))
+        return;
+
+    /*
+     * Three block sizes are interesting. 16MB is the default for WiredTiger and MongoDB. 1MB is the
+     * minimum allowed by MongoDB. Smaller sizes stress block tracking and are good for testing. The
+     * granularity is in units of KB.
+     */
+    granularity = 0;
+    i = mmrand(NULL, 1, 10);
+    switch (i) {
+    case 1: /* 50% small size for stress testing */
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+        granularity = 4 * i;
+        break;
+    case 6: /* 20% 1MB granularity */
+    case 7:
+        granularity = 1024;
+        break;
+    case 8: /* 30% 16MB granularity */
+    case 9:
+    case 10:
+        granularity = 16 * 1024;
+        break;
+    }
+
+    testutil_check(
+      __wt_snprintf(confbuf, sizeof(confbuf), "backup.incr_granularity=%u", granularity));
+    config_single(confbuf, false);
 }
 
 /*
@@ -352,6 +397,13 @@ config_backward_compatible(void)
             testutil_die(EINVAL, "stress.hs_sweep not supported in backward compatibility mode");
         config_single("stress.hs_sweep=off", false);
     }
+
+    if (g.c_timing_stress_hs_checkpoint_delay) {
+        if (config_is_perm("stress.hs_checkpoint_delay"))
+            testutil_die(
+              EINVAL, "stress.hs_checkpoint_delay not supported in backward compatibility mode");
+        config_single("stress.hs_checkpoint_delay=off", false);
+    }
 }
 
 /*
@@ -390,7 +442,11 @@ config_cache(void)
      * This code is what dramatically increases the cache size when there are lots of threads, it
      * grows the cache to several megabytes per thread.
      */
-    workers = g.c_threads + (g.c_random_cursor ? 1 : 0);
+    workers = g.c_threads;
+    if (g.c_hs_cursor)
+        ++workers;
+    if (g.c_random_cursor)
+        ++workers;
     g.c_cache = WT_MAX(g.c_cache, 2 * workers * g.c_memory_page_max);
 
     /*
@@ -552,8 +608,19 @@ config_directio(void)
      */
     if (g.c_backups) {
         if (config_is_perm("backup"))
-            testutil_die(EINVAL, "backup are incompatible with direct I/O");
+            testutil_die(EINVAL, "direct I/O is incompatible with backup configurations");
         config_single("backup=off", false);
+    }
+
+    /*
+     * Direct I/O may not work with mmap. Theoretically, Linux ignores direct I/O configurations in
+     * the presence of shared cache configurations (including mmap), but we've seen file corruption
+     * and it doesn't make much sense (the library disallows the combination).
+     */
+    if (g.c_mmap_all != 0) {
+        if (config_is_perm("disk.mmap_all"))
+            testutil_die(EINVAL, "direct I/O is incompatible with mmap_all configurations");
+        config_single("disk.mmap_all=off", false);
     }
 
     /*
@@ -564,12 +631,12 @@ config_directio(void)
      */
     if (g.c_rebalance) {
         if (config_is_perm("ops.rebalance"))
-            testutil_die(EINVAL, "rebalance is incompatible with direct I/O");
+            testutil_die(EINVAL, "direct I/O is incompatible with rebalance configurations");
         config_single("ops.rebalance=off", false);
     }
     if (g.c_salvage) {
         if (config_is_perm("ops.salvage"))
-            testutil_die(EINVAL, "salvage is incompatible with direct I/O");
+            testutil_die(EINVAL, "direct I/O is incompatible with salvage configurations");
         config_single("ops.salvage=off", false);
     }
 }
@@ -644,6 +711,8 @@ config_in_memory(void)
         return;
     if (config_is_perm("logging"))
         return;
+    if (config_is_perm("ops.hs_cursor"))
+        return;
     if (config_is_perm("ops.rebalance"))
         return;
     if (config_is_perm("ops.salvage"))
@@ -673,6 +742,8 @@ config_in_memory_reset(void)
         config_single("checkpoint=off", false);
     if (!config_is_perm("btree.compression"))
         config_single("btree.compression=none", false);
+    if (!config_is_perm("ops.hs_cursor"))
+        config_single("ops.hs_cursor=off", false);
     if (!config_is_perm("logging"))
         config_single("logging=off", false);
     if (!config_is_perm("ops.rebalance"))
@@ -859,13 +930,21 @@ config_transaction(void)
         if (g.c_txn_freq != 100 && config_is_perm("transaction.frequency"))
             testutil_die(EINVAL, "timestamps require transaction frequency set to 100");
     }
+    /* FIXME-WT-6410: temporarily disable rebalance with timestamps. */
+    if (g.c_txn_timestamps && g.c_rebalance) {
+        if (config_is_perm("ops.rebalance"))
+            testutil_die(EINVAL, "rebalance cannot run with timestamps");
+        config_single("ops.rebalance=off", false);
+    }
     if (g.c_isolation_flag == ISOLATION_SNAPSHOT && config_is_perm("transaction.isolation")) {
         if (!g.c_txn_timestamps && config_is_perm("transaction.timestamps"))
             testutil_die(EINVAL, "snapshot isolation requires timestamps");
         if (g.c_txn_freq != 100 && config_is_perm("transaction.frequency"))
             testutil_die(EINVAL, "snapshot isolation requires transaction frequency set to 100");
     }
-
+    if (g.c_txn_rollback_to_stable && config_is_perm("transaction.rollback_to_stable") &&
+      g.c_isolation_flag != ISOLATION_SNAPSHOT && config_is_perm("transaction.isolation"))
+        testutil_die(EINVAL, "rollback to stable requires snapshot isolation");
     /*
      * The permanent configuration has no incompatible settings, adjust the temporary configuration
      * as necessary. Prepare overrides timestamps, overrides isolation, for no reason other than
@@ -880,6 +959,12 @@ config_transaction(void)
             config_single("transaction.isolation=snapshot", false);
         if (g.c_txn_freq != 100)
             config_single("transaction.frequency=100", false);
+    }
+    if (g.c_txn_rollback_to_stable) {
+        if (!g.c_txn_timestamps)
+            config_single("transaction.timestamps=on", false);
+        if (g.c_logging)
+            config_single("logging=off", false);
     }
     if (g.c_txn_timestamps) {
         if (g.c_isolation_flag != ISOLATION_SNAPSHOT)
@@ -957,8 +1042,8 @@ config_print(bool error_display)
     CONFIG *cp;
     FILE *fp;
 
-    /* Reopening or replaying an existing database should leave the existing CONFIG file. */
-    if (g.reopen || g.replay)
+    /* Reopening an existing database should leave the existing CONFIG file. */
+    if (g.reopen)
         return;
 
     if (error_display)

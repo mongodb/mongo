@@ -180,7 +180,8 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
     WT_SESSION_IMPL *session;
 
     *valid = false;
-    btree = cbt->btree;
+
+    btree = CUR2BT(cbt);
     page = cbt->ref->page;
     session = CUR2S(cbt);
 
@@ -229,7 +230,7 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
      * update that's been deleted is not a valid key/value pair).
      */
     if (cbt->ins != NULL) {
-        WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
+        WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd, NULL));
         if (cbt->upd_value->type != WT_UPDATE_INVALID) {
             if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
                 return (0);
@@ -436,7 +437,7 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
     *updp = NULL;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     upd = NULL; /* -Wuninitialized */
 
     /*
@@ -459,7 +460,7 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
         return (0);
 
     /* Get any uncommitted update from the in-memory page. */
-    switch (cbt->btree->type) {
+    switch (btree->type) {
     case BTREE_ROW:
         /*
          * Any update must be either in the insert list, in which case search will have returned a
@@ -501,7 +502,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
     WT_SESSION_IMPL *session;
     bool leaf_found, valid;
 
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     session = CUR2S(cbt);
 
@@ -597,7 +598,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
     int exact;
     bool leaf_found, valid;
 
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     session = CUR2S(cbt);
     exact = 0;
@@ -751,14 +752,11 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
     uint64_t yield_count, sleep_usecs;
     bool append_key, valid;
 
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     insert_bytes = cursor->key.size + cursor->value.size;
     session = CUR2S(cbt);
     yield_count = sleep_usecs = 0;
-
-    WT_RET_PANIC_ASSERT(
-      session, S2BT(session) == btree, WT_PANIC, "btree differs unexpectedly from session's btree");
 
     WT_STAT_CONN_INCR(session, cursor_insert);
     WT_STAT_DATA_INCR(session, cursor_insert);
@@ -907,7 +905,7 @@ __curfile_update_check(WT_CURSOR_BTREE *cbt)
     WT_SESSION_IMPL *session;
     WT_UPDATE *upd;
 
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     page = cbt->ref->page;
     session = CUR2S(cbt);
     upd = NULL;
@@ -944,7 +942,7 @@ __wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
     session = CUR2S(cbt);
     yield_count = sleep_usecs = 0;
 
-    WT_ASSERT(session, cbt->btree->type == BTREE_ROW);
+    WT_ASSERT(session, CUR2BT(cbt)->type == BTREE_ROW);
 
     /*
      * The pinned page goes away if we do a search, get a local copy of any pinned key and discard
@@ -990,7 +988,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
     uint64_t yield_count, sleep_usecs;
     bool iterating, searched, valid;
 
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     session = CUR2S(cbt);
     yield_count = sleep_usecs = 0;
@@ -1181,13 +1179,10 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     uint64_t yield_count, sleep_usecs;
     bool leaf_found, valid;
 
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     session = CUR2S(cbt);
     yield_count = sleep_usecs = 0;
-
-    WT_RET_PANIC_ASSERT(
-      session, S2BT(session) == btree, WT_PANIC, "btree differs unexpectedly from session's btree");
 
     /* It's no longer possible to bulk-load into the tree. */
     __wt_cursor_disable_bulk(session);
@@ -1365,7 +1360,7 @@ __cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
     upd = NULL;
     if (cbt->ins != NULL)
         upd = cbt->ins->upd;
-    else if (cbt->btree->type == BTREE_ROW && page->modify != NULL &&
+    else if (CUR2BT(cbt)->type == BTREE_ROW && page->modify != NULL &&
       page->modify->mod_row_update != NULL)
         upd = page->modify->mod_row_update[cbt->slot];
 
@@ -1525,7 +1520,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
     WT_CURSOR *cursor;
     WT_SESSION_IMPL *session;
 
-    btree = cbt->btree;
+    btree = CUR2BT(cbt);
     cursor = &cbt->iface;
     session = CUR2S(cbt);
 
@@ -1548,18 +1543,20 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 int
 __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 {
+    WT_BTREE *btree;
     WT_CURSOR *a, *b;
     WT_SESSION_IMPL *session;
 
+    btree = CUR2BT(a_arg);
     a = (WT_CURSOR *)a_arg;
     b = (WT_CURSOR *)b_arg;
     session = CUR2S(a_arg);
 
     /* Confirm both cursors reference the same object. */
-    if (a_arg->btree != b_arg->btree)
-        WT_RET_MSG(session, EINVAL, "Cursors must reference the same object");
+    if (CUR2BT(a_arg) != CUR2BT(b_arg))
+        WT_RET_MSG(session, EINVAL, "cursors must reference the same object");
 
-    switch (a_arg->btree->type) {
+    switch (btree->type) {
     case BTREE_COL_FIX:
     case BTREE_COL_VAR:
         /*
@@ -1574,7 +1571,7 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
             *cmpp = 1;
         break;
     case BTREE_ROW:
-        WT_RET(__wt_compare(session, a_arg->btree->collator, &a->key, &b->key, cmpp));
+        WT_RET(__wt_compare(session, btree->collator, &a->key, &b->key, cmpp));
         break;
     }
     return (0);
@@ -1587,7 +1584,7 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 static inline bool
 __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 {
-    switch (a->btree->type) {
+    switch (CUR2BT(a)->type) {
     case BTREE_COL_FIX:
     case BTREE_COL_VAR:
         /*
@@ -1629,8 +1626,8 @@ __wt_btcur_equals(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *equalp)
     cmp = 0;
 
     /* Confirm both cursors reference the same object. */
-    if (a_arg->btree != b_arg->btree)
-        WT_RET_MSG(session, EINVAL, "Cursors must reference the same object");
+    if (CUR2BT(a_arg) != CUR2BT(b_arg))
+        WT_RET_MSG(session, EINVAL, "cursors must reference the same object");
 
     /*
      * The reason for an equals method is because we can avoid doing a full key comparison in some
@@ -1771,7 +1768,7 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    btree = start->btree;
+    btree = CUR2BT(start);
     session = CUR2S(start);
     WT_STAT_DATA_INCR(session, cursor_truncate);
 
@@ -1825,7 +1822,7 @@ __wt_btcur_init(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     memset(cbt, 0, sizeof(WT_CURSOR_BTREE));
 
     cbt->iface.session = &session->iface;
-    cbt->btree = S2BT(session);
+    cbt->dhandle = session->dhandle;
 }
 
 /*
@@ -1844,6 +1841,23 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
     cbt->lastkey = &cbt->_lastkey;
     cbt->lastrecno = WT_RECNO_OOB;
 #endif
+}
+
+/*
+ * __wt_btcur_cache --
+ *     Discard buffers when caching a cursor.
+ */
+void
+__wt_btcur_cache(WT_CURSOR_BTREE *cbt)
+{
+    WT_SESSION_IMPL *session;
+
+    session = CUR2S(cbt);
+
+    __wt_buf_free(session, &cbt->_row_key);
+    __wt_buf_free(session, &cbt->_tmp);
+    __wt_buf_free(session, &cbt->_modify_update.buf);
+    __wt_buf_free(session, &cbt->_upd_value.buf);
 }
 
 /*
@@ -1866,10 +1880,10 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, bool lowlevel)
     if (!lowlevel)
         ret = __cursor_reset(cbt);
 
-    __wt_buf_free(session, &cbt->_modify_update.buf);
-    __wt_buf_free(session, &cbt->_upd_value.buf);
     __wt_buf_free(session, &cbt->_row_key);
     __wt_buf_free(session, &cbt->_tmp);
+    __wt_buf_free(session, &cbt->_modify_update.buf);
+    __wt_buf_free(session, &cbt->_upd_value.buf);
 #ifdef HAVE_DIAGNOSTIC
     __wt_buf_free(session, &cbt->_lastkey);
 #endif

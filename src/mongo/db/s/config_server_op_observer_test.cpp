@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/config_server_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {

@@ -323,7 +323,7 @@ public:
      * Returns a MemberConfig index position corresponding to the member with the given
      * _id in the config, or -1 if there is no member with that address.
      */
-    int findMemberIndexByConfigId(long long configId) const;
+    int findMemberIndexByConfigId(int configId) const;
 
     /**
      * Gets the default write concern for the replica set described by this configuration.
@@ -484,6 +484,12 @@ public:
      * Returns true if this replica set has at least one arbiter.
      */
     bool containsArbiter() const;
+
+    /**
+     * Returns true if this replica set has at least one member with 'newlyAdded'
+     * field set to true.
+     */
+    bool containsNewlyAddedMembers() const;
 
     /**
      * Returns a mutable (but not directly usable) copy of the config.

@@ -34,7 +34,6 @@
 #include "mongo/db/catalog/database_holder_impl.h"
 
 #include "mongo/db/audit.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_impl.h"
@@ -204,6 +203,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
         Top::get(serviceContext).collectionDropped(coll->ns());
     }
 
+    // Clean up the in-memory database state.
+    CollectionCatalog::get(opCtx).clearDatabaseProfileLevel(name);
     close(opCtx, name);
 
     auto const storageEngine = serviceContext->getStorageEngine();

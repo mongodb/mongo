@@ -52,7 +52,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
@@ -135,17 +134,6 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
 
     auto collectionInfo = collectionDetails["info"].Obj();
     return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
-}
-
-void writeFirstChunksForCollection(OperationContext* opCtx,
-                                   const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
-    for (const auto& chunk : initialChunks.chunks) {
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
-            opCtx,
-            ChunkType::ConfigNS,
-            chunk.toConfigBSON(),
-            ShardingCatalogClient::kMajorityWriteConcern));
-    }
 }
 
 Status updateConfigDocumentInTxn(OperationContext* opCtx,

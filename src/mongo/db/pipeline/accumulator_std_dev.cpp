@@ -96,18 +96,15 @@ Value AccumulatorStdDev::getValue(bool toBeMerged) {
     }
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorStdDevSamp::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<AccumulatorState> AccumulatorStdDevSamp::create(ExpressionContext* const expCtx) {
     return new AccumulatorStdDevSamp(expCtx);
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorStdDevPop::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<AccumulatorState> AccumulatorStdDevPop::create(ExpressionContext* const expCtx) {
     return new AccumulatorStdDevPop(expCtx);
 }
 
-AccumulatorStdDev::AccumulatorStdDev(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     bool isSamp)
+AccumulatorStdDev::AccumulatorStdDev(ExpressionContext* const expCtx, bool isSamp)
     : AccumulatorState(expCtx), _isSamp(isSamp), _count(0), _mean(0), _m2(0) {
     // This is a fixed size AccumulatorState so we never need to update this
     _memUsageBytes = sizeof(*this);

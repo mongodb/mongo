@@ -839,7 +839,7 @@ TEST_F(RenameCollectionTest,
 
 DEATH_TEST_F(RenameCollectionTest,
              RenameCollectionForApplyOpsTriggersFatalAssertionIfLogOpReturnsValidOpTime,
-             "unexpected renameCollection oplog entry written to the oplog with optime") {
+             "unexpected renameCollection oplog entry written to the oplog") {
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     ASSERT_FALSE(_opCtx->writesAreReplicated());
 

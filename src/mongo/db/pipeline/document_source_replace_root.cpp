@@ -86,7 +86,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
     const auto stageName = elem.fieldNameStringData();
     auto newRootExpression = [&]() {
         if (stageName == kAliasNameReplaceWith) {
-            return Expression::parseOperand(expCtx, elem, expCtx->variablesParseState);
+            return Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState);
         }
 
         invariant(
@@ -106,7 +106,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
         // to adapt the two.
         BSONObj parsingBson = BSON("newRoot" << spec.getNewRoot());
         return Expression::parseOperand(
-            expCtx, parsingBson.firstElement(), expCtx->variablesParseState);
+            expCtx.get(), parsingBson.firstElement(), expCtx->variablesParseState);
     }();
 
     // Whether this was specified as $replaceWith or $replaceRoot, always use the name $replaceRoot

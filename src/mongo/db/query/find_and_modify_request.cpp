@@ -48,7 +48,7 @@ const char kHintField[] = "hint";
 const char kCollationField[] = "collation";
 const char kArrayFiltersField[] = "arrayFilters";
 const char kRuntimeConstantsField[] = "runtimeConstants";
-const char kLet[] = "let";
+const char kLetField[] = "let";
 const char kRemoveField[] = "remove";
 const char kUpdateField[] = "update";
 const char kNewField[] = "new";
@@ -138,7 +138,7 @@ BSONObj FindAndModifyRequest::toBSON(const BSONObj& commandPassthroughFields) co
 
     if (_letParameters) {
         if (auto letParams = _letParameters.get(); !letParams.isEmpty()) {
-            builder.append(kLet, _letParameters.get());
+            builder.append(kLetField, _letParameters.get());
         }
     }
 
@@ -253,10 +253,10 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
             runtimeConstants =
                 RuntimeConstants::parse(IDLParserErrorContext(kRuntimeConstantsField),
                                         cmdObj.getObjectField(kRuntimeConstantsField));
-        } else if (field == kLet) {
+        } else if (field == kLetField) {
             BSONElement letElt;
             if (Status letEltStatus =
-                    bsonExtractTypedField(cmdObj, kLet, BSONType::Object, &letElt);
+                    bsonExtractTypedField(cmdObj, kLetField, BSONType::Object, &letElt);
                 !letEltStatus.isOK()) {
                 return letEltStatus;
             }
@@ -275,6 +275,10 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
                 writeConcernOptionsSet = true;
                 writeConcernOptions = sw.getValue();
             }
+        } else if (isMongocryptdArgument(field)) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "unrecognized field '" << field
+                                  << "'. This command may be meant for a mongocryptd process."};
         } else if (!isGenericArgument(field) &&
                    !std::count(_knownFields.begin(), _knownFields.end(), field)) {
             return {ErrorCodes::Error(51177),

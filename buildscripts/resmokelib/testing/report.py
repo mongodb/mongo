@@ -8,20 +8,27 @@ import threading
 import time
 import unittest
 
-from .. import config as _config
-from .. import logging
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import logging
 
 
 # pylint: disable=attribute-defined-outside-init
 class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attributes
     """Record test status and timing information."""
 
-    def __init__(self, job_logger, suite_options):
-        """Initialize the TestReport with the buildlogger configuration."""
+    def __init__(self, job_logger, suite_options, job_num=None):
+        """
+        Initialize the TestReport with the buildlogger configuration.
+
+        :param job_logger: The higher-level logger that will be used to print metadata about the test.
+        :param suite_options: Options for the suite being executed.
+        :param job_num: The number corresponding to the job this test runs in.
+        """
 
         unittest.TestResult.__init__(self)
 
         self.job_logger = job_logger
+        self.job_num = job_num
         self.suite_options = suite_options
 
         self._lock = threading.Lock()
@@ -40,7 +47,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
 
         # TestReports that are used when running tests need a JobLogger but combined reports don't
         # use the logger.
-        combined_report = cls(logging.loggers.EXECUTOR_LOGGER,
+        combined_report = cls(logging.loggers.ROOT_EXECUTOR_LOGGER,
                               _config.SuiteOptions.ALL_INHERITED.resolve())
         combining_time = time.time()
 
@@ -107,9 +114,9 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
                 self.num_dynamic += 1
 
         # Set up the test-specific logger.
-        test_logger = self.job_logger.new_test_logger(test.short_name(), test.basename(), command,
-                                                      test.logger)
-        test_info.url_endpoint = test_logger.url_endpoint
+        (test_logger, url_endpoint) = logging.loggers.new_test_logger(
+            test.short_name(), test.basename(), command, test.logger, self.job_num, self.job_logger)
+        test_info.url_endpoint = url_endpoint
 
         test.override_logger(test_logger)
         test_info.start_time = time.time()

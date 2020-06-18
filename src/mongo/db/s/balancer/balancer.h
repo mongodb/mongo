@@ -170,6 +170,7 @@ private:
     void onStepUpBegin(OperationContext* opCtx) final;
     void onStepUpComplete(OperationContext* opCtx) final;
     void onStepDown() final;
+    void onBecomeArbiter() final;
 
     /**
      * The main balancer loop, which runs in a separate thread.

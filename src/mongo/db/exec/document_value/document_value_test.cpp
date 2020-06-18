@@ -30,6 +30,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include <math.h>
+#include <sstream>
 
 #include "mongo/platform/basic.h"
 
@@ -2245,6 +2246,12 @@ TEST(ValueIntegral, CorrectlyIdentifiesInvalid64BitIntegralValues) {
     ASSERT_FALSE(Value(kDoubleMin).integral64Bit());
     ASSERT_FALSE(Value(kDoubleMaxAsDecimal).integral64Bit());
     ASSERT_FALSE(Value(kDoubleMinAsDecimal).integral64Bit());
+}
+
+TEST(ValueOutput, StreamOutputForIllegalDateProducesErrorToken) {
+    auto sout = std::ostringstream{};
+    sout << mongo::Value{Date_t::min()};
+    ASSERT_EQ("illegal date", sout.str());
 }
 
 }  // namespace Value

@@ -1,8 +1,8 @@
 """Extracts `mongo-debugsymbols.tgz`."""
 
+import glob
 import os
 import sys
-import glob
 
 
 def extract_debug_symbols(root_logger):

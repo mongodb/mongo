@@ -108,8 +108,8 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
-    auto exec = uassertStatusOK(
-        getExecutor(opCtx, collection, std::move(cq), PlanExecutor::NO_YIELD, options));
+    auto exec = uassertStatusOK(getExecutor(
+        opCtx, collection, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, options));
 
     PlanExecutor::ExecState state;
     BSONObj obj;
@@ -117,9 +117,6 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     if (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
         return loc;
     }
-    massert(34427,
-            "Plan executor error: " + WorkingSetCommon::toStatusString(obj),
-            PlanExecutor::IS_EOF == state);
     return RecordId();
 }
 
@@ -188,7 +185,8 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
     boost::optional<AutoGetOplog> autoOplog;
     auto collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
 
-    auto exec = InternalPlanner::collectionScan(opCtx, ns, collection, PlanExecutor::NO_YIELD);
+    auto exec = InternalPlanner::collectionScan(
+        opCtx, ns, collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     CurOp::get(opCtx)->done();
@@ -210,7 +208,7 @@ bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) 
     auto collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
 
     auto exec = InternalPlanner::collectionScan(
-        opCtx, ns, collection, PlanExecutor::NO_YIELD, InternalPlanner::BACKWARD);
+        opCtx, ns, collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     // Non-yielding collection scans from InternalPlanner will never error.
@@ -249,7 +247,7 @@ void Helpers::upsert(OperationContext* opCtx,
     request.setUpdateModification(updateMod);
     request.setUpsert();
     request.setFromMigration(fromMigrate);
-    request.setYieldPolicy(PlanExecutor::NO_YIELD);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
 
     update(opCtx, context.db(), request);
 }

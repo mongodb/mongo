@@ -480,7 +480,8 @@ void GeoHash::clearUnusedBits() {
     _hash &= ~mask;
 }
 
-static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
+namespace {
+void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
     char buf[8];
     if constexpr (kNativeLittle) {
         // Reverse the order of bytes when copying between BinData and GeoHash.
@@ -495,7 +496,8 @@ static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const c
     builder->appendBinData(fieldName, 8, bdtCustom, buf);
 }
 
-static void appendHashToKeyString(long long hash, KeyString::Builder* ks) {
+template <typename KeyStringBuilder>
+void appendHashToKeyString(long long hash, KeyStringBuilder* ks) {
     char buf[8];
     if constexpr (kNativeLittle) {
         // Reverse the order of bytes when copying between BinData and GeoHash.
@@ -509,6 +511,7 @@ static void appendHashToKeyString(long long hash, KeyString::Builder* ks) {
     }
     ks->appendBinData(BSONBinData(buf, 8, bdtCustom));
 }
+}  // namespace
 
 void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
@@ -516,6 +519,11 @@ void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) cons
 }
 
 void GeoHash::appendHashMin(KeyString::Builder* ks) const {
+    // The min bound of a GeoHash region has all the unused suffix bits set to 0
+    appendHashToKeyString(_hash, ks);
+}
+
+void GeoHash::appendHashMin(KeyString::PooledBuilder* ks) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
     appendHashToKeyString(_hash, ks);
 }
@@ -662,46 +670,70 @@ static BSONField<double> minField("min", -180.0);
 // (about 1.11e-16) times the magnitude of the result.
 double const GeoHashConverter::kMachinePrecision = 0.5 * std::numeric_limits<double>::epsilon();
 
-Status GeoHashConverter::parseParameters(const BSONObj& paramDoc,
-                                         GeoHashConverter::Parameters* params) {
+StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromDoc(
+    const BSONObj& paramDoc) {
     string errMsg;
+    Parameters params{};
 
     if (FieldParser::FIELD_INVALID ==
-        FieldParser::extractNumber(paramDoc, bitsField, &params->bits, &errMsg)) {
+        FieldParser::extractNumber(paramDoc, bitsField, &params.bits, &errMsg)) {
         return Status(ErrorCodes::InvalidOptions, errMsg);
     }
 
     if (FieldParser::FIELD_INVALID ==
-        FieldParser::extractNumber(paramDoc, maxField, &params->max, &errMsg)) {
+        FieldParser::extractNumber(paramDoc, maxField, &params.max, &errMsg)) {
         return Status(ErrorCodes::InvalidOptions, errMsg);
     }
 
     if (FieldParser::FIELD_INVALID ==
-        FieldParser::extractNumber(paramDoc, minField, &params->min, &errMsg)) {
+        FieldParser::extractNumber(paramDoc, minField, &params.min, &errMsg)) {
         return Status(ErrorCodes::InvalidOptions, errMsg);
     }
 
-    if (params->bits < 1 || params->bits > 32) {
+    if (params.bits < 1 || params.bits > 32) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "bits for hash must be > 0 and <= 32, "
-                                    << "but " << params->bits << " bits were specified");
+                                    << "but " << params.bits << " bits were specified");
     }
 
-    if (params->min >= params->max) {
+    const bool rangeValid = params.min < params.max;
+    if (!rangeValid || std::isinf(params.min) || std::isinf(params.max)) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "region for hash must be valid and have positive area, "
-                                    << "but [" << params->min << ", " << params->max << "] "
+                                    << "but [" << params.min << ", " << params.max << "] "
                                     << "was specified");
     }
 
-    double numBuckets = (1024 * 1024 * 1024 * 4.0);
-    params->scaling = numBuckets / (params->max - params->min);
+    constexpr double numBuckets = 4.0 * 1024 * 1024 * 1024;
+    params.scaling = numBuckets / (params.max - params.min);
+    const bool scalingValid = params.scaling > 0;
+    if (!scalingValid || std::isinf(params.scaling)) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "range [" << params.min << ", " << params.max << "] is too small.");
+    }
 
-    return Status::OK();
+    return createFromParams(params);
+}
+
+StatusWith<std::unique_ptr<GeoHashConverter>> GeoHashConverter::createFromParams(
+    const Parameters& params) {
+    std::unique_ptr<GeoHashConverter> converter(new GeoHashConverter(params));
+
+    const bool errorValid = params.max - params.min >= converter->_error / 2;
+    if (!errorValid) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "invalid computed error: " << converter->_error
+                                    << " on range [" << params.min << ", " << params.max << "].");
+    }
+
+    return {std::move(converter)};
 }
 
 GeoHashConverter::GeoHashConverter(const Parameters& params) : _params(params) {
     init();
+    uassert(
+        4799400, "Invalid GeoHashConverter parameters", _params.max - _params.min >= _error / 2);
 }
 
 void GeoHashConverter::init() {

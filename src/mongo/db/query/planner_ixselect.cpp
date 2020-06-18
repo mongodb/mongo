@@ -185,14 +185,11 @@ static double fieldWithDefault(const BSONObj& infoObj, const string& name, doubl
  * 2d indices don't handle wrapping so we can't use them for queries that wrap.
  */
 static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
-    GeoHashConverter::Parameters hashParams;
-    Status paramStatus = GeoHashConverter::parseParameters(index.infoObj, &hashParams);
-    verify(paramStatus.isOK());  // we validated the params on index creation
-
-    GeoHashConverter conv(hashParams);
+    auto conv = GeoHashConverter::createFromDoc(index.infoObj);
+    uassertStatusOK(conv.getStatus());  // We validated the parameters when creating the index.
 
     // FYI: old code used flat not spherical error.
-    double yscandist = rad2deg(circle.radius) + conv.getErrorSphere();
+    double yscandist = rad2deg(circle.radius) + conv.getValue()->getErrorSphere();
     double xscandist = computeXScanDistance(circle.center.y, yscandist);
     bool ret = circle.center.x + xscandist < 180 && circle.center.x - xscandist > -180 &&
         circle.center.y + yscandist < 90 && circle.center.y - yscandist > -90;
@@ -289,8 +286,10 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
             if (entry.identifier.catalogName == hintName) {
                 LOGV2_DEBUG(20952,
                             5,
-                            "Hint by name specified, restricting indices to {entry_keyPattern}",
-                            "entry_keyPattern"_attr = entry.keyPattern.toString());
+                            "Hint by name specified, restricting indices to {keyPattern}",
+                            "Hint by name specified, restricting indices",
+                            "name"_attr = entry.identifier.catalogName,
+                            "keyPattern"_attr = entry.keyPattern);
                 out.push_back(entry);
             }
         }
@@ -299,8 +298,10 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
             if (SimpleBSONObjComparator::kInstance.evaluate(entry.keyPattern == hintedIndex)) {
                 LOGV2_DEBUG(20953,
                             5,
-                            "Hint specified, restricting indices to {hintedIndex}",
-                            "hintedIndex"_attr = hintedIndex.toString());
+                            "Hint specified, restricting indices to {keyPattern}",
+                            "Hint specified, restricting indices",
+                            "name"_attr = entry.identifier.catalogName,
+                            "keyPattern"_attr = entry.keyPattern);
                 out.push_back(entry);
             }
         }
@@ -585,9 +586,10 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         return false;
     } else {
         LOGV2_WARNING(20954,
-                      "Unknown indexing for node {node_debugString} and field {keyPatternElt}",
-                      "node_debugString"_attr = node->debugString(),
-                      "keyPatternElt"_attr = keyPatternElt.toString());
+                      "Unknown indexing for node {node} and field {field}",
+                      "Unknown indexing for given node and field",
+                      "node"_attr = node->debugString(),
+                      "field"_attr = keyPatternElt.toString());
         verify(0);
     }
 }

@@ -150,6 +150,15 @@ private:
     bool _dead = false;
 };
 
+/**
+ * A decorable object that is shared across all Collection instances for the same collection. There
+ * may be several Collection instances simultaneously in existence representing different versions
+ * of a collection's persisted state. A single instance of SharedCollectionDecorations will be
+ * associated with all of the Collection instances for a collection, sharing whatever data may
+ * decorate it across all point in time views of the collection.
+ */
+class SharedCollectionDecorations : public Decorable<SharedCollectionDecorations> {};
+
 class Collection : public Decorable<Collection> {
 public:
     enum class StoreDeletedDoc { Off, On };
@@ -240,7 +249,29 @@ public:
     Collection() = default;
     virtual ~Collection() = default;
 
-    virtual RecordId getCatalogId() const = 0;
+    /**
+     * Fetches the shared state across Collection instances for the a collection. Returns an object
+     * decorated by state shared across Collection instances for the same namespace. Its decorations
+     * are unversioned (not associated with any point in time view of the collection) data related
+     * to the collection.
+     */
+    virtual SharedCollectionDecorations* getSharedDecorations() const = 0;
+
+    virtual void init(OperationContext* opCtx) {}
+
+    virtual bool isCommitted() const {
+        return true;
+    }
+
+    /**
+     * Update the visibility of this collection in the Collection Catalog. Updates to this value
+     * are not idempotent, as successive updates with the same `val` should not occur.
+     */
+    virtual void setCommitted(bool val) {}
+
+    virtual bool isInitialized() const {
+        return false;
+    }
 
     virtual const NamespaceString& ns() const = 0;
 
@@ -252,6 +283,8 @@ public:
      * CollectionCatalog::setCollectionNamespace().
      */
     virtual void setNs(NamespaceString nss) = 0;
+
+    virtual RecordId getCatalogId() const = 0;
 
     virtual UUID uuid() const = 0;
 
@@ -510,7 +543,7 @@ public:
      */
     virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
-        PlanExecutor::YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         ScanDirection scanDirection) = 0;
 
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
@@ -522,22 +555,6 @@ public:
      * onto the global lock in exclusive mode.
      */
     virtual void establishOplogCollectionForLogging(OperationContext* opCtx) = 0;
-
-    virtual void init(OperationContext* opCtx) {}
-
-    virtual bool isCommitted() const {
-        return true;
-    }
-
-    /**
-     * Update the visibility of this collection in the Collection Catalog. Updates to this value
-     * are not idempotent, as successive updates with the same `val` should not occur.
-     */
-    virtual void setCommitted(bool val) {}
-
-    virtual bool isInitialized() const {
-        return false;
-    }
 
     friend auto logAttrs(const Collection& col) {
         return logv2::multipleAttrs(col.ns(), col.uuid());

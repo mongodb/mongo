@@ -82,8 +82,9 @@ void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const Cano
     auto whileWaitingFunc = [&, hasLogged = false]() mutable {
         if (!std::exchange(hasLogged, true)) {
             LOGV2(20908,
-                  "Waiting in find before making batch for query - {cq_Short}",
-                  "cq_Short"_attr = redact(cq.toStringShort()));
+                  "Waiting in find before making batch for query - {query}",
+                  "Waiting in find before making batch for query",
+                  "query"_attr = redact(cq.toStringShort()));
         }
     };
 

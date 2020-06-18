@@ -92,10 +92,10 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
     if ((err = shim_getaddrinfo(nativeHostName.c_str(), nullptr, &hints, &info)) != 0) {
         LOGV2_DEBUG(23170,
                     3,
-                    "Failed to obtain address information for hostname {hostName}: "
-                    "{getAddrInfoStrError_err}",
+                    "Failed to obtain address information for host {hostName}: {error}",
+                    "Failed to obtain address information for host",
                     "hostName"_attr = hostName,
-                    "getAddrInfoStrError_err"_attr = getAddrInfoStrError(err));
+                    "error"_attr = getAddrInfoStrError(err));
         return results;
     }
     const auto guard = makeGuard(shim_freeaddrinfo);
@@ -105,20 +105,14 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
         return results;
     }
 
-    bool encounteredErrors = false;
-    std::stringstream getNameInfoErrors;
-    getNameInfoErrors << "Failed to obtain name info for: [ ";
+    std::vector<std::string> getNameInfoErrors;
     for (shim_addrinfo* p = info; p; p = p->ai_next) {
+        std::stringstream getNameInfoError;
         shim_char host[NI_MAXHOST] = {};
         if ((err = shim_getnameinfo(
                  p->ai_addr, p->ai_addrlen, host, sizeof(host), nullptr, 0, NI_NAMEREQD)) == 0) {
             results.emplace_back(shim_fromNativeString(host));
         } else {
-            if (encounteredErrors) {
-                getNameInfoErrors << ", ";
-            }
-            encounteredErrors = true;
-
             // Format the addrinfo structure we have into a string for reporting
             char ip_str[INET6_ADDRSTRLEN];
             struct sockaddr* addr = p->ai_addr;
@@ -132,23 +126,24 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
                 sin_addr = reinterpret_cast<void*>(&addr_in6->sin6_addr);
             }
 
-            getNameInfoErrors << "(";
             if (sin_addr) {
                 invariant(inet_ntop(p->ai_family, sin_addr, ip_str, sizeof(ip_str)) != nullptr);
-                getNameInfoErrors << ip_str;
+                getNameInfoError << ip_str;
             } else {
-                getNameInfoErrors << "Unknown address family: " << p->ai_family;
+                getNameInfoError << "Unknown address family: " << p->ai_family;
             }
 
-            getNameInfoErrors << ", \"" << getAddrInfoStrError(err) << "\")";
+            getNameInfoError << ": \"" << getAddrInfoStrError(err);
         }
+        getNameInfoErrors.push_back(getNameInfoError.str());
     }
 
-    if (encounteredErrors) {
+    if (!getNameInfoErrors.empty()) {
         LOGV2_DEBUG(23171,
                     3,
-                    "{getNameInfoErrors_str} ]",
-                    "getNameInfoErrors_str"_attr = getNameInfoErrors.str());
+                    "Failed to obtain name info: {errors}",
+                    "Failed to obtain name info",
+                    "errors"_attr = getNameInfoErrors);
     }
 
     // Deduplicate the results list

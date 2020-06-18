@@ -76,14 +76,12 @@
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -469,8 +467,6 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
     if (_oplogBuffer) {
         _oplogBuffer->exitDrainMode();
     }
-
-    ReplicaSetAwareServiceRegistry::get(_service).onStepUpBegin(opCtx);
 }
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
@@ -521,13 +517,21 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
 
     auto newTermStartDate = loadLastOpTimeAndWallTimeResult.getValue().wallTime;
+    // This constant was based on data described in SERVER-44634. It is in relation to how long the
+    // first majority committed write takes after a new term has started.
+    const auto flowControlGracePeriod = Seconds(4);
+    // SERVER-44634: Disable flow control for a grace period after stepup. Because writes may stop
+    // while a node wins election and steps up, it's likely to determine there's majority point
+    // lag. Moreover, because there are no writes in the system, flow control will believe
+    // secondaries are unable to process oplog entries. This can result in an undesirable "slow
+    // start" phenomena.
+    FlowControl::get(opCtx)->disableUntil(newTermStartDate + flowControlGracePeriod);
     ReplicationMetrics::get(opCtx).setCandidateNewTermStartDate(newTermStartDate);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     replCoord->createWMajorityWriteAvailabilityDateWaiter(opTimeToReturn);
 
     _shardingOnTransitionToPrimaryHook(opCtx);
-    ReplicaSetAwareServiceRegistry::get(_service).onStepUpComplete(opCtx);
 
     _dropAllTempCollections(opCtx);
 
@@ -749,7 +753,6 @@ void ReplicationCoordinatorExternalStateImpl::closeConnections() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
-    ReplicaSetAwareServiceRegistry::get(_service).onStepDown();
     _shardingOnStepDownHook();
     stopNoopWriter();
     _stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
@@ -761,7 +764,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
         TransactionCoordinatorService::get(_service)->onStepDown();
     } else if (ShardingState::get(_service)->enabled()) {
         ChunkSplitter::get(_service).onStepDown();
-        getCatalogCacheLoaderForFiltering(_service).onStepDown();
+        CatalogCacheLoader::get(_service).onStepDown();
         PeriodicBalancerConfigRefresher::get(_service).onStepDown();
         TransactionCoordinatorService::get(_service)->onStepDown();
     }
@@ -879,7 +882,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(opCtx,
                                                                                   configsvrConnStr);
 
-        getCatalogCacheLoaderForFiltering(_service).onStepUp();
+        CatalogCacheLoader::get(_service).onStepUp();
         ChunkSplitter::get(_service).onStepUp();
         PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);

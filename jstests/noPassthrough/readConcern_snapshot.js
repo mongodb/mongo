@@ -1,4 +1,5 @@
-// Test parsing of readConcern level 'snapshot'.
+// Test parsing of readConcern level 'snapshot' and the presence of the 'atClusterTime' field in
+// snapshot cursor responses.
 // @tags: [requires_majority_read_concern, requires_replication, uses_transactions]
 (function() {
 "use strict";
@@ -113,17 +114,25 @@ sessionDb = session.getDatabase(dbName);
 
 // readConcern 'snapshot' is supported by find in a transaction.
 session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
-assert.commandWorked(sessionDb.runCommand({find: collName}));
+let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 0}));
+assert(!res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
+
+// readConcern 'snapshot' is supported by getMore in a transaction.
+res = assert.commandWorked(sessionDb.runCommand({getMore: res.cursor.id, collection: collName}));
+assert(!res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by aggregate in a transaction.
-assert.commandWorked(sessionDb.runCommand({aggregate: collName, pipeline: [], cursor: {}}));
+res = assert.commandWorked(sessionDb.runCommand({aggregate: collName, pipeline: [], cursor: {}}));
+assert(!res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by distinct in a transaction.
-assert.commandWorked(sessionDb.runCommand({distinct: collName, key: "x"}));
+res = assert.commandWorked(sessionDb.runCommand({distinct: collName, key: "x"}));
+assert(!res.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by geoSearch in a transaction.
-assert.commandWorked(
+res = assert.commandWorked(
     sessionDb.runCommand({geoSearch: collName, near: [0, 0], maxDistance: 1, search: {a: 1}}));
+assert(!res.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is not supported by non-CRUD commands in a transaction.
 assert.commandFailedWithCode(sessionDb.runCommand({dropIndexes: collName, index: "a_1"}),
@@ -136,15 +145,23 @@ const snapshotReadConcern = {
     level: "snapshot"
 };
 // readConcern 'snapshot' is supported by find outside of transactions.
-assert.commandWorked(testDB.runCommand({find: collName, readConcern: snapshotReadConcern}));
+res = assert.commandWorked(
+    testDB.runCommand({find: collName, batchSize: 0, readConcern: snapshotReadConcern}));
+assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
+
+// readConcern 'snapshot' is supported by getMore outside of a transaction.
+res = assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: collName}));
+assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by aggregate outside of transactions.
-assert.commandWorked(testDB.runCommand(
+res = assert.commandWorked(testDB.runCommand(
     {aggregate: collName, pipeline: [], cursor: {}, readConcern: snapshotReadConcern}));
+assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by distinct outside of transactions.
-assert.commandWorked(
+res = assert.commandWorked(
     testDB.runCommand({distinct: collName, key: "x", readConcern: snapshotReadConcern}));
+assert(res.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is not supported by geoSearch outside of transactions.
 assert.commandFailedWithCode(testDB.runCommand({

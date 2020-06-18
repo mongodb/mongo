@@ -54,10 +54,8 @@ struct R2RegionCoverer::CompareQueueEntries : public less<QueueEntry> {
     }
 };
 
-// Doesn't take ownership of "hashConverter". The caller should guarantee its life cycle
-// is longer than this coverer.
-R2RegionCoverer::R2RegionCoverer(GeoHashConverter* hashConverter)
-    : _hashConverter(hashConverter),
+R2RegionCoverer::R2RegionCoverer(std::unique_ptr<GeoHashConverter> hashConverter)
+    : _hashConverter(std::move(hashConverter)),
       _minLevel(0u),
       _maxLevel(GeoHash::kMaxBits),
       _maxCells(kDefaultMaxCells),
@@ -134,6 +132,10 @@ void R2RegionCoverer::getCovering(const R2Region& region, vector<GeoHash>* cover
 
     _region = nullptr;
     cover->swap(*_results);
+}
+
+const GeoHashConverter& R2RegionCoverer::getHashConverter() const {
+    return *_hashConverter;
 }
 
 // Caller owns the returned pointer

@@ -46,7 +46,7 @@ class R2RegionCoverer : boost::noncopyable {
     static const int kDefaultMaxCells;  // = 8;
 
 public:
-    R2RegionCoverer(GeoHashConverter* hashConverter);
+    R2RegionCoverer(std::unique_ptr<GeoHashConverter> hashConverter);
     ~R2RegionCoverer();
 
     // Set the minimum and maximum cell level to be used.  The default is to use
@@ -73,6 +73,8 @@ public:
     }
 
     void getCovering(const R2Region& region, std::vector<GeoHash>* cover);
+
+    const GeoHashConverter& getHashConverter() const;
 
 private:
     struct Candidate {
@@ -102,7 +104,7 @@ private:
     // Computes a set of initial candidates that cover the given region.
     void getInitialCandidates();
 
-    GeoHashConverter* _hashConverter;  // Not owned.
+    std::unique_ptr<GeoHashConverter> _hashConverter;
     // min / max level as unsigned so as to be consistent with GeoHash
     unsigned int _minLevel;
     unsigned int _maxLevel;

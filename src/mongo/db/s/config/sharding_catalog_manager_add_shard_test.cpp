@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
+#include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/catalog/config_server_version.h"
@@ -50,7 +51,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
@@ -387,7 +387,7 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     operationContext()->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
 
     auto future = launchAsync([this, expectedShardName] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName =
             assertGet(ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(),
@@ -470,7 +470,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         "TestDB2", ShardId(expectedShardName), false, databaseVersion::makeNew());
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(
             ShardingCatalogManager::get(operationContext())
                 ->addShard(operationContext(), nullptr, ConnectionString(shardTarget), 100));
@@ -560,7 +560,7 @@ TEST_F(AddShardTest, UnreachableHost) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status =
             ShardingCatalogManager::get(operationContext())
                 ->addShard(
@@ -587,7 +587,7 @@ TEST_F(AddShardTest, AddMongosAsShard) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status =
             ShardingCatalogManager::get(operationContext())
                 ->addShard(
@@ -614,7 +614,7 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
     std::string expectedShardName = "Standalone";
 
     auto future = launchAsync([this, expectedShardName, shardTarget] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status =
             ShardingCatalogManager::get(operationContext())
                 ->addShard(
@@ -645,7 +645,7 @@ TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
@@ -673,7 +673,7 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
@@ -702,7 +702,7 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
@@ -733,7 +733,7 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
@@ -766,7 +766,7 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
     std::string expectedShardName = "config";
 
     auto future = launchAsync([this, expectedShardName, connString] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::BadValue, status);
@@ -810,7 +810,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
 
 
     auto future = launchAsync([this, expectedShardName, connString] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
@@ -856,7 +856,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
         "shardDB", ShardId(expectedShardName), false, databaseVersion::makeNew());
 
     auto future = launchAsync([this, &expectedShardName, &connString] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(), nullptr, connString, 100));
         ASSERT_EQUALS(expectedShardName, shardName);
@@ -920,7 +920,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
         "shardDB", ShardId(expectedShardName), false, databaseVersion::makeNew());
 
     auto future = launchAsync([this, &expectedShardName, &seedString] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(), nullptr, seedString, 100));
         ASSERT_EQUALS(expectedShardName, shardName);
@@ -995,7 +995,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     ON_BLOCK_EXIT([&] { failPoint->setMode(FailPoint::off); });
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(
             ShardingCatalogManager::get(operationContext())
                 ->addShard(
@@ -1085,7 +1085,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
     // Adding the same standalone host with a different shard name should fail.
     std::string differentName = "anotherShardName";
     auto future1 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(),
@@ -1100,7 +1100,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
 
     // Adding the same standalone host with a different maxSize should fail.
     auto future2 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(),
@@ -1115,7 +1115,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
     // can't change the sharded cluster's notion of the shard from standalone to replica set just
     // by calling addShard.
     auto future3 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(),
@@ -1130,7 +1130,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
 
     // Adding the same standalone host with the same options should succeed.
     auto future4 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(),
                                                   &existingShardName,
@@ -1146,7 +1146,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
     // Adding the same standalone host with the same options (without explicitly specifying the
     // shard name) should succeed.
     auto future5 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(),
                                                   nullptr,
@@ -1189,7 +1189,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // Adding the same connection string with a different shard name should fail.
     std::string differentName = "anotherShardName";
     auto future1 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         ASSERT_EQUALS(
             ErrorCodes::IllegalOperation,
             ShardingCatalogManager::get(operationContext())
@@ -1203,7 +1203,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 
     // Adding the same connection string with a different maxSize should fail.
     auto future2 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         ASSERT_EQUALS(
             ErrorCodes::IllegalOperation,
             ShardingCatalogManager::get(operationContext())
@@ -1221,7 +1221,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // the sharded cluster's notion of the shard from replica set to standalone just by calling
     // addShard.
     auto future3 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(),
@@ -1239,7 +1239,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // change the replica set name the sharded cluster knows for it just by calling addShard again.
     std::string differentSetName = "differentSet";
     auto future4 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(),
@@ -1255,7 +1255,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 
     // Adding the same host with the same options should succeed.
     auto future5 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(),
                                                   &existingShardName,
@@ -1268,7 +1268,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // Adding the same host with the same options (without explicitly specifying the shard name)
     // should succeed.
     auto future6 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(
             ShardingCatalogManager::get(operationContext())
                 ->addShard(operationContext(), nullptr, connString, existingShard.getMaxSizeMB()));
@@ -1292,7 +1292,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
         targeterFactory()->addTargeterToReturn(otherHostConnString, std::move(otherHostTargeter));
     }
     auto future7 = launchAsync([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getServiceContext());
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(),
                                                   nullptr,

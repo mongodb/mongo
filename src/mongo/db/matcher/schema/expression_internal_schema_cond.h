@@ -72,6 +72,14 @@ public:
      */
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
     bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const final;
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
 };
 
 }  // namespace mongo

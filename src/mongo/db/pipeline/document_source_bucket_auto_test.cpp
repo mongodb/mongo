@@ -357,7 +357,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
     const size_t maxMemoryUsageBytes = 1000;
 
     VariablesParseState vps = expCtx->variablesParseState;
-    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$a", vps);
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
@@ -394,7 +394,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
     const size_t maxMemoryUsageBytes = 1000;
 
     VariablesParseState vps = expCtx->variablesParseState;
-    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$a", vps);
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
@@ -551,7 +551,7 @@ TEST_F(BucketAutoTests, FailsWithInvalidNumberOfBuckets) {
     const int numBuckets = 0;
     ASSERT_THROWS_CODE(
         DocumentSourceBucketAuto::create(
-            getExpCtx(), ExpressionConstant::create(getExpCtx(), Value(0)), numBuckets),
+            getExpCtx(), ExpressionConstant::create(getExpCtxRaw(), Value(0)), numBuckets),
         AssertionException,
         40243);
 }
@@ -636,7 +636,7 @@ void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expC
     const size_t maxMemoryUsageBytes = 1000;
 
     VariablesParseState vps = expCtx->variablesParseState;
-    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$a", vps);
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
@@ -675,7 +675,7 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     const size_t maxMemoryUsageBytes = 1000;
 
     VariablesParseState vps = expCtx->variablesParseState;
-    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$a", vps);
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(

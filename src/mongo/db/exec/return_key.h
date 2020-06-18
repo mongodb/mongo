@@ -71,7 +71,7 @@ public:
     }
 
 private:
-    Status _extractIndexKey(WorkingSetMember* member);
+    void _extractIndexKey(WorkingSetMember* member);
 
     WorkingSet& _ws;
     ReturnKeyStats _specificStats;

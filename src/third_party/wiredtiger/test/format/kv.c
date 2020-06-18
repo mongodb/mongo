@@ -51,7 +51,7 @@ key_init(void)
         if ((fp = fopen(g.home_key, "r")) == NULL)
             testutil_die(errno, "%s", g.home_key);
         for (i = 0; i < WT_ELEMENTS(g.key_rand_len); ++i)
-            fp_readv(fp, g.home_key, false, &g.key_rand_len[i]);
+            fp_readv(fp, g.home_key, &g.key_rand_len[i]);
         fclose_and_clear(&fp);
         return;
     }

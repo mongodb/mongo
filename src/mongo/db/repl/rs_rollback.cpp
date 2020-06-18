@@ -71,7 +71,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback_source.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -1031,62 +1030,43 @@ void dropCollection(OperationContext* opCtx,
         // Performs a collection scan and writes all documents in the collection to disk
         // in order to keep an archive of items that were rolled back.
         auto exec = InternalPlanner::collectionScan(
-            opCtx, nss.toString(), collection, PlanExecutor::YIELD_AUTO);
-        BSONObj curObj;
+            opCtx, nss.toString(), collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         PlanExecutor::ExecState execState;
-        while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, nullptr))) {
-            auto status = removeSaver.goingToDelete(curObj);
-            if (!status.isOK()) {
-                LOGV2_FATAL_CONTINUE(
-                    21740,
-                    "Rolling back createCollection on {namespace} failed to write document to "
-                    "remove saver file: {error}",
-                    "Rolling back createCollection failed to write document to remove saver file",
-                    "namespace"_attr = nss,
-                    "error"_attr = redact(status));
-                throw RSFatalException(
-                    "Rolling back createCollection. Failed to write document to remove saver "
-                    "file.");
+        try {
+            BSONObj curObj;
+            while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, nullptr))) {
+                auto status = removeSaver.goingToDelete(curObj);
+                if (!status.isOK()) {
+                    LOGV2_FATAL_CONTINUE(21740,
+                                         "Rolling back createCollection on {namespace} failed to "
+                                         "write document to remove saver file: {error}",
+                                         "Rolling back createCollection failed to write document "
+                                         "to remove saver file",
+                                         "namespace"_attr = nss,
+                                         "error"_attr = redact(status));
+                    throw RSFatalException(
+                        "Rolling back createCollection. Failed to write document to remove saver "
+                        "file.");
+                }
             }
+        } catch (const DBException&) {
+            LOGV2_FATAL_CONTINUE(21741,
+                                 "Rolling back createCollection on {namespace} failed with "
+                                 "{error}. A full resync is necessary",
+                                 "Rolling back createCollection failed. A full resync is necessary",
+                                 "namespace"_attr = nss,
+                                 "error"_attr = redact(exceptionToStatus()));
+            throw RSFatalException(
+                "Rolling back createCollection failed. A full resync is necessary.");
         }
 
-        // If we exited the above for loop with any other execState than IS_EOF, this means that
-        // a FAILURE state was returned. If a FAILURE state was returned, either an unrecoverable
-        // error was thrown by exec, or we attempted to retrieve data that could not be provided
-        // by the PlanExecutor. In both of these cases it is necessary for a full resync of the
-        // server.
-
-        if (execState != PlanExecutor::IS_EOF) {
-            if (execState == PlanExecutor::FAILURE &&
-                WorkingSetCommon::isValidStatusMemberObject(curObj)) {
-                Status errorStatus = WorkingSetCommon::getMemberObjectStatus(curObj);
-                LOGV2_FATAL_CONTINUE(
-                    21741,
-                    "Rolling back createCollection on {namespace} failed with {error}. A "
-                    "full resync is necessary.",
-                    "Rolling back createCollection failed. A full resync is necessary",
-                    "namespace"_attr = nss,
-                    "error"_attr = redact(errorStatus));
-                throw RSFatalException(
-                    "Rolling back createCollection failed. A full resync is necessary.");
-            } else {
-                LOGV2_FATAL_CONTINUE(
-                    21742,
-                    "Rolling back createCollection on {namespace} failed. A full resync is "
-                    "necessary.",
-                    "Rolling back createCollection failed. A full resync is necessary",
-                    "namespace"_attr = nss);
-                throw RSFatalException(
-                    "Rolling back createCollection failed. A full resync is necessary.");
-            }
-        }
+        invariant(execState == PlanExecutor::IS_EOF);
     }
 
     WriteUnitOfWork wunit(opCtx);
 
-    // We permanently drop the collection rather than 2-phase drop the collection
-    // here. By not passing in an opTime to dropCollectionEvenIfSystem() the collection
-    // is immediately dropped.
+    // We permanently drop the collection rather than 2-phase drop the collection here. By not
+    // passing in an opTime to dropCollectionEvenIfSystem() the collection is immediately dropped.
     fassert(40504, db->dropCollectionEvenIfSystem(opCtx, nss));
     wunit.commit();
 }
@@ -1223,11 +1203,10 @@ Status _syncRollback(OperationContext* opCtx,
 
     FixUpInfo how;
     how.localTopOfOplog = replCoord->getMyLastAppliedOpTime();
-    LOGV2_OPTIONS(21681,
-                  {logv2::LogTag::kRS},
-                  "Starting rollback. Sync source: {syncSource}",
-                  "Starting rollback",
-                  "syncSource"_attr = rollbackSource.getSource());
+    LOGV2(21681,
+          "Starting rollback. Sync source: {syncSource}",
+          "Starting rollback",
+          "syncSource"_attr = rollbackSource.getSource());
     how.rbid = rollbackSource.getRollbackId();
     uassert(
         40506, "Upstream node rolled back. Need to retry our rollback.", how.rbid == requiredRBID);
@@ -2059,13 +2038,11 @@ Status syncRollback(OperationContext* opCtx,
                                   replCoord,
                                   replicationProcess);
 
-    LOGV2_OPTIONS(21722,
-                  {logv2::LogTag::kRS},
-                  "Rollback finished. The final minValid is: "
-                  "{minValid}",
-                  "Rollback finished",
-                  "minValid"_attr =
-                      replicationProcess->getConsistencyMarkers()->getMinValid(opCtx));
+    LOGV2(21722,
+          "Rollback finished. The final minValid is: "
+          "{minValid}",
+          "Rollback finished",
+          "minValid"_attr = replicationProcess->getConsistencyMarkers()->getMinValid(opCtx));
 
     return status;
 }

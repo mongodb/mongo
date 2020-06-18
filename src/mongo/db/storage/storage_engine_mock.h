@@ -119,6 +119,9 @@ public:
     bool supportsOplogStones() const final {
         return false;
     }
+    bool supportsResumableIndexBuilds() const final {
+        return false;
+    }
     bool supportsPendingDrops() const final {
         return false;
     }

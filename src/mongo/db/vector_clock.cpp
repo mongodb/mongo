@@ -31,6 +31,11 @@
 
 #include "mongo/db/vector_clock.h"
 
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/logical_clock_gen.h"
+#include "mongo/db/logical_time_validator.h"
+
 namespace mongo {
 
 namespace {
@@ -65,8 +70,40 @@ VectorClock::VectorTime VectorClock::getTime() const {
     return VectorTime(_vectorTime);
 }
 
+bool VectorClock::_lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks) {
+    return time.asTimestamp().getSecs() <= kMaxValue &&
+        time.asTimestamp().getInc() <= (kMaxValue - nTicks);
+}
+
+void VectorClock::_ensurePassesRateLimiter(ServiceContext* service,
+                                           const LogicalTimeArray& newTime) {
+    const unsigned wallClockSecs =
+        durationCount<Seconds>(service->getFastClockSource()->now().toDurationSinceEpoch());
+    auto maxAcceptableDriftSecs = static_cast<const unsigned>(gMaxAcceptableLogicalClockDriftSecs);
+
+    for (auto newIt = newTime.begin(); newIt != newTime.end(); ++newIt) {
+        auto newTimeSecs = newIt->asTimestamp().getSecs();
+        auto name = _componentName(Component(newIt - newTime.begin()));
+
+        // Both values are unsigned, so compare them first to avoid wrap-around.
+        uassert(ErrorCodes::ClusterTimeFailsRateLimiter,
+                str::stream() << "New " << name << ", " << newTimeSecs
+                              << ", is too far from this node's wall clock time, " << wallClockSecs
+                              << ".",
+                ((newTimeSecs <= wallClockSecs) ||
+                 (newTimeSecs - wallClockSecs) <= maxAcceptableDriftSecs));
+
+        uassert(40484,
+                str::stream() << name << " cannot be advanced beyond its maximum value",
+                _lessThanOrEqualToMaxPossibleTime(*newIt, 0));
+    }
+}
+
 void VectorClock::_advanceTime(LogicalTimeArray&& newTime) {
+    _ensurePassesRateLimiter(_service, newTime);
+
     stdx::lock_guard<Latch> lock(_mutex);
+
     auto it = _vectorTime.begin();
     auto newIt = newTime.begin();
     for (; it != _vectorTime.end() && newIt != newTime.end(); ++it, ++newIt) {
@@ -80,14 +117,26 @@ class VectorClock::GossipFormat {
 public:
     class Plain;
     class Signed;
+    template <class ActualFormat>
+    class OnlyGossipOutOnNewFCV;
 
     static const ComponentArray<std::unique_ptr<GossipFormat>> _formatters;
 
     GossipFormat(std::string fieldName) : _fieldName(fieldName) {}
     virtual ~GossipFormat() = default;
 
-    virtual void out(BSONObjBuilder* out, LogicalTime time, Component component) const = 0;
-    virtual LogicalTime in(const BSONObj& in, Component component) const = 0;
+    // Returns true if the time was output, false otherwise.
+    virtual bool out(ServiceContext* service,
+                     OperationContext* opCtx,
+                     bool permitRefresh,
+                     BSONObjBuilder* out,
+                     LogicalTime time,
+                     Component component) const = 0;
+    virtual LogicalTime in(ServiceContext* service,
+                           OperationContext* opCtx,
+                           const BSONObj& in,
+                           bool couldBeUnauthenticated,
+                           Component component) const = 0;
 
     const std::string _fieldName;
 };
@@ -97,11 +146,21 @@ public:
     using GossipFormat::GossipFormat;
     virtual ~Plain() = default;
 
-    void out(BSONObjBuilder* out, LogicalTime time, Component component) const override {
+    bool out(ServiceContext* service,
+             OperationContext* opCtx,
+             bool permitRefresh,
+             BSONObjBuilder* out,
+             LogicalTime time,
+             Component component) const override {
         out->append(_fieldName, time.asTimestamp());
+        return true;
     }
 
-    LogicalTime in(const BSONObj& in, Component component) const override {
+    LogicalTime in(ServiceContext* service,
+                   OperationContext* opCtx,
+                   const BSONObj& in,
+                   bool couldBeUnauthenticated,
+                   Component component) const override {
         const auto componentElem(in[_fieldName]);
         if (componentElem.eoo()) {
             // Nothing to gossip in.
@@ -114,74 +173,231 @@ public:
     }
 };
 
+template <class ActualFormat>
+class VectorClock::GossipFormat::OnlyGossipOutOnNewFCV : public ActualFormat {
+public:
+    using ActualFormat::ActualFormat;
+    virtual ~OnlyGossipOutOnNewFCV() = default;
+
+    bool out(ServiceContext* service,
+             OperationContext* opCtx,
+             bool permitRefresh,
+             BSONObjBuilder* out,
+             LogicalTime time,
+             Component component) const override {
+        const auto& fcv = serverGlobalParams.featureCompatibility;
+        if (fcv.isVersionInitialized() &&
+            fcv.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
+            return ActualFormat::out(service, opCtx, permitRefresh, out, time, component);
+        }
+        return false;
+    }
+
+    LogicalTime in(ServiceContext* service,
+                   OperationContext* opCtx,
+                   const BSONObj& in,
+                   bool couldBeUnauthenticated,
+                   Component component) const override {
+        return ActualFormat::in(service, opCtx, in, couldBeUnauthenticated, component);
+    }
+};
+
 class VectorClock::GossipFormat::Signed : public VectorClock::GossipFormat {
 public:
     using GossipFormat::GossipFormat;
     virtual ~Signed() = default;
 
-    void out(BSONObjBuilder* out, LogicalTime time, Component component) const override {
-        // TODO SERVER-47914: make this do the actual proper signing
-        BSONObjBuilder bob;
-        bob.append("time", time.asTimestamp());
-        bob.append("signature", 0);
-        out->append(_fieldName, bob.done());
+    bool out(ServiceContext* service,
+             OperationContext* opCtx,
+             bool permitRefresh,
+             BSONObjBuilder* out,
+             LogicalTime time,
+             Component component) const override {
+        SignedLogicalTime signedTime;
+
+        if (opCtx && LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+            // Authorized clients always receive a dummy-signed $clusterTime (and operationTime).
+            signedTime = SignedLogicalTime(time, TimeProofService::TimeProof(), 0);
+        } else {
+            // Servers without validators (e.g. a shard server not yet added to a cluster) do not
+            // return logical times to unauthorized clients.
+            auto validator = LogicalTimeValidator::get(service);
+            if (!validator) {
+                return false;
+            }
+
+            // There are some contexts where refreshing is not permitted.
+            if (permitRefresh && opCtx) {
+                signedTime = validator->signLogicalTime(opCtx, time);
+            } else {
+                signedTime = validator->trySignLogicalTime(time);
+            }
+
+            // If there were no keys, do not return $clusterTime (or operationTime) to unauthorized
+            // clients.
+            if (signedTime.getKeyId() == 0) {
+                return false;
+            }
+        }
+
+        // TODO SERVER-48432: use IDL to do this serialization.
+
+        BSONObjBuilder subObjBuilder(out->subobjStart(_fieldName));
+        signedTime.getTime().asTimestamp().append(subObjBuilder.bb(), kClusterTimeFieldName);
+
+        BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart(kSignatureFieldName));
+        // Cluster time metadata is only written when the LogicalTimeValidator is set, which
+        // means the cluster time should always have a proof.
+        invariant(signedTime.getProof());
+        signedTime.getProof()->appendAsBinData(signatureObjBuilder, kSignatureHashFieldName);
+        signatureObjBuilder.append(kSignatureKeyIdFieldName, signedTime.getKeyId());
+        signatureObjBuilder.doneFast();
+
+        subObjBuilder.doneFast();
+
+        return true;
     }
 
-    LogicalTime in(const BSONObj& in, Component component) const override {
-        // TODO SERVER-47914: make this do the actual proper signing
-        const auto componentElem(in[_fieldName]);
-        if (componentElem.eoo()) {
+    LogicalTime in(ServiceContext* service,
+                   OperationContext* opCtx,
+                   const BSONObj& in,
+                   bool couldBeUnauthenticated,
+                   Component component) const override {
+        // TODO SERVER-48432: use IDL to do this deserialization.
+
+        const auto& metadataElem = in.getField(_fieldName);
+        if (metadataElem.eoo()) {
             // Nothing to gossip in.
             return LogicalTime();
         }
-        uassert(ErrorCodes::BadValue,
-                str::stream() << _fieldName << " is not a sub-object",
-                componentElem.isABSONObj());
-        const auto subobj = componentElem.embeddedObject();
-        const auto timeElem(subobj["time"]);
-        uassert(ErrorCodes::FailedToParse, "No time found", !timeElem.eoo());
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "time is not a Timestamp",
-                timeElem.type() == bsonTimestamp);
-        return LogicalTime(timeElem.timestamp());
+
+        const auto& obj = metadataElem.Obj();
+
+        Timestamp ts;
+        uassertStatusOK(bsonExtractTimestampField(obj, kClusterTimeFieldName, &ts));
+
+        BSONElement signatureElem;
+        uassertStatusOK(bsonExtractTypedField(obj, kSignatureFieldName, Object, &signatureElem));
+
+        const auto& signatureObj = signatureElem.Obj();
+
+        // Extract BinData type signature hash and construct a SHA1Block instance from it.
+        BSONElement hashElem;
+        uassertStatusOK(
+            bsonExtractTypedField(signatureObj, kSignatureHashFieldName, BinData, &hashElem));
+
+        int hashLength = 0;
+        auto rawBinSignature = hashElem.binData(hashLength);
+        BSONBinData proofBinData(rawBinSignature, hashLength, hashElem.binDataType());
+        auto proofStatus = SHA1Block::fromBinData(proofBinData);
+        uassertStatusOK(proofStatus);
+
+        long long keyId;
+        uassertStatusOK(bsonExtractIntegerField(signatureObj, kSignatureKeyIdFieldName, &keyId));
+
+        auto signedTime =
+            SignedLogicalTime(LogicalTime(ts), std::move(proofStatus.getValue()), keyId);
+
+        if (!opCtx) {
+            // If there's no opCtx then this must be coming from a reply, which must be internal,
+            // and so doesn't require validation.
+            return signedTime.getTime();
+        }
+
+        // Validate the signature.
+        if (couldBeUnauthenticated && AuthorizationManager::get(service)->isAuthEnabled() &&
+            (!signedTime.getProof() || *signedTime.getProof() == TimeProofService::TimeProof())) {
+
+            AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+            // The client is not authenticated and is not using localhost auth bypass. Do not
+            // gossip.
+            if (authSession && !authSession->isAuthenticated() &&
+                !authSession->isUsingLocalhostBypass()) {
+                return {};
+            }
+        }
+
+        auto logicalTimeValidator = LogicalTimeValidator::get(service);
+        if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+            if (!logicalTimeValidator) {
+                uasserted(ErrorCodes::CannotVerifyAndSignLogicalTime,
+                          "Cannot accept logicalTime: " + signedTime.getTime().toString() +
+                              ". May not be a part of a sharded cluster");
+            } else {
+                uassertStatusOK(logicalTimeValidator->validate(opCtx, signedTime));
+            }
+        }
+
+        return signedTime.getTime();
     }
+
+private:
+    static constexpr char kClusterTimeFieldName[] = "clusterTime";
+    static constexpr char kSignatureFieldName[] = "signature";
+    static constexpr char kSignatureHashFieldName[] = "hash";
+    static constexpr char kSignatureKeyIdFieldName[] = "keyId";
 };
 
-// TODO SERVER-47914: update $clusterTimeNew to $clusterTime once LogicalClock is migrated into
-// VectorClock.
 const VectorClock::ComponentArray<std::unique_ptr<VectorClock::GossipFormat>>
     VectorClock::GossipFormat::_formatters{
-        std::make_unique<VectorClock::GossipFormat::Signed>("$clusterTimeNew"),
-        std::make_unique<VectorClock::GossipFormat::Plain>("$configTime")};
+        std::make_unique<VectorClock::GossipFormat::Signed>(VectorClock::kClusterTimeFieldName),
+        std::make_unique<
+            VectorClock::GossipFormat::OnlyGossipOutOnNewFCV<VectorClock::GossipFormat::Plain>>(
+            VectorClock::kConfigTimeFieldName)};
 
-void VectorClock::gossipOut(BSONObjBuilder* outMessage,
-                            const transport::Session::TagMask clientSessionTags) const {
+bool VectorClock::gossipOut(OperationContext* opCtx,
+                            BSONObjBuilder* outMessage,
+                            const transport::Session::TagMask defaultClientSessionTags) const {
+    if (!isEnabled()) {
+        return false;
+    }
+    auto clientSessionTags = defaultClientSessionTags;
+    if (opCtx && opCtx->getClient()) {
+        clientSessionTags = opCtx->getClient()->getSessionTags();
+    }
+    VectorTime now = getTime();
     if (clientSessionTags & transport::Session::kInternalClient) {
-        _gossipOutInternal(outMessage);
+        return _gossipOutInternal(opCtx, outMessage, now._time);
     } else {
-        _gossipOutExternal(outMessage);
+        return _gossipOutExternal(opCtx, outMessage, now._time);
     }
 }
 
-void VectorClock::gossipIn(const BSONObj& inMessage,
-                           const transport::Session::TagMask clientSessionTags) {
+void VectorClock::gossipIn(OperationContext* opCtx,
+                           const BSONObj& inMessage,
+                           bool couldBeUnauthenticated,
+                           const transport::Session::TagMask defaultClientSessionTags) {
+    if (!isEnabled()) {
+        return;
+    }
+    auto clientSessionTags = defaultClientSessionTags;
+    if (opCtx && opCtx->getClient()) {
+        clientSessionTags = opCtx->getClient()->getSessionTags();
+    }
     if (clientSessionTags & transport::Session::kInternalClient) {
-        _advanceTime(_gossipInInternal(inMessage));
+        _advanceTime(_gossipInInternal(opCtx, inMessage, couldBeUnauthenticated));
     } else {
-        _advanceTime(_gossipInExternal(inMessage));
+        _advanceTime(_gossipInExternal(opCtx, inMessage, couldBeUnauthenticated));
     }
 }
 
-void VectorClock::_gossipOutComponent(BSONObjBuilder* out,
-                                      VectorTime time,
+bool VectorClock::_gossipOutComponent(OperationContext* opCtx,
+                                      BSONObjBuilder* out,
+                                      const LogicalTimeArray& time,
                                       Component component) const {
-    GossipFormat::_formatters[component]->out(out, time[component], component);
+    bool wasOutput = GossipFormat::_formatters[component]->out(
+        _service, opCtx, _permitRefreshDuringGossipOut(), out, time[component], component);
+    return (component == Component::ClusterTime) ? wasOutput : false;
 }
 
-void VectorClock::_gossipInComponent(const BSONObj& in,
+void VectorClock::_gossipInComponent(OperationContext* opCtx,
+                                     const BSONObj& in,
+                                     bool couldBeUnauthenticated,
                                      LogicalTimeArray* newTime,
                                      Component component) {
-    (*newTime)[component] = GossipFormat::_formatters[component]->in(in, component);
+    (*newTime)[component] = GossipFormat::_formatters[component]->in(
+        _service, opCtx, in, couldBeUnauthenticated, component);
 }
 
 std::string VectorClock::_componentName(Component component) {
@@ -193,9 +409,24 @@ bool VectorClock::isEnabled() const {
     return _isEnabled;
 }
 
-void VectorClock::disable() {
+void VectorClock::_disable() {
     stdx::lock_guard<Latch> lock(_mutex);
     _isEnabled = false;
+}
+
+void VectorClock::resetVectorClock_forTest() {
+    stdx::lock_guard<Latch> lock(_mutex);
+    auto it = _vectorTime.begin();
+    for (; it != _vectorTime.end(); ++it) {
+        *it = LogicalTime();
+    }
+    _isEnabled = true;
+}
+
+void VectorClock::advanceClusterTime_forTest(LogicalTime newClusterTime) {
+    LogicalTimeArray newTime;
+    newTime[Component::ClusterTime] = newClusterTime;
+    _advanceTime(std::move(newTime));
 }
 
 }  // namespace mongo

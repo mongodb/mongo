@@ -88,7 +88,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 
     dsk = (WT_PAGE_HEADER *)page->dsk;
     if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
-        __wt_cache_page_image_decr(session, dsk->mem_size);
+        __wt_cache_page_image_decr(session, page);
 
     /* Discard any mapped image. */
     if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))

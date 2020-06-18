@@ -395,13 +395,13 @@ BSONObj ServerDescription::toBson() const {
 
     BSONArrayBuilder arbitersBuilder;
     for (const auto& arbiter : _arbiters) {
-        hostsBuilder.append(arbiter.toString());
+        arbitersBuilder.append(arbiter.toString());
     }
     bson.append("arbiters", arbitersBuilder.obj());
 
     BSONArrayBuilder passivesBuilder;
     for (const auto& passive : _passives) {
-        hostsBuilder.append(passive.toString());
+        passivesBuilder.append(passive.toString());
     }
     bson.append("passives", passivesBuilder.obj());
 

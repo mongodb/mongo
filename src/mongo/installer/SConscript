@@ -1,6 +1,9 @@
 # -*- mode: python; -*-
 
 Import("env")
+Import("get_option")
+
+hygienic = get_option('install-mode') == 'hygienic'
 
 env = env.Clone()
 
@@ -12,3 +15,21 @@ env.SConscript(
         'env',
     ],
 )
+
+if hygienic and env.TargetOSIs('windows'):
+    # This ensures that the VC++ redistributable is always included in the
+    # community server ZIP.
+
+    redist_file = env['MSVS'].get('VCREDISTEXE', None)
+    if not redist_file:
+         env.FatalError('Required CRT redistributable not found; cannot build distribution package')
+
+    env.AutoInstall(
+        target='$PREFIX_BINDIR',
+        source=[
+            "${MSVS['VCREDISTEXE']}"
+        ],
+        AIB_COMPONENT="dist",
+        AIB_ROLE="runtime",
+    )
+

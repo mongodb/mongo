@@ -214,7 +214,7 @@ private:
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
      */
-    void _cleanup();
+    void _cleanup(bool completeMigration);
 
     // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
     // The caller must guarantee it outlives the MigrationSourceManager.
@@ -251,10 +251,6 @@ private:
     // The UUID of the the collection whose chunks are being moved. Default to empty if the
     // collection doesn't have UUID.
     boost::optional<UUID> _collectionUuid;
-
-    // Whether to use the resumable range deleter. This decision is based on whether the FCV 4.2 or
-    // FCV 4.4 protocol are in use and the disableResumableRangeDeleter option is off.
-    bool _enableResumableRangeDeleter;
 
     // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
     // correctly updated based on whether the migration committed or aborted.

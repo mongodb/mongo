@@ -253,20 +253,6 @@ void replaceNodeInTree(QuerySolutionNode** root,
     }
 }
 
-bool hasNode(QuerySolutionNode* root, StageType type) {
-    if (type == root->getType()) {
-        return true;
-    }
-
-    for (size_t i = 0; i < root->children.size(); ++i) {
-        if (hasNode(root->children[i], type)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
                          QuerySolutionNode* solnRoot) {
     // If there is a GeoMatchExpression in the tree on a field with a 2dsphere index,
@@ -346,8 +332,9 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
                                                   const bool hasSortStage) {
     LOGV2_DEBUG(20949,
                 5,
-                "PROJECTION: Current plan is:\n{solnRoot}",
-                "solnRoot"_attr = redact(solnRoot->toString()));
+                "PROJECTION: Current plan is:\n{plan}",
+                "PROJECTION: Current plan",
+                "plan"_attr = redact(solnRoot->toString()));
 
     // If the projection requires the entire document we add a fetch stage if not present. Otherwise
     // we add a fetch stage if we are not covered.
@@ -647,11 +634,13 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
 
     // Too many ixscans spoil the performance.
     if (totalNumScans > (size_t)internalQueryMaxScansToExplode.load()) {
-        LOGV2_DEBUG(20950,
-                    5,
-                    "Could expand ixscans to pull out sort order but resulting scan "
-                    "count({totalNumScans}) is too high.",
-                    "totalNumScans"_attr = totalNumScans);
+        LOGV2_DEBUG(
+            20950,
+            5,
+            "Could expand ixscans to pull out sort order but resulting scan count({numScans}) is "
+            "too high",
+            "Could expand ixscans to pull out sort order but resulting scan count is too high",
+            "numScans"_attr = totalNumScans);
         return false;
     }
 
@@ -710,8 +699,9 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         QueryPlannerCommon::reverseScans(solnRoot);
         LOGV2_DEBUG(20951,
                     5,
-                    "Reversing ixscan to provide sort. Result: {solnRoot}",
-                    "solnRoot"_attr = redact(solnRoot->toString()));
+                    "Reversing ixscan to provide sort. Result: {newPlan}",
+                    "Reversing ixscan to provide sort",
+                    "newPlan"_attr = redact(solnRoot->toString()));
         return solnRoot;
     }
 
@@ -888,7 +878,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     // A solution can be blocking if it has a blocking sort stage or
     // a hashed AND stage.
-    bool hasAndHashStage = hasNode(solnRoot.get(), STAGE_AND_HASH);
+    bool hasAndHashStage = solnRoot->hasNode(STAGE_AND_HASH);
     soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
     const QueryRequest& qr = query.getQueryRequest();

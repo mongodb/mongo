@@ -21,6 +21,7 @@ var isConfigCommitted;
 var waitForConfigReplication;
 var assertSameConfigContent;
 var isMemberNewlyAdded;
+var replConfigHasNewlyAddedMembers;
 var waitForNewlyAddedRemovalForNodeToBeCommitted;
 var assertVoteCount;
 
@@ -354,8 +355,10 @@ function autoReconfig(rst, targetConfig) {
  * @param config - the desired target config. After this function returns, the
  * given replica set should be in 'config', except with a higher version.
  * @param force - should this be a 'force' reconfig or not.
+ * @param doNotWaitForMembers - if set, we will skip waiting for all members to be in primary,
+ *     secondary, or arbiter states
  */
-reconfig = function(rst, config, force) {
+reconfig = function(rst, config, force, doNotWaitForMembers) {
     "use strict";
     var primary = rst.getPrimary();
     config = rst._updateConfigIfNotDurable(config);
@@ -372,7 +375,9 @@ reconfig = function(rst, config, force) {
     }
 
     var primaryAdminDB = rst.getPrimary().getDB("admin");
-    waitForAllMembers(primaryAdminDB);
+    if (!doNotWaitForMembers) {
+        waitForAllMembers(primaryAdminDB);
+    }
     return primaryAdminDB;
 };
 
@@ -716,6 +721,10 @@ assertSameConfigContent = function(configA, configB) {
     configB.term = termB;
 };
 
+/**
+ * @param memberIndex is optional. If not provided, then it will return true even if
+ * a single member in the replSet config has "newlyAdded" field.
+ */
 isMemberNewlyAdded = function(node, memberIndex, force = false) {
     // The in-memory config will not include the 'newlyAdded' field, so we must consult the on-disk
     // version. However, the in-memory config is updated after the config is persisted to disk, so
@@ -747,12 +756,34 @@ isMemberNewlyAdded = function(node, memberIndex, force = false) {
             ", on-disk: " + tojsononeline(configOnDisk));
     }
 
-    const memberConfigOnDisk = configOnDisk.members[memberIndex];
-    if (memberConfigOnDisk.hasOwnProperty("newlyAdded")) {
-        assert(memberConfigOnDisk["newlyAdded"] === true, () => tojson(configOnDisk));
-        return true;
+    const allMembers = (memberIndex === undefined);
+    assert(allMembers || (memberIndex >= 0 && memberIndex < configOnDisk.members.length),
+           "memberIndex should be between 0 and " + (configOnDisk.members.length - 1) +
+               ", but memberIndex is " + memberIndex);
+
+    var hasNewlyAdded = (index) => {
+        const memberConfigOnDisk = configOnDisk.members[index];
+        if (memberConfigOnDisk.hasOwnProperty("newlyAdded")) {
+            assert(memberConfigOnDisk["newlyAdded"] === true, () => tojson(configOnDisk));
+            return true;
+        }
+        return false;
+    };
+
+    if (allMembers) {
+        for (let i = 0; i < configOnDisk.members.length; i++) {
+            if (hasNewlyAdded(i))
+                return true;
+        }
+        return false;
     }
-    return false;
+
+    return hasNewlyAdded(memberIndex);
+};
+
+// Returns true if at least one member in the repl set config contains "newlyAdded" field.
+replConfigHasNewlyAddedMembers = function(conn) {
+    return isMemberNewlyAdded(conn);
 };
 
 waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex, force = false) {
@@ -762,12 +793,18 @@ waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex, force
     }, () => tojson(node.getDB("local").system.replset.findOne()));
 };
 
-assertVoteCount = function(
-    node, {votingMembersCount, majorityVoteCount, writableVotingMembersCount, writeMajorityCount}) {
+assertVoteCount = function(node, {
+    votingMembersCount,
+    majorityVoteCount,
+    writableVotingMembersCount,
+    writeMajorityCount,
+    totalMembersCount
+}) {
     const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
-    assert.eq(status["votingMembersCount"], votingMembersCount, tojson(status));
-    assert.eq(status["majorityVoteCount"], majorityVoteCount, tojson(status));
-    assert.eq(status["writableVotingMembersCount"], writableVotingMembersCount, tojson(status));
-    assert.eq(status["writeMajorityCount"], writeMajorityCount, tojson(status));
+    assert.eq(status["votingMembersCount"], votingMembersCount, status);
+    assert.eq(status["majorityVoteCount"], majorityVoteCount, status);
+    assert.eq(status["writableVotingMembersCount"], writableVotingMembersCount, status);
+    assert.eq(status["writeMajorityCount"], writeMajorityCount, status);
+    assert.eq(status["members"].length, totalMembersCount, status);
 };
 }());

@@ -83,10 +83,6 @@ commands:
                 description: "The collation to use in the count command."
                 type: object
                 optional: true
-            comment:
-                description: "A comment."
-                type: string
-                optional: true
             fields:
                 description: "A BSONObj added by the shell. Left in for backwards compatibility."
                 type: object

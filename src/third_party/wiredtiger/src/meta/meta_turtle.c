@@ -145,12 +145,12 @@ err:
 }
 
 /*
- * __turtle_validate_version --
+ * __wt_turtle_validate_version --
  *     Retrieve version numbers from the turtle file and validate them against our WiredTiger
  *     version.
  */
-static int
-__turtle_validate_version(WT_SESSION_IMPL *session)
+int
+__wt_turtle_validate_version(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
     uint32_t major, minor;
@@ -293,7 +293,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
             WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE, false));
             load = true;
         } else if (validate_turtle)
-            WT_RET(__turtle_validate_version(session));
+            WT_RET(__wt_turtle_validate_version(session));
     } else
         load = true;
     if (load) {
@@ -381,6 +381,7 @@ err:
      */
     if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 || F_ISSET(S2C(session), WT_CONN_SALVAGE))
         return (ret);
+    F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
     WT_RET_PANIC(session, WT_TRY_SALVAGE, "%s: fatal turtle file read error", WT_METADATA_TURTLE);
 }
 
@@ -437,5 +438,6 @@ err:
      */
     if (ret == 0)
         return (ret);
+    F_SET(conn, WT_CONN_DATA_CORRUPTION);
     WT_RET_PANIC(session, ret, "%s: fatal turtle file update error", WT_METADATA_TURTLE);
 }

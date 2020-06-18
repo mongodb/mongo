@@ -87,16 +87,6 @@ public:
     virtual void clearTmpCollections(OperationContext* const opCtx) const = 0;
 
     /**
-     * Sets a new profiling level for the database and returns the outcome.
-     *
-     * @param opCtx Operation context which to use for creating the profiling collection.
-     * @param newLevel New profiling level to use.
-     */
-    virtual Status setProfilingLevel(OperationContext* const opCtx, const int newLevel) = 0;
-
-    virtual int getProfilingLevel() const = 0;
-
-    /**
      * Sets the 'drop-pending' state of this Database.
      * This is done at the beginning of a dropDatabase operation and is used to reject subsequent
      * collection creation requests on this database.
@@ -133,6 +123,14 @@ public:
 
     virtual Status dropView(OperationContext* const opCtx, NamespaceString viewName) const = 0;
 
+    /**
+     * A MODE_IX collection lock must be held for this call. Throws a WriteConflictException error
+     * if the collection already exists (say if another thread raced to create it).
+     *
+     * Surrounding writeConflictRetry loops must encompass checking that the collection exists as
+     * well as creating it. Otherwise the loop will endlessly throw WCEs: the caller must check that
+     * the collection exists to break free.
+     */
     virtual Collection* createCollection(OperationContext* const opCtx,
                                          const NamespaceString& nss,
                                          const CollectionOptions& options = CollectionOptions(),

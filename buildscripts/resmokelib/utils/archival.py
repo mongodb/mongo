@@ -2,16 +2,17 @@
 
 import collections
 import json
-import math
 import os
+import queue
 import sys
 import tarfile
 import tempfile
 import threading
 import time
-import queue
 
-from .. import config
+import math
+
+from buildscripts.resmokelib import config
 
 _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 

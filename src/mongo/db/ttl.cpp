@@ -240,13 +240,15 @@ private:
                 LOGV2_WARNING(22537,
                               "TTLMonitor was interrupted, waiting {ttlMonitorSleepSecs_load} "
                               "seconds before doing another pass",
-                              "ttlMonitorSleepSecs_load"_attr = ttlMonitorSleepSecs.load());
+                              "TTLMonitor was interrupted, waiting before doing another pass",
+                              "wait"_attr = Milliseconds(Seconds(ttlMonitorSleepSecs.load())));
                 return;
             } catch (const DBException& dbex) {
                 LOGV2_ERROR(22538,
                             "Error processing ttl index: {it_second} -- {dbex}",
-                            "it_second"_attr = it.second,
-                            "dbex"_attr = dbex.toString());
+                            "Error processing TTL index",
+                            "index"_attr = it.second,
+                            "error"_attr = dbex);
                 // Continue on to the next index.
                 continue;
             }
@@ -264,9 +266,10 @@ private:
         if (!userAllowedWriteNS(collectionNSS).isOK()) {
             LOGV2_ERROR(
                 22539,
-                "namespace '{collectionNSS}' doesn't allow deletes, skipping ttl job for: {idx}",
-                "collectionNSS"_attr = collectionNSS,
-                "idx"_attr = idx);
+                "namespace '{namespace}' doesn't allow deletes, skipping ttl job for: {index}",
+                "Namespace doesn't allow deletes, skipping TTL job",
+                logAttrs(collectionNSS),
+                "index"_attr = idx);
             return;
         }
 
@@ -274,8 +277,9 @@ private:
         const StringData name = idx["name"].valueStringData();
         if (key.nFields() != 1) {
             LOGV2_ERROR(22540,
-                        "key for ttl index can only have 1 field, skipping ttl job for: {idx}",
-                        "idx"_attr = idx);
+                        "key for ttl index can only have 1 field, skipping ttl job for: {index}",
+                        "Key for ttl index can only have 1 field, skipping TTL job",
+                        "index"_attr = idx);
             return;
         }
 
@@ -319,20 +323,21 @@ private:
 
         if (IndexType::INDEX_BTREE != IndexNames::nameToType(desc->getAccessMethodName())) {
             LOGV2_ERROR(22541,
-                        "special index can't be used as a ttl index, skipping ttl job for: {idx}",
-                        "idx"_attr = idx);
+                        "special index can't be used as a ttl index, skipping ttl job for: {index}",
+                        "Special index can't be used as a TTL index, skipping TTL job",
+                        "index"_attr = idx);
             return;
         }
 
         BSONElement secondsExpireElt = idx[IndexDescriptor::kExpireAfterSecondsFieldName];
         if (!secondsExpireElt.isNumber()) {
-            LOGV2_ERROR(
-                22542,
-                "ttl indexes require the {secondsExpireField} field to be numeric but received a "
-                "type of {typeName_secondsExpireElt_type}, skipping ttl job for: {idx}",
-                "secondsExpireField"_attr = IndexDescriptor::kExpireAfterSecondsFieldName,
-                "typeName_secondsExpireElt_type"_attr = typeName(secondsExpireElt.type()),
-                "idx"_attr = idx);
+            LOGV2_ERROR(22542,
+                        "ttl indexes require the {expireField} field to be numeric but received a "
+                        "type of {typeName_secondsExpireElt_type}, skipping ttl job for: {idx}",
+                        "TTL indexes require the expire field to be numeric, skipping TTL job",
+                        "field"_attr = IndexDescriptor::kExpireAfterSecondsFieldName,
+                        "type"_attr = typeName(secondsExpireElt.type()),
+                        "index"_attr = idx);
             return;
         }
 
@@ -370,15 +375,17 @@ private:
                                                  startKey,
                                                  endKey,
                                                  BoundInclusion::kIncludeBothStartAndEndKeys,
-                                                 PlanExecutor::YIELD_AUTO,
+                                                 PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                  direction);
 
-        Status result = exec->executePlan();
-        if (!result.isOK()) {
-            LOGV2_ERROR(22543,
-                        "ttl query execution for index {idx} failed with status: {result}",
-                        "idx"_attr = idx,
-                        "result"_attr = redact(result));
+        try {
+            exec->executePlan();
+        } catch (const DBException& exception) {
+            LOGV2_WARNING(22543,
+                          "ttl query execution for index {index} failed with status: {error}",
+                          "TTL query execution failed",
+                          "index"_attr = idx,
+                          "error"_attr = redact(exception.toStatus()));
             return;
         }
 

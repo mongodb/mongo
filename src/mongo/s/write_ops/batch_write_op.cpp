@@ -439,7 +439,6 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
 
     for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end(); ++it) {
         TargetedWriteBatch* batch = it->second;
-
         if (batch->getWrites().empty())
             continue;
 
@@ -513,8 +512,10 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                 return BatchedCommandRequest([&] {
                     write_ops::Update updateOp(_clientRequest.getNS());
                     updateOp.setUpdates(std::move(*updates));
-                    // Each child batch inherits its runtime constants from the parent batch.
+                    // Each child batch inherits its let params/runtime constants from the parent
+                    // batch.
                     updateOp.setRuntimeConstants(_clientRequest.getRuntimeConstants());
+                    updateOp.setLet(_clientRequest.getLet());
                     return updateOp;
                 }());
             }
@@ -522,6 +523,9 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                 return BatchedCommandRequest([&] {
                     write_ops::Delete deleteOp(_clientRequest.getNS());
                     deleteOp.setDeletes(std::move(*deletes));
+                    // Each child batch inherits its let params from the parent batch.
+                    deleteOp.setLet(_clientRequest.getLet());
+                    deleteOp.setRuntimeConstants(_clientRequest.getRuntimeConstants());
                     return deleteOp;
                 }());
         }

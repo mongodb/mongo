@@ -47,13 +47,7 @@ namespace mongo {
  * execute in an order that respects the programmer-established prerequistes.
  */
 class Initializer {
-    Initializer(const Initializer&) = delete;
-    Initializer& operator=(const Initializer&) = delete;
-
 public:
-    Initializer();
-    ~Initializer();
-
     /**
      * Get the initializer dependency graph, presumably for the purpose of adding more nodes.
      */
@@ -67,13 +61,21 @@ public:
      * Returns Status::OK on success.  All other returns constitute initialization failures,
      * and the thing being initialized should be considered dead in the water.
      */
-    Status executeInitializers(const InitializerContext::ArgumentVector& args,
-                               const InitializerContext::EnvironmentMap& env);
+    Status executeInitializers(const std::vector<std::string>& args);
 
     Status executeDeinitializers();
 
 private:
+    enum class State {
+        kUninitialized,
+        kInitializing,
+        kInitialized,
+        kDeinitializing,
+    };
+
     InitializerDependencyGraph _graph;
+    std::vector<std::string> _sortedNodes;
+    State _lifecycleState{State::kUninitialized};
 };
 
 /**
@@ -85,16 +87,13 @@ private:
  * This means that the few initializers that might want to terminate the program by failing
  * should probably arrange to terminate the process themselves.
  */
-Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
-                             const InitializerContext::EnvironmentMap& env);
-
-Status runGlobalInitializers(int argc, const char* const* argv, const char* const* envp);
+Status runGlobalInitializers(const std::vector<std::string>& argv);
 
 /**
  * Same as runGlobalInitializers(), except prints a brief message to std::cerr
  * and terminates the process on failure.
  */
-void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp);
+void runGlobalInitializersOrDie(const std::vector<std::string>& argv);
 
 /**
  * Run the global deinitializers. They will execute in reverse order from initialization.

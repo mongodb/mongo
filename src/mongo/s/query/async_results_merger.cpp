@@ -41,6 +41,7 @@
 #include "mongo/db/query/killcursors_request.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -128,7 +129,23 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
     }
     // If this is a change stream, then we expect to have already received PBRTs from every shard.
     invariant(_promisedMinSortKeys.empty() || _promisedMinSortKeys.size() == _remotes.size());
-    _highWaterMark = _promisedMinSortKeys.empty() ? BSONObj() : _promisedMinSortKeys.begin()->first;
+    _setInitialHighWaterMark();
+}
+
+void AsyncResultsMerger::_setInitialHighWaterMark() {
+    // If we do not have any minimum promised sort keys, this is not a change stream. Return early.
+    if (_promisedMinSortKeys.empty()) {
+        return;
+    }
+    // Find the minimum promised sort key whose remote is eligible to contribute a high water mark.
+    for (auto&& [minSortKey, remoteId] : _promisedMinSortKeys) {
+        if (_remotes[remoteId].eligibleForHighWaterMark) {
+            _highWaterMark = minSortKey;
+            break;
+        }
+    }
+    // We should always be guaranteed to find an eligible remote, if this is a change stream.
+    invariant(!_highWaterMark.isEmpty());
 }
 
 AsyncResultsMerger::~AsyncResultsMerger() {
@@ -231,9 +248,12 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
     stdx::lock_guard<Latch> lk(_mutex);
     // At this point, the high water mark may be the resume token of the last document we returned.
     // If no further results are eligible for return, we advance to the minimum promised sort key.
-    auto minPromisedSortKey = _getMinPromisedSortKey(lk);
-    if (!minPromisedSortKey.isEmpty() && !_ready(lk)) {
-        _highWaterMark = minPromisedSortKey;
+    // If the remote associated with the minimum promised sort key is not currently eligible to
+    // provide a high water mark, then we do not advance even if no further results are ready.
+    if (auto minPromisedSortKey = _getMinPromisedSortKey(lk); minPromisedSortKey && !_ready(lk)) {
+        if (_remotes[minPromisedSortKey->second].eligibleForHighWaterMark) {
+            _highWaterMark = minPromisedSortKey->first;
+        }
     }
     // The high water mark is stored in sort-key format: {"": <high watermark>}. We only return
     // the <high watermark> part of of the sort key, which looks like {_data: ..., _typeBits: ...}.
@@ -241,10 +261,11 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
     return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
 }
 
-BSONObj AsyncResultsMerger::_getMinPromisedSortKey(WithLock) {
+boost::optional<AsyncResultsMerger::MinSortKeyRemoteIdPair>
+AsyncResultsMerger::_getMinPromisedSortKey(WithLock) {
     // We cannot return the minimum promised sort key unless all shards have reported one.
-    return _promisedMinSortKeys.size() < _remotes.size() ? BSONObj()
-                                                         : _promisedMinSortKeys.begin()->first;
+    return _promisedMinSortKeys.size() < _remotes.size() ? boost::optional<MinSortKeyRemoteIdPair>{}
+                                                         : *_promisedMinSortKeys.begin();
 }
 
 bool AsyncResultsMerger::_ready(WithLock lk) {
@@ -296,8 +317,8 @@ bool AsyncResultsMerger::_readySortedTailable(WithLock lk) {
         extractSortKey(*smallestResult.getResult(), _params.getCompareWholeSortKey());
     // We should always have a minPromisedSortKey from every shard in the sorted tailable case.
     auto minPromisedSortKey = _getMinPromisedSortKey(lk);
-    invariant(!minPromisedSortKey.isEmpty());
-    return compareSortKeys(keyWeWantToReturn, minPromisedSortKey, *_params.getSort()) <= 0;
+    invariant(minPromisedSortKey);
+    return compareSortKeys(keyWeWantToReturn, minPromisedSortKey->first, *_params.getSort()) <= 0;
 }
 
 bool AsyncResultsMerger::_readyUnsorted(WithLock) {
@@ -359,8 +380,10 @@ ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
 
     // For sorted tailable awaitData cursors, update the high water mark to the document's sort key.
     if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
-        _highWaterMark =
-            extractSortKey(*front.getResult(), _params.getCompareWholeSortKey()).getOwned();
+        if (_remotes[smallestRemote].eligibleForHighWaterMark) {
+            _highWaterMark =
+                extractSortKey(*front.getResult(), _params.getCompareWholeSortKey()).getOwned();
+        }
     }
 
     return front;
@@ -547,7 +570,7 @@ StatusWith<CursorResponse> AsyncResultsMerger::_parseCursorResponse(
     return std::move(cursorResponse);
 }
 
-void AsyncResultsMerger::_updateRemoteMetadata(WithLock,
+void AsyncResultsMerger::_updateRemoteMetadata(WithLock lk,
                                                size_t remoteIndex,
                                                const CursorResponse& response) {
     // Update the cursorId; it is sent as '0' when the cursor has been exhausted on the shard.
@@ -562,11 +585,16 @@ void AsyncResultsMerger::_updateRemoteMetadata(WithLock,
         // The postBatchResumeToken should never be empty.
         invariant(!response.getPostBatchResumeToken()->isEmpty());
 
-        // The most recent minimum sort key should never be smaller than the previous promised
-        // minimum sort key for this remote, if one exists. Note that the post-batch resume token is
-        // an object (with format {_data: ..., _typeBits: ...}) that we must wrap in a sort key so
-        // that it can compare correctly with sort keys from other streams.
+        // Note that the PBRT is an object of format {_data: ..., _typeBits: ...} that we must wrap
+        // in a sort key so that it can compare correctly with sort keys from other streams.
         auto newMinSortKey = BSON("" << *response.getPostBatchResumeToken());
+
+        // Determine whether the new batch is eligible to provide a high water mark resume token.
+        remote.eligibleForHighWaterMark =
+            _checkHighWaterMarkEligibility(lk, newMinSortKey, remote, response);
+
+        // The most recent minimum sort key should never be smaller than the previous promised
+        // minimum sort key for this remote, if a previous promised minimum sort key exists.
         if (auto& oldMinSortKey = remote.promisedMinSortKey) {
             invariant(compareSortKeys(newMinSortKey, *oldMinSortKey, *_params.getSort()) >= 0);
             invariant(_promisedMinSortKeys.size() <= _remotes.size());
@@ -575,6 +603,59 @@ void AsyncResultsMerger::_updateRemoteMetadata(WithLock,
         _promisedMinSortKeys.insert({newMinSortKey, remoteIndex});
         remote.promisedMinSortKey = newMinSortKey;
     }
+}
+
+bool AsyncResultsMerger::_checkHighWaterMarkEligibility(WithLock,
+                                                        BSONObj newMinSortKey,
+                                                        const RemoteCursorData& remote,
+                                                        const CursorResponse& response) {
+    // If the cursor is not on the "config.shards" namespace, then it is a normal shard cursor.
+    // These cursors are always eligible to provide a high water mark resume token.
+    if (remote.cursorNss != ShardType::ConfigNS) {
+        return true;
+    }
+
+    // If we are here, the cursor is on the "config.shards" namespace. This is an internal cursor
+    // which monitors for the addition of new shards. There are two special cases which we must
+    // handle for this cursor:
+    //
+    //   - The user specified a 'startAtOperationTime' in the future. This is a problem because the
+    //     config cursor must always be opened at the current clusterTime, to ensure that it detects
+    //     all shards that are added after the change stream is dispatched. We must make sure that
+    //     the high water mark ignores the config cursor's minimum promised sort keys, otherwise we
+    //     will end up returning a token that is earlier than the start time requested by the user.
+    //
+    //   - The cursor returns a "shard added" event. All events produced by the config cursor are
+    //     handled and swallowed internally by the stream. We therefore do not want to allow their
+    //     resume tokens to be exposed to the user via the postBatchResumeToken mechanism, since
+    //     these token are not actually resumable. See SERVER-47810 for further details.
+
+    // If the current high water mark is ahead of the config cursor, it implies that the client has
+    // opened a stream with a startAtOperationTime in the future. We should hold the high water mark
+    // at the user-specified start time until the config server catches up to it. The config cursor
+    // is therefore not eligible to provide a new high water mark.
+    if (compareSortKeys(newMinSortKey, _highWaterMark, *_params.getSort()) < 0) {
+        return false;
+    }
+    // If the config server returns an event which indicates a change in the cluster topology, it
+    // will be swallowed by the stream. It will not be returned to the user, and it should not be
+    // eligible to become the high water mark either.
+    if (!response.getBatch().empty()) {
+        return false;
+    }
+    // If we are here, then the only remaining reason not to mark this batch as eligible is if the
+    // current batch's sort key is the same as the last batch's, and the last batch was ineligible.
+    // Therefore, if the previous batch was eligible, this batch is as well.
+    if (remote.eligibleForHighWaterMark) {
+        return true;
+    }
+    // If we are here, then either the last batch we received was ineligible for one of the reasons
+    // outlined above, or this is the first batch we have ever received for this cursor. If this is
+    // the first batch, then we always mark the config cursor as ineligible so that the initial high
+    // water mark will be taken from one of the shards instead. If we received an ineligible batch
+    // last time, then the current batch is only eligible if its sort key is greater than the last.
+    return remote.promisedMinSortKey &&
+        compareSortKeys(newMinSortKey, *remote.promisedMinSortKey, *_params.getSort()) > 0;
 }
 
 void AsyncResultsMerger::_handleBatchResponse(WithLock lk,

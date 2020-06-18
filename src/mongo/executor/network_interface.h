@@ -46,6 +46,7 @@ extern FailPoint networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder;
 extern FailPoint networkInterfaceDiscardCommandsBeforeAcquireConn;
 extern FailPoint networkInterfaceHangCommandsAfterAcquireConn;
 extern FailPoint networkInterfaceCommandsFailedWithErrorCode;
+extern FailPoint networkInterfaceShouldNotKillPendingRequests;
 
 /**
  * Interface to networking for use by TaskExecutor implementations.
@@ -136,7 +137,7 @@ public:
     };
     /*
      * Returns a copy of the operation counters (see struct Counters above). This method should
-     * only be used in tests, and will invariant if getTestCommands() returns false.
+     * only be used in tests, and will invariant if testing diagnostics are not enabled.
      */
     virtual Counters getCounters() const = 0;
 
@@ -151,6 +152,8 @@ public:
      *
      * Note that if you pass a baton to startCommand and that baton refuses work, then your onFinish
      * function will not run.
+     *
+     * These methods may throw.
      */
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequestOnAny& request,

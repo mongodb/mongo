@@ -154,7 +154,7 @@ if (isJsonLog(db.getMongo())) {
     checkLog.contains(db.getMongo(),
                       `dropDatabase - dropping collection","attr":{"db":"${
                           dbNameToDrop}","namespace":"${dbNameToDrop}.${collNameToDrop}"`);
-    checkLog.contains(db.getMongo(), 'dropDatabase - finished","attr":{"db":"dbToDrop"');
+    checkLog.containsJson(db.getMongo(), 20336, {"db": "dbToDrop"});
 } else {
     checkLog.contains(db.getMongo(), "dropping collection: " + dbNameToDrop + "." + collNameToDrop);
     checkLog.contains(db.getMongo(), "dropped 1 collection(s)");

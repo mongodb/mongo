@@ -32,8 +32,10 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
+#include <fmt/format.h>
 
 #include "mongo/base/init.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -48,6 +50,7 @@
 
 namespace {
 using namespace mongo;
+using namespace fmt::literals;
 
 MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
     addTestsForThreadPool("ThreadPoolCommon",
@@ -256,29 +259,22 @@ DEATH_TEST_REGEX(ThreadPoolTest,
 
 TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks) {
     unittest::Barrier barrier(2U);
-
-    bool onCreateThreadCalled = false;
-    std::string taskThreadName;
+    std::string journal;
     ThreadPool::Options options;
     options.threadNamePrefix = "mythread";
     options.maxThreads = 1U;
-    options.onCreateThread = [&onCreateThreadCalled,
-                              &taskThreadName](const std::string& threadName) {
-        onCreateThreadCalled = true;
-        taskThreadName = threadName;
+    options.onCreateThread = [&](const std::string& threadName) {
+        journal.append("[onCreate({})]"_format(threadName));
     };
 
     ThreadPool pool(options);
     pool.startup();
-
-    pool.schedule([&barrier](auto status) {
-        ASSERT_OK(status);
+    pool.schedule([&](auto status) {
+        journal.append("[Call({})]"_format(status.toString()));
         barrier.countDownAndWait();
     });
     barrier.countDownAndWait();
-
-    ASSERT_TRUE(onCreateThreadCalled);
-    ASSERT_EQUALS(options.threadNamePrefix + "0", taskThreadName);
+    ASSERT_EQUALS(journal, "[onCreate(mythread0)][Call(OK)]");
 }
 
 TEST(ThreadPoolTest, JoinAllRetiredThreads) {

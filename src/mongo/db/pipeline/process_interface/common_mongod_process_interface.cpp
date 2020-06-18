@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -166,7 +167,9 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         return indexStats;
     }
 
-    auto indexStatsMap = CollectionQueryInfo::get(collection).getIndexUsageStats();
+    auto indexStatsMap =
+        CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
+            .getUsageStats();
     for (auto&& indexStatsMapIter : indexStatsMap) {
         auto indexName = indexStatsMapIter.first;
         auto stats = indexStatsMapIter.second;
@@ -237,7 +240,9 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
                 str::stream() << "Collection [" << nss.toString() << "] not found."};
     }
 
-    auto collectionScanStats = CollectionQueryInfo::get(collection).getCollectionScanStats();
+    auto collectionScanStats =
+        CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
+            .getCollectionScanStats();
 
     dassert(collectionScanStats.collectionScans <=
             static_cast<unsigned long long>(std::numeric_limits<long long>::max()));
@@ -613,7 +618,10 @@ Update CommonMongodProcessInterface::buildUpdateOp(
         return wcb;
     }());
     updateOp.setRuntimeConstants(expCtx->getRuntimeConstants());
-    updateOp.setLet(expCtx->variables.serializeLetParameters(expCtx->variablesParseState));
+    if (auto letParams = expCtx->variablesParseState.serializeUserVariables(expCtx->variables);
+        !letParams.isEmpty()) {
+        updateOp.setLet(letParams);
+    }
     return updateOp;
 }
 

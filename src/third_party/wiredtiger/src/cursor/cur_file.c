@@ -27,7 +27,7 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     WT_SESSION_IMPL *session;
 
     cbt = (WT_CURSOR_BTREE *)a;
-    CURSOR_API_CALL(a, session, compare, cbt->btree);
+    CURSOR_API_CALL(a, session, compare, CUR2BT(cbt));
 
     /*
      * Check both cursors are a "file:" type then call the underlying function, it can handle
@@ -57,7 +57,7 @@ __curfile_equals(WT_CURSOR *a, WT_CURSOR *b, int *equalp)
     WT_SESSION_IMPL *session;
 
     cbt = (WT_CURSOR_BTREE *)a;
-    CURSOR_API_CALL(a, session, equals, cbt->btree);
+    CURSOR_API_CALL(a, session, equals, CUR2BT(cbt));
 
     /*
      * Check both cursors are a "file:" type then call the underlying function, it can handle
@@ -87,7 +87,7 @@ __curfile_next(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_API_CALL(cursor, session, next, cbt->btree);
+    CURSOR_API_CALL(cursor, session, next, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
 
     WT_ERR(__wt_btcur_next(cbt, false));
@@ -114,7 +114,7 @@ __wt_curfile_next_random(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_API_CALL(cursor, session, next, cbt->btree);
+    CURSOR_API_CALL(cursor, session, next, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
 
     WT_ERR(__wt_btcur_next_random(cbt));
@@ -140,7 +140,7 @@ __curfile_prev(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_API_CALL(cursor, session, prev, cbt->btree);
+    CURSOR_API_CALL(cursor, session, prev, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
 
     WT_ERR(__wt_btcur_prev(cbt, false));
@@ -166,7 +166,7 @@ __curfile_reset(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, cbt->btree);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
 
     ret = __wt_btcur_reset(cbt);
@@ -192,7 +192,7 @@ __curfile_search(WT_CURSOR *cursor)
     uint64_t time_start, time_stop;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_API_CALL(cursor, session, search, cbt->btree);
+    CURSOR_API_CALL(cursor, session, search, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
@@ -223,7 +223,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
     uint64_t time_start, time_stop;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
+    CURSOR_API_CALL(cursor, session, search_near, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
@@ -254,7 +254,7 @@ __curfile_insert(WT_CURSOR *cursor)
     uint64_t time_start, time_stop;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, insert, cbt->btree);
+    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, insert);
     WT_ERR(__cursor_copy_release(cursor));
 
     if (!F_ISSET(cursor, WT_CURSTD_APPEND))
@@ -295,7 +295,7 @@ __wt_curfile_insert_check(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     tret = 0;
-    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update, cbt->btree);
+    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update);
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
@@ -322,7 +322,7 @@ __curfile_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
     WT_SESSION_IMPL *session;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, modify, cbt->btree);
+    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, modify);
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
@@ -357,7 +357,7 @@ __curfile_update(WT_CURSOR *cursor)
     uint64_t time_start, time_stop;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update, cbt->btree);
+    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update);
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
     WT_ERR(__cursor_checkvalue(cursor));
@@ -400,7 +400,7 @@ __curfile_remove(WT_CURSOR *cursor)
     positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
+    CURSOR_REMOVE_API_CALL(cursor, session, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
@@ -437,7 +437,7 @@ __curfile_reserve(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, reserve, cbt->btree);
+    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, reserve);
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 
@@ -474,13 +474,12 @@ static int
 __curfile_close(WT_CURSOR *cursor)
 {
     WT_CURSOR_BTREE *cbt;
-    WT_CURSOR_BULK *cbulk;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     bool dead, released;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, cbt->btree);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, CUR2BT(cbt));
     WT_ERR(__cursor_copy_release(cursor));
 err:
 
@@ -496,12 +495,10 @@ err:
     }
 
     dead = F_ISSET(cursor, WT_CURSTD_DEAD);
-    if (F_ISSET(cursor, WT_CURSTD_BULK)) {
-        /* Free the bulk-specific resources. */
-        cbulk = (WT_CURSOR_BULK *)cbt;
-        WT_TRET(__wt_bulk_wrapup(session, cbulk));
-        __wt_buf_free(session, &cbulk->last);
-    }
+
+    /* Free the bulk-specific resources. */
+    if (F_ISSET(cursor, WT_CURSTD_BULK))
+        WT_TRET(__wt_curbulk_close(session, (WT_CURSOR_BULK *)cursor));
 
     WT_TRET(__wt_btcur_close(cbt, false));
     /* The URI is owned by the btree handle. */
@@ -543,7 +540,6 @@ __curfile_cache(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     session = CUR2S(cursor);
-    cbt->dhandle = cbt->btree->dhandle;
 
     WT_TRET(__wt_cursor_cache(cursor, cbt->dhandle));
     WT_TRET(__wt_session_release_dhandle(session));
@@ -557,6 +553,7 @@ __curfile_cache(WT_CURSOR *cursor)
 static int
 __curfile_reopen(WT_CURSOR *cursor, bool check_only)
 {
+    WT_BTREE *btree;
     WT_CURSOR_BTREE *cbt;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
@@ -601,10 +598,10 @@ __curfile_reopen(WT_CURSOR *cursor, bool check_only)
         WT_ASSERT(session, dhandle->type == WT_DHANDLE_TYPE_BTREE);
         WT_ASSERT(session, ((WT_BTREE *)dhandle->handle)->root.page != NULL);
 
-        cbt->btree = dhandle->handle;
-        cursor->internal_uri = cbt->btree->dhandle->name;
-        cursor->key_format = cbt->btree->key_format;
-        cursor->value_format = cbt->btree->value_format;
+        btree = CUR2BT(cbt);
+        cursor->internal_uri = btree->dhandle->name;
+        cursor->key_format = btree->key_format;
+        cursor->value_format = btree->value_format;
     }
     return (ret);
 }
@@ -661,7 +658,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
     cursor->internal_uri = btree->dhandle->name;
     cursor->key_format = btree->key_format;
     cursor->value_format = btree->value_format;
-    cbt->btree = btree;
+    cbt->dhandle = session->dhandle;
 
     /*
      * Increment the data-source's in-use counter; done now because closing the cursor will
@@ -670,7 +667,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
     __wt_cursor_dhandle_incr_use(session);
 
     if (session->dhandle->checkpoint != NULL)
-        F_SET(cbt, WT_CBT_NO_TXN);
+        F_SET(cbt, WT_CBT_NO_TXN | WT_CBT_NO_TRACKING);
 
     if (bulk) {
         F_SET(cursor, WT_CURSTD_BULK);
@@ -728,12 +725,14 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
 
     if (0) {
 err:
+        __wt_cursor_dhandle_decr_use(session);
+
         /*
          * Our caller expects to release the data handle if we fail. Disconnect it from the cursor
          * before closing.
          */
-        __wt_cursor_dhandle_decr_use(session);
-        cbt->btree = NULL;
+        cbt->dhandle = NULL;
+
         WT_TRET(__curfile_close(cursor));
         *cursorp = NULL;
     }

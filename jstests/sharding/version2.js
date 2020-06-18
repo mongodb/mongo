@@ -5,7 +5,10 @@
  */
 (function() {
 'use strict';
-
+/**
+ * One-shard cluster test do not need to be tested in the multiversion suites.
+ * @tags: [multiversion_incompatible]
+ */
 var s = new ShardingTest({name: "version2", shards: 1});
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "alleyinsider"}));

@@ -38,7 +38,7 @@ const awaitShell = startParallelShell(() => {
 // Ensure the dropDatabase command has begun before stepping down.
 checkLog.contains(primary,
                   "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop " +
-                      "enabled. Blocking until fail point is disabled.");
+                      "enabled. Blocking until fail point is disabled");
 
 assert.commandWorked(testDB.adminCommand({replSetStepDown: 60, force: true}));
 replSet.waitForState(primary, ReplSetTest.State.SECONDARY);

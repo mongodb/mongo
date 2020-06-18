@@ -45,6 +45,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -71,7 +72,7 @@ protected:
     }
 
 public:
-    TopologyVersionObserverTest() {
+    virtual void setUp() {
         auto configObj = getConfigObj();
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         ReplSetConfig config = assertMakeRSConfig(configObj);
@@ -92,8 +93,10 @@ public:
         observer->init(serviceContext, replCoord);
     }
 
-    ~TopologyVersionObserverTest() {
+    virtual void tearDown() {
         observer->shutdown();
+        ASSERT(observer->isShutdown());
+        observer.reset();
     }
 
     auto getObserverCache() {
@@ -172,30 +175,68 @@ TEST_F(TopologyVersionObserverTest, HandleDBException) {
     // The client should not go out-of-scope as it is attached to the observer thread.
     ASSERT(observerClient);
 
-    ClockSource::StopWatch timer;
-    constexpr auto maxWait = Seconds(10);
-
-    // Kill the operation waiting on the `isMaster` future to make it throw
-    bool wasAbleToKillOpCtx = false;
-    while (!wasAbleToKillOpCtx) {
-        if (timer.elapsed() > maxWait) {
-            FAIL(str::stream() << "Timed out while waiting for the observer to create OpCtx.");
-        }
-
+    auto tryKillOperation = [&] {
         stdx::lock_guard clientLock(*observerClient);
+
         if (auto opCtx = observerClient->getOperationContext()) {
             observerClient->getServiceContext()->killOperation(clientLock, opCtx);
-            wasAbleToKillOpCtx = true;
-            continue;
+            return true;
         }
 
-        sleepFor(sleepTime);
+        return false;
+    };
+
+    {
+        // Set the failpoint here so that if there is no opCtx we catch the next one.
+        FailPointEnableBlock failBlock("topologyVersionObserverExpectsInterruption");
+
+        // Kill the operation waiting on the `isMaster` future to make it throw
+        if (!tryKillOperation()) {
+            // If we weren't able to kill, then block until there is an opCtx again.
+            failBlock->waitForTimesEntered(failBlock.initialTimesEntered() + 1);
+
+            // Try again to kill now that we've waited for the failpoint.
+            ASSERT(tryKillOperation()) << "Unable to acquire and kill observer OpCtx";
+        }
     }
 
     // Observer thread must handle the exception and fetch the most recent IMR
     auto newResponse = getObserverCache();
     ASSERT(newResponse->getTopologyVersion()->getCounter() ==
            cachedResponse->getTopologyVersion()->getCounter());
+}
+
+TEST_F(TopologyVersionObserverTest, HandleQuiesceMode) {
+    // Start out as a secondary to transition to quiesce mode easily.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto cachedResponse = getObserverCache();
+    ASSERT(cachedResponse);
+
+    // Set a failpoint so we can observe the background thread shutting down.
+    FailPointEnableBlock failBlock("topologyVersionObserverExpectsShutdown");
+
+    {
+        // Enter quiesce mode in the replication coordinator to make shutdown errors come from
+        // awaitIsMasterResponseFuture()/getIsMasterResponseFuture().
+        auto opCtx = makeOperationContext();
+        getReplCoord()->enterQuiesceModeIfSecondary();
+
+        getNet()->enterNetwork();
+        getNet()->advanceTime(getNet()->now() + sleepTime);
+        getNet()->exitNetwork();
+
+        ASSERT_THROWS_CODE(replCoord->getIsMasterResponseFuture({}, boost::none).get(opCtx.get()),
+                           AssertionException,
+                           ErrorCodes::ShutdownInProgress);
+    }
+
+    // Wait for the background thread to fully shutdown.
+    failBlock->waitForTimesEntered(failBlock.initialTimesEntered() + 1);
+
+    // In quiescence, the observer should be shutdown and have nothing in cache.
+    ASSERT(!observer->getCached());
+    ASSERT(observer->isShutdown());
 }
 
 }  // namespace

@@ -12,7 +12,6 @@ selector:
   - jstests/sharding/query/*[aA]uth*.js
   - jstests/sharding/change_streams/*[aA]uth*.js
 
-  - jstests/sharding/cleanup_orphaned_auth.js
   - jstests/sharding/localhostAuthBypass.js
   - jstests/sharding/kill_sessions.js
   - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
@@ -138,14 +137,13 @@ selector:
   - jstests/sharding/mongos_no_replica_set_refresh.js
   - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
   - jstests/sharding/primary_config_server_blackholed_from_mongos.js
+  - jstests/sharding/refine_collection_shard_key_abort_on_stepup.js
   # Nothing is affected by config server step down
   - jstests/sharding/basic_sharding_params.js
   # ShardingTest is never used, so continuous step down thread never starts
   - jstests/sharding/config_rs_change.js
   - jstests/sharding/empty_cluster_init.js
   # Temporarily blacklisted until more robust
-  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
-  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
   # Expects same secondaries for entire test
   - jstests/sharding/commands_that_write_accept_wc_configRS.js
   - jstests/sharding/commands_that_write_accept_wc_shards.js
@@ -157,9 +155,6 @@ selector:
   - jstests/sharding/migration_ignore_interrupts_1.js
   - jstests/sharding/migration_sets_fromMigrate_flag.js
   - jstests/sharding/migration_waits_for_majority_commit.js
-  # Stepping down the config can cause moveChunks stopped on shards via killOp to be restarted.
-  - jstests/sharding/migration_ignore_interrupts_3.js
-  - jstests/sharding/migration_ignore_interrupts_4.js
   # listCollections is not retryable
   - jstests/sharding/sessions_collection_auto_healing.js
   # shardCollection is not retryable
@@ -221,6 +216,9 @@ selector:
   # Runs commands on mongos which target the primary configsvr, and then checks the outcome using
   # profiling/logging (on the configsvr primary), so cannot tolerate the configsvr primary changing.
   - jstests/sharding/read_write_concern_defaults_application.js
+
+  # SERVER-48537 addShard is not idempotent for retries
+  - jstests/sharding/conversion_of_replica_set_to_sharded_cluster.js
 
 executor:
   config:

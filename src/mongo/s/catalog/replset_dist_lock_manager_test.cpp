@@ -64,6 +64,24 @@ const Seconds kJoinTimeout(30);
 const Milliseconds kPingInterval(2);
 const Seconds kLockExpiration(10);
 
+std::string mapToString(const std::map<OID, int>& map) {
+    StringBuilder str;
+    for (const auto& entry : map) {
+        str << "(" << entry.first.toString() << ": " << entry.second << ")";
+    }
+
+    return str.str();
+}
+
+std::string vectorToString(const std::vector<OID>& list) {
+    StringBuilder str;
+    for (const auto& entry : list) {
+        str << "(" << entry.toString() << ")";
+    }
+
+    return str.str();
+}
+
 /**
  * Basic fixture for ReplSetDistLockManager that starts it up before the test begins
  * and shuts it down when a test finishes.
@@ -115,38 +133,6 @@ protected:
 private:
     std::string _processID = "test";
 };
-
-class RSDistLockMgrWithMockTickSource : public ReplSetDistLockManagerFixture {
-protected:
-    RSDistLockMgrWithMockTickSource() {
-        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<>>());
-    }
-
-    /**
-     * Returns the mock tick source.
-     */
-    TickSourceMock<>* getMockTickSource() {
-        return dynamic_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
-    }
-};
-
-std::string mapToString(const std::map<OID, int>& map) {
-    StringBuilder str;
-    for (const auto& entry : map) {
-        str << "(" << entry.first.toString() << ": " << entry.second << ")";
-    }
-
-    return str.str();
-}
-
-std::string vectorToString(const std::vector<OID>& list) {
-    StringBuilder str;
-    for (const auto& entry : list) {
-        str << "(" << entry.toString() << ")";
-    }
-
-    return str.str();
-}
 
 /**
  * Test scenario:
@@ -207,324 +193,6 @@ TEST_F(ReplSetDistLockManagerFixture, BasicLockLifeCycle) {
 
     ASSERT_EQUALS(1, unlockCallCount);
     ASSERT_EQUALS(lockSessionIDPassed, unlockSessionIDPassed);
-}
-
-/**
- * Test scenario:
- * 1. Grab lock fails up to 3 times.
- * 2. Check that each subsequent attempt uses the same lock session id.
- * 3. Unlock (on destructor of ScopedDistLock).
- * 4. Check lock id used in lock and unlock are the same.
- */
-TEST_F(RSDistLockMgrWithMockTickSource, LockSuccessAfterRetry) {
-    std::string lockName("test");
-    std::string me("me");
-    boost::optional<OID> lastTS;
-    Date_t lastTime(Date_t::now());
-    std::string whyMsg("because");
-
-    int retryAttempt = 0;
-    const int kMaxRetryAttempt = 3;
-
-    LocksType goodLockDoc;
-    goodLockDoc.setName(lockName);
-    goodLockDoc.setState(LocksType::LOCKED);
-    goodLockDoc.setProcess(getProcessID());
-    goodLockDoc.setWho("me");
-    goodLockDoc.setWhy(whyMsg);
-    goodLockDoc.setLockID(OID::gen());
-
-    getMockCatalog()->expectGrabLock(
-        [this,
-         &lockName,
-         &lastTS,
-         &me,
-         &lastTime,
-         &whyMsg,
-         &retryAttempt,
-         &kMaxRetryAttempt,
-         &goodLockDoc](StringData lockID,
-                       const OID& lockSessionID,
-                       StringData who,
-                       StringData processId,
-                       Date_t time,
-                       StringData why) {
-            ASSERT_EQUALS(lockName, lockID);
-            // Lock session ID should be the same after first attempt.
-            if (lastTS) {
-                ASSERT_EQUALS(*lastTS, lockSessionID);
-            }
-            ASSERT_EQUALS(getProcessID(), processId);
-            ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
-            ASSERT_EQUALS(whyMsg, why);
-
-            lastTS = lockSessionID;
-            lastTime = time;
-
-            getMockTickSource()->advance(Milliseconds(1));
-
-            if (++retryAttempt >= kMaxRetryAttempt) {
-                getMockCatalog()->expectGrabLock(
-                    [this, &lockName, &lastTS, &me, &lastTime, &whyMsg](StringData lockID,
-                                                                        const OID& lockSessionID,
-                                                                        StringData who,
-                                                                        StringData processId,
-                                                                        Date_t time,
-                                                                        StringData why) {
-                        ASSERT_EQUALS(lockName, lockID);
-                        // Lock session ID should be the same after first attempt.
-                        if (lastTS) {
-                            ASSERT_EQUALS(*lastTS, lockSessionID);
-                        }
-                        ASSERT_TRUE(lockSessionID.isSet());
-                        ASSERT_EQUALS(getProcessID(), processId);
-                        ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
-                        ASSERT_EQUALS(whyMsg, why);
-
-                        getMockCatalog()->expectNoGrabLock();
-
-                        getMockCatalog()->expectGetLockByName(
-                            [](StringData name) {
-                                FAIL("should not attempt to overtake lock after successful lock");
-                            },
-                            LocksType());
-                    },
-                    goodLockDoc);
-            }
-        },
-        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
-
-    //
-    // Setup mock for lock overtaking.
-    //
-
-    LocksType currentLockDoc;
-    currentLockDoc.setName("test");
-    currentLockDoc.setState(LocksType::LOCKED);
-    currentLockDoc.setProcess("otherProcess");
-    currentLockDoc.setLockID(OID::gen());
-    currentLockDoc.setWho("me");
-    currentLockDoc.setWhy("why");
-
-    getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("test", name); },
-                                          currentLockDoc);
-
-    LockpingsType pingDoc;
-    pingDoc.setProcess("otherProcess");
-    pingDoc.setPing(Date_t());
-
-    getMockCatalog()->expectGetPing(
-        [](StringData process) { ASSERT_EQUALS("otherProcess", process); }, pingDoc);
-
-    // Config server time is fixed, so overtaking will never succeed.
-    getMockCatalog()->expectGetServerInfo([]() {}, DistLockCatalog::ServerInfo(Date_t(), OID()));
-
-    //
-    // Try grabbing lock.
-    //
-
-    int unlockCallCount = 0;
-    OID unlockSessionIDPassed;
-
-    {
-        auto lockStatus = distLock()->lock(operationContext(), lockName, whyMsg, Milliseconds(10));
-        ASSERT_OK(lockStatus.getStatus());
-
-        getMockCatalog()->expectNoGrabLock();
-        getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
-                unlockCallCount++;
-                unlockSessionIDPassed = lockSessionID;
-            },
-            Status::OK());
-    }
-
-    ASSERT_EQUALS(1, unlockCallCount);
-    ASSERT(lastTS);
-    ASSERT_EQUALS(*lastTS, unlockSessionIDPassed);
-}
-
-/**
- * Test scenario:
- * 1. Grab lock fails up to 3 times.
- * 2. Check that each subsequent attempt uses the same lock session id.
- * 3. Grab lock errors out on the fourth try.
- * 4. Make sure that unlock is called to cleanup the last lock attempted that error out.
- */
-TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
-    std::string lockName("test");
-    std::string me("me");
-    boost::optional<OID> lastTS;
-    Date_t lastTime(Date_t::now());
-    std::string whyMsg("because");
-
-    int retryAttempt = 0;
-    const int kMaxRetryAttempt = 3;
-
-    getMockCatalog()->expectGrabLock(
-        [this, &lockName, &lastTS, &me, &lastTime, &whyMsg, &retryAttempt, &kMaxRetryAttempt](
-            StringData lockID,
-            const OID& lockSessionID,
-            StringData who,
-            StringData processId,
-            Date_t time,
-            StringData why) {
-            ASSERT_EQUALS(lockName, lockID);
-            // Lock session ID should be the same after first attempt.
-            if (lastTS) {
-                ASSERT_EQUALS(*lastTS, lockSessionID);
-            }
-            ASSERT_EQUALS(getProcessID(), processId);
-            ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
-            ASSERT_EQUALS(whyMsg, why);
-
-            lastTS = lockSessionID;
-            lastTime = time;
-
-            getMockTickSource()->advance(Milliseconds(1));
-
-            if (++retryAttempt >= kMaxRetryAttempt) {
-                getMockCatalog()->expectGrabLock(
-                    [this, &lockName, &lastTS, &me, &lastTime, &whyMsg](StringData lockID,
-                                                                        const OID& lockSessionID,
-                                                                        StringData who,
-                                                                        StringData processId,
-                                                                        Date_t time,
-                                                                        StringData why) {
-                        ASSERT_EQUALS(lockName, lockID);
-                        // Lock session ID should be the same after first attempt.
-                        if (lastTS) {
-                            ASSERT_EQUALS(*lastTS, lockSessionID);
-                        }
-                        lastTS = lockSessionID;
-                        ASSERT_TRUE(lockSessionID.isSet());
-                        ASSERT_EQUALS(getProcessID(), processId);
-                        ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
-                        ASSERT_EQUALS(whyMsg, why);
-
-                        getMockCatalog()->expectNoGrabLock();
-                    },
-                    {ErrorCodes::ExceededMemoryLimit, "bad remote server"});
-            }
-        },
-        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
-
-    // Make mock return lock not found to skip lock overtaking.
-    getMockCatalog()->expectGetLockByName([](StringData) {},
-                                          {ErrorCodes::LockNotFound, "not found!"});
-
-    auto unlockMutex = MONGO_MAKE_LATCH();
-    stdx::condition_variable unlockCV;
-    OID unlockSessionIDPassed;
-    int unlockCallCount = 0;
-
-    getMockCatalog()->expectUnLock(
-        [&unlockMutex, &unlockCV, &unlockCallCount, &unlockSessionIDPassed](
-            const OID& lockSessionID) {
-            stdx::unique_lock<Latch> lk(unlockMutex);
-            unlockCallCount++;
-            unlockSessionIDPassed = lockSessionID;
-            unlockCV.notify_all();
-        },
-        Status::OK());
-
-    {
-        auto lockStatus = distLock()->lock(operationContext(), lockName, whyMsg, Milliseconds(10));
-        ASSERT_NOT_OK(lockStatus.getStatus());
-    }
-
-    bool didTimeout = false;
-    {
-        stdx::unique_lock<Latch> lk(unlockMutex);
-        if (unlockCallCount == 0) {
-            didTimeout =
-                unlockCV.wait_for(lk, kJoinTimeout.toSystemDuration()) == stdx::cv_status::timeout;
-        }
-    }
-
-    // Join the background thread before trying to call asserts. Shutdown calls
-    // stopPing and we don't care in this test.
-    getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    distLock()->shutDown(operationContext());
-
-    // No assert until shutDown has been called to make sure that the background thread
-    // won't be trying to access the local variables that were captured by lamdas that
-    // may have gone out of scope when the assert unwinds the stack.
-    // No need to grab unlockMutex since there is only one thread running at this point.
-
-    ASSERT_FALSE(didTimeout);
-    ASSERT_EQUALS(1, unlockCallCount);
-    ASSERT(lastTS);
-    ASSERT_EQUALS(*lastTS, unlockSessionIDPassed);
-}
-
-TEST_F(ReplSetDistLockManagerFixture, LockBusyNoRetry) {
-    getMockCatalog()->expectGrabLock(
-        [this](StringData, const OID&, StringData, StringData, Date_t, StringData) {
-            getMockCatalog()->expectNoGrabLock();  // Call only once.
-        },
-        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
-
-    // Make mock return lock not found to skip lock overtaking.
-    getMockCatalog()->expectGetLockByName([](StringData) {},
-                                          {ErrorCodes::LockNotFound, "not found!"});
-
-    auto status = distLock()->lock(operationContext(), "", "", Milliseconds(0)).getStatus();
-    ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
-}
-
-/**
- * Test scenario:
- * 1. Attempt to grab lock.
- * 2. Check that each subsequent attempt uses the same lock session id.
- * 3. Times out trying.
- * 4. Checks result is error.
- * 5. Implicitly check that unlock is not called (default setting of mock catalog).
- */
-TEST_F(RSDistLockMgrWithMockTickSource, LockRetryTimeout) {
-    std::string lockName("test");
-    std::string me("me");
-    boost::optional<OID> lastTS;
-    Date_t lastTime(Date_t::now());
-    std::string whyMsg("because");
-
-    int retryAttempt = 0;
-
-    getMockCatalog()->expectGrabLock(
-        [this, &lockName, &lastTS, &me, &lastTime, &whyMsg, &retryAttempt](StringData lockID,
-                                                                           const OID& lockSessionID,
-                                                                           StringData who,
-                                                                           StringData processId,
-                                                                           Date_t time,
-                                                                           StringData why) {
-            ASSERT_EQUALS(lockName, lockID);
-            // Lock session ID should be the same after first attempt.
-            if (lastTS) {
-                ASSERT_EQUALS(*lastTS, lockSessionID);
-            }
-            ASSERT_EQUALS(getProcessID(), processId);
-            ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
-            ASSERT_EQUALS(whyMsg, why);
-
-            lastTS = lockSessionID;
-            lastTime = time;
-            retryAttempt++;
-
-            getMockTickSource()->advance(Milliseconds(1));
-        },
-        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
-
-    // Make mock return lock not found to skip lock overtaking.
-    getMockCatalog()->expectGetLockByName([](StringData) {},
-                                          {ErrorCodes::LockNotFound, "not found!"});
-
-    auto lockStatus =
-        distLock()->lock(operationContext(), lockName, whyMsg, Milliseconds(5)).getStatus();
-    ASSERT_NOT_OK(lockStatus);
-
-    ASSERT_EQUALS(ErrorCodes::LockBusy, lockStatus.code());
-    ASSERT_GREATER_THAN(retryAttempt, 1);
 }
 
 /**
@@ -1945,6 +1613,338 @@ TEST_F(ReplSetDistLockManagerFixture, LockAcquisitionRetriesOnInterruptionNeverS
 
     auto status = distLock()->lock(operationContext(), "bar", "foo", Milliseconds(0)).getStatus();
     ASSERT_NOT_OK(status);
+}
+
+class RSDistLockMgrWithMockTickSource : public ReplSetDistLockManagerFixture {
+protected:
+    RSDistLockMgrWithMockTickSource() {
+        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<>>());
+    }
+
+    /**
+     * Returns the mock tick source.
+     */
+    TickSourceMock<>* getMockTickSource() {
+        return dynamic_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
+    }
+};
+
+/**
+ * Test scenario:
+ * 1. Grab lock fails up to 3 times.
+ * 2. Check that each subsequent attempt uses the same lock session id.
+ * 3. Unlock (on destructor of ScopedDistLock).
+ * 4. Check lock id used in lock and unlock are the same.
+ */
+TEST_F(RSDistLockMgrWithMockTickSource, LockSuccessAfterRetry) {
+    std::string lockName("test");
+    std::string me("me");
+    boost::optional<OID> lastTS;
+    Date_t lastTime(Date_t::now());
+    std::string whyMsg("because");
+
+    int retryAttempt = 0;
+    const int kMaxRetryAttempt = 3;
+
+    LocksType goodLockDoc;
+    goodLockDoc.setName(lockName);
+    goodLockDoc.setState(LocksType::LOCKED);
+    goodLockDoc.setProcess(getProcessID());
+    goodLockDoc.setWho("me");
+    goodLockDoc.setWhy(whyMsg);
+    goodLockDoc.setLockID(OID::gen());
+
+    getMockCatalog()->expectGrabLock(
+        [this,
+         &lockName,
+         &lastTS,
+         &me,
+         &lastTime,
+         &whyMsg,
+         &retryAttempt,
+         &kMaxRetryAttempt,
+         &goodLockDoc](StringData lockID,
+                       const OID& lockSessionID,
+                       StringData who,
+                       StringData processId,
+                       Date_t time,
+                       StringData why) {
+            ASSERT_EQUALS(lockName, lockID);
+            // Lock session ID should be the same after first attempt.
+            if (lastTS) {
+                ASSERT_EQUALS(*lastTS, lockSessionID);
+            }
+            ASSERT_EQUALS(getProcessID(), processId);
+            ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
+            ASSERT_EQUALS(whyMsg, why);
+
+            lastTS = lockSessionID;
+            lastTime = time;
+
+            getMockTickSource()->advance(Milliseconds(1));
+
+            if (++retryAttempt >= kMaxRetryAttempt) {
+                getMockCatalog()->expectGrabLock(
+                    [this, &lockName, &lastTS, &me, &lastTime, &whyMsg](StringData lockID,
+                                                                        const OID& lockSessionID,
+                                                                        StringData who,
+                                                                        StringData processId,
+                                                                        Date_t time,
+                                                                        StringData why) {
+                        ASSERT_EQUALS(lockName, lockID);
+                        // Lock session ID should be the same after first attempt.
+                        if (lastTS) {
+                            ASSERT_EQUALS(*lastTS, lockSessionID);
+                        }
+                        ASSERT_TRUE(lockSessionID.isSet());
+                        ASSERT_EQUALS(getProcessID(), processId);
+                        ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
+                        ASSERT_EQUALS(whyMsg, why);
+
+                        getMockCatalog()->expectNoGrabLock();
+
+                        getMockCatalog()->expectGetLockByName(
+                            [](StringData name) {
+                                FAIL("should not attempt to overtake lock after successful lock");
+                            },
+                            LocksType());
+                    },
+                    goodLockDoc);
+            }
+        },
+        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
+
+    //
+    // Setup mock for lock overtaking.
+    //
+
+    LocksType currentLockDoc;
+    currentLockDoc.setName("test");
+    currentLockDoc.setState(LocksType::LOCKED);
+    currentLockDoc.setProcess("otherProcess");
+    currentLockDoc.setLockID(OID::gen());
+    currentLockDoc.setWho("me");
+    currentLockDoc.setWhy("why");
+
+    getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("test", name); },
+                                          currentLockDoc);
+
+    LockpingsType pingDoc;
+    pingDoc.setProcess("otherProcess");
+    pingDoc.setPing(Date_t());
+
+    getMockCatalog()->expectGetPing(
+        [](StringData process) { ASSERT_EQUALS("otherProcess", process); }, pingDoc);
+
+    // Config server time is fixed, so overtaking will never succeed.
+    getMockCatalog()->expectGetServerInfo([]() {}, DistLockCatalog::ServerInfo(Date_t(), OID()));
+
+    //
+    // Try grabbing lock.
+    //
+
+    int unlockCallCount = 0;
+    OID unlockSessionIDPassed;
+
+    {
+        auto lockStatus = distLock()->lock(operationContext(), lockName, whyMsg, Milliseconds(10));
+        ASSERT_OK(lockStatus.getStatus());
+
+        getMockCatalog()->expectNoGrabLock();
+        getMockCatalog()->expectUnLock(
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+                unlockCallCount++;
+                unlockSessionIDPassed = lockSessionID;
+            },
+            Status::OK());
+    }
+
+    ASSERT_EQUALS(1, unlockCallCount);
+    ASSERT(lastTS);
+    ASSERT_EQUALS(*lastTS, unlockSessionIDPassed);
+}
+
+/**
+ * Test scenario:
+ * 1. Grab lock fails up to 3 times.
+ * 2. Check that each subsequent attempt uses the same lock session id.
+ * 3. Grab lock errors out on the fourth try.
+ * 4. Make sure that unlock is called to cleanup the last lock attempted that error out.
+ */
+TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
+    std::string lockName("test");
+    std::string me("me");
+    boost::optional<OID> lastTS;
+    Date_t lastTime(Date_t::now());
+    std::string whyMsg("because");
+
+    int retryAttempt = 0;
+    const int kMaxRetryAttempt = 3;
+
+    getMockCatalog()->expectGrabLock(
+        [this, &lockName, &lastTS, &me, &lastTime, &whyMsg, &retryAttempt, &kMaxRetryAttempt](
+            StringData lockID,
+            const OID& lockSessionID,
+            StringData who,
+            StringData processId,
+            Date_t time,
+            StringData why) {
+            ASSERT_EQUALS(lockName, lockID);
+            // Lock session ID should be the same after first attempt.
+            if (lastTS) {
+                ASSERT_EQUALS(*lastTS, lockSessionID);
+            }
+            ASSERT_EQUALS(getProcessID(), processId);
+            ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
+            ASSERT_EQUALS(whyMsg, why);
+
+            lastTS = lockSessionID;
+            lastTime = time;
+
+            getMockTickSource()->advance(Milliseconds(1));
+
+            if (++retryAttempt >= kMaxRetryAttempt) {
+                getMockCatalog()->expectGrabLock(
+                    [this, &lockName, &lastTS, &me, &lastTime, &whyMsg](StringData lockID,
+                                                                        const OID& lockSessionID,
+                                                                        StringData who,
+                                                                        StringData processId,
+                                                                        Date_t time,
+                                                                        StringData why) {
+                        ASSERT_EQUALS(lockName, lockID);
+                        // Lock session ID should be the same after first attempt.
+                        if (lastTS) {
+                            ASSERT_EQUALS(*lastTS, lockSessionID);
+                        }
+                        lastTS = lockSessionID;
+                        ASSERT_TRUE(lockSessionID.isSet());
+                        ASSERT_EQUALS(getProcessID(), processId);
+                        ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
+                        ASSERT_EQUALS(whyMsg, why);
+
+                        getMockCatalog()->expectNoGrabLock();
+                    },
+                    {ErrorCodes::ExceededMemoryLimit, "bad remote server"});
+            }
+        },
+        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
+
+    // Make mock return lock not found to skip lock overtaking.
+    getMockCatalog()->expectGetLockByName([](StringData) {},
+                                          {ErrorCodes::LockNotFound, "not found!"});
+
+    auto unlockMutex = MONGO_MAKE_LATCH();
+    stdx::condition_variable unlockCV;
+    OID unlockSessionIDPassed;
+    int unlockCallCount = 0;
+
+    getMockCatalog()->expectUnLock(
+        [&unlockMutex, &unlockCV, &unlockCallCount, &unlockSessionIDPassed](
+            const OID& lockSessionID) {
+            stdx::unique_lock<Latch> lk(unlockMutex);
+            unlockCallCount++;
+            unlockSessionIDPassed = lockSessionID;
+            unlockCV.notify_all();
+        },
+        Status::OK());
+
+    {
+        auto lockStatus = distLock()->lock(operationContext(), lockName, whyMsg, Milliseconds(10));
+        ASSERT_NOT_OK(lockStatus.getStatus());
+    }
+
+    bool didTimeout = false;
+    {
+        stdx::unique_lock<Latch> lk(unlockMutex);
+        if (unlockCallCount == 0) {
+            didTimeout =
+                unlockCV.wait_for(lk, kJoinTimeout.toSystemDuration()) == stdx::cv_status::timeout;
+        }
+    }
+
+    // Join the background thread before trying to call asserts. Shutdown calls
+    // stopPing and we don't care in this test.
+    getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
+    distLock()->shutDown(operationContext());
+
+    // No assert until shutDown has been called to make sure that the background thread
+    // won't be trying to access the local variables that were captured by lamdas that
+    // may have gone out of scope when the assert unwinds the stack.
+    // No need to grab unlockMutex since there is only one thread running at this point.
+
+    ASSERT_FALSE(didTimeout);
+    ASSERT_EQUALS(1, unlockCallCount);
+    ASSERT(lastTS);
+    ASSERT_EQUALS(*lastTS, unlockSessionIDPassed);
+}
+
+TEST_F(ReplSetDistLockManagerFixture, LockBusyNoRetry) {
+    getMockCatalog()->expectGrabLock(
+        [this](StringData, const OID&, StringData, StringData, Date_t, StringData) {
+            getMockCatalog()->expectNoGrabLock();  // Call only once.
+        },
+        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
+
+    // Make mock return lock not found to skip lock overtaking.
+    getMockCatalog()->expectGetLockByName([](StringData) {},
+                                          {ErrorCodes::LockNotFound, "not found!"});
+
+    auto status = distLock()->lock(operationContext(), "", "", Milliseconds(0)).getStatus();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
+}
+
+/**
+ * Test scenario:
+ * 1. Attempt to grab lock.
+ * 2. Check that each subsequent attempt uses the same lock session id.
+ * 3. Times out trying.
+ * 4. Checks result is error.
+ * 5. Implicitly check that unlock is not called (default setting of mock catalog).
+ */
+TEST_F(RSDistLockMgrWithMockTickSource, LockRetryTimeout) {
+    std::string lockName("test");
+    std::string me("me");
+    boost::optional<OID> lastTS;
+    Date_t lastTime(Date_t::now());
+    std::string whyMsg("because");
+
+    int retryAttempt = 0;
+
+    getMockCatalog()->expectGrabLock(
+        [this, &lockName, &lastTS, &me, &lastTime, &whyMsg, &retryAttempt](StringData lockID,
+                                                                           const OID& lockSessionID,
+                                                                           StringData who,
+                                                                           StringData processId,
+                                                                           Date_t time,
+                                                                           StringData why) {
+            ASSERT_EQUALS(lockName, lockID);
+            // Lock session ID should be the same after first attempt.
+            if (lastTS) {
+                ASSERT_EQUALS(*lastTS, lockSessionID);
+            }
+            ASSERT_EQUALS(getProcessID(), processId);
+            ASSERT_GREATER_THAN_OR_EQUALS(time, lastTime);
+            ASSERT_EQUALS(whyMsg, why);
+
+            lastTS = lockSessionID;
+            lastTime = time;
+            retryAttempt++;
+
+            getMockTickSource()->advance(Milliseconds(1));
+        },
+        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
+
+    // Make mock return lock not found to skip lock overtaking.
+    getMockCatalog()->expectGetLockByName([](StringData) {},
+                                          {ErrorCodes::LockNotFound, "not found!"});
+
+    auto lockStatus =
+        distLock()->lock(operationContext(), lockName, whyMsg, Milliseconds(5)).getStatus();
+    ASSERT_NOT_OK(lockStatus);
+
+    ASSERT_EQUALS(ErrorCodes::LockBusy, lockStatus.code());
+    ASSERT_GREATER_THAN(retryAttempt, 1);
 }
 
 /**

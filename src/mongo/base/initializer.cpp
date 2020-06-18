@@ -38,23 +38,25 @@
 #include "mongo/base/initializer_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
-Initializer::Initializer() {}
-Initializer::~Initializer() {}
+Status Initializer::executeInitializers(const std::vector<std::string>& args) {
+    auto oldState = std::exchange(_lifecycleState, State::kInitializing);
+    invariant(oldState == State::kUninitialized, "invalid initializer state transition");
 
-Status Initializer::executeInitializers(const InitializerContext::ArgumentVector& args,
-                                        const InitializerContext::EnvironmentMap& env) {
-    std::vector<std::string> sortedNodes;
-    Status status = _graph.topSort(&sortedNodes);
-    if (Status::OK() != status)
-        return status;
+    if (_sortedNodes.empty()) {
+        if (Status status = _graph.topSort(&_sortedNodes); !status.isOK()) {
+            return status;
+        }
+    }
+    _graph.freeze();
 
-    InitializerContext context(args, env);
+    InitializerContext context(args);
 
-    for (size_t i = 0; i < sortedNodes.size(); ++i) {
-        InitializerDependencyNode* node = _graph.getInitializerNode(sortedNodes[i]);
+    for (const auto& nodeName : _sortedNodes) {
+        InitializerDependencyNode* node = _graph.getInitializerNode(nodeName);
 
         // If already initialized then this node is a legacy initializer without re-initialization
         // support.
@@ -64,81 +66,65 @@ Status Initializer::executeInitializers(const InitializerContext::ArgumentVector
         auto const& fn = node->getInitializerFunction();
         if (!fn) {
             return Status(ErrorCodes::InternalError,
-                          "topSort returned a node that has no associated function: \"" +
-                              sortedNodes[i] + '"');
+                          "topSort returned a node that has no associated function: \"" + nodeName +
+                              '"');
         }
         try {
-            status = fn(&context);
+            if (Status status = fn(&context); !status.isOK()) {
+                return status;
+            }
         } catch (const DBException& xcp) {
             return xcp.toStatus();
         }
 
-        if (Status::OK() != status)
-            return status;
-
         node->setInitialized(true);
     }
+
+    oldState = std::exchange(_lifecycleState, State::kInitialized);
+    invariant(oldState == State::kInitializing, "invalid initializer state transition");
+
     return Status::OK();
 }
 
 Status Initializer::executeDeinitializers() {
-    std::vector<std::string> sortedNodes;
-    Status status = _graph.topSort(&sortedNodes);
-    if (Status::OK() != status)
-        return status;
+    auto oldState = std::exchange(_lifecycleState, State::kDeinitializing);
+    invariant(oldState == State::kInitialized, "invalid initializer state transition");
 
     DeinitializerContext context{};
 
     // Execute deinitialization in reverse order from initialization.
-    for (auto it = sortedNodes.rbegin(), end = sortedNodes.rend(); it != end; ++it) {
+    for (auto it = _sortedNodes.rbegin(), end = _sortedNodes.rend(); it != end; ++it) {
         InitializerDependencyNode* node = _graph.getInitializerNode(*it);
         auto const& fn = node->getDeinitializerFunction();
         if (fn) {
             try {
-                status = fn(&context);
+                if (Status status = fn(&context); !status.isOK()) {
+                    return status;
+                }
             } catch (const DBException& xcp) {
                 return xcp.toStatus();
             }
 
-            if (Status::OK() != status)
-                return status;
-
             node->setInitialized(false);
         }
     }
+
+    oldState = std::exchange(_lifecycleState, State::kUninitialized);
+    invariant(oldState == State::kDeinitializing, "invalid initializer state transition");
+
     return Status::OK();
 }
 
-Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
-                             const InitializerContext::EnvironmentMap& env) {
-    return getGlobalInitializer().executeInitializers(args, env);
-}
-
-Status runGlobalInitializers(int argc, const char* const* argv, const char* const* envp) {
-    InitializerContext::ArgumentVector args(argc);
-    std::copy(argv, argv + argc, args.begin());
-
-    InitializerContext::EnvironmentMap env;
-
-    if (envp) {
-        for (; *envp; ++envp) {
-            const char* firstEqualSign = strchr(*envp, '=');
-            if (!firstEqualSign) {
-                return Status(ErrorCodes::BadValue, "malformed environment block");
-            }
-            env[std::string(*envp, firstEqualSign)] = std::string(firstEqualSign + 1);
-        }
-    }
-
-    return runGlobalInitializers(args, env);
+Status runGlobalInitializers(const std::vector<std::string>& argv) {
+    return getGlobalInitializer().executeInitializers(argv);
 }
 
 Status runGlobalDeinitializers() {
     return getGlobalInitializer().executeDeinitializers();
 }
 
-void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp) {
-    Status status = runGlobalInitializers(argc, argv, envp);
+void runGlobalInitializersOrDie(const std::vector<std::string>& argv) {
+    Status status = runGlobalInitializers(argv);
     if (!status.isOK()) {
         std::cerr << "Failed global initialization: " << status << std::endl;
         quickExit(1);

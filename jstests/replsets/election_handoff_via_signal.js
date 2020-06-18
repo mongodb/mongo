@@ -9,7 +9,13 @@ load("jstests/replsets/libs/election_handoff.js");
 
 const testName = "election_handoff_via_signal";
 const numNodes = 3;
-const rst = ReplSetTest({name: testName, nodes: numNodes});
+// Initiate with a higher 5 second shutdownTimeout instead of the default 100 ms to allow enough
+// time for nodes to grab the RSTL while stepping down during shutdown.
+const rst = ReplSetTest({
+    name: testName,
+    nodes: numNodes,
+    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"}
+});
 const nodes = rst.nodeList();
 rst.startSet();
 

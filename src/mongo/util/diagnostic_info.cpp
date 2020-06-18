@@ -40,9 +40,11 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/interruptible.h"
 

@@ -92,12 +92,9 @@ const kNonRetryableCommands = new Set([
     "captrunc",
     "clone",
     "cloneCollectionAsCapped",
-    "collMod",
     "convertToCapped",
     "create",
     "createIndexes",
-    "createRole",
-    "createUser",
     "deleteIndexes",
     "drop",
     "dropAllRolesFromDatabase",
@@ -108,13 +105,7 @@ const kNonRetryableCommands = new Set([
     "dropUser",
     "emptycapped",
     "godinsert",
-    "grantPrivilegesToRole",
-    "grantRolesToRole",
-    "grantRolesToUser",
     "renameCollection",
-    "revokePrivilegesFromRole",
-    "revokeRolesFromRole",
-    "revokeRolesFromUser",
     "updateRole",
     "updateUser",
 ]);
@@ -125,6 +116,8 @@ const kNonRetryableCommands = new Set([
 const kAcceptableNonRetryableCommands = new Set([
     "create",
     "createIndexes",
+    "createRole",
+    "createUser",
     "deleteIndexes",
     "drop",
     "dropDatabase",  // Already ignores NamespaceNotFound errors, so not handled below.
@@ -145,9 +138,14 @@ function isRetryableReadCmdName(cmdName) {
 // given command type.
 function isAcceptableRetryFailedResponse(cmdName, res) {
     assert(!res.ok, res);
+    // These codes are uniquely returned from user_management_commands.cpp
+    const kErrorCodeRoleAlreadyExists = 51002;
+    const kErrorCodeUserAlreadyExists = 51003;
     return ((cmdName === "create" && res.code === ErrorCodes.NamespaceExists) ||
             (cmdName === "createIndexes" && res.code === ErrorCodes.IndexAlreadyExists) ||
             (cmdName === "drop" && res.code === ErrorCodes.NamespaceNotFound) ||
+            ((cmdName == "createUser") && (res.code === kErrorCodeUserAlreadyExists)) ||
+            ((cmdName == "createRole") && (res.code === kErrorCodeRoleAlreadyExists)) ||
             ((cmdName === "dropIndexes" || cmdName === "deleteIndexes") &&
              res.code === ErrorCodes.IndexNotFound));
 }

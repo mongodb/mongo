@@ -7,7 +7,7 @@ import logging
 import threading
 import time
 
-from ..utils import scheduler
+from buildscripts.resmokelib.utils import scheduler
 
 _FLUSH_THREAD_LOCK = threading.Lock()
 _FLUSH_THREAD = None

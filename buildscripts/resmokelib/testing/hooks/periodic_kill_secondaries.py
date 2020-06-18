@@ -6,13 +6,13 @@ import bson
 import pymongo
 import pymongo.errors
 
-from . import dbhash
-from . import interface
-from . import oplog
-from . import validate
-from ..fixtures import interface as fixture
-from ..fixtures import replicaset
-from ... import errors
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.testing.fixtures import interface as fixture
+from buildscripts.resmokelib.testing.fixtures import replicaset
+from buildscripts.resmokelib.testing.hooks import dbhash
+from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.hooks import oplog
+from buildscripts.resmokelib.testing.hooks import validate
 
 
 class PeriodicKillSecondaries(interface.Hook):
@@ -79,7 +79,7 @@ class PeriodicKillSecondaries(interface.Hook):
     def _run(self, test_report):
         try:
             hook_test_case = PeriodicKillSecondariesTestCase.create_after_test(
-                self.logger.test_case_logger, self._last_test, self, test_report)
+                self.logger, self._last_test, self, test_report)
             hook_test_case.configure(self.fixture)
             hook_test_case.run_dynamic_test(test_report)
         finally:

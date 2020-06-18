@@ -63,8 +63,28 @@ function runTest(name, conns, restartCallback) {
 
     // Can't recreate ourselves because localhost auth bypass is still disabled.
     assert.commandFailed(admin.runCommand(CREATE_ADMIN));
+
     if (conns.replset) {
-        assert.commandFailed(conns.replset.getSecondary().getDB('admin').runCommand(CREATE_ADMIN));
+        // Scan all nodes to make sure remove has applied everywhere.
+        jsTest.log('Checking to make sure drop all users has propagated');
+
+        conns.replset.nodes.forEach(function(node) {
+            assert(node.getDB('admin').auth('__system', keyfileContents));
+        });
+        assert.soon(function() {
+            return conns.replset.nodes.every(function(node) {
+                // Roles collection is never added to above,
+                // but go ahead and future-proof the auth-bypass restoration
+                // check below by ensuring we notice this test changing later.
+                const users = node.getDB('admin').system.users.find({}).toArray();
+                const roles = node.getDB('admin').system.roles.find({}).toArray();
+                jsTest.log(node + ': ' + tojson(users) + ' ' + tojson(roles));
+                return (users.length == 0) && (roles.length == 0);
+            });
+        });
+        conns.replset.nodes.forEach(function(node) {
+            node.getDB('admin').logout();
+        });
     }
 
     // Shut down server and restart, we should get bypass back now.
@@ -90,11 +110,12 @@ const standaloneWC = {
     w: 1,
     j: true
 };
-let standalone = MongoRunner.runMongod({auth: ''});
+let standalone = MongoRunner.runMongod({auth: '', useHostName: false});
 runTest('Standalone', {primary: standalone, wc: standaloneWC}, function() {
     const dbpath = standalone.dbpath;
     MongoRunner.stopMongod(standalone);
-    standalone = MongoRunner.runMongod({auth: '', restart: true, cleanData: false, dbpath: dbpath});
+    standalone = MongoRunner.runMongod(
+        {auth: '', restart: true, cleanData: false, dbpath: dbpath, useHostName: false});
     return {primary: standalone, wc: standaloneWC};
 });
 MongoRunner.stopMongod(standalone);
@@ -105,8 +126,13 @@ const replsetWC = {
     w: replsetNodes,
     j: true
 };
-const replset =
-    new ReplSetTest({name: 'rs0', nodes: replsetNodes, nodeOptions: {auth: ''}, keyFile: keyfile});
+const replset = new ReplSetTest({
+    name: 'rs0',
+    nodes: replsetNodes,
+    nodeOptions: {auth: ''},
+    keyFile: keyfile,
+    useHostName: false,
+});
 replset.startSet();
 replset.initiate();
 replset.awaitSecondaryNodes();

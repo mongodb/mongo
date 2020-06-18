@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/rename_collection.h"
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -73,7 +72,7 @@ boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, c
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     return opCtx->writesAreReplicated() &&
-        CollectionShardingState::get(opCtx, nss)->getCollectionDescription().isSharded();
+        CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx).isSharded();
 }
 
 // From a replicated to an unreplicated collection or vice versa.
@@ -121,7 +120,6 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream() << "Source collection " << source.ns() << " does not exist");
     }
 
-    BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
     Collection* targetColl =
@@ -241,7 +239,6 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
             invariant(renameOpTimeFromApplyOps.isNull());
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(targetColl->ns().ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             targetColl->uuid());
 
@@ -256,10 +253,12 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
             if (!renameOpTime.isNull()) {
                 LOGV2_FATAL(
                     40616,
-                    "renameCollection: {source} to {target} (with dropTarget=true) - unexpected "
+                    "renameCollection: {from} to {to} (with dropTarget=true) - unexpected "
                     "renameCollection oplog entry written to the oplog with optime {renameOpTime}",
-                    "source"_attr = source,
-                    "target"_attr = target,
+                    "renameCollection (with dropTarget=true): unexpected renameCollection oplog "
+                    "entry written to the oplog",
+                    "from"_attr = source,
+                    "to"_attr = target,
                     "renameOpTime"_attr = renameOpTime);
             }
             renameOpTime = renameOpTimeFromApplyOps;
@@ -325,11 +324,12 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     Collection* const targetColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
 
-    AutoStatsTracker statsTracker(opCtx,
-                                  source,
-                                  Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateCurOp,
-                                  db->getProfilingLevel());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        source,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
 
     if (!targetColl) {
         return renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
@@ -365,11 +365,12 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     Collection* const sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
 
-    AutoStatsTracker statsTracker(opCtx,
-                                  source,
-                                  Top::LockType::NotLocked,
-                                  AutoStatsTracker::LogMode::kUpdateCurOp,
-                                  db->getProfilingLevel());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        source,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
 
     return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
         Collection* targetColl =
@@ -482,12 +483,13 @@ Status renameBetweenDBs(OperationContext* opCtx,
     if (!sourceDB)
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
 
-    boost::optional<AutoStatsTracker> statsTracker(boost::in_place_init,
-                                                   opCtx,
-                                                   source,
-                                                   Top::LockType::NotLocked,
-                                                   AutoStatsTracker::LogMode::kUpdateCurOp,
-                                                   sourceDB->getProfilingLevel());
+    boost::optional<AutoStatsTracker> statsTracker(
+        boost::in_place_init,
+        opCtx,
+        source,
+        Top::LockType::NotLocked,
+        AutoStatsTracker::LogMode::kUpdateCurOp,
+        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
 
     Collection* const sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
@@ -506,7 +508,6 @@ Status renameBetweenDBs(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "Cannot rename collections between a replicated and an unreplicated database"};
 
-    BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
     auto targetDB = DatabaseHolder::get(opCtx)->getDb(opCtx, target.db());
@@ -592,12 +593,12 @@ Status renameBetweenDBs(OperationContext* opCtx,
             // the rename operation has already failed for another reason.
             LOGV2(20399,
                   "Unable to drop temporary collection {tmpName} while renaming from {source} to "
-                  "{target}: {status}",
+                  "{target}: {error}",
                   "Unable to drop temporary collection while renaming",
                   "tempCollection"_attr = tmpName,
                   "source"_attr = source,
                   "target"_attr = target,
-                  "reason"_attr = status);
+                  "error"_attr = status);
         }
     });
 

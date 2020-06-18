@@ -88,6 +88,22 @@ public:
         return false;
     }
 
+    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
+                                                 repl::ReadConcernLevel level) const final {
+
+        static const Status kReadConcernNotSupported{ErrorCodes::InvalidOptions,
+                                                     "read concern not supported"};
+        static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
+                                                            "default read concern not permitted"};
+        // The dbHash command only supports local and snapshot read concern. Additionally, snapshot
+        // read concern is only supported if test commands are enabled.
+        return {{level != repl::ReadConcernLevel::kLocalReadConcern &&
+                     (!getTestCommandsEnabled() ||
+                      level != repl::ReadConcernLevel::kSnapshotReadConcern),
+                 kReadConcernNotSupported},
+                kDefaultReadConcernNotPermitted};
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {
@@ -343,12 +359,12 @@ private:
                                               BSONObj(),
                                               BSONObj(),
                                               BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanExecutor::NO_YIELD,
+                                              PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                               InternalPlanner::FORWARD,
                                               InternalPlanner::IXSCAN_FETCH);
         } else if (collection->isCapped()) {
             exec = InternalPlanner::collectionScan(
-                opCtx, nss.ns(), collection, PlanExecutor::NO_YIELD);
+                opCtx, nss.ns(), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         } else {
             LOGV2(20455,
                   "Can't find _id index for namespace: {namespace}",
@@ -360,21 +376,21 @@ private:
         md5_state_t st;
         md5_init(&st);
 
-        long long n = 0;
-        PlanExecutor::ExecState state;
-        BSONObj c;
-        verify(nullptr != exec.get());
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&c, nullptr))) {
-            md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
-            n++;
-        }
-        if (PlanExecutor::IS_EOF != state) {
+        try {
+            long long n = 0;
+            BSONObj c;
+            verify(nullptr != exec.get());
+            while (exec->getNext(&c, nullptr) == PlanExecutor::ADVANCED) {
+                md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
+                n++;
+            }
+        } catch (DBException& exception) {
             LOGV2_WARNING(
                 20456, "Error while hashing, db possibly dropped", "namespace"_attr = nss);
-            uasserted(34371,
-                      "Plan executor error while running dbHash command: " +
-                          WorkingSetCommon::toStatusString(c));
+            exception.addContext("Plan executor error while running dbHash command");
+            throw;
         }
+
         md5digest d;
         md5_finish(&st, d);
         std::string hash = digestToString(d);

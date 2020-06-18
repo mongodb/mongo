@@ -101,7 +101,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
 
         _letVariables.emplace_back(
             varName.toString(),
-            Expression::parseOperand(expCtx, varElem, expCtx->variablesParseState),
+            Expression::parseOperand(expCtx.get(), varElem, expCtx->variablesParseState),
             _variablesParseState.defineVariable(varName));
     }
 

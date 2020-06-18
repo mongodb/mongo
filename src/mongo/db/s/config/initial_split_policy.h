@@ -33,9 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/shard_id.h"
@@ -58,7 +56,7 @@ public:
     static std::unique_ptr<InitialSplitPolicy> calculateOptimizationStrategy(
         OperationContext* opCtx,
         const ShardKeyPattern& shardKeyPattern,
-        const ShardsvrShardCollection& request,
+        const ShardsvrShardCollectionRequest& request,
         const std::vector<TagsType>& tags,
         size_t numShards,
         bool collectionIsEmpty);
@@ -109,18 +107,6 @@ public:
         const std::vector<BSONObj>& splitPoints,
         const std::vector<ShardId>& allShardIds,
         const int numContiguousChunksPerShard = 1);
-
-    /**
-     * Throws an exception if the collection is already sharded with different options.
-     *
-     * If the collection is already sharded with the same options, returns the existing
-     * collection's full spec, else returns boost::none.
-     */
-    static boost::optional<CollectionType> checkIfCollectionAlreadyShardedWithSameOptions(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ShardsvrShardCollection& request,
-        repl::ReadConcernLevel readConcernLevel);
 
     /**
      * Generates a list of initial chunks to be created during a shardCollection operation.

@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <limits>
 #include <memory>
 #include <timelib.h>
 
@@ -57,16 +58,14 @@ std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter> createTimelibTime()
 // Converts a date to a number of seconds, being careful to round appropriately for negative numbers
 // of seconds.
 long long seconds(Date_t date) {
-    auto millis = date.toMillisSinceEpoch();
-    if (millis < 0) {
-        // We want the division below to truncate toward -inf rather than 0
-        // eg Dec 31, 1969 23:59:58.001 should be -2 seconds rather than -1
-        // This is needed to get the correct values from coerceToTM
-        if (-1999 / 1000 != -2) {  // this is implementation defined
-            millis -= 1000 - 1;
-        }
-    }
-    return durationCount<Seconds>(Milliseconds(millis));
+    // We want the division below to truncate toward -inf rather than 0
+    // eg Dec 31, 1969 23:59:58.001 should be -2 seconds rather than -1
+    // This is needed to get the correct values from coerceToTM
+    constexpr auto needsRounding = -1999 / 1000 != -2;  // This is implementaiton defined.
+    if (auto millis = date.toMillisSinceEpoch(); millis < 0 && millis % 1000 != 0 && needsRounding)
+        return durationCount<Seconds>(Milliseconds(millis)) - 1ll;
+    else
+        return durationCount<Seconds>(Milliseconds(millis));
 }
 
 //
@@ -562,9 +561,11 @@ void TimeZone::validateFromStringFormat(StringData format) {
     return validateFormat(format, kDateFromStringFormatMap);
 }
 
-std::string TimeZone::formatDate(StringData format, Date_t date) const {
+StatusWith<std::string> TimeZone::formatDate(StringData format, Date_t date) const {
     StringBuilder formatted;
-    outputDateWithFormat(formatted, format, date);
-    return formatted.str();
+    if (auto status = outputDateWithFormat(formatted, format, date); status != Status::OK())
+        return status;
+    else
+        return formatted.str();
 }
 }  // namespace mongo

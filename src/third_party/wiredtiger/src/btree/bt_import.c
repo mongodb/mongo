@@ -108,9 +108,9 @@ __wt_import(WT_SESSION_IMPL *session, const char *uri)
     __wt_verbose(session, WT_VERB_CHECKPOINT, "import configuration: %s/%s", uri, fileconf);
 
     /*
-     * The just inserted metadata was correct as of immediately before the before the final
-     * checkpoint, but it's not quite right. The block manager returned the corrected final
-     * checkpoint, put it all together.
+     * The just inserted metadata was correct as of immediately before the final checkpoint, but
+     * it's not quite right. The block manager returned the corrected final checkpoint, put it all
+     * together.
      *
      * Get the checkpoint information from the file's metadata as an array of WT_CKPT structures.
      *

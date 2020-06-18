@@ -86,16 +86,6 @@ using std::unique_ptr;
 
 namespace {
 /**
- * Returns true if this PlanExecutor is for a Pipeline.
- */
-bool isPipelineExecutor(const PlanExecutor* exec) {
-    invariant(exec);
-    auto rootStage = exec->getRootStage();
-    return rootStage->stageType() == StageType::STAGE_PIPELINE_PROXY ||
-        rootStage->stageType() == StageType::STAGE_CHANGE_STREAM_PROXY;
-}
-
-/**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
  * that we were able to absorb all pipeline stages and pull them into a single PlanExecutor. So,
  * instead of creating a whole pipeline to do nothing more than forward the results of its cursor
@@ -121,6 +111,7 @@ bool canOptimizeAwayPipeline(const Pipeline* pipeline,
  * and thus will be different from that in 'request'.
  */
 bool handleCursorCommand(OperationContext* opCtx,
+                         boost::intrusive_ptr<ExpressionContext> expCtx,
                          const NamespaceString& nsForCursor,
                          std::vector<ClientCursor*> cursors,
                          const AggregationRequest& request,
@@ -162,7 +153,9 @@ bool handleCursorCommand(OperationContext* opCtx,
 
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
-    options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    if (!opCtx->inMultiDocumentTransaction()) {
+        options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    }
     CursorResponseBuilder responseBuilder(result, options);
 
     auto curOp = CurOp::get(opCtx);
@@ -181,42 +174,36 @@ bool handleCursorCommand(OperationContext* opCtx,
         try {
             state = exec->getNext(&nextDoc, nullptr);
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
-            // This exception is thrown when a $changeStream stage encounters an event
-            // that invalidates the cursor. We should close the cursor and return without
-            // error.
+            // This exception is thrown when a $changeStream stage encounters an event that
+            // invalidates the cursor. We should close the cursor and return without error.
             cursor = nullptr;
             exec = nullptr;
             break;
+        } catch (DBException& exception) {
+            LOGV2_WARNING(23799,
+                          "Aggregate command executor error: {error}, stats: {stats}",
+                          "Aggregate command executor error",
+                          "error"_attr = exception.toStatus(),
+                          "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
+
+            exception.addContext("PlanExecutor error during aggregation");
+            throw;
         }
 
         if (state == PlanExecutor::IS_EOF) {
             if (!cursor->isTailable()) {
-                // make it an obvious error to use cursor or executor after this point
+                // Make it an obvious error to use cursor or executor after this point.
                 cursor = nullptr;
                 exec = nullptr;
             }
             break;
         }
 
-        if (PlanExecutor::ADVANCED != state) {
-            // We should always have a valid status member object at this point.
-            auto status = WorkingSetCommon::getMemberObjectStatus(nextDoc);
-            invariant(!status.isOK());
-            LOGV2_WARNING(
-                23799,
-                "Aggregate command executor error: {state}, status: {error}, stats: {stats}",
-                "Aggregate command executor error",
-                "state"_attr = PlanExecutor::statestr(state),
-                "error"_attr = status,
-                "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
-
-            uassertStatusOK(status.withContext("PlanExecutor error during aggregation"));
-        }
+        invariant(state == PlanExecutor::ADVANCED);
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
 
-        auto* expCtx = exec->getExpCtx().get();
         BSONObj next = expCtx->needsMerge ? nextDoc.toBsonWithMetaData() : nextDoc.toBson();
         if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
             exec->enqueue(nextDoc);
@@ -480,8 +467,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createOuterPipelineProxyExe
     // invalidations. The Pipeline may contain PlanExecutors which *are* yielding
     // PlanExecutors and which *are* registered with their respective collection's
     // CursorManager
-    return uassertStatusOK(PlanExecutor::make(
-        std::move(expCtx), std::move(ws), std::move(proxy), nullptr, PlanExecutor::NO_YIELD, nss));
+    return uassertStatusOK(PlanExecutor::make(std::move(expCtx),
+                                              std::move(ws),
+                                              std::move(proxy),
+                                              nullptr,
+                                              PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                              nss));
 }
 }  // namespace
 
@@ -715,14 +706,6 @@ Status runAggregate(OperationContext* opCtx,
         }
     });
     for (auto&& exec : execs) {
-        // PlanExecutors for pipelines always have a 'kLocksInternally' policy. If this executor is
-        // not for a pipeline, though, that means the pipeline was optimized away and the
-        // PlanExecutor will answer the query using the query engine only. Without the
-        // DocumentSourceCursor to do its locking, an executor needs a 'kLockExternally' policy.
-        auto lockPolicy = isPipelineExecutor(exec.get())
-            ? ClientCursorParams::LockPolicy::kLocksInternally
-            : ClientCursorParams::LockPolicy::kLockExternally;
-
         ClientCursorParams cursorParams(
             std::move(exec),
             origNss,
@@ -730,7 +713,6 @@ Status runAggregate(OperationContext* opCtx,
             opCtx->getWriteConcern(),
             repl::ReadConcernArgs::get(opCtx),
             cmdObj,
-            lockPolicy,
             privileges,
             expCtx->needsMerge);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
@@ -752,13 +734,13 @@ Status runAggregate(OperationContext* opCtx,
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {
-        auto explainExecutor = pins[0].getCursor()->getExecutor();
+        auto explainExecutor = pins[0]->getExecutor();
         auto bodyBuilder = result->getBodyBuilder();
-        if (isPipelineExecutor(explainExecutor)) {
+        if (explainExecutor->isPipelineExecutor()) {
             Explain::explainPipelineExecutor(explainExecutor, *(expCtx->explain), &bodyBuilder);
         } else {
-            invariant(pins[0].getCursor()->lockPolicy() ==
-                      ClientCursorParams::LockPolicy::kLockExternally);
+            invariant(pins[0]->getExecutor()->lockPolicy() ==
+                      PlanExecutor::LockPolicy::kLockExternally);
             invariant(!explainExecutor->isDetached());
             invariant(explainExecutor->getOpCtx() == opCtx);
             // The explainStages() function for a non-pipeline executor expects to be called with
@@ -773,7 +755,7 @@ Status runAggregate(OperationContext* opCtx,
     } else {
         // Cursor must be specified, if explain is not.
         const bool keepCursor =
-            handleCursorCommand(opCtx, origNss, std::move(cursors), request, result);
+            handleCursorCommand(opCtx, expCtx, origNss, std::move(cursors), request, result);
         if (keepCursor) {
             cursorFreer.dismiss();
         }
@@ -785,7 +767,8 @@ Status runAggregate(OperationContext* opCtx,
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
         if (ctx && ctx->getCollection()) {
-            CollectionQueryInfo::get(ctx->getCollection()).notifyOfQuery(opCtx, stats);
+            Collection* coll = ctx->getCollection();
+            CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, stats);
         }
     }
 

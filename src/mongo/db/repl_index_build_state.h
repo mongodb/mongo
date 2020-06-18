@@ -293,7 +293,7 @@ struct ReplIndexBuildState {
      */
     boost::optional<Lock::ResourceMutex> commitQuorumLock;
 
-    using IndexCatalogStats = struct {
+    struct IndexCatalogStats {
         int numIndexesBefore = 0;
         int numIndexesAfter = 0;
     };

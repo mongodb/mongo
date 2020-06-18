@@ -330,48 +330,84 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord,
     *status = replCoord->processReplSetReconfig(opCtx, args, &garbage);
 }
 
-TEST_F(ReplCoordTest,
-       NodeReturnsNewReplicaSetConfigurationIncompatibleWhenQuorumCheckFailsDuringReconfig) {
-    // start up, become primary, fail during quorum check due to a heartbeat
-    // containing a higher config version
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))),
-                       HostAndPort("node1", 12345));
+TEST_F(ReplCoordTest, QuorumCheckFailsWhenOtherNodesHaveHigherTerm) {
+    // Initiate a config without a term to avoid stepup auto-reconfig.
+    auto configObj =
+        configWithMembers(2, -1, BSON_ARRAY(member(1, "node1:12345") << member(2, "node2:12345")));
+
+    OpTime opTime{Timestamp(100, 1), 1};
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedAndDurableOpTime(opTime, getNet()->now());
     simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
-    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
+    // Reconfig with version 3.
+    stdx::thread reconfigThread([&] {
+        doReplSetReconfig(getReplCoord(), &status, opCtx.get(), getReplCoord()->getTerm());
+    });
 
     NetworkInterfaceMock* net = getNet();
-    getNet()->enterNetwork();
-    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const RemoteCommandRequest& request = noi->getRequest();
+    net->enterNetwork();
+    auto noi = net->getNextReadyRequest();
+    auto& request = noi->getRequest();
     repl::ReplSetHeartbeatArgsV1 hbArgs;
     ASSERT_OK(hbArgs.initialize(request.cmdObj));
     repl::ReplSetHeartbeatResponse hbResp;
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
-    hbResp.setConfigVersion(5);
-    BSONObjBuilder respObj;
-    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
-    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
-    respObj << "ok" << 1;
-    hbResp.addToBSON(&respObj);
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+    // The config version from the remote is lower, but its term is higher.
+    hbResp.setConfigVersion(2);
+    hbResp.setConfigTerm(getReplCoord()->getTerm() + 1);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, net->now()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, net->now()});
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
     net->runReadyNetworkOperations();
-    getNet()->exitNetwork();
+    net->exitNetwork();
     reconfigThread.join();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
 }
+
+TEST_F(ReplCoordTest, QuorumCheckSucceedsWhenOtherNodesHaveLowerTerm) {
+    // Initiate a config without a term to avoid stepup auto-reconfig.
+    auto configObj =
+        configWithMembers(2, -1, BSON_ARRAY(member(1, "node1:12345") << member(2, "node2:12345")));
+
+    OpTime opTime{Timestamp(100, 1), 1};
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedAndDurableOpTime(opTime, getNet()->now());
+    simulateSuccessfulV1Election();
+
+    Status status(ErrorCodes::InternalError, "Not Set");
+    const auto opCtx = makeOperationContext();
+    // Reconfig with version 3.
+    stdx::thread reconfigThread([&] {
+        doReplSetReconfig(getReplCoord(), &status, opCtx.get(), getReplCoord()->getTerm());
+    });
+
+    NetworkInterfaceMock* net = getNet();
+    net->enterNetwork();
+    auto noi = net->getNextReadyRequest();
+    auto& request = noi->getRequest();
+    repl::ReplSetHeartbeatArgsV1 hbArgs;
+    ASSERT_OK(hbArgs.initialize(request.cmdObj));
+    repl::ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    // The config version from the remote is higher, but its term is lower.
+    hbResp.setConfigVersion(4);
+    hbResp.setConfigTerm(getReplCoord()->getTerm() - 1);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, net->now()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, net->now()});
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+    reconfigThread.join();
+    ASSERT_OK(status);
+}
+
 
 TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringReconfig) {
     // start up, become primary, saving the config fails
@@ -1664,7 +1700,7 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotAppendNewlyAddedFieldToNewNode
                       "Appended the 'newlyAdded' field to a node in the new config."));
 }
 
-TEST_F(ReplCoordReconfigTest, ForceReconfigSucceedsWhenNewlyAddedFieldIsSetToTrue) {
+TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldIsSetToTrue) {
     // Set the flag to add the 'newlyAdded' field to MemberConfigs.
     enableAutomaticReconfig = true;
     // Set the flag back to false after this test exits.
@@ -1685,23 +1721,8 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigSucceedsWhenNewlyAddedFieldIsSetToTru
                                                                      << "n3:1"
                                                                      << "newlyAdded" << true)));
 
-    startCapturingLogMessages();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
-    stopCapturingLogMessages();
-
-    const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
-    const auto newMember = rsConfig.findMemberByID(3);
-
-    // Verify that the 'newlyAdded' field is set and that the member is considered a non-voting
-    // node.
-    ASSERT_TRUE(newMember->isNewlyAdded());
-    ASSERT_FALSE(newMember->isVoter());
-
-    // Verify that a log message was not created for adding the 'newlyAdded' field, since a force
-    // reconfig should not attempt to append the field.
-    ASSERT_EQUALS(0,
-                  countTextFormatLogLinesContaining(
-                      "Appended the 'newlyAdded' field to a node in the new config."));
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
 }
 
 TEST_F(ReplCoordReconfigTest, ForceReconfigFailsWhenNewlyAddedFieldSetToFalse) {

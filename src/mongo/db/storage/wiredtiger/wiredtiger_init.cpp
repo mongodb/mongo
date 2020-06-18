@@ -64,8 +64,8 @@ namespace {
 class WiredTigerFactory : public StorageEngine::Factory {
 public:
     virtual ~WiredTigerFactory() {}
-    virtual StorageEngine* create(const StorageGlobalParams& params,
-                                  const StorageEngineLockFile* lockFile) const {
+    virtual std::unique_ptr<StorageEngine> create(const StorageGlobalParams& params,
+                                                  const StorageEngineLockFile* lockFile) const {
         if (lockFile && lockFile->createdByUncleanShutdown()) {
             LOGV2_WARNING(22302, "Recovering data from the last clean checkpoint.");
         }
@@ -79,15 +79,10 @@ public:
             int ret = statfs(params.dbpath.c_str(), &fs_stats);
 
             if (ret == 0 && fs_stats.f_type == EXT4_SUPER_MAGIC) {
-                LOGV2_OPTIONS(22296, {logv2::LogTag::kStartupWarnings}, "");
-                LOGV2_OPTIONS(
-                    22297,
-                    {logv2::LogTag::kStartupWarnings},
-                    "** WARNING: Using the XFS filesystem is strongly recommended with the "
-                    "WiredTiger storage engine");
-                LOGV2_OPTIONS(22298,
+                LOGV2_OPTIONS(22297,
                               {logv2::LogTag::kStartupWarnings},
-                              "**          See "
+                              "Using the XFS filesystem is strongly recommended with the "
+                              "WiredTiger storage engine. See "
                               "http://dochub.mongodb.org/core/prodnotes-filesystem");
             }
         }
@@ -98,31 +93,24 @@ public:
         ProcessInfo p;
         if (p.supported()) {
             if (cacheMB > memoryThresholdPercentage * p.getMemSizeMB()) {
-                LOGV2_OPTIONS(22299, {logv2::LogTag::kStartupWarnings}, "");
                 LOGV2_OPTIONS(22300,
                               {logv2::LogTag::kStartupWarnings},
-                              "** WARNING: The configured WiredTiger cache size is more than "
-                              "{memoryThresholdPercentage_100}% of available RAM.",
-                              "memoryThresholdPercentage_100"_attr =
-                                  memoryThresholdPercentage * 100);
-                LOGV2_OPTIONS(22301,
-                              {logv2::LogTag::kStartupWarnings},
-                              "**          See "
-                              "http://dochub.mongodb.org/core/faq-memory-diagnostics-wt");
+                              "The configured WiredTiger cache size is more than 80% of available "
+                              "RAM. See http://dochub.mongodb.org/core/faq-memory-diagnostics-wt");
             }
         }
         const bool ephemeral = false;
-        WiredTigerKVEngine* kv =
-            new WiredTigerKVEngine(getCanonicalName().toString(),
-                                   params.dbpath,
-                                   getGlobalServiceContext()->getFastClockSource(),
-                                   wiredTigerGlobalOptions.engineConfig,
-                                   cacheMB,
-                                   wiredTigerGlobalOptions.getMaxHistoryFileSizeMB(),
-                                   params.dur,
-                                   ephemeral,
-                                   params.repair,
-                                   params.readOnly);
+        auto kv =
+            std::make_unique<WiredTigerKVEngine>(getCanonicalName().toString(),
+                                                 params.dbpath,
+                                                 getGlobalServiceContext()->getFastClockSource(),
+                                                 wiredTigerGlobalOptions.engineConfig,
+                                                 cacheMB,
+                                                 wiredTigerGlobalOptions.getMaxHistoryFileSizeMB(),
+                                                 params.dur,
+                                                 ephemeral,
+                                                 params.repair,
+                                                 params.readOnly);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
 
@@ -133,7 +121,7 @@ public:
 
             // Intentionally leaked.
             MONGO_COMPILER_VARIABLE_UNUSED auto leakedSection =
-                new WiredTigerServerStatusSection(kv);
+                new WiredTigerServerStatusSection(kv.get());
 
             // This allows unit tests to run this code without encountering memory leaks
 #if __has_feature(address_sanitizer)
@@ -145,7 +133,7 @@ public:
         options.directoryPerDB = params.directoryperdb;
         options.directoryForIndexes = wiredTigerGlobalOptions.directoryForIndexes;
         options.forRepair = params.repair;
-        return new StorageEngineImpl(kv, options);
+        return std::make_unique<StorageEngineImpl>(std::move(kv), options);
     }
 
     virtual StringData getCanonicalName() const {

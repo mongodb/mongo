@@ -142,7 +142,7 @@ void Variables::setValue(Id id, const Value& value, bool isConstant) {
     // If a value has already been set for 'id', and that value was marked as constant, then it
     // is illegal to modify.
     invariant(!hasConstantValue(id));
-    _values[id] = {value, isConstant};
+    _letParametersMap[id] = {value, isConstant};
 }
 
 void Variables::setValue(Variables::Id id, const Value& value) {
@@ -158,8 +158,8 @@ void Variables::setConstantValue(Variables::Id id, const Value& value) {
 Value Variables::getUserDefinedValue(Variables::Id id) const {
     invariant(isUserDefinedVariable(id));
 
-    auto it = _values.find(id);
-    uassert(40434, str::stream() << "Undefined variable id: " << id, it != _values.end());
+    auto it = _letParametersMap.find(id);
+    uassert(40434, str::stream() << "Undefined variable id: " << id, it != _letParametersMap.end());
     return it->second.value;
 }
 
@@ -233,13 +233,7 @@ void Variables::setDefaultRuntimeConstants(OperationContext* opCtx) {
     setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
 }
 
-BSONObj Variables::serializeLetParameters(const VariablesParseState& vps) const {
-    auto bob = BSONObjBuilder{};
-    for (auto&& [id, value] : _letParametersMap)
-        bob << kIdToBuiltinVarName.at(id) << value;
-    return bob.appendElements(vps.serialize(*this)).obj();
-}
-void Variables::seedVariablesWithLetParameters(boost::intrusive_ptr<ExpressionContext> expCtx,
+void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
                                                const BSONObj letParams) {
     for (auto&& elem : letParams) {
         Variables::validateNameForUserWrite(elem.fieldName());
@@ -332,7 +326,7 @@ std::set<Variables::Id> VariablesParseState::getDefinedVariableIDs() const {
     return ids;
 }
 
-BSONObj VariablesParseState::serialize(const Variables& vars) const {
+BSONObj VariablesParseState::serializeUserVariables(const Variables& vars) const {
     auto bob = BSONObjBuilder{};
     for (auto&& [var_name, id] : _variables)
         if (vars.hasValue(id))

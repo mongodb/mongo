@@ -274,6 +274,8 @@ DBCollection.prototype.insert = function(obj, options) {
     if (!obj)
         throw Error("no object passed to insert!");
 
+    options = typeof (options) === 'undefined' ? {} : options;
+
     var flags = 0;
 
     var wc = undefined;
@@ -299,7 +301,7 @@ DBCollection.prototype.insert = function(obj, options) {
     var ordered = ((flags & 1) == 0);
 
     if (!wc)
-        wc = this.getWriteConcern();
+        wc = this._createWriteConcern(options);
 
     var result = undefined;
     var startTime =
@@ -696,9 +698,8 @@ DBCollection.prototype.drop = function(options = {}) {
     const cmdObj = Object.assign({drop: this.getName()}, options);
     ret = this._db.runCommand(cmdObj);
     if (!ret.ok) {
-        if (ret.errmsg.includes("ns not found")) {
+        if (ret.errmsg == "ns not found")
             return false;
-        }
         throw _getErrorWithCode(ret, "drop failed: " + tojson(ret));
     }
     return true;

@@ -81,7 +81,7 @@ public:
             result.append("shardName", shardingState->shardId());
             result.append("clusterId", shardingState->clusterId());
 
-            CollectionShardingState::report(opCtx, &result);
+            CollectionShardingState::appendInfoForShardingStateCommand(opCtx, &result);
         }
 
         return true;

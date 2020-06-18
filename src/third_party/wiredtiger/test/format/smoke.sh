@@ -11,9 +11,12 @@ args="$args runs.rows=10000 "
 args="$args runs.source=table "
 args="$args runs.threads=4 "
 
-$TEST_WRAPPER ./t $args runs.type=fix
+# Temporarily disabled
+# $TEST_WRAPPER ./t $args runs.type=fix
+# $TEST_WRAPPER ./t $args runs.type=row runs.source=lsm
+# $TEST_WRAPPER ./t $args runs.type=var
+
 $TEST_WRAPPER ./t $args runs.type=row
-$TEST_WRAPPER ./t $args runs.type=row runs.source=lsm
-$TEST_WRAPPER ./t $args runs.type=var
 # Force a rebalance to occur with statistics logging to test the utility
-$TEST_WRAPPER ./t $args runs.type=row statistics.server=1 ops.rebalance=1
+# FIXME-WT-6410: temporarily disable running rebalance with timestamps
+# $TEST_WRAPPER ./t $args runs.type=row statistics.server=1 ops.rebalance=1

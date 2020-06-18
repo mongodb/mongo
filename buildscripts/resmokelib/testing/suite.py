@@ -4,10 +4,10 @@ import itertools
 import threading
 import time
 
-from . import report as _report
-from . import summary as _summary
-from .. import config as _config
-from .. import selector as _selector
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import selector as _selector
+from buildscripts.resmokelib.testing import report as _report
+from buildscripts.resmokelib.testing import summary as _summary
 
 # Map of error codes that could be seen. This is collected from:
 # * dbshell.cpp

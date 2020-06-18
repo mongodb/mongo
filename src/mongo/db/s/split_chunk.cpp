@@ -71,7 +71,7 @@ bool checkIfSingleDoc(OperationContext* opCtx,
                                            newmin,
                                            newmax,
                                            BoundInclusion::kIncludeStartKeyOnly,
-                                           PlanExecutor::NO_YIELD);
+                                           PlanYieldPolicy::YieldPolicy::NO_YIELD);
     // check if exactly one document found
     PlanExecutor::ExecState state;
     BSONObj obj;
@@ -196,7 +196,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     // succeeds, thus the automatic retry fails with a precondition violation, for example.
     //
     if (!commandStatus.isOK() || !writeConcernStatus.isOK()) {
-        forceShardFilteringMetadataRefresh(opCtx, nss);
+        onShardVersionMismatch(opCtx, nss, boost::none);
 
         if (checkMetadataForSuccessfulSplitChunk(
                 opCtx, nss, expectedCollectionEpoch, chunkRange, splitKeys)) {

@@ -63,7 +63,7 @@ OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
                                           NamespaceString::kRsOplogNamespace.ns(),
                                           CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
                                               opCtx, NamespaceString::kRsOplogNamespace),
-                                          PlanExecutor::NO_YIELD,
+                                          PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                           InternalPlanner::BACKWARD)) {}
 
 StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {

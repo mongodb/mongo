@@ -56,10 +56,11 @@ platforms:
       username: admin
   - name: rhel62
     driver:
-      # Use rhel 6.3 because chef-solo fails on rhel 6.2
-      image_id: ami-a35a33ca
+      # Use rhel 6.5 chef fails on previous versions.
+      image_id: ami-5b697332
     transport:
       username: root
+      instance_type: t2.small
   - name: rhel70
     driver:
       image_id: ami-60a1e808
@@ -77,7 +78,7 @@ platforms:
       username: ec2-user
   - name: suse12
     driver:
-      image_id: ami-aeb532c6
+      image_id: ami-043eebeabcc4e3d35
     transport:
       username: ec2-user
   - name: suse15

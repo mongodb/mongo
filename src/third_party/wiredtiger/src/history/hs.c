@@ -13,9 +13,10 @@
  * 	A pair containing a timestamp and transaction id.
  */
 typedef struct {
-    wt_timestamp_t timestamp;
+    wt_timestamp_t ts;
+    wt_timestamp_t durable_ts;
     uint64_t txnid;
-} WT_HS_TIME_PAIR;
+} WT_HS_TIME_POINT;
 
 /*
  * When an operation is accessing the history store table, it should ignore the cache size (since
@@ -66,7 +67,7 @@ __wt_hs_get_btree(WT_SESSION_IMPL *session, WT_BTREE **hs_btreep)
 
     WT_RET(__wt_hs_cursor(session, &session_flags, &is_owner));
 
-    *hs_btreep = ((WT_CURSOR_BTREE *)session->hs_cursor)->btree;
+    *hs_btreep = CUR2BT(session->hs_cursor);
     WT_ASSERT(session, *hs_btreep != NULL);
 
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
@@ -143,11 +144,11 @@ err:
 }
 
 /*
- * __wt_hs_create --
- *     Initialize the database's history store.
+ * __wt_hs_cleanup_las --
+ *     Drop the lookaside file if it exists.
  */
 int
-__wt_hs_create(WT_SESSION_IMPL *session, const char **cfg)
+__wt_hs_cleanup_las(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -155,16 +156,33 @@ __wt_hs_create(WT_SESSION_IMPL *session, const char **cfg)
 
     conn = S2C(session);
 
-    /* Read-only and in-memory configurations don't need the history store table. */
+    /* Read-only and in-memory configurations won't drop the lookaside. */
     if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
         return (0);
 
     /* The LAS table may exist on upgrade. Discard it. */
     WT_WITH_SCHEMA_LOCK(
       session, ret = __wt_schema_drop(session, "file:WiredTigerLAS.wt", drop_cfg));
-    WT_RET(ret);
 
-    /* Re-create the table. */
+    return (ret);
+}
+
+/*
+ * __wt_hs_create --
+ *     Initialize the database's history store.
+ */
+int
+__wt_hs_create(WT_SESSION_IMPL *session, const char **cfg)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+    /* Read-only and in-memory configurations don't need the history store table. */
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
+        return (0);
+
+    /* Create the table. */
     WT_RET(__wt_session_create(session, WT_HS_URI, WT_HS_CONFIG));
 
     WT_RET(__wt_hs_config(session, cfg));
@@ -201,6 +219,13 @@ __wt_hs_cursor_open(WT_SESSION_IMPL *session)
       session, ret = __wt_open_cursor(session, WT_HS_URI, NULL, open_cursor_cfg, &cursor));
     WT_RET(ret);
 
+    /*
+     * Set the flag to stop creating snapshots for history store cursors
+     */
+    F_SET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN);
+    /* History store cursors should always ignore tombstones. */
+    F_SET(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+
     session->hs_cursor = cursor;
     F_SET(session, WT_SESSION_HS_CURSOR);
 
@@ -214,7 +239,6 @@ __wt_hs_cursor_open(WT_SESSION_IMPL *session)
 int
 __wt_hs_cursor(WT_SESSION_IMPL *session, uint32_t *session_flags, bool *is_owner)
 {
-
     /*
      * We don't want to get tapped for eviction after we start using the history store cursor; save
      * a copy of the current eviction state, we'll turn eviction off before we return.
@@ -276,6 +300,51 @@ __wt_hs_cursor_close(WT_SESSION_IMPL *session, uint32_t session_flags, bool is_o
 }
 
 /*
+ * __hs_row_search --
+ *     Search the history store for a given key and position the cursor on it.
+ */
+static int
+__hs_row_search(WT_CURSOR_BTREE *hs_cbt, WT_ITEM *srch_key, bool insert)
+{
+    WT_CURSOR *hs_cursor;
+    WT_DECL_RET;
+    bool leaf_found;
+
+    hs_cursor = &hs_cbt->iface;
+    leaf_found = false;
+
+    /*
+     * Check whether the search key can be find in the provided leaf page, if exists. Otherwise
+     * perform a full search.
+     */
+    if (hs_cbt->ref != NULL) {
+        WT_WITH_BTREE(CUR2S(hs_cbt), CUR2BT(hs_cbt),
+          ret = __wt_row_search(hs_cbt, srch_key, insert, hs_cbt->ref, false, &leaf_found));
+        WT_RET(ret);
+
+        /*
+         * Only use the pinned page search results if search returns an exact match or a slot other
+         * than the page's boundary slots, if that's not the case, the record might belong on an
+         * entirely different page.
+         */
+        if (leaf_found && (hs_cbt->compare != 0 &&
+                            (hs_cbt->slot == 0 || hs_cbt->slot == hs_cbt->ref->page->entries - 1)))
+            leaf_found = false;
+        if (!leaf_found)
+            hs_cursor->reset(hs_cursor);
+    }
+
+    if (!leaf_found)
+        WT_WITH_BTREE(CUR2S(hs_cbt), CUR2BT(hs_cbt),
+          ret = __wt_row_search(hs_cbt, srch_key, insert, NULL, false, NULL));
+
+#ifdef HAVE_DIAGNOSTIC
+    WT_TRET(__wt_cursor_key_order_init(hs_cbt));
+#endif
+    return (ret);
+}
+
+/*
  * __wt_hs_modify --
  *     Make an update to the history store.
  *
@@ -287,24 +356,13 @@ int
 __wt_hs_modify(WT_CURSOR_BTREE *hs_cbt, WT_UPDATE *hs_upd)
 {
     WT_DECL_RET;
-    WT_PAGE_MODIFY *mod;
-    WT_SESSION_IMPL *session;
-    WT_UPDATE *last_upd;
 
-    session = CUR2S(hs_cbt);
-
-    /* If there are existing updates, append them after the new updates. */
-    if (hs_cbt->compare == 0) {
-        for (last_upd = hs_upd; last_upd->next != NULL; last_upd = last_upd->next)
-            ;
-        if (hs_cbt->ins != NULL)
-            last_upd->next = hs_cbt->ins->upd;
-        else if ((mod = hs_cbt->ref->page->modify) != NULL && mod->mod_row_update != NULL)
-            last_upd->next = mod->mod_row_update[hs_cbt->slot];
-    }
-
-    WT_WITH_BTREE(session, hs_cbt->btree,
-      ret = __wt_row_modify(hs_cbt, &hs_cbt->iface.key, NULL, hs_upd, WT_UPDATE_INVALID, true));
+    /*
+     * We don't have exclusive access to the history store page so we need to pass "false" here to
+     * ensure that we're locking when inserting new keys to an insert list.
+     */
+    WT_WITH_BTREE(CUR2S(hs_cbt), CUR2BT(hs_cbt),
+      ret = __wt_row_modify(hs_cbt, &hs_cbt->iface.key, NULL, hs_upd, WT_UPDATE_INVALID, false));
     return (ret);
 }
 
@@ -359,43 +417,76 @@ __hs_insert_updates_verbose(WT_SESSION_IMPL *session, WT_BTREE *btree)
 
 /*
  * __hs_insert_record_with_btree_int --
- *     Internal helper for inserting history store records.
+ *     Internal helper for inserting history store records. If this call is successful, the cursor
+ *     parameter will be positioned on the newly inserted record. Otherwise, it will be reset.
  */
 static int
 __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
   const WT_ITEM *key, const WT_UPDATE *upd, const uint8_t type, const WT_ITEM *hs_value,
-  WT_HS_TIME_PAIR stop_ts_pair)
+  WT_HS_TIME_POINT *stop_time_point)
 {
     WT_CURSOR_BTREE *cbt;
+    WT_DECL_ITEM(hs_key);
     WT_DECL_RET;
     WT_UPDATE *hs_upd, *upd_local;
+    wt_timestamp_t hs_start_ts;
+    uint64_t counter, hs_counter;
+    uint32_t hs_btree_id;
+    int cmp;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     hs_upd = upd_local = NULL;
+    counter = 0;
+
+    /* Allocate buffers for the data store and history store key. */
+    WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
+
+    /*
+     * Adjust counter if there exists an update in the history store with same btree id, key and
+     * timestamp. Otherwise the newly inserting history store record may fall behind the existing
+     * one can lead to wrong order.
+     */
+    WT_ERR_NOTFOUND_OK(
+      __wt_hs_cursor_position(session, cursor, btree->id, key, upd->start_ts), true);
+    if (ret == 0) {
+        WT_ERR(cursor->get_key(cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
+
+        /*
+         * Check the whether the existing record is also from the same timestamp.
+         *
+         * Verify simple checks first to confirm whether the retrieved update same or not before
+         * performing the expensive key comparison.
+         */
+        if (hs_btree_id == btree->id && upd->start_ts == hs_start_ts) {
+            WT_ERR(__wt_compare(session, NULL, hs_key, key, &cmp));
+            if (cmp == 0)
+                counter = hs_counter + 1;
+        }
+    }
 
     /*
      * Use WT_CURSOR.set_key and WT_CURSOR.set_value to create key and value items, then use them to
      * create an update chain for a direct insertion onto the history store page.
      */
-    cursor->set_key(
-      cursor, btree->id, key, upd->start_ts, __wt_atomic_add64(&btree->hs_counter, 1));
-    cursor->set_value(cursor, stop_ts_pair.timestamp, upd->durable_ts, (uint64_t)type, hs_value);
+    cursor->set_key(cursor, btree->id, key, upd->start_ts, counter);
+    cursor->set_value(
+      cursor, stop_time_point->durable_ts, upd->durable_ts, (uint64_t)type, hs_value);
 
-    /* Allocate a tombstone only when there is a valid stop time pair. */
-    if (stop_ts_pair.timestamp != WT_TS_MAX || stop_ts_pair.txnid != WT_TXN_MAX) {
+    /* Allocate a tombstone only when there is a valid stop time point. */
+    if (stop_time_point->ts != WT_TS_MAX || stop_time_point->txnid != WT_TXN_MAX) {
         /*
-         * Insert a delete record to represent stop time pair for the actual record to be inserted.
-         * Set the stop time pair as the commit time pair of the history store delete record.
+         * Insert a delete record to represent stop time point for the actual record to be inserted.
+         * Set the stop time point as the commit time point of the history store delete record.
          */
         WT_ERR(__wt_upd_alloc_tombstone(session, &hs_upd, NULL));
-        hs_upd->start_ts = stop_ts_pair.timestamp;
-        hs_upd->durable_ts = stop_ts_pair.timestamp;
-        hs_upd->txnid = stop_ts_pair.txnid;
+        hs_upd->start_ts = stop_time_point->ts;
+        hs_upd->durable_ts = stop_time_point->durable_ts;
+        hs_upd->txnid = stop_time_point->txnid;
     }
 
     /*
      * Append to the delete record, the actual record to be inserted into the history store. Set the
-     * current update start time pair as the commit time pair to the history store record.
+     * current update start time point as the commit time point to the history store record.
      */
     WT_ERR(__wt_upd_alloc(session, &cursor->value, WT_UPDATE_STANDARD, &upd_local, NULL));
     upd_local->start_ts = upd->start_ts;
@@ -408,11 +499,8 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
     else
         hs_upd = upd_local;
 
-    /*
-     * Search the page and insert the updates. We expect there will be no existing data: assert that
-     * we don't find a matching key.
-     */
-    WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, &cursor->key, true, NULL, false, NULL));
+    /* Search the page and insert the updates. */
+    WT_WITH_PAGE_INDEX(session, ret = __hs_row_search(cbt, &cursor->key, true));
     WT_ERR(ret);
     WT_ERR(__wt_hs_modify(cbt, hs_upd));
 
@@ -423,51 +511,31 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, W
     WT_STAT_CONN_INCR(session, cache_hs_insert);
 
 err:
-    if (ret != 0)
+    __wt_scr_free(session, &hs_key);
+    if (ret != 0) {
         __wt_free_update_list(session, &hs_upd);
-    /*
-     * If we inserted an update with no timestamp, we need to delete all history records for that
-     * key that are further in the history table than us (the key is lexicographically greater). For
-     * timestamped tables that are occasionally getting a non-timestamped update, that means that
-     * all timestamped updates should get removed. In the case of non-timestamped tables, that means
-     * that all updates with higher transaction ids will get removed (which could happen at some
-     * more relaxed isolation levels).
-     */
-    if (ret == 0 && upd->start_ts == WT_TS_NONE) {
-#ifdef HAVE_DIAGNOSTIC
+
         /*
-         * We need to initialize the last searched key so that we can do key comparisons when we
-         * begin iterating over the history store. This needs to be done otherwise the subsequent
-         * "next" calls will blow up.
+         * We did a row search, release the cursor so that the page doesn't continue being held.
+         *
+         * If we were successful, do NOT reset the cursor. We may want to make use of its position
+         * later to remove timestamped entries.
          */
-        WT_TRET(__wt_cursor_key_order_init(cbt));
-#endif
-        F_SET(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
-        /* We're pointing at the newly inserted update. Iterate once more to avoid deleting it. */
-        ret = cursor->next(cursor);
-        if (ret == WT_NOTFOUND)
-            ret = 0;
-        else if (ret == 0) {
-            WT_TRET(__hs_delete_key_from_pos(session, cursor, btree->id, key));
-            WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts);
-        }
-        F_CLR(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+        cursor->reset(cursor);
     }
-    /* We did a row search, release the cursor so that the page doesn't continue being held. */
-    cursor->reset(cursor);
 
     return (ret);
 }
 
 /*
  * __hs_insert_record_with_btree --
- *     A helper function to insert the record into the history store including stop time pair.
+ *     A helper function to insert the record into the history store including stop time point.
  *     Should be called with session's btree switched to the history store.
  */
 static int
 __hs_insert_record_with_btree(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
   const WT_ITEM *key, const WT_UPDATE *upd, const uint8_t type, const WT_ITEM *hs_value,
-  WT_HS_TIME_PAIR stop_ts_pair)
+  WT_HS_TIME_POINT *stop_time_point, bool clear_hs)
 {
     WT_DECL_RET;
 
@@ -492,24 +560,44 @@ __hs_insert_record_with_btree(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BT
      */
     WT_ASSERT(session, type == WT_UPDATE_STANDARD || type == WT_UPDATE_MODIFY);
 
-    /*
-     * If the time pairs are out of order (which can happen if the application performs updates with
-     * out-of-order timestamps), so this value can never be seen, don't bother inserting it.
-     */
-    if (stop_ts_pair.timestamp < upd->start_ts ||
-      (stop_ts_pair.timestamp == upd->start_ts && stop_ts_pair.txnid <= upd->txnid)) {
-        char ts_string[2][WT_TS_INT_STRING_SIZE];
-        __wt_verbose(session, WT_VERB_TIMESTAMP,
-          "Warning: fixing out-of-order timestamps %s earlier than previous update %s",
-          __wt_timestamp_to_string(stop_ts_pair.timestamp, ts_string[0]),
-          __wt_timestamp_to_string(upd->start_ts, ts_string[1]));
-        return (0);
-    }
-
     /* The tree structure can change while we try to insert the mod list, retry if that happens. */
     while ((ret = __hs_insert_record_with_btree_int(
-              session, cursor, btree, key, upd, type, hs_value, stop_ts_pair)) == WT_RESTART)
-        ;
+              session, cursor, btree, key, upd, type, hs_value, stop_time_point)) == WT_RESTART)
+        WT_STAT_CONN_INCR(session, cache_hs_insert_restart);
+    WT_ERR(ret);
+
+    /* Done if we don't need to clear the history store content. */
+    if (!clear_hs)
+        goto done;
+
+    /*
+     * We can only insert update without timestamp into the history store if we need to clear the
+     * history store record.
+     */
+    WT_ASSERT(session, upd->start_ts == WT_TS_NONE);
+
+    /*
+     * If we need to clear the history store content, we need to delete all history records for that
+     * key that are further in the history table than us (the key is lexicographically greater). For
+     * timestamped tables that are occasionally getting a non-timestamped update, that means that
+     * all timestamped updates should get removed.
+     */
+    WT_ERR_NOTFOUND_OK(cursor->next(cursor), true);
+
+    /* No records to delete. */
+    if (ret == WT_NOTFOUND) {
+        ret = 0;
+        goto done;
+    }
+    while ((ret = __hs_delete_key_from_pos(session, cursor, btree->id, key)) == WT_RESTART)
+        WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts_restart);
+    WT_ERR(ret);
+    WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts);
+
+done:
+err:
+    /* We did a row search, release the cursor so that the page doesn't continue being held. */
+    cursor->reset(cursor);
 
     return (ret);
 }
@@ -520,27 +608,42 @@ __hs_insert_record_with_btree(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BT
  */
 static int
 __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree, const WT_ITEM *key,
-  const WT_UPDATE *upd, const uint8_t type, const WT_ITEM *hs_value, WT_HS_TIME_PAIR stop_ts_pair)
+  const WT_UPDATE *upd, const uint8_t type, const WT_ITEM *hs_value,
+  WT_HS_TIME_POINT *stop_time_point, bool clear_hs)
 {
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
 
     cbt = (WT_CURSOR_BTREE *)cursor;
-    WT_WITH_BTREE(session, cbt->btree, ret = __hs_insert_record_with_btree(session, cursor, btree,
-                                         key, upd, type, hs_value, stop_ts_pair));
+    WT_WITH_BTREE(session, CUR2BT(cbt), ret = __hs_insert_record_with_btree(session, cursor, btree,
+                                          key, upd, type, hs_value, stop_time_point, clear_hs));
     return (ret);
 }
 
 /*
- * __hs_calculate_full_value --
- *     Calculate the full value of an update.
+ * __hs_next_upd_full_value --
+ *     Get the next update and its full value.
  */
 static inline int
-__hs_calculate_full_value(WT_SESSION_IMPL *session, WT_ITEM *full_value, WT_UPDATE *upd,
-  const void *base_full_value, size_t size)
+__hs_next_upd_full_value(WT_SESSION_IMPL *session, WT_MODIFY_VECTOR *modifies,
+  WT_ITEM *older_full_value, WT_ITEM *full_value, WT_UPDATE **updp)
 {
-    if (upd->type == WT_UPDATE_MODIFY) {
-        WT_RET(__wt_buf_set(session, full_value, base_full_value, size));
+    WT_UPDATE *upd;
+    *updp = NULL;
+    __wt_modify_vector_pop(modifies, &upd);
+    if (upd->type == WT_UPDATE_TOMBSTONE) {
+        if (modifies->size == 0) {
+            WT_ASSERT(session, older_full_value == NULL);
+            *updp = upd;
+            return (0);
+        }
+
+        __wt_modify_vector_pop(modifies, &upd);
+        WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);
+        full_value->data = upd->data;
+        full_value->size = upd->size;
+    } else if (upd->type == WT_UPDATE_MODIFY) {
+        WT_RET(__wt_buf_set(session, full_value, older_full_value->data, older_full_value->size));
         WT_RET(__wt_modify_apply_item(session, S2BT(session)->value_format, full_value, upd->data));
     } else {
         WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);
@@ -548,6 +651,7 @@ __hs_calculate_full_value(WT_SESSION_IMPL *session, WT_ITEM *full_value, WT_UPDA
         full_value->size = upd->size;
     }
 
+    *updp = upd;
     return (0);
 }
 
@@ -571,14 +675,14 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
     WT_MODIFY entries[MAX_REVERSE_MODIFY_NUM];
     WT_MODIFY_VECTOR modifies;
     WT_SAVE_UPD *list;
-    WT_UPDATE *prev_upd, *upd;
-    WT_HS_TIME_PAIR stop_ts_pair;
+    WT_UPDATE *first_non_ts_upd, *non_aborted_upd, *oldest_upd, *prev_upd, *upd;
+    WT_HS_TIME_POINT stop_time_point;
     wt_off_t hs_size;
     uint64_t insert_cnt, max_hs_size;
     uint32_t i;
     uint8_t *p;
     int nentries;
-    bool squashed;
+    bool clear_hs, enable_reverse_modify, squashed, ts_updates_in_hs;
 
     btree = S2BT(session);
     cursor = session->hs_cursor;
@@ -632,6 +736,10 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
         __wt_free_update_list(session, &upd);
         upd = list->onpage_upd;
 
+        first_non_ts_upd = NULL;
+        ts_updates_in_hs = false;
+        enable_reverse_modify = true;
+
         /*
          * The algorithm assumes the oldest update on the update chain in memory is either a full
          * update or a tombstone.
@@ -641,8 +749,8 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
          * newer than a TOMBSTONE must be a full update.
          *
          * The algorithm walks from the oldest update, or the most recently inserted into history
-         * store update. To the newest update and build full updates along the way. It sets the stop
-         * time pair of the update to the start time pair of the next update, squashes the updates
+         * store update, to the newest update and build full updates along the way. It sets the stop
+         * time point of the update to the start time point of the next update, squashes the updates
          * that are from the same transaction and of the same start timestamp, calculates reverse
          * modification if prev_upd is a MODIFY, and inserts the update to the history store.
          *
@@ -655,50 +763,111 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
          * With regard to the example, we insert U -> RM -> U to the history store.
          * 3) We have tombstones in the middle of the chain, e.g.,
          * U (selected onpage value) -> U -> T -> M -> U.
-         * We write the stop time pair of M with the start time pair of the tombstone and skip the
+         * We write the stop time point of M with the start time point of the tombstone and skip the
          * tombstone.
          * 4) We have a single tombstone on the chain, it is simply ignored.
          */
-        for (; upd != NULL; upd = upd->next) {
+        for (non_aborted_upd = prev_upd = NULL; upd != NULL;
+             prev_upd = non_aborted_upd, upd = upd->next) {
             if (upd->txnid == WT_TXN_ABORTED)
                 continue;
+
+            non_aborted_upd = upd;
+
             WT_ERR(__wt_modify_vector_push(&modifies, upd));
+
             /*
-             * If we've reached a full update and its in the history store we don't need to continue
-             * as anything beyond this point won't help with calculating deltas.
+             * Always insert full update to the history store if we write a prepared update to the
+             * data store.
+             */
+            if (upd->prepare_state == WT_PREPARE_INPROGRESS)
+                enable_reverse_modify = false;
+
+            /* Always insert full update to the history store if we need to squash the updates. */
+            if (prev_upd != NULL && prev_upd->txnid == upd->txnid &&
+              prev_upd->start_ts == upd->start_ts)
+                enable_reverse_modify = false;
+
+            /* Always insert full update to the history store if the timestamps are not in order. */
+            if (prev_upd != NULL && prev_upd->start_ts < upd->start_ts)
+                enable_reverse_modify = false;
+
+            /* Find the first update without timestamp. */
+            if (first_non_ts_upd == NULL && upd->start_ts == WT_TS_NONE) {
+                first_non_ts_upd = upd;
+            } else if (first_non_ts_upd != NULL && upd->start_ts != WT_TS_NONE) {
+                /*
+                 * Don't insert updates with timestamps after updates without timestamps to the
+                 * history store.
+                 */
+                F_SET(upd, WT_UPDATE_MASKED_BY_NON_TS_UPDATE);
+                if (F_ISSET(upd, WT_UPDATE_HS))
+                    ts_updates_in_hs = true;
+            }
+
+            /*
+             * If we've reached a full update and it's in the history store we don't need to
+             * continue as anything beyond this point won't help with calculating deltas.
              */
             if (upd->type == WT_UPDATE_STANDARD && F_ISSET(upd, WT_UPDATE_HS))
                 break;
         }
 
+        prev_upd = upd = NULL;
+
+        /*
+         * Trim from the end until there is a full update. We need this if we are dealing with
+         * updates without timestamps, and there are timestamped modify updates at the end of update
+         * chain that are not relevant due to newer full updates without timestamps.
+         */
+        for (; modifies.size > 0;) {
+            __wt_modify_vector_peek(&modifies, &upd);
+            if (upd->type == WT_UPDATE_MODIFY) {
+                WT_ASSERT(session, F_ISSET(upd, WT_UPDATE_MASKED_BY_NON_TS_UPDATE));
+                __wt_modify_vector_pop(&modifies, &upd);
+            } else
+                break;
+        }
         upd = NULL;
 
         /* Construct the oldest full update. */
         WT_ASSERT(session, modifies.size > 0);
-        __wt_modify_vector_pop(&modifies, &upd);
 
-        WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD || upd->type == WT_UPDATE_TOMBSTONE);
-        /* Skip TOMBSTONE at the end of the update chain. */
-        if (upd->type == WT_UPDATE_TOMBSTONE) {
-            if (modifies.size > 0) {
-                if (upd->start_ts == WT_TS_NONE) {
-                    WT_ERR(__wt_hs_delete_key(session, btree->id, key));
-                    WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts);
-                }
-                __wt_modify_vector_pop(&modifies, &upd);
-            } else
-                continue;
-        }
+        __wt_modify_vector_peek(&modifies, &oldest_upd);
 
-        WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD);
-        full_value->data = upd->data;
-        full_value->size = upd->size;
+        WT_ASSERT(session,
+          oldest_upd->type == WT_UPDATE_STANDARD || oldest_upd->type == WT_UPDATE_TOMBSTONE);
+
+        /*
+         * Clear the history store here if the oldest update is a tombstone and it is the first
+         * update without timestamp on the update chain because we don't have the cursor placed at
+         * the correct place to delete the history store records when inserting the first update and
+         * it may be skipped if there is nothing to insert to the history store.
+         */
+        if (oldest_upd->type == WT_UPDATE_TOMBSTONE && oldest_upd == first_non_ts_upd) {
+            /* We can only delete history store entries that have timestamps. */
+            WT_ERR(__wt_hs_delete_key_from_ts(session, btree->id, key, 1));
+            WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts);
+            clear_hs = false;
+        } else
+            /*
+             * Clear the content with timestamps in the history store if we see updates without
+             * timestamps on the update chain.
+             *
+             * We don't need to clear the history store records if everything is still on the insert
+             * list and there are no updates moved to the history store by checkpoint or a failed
+             * eviction.
+             */
+            clear_hs = first_non_ts_upd != NULL && !F_ISSET(first_non_ts_upd, WT_UPDATE_HS) &&
+              (list->ins == NULL || ts_updates_in_hs);
+
+        WT_ERR(__hs_next_upd_full_value(session, &modifies, NULL, full_value, &upd));
 
         squashed = false;
 
         /*
          * Flush the updates on stack. Stopping once we run out or we reach the onpage upd start
-         * time pair, we can squash modifies with the same start time pair as the onpage upd away.
+         * time point, we can squash modifies with the same start time point as the onpage upd away.
          */
         for (; modifies.size > 0 &&
              !(upd->txnid == list->onpage_upd->txnid &&
@@ -707,7 +876,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
              upd = prev_upd) {
             WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD || upd->type == WT_UPDATE_MODIFY);
 
-            __wt_modify_vector_pop(&modifies, &prev_upd);
+            __wt_modify_vector_peek(&modifies, &prev_upd);
 
             /*
              * For any uncommitted prepared updates written to disk, the stop timestamp of the last
@@ -715,10 +884,10 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
              * removal by checkpoint garbage collection until the data store update is committed.
              */
             if (prev_upd->prepare_state == WT_PREPARE_INPROGRESS) {
-                WT_ASSERT(session,
-                  list->onpage_upd == prev_upd || list->onpage_upd->txnid == prev_upd->txnid);
-                stop_ts_pair.timestamp = WT_TS_MAX;
-                stop_ts_pair.txnid = WT_TXN_MAX;
+                WT_ASSERT(session, list->onpage_upd->txnid == prev_upd->txnid &&
+                    list->onpage_upd->start_ts == prev_upd->start_ts);
+                stop_time_point.durable_ts = stop_time_point.ts = WT_TS_MAX;
+                stop_time_point.txnid = WT_TXN_MAX;
             } else {
                 /*
                  * Set the stop timestamp from durable timestamp instead of commit timestamp. The
@@ -726,69 +895,94 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
                  * timestamp is globally visible. i.e. durable timestamp of data store version.
                  */
                 WT_ASSERT(session, prev_upd->start_ts <= prev_upd->durable_ts);
-                stop_ts_pair.timestamp = prev_upd->durable_ts;
-                stop_ts_pair.txnid = prev_upd->txnid;
+                stop_time_point.durable_ts = prev_upd->durable_ts;
+                stop_time_point.ts = prev_upd->start_ts;
+                stop_time_point.txnid = prev_upd->txnid;
             }
 
-            if (prev_upd->type == WT_UPDATE_TOMBSTONE) {
-                WT_ASSERT(session, modifies.size > 0);
-                if (prev_upd->start_ts == WT_TS_NONE) {
-                    WT_ERR(__wt_hs_delete_key(session, btree->id, key));
-                    WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts);
-                }
-                __wt_modify_vector_pop(&modifies, &prev_upd);
-                WT_ASSERT(session, prev_upd->type == WT_UPDATE_STANDARD);
-                prev_full_value->data = prev_upd->data;
-                prev_full_value->size = prev_upd->size;
-            } else
-                WT_ERR(__hs_calculate_full_value(
-                  session, prev_full_value, prev_upd, full_value->data, full_value->size));
+            WT_ERR(
+              __hs_next_upd_full_value(session, &modifies, full_value, prev_full_value, &prev_upd));
+
+            /* Squash the updates from the same transaction. */
+            if (upd->start_ts == prev_upd->start_ts && upd->txnid == prev_upd->txnid) {
+                squashed = true;
+                continue;
+            }
+
+            /* Skip updates already in the history store or masked by updates without timestamps. */
+            if (F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_MASKED_BY_NON_TS_UPDATE))
+                continue;
 
             /*
-             * Skip the updates have the same start timestamp and transaction id
-             *
-             * Modifies that have the same start time pair as the onpage_upd can be squashed away.
+             * If the time points are out of order (which can happen if the application performs
+             * updates with out-of-order timestamps), so this value can never be seen, don't bother
+             * inserting it.
              */
-            if (upd->start_ts != prev_upd->start_ts || upd->txnid != prev_upd->txnid) {
-                /*
-                 * Calculate reverse delta. Insert full update for the newest historical record even
-                 * it's a MODIFY.
-                 *
-                 * It is not correct to check prev_upd == list->onpage_upd as we may have aborted
-                 * updates in the middle.
-                 */
-                nentries = MAX_REVERSE_MODIFY_NUM;
-                if (!F_ISSET(upd, WT_UPDATE_HS)) {
-                    if (upd->type == WT_UPDATE_MODIFY &&
-                      __wt_calc_modify(session, prev_full_value, full_value,
-                        prev_full_value->size / 10, entries, &nentries) == 0) {
-                        WT_ERR(__wt_modify_pack(cursor, entries, nentries, &modify_value));
-                        WT_ERR(__hs_insert_record(session, cursor, btree, key, upd,
-                          WT_UPDATE_MODIFY, modify_value, stop_ts_pair));
-                        __wt_scr_free(session, &modify_value);
-                    } else
-                        WT_ERR(__hs_insert_record(session, cursor, btree, key, upd,
-                          WT_UPDATE_STANDARD, full_value, stop_ts_pair));
+            if (stop_time_point.ts < upd->start_ts ||
+              (stop_time_point.ts == upd->start_ts && stop_time_point.txnid <= upd->txnid)) {
+                char ts_string[2][WT_TS_INT_STRING_SIZE];
+                __wt_verbose(session, WT_VERB_TIMESTAMP,
+                  "Warning: fixing out-of-order timestamps %s earlier than previous update %s",
+                  __wt_timestamp_to_string(stop_time_point.ts, ts_string[0]),
+                  __wt_timestamp_to_string(upd->start_ts, ts_string[1]));
+                continue;
+            }
 
-                    /* Flag the update as now in the history store. */
-                    F_SET(upd, WT_UPDATE_HS);
-                    ++insert_cnt;
-                    if (squashed) {
-                        WT_STAT_CONN_INCR(session, cache_hs_write_squash);
-                        squashed = false;
-                    }
-                }
+            /*
+             * Calculate reverse modify and clear the history store records with timestamps when
+             * inserting the first update.
+             */
+            nentries = MAX_REVERSE_MODIFY_NUM;
+            if (upd->type == WT_UPDATE_MODIFY && enable_reverse_modify &&
+              __wt_calc_modify(session, prev_full_value, full_value, prev_full_value->size / 10,
+                entries, &nentries) == 0) {
+                WT_ERR(__wt_modify_pack(cursor, entries, nentries, &modify_value));
+                WT_ERR(__hs_insert_record(session, cursor, btree, key, upd, WT_UPDATE_MODIFY,
+                  modify_value, &stop_time_point, clear_hs));
+                __wt_scr_free(session, &modify_value);
             } else
-                squashed = true;
+                WT_ERR(__hs_insert_record(session, cursor, btree, key, upd, WT_UPDATE_STANDARD,
+                  full_value, &stop_time_point, clear_hs));
+
+            clear_hs = false;
+            /* Flag the update as now in the history store. */
+            F_SET(upd, WT_UPDATE_HS);
+            ++insert_cnt;
+            if (squashed) {
+                WT_STAT_CONN_INCR(session, cache_hs_write_squash);
+                squashed = false;
+            }
         }
 
         if (modifies.size > 0)
             WT_STAT_CONN_INCR(session, cache_hs_write_squash);
+
+        /*
+         * We need to clear the history store if we haven't inserted anything into the history store
+         * and there are updates without timestamps in the middle of the update chain.
+         *
+         * e.g., U@10 -> T@0 -> U@5.
+         *
+         * But we don't need to clear the history store if we write an update without timestamp to
+         * the data store because we don't insert any update with timestamp to the history store and
+         * we will clear the history store again once that update is moved to the history store.
+         *
+         * e.g., U@0 -> U@10 -> U@5 and U@1 in the history store. U@10 and U@5 are not inserted to
+         * the history store as they are flagged as WT_UPDATE_MASKED_BY_NON_TS_UPDATE and U@1 is not
+         * removed from the history store. U@1 will be removed from the history store once U@0 is
+         * moved to the history store.
+         */
+        if (clear_hs && (first_non_ts_upd->txnid != list->onpage_upd->txnid ||
+                          first_non_ts_upd->start_ts != list->onpage_upd->start_ts)) {
+            /* We can only delete history store entries that have timestamps. */
+            WT_ERR(__wt_hs_delete_key_from_ts(session, btree->id, key, 1));
+            WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts);
+        }
     }
 
     WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
     WT_STAT_CONN_SET(session, cache_hs_ondisk, hs_size);
-    max_hs_size = ((WT_CURSOR_BTREE *)cursor)->btree->file_max;
+    max_hs_size = CUR2BT(cursor)->file_max;
     if (max_hs_size != 0 && (uint64_t)hs_size > max_hs_size)
         WT_ERR_PANIC(session, WT_PANIC,
           "WiredTigerHS: file size of %" PRIu64 " exceeds maximum size %" PRIu64, (uint64_t)hs_size,
@@ -816,7 +1010,7 @@ err:
  */
 int
 __wt_hs_cursor_position(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t btree_id,
-  WT_ITEM *key, wt_timestamp_t timestamp)
+  const WT_ITEM *key, wt_timestamp_t timestamp)
 {
     WT_DECL_ITEM(srch_key);
     WT_DECL_RET;
@@ -865,19 +1059,6 @@ err:
 }
 
 /*
- * __hs_restore_read_timestamp --
- *     Reset the currently running transaction's read timestamp with the original read timestamp.
- */
-static void
-__hs_restore_read_timestamp(WT_SESSION_IMPL *session)
-{
-    WT_TXN_SHARED *txn_shared;
-
-    txn_shared = WT_SESSION_TXN_SHARED(session);
-    session->txn->read_timestamp = txn_shared->pinned_read_timestamp;
-}
-
-/*
  * __wt_find_hs_upd --
  *     Scan the history store for a record the btree cursor wants to position on. Create an update
  *     for the record and return to the caller. The caller may choose to optionally allow prepared
@@ -889,15 +1070,17 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
   WT_UPDATE_VALUE *upd_value, bool allow_prepare, WT_ITEM *on_disk_buf)
 {
     WT_CURSOR *hs_cursor;
+    WT_CURSOR_BTREE *hs_cbt;
     WT_DECL_ITEM(hs_value);
     WT_DECL_ITEM(orig_hs_value_buf);
     WT_DECL_RET;
     WT_ITEM hs_key, recno_key;
     WT_MODIFY_VECTOR modifies;
     WT_TXN *txn;
+    WT_TXN_SHARED *txn_shared;
     WT_UPDATE *mod_upd, *upd;
     wt_timestamp_t durable_timestamp, durable_timestamp_tmp, hs_start_ts, hs_start_ts_tmp;
-    wt_timestamp_t hs_stop_ts, hs_stop_ts_tmp, read_timestamp;
+    wt_timestamp_t hs_stop_durable_ts, hs_stop_durable_ts_tmp, read_timestamp;
     uint64_t hs_counter, hs_counter_tmp, upd_type_full;
     uint32_t hs_btree_id, session_flags;
     uint8_t *p, recno_key_buf[WT_INTPACK64_MAXSIZE], upd_type;
@@ -910,17 +1093,11 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
     WT_CLEAR(hs_key);
     __wt_modify_vector_init(session, &modifies);
     txn = session->txn;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
     hs_btree_id = S2BT(session)->id;
     session_flags = 0; /* [-Werror=maybe-uninitialized] */
     WT_NOT_READ(modify, false);
     is_owner = false;
-
-    /*
-     * We temporarily move the read timestamp forwards to read modify records in the history store.
-     * Outside of that window, it should always be equal to the original read timestamp.
-     */
-    WT_ASSERT(
-      session, txn->read_timestamp == WT_SESSION_TXN_SHARED(session)->pinned_read_timestamp);
 
     /* Row-store key is as passed to us, create the column-store key as needed. */
     WT_ASSERT(
@@ -940,35 +1117,54 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
     /* Open a history store table cursor. */
     WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
     hs_cursor = session->hs_cursor;
+    hs_cbt = (WT_CURSOR_BTREE *)hs_cursor;
 
     /*
      * After positioning our cursor, we're stepping backwards to find the correct update. Since the
      * timestamp is part of the key, our cursor needs to go from the newest record (further in the
-     * las) to the oldest (earlier in the las) for a given key.
+     * history store) to the oldest (earlier in the history store) for a given key.
      */
-    read_timestamp = allow_prepare ? txn->prepare_timestamp : txn->read_timestamp;
+    read_timestamp = allow_prepare ? txn->prepare_timestamp : txn_shared->read_timestamp;
     WT_ERR_NOTFOUND_OK(
       __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, key, read_timestamp), true);
     if (ret == WT_NOTFOUND) {
         ret = 0;
         goto done;
     }
-    WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
+    for (;; ret = hs_cursor->prev(hs_cursor)) {
+        WT_ERR_NOTFOUND_OK(ret, true);
+        /* If we hit the end of the table, let's get out of here. */
+        if (ret == WT_NOTFOUND) {
+            ret = 0;
+            goto done;
+        }
+        WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
 
-    /* Stop before crossing over to the next btree */
-    if (hs_btree_id != S2BT(session)->id)
-        goto done;
+        /* Stop before crossing over to the next btree */
+        if (hs_btree_id != S2BT(session)->id)
+            goto done;
 
-    /*
-     * Keys are sorted in an order, skip the ones before the desired key, and bail out if we have
-     * crossed over the desired key and not found the record we are looking for.
-     */
-    WT_ERR(__wt_compare(session, NULL, &hs_key, key, &cmp));
-    if (cmp != 0)
-        goto done;
+        /*
+         * Keys are sorted in an order, skip the ones before the desired key, and bail out if we
+         * have crossed over the desired key and not found the record we are looking for.
+         */
+        WT_ERR(__wt_compare(session, NULL, &hs_key, key, &cmp));
+        if (cmp != 0)
+            goto done;
 
-    WT_ERR(
-      hs_cursor->get_value(hs_cursor, &hs_stop_ts, &durable_timestamp, &upd_type_full, hs_value));
+        /*
+         * If the stop time point of a record is visible to us, we won't be able to see anything for
+         * this entire key. Just jump straight to the end.
+         */
+        if (__wt_txn_tw_stop_visible(session, &hs_cbt->upd_value->tw))
+            goto done;
+        /* If the start time point is visible to us, let's return that record. */
+        if (__wt_txn_tw_start_visible(session, &hs_cbt->upd_value->tw))
+            break;
+    }
+
+    WT_ERR(hs_cursor->get_value(
+      hs_cursor, &hs_stop_durable_ts, &durable_timestamp, &upd_type_full, hs_value));
     upd_type = (uint8_t)upd_type_full;
 
     /* We do not have tombstones in the history store anymore. */
@@ -988,7 +1184,7 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
     if (upd_type == WT_UPDATE_MODIFY) {
         WT_NOT_READ(modify, true);
         /* Store this so that we don't have to make a special case for the first modify. */
-        hs_stop_ts_tmp = hs_stop_ts;
+        hs_stop_durable_ts_tmp = hs_stop_durable_ts;
 
         /*
          * Resolving update chains of reverse deltas requires the current transaction to look beyond
@@ -996,22 +1192,10 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
          * visibility checks when reading in order to construct the modify chain, so we can create
          * the value we expect.
          */
-        F_SET(session, WT_SESSION_RESOLVING_MODIFY);
         while (upd_type == WT_UPDATE_MODIFY) {
             WT_ERR(__wt_upd_alloc(session, hs_value, upd_type, &mod_upd, NULL));
             WT_ERR(__wt_modify_vector_push(&modifies, mod_upd));
             mod_upd = NULL;
-
-            /*
-             * Each entry in the lookaside is written with the actual start and stop time pair
-             * embedded in the key. In order to traverse a sequence of modifies, we're going to have
-             * to manipulate our read timestamp to see records we wouldn't otherwise be able to see.
-             *
-             * In this case, we want to read the next update in the chain meaning that its start
-             * timestamp should be equivalent to the stop timestamp of the record that we're
-             * currently on.
-             */
-            session->txn->read_timestamp = hs_stop_ts_tmp;
 
             /*
              * Find the base update to apply the reverse deltas. If our cursor next fails to find an
@@ -1046,11 +1230,10 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
                 break;
             }
 
-            WT_ERR(hs_cursor->get_value(
-              hs_cursor, &hs_stop_ts_tmp, &durable_timestamp_tmp, &upd_type_full, hs_value));
+            WT_ERR(hs_cursor->get_value(hs_cursor, &hs_stop_durable_ts_tmp, &durable_timestamp_tmp,
+              &upd_type_full, hs_value));
             upd_type = (uint8_t)upd_type_full;
         }
-        F_CLR(session, WT_SESSION_RESOLVING_MODIFY);
         WT_ASSERT(session, upd_type == WT_UPDATE_STANDARD);
         while (modifies.size > 0) {
             __wt_modify_vector_pop(&modifies, &mod_upd);
@@ -1058,8 +1241,6 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
             __wt_free_update_list(session, &mod_upd);
             mod_upd = NULL;
         }
-        /* After we're done looping over modifies, reset the read timestamp. */
-        __hs_restore_read_timestamp(session);
         WT_STAT_CONN_INCR(session, cache_hs_read_squash);
     }
 
@@ -1070,27 +1251,18 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
      */
     WT_ERR(__wt_buf_set(session, &upd_value->buf, hs_value->data, hs_value->size));
 skip_buf:
-    upd_value->durable_ts = durable_timestamp;
-    upd_value->txnid = WT_TXN_NONE;
+    upd_value->tw.durable_start_ts = durable_timestamp;
+    upd_value->tw.start_txn = WT_TXN_NONE;
     upd_value->type = upd_type;
-    upd_value->prepare_state =
-      (hs_start_ts == durable_timestamp) ? WT_PREPARE_INIT : WT_PREPARE_RESOLVED;
 
 done:
 err:
-    F_CLR(session, WT_SESSION_RESOLVING_MODIFY);
-
     if (orig_hs_value_buf != NULL)
         __wt_scr_free(session, &orig_hs_value_buf);
     else
         __wt_scr_free(session, &hs_value);
     WT_ASSERT(session, hs_key.mem == NULL && hs_key.memsize == 0);
 
-    /*
-     * Restore the read timestamp if we encountered an error while processing a modify. There's no
-     * harm in doing this multiple times.
-     */
-    __hs_restore_read_timestamp(session);
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
 
     __wt_free_update_list(session, &mod_upd);
@@ -1117,11 +1289,12 @@ err:
 }
 
 /*
- * __hs_delete_key_int --
- *     Internal helper for deleting history store content for a given key.
+ * __hs_delete_key_from_ts_int --
+ *     Internal helper for deleting history store content of a given key from a timestamp.
  */
 static int
-__hs_delete_key_int(WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *key)
+__hs_delete_key_from_ts_int(
+  WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts)
 {
     WT_CURSOR *hs_cursor;
     WT_DECL_ITEM(srch_key);
@@ -1135,7 +1308,7 @@ __hs_delete_key_int(WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *
     hs_cursor = session->hs_cursor;
     WT_RET(__wt_scr_alloc(session, 0, &srch_key));
 
-    hs_cursor->set_key(hs_cursor, btree_id, key, WT_TS_NONE, (uint64_t)0);
+    hs_cursor->set_key(hs_cursor, btree_id, key, ts, 0);
     WT_ERR(__wt_buf_set(session, srch_key, hs_cursor->key.data, hs_cursor->key.size));
     WT_ERR_NOTFOUND_OK(hs_cursor->search_near(hs_cursor, &exact), true);
     /* Empty history store is fine. */
@@ -1167,6 +1340,8 @@ __hs_delete_key_int(WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *
     WT_ERR(__wt_compare(session, NULL, &hs_key, key, &cmp));
     if (cmp != 0)
         goto done;
+
+    WT_ASSERT(session, ts == WT_TS_NONE || hs_start_ts != WT_TS_NONE);
     WT_ERR(__hs_delete_key_from_pos(session, hs_cursor, btree_id, key));
 done:
     ret = 0;
@@ -1176,11 +1351,12 @@ err:
 }
 
 /*
- * __wt_hs_delete_key --
- *     Delete an entire key's worth of data in the history store.
+ * __wt_hs_delete_key_from_ts --
+ *     Delete history store content of a given key from a timestamp.
  */
 int
-__wt_hs_delete_key(WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *key)
+__wt_hs_delete_key_from_ts(
+  WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts)
 {
     WT_DECL_RET;
     uint32_t session_flags;
@@ -1198,17 +1374,9 @@ __wt_hs_delete_key(WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *k
 
     WT_RET(__wt_hs_cursor(session, &session_flags, &is_owner));
 
-    /*
-     * In order to delete a key range, we need to be able to inspect all history store records
-     * regardless of their stop time pairs.
-     */
-    F_SET(session->hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
-
     /* The tree structure can change while we try to insert the mod list, retry if that happens. */
-    while ((ret = __hs_delete_key_int(session, btree_id, key)) == WT_RESTART)
-        ;
-
-    F_CLR(session->hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+    while ((ret = __hs_delete_key_from_ts_int(session, btree_id, key, ts)) == WT_RESTART)
+        WT_STAT_CONN_INCR(session, cache_hs_insert_restart);
 
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
     return (ret);
@@ -1301,7 +1469,6 @@ __verify_history_store_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint32
      * visible tombstones in the data table to verify the corresponding entries in the history store
      * are too present in the data store.
      */
-    F_SET(hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
     F_SET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE);
 
     /*
@@ -1329,7 +1496,7 @@ __verify_history_store_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint32
         WT_ERR(__wt_compare(session, NULL, &hs_key, prev_hs_key, &cmp));
         if (cmp == 0)
             continue;
-        WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, &hs_key, false, NULL, false, NULL));
+        WT_WITH_PAGE_INDEX(session, ret = __hs_row_search(cbt, &hs_key, false));
         WT_ERR(ret);
 
         found = cbt->compare == 0;
@@ -1352,7 +1519,6 @@ __verify_history_store_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint32
     WT_ERR_NOTFOUND_OK(ret, true);
 err:
     F_CLR(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE);
-    F_CLR(hs_cursor, WT_CURSTD_IGNORE_TOMBSTONE);
     WT_ASSERT(session, hs_key.mem == NULL && hs_key.memsize == 0);
     __wt_scr_free(session, &prev_hs_key);
     return (ret);
@@ -1381,7 +1547,7 @@ __wt_history_store_verify_one(WT_SESSION_IMPL *session)
      * in the history store.
      */
     memset(&hs_key, 0, sizeof(hs_key));
-    cursor->set_key(cursor, btree_id, &hs_key, 0, 0, 0, 0);
+    cursor->set_key(cursor, btree_id, &hs_key, 0, 0);
     ret = cursor->search_near(cursor, &exact);
     if (ret == 0 && exact < 0)
         ret = cursor->next(cursor);

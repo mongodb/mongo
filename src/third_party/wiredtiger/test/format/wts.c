@@ -40,25 +40,6 @@
     "cd %s > /dev/null && rm -rf `ls | sed /CONFIG.rand/d`"
 
 /*
- * wts_create --
- *     Create the database home.
- */
-void
-wts_create(void)
-{
-    WT_DECL_RET;
-    size_t len;
-    char *cmd;
-
-    len = strlen(g.home) * 3 + strlen(FORMAT_HOME_INIT_CMD) + 1;
-    cmd = dmalloc(len);
-    testutil_check(__wt_snprintf(cmd, len, FORMAT_HOME_INIT_CMD, g.home, g.home, g.home));
-    if ((ret = system(cmd)) != 0)
-        testutil_die(ret, "home initialization (\"%s\") failed", cmd);
-    free(cmd);
-}
-
-/*
  * compressor --
  *     Configure compression.
  */
@@ -118,7 +99,8 @@ encryptor(uint32_t encrypt_flag)
 static int
 handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {
-    int out;
+    WT_DECL_RET;
+    int nw;
 
     (void)(handler);
     (void)(session);
@@ -132,20 +114,11 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *messa
         return (0);
 
     /* Write and flush the message so we're up-to-date on error. */
-    if (g.logfp == NULL) {
-        out = printf("%p:%s\n", (void *)session, message);
-        (void)fflush(stdout);
-    } else {
-        out = fprintf(g.logfp, "%p:%s\n", (void *)session, message);
-        (void)fflush(g.logfp);
-    }
-    return (out < 0 ? EIO : 0);
+    nw = printf("%p:%s\n", (void *)session, message);
+    ret = fflush(stdout);
+    return (nw < 0 ? EIO : (ret == EOF ? errno : 0));
 }
 
-/*
- * __handle_progress_default --
- *     Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
- */
 static int
 handle_progress(
   WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *operation, uint64_t progress)
@@ -172,20 +145,18 @@ static WT_EVENT_HANDLER event_handler = {
     } while (0)
 
 /*
- * wts_open --
- *     Open a connection to a WiredTiger database.
+ * create_database --
+ *     Create a WiredTiger database.
  */
-void
-wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
+static void
+create_database(const char *home, WT_CONNECTION **connp)
 {
     WT_CONNECTION *conn;
     size_t max;
-    char *config, *p;
+    char config[8 * 1024], *p;
 
-    *connp = NULL;
-
-    config = p = g.wiredtiger_open_config;
-    max = sizeof(g.wiredtiger_open_config);
+    p = config;
+    max = sizeof(config);
 
     CONFIG_APPEND(p,
       "create=true"
@@ -261,6 +232,8 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",aggressive_sweep");
     if (g.c_timing_stress_checkpoint)
         CONFIG_APPEND(p, ",checkpoint_slow");
+    if (g.c_timing_stress_hs_checkpoint_delay)
+        CONFIG_APPEND(p, ",history_store_checkpoint_delay");
     if (g.c_timing_stress_hs_sweep)
         CONFIG_APPEND(p, ",history_store_sweep_race");
     if (g.c_timing_stress_split_1)
@@ -280,11 +253,6 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     if (g.c_timing_stress_split_8)
         CONFIG_APPEND(p, ",split_8");
     CONFIG_APPEND(p, "]");
-
-#if WIREDTIGER_VERSION_MAJOR >= 10
-    if (g.c_verify)
-        CONFIG_APPEND(p, ",verify_metadata=true");
-#endif
 
     /* Extensions. */
     CONFIG_APPEND(p,
@@ -309,42 +277,21 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 
     testutil_checkfmt(wiredtiger_open(home, &event_handler, config, &conn), "%s", home);
 
-    if (set_api)
-        g.wt_api = conn->get_extension_api(conn);
-
     *connp = conn;
 }
 
 /*
- * wts_reopen --
- *     Re-open a connection to a WiredTiger database.
- */
-void
-wts_reopen(void)
-{
-    WT_CONNECTION *conn;
-
-    testutil_checkfmt(
-      wiredtiger_open(g.home, &event_handler, g.wiredtiger_open_config, &conn), "%s", g.home);
-
-    g.wt_api = conn->get_extension_api(conn);
-    g.wts_conn = conn;
-}
-
-/*
- * wts_init --
+ * create_object --
  *     Create the database object.
  */
-void
-wts_init(void)
+static void
+create_object(WT_CONNECTION *conn)
 {
-    WT_CONNECTION *conn;
     WT_SESSION *session;
     size_t max;
     uint32_t maxintlkey, maxleafkey, maxleafvalue;
     char config[4096], *p;
 
-    conn = g.wts_conn;
     p = config;
     max = sizeof(config);
 
@@ -456,37 +403,101 @@ wts_init(void)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * wts_create --
+ *     Create the database home and objects.
+ */
 void
-wts_close(void)
+wts_create(const char *home)
+{
+    WT_CONNECTION *conn;
+    WT_DECL_RET;
+    size_t len;
+    char *cmd;
+
+    len = strlen(g.home) * 3 + strlen(FORMAT_HOME_INIT_CMD) + 1;
+    cmd = dmalloc(len);
+    testutil_check(__wt_snprintf(cmd, len, FORMAT_HOME_INIT_CMD, g.home, g.home, g.home));
+    if ((ret = system(cmd)) != 0)
+        testutil_die(ret, "home initialization (\"%s\") failed", cmd);
+    free(cmd);
+
+    create_database(home, &conn);
+    create_object(conn);
+    if (g.c_in_memory != 0)
+        g.wts_conn_inmemory = conn;
+    else
+        testutil_check(conn->close(conn, NULL));
+}
+
+/*
+ * wts_open --
+ *     Open a connection to a WiredTiger database.
+ */
+void
+wts_open(const char *home, WT_CONNECTION **connp, WT_SESSION **sessionp, bool allow_verify)
+{
+    WT_CONNECTION *conn;
+    const char *config;
+
+    *connp = NULL;
+    *sessionp = NULL;
+
+    /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
+    if (g.c_in_memory != 0)
+        conn = g.wts_conn_inmemory;
+    else {
+        config = "";
+#if WIREDTIGER_VERSION_MAJOR >= 10
+        if (g.c_verify && allow_verify)
+            config = ",verify_metadata=true";
+#else
+        WT_UNUSED(allow_verify);
+#endif
+        testutil_checkfmt(wiredtiger_open(home, &event_handler, config, &conn), "%s", home);
+    }
+
+    testutil_check(conn->open_session(conn, NULL, NULL, sessionp));
+    *connp = conn;
+}
+
+void
+wts_close(WT_CONNECTION **connp, WT_SESSION **sessionp)
 {
     WT_CONNECTION *conn;
 
-    conn = g.wts_conn;
+    conn = *connp;
+    *connp = NULL;
+
+    /*
+     * If running in-memory, there's only a single, shared WT_CONNECTION handle. Format currently
+     * doesn't perform the operations coded to close and then re-open the database on in-memory
+     * databases (for example, salvage or rebalance), so the close gets all references, it doesn't
+     * have to avoid closing the real handle.
+     */
+    if (conn == g.wts_conn_inmemory)
+        g.wts_conn_inmemory = NULL;
+    *sessionp = NULL;
 
     if (g.backward_compatible)
         testutil_check(conn->reconfigure(conn, "compatibility=(release=3.3)"));
 
     testutil_check(conn->close(conn, g.c_leak_memory ? "leak_memory" : NULL));
-
-    g.wts_conn = NULL;
-    g.wt_api = NULL;
 }
 
 void
-wts_verify(const char *tag)
+wts_verify(WT_CONNECTION *conn, const char *tag)
 {
-    WT_CONNECTION *conn;
     WT_DECL_RET;
     WT_SESSION *session;
 
     if (g.c_verify == 0)
         return;
 
-    conn = g.wts_conn;
     track("verify", 0ULL, NULL);
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    logop(session, "%s", "=============== verify start");
+    trace_msg("%s", "=============== verify start");
 
     /*
      * Verify can return EBUSY if the handle isn't available. Don't yield and retry, in the case of
@@ -495,7 +506,7 @@ wts_verify(const char *tag)
     ret = session->verify(session, g.uri, "strict");
     testutil_assertfmt(ret == 0 || ret == EBUSY, "session.verify: %s: %s", g.uri, tag);
 
-    logop(session, "%s", "=============== verify stop");
+    trace_msg("%s", "=============== verify stop");
     testutil_check(session->close(session, NULL));
 }
 

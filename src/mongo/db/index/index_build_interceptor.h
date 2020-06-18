@@ -68,15 +68,17 @@ public:
      * table to store any duplicate key constraint violations found during the build, if the index
      * being built has uniqueness constraints.
      *
-     * deleteTemporaryTable() must be called before destruction to delete the temporary tables.
+     * finalizeTemporaryTables() must be called before destruction to delete or keep the temporary
+     * tables.
      */
     IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
 
     /**
-     * Deletes the temporary side writes and duplicate key constraint violations tables. Must be
-     * called before object destruction.
+     * Deletes or keeps the temporary side writes and duplicate key constraint violations tables.
+     * Must be called before object destruction.
      */
-    void deleteTemporaryTables(OperationContext* opCtx);
+    void finalizeTemporaryTables(OperationContext* opCtx,
+                                 TemporaryRecordStore::FinalizationAction action);
 
     /**
      * Client writes that are concurrent with an index build will have their index updates written
@@ -114,19 +116,11 @@ public:
      *
      * This is resumable, so subsequent calls will start the scan at the record immediately
      * following the last inserted record from a previous call to drainWritesIntoIndex.
-     *
-     * TODO (SERVER-40894): Implement draining while reading at a timestamp. The following comment
-     * does not apply.
-     * When 'readSource' is not kUnset, perform the drain by reading at the timestamp described by
-     * the ReadSource. This will always reset the ReadSource to its original value before returning.
-     * The drain otherwise reads at the pre-existing ReadSource on the RecoveryUnit. This may be
-     * necessary by callers that can only guarantee consistency of data up to a certain point in
-     * time.
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
+                                const Collection* coll,
                                 const InsertDeleteOptions& options,
                                 TrackDuplicates trackDups,
-                                RecoveryUnit::ReadSource readSource,
                                 DrainYieldPolicy drainYieldPolicy);
 
     SkippedRecordTracker* getSkippedRecordTracker() {
@@ -156,10 +150,20 @@ public:
      */
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
 
+    std::string getSideWritesTableIdent() const {
+        return _sideWritesTable->rs()->getIdent();
+    }
+
+    boost::optional<std::string> getDuplicateKeyTrackerTableIdent() const {
+        return _duplicateKeyTracker ? boost::make_optional(_duplicateKeyTracker->getTableIdent())
+                                    : boost::none;
+    }
+
 private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
     Status _applyWrite(OperationContext* opCtx,
+                       const Collection* coll,
                        const BSONObj& doc,
                        const InsertDeleteOptions& options,
                        TrackDuplicates trackDups,

@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/drop_indexes.h"
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -65,21 +64,34 @@ Status checkView(OperationContext* opCtx,
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "Cannot drop indexes on view " << nss);
         }
-        return Status(ErrorCodes::NamespaceNotFound,
-                      "Namespace '" + nss.ns() + "' does not exists (ns not found)");
+        return Status(ErrorCodes::NamespaceNotFound, str::stream() << "ns not found " << nss);
     }
     return Status::OK();
 }
 
-Status checkReplState(OperationContext* opCtx, NamespaceStringOrUUID dbAndUUID) {
-    bool writesAreReplicatedAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, dbAndUUID);
+Status checkReplState(OperationContext* opCtx,
+                      NamespaceStringOrUUID dbAndUUID,
+                      Collection* collection) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    auto canAcceptWrites = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
+    bool writesAreReplicatedAndNotPrimary = opCtx->writesAreReplicated() && !canAcceptWrites;
 
     if (writesAreReplicatedAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while dropping indexes on database "
                                     << dbAndUUID.db() << " with collection " << dbAndUUID.uuid());
     }
+
+    // Disallow index drops on drop-pending namespaces (system.drop.*) if we are primary.
+    auto isPrimary = replCoord->getSettings().usingReplSets() && canAcceptWrites;
+    const auto& nss = collection->ns();
+    if (isPrimary && nss.isDropPendingNamespace()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Cannot drop indexes on drop-pending namespace " << nss
+                                    << " in database " << dbAndUUID.db() << " with uuid "
+                                    << dbAndUUID.uuid());
+    }
+
     return Status::OK();
 }
 
@@ -197,13 +209,16 @@ Status dropIndexByDescriptor(OperationContext* opCtx,
                           << "can't drop unfinished index with name: " << desc->indexName());
     }
 
+    // Log the operation first, which reserves an optime in the oplog and sets the timestamp for
+    // future writes. This guarantees the durable catalog's metadata change to share the same
+    // timestamp when dropping the index below.
+    opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+        opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
+
     auto s = indexCatalog->dropIndex(opCtx, desc);
     if (!s.isOK()) {
         return s;
     }
-
-    opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-        opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
 
     return Status::OK();
 }
@@ -289,7 +304,7 @@ Status dropIndexes(OperationContext* opCtx,
     const UUID collectionUUID = collection->uuid();
     const NamespaceStringOrUUID dbAndUUID = {nss.db().toString(), collectionUUID};
 
-    status = checkReplState(opCtx, dbAndUUID);
+    status = checkReplState(opCtx, dbAndUUID, collection);
     if (!status.isOK()) {
         return status;
     }
@@ -298,6 +313,7 @@ Status dropIndexes(OperationContext* opCtx,
         LOGV2(51806,
               "CMD: dropIndexes",
               "namespace"_attr = nss,
+              "uuid"_attr = collectionUUID,
               "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
     }
 
@@ -370,7 +386,7 @@ Status dropIndexes(OperationContext* opCtx,
                               << " in database " << dbAndUUID.db() << " does not exist.");
         }
 
-        status = checkReplState(opCtx, dbAndUUID);
+        status = checkReplState(opCtx, dbAndUUID, collection);
         if (!status.isOK()) {
             return status;
         }
@@ -430,7 +446,6 @@ Status dropIndexes(OperationContext* opCtx,
     } else {
         // The index catalog requires that no active index builders are running when dropping
         // indexes.
-        BackgroundOperation::assertNoBgOpInProgForNs(collection->ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
     }
 
@@ -478,7 +493,6 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                   "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(nss);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             collection->uuid());
 

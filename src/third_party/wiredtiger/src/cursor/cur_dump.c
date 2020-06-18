@@ -90,8 +90,12 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
         } else {
             WT_ERR(child->get_key(child, &item));
 
-            WT_ERR(
-              __raw_to_dump(session, &item, &cursor->key, F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
+            if (F_ISSET(cursor, WT_CURSTD_DUMP_PRETTY)) {
+                WT_IGNORE_RET_PTR(__wt_buf_set_printable_format(
+                  session, item.data, item.size, cursor->key_format, &cursor->key));
+            } else
+                WT_ERR(
+                  __raw_to_dump(session, &item, &cursor->key, F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
         }
 
         va_start(ap, cursor);
@@ -236,7 +240,12 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
     } else {
         WT_ERR(child->get_value(child, &item));
 
-        WT_ERR(__raw_to_dump(session, &item, &cursor->value, F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
+        if (F_ISSET(cursor, WT_CURSTD_DUMP_PRETTY))
+            WT_IGNORE_RET_PTR(__wt_buf_set_printable_format(
+              session, item.data, item.size, cursor->value_format, &cursor->value));
+        else
+            WT_ERR(
+              __raw_to_dump(session, &item, &cursor->value, F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
 
         va_start(ap, cursor);
         if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -411,7 +420,8 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
     cdump->child = child;
 
     /* Copy the dump flags from the child cursor. */
-    F_SET(cursor, F_MASK(child, WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_JSON | WT_CURSTD_DUMP_PRINT));
+    F_SET(cursor, F_MASK(child, WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_JSON | WT_CURSTD_DUMP_PRETTY |
+                      WT_CURSTD_DUMP_PRINT));
     if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
         WT_ERR(__wt_calloc_one(session, &json));
         cursor->json_private = child->json_private = json;

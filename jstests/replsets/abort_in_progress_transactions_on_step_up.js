@@ -70,13 +70,17 @@ jsTestLog("Committing transaction but fail on replication");
 let res = session.commitTransaction_forTesting();
 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
 
-// Remember the commit OpTime on primary.
+// Remember the start and commit OpTimes on primary.
 let txnTableEntry = getTxnTableEntry(testDB);
 assert.eq(txnTableEntry.state, "committed");
-const commitOpTime = getTxnTableEntry(testDB).lastWriteOpTime;
+const commitOpTime = txnTableEntry.lastWriteOpTime;
+const startOpTime = testDB.getSiblingDB("local").oplog.rs.findOne({ts: commitOpTime.ts}).prevOpTime;
 
 jsTestLog("Wait for the new primary to block on fail point.");
 stopReplProducerOnDocumentFailPoint.wait();
+
+jsTestLog("Wait for the new primary to apply the first op of transaction.");
+assert.soon(() => getLastOpTime(newPrimary) >= startOpTime);
 
 // Now the transaction should be in-progress on newPrimary.
 txnTableEntry = getTxnTableEntry(newTestDB);

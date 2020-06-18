@@ -136,6 +136,10 @@ public:
 
     ~FixedFCVRegion() = default;
 
+    void release() {
+        _lk.reset();
+    }
+
 private:
     boost::optional<Lock::SharedLock> _lk;
 };

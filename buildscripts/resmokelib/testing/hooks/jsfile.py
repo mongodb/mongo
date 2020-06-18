@@ -1,9 +1,9 @@
 """Interface for customizing the behavior of a test fixture by executing a JavaScript file."""
 
-from . import interface
-from ..testcases import jstest
-from ... import errors
-from ...utils import registry
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.testcases import jstest
+from buildscripts.resmokelib.utils import registry
 
 
 class JSHook(interface.Hook):
@@ -31,8 +31,8 @@ class JSHook(interface.Hook):
         if not self._should_run_after_test():
             return
 
-        hook_test_case = DynamicJSTestCase.create_after_test(
-            self.logger.test_case_logger, test, self, self._js_filename, self._shell_options)
+        hook_test_case = DynamicJSTestCase.create_after_test(self.logger, test, self,
+                                                             self._js_filename, self._shell_options)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 

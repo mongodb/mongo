@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
@@ -39,6 +41,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -54,7 +57,12 @@ bool WiredTigerServerStatusSection::includeByDefault() const {
 
 BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
                                                        const BSONElement& configElement) const {
-    Lock::GlobalLock lk(opCtx, LockMode::MODE_IS);
+    Lock::GlobalLock lk(
+        opCtx, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked);
+    if (!lk.isLocked()) {
+        LOGV2_DEBUG(3088800, 2, "Failed to retrieve wiredTiger statistics");
+        return BSONObj();
+    }
 
     // The session does not open a transaction here as one is not needed and opening one would
     // mean that execution could become blocked when a new transaction cannot be allocated

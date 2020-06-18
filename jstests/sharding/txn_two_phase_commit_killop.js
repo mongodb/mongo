@@ -170,18 +170,7 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
 
 const failpointDataArr = getCoordinatorFailpoints();
 
-// TODO(SERVER-39754): The abort path is unreliable, because depending on the stage at which the
-// transaction is aborted, the failpoints might be hit more than the specified number of times.
-//
-// // Test abort path.
-
-// failpointDataArr.forEach(function(failpointData) {
-//     testCommitProtocol(false /* shouldCommit */, failpointData);
-//     clearRawMongoProgramOutput();
-// });
-
 // Test commit path.
-
 failpointDataArr.forEach(function(failpointData) {
     testCommitProtocol(true /* shouldCommit */, failpointData);
     clearRawMongoProgramOutput();

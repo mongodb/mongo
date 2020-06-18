@@ -41,6 +41,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sdam/json_test_arg_parser.h"
+#include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/topology_manager.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
@@ -448,7 +449,9 @@ public:
         auto config =
             std::make_unique<SdamConfiguration>(getSeedList(),
                                                 _initialType,
-                                                SdamConfiguration::kDefaultHeartbeatFrequencyMs,
+                                                Milliseconds{kHeartBeatFrequencyMsDefault},
+                                                Milliseconds{kConnectTimeoutMsDefault},
+                                                Milliseconds{kLocalThresholdMsDefault},
                                                 _replicaSetName);
 
         auto clockSource = std::make_unique<ClockSourceMock>();

@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/action_set.h"
@@ -37,7 +35,6 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -53,7 +50,7 @@ void ActionSet::addAction(const ActionType& action) {
         addAllActions();
         return;
     }
-    _actions.set(action.getIdentifier(), true);
+    _actions.set(static_cast<size_t>(action), true);
 }
 
 void ActionSet::addAllActionsFromSet(const ActionSet& actions) {
@@ -65,27 +62,27 @@ void ActionSet::addAllActionsFromSet(const ActionSet& actions) {
 }
 
 void ActionSet::addAllActions() {
-    _actions = ~std::bitset<ActionType::NUM_ACTION_TYPES>();
+    _actions.set();
 }
 
 void ActionSet::removeAction(const ActionType& action) {
-    _actions.set(action.getIdentifier(), false);
-    _actions.set(ActionType::anyAction.getIdentifier(), false);
+    _actions.set(static_cast<size_t>(action), false);
+    _actions.set(static_cast<size_t>(ActionType::anyAction), false);
 }
 
 void ActionSet::removeAllActionsFromSet(const ActionSet& other) {
     _actions &= ~other._actions;
     if (!other.empty()) {
-        _actions.set(ActionType::anyAction.getIdentifier(), false);
+        _actions.set(static_cast<size_t>(ActionType::anyAction), false);
     }
 }
 
 void ActionSet::removeAllActions() {
-    _actions = std::bitset<ActionType::NUM_ACTION_TYPES>();
+    _actions.reset();
 }
 
 bool ActionSet::contains(const ActionType& action) const {
-    return _actions[action.getIdentifier()];
+    return _actions[static_cast<size_t>(action)];
 }
 
 bool ActionSet::isSupersetOf(const ActionSet& other) const {
@@ -112,13 +109,17 @@ Status ActionSet::parseActionSetFromStringVector(const std::vector<std::string>&
                                                  ActionSet* result,
                                                  std::vector<std::string>* unrecognizedActions) {
     result->removeAllActions();
-    for (size_t i = 0; i < actionsVector.size(); i++) {
-        ActionType action;
-        Status status = ActionType::parseActionFromString(actionsVector[i], &action);
-        if (status == ErrorCodes::FailedToParse) {
-            unrecognizedActions->push_back(actionsVector[i]);
+    for (StringData actionName : actionsVector) {
+        auto parseResult = parseActionFromString(actionName);
+        if (!parseResult.isOK()) {
+            const auto& status = parseResult.getStatus();
+            if (status == ErrorCodes::FailedToParse) {
+                unrecognizedActions->push_back(std::string{actionName});
+            } else {
+                invariant(status);
+            }
         } else {
-            invariant(status);
+            const auto& action = parseResult.getValue();
             if (action == ActionType::anyAction) {
                 result->addAllActions();
                 return Status::OK();
@@ -131,33 +132,34 @@ Status ActionSet::parseActionSetFromStringVector(const std::vector<std::string>&
 
 std::string ActionSet::toString() const {
     if (contains(ActionType::anyAction)) {
-        return ActionType::anyAction.toString();
+        using mongo::toString;
+        return toString(ActionType::anyAction);
     }
-    StringBuilder str;
-    bool addedOne = false;
-    for (int i = 0; i < ActionType::actionTypeEndValue; i++) {
-        ActionType action(i);
+    std::string str;
+    StringData sep;
+    for (size_t i = 0; i < kNumActionTypes; ++i) {
+        auto action = static_cast<ActionType>(i);
         if (contains(action)) {
-            if (addedOne) {
-                str << ",";
-            }
-            str << ActionType::actionToString(action);
-            addedOne = true;
+            StringData name = toStringData(action);
+            str.append(sep.rawData(), sep.size());
+            str.append(name.rawData(), name.size());
+            sep = ","_sd;
         }
     }
-    return str.str();
+    return str;
 }
 
 std::vector<std::string> ActionSet::getActionsAsStrings() const {
+    using mongo::toString;
     std::vector<std::string> result;
     if (contains(ActionType::anyAction)) {
-        result.push_back(ActionType::anyAction.toString());
+        result.push_back(toString(ActionType::anyAction));
         return result;
     }
-    for (int i = 0; i < ActionType::actionTypeEndValue; i++) {
-        ActionType action(i);
+    for (size_t i = 0; i < kNumActionTypes; ++i) {
+        auto action = static_cast<ActionType>(i);
         if (contains(action)) {
-            result.push_back(ActionType::actionToString(action));
+            result.push_back(toString(action));
         }
     }
     return result;

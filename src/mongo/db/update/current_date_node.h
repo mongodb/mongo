@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class ServiceContext;
+
 /**
  * Represents the application of a $currentDate to the value at the end of a path.
  */
@@ -71,6 +73,8 @@ private:
 
     // If true, the current date should be expressed as a Date. If false, a Timestamp.
     bool _typeIsDate;
+
+    ServiceContext* _service;
 };
 
 }  // namespace mongo

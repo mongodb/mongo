@@ -57,8 +57,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     // massert(40389, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
     if (!file.has_branch_path()) {
         LOGV2(22274,
-              "warning flushMyDirectory couldn't find parent dir for file: {file_string}",
-              "file_string"_attr = file.string());
+              "warning flushMyDirectory couldn't find parent dir for file: {file}",
+              "flushMyDirectory couldn't find parent dir for file",
+              "file"_attr = file.generic_string());
         return;
     }
 
@@ -79,14 +80,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
                 LOGV2_OPTIONS(
                     22276,
                     {logv2::LogTag::kStartupWarnings},
-                    "\tWARNING: This file system is not supported. For further information see:");
-                LOGV2_OPTIONS(22277,
-                              {logv2::LogTag::kStartupWarnings},
-                              "\t\t\thttp://dochub.mongodb.org/core/unsupported-filesystems");
-                LOGV2_OPTIONS(22278,
-                              {logv2::LogTag::kStartupWarnings},
-                              "\t\tPlease notify MongoDB, Inc. if an unlisted filesystem generated "
-                              "this warning.");
+                    "This file system is not supported. For further information see: "
+                    "http://dochub.mongodb.org/core/unsupported-filesystems Please notify MongoDB, "
+                    "Inc. if an unlisted filesystem generated this warning");
                 _warnedAboutFilesystem = true;
             }
         } else {
@@ -239,7 +235,8 @@ void StorageEngineLockFile::clearPidAndUnlock() {
         int errorcode = errno;
         LOGV2(22280,
               "couldn't remove fs lock {errnoWithDescription_errorcode}",
-              "errnoWithDescription_errorcode"_attr = errnoWithDescription(errorcode));
+              "Couldn't remove fs lock",
+              "error"_attr = errnoWithDescription(errorcode));
     }
     close();
 }

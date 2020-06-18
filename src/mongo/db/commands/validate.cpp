@@ -140,12 +140,20 @@ public:
                                     << " and { full: true } is not supported.");
         }
 
+        const bool enforceFastCount = cmdObj["enforceFastCount"].trueValue();
+        if (background && enforceFastCount) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Running the validate command with both { background: true }"
+                                    << " and { enforceFastCount: true } is not supported.");
+        }
+
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,
                   "CMD: validate",
                   "namespace"_attr = nss,
                   "background"_attr = background,
-                  "full"_attr = fullValidate);
+                  "full"_attr = fullValidate,
+                  "enforceFastCount"_attr = enforceFastCount);
         }
 
         // Only one validation per collection can be in progress, the rest wait.
@@ -172,12 +180,17 @@ public:
             _validationNotifier.notify_all();
         });
 
-        auto options = (fullValidate) ? CollectionValidation::ValidateOptions::kFullValidation
-                                      : CollectionValidation::ValidateOptions::kNoFullValidation;
-
+        auto mode = [&] {
+            if (background)
+                return CollectionValidation::ValidateMode::kBackground;
+            if (enforceFastCount)
+                return CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount;
+            if (fullValidate)
+                return CollectionValidation::ValidateMode::kForegroundFull;
+            return CollectionValidation::ValidateMode::kForeground;
+        }();
         ValidateResults validateResults;
-        Status status = CollectionValidation::validate(
-            opCtx, nss, options, background, &validateResults, &result);
+        Status status = CollectionValidation::validate(opCtx, nss, mode, &validateResults, &result);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }

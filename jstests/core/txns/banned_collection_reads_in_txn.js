@@ -1,5 +1,5 @@
 // Tests that it is illegal to read from system.views and system.profile within a transaction.
-// @tags: [requires_fcv_46, uses_transactions, uses_snapshot_read_concern]
+// @tags: [uses_transactions, uses_snapshot_read_concern]
 (function() {
 "use strict";
 

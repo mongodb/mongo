@@ -85,7 +85,7 @@ public:
 
         KVPrefix prefix = KVPrefix::kNotPrefixed;
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", desc, prefix.isPrefixed());
+            kWiredTigerEngineName, "", "", NamespaceString(ns), desc, prefix.isPrefixed());
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
@@ -111,11 +111,12 @@ public:
         }
 
         auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
-        IndexDescriptor desc(collection.get(), "", spec);
+
+        IndexDescriptor& desc = _descriptors.emplace_back(collection.get(), "", spec);
 
         KVPrefix prefix = KVPrefix::kNotPrefixed;
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", desc, prefix.isPrefixed());
+            kWiredTigerEngineName, "", "", NamespaceString(ns), desc, prefix.isPrefixed());
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
@@ -133,6 +134,7 @@ public:
 private:
     unittest::TempDir _dbpath;
     std::unique_ptr<ClockSource> _fastClockSource;
+    std::vector<IndexDescriptor> _descriptors;
     WT_CONNECTION* _conn;
     WiredTigerSessionCache* _sessionCache;
     WiredTigerOplogManager _oplogManager;

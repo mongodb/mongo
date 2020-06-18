@@ -1,18 +1,14 @@
 """Configure the command line input for the resmoke 'run' subcommand."""
 
+import configparser
+import datetime
 import os
 import os.path
-import sys
-import shlex
-import configparser
 
-from typing import NamedTuple
-
-import datetime
 import pymongo.uri_parser
 
-from . import config as _config
-from . import utils
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import utils
 
 
 def validate_and_update_config(parser, args):
@@ -66,15 +62,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     config = _config.DEFAULTS.copy()
 
-    # Use RSK_ prefixed environment variables to indicate resmoke-specific values.
-    # The list of configuration is detailed in config.py
-    resmoke_env_prefix = 'RSK_'
-    for key in os.environ.keys():
-        if key.startswith(resmoke_env_prefix):
-            # Windows env vars are case-insensitive, we use lowercase to be consistent
-            # with existing resmoke options.
-            config[key[len(resmoke_env_prefix):].lower()] = os.environ[key]
-
     # Override `config` with values from command line arguments.
     cmdline_vars = vars(values)
     for cmdline_key in cmdline_vars:
@@ -92,8 +79,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             config.update(user_config)
 
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
-    _config.IS_ASAN_BUILD = config.pop("is_asan_build")
     _config.BASE_PORT = int(config.pop("base_port"))
+    _config.BACKUP_ON_RESTART_DIR = config.pop("backup_on_restart_dir")
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
     _config.DRY_RUN = config.pop("dry_run")
@@ -196,6 +183,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     # Config Dir options.
     _config.CONFIG_DIR = config.pop("config_dir")
+
+    _config.UNDO_RECORDER_PATH = config.pop("undo_recorder_path")
 
     # Populate the named suites by scanning config_dir/suites
     named_suites = {}

@@ -62,10 +62,10 @@ public:
     static constexpr StringData kAllowDiskUseName = "allowDiskUse"_sd;
     static constexpr StringData kHintName = "hint"_sd;
     static constexpr StringData kExchangeName = "exchange"_sd;
-    static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
-    static constexpr StringData kUse44SortKeys = "use44SortKeys"_sd;
-    static constexpr StringData kIsMapReduceCommand = "isMapReduceCommand"_sd;
-    static constexpr StringData kLet = "let"_sd;
+    static constexpr StringData kRuntimeConstantsName = "runtimeConstants"_sd;
+    static constexpr StringData kUse44SortKeysName = "use44SortKeys"_sd;
+    static constexpr StringData kIsMapReduceCommandName = "isMapReduceCommand"_sd;
+    static constexpr StringData kLetName = "let"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -219,6 +219,10 @@ public:
         return _runtimeConstants;
     }
 
+    const auto& getLetParameters() const {
+        return _letParameters;
+    }
+
     bool getIsMapReduceCommand() const {
         return _isMapReduceCommand;
     }
@@ -287,13 +291,13 @@ public:
         _runtimeConstants = std::move(runtimeConstants);
     }
 
+    void setLetParameters(BSONObj letParameters) {
+        _letParameters = letParameters.getOwned();
+    }
+
     void setIsMapReduceCommand(bool isMapReduce) {
         _isMapReduceCommand = isMapReduce;
     }
-
-    // A document containing user-specified let parameter constants; i.e. values that do not change
-    // once computed.
-    BSONObj letParameters;
 
 private:
     // Required fields.
@@ -344,6 +348,10 @@ private:
     // A document containing runtime constants; i.e. values that do not change once computed (e.g.
     // $$NOW).
     boost::optional<RuntimeConstants> _runtimeConstants;
+
+    // A document containing user-specified let parameter constants; i.e. values that do not change
+    // once computed.
+    BSONObj _letParameters;
 
     // True when an aggregation was invoked by the MapReduce command.
     bool _isMapReduceCommand = false;

@@ -79,7 +79,7 @@ public:
                                                       std::move(workingSet),
                                                       std::move(queuedDataStage),
                                                       nullptr,
-                                                      PlanExecutor::YieldPolicy::NO_YIELD,
+                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                       kTestNss));
     }
 
@@ -91,7 +91,6 @@ public:
             opCtx->getWriteConcern(),
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         };
@@ -145,7 +144,6 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -175,7 +173,6 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -216,7 +213,6 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -236,7 +232,6 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -260,7 +255,6 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -288,7 +282,6 @@ TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -325,7 +318,6 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -361,7 +353,6 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -379,7 +370,6 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });
@@ -420,7 +410,6 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
             {},
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             BSONObj(),
-            ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
             false  // needsMerge
         });

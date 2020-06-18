@@ -36,6 +36,10 @@ const snapshotReadsTest = new SnapshotReadsTest({
 
 snapshotReadsTest.cursorTest({testScenarioName: jsTestName(), collName: "test"});
 snapshotReadsTest.distinctTest({testScenarioName: jsTestName(), collName: "test"});
+snapshotReadsTest.outAndMergeTest(
+    {testScenarioName: jsTestName(), coll: "test", outColl: "testOut", isOutCollSharded: false});
+snapshotReadsTest.lookupAndUnionWithTest(
+    {testScenarioName: jsTestName(), coll1: "test1", coll2: "test2", isColl2Sharded: false});
 
 // Ensure "atClusterTime" is omitted from a regular (non-snapshot) read.
 primaryDB["collection"].insertOne({});

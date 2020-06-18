@@ -46,10 +46,10 @@ DEFAULT_GENNY_EXECUTABLE = os.path.normpath("genny/build/src/driver/genny")
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
     "always_use_log_files": False,
-    "is_asan_build": False,
     "archive_limit_mb": 5000,
     "archive_limit_tests": 10,
     "base_port": 20000,
+    "backup_on_restart_dir": None,
     "buildlogger_url": "https://logkeeper.mongodb.org",
     "continue_on_failure": False,
     "dbpath_prefix": None,
@@ -127,7 +127,10 @@ DEFAULTS = {
     "benchmark_repetitions": None,
 
     # Config Dir
-    "config_dir": "buildscripts/resmokeconfig"
+    "config_dir": "buildscripts/resmokeconfig",
+
+    # UndoDB options
+    "undo_recorder_path": None
 }
 
 _SuiteOptions = collections.namedtuple("_SuiteOptions", [
@@ -233,9 +236,6 @@ ARCHIVE_LIMIT_MB = None
 
 # The limit number of tests to archive for an Evergreen task.
 ARCHIVE_LIMIT_TESTS = None
-
-# True if resmoke is running against and ASAN build.
-IS_ASAN_BUILD = None
 
 # The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
 # mongo shell.
@@ -456,6 +456,9 @@ BENCHMARK_LIST_TESTS = None
 BENCHMARK_MIN_TIME = None
 BENCHMARK_REPETITIONS = None
 
+# UndoDB options
+UNDO_RECORDER_PATH = None
+
 ##
 # Internally used configuration options that aren't exposed to the user
 ##
@@ -490,4 +493,4 @@ NAMED_SUITES = None
 LOGGER_DIR = None
 
 # Generated logging config for the current invocation.
-LOGGING_CONFIG = None
+LOGGING_CONFIG: dict = {}

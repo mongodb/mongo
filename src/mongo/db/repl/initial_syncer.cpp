@@ -46,6 +46,7 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/all_database_cloner.h"
@@ -799,7 +800,11 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
         }
     }
 
-    // 2.) Drop user databases.
+    // 2a.) Abort any index builds started during initial sync.
+    IndexBuildsCoordinator::get(opCtx.get())
+        ->abortAllIndexBuildsForInitialSync(opCtx.get(), "Aborting index builds for initial sync");
+
+    // 2b.) Drop user databases.
     LOGV2_DEBUG(21175, 2, "Dropping user databases");
     return _storage->dropReplicatedDatabases(opCtx.get());
 }

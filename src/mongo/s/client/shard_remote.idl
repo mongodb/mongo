@@ -36,3 +36,11 @@ server_parameters:
         default: false
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gInternalProhibitShardOperationRetry
+
+    findChunksOnConfigTimeoutMS:
+        description: >-
+            The timeout for find operations against config.chunks.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gFindChunksOnConfigTimeoutMS
+        default: 900000

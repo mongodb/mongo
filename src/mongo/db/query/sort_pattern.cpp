@@ -64,8 +64,8 @@ SortPattern::SortPattern(const BSONObj& obj,
             } else {
                 uasserted(31138, str::stream() << "Illegal $meta sort: " << metaElem);
             }
-            patternPart.expression =
-                static_cast<ExpressionMeta*>(ExpressionMeta::parse(pExpCtx, metaElem, vps).get());
+            patternPart.expression = static_cast<ExpressionMeta*>(
+                ExpressionMeta::parse(pExpCtx.get(), metaElem, vps).get());
 
             // If sorting by textScore, sort highest scores first. If sorting by randVal, order
             // doesn't matter, so just always use descending.

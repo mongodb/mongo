@@ -216,7 +216,7 @@ This package provides the MongoDB static library and header files needed to deve
 mkdir -p $RPM_BUILD_ROOT/usr
 cp -rv bin $RPM_BUILD_ROOT/usr
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
-cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
+cp debian/mongo{,d,s,ldap}.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 mkdir -p $RPM_BUILD_ROOT/etc
 cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system
@@ -311,6 +311,9 @@ fi
 %{_bindir}/mongocryptd
 
 %changelog
+* Wed May 13 2020 MongoDB Packaging <packaging@mongodb.com>
+- Update packaging contact
+
 * Mon Oct 10 2016 Sam Kleinman <sam@mongodb.com>
 - Support for systemd init processes.
 

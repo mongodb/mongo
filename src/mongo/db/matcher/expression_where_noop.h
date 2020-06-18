@@ -46,6 +46,14 @@ public:
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
+
+    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
 };
 
 }  // namespace mongo

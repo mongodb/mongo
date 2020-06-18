@@ -1,12 +1,13 @@
 // Tests that commands like find, aggregate and update accepts a 'let' parameter which defines
 // variables for use in expressions within the command.
-// TODO SERVER-46707: move this back to core after let params work in sharded aggreggate.
+// TODO SERVER-46707: move this back to core after let params work in sharded commands is complete.
 // @tags: [assumes_against_mongod_not_mongos, requires_fcv46]
 
 (function() {
 "use strict";
 
-const coll = db.update_let_variables;
+const coll = db.command_let_variables;
+const targetColl = db.command_let_variables_target;
 coll.drop();
 
 assert.commandWorked(coll.insert([
@@ -110,51 +111,88 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              ErrorCodes.TypeMismatch);
 
-// findAndModify
-assert.commandWorked(coll.insert({Species: "spy_bird"}));
-let result = db.runCommand({
-    findAndModify: coll.getName(),
-    let : {target_species: "spy_bird"},
-    query: {$expr: {$eq: ["$Species", "$$target_species"]}},
-    update: {Species: "questionable_bird"},
-    fields: {_id: 0},
-    new: true
-});
-assert.eq(result.value, {Species: "questionable_bird"}, result);
+// Function to prepare target collection of $merge stage for testing.
+function prepMergeTargetColl() {
+    targetColl.drop();
 
-result = db.runCommand({
-    findAndModify: coll.getName(),
-    let : {species_name: "not_a_bird", realSpecies: "dino"},
-    query: {$expr: {$eq: ["$Species", "questionable_bird"]}},
-    update: [{$project: {Species: "$$species_name"}}, {$addFields: {suspect: "$$realSpecies"}}],
-    fields: {_id: 0},
-    new: true
-});
-assert.eq(result.value, {Species: "not_a_bird", suspect: "dino"}, result);
+    assert.commandWorked(db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$match: {$expr: {$eq: ["$Species", "Song Thrush (Turdus philomelos)"]}}},
+            {$out: targetColl.getName()}
+        ],
+        cursor: {}
+    }));
+}
 
-// Delete
-result = assert.commandWorked(db.runCommand({
-    delete: coll.getName(),
-    let : {target_species: "not_a_bird"},
-    deletes: [{q: {$expr: {$eq: ["$Species", "$$target_species"]}}, limit: 0}]
-}));
-
-// Update
+// Test that $merge stage can use 'let' variables within its own stage's pipeline.
+prepMergeTargetColl();
 assert.commandWorked(db.runCommand({
-    update: coll.getName(),
-    let : {target_species: "Song Thrush (Turdus philomelos)", new_name: "Song Thrush"},
-    updates: [
-        {q: {$expr: {$eq: ["$Species", "$$target_species"]}}, u: [{$set: {Species: "$$new_name"}}]}
-    ]
+    aggregate: coll.getName(),
+    pipeline: [{
+        $merge: {
+            into: targetColl.getName(),
+            let : {variable: "INNER"},
+            whenMatched: [{$addFields: {"var": "$$variable"}}]
+        }
+    }],
+    cursor: {}
 }));
+assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", "INNER"]}}}).toArray().length, 1);
 
+// Test that $merge stage can access command-level 'let' variables.
+prepMergeTargetColl();
 assert.commandWorked(db.runCommand({
-    update: coll.getName(),
-    let : {target_species: "Song Thrush (Turdus philomelos)"},
-    updates: [{
-        q: {$expr: {$eq: ["$Species", "$$target_species"]}},
-        u: [{$set: {Location: "$$place"}}],
-        c: {place: "North America"}
-    }]
+    aggregate: coll.getName(),
+    pipeline: [
+        {$merge: {into: targetColl.getName(), whenMatched: [{$addFields: {"var": "$$variable"}}]}}
+    ],
+    cursor: {},
+    let : {variable: "OUTER"}
 }));
+assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", "OUTER"]}}}).toArray().length, 1);
+
+// Test that $merge stage can use stage-level and command-level 'let' variables in same command.
+prepMergeTargetColl();
+assert.commandWorked(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{
+        $merge: {
+            into: targetColl.getName(),
+            let : {stage: "INNER"},
+            whenMatched: [{$addFields: {"innerVar": "$$stage", "outerVar": "$$command"}}]
+        }
+    }],
+    cursor: {},
+    let : {command: "OUTER"}
+}));
+assert.eq(
+    targetColl
+        .aggregate({
+            $match: {
+                $and:
+                    [{$expr: {$eq: ["$innerVar", "INNER"]}},
+                     {$expr: {$eq: ["$outerVar", "OUTER"]}}]
+            }
+        })
+        .toArray()
+        .length,
+    1);
+
+// Test that $merge stage follows variable scoping rules with stage-level and command-level 'let'
+// variables.
+prepMergeTargetColl();
+assert.commandWorked(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{
+        $merge: {
+            into: targetColl.getName(),
+            let : {variable: "INNER"},
+            whenMatched: [{$addFields: {"var": "$$variable"}}]
+        }
+    }],
+    cursor: {},
+    let : {variable: "OUTER"}
+}));
+assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", "INNER"]}}}).toArray().length, 1);
 }());

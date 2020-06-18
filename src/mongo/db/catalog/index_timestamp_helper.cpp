@@ -78,50 +78,6 @@ bool requiresGhostCommitTimestampForWrite(OperationContext* opCtx, const Namespa
 }
 }  // namespace
 
-void IndexTimestampHelper::setGhostCommitTimestampForWrite(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
-
-    if (!requiresGhostCommitTimestampForWrite(opCtx, nss)) {
-        return;
-    }
-
-    // The lastApplied timestamp is the last OpTime that a node has applied. We choose this
-    // timestamp on primaries because it is the most recent point-in-time a reader would be able to
-    // to read at, despite it lagging slighly behind recently committed writes. Because of this lag,
-    // both on primaries and secondaries, the lastApplied time may be older than any newly committed
-    // writes. It is therefore required that all callers holding intent locks and wishing to apply
-    // ghost timestamps also establish a storage engine snapshot for reading that is less than or
-    // equal to the lastApplied timestamp.
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const auto commitTimestamp = replCoord->getMyLastAppliedOpTime().getTimestamp();
-
-    const auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
-    // If a lock that blocks writes is held, there can be no uncommitted writes, so there is no
-    // need to check snapshot visibility, especially if a caller is not reading with a timestamp.
-    invariant(mySnapshot || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_S),
-              "a write-blocking lock is required when applying a ghost timestamp without a read "
-              "timestamp");
-    invariant(!mySnapshot || *mySnapshot <= commitTimestamp,
-              str::stream() << "commit timestamp " << commitTimestamp.toString()
-                            << " cannot be older than current read timestamp "
-                            << mySnapshot->toString());
-
-    auto status = setGhostTimestamp(opCtx, commitTimestamp);
-    if (status.code() == ErrorCodes::BadValue) {
-        LOGV2(20379,
-              "Temporarily could not apply ghost commit timestamp.",
-              "reason"_attr = status.reason());
-        throw WriteConflictException();
-    }
-    LOGV2_DEBUG(20380,
-                1,
-                "assigning ghost commit timestamp: {commitTimestamp}",
-                "commitTimestamp"_attr = commitTimestamp.toString());
-
-    fassert(51053, status);
-}
-
 bool IndexTimestampHelper::requiresGhostCommitTimestampForCatalogWrite(OperationContext* opCtx,
                                                                        NamespaceString nss) {
     if (opCtx->writesAreReplicated()) {
@@ -174,7 +130,7 @@ bool IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(OperationConte
         setGhostTimestamp(opCtx, LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
     if (status.code() == ErrorCodes::BadValue) {
         LOGV2(20381,
-              "Temporarily could not timestamp the index build commit, retrying.",
+              "Temporarily could not timestamp the index build commit, retrying",
               "reason"_attr = status.reason());
         throw WriteConflictException();
     }

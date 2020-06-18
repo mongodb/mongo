@@ -59,23 +59,11 @@ AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    Top::LockType lockType,
                                    LogMode logMode,
-                                   boost::optional<int> dbProfilingLevel,
+                                   int dbProfilingLevel,
                                    Date_t deadline)
     : _opCtx(opCtx), _lockType(lockType), _nss(nss), _logMode(logMode) {
     if (_logMode == LogMode::kUpdateTop) {
         return;
-    }
-
-    if (!dbProfilingLevel) {
-        // No profiling level was determined, attempt to read the profiling level from the Database
-        // object. Since we are only reading the in-memory profiling level out of the database
-        // object (which is configured on a per-node basis and not replicated or persisted), we
-        // never need to conflict with secondary batch application.
-        ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
-        AutoGetDb autoDb(_opCtx, _nss.db(), MODE_IS, deadline);
-        if (autoDb.getDb()) {
-            dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
-        }
     }
 
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
@@ -113,7 +101,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     _autoColl.emplace(opCtx, nsOrUUID, collectionLockMode, viewMode, deadline);
 
     // If the read source is explicitly set to kNoTimestamp, we read the most up to date data and do
-    // not consider reading at the no-overlap point (e.g. FTDC needs that).
+    // not consider changing our ReadSource (e.g. FTDC needs that).
     if (opCtx->recoveryUnit()->getTimestampReadSource() == RecoveryUnit::ReadSource::kNoTimestamp)
         return;
 
@@ -137,12 +125,12 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         // during this period, we default to not acquiring the lock (by setting
         // _shouldNotConflictWithSecondaryBatchApplicationBlock). On primaries, we always read at a
         // consistent time, so not taking the PBWM lock is not a problem. On secondaries, we have to
-        // guarantee we read at a consistent state, so we must read at the no-overlap timestamp,
-        // which is a function of the lastApplied timestamp, which is set after each complete batch.
+        // guarantee we read at a consistent state, so we must read at the lastApplied timestamp,
+        // which is set after each complete batch.
         //
-        // If an attempt to read at the no-overlap timestamp is unsuccessful because there are
-        // pending catalog changes that occur after the no-overlap timestamp, we release our locks
-        // and try again with the PBWM lock (by unsetting
+        // If an attempt to read at the lastApplied timestamp is unsuccessful because there are
+        // pending catalog changes that occur after that timestamp, we release our locks and try
+        // again with the PBWM lock (by unsetting
         // _shouldNotConflictWithSecondaryBatchApplicationBlock).
 
         const NamespaceString nss = coll->ns();
@@ -159,10 +147,10 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         const auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
         if (readTimestamp && afterClusterTime) {
             // Readers that use afterClusterTime have already waited at a higher level for the
-            // lastApplied time to advance to a specified optime, and they assume the read timestamp
-            // of the operation is at least that waited-for timestamp. For kNoOverlap, which is the
-            // minimum of lastApplied and all_durable, this invariant ensures that afterClusterTime
-            // reads do not choose a read timestamp older than the one requested.
+            // all_durable time to advance to a specified optime, and they assume the read timestamp
+            // of the operation is at least that waited-for timestamp. For kNoOverlap, which is
+            // the minimum of lastApplied and all_durable, this invariant ensures that
+            // afterClusterTime reads do not choose a read timestamp older than the one requested.
             invariant(*readTimestamp >= afterClusterTime->asTimestamp(),
                       str::stream() << "read timestamp " << readTimestamp->toString()
                                     << "was less than afterClusterTime: "
@@ -186,29 +174,32 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         }
 
         invariant(
-            // The kMajorityCommitted and kNoOverlap read sources already read from timestamps
+            // The kMajorityCommitted and kLastApplied read sources already read from timestamps
             // that are safe with respect to concurrent secondary batch application, and are
             // eligible for retrying.
             readSource == RecoveryUnit::ReadSource::kMajorityCommitted ||
-            readSource == RecoveryUnit::ReadSource::kNoOverlap);
+            readSource == RecoveryUnit::ReadSource::kNoOverlap ||
+            readSource == RecoveryUnit::ReadSource::kLastApplied);
         invariant(readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
 
         // Yield locks in order to do the blocking call below.
         _autoColl = boost::none;
 
-        // If there are pending catalog changes when using a no-overlap read source, we choose to
-        // take the PBWM lock to conflict with any in-progress batches. This prevents us from idly
-        // spinning in this loop trying to get a new read timestamp ahead of the minimum visible
-        // snapshot. This helps us guarantee liveness (i.e. we can eventually get a suitable read
-        // timestamp) but should not be necessary for correctness. After initial sync finishes, if
-        // we waited instead of retrying, readers would block indefinitely waiting for the
-        // noOverlap time to move forward. Instead we force the reader take the PBWM lock and retry.
-        if (readSource == RecoveryUnit::ReadSource::kNoOverlap) {
+        // If there are pending catalog changes when using a no-overlap or lastApplied read source,
+        // we choose to take the PBWM lock to conflict with any in-progress batches. This prevents
+        // us from idly spinning in this loop trying to get a new read timestamp ahead of the
+        // minimum visible snapshot. This helps us guarantee liveness (i.e. we can eventually get a
+        // suitable read timestamp) but should not be necessary for correctness. After initial sync
+        // finishes, if we waited instead of retrying, readers would block indefinitely waiting for
+        // their read timstamp to move forward. Instead we force the reader take the PBWM lock and
+        // retry.
+        if (readSource == RecoveryUnit::ReadSource::kLastApplied ||
+            readSource == RecoveryUnit::ReadSource::kNoOverlap) {
             invariant(readTimestamp);
             LOGV2(20576,
-                  "Tried reading at no-overlap time, but future catalog changes are pending. "
-                  "Trying again without reading at no-overlap time.",
-                  "noOverlapTimestamp"_attr = *readTimestamp,
+                  "Tried reading at a timestamp, but future catalog changes are pending. "
+                  "Trying again without reading at a timestamp",
+                  "readTimestamp"_attr = *readTimestamp,
                   "collection"_attr = nss.ns(),
                   "collectionMinSnapshot"_attr = *minSnapshot);
             // Destructing the block sets _shouldConflictWithSecondaryBatchApplication back to the
@@ -256,13 +247,13 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     Date_t deadline,
     AutoStatsTracker::LogMode logMode)
     : _autoCollForRead(opCtx, nsOrUUID, viewMode, deadline),
-      _statsTracker(opCtx,
-                    _autoCollForRead.getNss(),
-                    Top::LockType::ReadLocked,
-                    logMode,
-                    _autoCollForRead.getDb() ? _autoCollForRead.getDb()->getProfilingLevel()
-                                             : kDoNotChangeProfilingLevel,
-                    deadline) {
+      _statsTracker(
+          opCtx,
+          _autoCollForRead.getNss(),
+          Top::LockType::ReadLocked,
+          logMode,
+          CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_autoCollForRead.getNss().db()),
+          deadline) {
 
     if (!_autoCollForRead.getView()) {
         auto* const css = CollectionShardingState::get(opCtx, _autoCollForRead.getNss());
@@ -294,7 +285,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
     }
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    currentOp->enter_inlock(ns.c_str(), _db->getProfilingLevel());
+    currentOp->enter_inlock(ns.c_str(),
+                            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_db->name()));
 }
 
 OldClientContext::~OldClientContext() {

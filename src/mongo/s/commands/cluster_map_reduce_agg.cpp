@@ -118,9 +118,9 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
         Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
     translatedCmd[AggregationRequest::kAllowDiskUseName] = Value(true);
     translatedCmd[AggregationRequest::kFromMongosName] = Value(true);
-    translatedCmd[AggregationRequest::kRuntimeConstants] =
+    translatedCmd[AggregationRequest::kRuntimeConstantsName] =
         Value(pipeline->getContext()->getRuntimeConstants().toBSON());
-    translatedCmd[AggregationRequest::kIsMapReduceCommand] = Value(true);
+    translatedCmd[AggregationRequest::kIsMapReduceCommandName] = Value(true);
 
     if (shouldBypassDocumentValidationForCommand(originalCmd)) {
         translatedCmd[bypassDocumentValidationCommandOption()] = Value(true);

@@ -149,11 +149,11 @@ class test_compact02(wttest.WiredTigerTestCase):
         # Compact can collide with eviction, if that happens we retry. Wait for
         # a long time, the check for EBUSY means we're not retrying on any real
         # errors.
-        for i in range(1, 60):
+        for i in range(1, 80):
             if not self.raisesBusy(
               lambda: self.session.compact(self.uri, None)):
                 break
-            time.sleep(5)
+            time.sleep(6)
 
         # 6. Get stats on compacted table.
         sz = self.getSize()

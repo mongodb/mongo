@@ -3,18 +3,19 @@
 import threading
 import time
 
-from . import fixtures
-from . import hook_test_archival as archival
-from . import hooks as _hooks
-from . import job as _job
-from .queue_element import queue_elem_factory
-from . import report as _report
-from . import testcases
-from .. import config as _config
-from .. import errors
-from .. import utils
-from ..core import network
-from ..utils.queue import Queue
+from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.core import network
+from buildscripts.resmokelib.testing import fixtures
+from buildscripts.resmokelib.testing import hook_test_archival as archival
+from buildscripts.resmokelib.testing import hooks as _hooks
+from buildscripts.resmokelib.testing import job as _job
+from buildscripts.resmokelib.testing import report as _report
+from buildscripts.resmokelib.testing import testcases
+from buildscripts.resmokelib.testing.queue_element import queue_elem_factory
+from buildscripts.resmokelib.utils.queue import Queue
 
 
 class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
@@ -52,7 +53,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         self._suite = suite
         self.num_tests = len(suite.tests) * suite.options.num_repeat_tests
-        self.test_queue_logger = self.logger.new_testqueue_logger(suite.test_kind)
+        self.test_queue_logger = logging.loggers.new_testqueue_logger(suite.test_kind)
 
         # Must be done after getting buildlogger configuration.
         self._jobs = self._create_jobs(self.num_tests)
@@ -233,7 +234,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 success = False
         return success
 
-    def _make_fixture(self, job_num, job_logger):
+    def _make_fixture(self, job_num):
         """Create a fixture for a job."""
 
         fixture_config = {}
@@ -242,11 +243,11 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             fixture_config = self.fixture_config.copy()
             fixture_class = fixture_config.pop("class")
 
-        fixture_logger = job_logger.new_fixture_logger(fixture_class)
+        fixture_logger = logging.loggers.new_fixture_logger(fixture_class, job_num)
 
         return fixtures.make_fixture(fixture_class, fixture_logger, job_num, **fixture_config)
 
-    def _make_hooks(self, fixture):
+    def _make_hooks(self, fixture, job_num):
         """Create the hooks for the job's fixture."""
 
         hooks = []
@@ -255,7 +256,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             hook_config = hook_config.copy()
             hook_class = hook_config.pop("class")
 
-            hook_logger = self.logger.new_hook_logger(hook_class, fixture.logger)
+            hook_logger = logging.loggers.new_hook_logger(hook_class, job_num)
             hook = _hooks.make_hook(hook_class, hook_logger, fixture, **hook_config)
             hooks.append(hook)
 
@@ -268,12 +269,12 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         :param job_num: instance number of job being created.
         :return: Job instance.
         """
-        job_logger = self.logger.new_job_logger(self._suite.test_kind, job_num)
+        job_logger = logging.loggers.new_job_logger(self._suite.test_kind, job_num)
 
-        fixture = self._make_fixture(job_num, job_logger)
-        hooks = self._make_hooks(fixture)
+        fixture = self._make_fixture(job_num)
+        hooks = self._make_hooks(fixture, job_num)
 
-        report = _report.TestReport(job_logger, self._suite.options)
+        report = _report.TestReport(job_logger, self._suite.options, job_num)
 
         return _job.Job(job_num, job_logger, fixture, hooks, report, self.archival,
                         self._suite.options, self.test_queue_logger)

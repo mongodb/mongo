@@ -37,7 +37,8 @@ for (let versions of [{from: lastStableFCV, to: latestFCV}, {from: latestFCV, to
         }, primary.port);
 
         assert.soon(function() {
-            return rawMongoProgramOutput().match(/createCollection.*test.mycoll/);
+            return rawMongoProgramOutput().match(
+                /\"id\":20320.*test.mycoll/);  // Create Collection log
         });
 
         awaitUpgradeFCV = startParallelShell(

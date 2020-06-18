@@ -34,6 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/initializer_dependency_graph.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 /*
@@ -52,145 +53,396 @@
 
 #define STRIP_PARENS_(...) __VA_ARGS__
 
-#define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS)                     \
+#define ADD_INITIALIZER(GRAPH, NAME, INIT_FN, DEINIT_FN, PREREQS, DEPS)     \
     (GRAPH).addInitializer((NAME),                                          \
-                           (FN),                                            \
-                           DeinitializerFunction(),                         \
+                           (INIT_FN),                                       \
+                           (DEINIT_FN),                                     \
                            std::vector<std::string>{STRIP_PARENS_ PREREQS}, \
                            std::vector<std::string>{STRIP_PARENS_ DEPS})
 
-#define ASSERT_ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS) \
-    ASSERT_EQUALS(Status::OK(), ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS))
+#define ASSERT_ADD_INITIALIZER(GRAPH, NAME, INIT_FN, DEINIT_FN, PREREQS, DEPS) \
+    ASSERT_EQUALS(Status::OK(), ADD_INITIALIZER(GRAPH, NAME, INIT_FN, DEINIT_FN, PREREQS, DEPS))
 
 
-#define CONSTRUCT_DEPENDENCY_GRAPH(GRAPH, FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8)           \
-    do {                                                                                         \
-        InitializerDependencyGraph& _graph_ = (GRAPH);                                           \
-        ASSERT_ADD_INITIALIZER(_graph_, "n0", FN0, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS); \
-        ASSERT_ADD_INITIALIZER(_graph_, "n1", FN1, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS); \
-        ASSERT_ADD_INITIALIZER(_graph_, "n2", FN2, ("n0", "n1"), MONGO_NO_DEPENDENTS);           \
-        ASSERT_ADD_INITIALIZER(_graph_, "n3", FN3, ("n0", "n2"), MONGO_NO_DEPENDENTS);           \
-        ASSERT_ADD_INITIALIZER(_graph_, "n4", FN4, ("n2", "n1"), MONGO_NO_DEPENDENTS);           \
-        ASSERT_ADD_INITIALIZER(_graph_, "n5", FN5, ("n3", "n4"), MONGO_NO_DEPENDENTS);           \
-        ASSERT_ADD_INITIALIZER(_graph_, "n6", FN6, ("n4"), MONGO_NO_DEPENDENTS);                 \
-        ASSERT_ADD_INITIALIZER(_graph_, "n7", FN7, ("n3"), MONGO_NO_DEPENDENTS);                 \
-        ASSERT_ADD_INITIALIZER(_graph_, "n8", FN8, ("n5", "n6", "n7"), MONGO_NO_DEPENDENTS);     \
+#define CONSTRUCT_DEPENDENCY_GRAPH(GRAPH,                                                         \
+                                   INIT_FN0,                                                      \
+                                   DEINIT_FN0,                                                    \
+                                   INIT_FN1,                                                      \
+                                   DEINIT_FN1,                                                    \
+                                   INIT_FN2,                                                      \
+                                   DEINIT_FN2,                                                    \
+                                   INIT_FN3,                                                      \
+                                   DEINIT_FN3,                                                    \
+                                   INIT_FN4,                                                      \
+                                   DEINIT_FN4,                                                    \
+                                   INIT_FN5,                                                      \
+                                   DEINIT_FN5,                                                    \
+                                   INIT_FN6,                                                      \
+                                   DEINIT_FN6,                                                    \
+                                   INIT_FN7,                                                      \
+                                   DEINIT_FN7,                                                    \
+                                   INIT_FN8,                                                      \
+                                   DEINIT_FN8)                                                    \
+    do {                                                                                          \
+        InitializerDependencyGraph& _graph_ = (GRAPH);                                            \
+        ASSERT_ADD_INITIALIZER(                                                                   \
+            _graph_, "n0", INIT_FN0, DEINIT_FN0, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);    \
+        ASSERT_ADD_INITIALIZER(                                                                   \
+            _graph_, "n1", INIT_FN1, DEINIT_FN1, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);    \
+        ASSERT_ADD_INITIALIZER(                                                                   \
+            _graph_, "n2", INIT_FN2, DEINIT_FN2, ("n0", "n1"), MONGO_NO_DEPENDENTS);              \
+        ASSERT_ADD_INITIALIZER(                                                                   \
+            _graph_, "n3", INIT_FN3, DEINIT_FN3, ("n0", "n2"), MONGO_NO_DEPENDENTS);              \
+        ASSERT_ADD_INITIALIZER(                                                                   \
+            _graph_, "n4", INIT_FN4, DEINIT_FN4, ("n2", "n1"), MONGO_NO_DEPENDENTS);              \
+        ASSERT_ADD_INITIALIZER(                                                                   \
+            _graph_, "n5", INIT_FN5, DEINIT_FN5, ("n3", "n4"), MONGO_NO_DEPENDENTS);              \
+        ASSERT_ADD_INITIALIZER(_graph_, "n6", INIT_FN6, DEINIT_FN6, ("n4"), MONGO_NO_DEPENDENTS); \
+        ASSERT_ADD_INITIALIZER(_graph_, "n7", INIT_FN7, DEINIT_FN7, ("n3"), MONGO_NO_DEPENDENTS); \
+        ASSERT_ADD_INITIALIZER(                                                                   \
+            _graph_, "n8", INIT_FN8, DEINIT_FN8, ("n5", "n6", "n7"), MONGO_NO_DEPENDENTS);        \
     } while (false)
 
 namespace mongo {
 namespace {
 
-int globalCounts[9];
+enum State {
+    UNSET = 0,
+    INITIALIZED = 1,
+    DEINITIALIZED = 2,
+};
 
-Status doNothing(InitializerContext*) {
+State globalStates[9];
+
+Status initNoop(InitializerContext*) {
     return Status::OK();
 }
 
-Status set0(InitializerContext*) {
-    globalCounts[0] = 1;
+Status deinitNoop(DeinitializerContext*) {
     return Status::OK();
 }
 
-Status set1(InitializerContext*) {
-    globalCounts[1] = 1;
+Status init0(InitializerContext*) {
+    globalStates[0] = INITIALIZED;
     return Status::OK();
 }
 
-Status set2(InitializerContext*) {
-    if (!globalCounts[0] || !globalCounts[1])
-        return Status(ErrorCodes::UnknownError, "one of 0 or 1 not already set");
-    globalCounts[2] = 1;
+Status init1(InitializerContext*) {
+    globalStates[1] = INITIALIZED;
     return Status::OK();
 }
 
-Status set3(InitializerContext*) {
-    if (!globalCounts[0] || !globalCounts[2])
-        return Status(ErrorCodes::UnknownError, "one of 0 or 2 not already set");
-    globalCounts[3] = 1;
+Status init2(InitializerContext*) {
+    if (globalStates[0] != INITIALIZED || globalStates[1] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(init2) one of 0 or 1 not already initialized");
+    globalStates[2] = INITIALIZED;
     return Status::OK();
 }
 
-Status set4(InitializerContext*) {
-    if (!globalCounts[1] || !globalCounts[2])
-        return Status(ErrorCodes::UnknownError, "one of 1 or 2 not already set");
-    globalCounts[4] = 1;
+Status init3(InitializerContext*) {
+    if (globalStates[0] != INITIALIZED || globalStates[2] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(init3) one of 0 or 2 not already initialized");
+    globalStates[3] = INITIALIZED;
     return Status::OK();
 }
 
-Status set5(InitializerContext*) {
-    if (!globalCounts[3] || !globalCounts[4])
-        return Status(ErrorCodes::UnknownError, "one of 3 or 4 not already set");
-    globalCounts[5] = 1;
+Status init4(InitializerContext*) {
+    if (globalStates[1] != INITIALIZED || globalStates[2] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(init4) one of 1 or 2 not already initialized");
+    globalStates[4] = INITIALIZED;
     return Status::OK();
 }
 
-Status set6(InitializerContext*) {
-    if (!globalCounts[4])
-        return Status(ErrorCodes::UnknownError, "4 not already set");
-    globalCounts[6] = 1;
+Status init5(InitializerContext*) {
+    if (globalStates[3] != INITIALIZED || globalStates[4] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(init5) one of 3 or 4 not already initialized");
+    globalStates[5] = INITIALIZED;
     return Status::OK();
 }
 
-Status set7(InitializerContext*) {
-    if (!globalCounts[3])
-        return Status(ErrorCodes::UnknownError, "3 not already set");
-    globalCounts[7] = 1;
+Status init6(InitializerContext*) {
+    if (globalStates[4] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(init6) 4 not already initialized");
+    globalStates[6] = INITIALIZED;
     return Status::OK();
 }
 
-Status set8(InitializerContext*) {
-    if (!globalCounts[5] || !globalCounts[6] || !globalCounts[7])
-        return Status(ErrorCodes::UnknownError, "one of 5, 6, 7 not already set");
-    globalCounts[8] = 1;
+Status init7(InitializerContext*) {
+    if (globalStates[3] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(init7) 3 not already initialized");
+    globalStates[7] = INITIALIZED;
+    return Status::OK();
+}
+
+Status init8(InitializerContext*) {
+    if (globalStates[5] != INITIALIZED || globalStates[6] != INITIALIZED ||
+        globalStates[7] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(init8) one of 5, 6, 7 not already initialized");
+    globalStates[8] = INITIALIZED;
+    return Status::OK();
+}
+
+Status deinit8(DeinitializerContext*) {
+    if (globalStates[8] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit8) 8 not initialized");
+    globalStates[8] = DEINITIALIZED;
+    return Status::OK();
+}
+
+Status deinit7(DeinitializerContext*) {
+    if (globalStates[7] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit7) 7 not initialized");
+    if (globalStates[8] != DEINITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit7) 8 not already deinitialized");
+    globalStates[7] = DEINITIALIZED;
+    return Status::OK();
+}
+
+Status deinit6(DeinitializerContext*) {
+    if (globalStates[6] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit6) 6 not initialized");
+    if (globalStates[8] != DEINITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit6) 8 not already deinitialized");
+    globalStates[6] = DEINITIALIZED;
+    return Status::OK();
+}
+
+Status deinit5(DeinitializerContext*) {
+    if (globalStates[5] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit5) 5 not initialized");
+    if (globalStates[8] != DEINITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit5) 8 not already deinitialized");
+    globalStates[5] = DEINITIALIZED;
+    return Status::OK();
+}
+
+Status deinit4(DeinitializerContext*) {
+    if (globalStates[4] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit4) 4 not initialized");
+    if (globalStates[5] != DEINITIALIZED || globalStates[6] != DEINITIALIZED)
+        return Status(ErrorCodes::UnknownError,
+                      "(deinit4) one of 5 or 6 not already deinitialized");
+    globalStates[4] = DEINITIALIZED;
+    return Status::OK();
+}
+
+Status deinit3(DeinitializerContext*) {
+    if (globalStates[3] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit3) 3 not initialized");
+    if (globalStates[5] != DEINITIALIZED || globalStates[7] != DEINITIALIZED)
+        return Status(ErrorCodes::UnknownError,
+                      "(deinit3) one of 5 or 7 not already deinitialized");
+    globalStates[3] = DEINITIALIZED;
+    return Status::OK();
+}
+
+Status deinit2(DeinitializerContext*) {
+    if (globalStates[2] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit2) 2 not initialized");
+    if (globalStates[3] != DEINITIALIZED || globalStates[4] != DEINITIALIZED)
+        return Status(ErrorCodes::UnknownError,
+                      "(deinit2) one of 3 or 4 not already deinitialized");
+    globalStates[2] = DEINITIALIZED;
+    return Status::OK();
+}
+
+Status deinit1(DeinitializerContext*) {
+    if (globalStates[1] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit1) 1 not initialized");
+    if (globalStates[2] != DEINITIALIZED || globalStates[4] != DEINITIALIZED)
+        return Status(ErrorCodes::UnknownError,
+                      "(deinit1) one of 2 or 4 not already deinitialized");
+    globalStates[1] = DEINITIALIZED;
+    return Status::OK();
+}
+
+Status deinit0(DeinitializerContext*) {
+    if (globalStates[0] != INITIALIZED)
+        return Status(ErrorCodes::UnknownError, "(deinit0) 0 not initialized");
+    if (globalStates[2] != DEINITIALIZED || globalStates[3] != DEINITIALIZED)
+        return Status(ErrorCodes::UnknownError,
+                      "(deinit0) one of 2 or 3 not already deinitialized");
+    globalStates[0] = DEINITIALIZED;
     return Status::OK();
 }
 
 void clearCounts() {
     for (size_t i = 0; i < 9; ++i)
-        globalCounts[i] = 0;
+        globalStates[i] = UNSET;
 }
 
-TEST(InitializerTest, SuccessfulInitialization) {
+void constructNormalDependencyGraph(Initializer* initializer) {
+    CONSTRUCT_DEPENDENCY_GRAPH(initializer->getInitializerDependencyGraph(),
+                               init0,
+                               deinit0,
+                               init1,
+                               deinit1,
+                               init2,
+                               deinit2,
+                               init3,
+                               deinit3,
+                               init4,
+                               deinit4,
+                               init5,
+                               deinit5,
+                               init6,
+                               deinit6,
+                               init7,
+                               deinit7,
+                               init8,
+                               deinit8);
+}
+
+TEST(InitializerTest, SuccessfulInitializationAndDeinitialization) {
     Initializer initializer;
-    CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
-                               set0,
-                               set1,
-                               set2,
-                               set3,
-                               set4,
-                               set5,
-                               set6,
-                               set7,
-                               set8);
+    constructNormalDependencyGraph(&initializer);
     clearCounts();
-    ASSERT_OK(initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                              InitializerContext::EnvironmentMap()));
+
+    ASSERT_OK(initializer.executeInitializers({}));
+
     for (int i = 0; i < 9; ++i)
-        ASSERT_EQUALS(1, globalCounts[i]);
+        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
+
+    ASSERT_OK(initializer.executeDeinitializers());
+
+    for (int i = 0; i < 9; ++i)
+        ASSERT_EQUALS(DEINITIALIZED, globalStates[i]);
 }
 
-TEST(InitializerTest, Step5Misimplemented) {
+TEST(InitializerTest, Init5Misimplemented) {
     Initializer initializer;
     CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
-                               set0,
-                               set1,
-                               set2,
-                               set3,
-                               set4,
-                               doNothing,
-                               set6,
-                               set7,
-                               set8);
+                               init0,
+                               deinitNoop,
+                               init1,
+                               deinitNoop,
+                               init2,
+                               deinitNoop,
+                               init3,
+                               deinitNoop,
+                               init4,
+                               deinitNoop,
+                               initNoop,
+                               deinitNoop,
+                               init6,
+                               deinitNoop,
+                               init7,
+                               deinitNoop,
+                               init8,
+                               deinitNoop);
     clearCounts();
-    ASSERT_EQUALS(ErrorCodes::UnknownError,
-                  initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                                  InitializerContext::EnvironmentMap()));
-    ASSERT_EQUALS(1, globalCounts[0]);
-    ASSERT_EQUALS(1, globalCounts[1]);
-    ASSERT_EQUALS(1, globalCounts[2]);
-    ASSERT_EQUALS(1, globalCounts[3]);
-    ASSERT_EQUALS(1, globalCounts[4]);
-    ASSERT_EQUALS(0, globalCounts[8]);
+
+    ASSERT_EQUALS(ErrorCodes::UnknownError, initializer.executeInitializers({}));
+
+    ASSERT_EQUALS(INITIALIZED, globalStates[0]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[1]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[2]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[3]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[4]);
+    ASSERT_EQUALS(UNSET, globalStates[5]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[6]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[7]);
+    ASSERT_EQUALS(UNSET, globalStates[8]);
+}
+
+TEST(InitializerTest, Deinit2Misimplemented) {
+    Initializer initializer;
+    CONSTRUCT_DEPENDENCY_GRAPH(initializer.getInitializerDependencyGraph(),
+                               init0,
+                               deinit0,
+                               init1,
+                               deinit1,
+                               init2,
+                               deinitNoop,
+                               init3,
+                               deinit3,
+                               init4,
+                               deinit4,
+                               init5,
+                               deinit5,
+                               init6,
+                               deinit6,
+                               init7,
+                               deinit7,
+                               init8,
+                               deinit8);
+    clearCounts();
+
+    ASSERT_OK(initializer.executeInitializers({}));
+
+    for (int i = 0; i < 9; ++i)
+        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
+
+    ASSERT_EQUALS(ErrorCodes::UnknownError, initializer.executeDeinitializers());
+
+    ASSERT_EQUALS(DEINITIALIZED, globalStates[8]);
+    ASSERT_EQUALS(DEINITIALIZED, globalStates[7]);
+    ASSERT_EQUALS(DEINITIALIZED, globalStates[6]);
+    ASSERT_EQUALS(DEINITIALIZED, globalStates[5]);
+    ASSERT_EQUALS(DEINITIALIZED, globalStates[4]);
+    ASSERT_EQUALS(DEINITIALIZED, globalStates[3]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[2]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[1]);
+    ASSERT_EQUALS(INITIALIZED, globalStates[0]);
+}
+
+DEATH_TEST(InitializerTest, CannotAddInitializerAfterInitializing, "!frozen()") {
+    Initializer initializer;
+    constructNormalDependencyGraph(&initializer);
+    clearCounts();
+
+    ASSERT_OK(initializer.executeInitializers({}));
+
+    for (int i = 0; i < 9; ++i)
+        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
+
+    ASSERT_ADD_INITIALIZER(initializer.getInitializerDependencyGraph(),
+                           "test",
+                           initNoop,
+                           deinitNoop,
+                           MONGO_NO_PREREQUISITES,
+                           MONGO_NO_DEPENDENTS);
+}
+
+DEATH_TEST(InitializerTest, CannotDoubleInitialize, "invalid initializer state transition") {
+    Initializer initializer;
+    constructNormalDependencyGraph(&initializer);
+    clearCounts();
+
+    ASSERT_OK(initializer.executeInitializers({}));
+
+    for (int i = 0; i < 9; ++i)
+        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
+
+    initializer.executeInitializers({}).ignore();
+}
+
+DEATH_TEST(InitializerTest,
+           CannotDeinitializeWithoutInitialize,
+           "invalid initializer state transition") {
+    Initializer initializer;
+    constructNormalDependencyGraph(&initializer);
+    clearCounts();
+
+    initializer.executeDeinitializers().ignore();
+}
+
+DEATH_TEST(InitializerTest, CannotDoubleDeinitialize, "invalid initializer state transition") {
+    Initializer initializer;
+    constructNormalDependencyGraph(&initializer);
+    clearCounts();
+
+    ASSERT_OK(initializer.executeInitializers({}));
+
+    for (int i = 0; i < 9; ++i)
+        ASSERT_EQUALS(INITIALIZED, globalStates[i]);
+
+    ASSERT_OK(initializer.executeDeinitializers());
+
+    for (int i = 0; i < 9; ++i)
+        ASSERT_EQUALS(DEINITIALIZED, globalStates[i]);
+
+    initializer.executeDeinitializers().ignore();
 }
 
 }  // namespace

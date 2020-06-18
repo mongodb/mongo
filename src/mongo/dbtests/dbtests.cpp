@@ -59,6 +59,7 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -171,12 +172,13 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
 }  // namespace mongo
 
 
-int dbtestsMain(int argc, char** argv, char** envp) {
+int dbtestsMain(int argc, char** argv) {
     ::mongo::setTestCommandsEnabled(true);
+    ::mongo::TestingProctor::instance().setEnabled(true);
     ::mongo::setupSynchronousSignalHandlers();
     mongo::dbtests::initWireSpec();
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
     repl::ReplSettings replSettings;
@@ -229,14 +231,11 @@ int dbtestsMain(int argc, char** argv, char** envp) {
 // WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
 // and makes them available through the argv() and envp() members.  This enables dbtestsMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    WindowsCommandLine wcl(argc, argvW, envpW);
-    int exitCode = dbtestsMain(argc, wcl.argv(), wcl.envp());
-    quickExit(exitCode);
+int wmain(int argc, wchar_t* argvW[]) {
+    quickExit(dbtestsMain(argc, WindowsCommandLine(argc, argvW).argv()));
 }
 #else
-int main(int argc, char* argv[], char** envp) {
-    int exitCode = dbtestsMain(argc, argv, envp);
-    quickExit(exitCode);
+int main(int argc, char* argv[]) {
+    quickExit(dbtestsMain(argc, argv));
 }
 #endif

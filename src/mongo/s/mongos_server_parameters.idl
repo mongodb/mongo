@@ -36,32 +36,6 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 server_parameters:
-  loadRoutingTableOnStartup:
-    description: >-
-        Enables precaching of the mongos routing table on startup.
-    set_at: [ startup ]
-    cpp_vartype: bool
-    cpp_varname: "gLoadRoutingTableOnStartup"
-    default: true
-
-  warmMinConnectionsInShardingTaskExecutorPoolOnStartup:
-    description: >-
-        Enables prewarming of the connection pool.
-    set_at: [ startup ]
-    cpp_vartype: bool
-    cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup"
-    default: true
-
-  warmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS:
-    description: >-
-        How long to wait for all hosts to have at least one connection.
-    set_at: [ startup ]
-    cpp_vartype: int
-    cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS"
-    default: 2000 # 2secs
-    validator:
-      gte: 0
-
   readHedgingMode:
     description: >-
         Enables hedged reads.
@@ -77,12 +51,14 @@ server_parameters:
     cpp_varname: "gMaxTimeMSForHedgedReads"
     validator:
         gte: 0
-    default: 10
+    default: 150
 
-  enableFinerGrainedCatalogCacheRefresh:
+  mongosShutdownTimeoutMillisForSignaledShutdown:
     description: >-
-        Enables the finer grained catalog cache refresh behavior.
-    set_at: [ startup ]
-    cpp_vartype: bool
-    cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
-    default: true
+        The time taken for quiesce mode at shutdown in response to SIGTERM.
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: "mongosShutdownTimeoutMillisForSignaledShutdown"
+    default: 15000
+    validator:
+        gte: 0

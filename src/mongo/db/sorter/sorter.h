@@ -152,6 +152,12 @@ public:
     }
 };
 
+struct SorterRangeInfo {
+    std::streamoff startOffset;
+    std::streamoff endOffset;
+    uint32_t checksum;
+};
+
 /**
  * This is the sorted output iterator from the sorting framework.
  */
@@ -181,6 +187,11 @@ public:
     // Opens and closes the source of data over which this class iterates, if applicable.
     virtual void openSource() = 0;
     virtual void closeSource() = 0;
+
+    virtual SorterRangeInfo getRangeInfo() const {
+        invariant(false, "Only FileIterator has ranges");
+        MONGO_UNREACHABLE;
+    }
 
 protected:
     SortIteratorInterface() {}  // can only be constructed as a base
@@ -213,6 +224,12 @@ public:
                       typename Value::SorterDeserializeSettings>
         Settings;
 
+    struct State {
+        std::string tempDir;
+        std::string fileName;
+        std::vector<SorterRangeInfo> ranges;
+    };
+
     template <typename Comparator>
     static Sorter* make(const SortOptions& opts,
                         const Comparator& comp,
@@ -233,10 +250,28 @@ public:
         return _usedDisk;
     }
 
+    State getState() const {
+        return {_tempDir, _fileName, _getRangeInfos()};
+    }
+
+    void persistDataForShutdown();
+
 protected:
     Sorter() {}  // can only be constructed as a base
 
+    virtual void spill() = 0;
+
+    std::vector<SorterRangeInfo> _getRangeInfos() const;
+
     bool _usedDisk{false};  // Keeps track of whether the sorter used disk or not
+
+    // Whether the files written by this Sorter should be kept on destruction.
+    bool _shouldKeepFilesOnDestruction = false;
+
+    std::string _tempDir;
+    std::string _fileName;
+
+    std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 };
 
 /**

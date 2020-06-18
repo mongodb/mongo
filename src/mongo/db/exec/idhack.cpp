@@ -52,8 +52,9 @@ const char* IDHackStage::kStageType = "IDHACK";
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          CanonicalQuery* query,
                          WorkingSet* ws,
+                         const Collection* collection,
                          const IndexDescriptor* descriptor)
-    : RequiresIndexStage(kStageType, expCtx, descriptor, ws),
+    : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),
       _key(query->getQueryObj()["_id"].wrap()) {
     _specificStats.indexName = descriptor->indexName();
@@ -63,8 +64,11 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          const BSONObj& key,
                          WorkingSet* ws,
+                         const Collection* collection,
                          const IndexDescriptor* descriptor)
-    : RequiresIndexStage(kStageType, expCtx, descriptor, ws), _workingSet(ws), _key(key) {
+    : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
+      _workingSet(ws),
+      _key(key) {
     _specificStats.indexName = descriptor->indexName();
 }
 
@@ -156,16 +160,6 @@ void IDHackStage::doDetachFromOperationContext() {
 void IDHackStage::doReattachToOperationContext() {
     if (_recordCursor)
         _recordCursor->reattachToOperationContext(opCtx());
-}
-
-// static
-bool IDHackStage::supportsQuery(Collection* collection, const CanonicalQuery& query) {
-    return !query.getQueryRequest().showRecordId() && query.getQueryRequest().getHint().isEmpty() &&
-        query.getQueryRequest().getMin().isEmpty() && query.getQueryRequest().getMax().isEmpty() &&
-        !query.getQueryRequest().getSkip() &&
-        CanonicalQuery::isSimpleIdQuery(query.getQueryRequest().getFilter()) &&
-        !query.getQueryRequest().isTailable() &&
-        CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
 }
 
 unique_ptr<PlanStageStats> IDHackStage::getStats() {

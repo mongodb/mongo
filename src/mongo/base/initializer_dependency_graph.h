@@ -71,16 +71,17 @@ private:
  * Each operation has a unique name, a function object implementing the operation's behavior,
  * and a set of prerequisite operations, which may be empty.  A legal graph contains no cycles.
  *
- * Instances of this class are used in two phases.  In the first phase, the graph is constructed
- * by repeated calls to addInitializer().  In the second phase, a user calls the topSort()
- * method to produce an initialization order that respects the dependencies among operations, and
- * then uses the getInitializerFunction() to get the behavior function for each operation, in
- * turn.
+ * Instances of this class are used in two phases.  In the first phase, the graph is "unfrozen",
+ * which permits it to be constructed by repeated calls to addInitializer().  In the second phase,
+ * the graph is "frozen" by calling frozen(), which prevents the addition of any further
+ * initializers to the graph.  A user can then call the topSort() method to produce an
+ * initialization order that respects the dependencies among operations, and then uses the
+ * getInitializerFunction() to get the behavior function for each operation, in turn.
  *
  * Concurrency Notes: The user is responsible for synchronization.  Multiple threads may
- * simultaneously call the const functions, getInitializerFunction and topSort, on the same
- * instance of InitializerDependencyGraph.  However, no thread may call addInitializer while any
- * thread is executing those functions or addInitializer on the same instance.
+ * simultaneously call the const functions, getInitializerFunction and topSort, on the same instance
+ * of InitializerDependencyGraph.  However, no thread may call addInitializer or freeze while any
+ * thread is executing those functions, addInitializer or freeze on the same instance.
  */
 class InitializerDependencyGraph {
     InitializerDependencyGraph(const InitializerDependencyGraph&) = delete;
@@ -94,6 +95,8 @@ public:
      * Add a new initializer node, named "name", to the dependency graph, with the given
      * behavior, "fn", and the given "prerequisites" (input dependencies) and "dependents"
      * (output dependencies).
+     *
+     * The graph must not be frozen.
      *
      * If "!fn" (fn is NULL in function pointer parlance), returns status with code
      * ErrorCodes::badValue.  If "name" is a duplicate of a name already present in the graph,
@@ -128,6 +131,21 @@ public:
      */
     Status topSort(std::vector<std::string>* sortedNames) const;
 
+    /**
+     * Called to mark the end of the period when nodes are allowed to be added to the graph.
+     * The graph is effectively read-only after this point.
+     */
+    void freeze() {
+        _frozen = true;
+    }
+
+    /**
+     * Returns true if this graph has been frozen.
+     */
+    bool frozen() const {
+        return _frozen;
+    }
+
 private:
     typedef stdx::unordered_map<std::string, InitializerDependencyNode> NodeMap;
     typedef NodeMap::value_type Node;
@@ -138,6 +156,12 @@ private:
      * NodeData::fn set to a false-ish value.
      */
     NodeMap _nodes;
+
+    /**
+     * If true, then the graph is "frozen" (ie. effectively read-only), and adding initializer nodes
+     * is not allowed.
+     */
+    bool _frozen{false};
 };
 
 }  // namespace mongo

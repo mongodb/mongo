@@ -230,15 +230,21 @@ __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *le
     item = cbt->tmp;
     current = NULL;
 
+    /*
+     * Assert the session and cursor have the right relationship (not search specific, but search is
+     * a convenient place to check given any operation on a cursor will likely search a page).
+     */
+    WT_ASSERT(session, session->dhandle == cbt->dhandle);
+
     __cursor_pos_clear(cbt);
 
     /*
      * In some cases we expect we're comparing more than a few keys with matching prefixes, so it's
      * faster to avoid the memory fetches by skipping over those prefixes. That's done by tracking
      * the length of the prefix match for the lowest and highest keys we compare as we descend the
-     * tree.
+     * tree. The high boundary is reset on each new page, the lower boundary is maintained.
      */
-    skiphigh = skiplow = 0;
+    skiplow = 0;
 
     /*
      * If a cursor repeatedly appends to the tree, compare the search key against the last key on
@@ -275,7 +281,7 @@ restart:
          * Discard the currently held page and restart the search from the root.
          */
         WT_RET(__wt_page_release(session, current, 0));
-        skiphigh = skiplow = 0;
+        skiplow = 0;
     }
 
     /* Search the internal pages of the tree. */
@@ -346,8 +352,7 @@ restart:
              * parent, the child page's key space will have been truncated, and the values from the
              * parent's search may be wrong for the child. We only need to reset the high count
              * because the split-page algorithm truncates the end of the internal page's key space,
-             * the low count is still correct. We also don't need to clear either count when
-             * transitioning to a leaf page, a leaf page's key space can't change in flight.
+             * the low count is still correct.
              */
             skiphigh = 0;
 
@@ -495,7 +500,17 @@ leaf_only:
             } else if (cmp == 0)
                 goto leaf_match;
         }
-    else if (collator == NULL)
+    else if (collator == NULL) {
+        /*
+         * Reset the skipped prefix counts; we'd normally expect the parent's skipped prefix values
+         * to be larger than the child's values and so we'd only increase them as we walk down the
+         * tree (in other words, if we can skip N bytes on the parent, we can skip at least N bytes
+         * on the child). However, leaf pages at the end of the tree can be extended, causing the
+         * parent's search to be wrong for the child. We only need to reset the high count, the page
+         * can only be extended so the low count is still correct.
+         */
+        skiphigh = 0;
+
         for (; limit != 0; limit >>= 1) {
             indx = base + (limit >> 1);
             rip = page->pg_row + indx;
@@ -512,7 +527,7 @@ leaf_only:
             else
                 goto leaf_match;
         }
-    else
+    } else
         for (; limit != 0; limit >>= 1) {
             indx = base + (limit >> 1);
             rip = page->pg_row + indx;

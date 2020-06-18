@@ -1,6 +1,7 @@
 """Command-line entry-point into resmoke."""
 
 import time
+
 from buildscripts.resmokelib import parser
 
 

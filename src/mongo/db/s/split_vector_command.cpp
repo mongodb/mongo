@@ -133,18 +133,17 @@ public:
             maxChunkSizeBytes = maxSizeBytesElem.numberLong();
         }
 
-        auto statusWithSplitKeys = splitVector(opCtx,
-                                               nss,
-                                               keyPattern,
-                                               min,
-                                               max,
-                                               force,
-                                               maxSplitPoints,
-                                               maxChunkObjects,
-                                               maxChunkSizeBytes);
-        uassertStatusOK(statusWithSplitKeys.getStatus());
+        auto splitKeys = splitVector(opCtx,
+                                     nss,
+                                     keyPattern,
+                                     min,
+                                     max,
+                                     force,
+                                     maxSplitPoints,
+                                     maxChunkObjects,
+                                     maxChunkSizeBytes);
 
-        result.append("splitKeys", statusWithSplitKeys.getValue());
+        result.append("splitKeys", splitKeys);
         return true;
     }
 

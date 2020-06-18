@@ -123,13 +123,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             case PlanStage::ADVANCED:
                 break;
 
-            case PlanStage::FAILURE:
-                // The stage which produces a failure is responsible for allocating a working set
-                // member with error details.
-                invariant(WorkingSet::INVALID_ID != id);
-                *out = id;
-                return status;
-
             case PlanStage::NEED_TIME:
                 return status;
 

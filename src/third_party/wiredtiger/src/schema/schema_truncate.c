@@ -138,7 +138,7 @@ __wt_schema_range_truncate(WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR
         WT_ERR(__cursor_needkey(start));
         if (stop != NULL)
             WT_ERR(__cursor_needkey(stop));
-        WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)start)->btree,
+        WT_WITH_BTREE(session, CUR2BT(start),
           ret = __wt_btcur_range_truncate((WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));
     } else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __wt_table_range_truncate((WT_CURSOR_TABLE *)start, (WT_CURSOR_TABLE *)stop);

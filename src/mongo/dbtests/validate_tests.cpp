@@ -103,14 +103,17 @@ protected:
         _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
                                                                  /*stableCheckpoint*/ false);
 
-        auto options = (_full) ? CollectionValidation::ValidateOptions::kFullValidation
-                               : CollectionValidation::ValidateOptions::kNoFullValidation;
-
+        auto mode = [&] {
+            if (_background)
+                return CollectionValidation::ValidateMode::kBackground;
+            return _full ? CollectionValidation::ValidateMode::kForegroundFull
+                         : CollectionValidation::ValidateMode::kForeground;
+        }();
         ValidateResults results;
         BSONObjBuilder output;
 
         ASSERT_OK(CollectionValidation::validate(
-            &_opCtx, _nss, options, _background, &results, &output, kTurnOnExtraLoggingForTest));
+            &_opCtx, _nss, mode, &results, &output, kTurnOnExtraLoggingForTest));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
@@ -900,7 +903,7 @@ public:
 
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
-            auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
+            auto insertStatus = iam->insert(&_opCtx, coll, badKey, id1, options, &insertResult);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_EQUALS(insertResult.numInserted, 1);
@@ -1210,14 +1213,13 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            ASSERT_OK(CollectionValidation::validate(
-                &_opCtx,
-                _nss,
-                CollectionValidation::ValidateOptions::kFullValidation,
-                _background,
-                &results,
-                &output,
-                kTurnOnExtraLoggingForTest));
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1336,14 +1338,13 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            ASSERT_OK(CollectionValidation::validate(
-                &_opCtx,
-                _nss,
-                CollectionValidation::ValidateOptions::kFullValidation,
-                _background,
-                &results,
-                &output,
-                kTurnOnExtraLoggingForTest));
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1435,14 +1436,13 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            ASSERT_OK(CollectionValidation::validate(
-                &_opCtx,
-                _nss,
-                CollectionValidation::ValidateOptions::kFullValidation,
-                _background,
-                &results,
-                &output,
-                kTurnOnExtraLoggingForTest));
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
 
             auto dumpOnErrorGuard = makeGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
@@ -1710,6 +1710,7 @@ public:
 
                 InsertResult result;
                 auto insertStatus = iam->insertKeys(&_opCtx,
+                                                    coll,
                                                     {keys.begin(), keys.end()},
                                                     {},
                                                     MultikeyPaths{},
@@ -1741,6 +1742,7 @@ public:
                              IndexAccessMethod::kNoopOnSuppressedErrorFn);
                 ASSERT_EQ(1, keys.size());
                 auto insertStatus = iam->insertKeys(&_opCtx,
+                                                    coll,
                                                     {keys.begin(), keys.end()},
                                                     {},
                                                     MultikeyPaths{},

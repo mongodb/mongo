@@ -59,18 +59,16 @@ namespace {
 class WiredTigerKVHarnessHelper : public KVHarnessHelper, public ScopedGlobalServiceContextForTest {
 public:
     WiredTigerKVHarnessHelper(bool forRepair = false)
-        : _dbpath("wt-kv-harness"), _forRepair(forRepair) {
-        invariant(hasGlobalServiceContext());
-        _engine.reset(makeEngine());
+        : _dbpath("wt-kv-harness"), _forRepair(forRepair), _engine(makeEngine()) {
+        auto context = getGlobalServiceContext();
         repl::ReplicationCoordinator::set(
-            getGlobalServiceContext(),
-            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
-                getGlobalServiceContext(), repl::ReplSettings())));
+            context,
+            std::make_unique<repl::ReplicationCoordinatorMock>(context, repl::ReplSettings()));
     }
 
     virtual KVEngine* restartEngine() override {
         _engine.reset(nullptr);
-        _engine.reset(makeEngine());
+        _engine = makeEngine();
         return _engine.get();
     }
 
@@ -83,17 +81,17 @@ public:
     }
 
 private:
-    WiredTigerKVEngine* makeEngine() {
-        auto engine = new WiredTigerKVEngine(kWiredTigerEngineName,
-                                             _dbpath.path(),
-                                             _cs.get(),
-                                             "",
-                                             1,
-                                             0,
-                                             false,
-                                             false,
-                                             _forRepair,
-                                             false);
+    std::unique_ptr<WiredTigerKVEngine> makeEngine() {
+        auto engine = std::make_unique<WiredTigerKVEngine>(kWiredTigerEngineName,
+                                                           _dbpath.path(),
+                                                           _cs.get(),
+                                                           "",
+                                                           1,
+                                                           0,
+                                                           false,
+                                                           false,
+                                                           _forRepair,
+                                                           false);
         // There are unit tests expecting checkpoints to occur asynchronously.
         engine->startAsyncThreads();
         return engine;
@@ -101,8 +99,8 @@ private:
 
     const std::unique_ptr<ClockSource> _cs = std::make_unique<ClockSourceMock>();
     unittest::TempDir _dbpath;
-    std::unique_ptr<WiredTigerKVEngine> _engine;
     bool _forRepair;
+    std::unique_ptr<WiredTigerKVEngine> _engine;
 };
 
 class WiredTigerKVEngineTest : public unittest::Test, public ScopedGlobalServiceContextForTest {

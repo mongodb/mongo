@@ -143,7 +143,7 @@ TEST_F(StorageEngineTest, ReconcileDropsTemporary) {
     // The storage engine is responsible for dropping its temporary idents.
     ASSERT(!identExists(opCtx.get(), ident));
 
-    rs->deleteTemporaryTable(opCtx.get());
+    rs->finalizeTemporaryTable(opCtx.get(), TemporaryRecordStore::FinalizationAction::kDelete);
 }
 
 TEST_F(StorageEngineTest, TemporaryDropsItself) {
@@ -159,7 +159,7 @@ TEST_F(StorageEngineTest, TemporaryDropsItself) {
 
         ASSERT(identExists(opCtx.get(), ident));
 
-        rs->deleteTemporaryTable(opCtx.get());
+        rs->finalizeTemporaryTable(opCtx.get(), TemporaryRecordStore::FinalizationAction::kDelete);
     }
 
     // The temporary record store RAII class should drop itself.
@@ -429,7 +429,8 @@ public:
     TimestampKVEngineTest() {
         StorageEngineOptions options{
             /*directoryPerDB=*/false, /*directoryForIndexes=*/false, /*forRepair=*/false};
-        _storageEngine = std::make_unique<StorageEngineImpl>(new TimestampMockKVEngine, options);
+        _storageEngine =
+            std::make_unique<StorageEngineImpl>(std::make_unique<TimestampMockKVEngine>(), options);
         _storageEngine->finishInit();
     }
 

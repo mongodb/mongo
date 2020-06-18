@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/intrusive_ptr.hpp>
 #include <string>
 
 #include "mongo/db/pipeline/accumulation_statement.h"
@@ -42,7 +43,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
 using std::string;
 
 namespace {
@@ -88,9 +88,7 @@ boost::intrusive_ptr<AccumulatorState> AccumulationStatement::makeAccumulator() 
 }
 
 AccumulationStatement AccumulationStatement::parseAccumulationStatement(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const BSONElement& elem,
-    const VariablesParseState& vps) {
+    ExpressionContext* const expCtx, const BSONElement& elem, const VariablesParseState& vps) {
     auto fieldName = elem.fieldNameStringData();
     uassert(40234,
             str::stream() << "The field '" << fieldName << "' must be an accumulator object",

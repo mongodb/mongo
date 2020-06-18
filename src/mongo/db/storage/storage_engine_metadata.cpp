@@ -85,10 +85,10 @@ std::unique_ptr<StorageEngineMetadata> StorageEngineMetadata::forPath(const std:
         metadata.reset(new StorageEngineMetadata(dbpath));
         Status status = metadata->read();
         if (!status.isOK()) {
-            LOGV2_ERROR(22288,
-                        "Unable to read the storage engine metadata file: {status}",
-                        "status"_attr = status);
-            fassertFailedNoTrace(28661);
+            LOGV2_FATAL_NOTRACE(28661,
+                                "Unable to read the storage engine metadata file: {error}",
+                                "Unable to read the storage engine metadata file",
+                                "error"_attr = status);
         }
     }
     return metadata;
@@ -222,8 +222,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     // massert(13652, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
     if (!file.has_branch_path()) {
         LOGV2(22283,
-              "warning flushMyDirectory couldn't find parent dir for file: {file_string}",
-              "file_string"_attr = file.string());
+              "warning flushMyDirectory couldn't find parent dir for file: {file}",
+              "flushMyDirectory couldn't find parent dir for file",
+              "file"_attr = file.generic_string());
         return;
     }
 
@@ -244,14 +245,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
                 LOGV2_OPTIONS(
                     22285,
                     {logv2::LogTag::kStartupWarnings},
-                    "\tWARNING: This file system is not supported. For further information see:");
-                LOGV2_OPTIONS(22286,
-                              {logv2::LogTag::kStartupWarnings},
-                              "\t\t\thttp://dochub.mongodb.org/core/unsupported-filesystems");
-                LOGV2_OPTIONS(22287,
-                              {logv2::LogTag::kStartupWarnings},
-                              "\t\tPlease notify MongoDB, Inc. if an unlisted filesystem generated "
-                              "this warning.");
+                    "This file system is not supported. For further information see: "
+                    "http://dochub.mongodb.org/core/unsupported-filesystems Please notify MongoDB, "
+                    "Inc. if an unlisted filesystem generated this warning");
                 _warnedAboutFilesystem = true;
             }
         } else {

@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <utility>
+
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/expression.h"
@@ -36,32 +38,33 @@
 #include "mongo/unittest/unittest.h"
 
 namespace {
-using boost::intrusive_ptr;
-using std::string;
 using namespace mongo;
 
-intrusive_ptr<Expression> parse(const string& expressionName, ImplicitValue operand) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>();
-    VariablesParseState vps = expCtx->variablesParseState;
+auto parse(const std::string& expressionName, ImplicitValue operand) {
+    auto pair =
+        std::pair{std::make_unique<ExpressionContextForTest>(), boost::intrusive_ptr<Expression>{}};
+    VariablesParseState vps = pair.first->variablesParseState;
     Value operandValue = operand;
     const BSONObj obj = BSON(expressionName << operandValue);
-    return Expression::parseExpression(expCtx, obj, vps);
+    pair.second = Expression::parseExpression(pair.first.get(), obj, vps);
+    return pair;
 }
 
-Value eval(const string& expressionName,
-           ImplicitValue input,
-           ImplicitValue find,
-           ImplicitValue replacement) {
-    auto expression = parse(
+auto eval(const std::string& expressionName,
+          ImplicitValue input,
+          ImplicitValue find,
+          ImplicitValue replacement) {
+    auto [expCtx, expression] = parse(
         expressionName, Document{{"input", input}, {"find", find}, {"replacement", replacement}});
-    return expression->evaluate({}, &expression->getExpressionContext()->variables);
+    return std::pair{std::move(expCtx),
+                     expression->evaluate({}, &expression->getExpressionContext()->variables)};
 }
 
-Value replaceOne(ImplicitValue input, ImplicitValue find, ImplicitValue replacement) {
+auto replaceOne(ImplicitValue input, ImplicitValue find, ImplicitValue replacement) {
     return eval("$replaceOne", input, find, replacement);
 }
 
-Value replaceAll(ImplicitValue input, ImplicitValue find, ImplicitValue replacement) {
+auto replaceAll(ImplicitValue input, ImplicitValue find, ImplicitValue replacement) {
     return eval("$replaceAll", input, find, replacement);
 }
 
@@ -81,79 +84,81 @@ TEST(ExpressionReplaceTest, Expects3NamedArgs) {
 TEST(ExpressionReplaceTest, ExpectsStringsOrNullish) {
     // If any argument is non-string non-nullish, it's an error.
 
-    ASSERT_THROWS(replaceOne(1, BSONNULL, BSONNULL), AssertionException);
-    ASSERT_THROWS(replaceOne(BSONNULL, 1, BSONNULL), AssertionException);
-    ASSERT_THROWS(replaceOne(BSONNULL, BSONNULL, 1), AssertionException);
+    ASSERT_THROWS(replaceOne(1, BSONNULL, BSONNULL).second, AssertionException);
+    ASSERT_THROWS(replaceOne(BSONNULL, 1, BSONNULL).second, AssertionException);
+    ASSERT_THROWS(replaceOne(BSONNULL, BSONNULL, 1).second, AssertionException);
 
-    ASSERT_THROWS(replaceAll(1, BSONNULL, BSONNULL), AssertionException);
-    ASSERT_THROWS(replaceAll(BSONNULL, 1, BSONNULL), AssertionException);
-    ASSERT_THROWS(replaceAll(BSONNULL, BSONNULL, 1), AssertionException);
+    ASSERT_THROWS(replaceAll(1, BSONNULL, BSONNULL).second, AssertionException);
+    ASSERT_THROWS(replaceAll(BSONNULL, 1, BSONNULL).second, AssertionException);
+    ASSERT_THROWS(replaceAll(BSONNULL, BSONNULL, 1).second, AssertionException);
 
-    ASSERT_THROWS(replaceOne(1, ""_sd, ""_sd), AssertionException);
-    ASSERT_THROWS(replaceOne(""_sd, 1, ""_sd), AssertionException);
-    ASSERT_THROWS(replaceOne(""_sd, ""_sd, 1), AssertionException);
+    ASSERT_THROWS(replaceOne(1, ""_sd, ""_sd).second, AssertionException);
+    ASSERT_THROWS(replaceOne(""_sd, 1, ""_sd).second, AssertionException);
+    ASSERT_THROWS(replaceOne(""_sd, ""_sd, 1).second, AssertionException);
 
-    ASSERT_THROWS(replaceAll(1, ""_sd, ""_sd), AssertionException);
-    ASSERT_THROWS(replaceAll(""_sd, 1, ""_sd), AssertionException);
-    ASSERT_THROWS(replaceAll(""_sd, ""_sd, 1), AssertionException);
+    ASSERT_THROWS(replaceAll(1, ""_sd, ""_sd).second, AssertionException);
+    ASSERT_THROWS(replaceAll(""_sd, 1, ""_sd).second, AssertionException);
+    ASSERT_THROWS(replaceAll(""_sd, ""_sd, 1).second, AssertionException);
 }
 TEST(ExpressionReplaceTest, HandlesNullish) {
     // If any argument is nullish, the result is null.
 
-    ASSERT_VALUE_EQ(replaceOne(BSONNULL, ""_sd, ""_sd), Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONNULL, ""_sd), Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, BSONNULL), Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(BSONNULL, ""_sd, ""_sd).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONNULL, ""_sd).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, BSONNULL).second, Value(BSONNULL));
 
-    ASSERT_VALUE_EQ(replaceAll(BSONNULL, ""_sd, ""_sd), Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceAll(""_sd, BSONNULL, ""_sd), Value(BSONNULL));
-    ASSERT_VALUE_EQ(replaceAll(""_sd, ""_sd, BSONNULL), Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceAll(BSONNULL, ""_sd, ""_sd).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceAll(""_sd, BSONNULL, ""_sd).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceAll(""_sd, ""_sd, BSONNULL).second, Value(BSONNULL));
 }
 
 TEST(ExpressionReplaceTest, ReplacesNothingWhenNoMatches) {
     // When there are no matches, the result is the input, unchanged.
 
-    ASSERT_VALUE_EQ(replaceOne(""_sd, "x"_sd, "y"_sd), Value(""_sd));
-    ASSERT_VALUE_EQ(replaceOne("a"_sd, "x"_sd, "y"_sd), Value("a"_sd));
-    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "x"_sd, "y"_sd), Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "xyz"_sd, "y"_sd), Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyyz"_sd, "xyz"_sd, "y"_sd), Value("xyyz"_sd));
+    ASSERT_VALUE_EQ(replaceOne(""_sd, "x"_sd, "y"_sd).second, Value(""_sd));
+    ASSERT_VALUE_EQ(replaceOne("a"_sd, "x"_sd, "y"_sd).second, Value("a"_sd));
+    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "x"_sd, "y"_sd).second, Value("abcd"_sd));
+    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "xyz"_sd, "y"_sd).second, Value("abcd"_sd));
+    ASSERT_VALUE_EQ(replaceOne("xyyz"_sd, "xyz"_sd, "y"_sd).second, Value("xyyz"_sd));
 
-    ASSERT_VALUE_EQ(replaceAll(""_sd, "x"_sd, "y"_sd), Value(""_sd));
-    ASSERT_VALUE_EQ(replaceAll("a"_sd, "x"_sd, "y"_sd), Value("a"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abcd"_sd, "x"_sd, "y"_sd), Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abcd"_sd, "xyz"_sd, "y"_sd), Value("abcd"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyyz"_sd, "xyz"_sd, "y"_sd), Value("xyyz"_sd));
+    ASSERT_VALUE_EQ(replaceAll(""_sd, "x"_sd, "y"_sd).second, Value(""_sd));
+    ASSERT_VALUE_EQ(replaceAll("a"_sd, "x"_sd, "y"_sd).second, Value("a"_sd));
+    ASSERT_VALUE_EQ(replaceAll("abcd"_sd, "x"_sd, "y"_sd).second, Value("abcd"_sd));
+    ASSERT_VALUE_EQ(replaceAll("abcd"_sd, "xyz"_sd, "y"_sd).second, Value("abcd"_sd));
+    ASSERT_VALUE_EQ(replaceAll("xyyz"_sd, "xyz"_sd, "y"_sd).second, Value("xyyz"_sd));
 }
 TEST(ExpressionReplaceTest, ReplacesOnlyMatch) {
-    ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, "abc"_sd), Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("x"_sd, "x"_sd, "abc"_sd), Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyz"_sd, "xyz"_sd, "abc"_sd), Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("..xyz.."_sd, "xyz"_sd, "abc"_sd), Value("..abc.."_sd));
-    ASSERT_VALUE_EQ(replaceOne("..xyz"_sd, "xyz"_sd, "abc"_sd), Value("..abc"_sd));
-    ASSERT_VALUE_EQ(replaceOne("xyz.."_sd, "xyz"_sd, "abc"_sd), Value("abc.."_sd));
+    ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceOne("x"_sd, "x"_sd, "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceOne("xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceOne("..xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("..abc.."_sd));
+    ASSERT_VALUE_EQ(replaceOne("..xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("..abc"_sd));
+    ASSERT_VALUE_EQ(replaceOne("xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("abc.."_sd));
 
-    ASSERT_VALUE_EQ(replaceAll(""_sd, ""_sd, "abc"_sd), Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("x"_sd, "x"_sd, "abc"_sd), Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyz"_sd, "xyz"_sd, "abc"_sd), Value("abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("..xyz.."_sd, "xyz"_sd, "abc"_sd), Value("..abc.."_sd));
-    ASSERT_VALUE_EQ(replaceAll("..xyz"_sd, "xyz"_sd, "abc"_sd), Value("..abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("xyz.."_sd, "xyz"_sd, "abc"_sd), Value("abc.."_sd));
+    ASSERT_VALUE_EQ(replaceAll(""_sd, ""_sd, "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceAll("x"_sd, "x"_sd, "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceAll("xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceAll("..xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("..abc.."_sd));
+    ASSERT_VALUE_EQ(replaceAll("..xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("..abc"_sd));
+    ASSERT_VALUE_EQ(replaceAll("xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("abc.."_sd));
 }
 TEST(ExpressionReplaceOneTest, ReplacesFirstMatchOnly) {
-    ASSERT_VALUE_EQ(replaceOne("."_sd, ""_sd, "abc"_sd), Value("abc."_sd));
-    ASSERT_VALUE_EQ(replaceOne(".."_sd, ""_sd, "abc"_sd), Value("abc.."_sd));
-    ASSERT_VALUE_EQ(replaceOne(".."_sd, "."_sd, "abc"_sd), Value("abc."_sd));
-    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"_sd, "->"_sd, "."_sd), Value("abc.defg->hij"_sd));
+    ASSERT_VALUE_EQ(replaceOne("."_sd, ""_sd, "abc"_sd).second, Value("abc."_sd));
+    ASSERT_VALUE_EQ(replaceOne(".."_sd, ""_sd, "abc"_sd).second, Value("abc.."_sd));
+    ASSERT_VALUE_EQ(replaceOne(".."_sd, "."_sd, "abc"_sd).second, Value("abc."_sd));
+    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"_sd, "->"_sd, "."_sd).second,
+                    Value("abc.defg->hij"_sd));
 }
 TEST(ExpressionReplaceAllTest, ReplacesAllMatches) {
-    ASSERT_VALUE_EQ(replaceAll("."_sd, ""_sd, "abc"_sd), Value("abc.abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll(".."_sd, ""_sd, "abc"_sd), Value("abc.abc.abc"_sd));
-    ASSERT_VALUE_EQ(replaceAll(".."_sd, "."_sd, "abc"_sd), Value("abcabc"_sd));
-    ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"_sd, "->"_sd, "."_sd), Value("abc.defg.hij"_sd));
+    ASSERT_VALUE_EQ(replaceAll("."_sd, ""_sd, "abc"_sd).second, Value("abc.abc"_sd));
+    ASSERT_VALUE_EQ(replaceAll(".."_sd, ""_sd, "abc"_sd).second, Value("abc.abc.abc"_sd));
+    ASSERT_VALUE_EQ(replaceAll(".."_sd, "."_sd, "abc"_sd).second, Value("abcabc"_sd));
+    ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"_sd, "->"_sd, "."_sd).second,
+                    Value("abc.defg.hij"_sd));
 }
 TEST(ExpressionReplaceTest, DoesNotReplaceInTheReplacement) {
-    ASSERT_VALUE_EQ(replaceOne("a.b.c"_sd, "."_sd, ".."_sd), Value("a..b.c"_sd));
-    ASSERT_VALUE_EQ(replaceAll("a.b.c"_sd, "."_sd, ".."_sd), Value("a..b..c"_sd));
+    ASSERT_VALUE_EQ(replaceOne("a.b.c"_sd, "."_sd, ".."_sd).second, Value("a..b.c"_sd));
+    ASSERT_VALUE_EQ(replaceAll("a.b.c"_sd, "."_sd, ".."_sd).second, Value("a..b..c"_sd));
 }
 
 TEST(ExpressionReplaceTest, DoesNotNormalizeUnicode) {
@@ -166,20 +171,22 @@ TEST(ExpressionReplaceTest, DoesNotNormalizeUnicode) {
     ASSERT_NOT_EQUALS(precomposedAcuteE[0], 'e');
 
     // If the input has combining characters, you can match and replace the base letter.
-    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, "e"_sd, "a"_sd), Value("á"_sd));
-    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, "e"_sd, "a"_sd), Value("á"_sd));
+    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, "e"_sd, "a"_sd).second, Value("á"_sd));
+    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, "e"_sd, "a"_sd).second, Value("á"_sd));
 
     // If the input has precomposed characters, you can't replace the base letter.
-    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, "e"_sd, "x"_sd), Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, "e"_sd, "x"_sd), Value(precomposedAcuteE));
+    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, "e"_sd, "x"_sd).second, Value(precomposedAcuteE));
+    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, "e"_sd, "x"_sd).second, Value(precomposedAcuteE));
 
     // Precomposed characters and combined forms can't match each other.
-    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, combinedAcuteE, "x"_sd),
+    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, combinedAcuteE, "x"_sd).second,
                     Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, combinedAcuteE, "x"_sd),
+    ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, combinedAcuteE, "x"_sd).second,
                     Value(precomposedAcuteE));
-    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, precomposedAcuteE, "x"_sd), Value(combinedAcuteE));
-    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, precomposedAcuteE, "x"_sd), Value(combinedAcuteE));
+    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, precomposedAcuteE, "x"_sd).second,
+                    Value(combinedAcuteE));
+    ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, precomposedAcuteE, "x"_sd).second,
+                    Value(combinedAcuteE));
 }
 
 }  // namespace

@@ -123,7 +123,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 
     if (have_primary) {
         WT_ENTER_PAGE_INDEX(session);
-        WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+        WT_WITH_BTREE(session, CUR2BT(primary),
           ovfl = __wt_btree_lsm_over_size(
             session, hard_limit ? 2 * lsm_tree->chunk_size : lsm_tree->chunk_size));
         WT_LEAVE_PAGE_INDEX(session);
@@ -530,7 +530,7 @@ retry:
              */
             if (lsm_tree->custom_generation == 0 ||
               chunk->generation < lsm_tree->custom_generation) {
-                checkpoint = ((WT_CURSOR_BTREE *)cursor)->btree->dhandle->checkpoint;
+                checkpoint = ((WT_CURSOR_BTREE *)cursor)->dhandle->checkpoint;
                 if (checkpoint == NULL && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty)
                     break;
             }
@@ -639,7 +639,7 @@ retry:
     /* The last chunk is our new primary. */
     if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && chunk->switch_txn == WT_TXN_NONE) {
         primary = clsm->chunks[clsm->nchunks - 1]->cursor;
-        btree = ((WT_CURSOR_BTREE *)primary)->btree;
+        btree = CUR2BT(primary);
 
         /*
          * If the primary is not yet set as the primary, do that now. Note that eviction was
@@ -681,7 +681,7 @@ err:
              */
             if (lsm_tree->custom_generation == 0 ||
               chunk->generation < lsm_tree->custom_generation) {
-                checkpoint = ((WT_CURSOR_BTREE *)cursor)->btree->dhandle->checkpoint;
+                checkpoint = ((WT_CURSOR_BTREE *)cursor)->dhandle->checkpoint;
                 WT_ASSERT(session, (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty) ?
                     checkpoint != NULL :
                     checkpoint == NULL);

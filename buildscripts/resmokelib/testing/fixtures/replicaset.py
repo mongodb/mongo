@@ -3,17 +3,18 @@
 import os.path
 import time
 
-import bson.errors
 import pymongo
 import pymongo.errors
 import pymongo.write_concern
 
-from . import interface
-from . import replicaset_utils
-from . import standalone
-from ... import config
-from ... import errors
-from ... import utils
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOD_BINARY
+from buildscripts.resmokelib.testing.fixtures import interface
+from buildscripts.resmokelib.testing.fixtures import replicaset_utils
+from buildscripts.resmokelib.testing.fixtures import standalone
 
 
 class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes
@@ -59,13 +60,11 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             latest_mongod = mongod_executable
             # The last-stable binary is currently expected to live in '/data/multiversion', which is
             # part of the PATH.
-            last_stable_mongod = config.DEFAULT_MONGOD_EXECUTABLE + "-" \
-                                + ReplicaSetFixture._LAST_STABLE_BIN_VERSION
             is_config_svr = "configsvr" in self.replset_config_options and self.replset_config_options[
                 "configsvr"]
             if not is_config_svr:
                 self.mixed_bin_versions = [
-                    latest_mongod if (x == "new") else last_stable_mongod
+                    latest_mongod if (x == "new") else LAST_STABLE_MONGOD_BINARY
                     for x in self.mixed_bin_versions
                 ]
             else:
@@ -549,7 +548,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             suffix = str(index - 1) if self.num_nodes > 2 else ""
             node_name = "secondary{}".format(suffix)
 
-        return self.logger.new_fixture_node_logger(node_name)
+        return logging.loggers.new_fixture_node_logger(self.__class__.__name__, self.job_num,
+                                                       node_name)
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""

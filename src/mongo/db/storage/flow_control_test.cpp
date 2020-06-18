@@ -38,6 +38,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
+#include "mongo/logv2/log_debug.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -48,6 +49,7 @@ public:
         ServiceContextMongoDTest::setUp();
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
         auto replCoordPtr = replCoord.get();
+        replCoordMock = replCoordPtr;
         repl::ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
 
         FlowControlTicketholder::set(getServiceContext(),
@@ -62,6 +64,7 @@ public:
     }
 
     std::unique_ptr<FlowControl> flowControl;
+    repl::ReplicationCoordinatorMock* replCoordMock;
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
 };
@@ -244,5 +247,26 @@ TEST_F(FlowControlTest, CalculatingTickets) {
                                                       locksPerOp,
                                                       currLag,
                                                       thresholdLag));
+}
+
+TEST_F(FlowControlTest, DisableUntil) {
+    const int ticketOverride = 52319;
+
+    // Use a mock and failpoint to avoid having to setup an entire replication topology. Isolate the
+    // `disableDeadline` behavior.
+    replCoordMock->setCanAcceptNonLocalWrites(true);
+    FailPointEnableBlock failpoint("flowControlTicketOverride",
+                                   BSON("numTickets" << ticketOverride));
+    // Sanity check the failpoint is working.
+    ASSERT_EQ(ticketOverride, flowControl->getNumTickets());
+
+    const Date_t disableDeadline = Date_t::fromMillisSinceEpoch(200);
+    const Date_t whileDisabled = Date_t::fromMillisSinceEpoch(100);
+    const Date_t reenabled = Date_t::fromMillisSinceEpoch(300);
+    flowControl->disableUntil(disableDeadline);
+    // When getting tickets prior to the deadline, `kMaxTickets` should be returned.
+    ASSERT_EQ(FlowControl::kMaxTickets, flowControl->getNumTickets(whileDisabled));
+    // After the deadline passes, the override should take effect.
+    ASSERT_EQ(ticketOverride, flowControl->getNumTickets(reenabled));
 }
 }  // namespace mongo

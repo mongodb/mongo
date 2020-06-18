@@ -65,9 +65,7 @@ PipelineProxyStage::PipelineProxyStage(ExpressionContext* expCtx,
 }
 
 PlanStage::StageState PipelineProxyStage::doWork(WorkingSetID* out) {
-    if (!out) {
-        return PlanStage::FAILURE;
-    }
+    invariant(out);
 
     if (!_stash.empty()) {
         *out = _ws->allocate();

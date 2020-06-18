@@ -3,8 +3,8 @@
 import copy
 
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
+from buildscripts.resmokelib.testing.hooks import interface
 
 
 class CleanupConcurrencyWorkloads(interface.Hook):
@@ -38,7 +38,7 @@ class CleanupConcurrencyWorkloads(interface.Hook):
     def after_test(self, test, test_report):
         """After test cleanup."""
         hook_test_case = CleanupConcurrencyWorkloadsTestCase.create_after_test(
-            self.logger.test_case_logger, test, self)
+            self.logger, test, self)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 

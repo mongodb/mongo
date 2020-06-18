@@ -1,14 +1,13 @@
 """Interactions with the undodb tool-suite."""
-from typing import Optional
 
-from buildscripts.resmokelib.commands import interface
+from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _HELP = """
 Info on how to install undodb.
 """
 
 _MESSAGE = """
-You must manually download install the undodb package.
+Instructions for setting up and using UndoDB's reversible debugger  
 
 UndoDB is only supported on linux platforms. It will not work on macOS or Windows.
 
@@ -19,6 +18,11 @@ UndoDB is only supported on linux platforms. It will not work on macOS or Window
    You must be logged into your MongoDB/10gen google account to access this link.
    This file has MongoDB's private undodb key-server parameters baked into it,
    so do not share this file outside of the company.
+   
+   If you're using an Evergreen virtual workstation, use the following command
+   to copy the tarball over.
+       
+       evergreen host rsync --host <HOST_ID> -l /path/to/local/undodb-*.tgz -r /home/ubuntu/undo.tgz
 
 2. Untar and install:
 
@@ -27,48 +31,39 @@ UndoDB is only supported on linux platforms. It will not work on macOS or Window
         sudo make install
 
 There is good README help in the undodb directory if you have questions.
-There is also extensive documentation at https://docs.undo.io. 
 
-Please also refer to William Schultz's intro talk for a getting started primer:
+3. To use UndoDB, you first need to make a recording by running a test suite
+   in resmoke.py with the recorder
+        
+        ./buildscripts/resmoke.py run --recordWith live-record [your other resmoke args]
+    
+    This will generate one recording per invocation of each mongod and mongos process.
+    The recordings are stored in the current working directory.
+    
+    Once you have the recording, you're ready to use `udb` to start debugging:
+    
+        udb --undodb-gdb-exe /opt/mongodbtoolchain/gdb/bin/gdb path/to/recording.undo
+
+    There is a quick reference guide of UndoDB commands at:
+    https://undo.io/media/uploads/files/A5_UndoDB_quick_reference_guide_June_2019.pdf
+
+    Please also refer to Will Schultz's intro talk for a getting started primer:
 
     https://mongodb.zoom.com/rec/share/5eBrDqHJ7k5If6uX9Fn7Wo0sGKT6T6a8gydK-_QOxBkaEyZzwv6Yf4tjTB4cS0f1
+    
+    If you have any questions, suggestions or run into hiccups, please reach out
+    to #server-tig.
 
 """
 
 _COMMAND = "undodb"
 
 
-def add_subcommand(subparsers) -> None:
-    """
-    Add 'undodb' subcommand.
-
-    :param subparsers: argparse parser to add to
-    :return: None
-    """
-    parser = subparsers.add_parser(_COMMAND, help=_HELP)
-    # Accept arbitrary args like 'resmoke.py undodb foobar', but ignore them.
-    parser.add_argument("args", nargs="*")
-
-
-def subcommand(command: str, parsed_args) -> Optional[interface.Subcommand]:
-    """
-    Return UndoDb if command is one we recognize.
-
-    :param command: The first arg to resmoke.py (e.g. resmoke.py run => command = run).
-    :param parsed_args: Additional arguments parsed as a result of the `parser.parse` call.
-    :return: Callback if the command is for undodb else none.
-    """
-    if command != _COMMAND:
-        return None
-    return UndoDb(parsed_args)
-
-
-class UndoDb(interface.Subcommand):
+class UndoDb(Subcommand):
     """Interact with UndoDB."""
 
-    def __init__(self, _):
+    def __init__(self):
         """Constructor."""
-        pass
 
     def execute(self) -> None:
         """
@@ -77,3 +72,32 @@ class UndoDb(interface.Subcommand):
         :return: None
         """
         print(_MESSAGE)
+
+
+class UndoDbPlugin(PluginInterface):
+    """Interact with UndoDB."""
+
+    def add_subcommand(self, subparsers):
+        """
+        Add 'undodb' subcommand.
+
+        :param subparsers: argparse parser to add to
+        :return: None
+        """
+        parser = subparsers.add_parser(_COMMAND, help=_HELP)
+        # Accept arbitrary args like 'resmoke.py undodb foobar', but ignore them.
+        parser.add_argument("args", nargs="*")
+
+    def parse(self, subcommand, parser, parsed_args, **kwargs):
+        """
+        Return UndoDb if command is one we recognize.
+
+        :param subcommand: equivalent to parsed_args.command
+        :param parser: parser used
+        :param parsed_args: output of parsing
+        :param kwargs: additional args
+        :return: None or a Subcommand
+        """
+        if subcommand != _COMMAND:
+            return None
+        return UndoDb()

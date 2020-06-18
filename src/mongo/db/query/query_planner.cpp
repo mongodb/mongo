@@ -57,6 +57,47 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo {
+namespace {
+/**
+ * On success, applies the index tags from 'branchCacheData' (which represent the winning
+ * plan for 'orChild') to 'compositeCacheData'.
+ */
+Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
+                                  SolutionCacheData* branchCacheData,
+                                  MatchExpression* orChild,
+                                  const std::map<IndexEntry::Identifier, size_t>& indexMap) {
+    invariant(compositeCacheData);
+
+    // We want a well-formed *indexed* solution.
+    if (nullptr == branchCacheData) {
+        // For example, we don't cache things for 2d indices.
+        str::stream ss;
+        ss << "No cache data for subchild " << orChild->debugString();
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
+    }
+
+    if (SolutionCacheData::USE_INDEX_TAGS_SOLN != branchCacheData->solnType) {
+        str::stream ss;
+        ss << "No indexed cache data for subchild " << orChild->debugString();
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
+    }
+
+    // Add the index assignments to our original query.
+    Status tagStatus =
+        QueryPlanner::tagAccordingToCache(orChild, branchCacheData->tree.get(), indexMap);
+
+    if (!tagStatus.isOK()) {
+        str::stream ss;
+        ss << "Failed to extract indices from subchild " << orChild->debugString();
+        return tagStatus.withContext(ss);
+    }
+
+    // Add the child's cache data to the cache data we're creating for the main query.
+    compositeCacheData->children.push_back(branchCacheData->tree->clone());
+
+    return Status::OK();
+}
+}  // namespace
 
 using std::numeric_limits;
 using std::unique_ptr;
@@ -477,10 +518,11 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 
     LOGV2_DEBUG(20963,
                 5,
-                "Tagging the match expression according to cache data: "
-                "\nFilter:\n{clone_debugString}Cache data:\n{winnerCacheData}",
-                "clone_debugString"_attr = redact(clone->debugString()),
-                "winnerCacheData"_attr = redact(winnerCacheData.toString()));
+                "Tagging the match expression according to cache data: \nFilter:\n{filter}Cache "
+                "data:\n{cacheData}",
+                "Tagging the match expression according to cache data",
+                "filter"_attr = redact(clone->debugString()),
+                "cacheData"_attr = redact(winnerCacheData.toString()));
 
     stdx::unordered_set<string> fields;
     QueryPlannerIXSelect::getFields(query.root(), &fields);
@@ -496,9 +538,10 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
         invariant(insertionRes.second);
         LOGV2_DEBUG(20964,
                     5,
-                    "Index {i}: {ie_identifier}",
-                    "i"_attr = i,
-                    "ie_identifier"_attr = ie.identifier);
+                    "Index {indexNumber}: {id}",
+                    "Index mapping: number and identifier",
+                    "indexNumber"_attr = i,
+                    "id"_attr = ie.identifier);
     }
 
     Status s = tagAccordingToCache(clone.get(), winnerCacheData.tree.get(), indexMap);
@@ -511,8 +554,9 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 
     LOGV2_DEBUG(20965,
                 5,
-                "Tagged tree:\n{clone_debugString}",
-                "clone_debugString"_attr = redact(clone->debugString()));
+                "Tagged tree:\n{tree}",
+                "Tagged tree",
+                "tree"_attr = redact(clone->debugString()));
 
     // Use the cached index assignments to build solnRoot.
     std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
@@ -533,28 +577,30 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 
     LOGV2_DEBUG(20966,
                 5,
-                "Planner: solution constructed from the cache:\n{soln}",
-                "soln"_attr = redact(soln->toString()));
+                "Planner: solution constructed from the cache:\n{solution}",
+                "Planner: solution constructed from the cache",
+                "solution"_attr = redact(soln->toString()));
     return {std::move(soln)};
 }
 
 // static
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const CanonicalQuery& query, const QueryPlannerParams& params) {
-    LOGV2_DEBUG(
-        20967,
-        5,
-        "Beginning planning...\n=============================\nOptions = "
-        "{optionString_params_options}\nCanonical query:\n{query}=============================",
-        "optionString_params_options"_attr = optionString(params.options),
-        "query"_attr = redact(query.toString()));
+    LOGV2_DEBUG(20967,
+                5,
+                "Beginning planning...\n=============================\nOptions = "
+                "{options}\nCanonical query:\n{query}=============================",
+                "Beginning planning",
+                "options"_attr = optionString(params.options),
+                "query"_attr = redact(query.toString()));
 
     for (size_t i = 0; i < params.indices.size(); ++i) {
         LOGV2_DEBUG(20968,
                     5,
-                    "Index {i} is {params_indices_i}",
-                    "i"_attr = i,
-                    "params_indices_i"_attr = params.indices[i].toString());
+                    "Index {indexNumber} is {value}",
+                    "Index number and details",
+                    "indexNumber"_attr = i,
+                    "index"_attr = params.indices[i].toString());
     }
 
     const bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
@@ -644,7 +690,11 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     stdx::unordered_set<string> fields;
     QueryPlannerIXSelect::getFields(query.root(), &fields);
     for (auto&& field : fields) {
-        LOGV2_DEBUG(20970, 5, "Predicate over field '{field}'", "field"_attr = field);
+        LOGV2_DEBUG(20970,
+                    5,
+                    "Predicate over field '{field}'",
+                    "Predicate over field",
+                    "field"_attr = field);
     }
 
     fullIndexList = QueryPlannerIXSelect::expandIndexes(fields, std::move(fullIndexList));
@@ -720,9 +770,10 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     for (size_t i = 0; i < relevantIndices.size(); ++i) {
         LOGV2_DEBUG(20971,
                     2,
-                    "Relevant index {i} is {relevantIndices_i}",
-                    "i"_attr = i,
-                    "relevantIndices_i"_attr = relevantIndices[i].toString());
+                    "Relevant index {indexNumber} is {value}",
+                    "Relevant index",
+                    "indexNumber"_attr = i,
+                    "index"_attr = relevantIndices[i].toString());
     }
 
     // Figure out how useful each index is to each predicate.
@@ -746,8 +797,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // query.root() is now annotated with RelevantTag(s).
     LOGV2_DEBUG(20972,
                 5,
-                "Rated tree:\n{query_root_debugString}",
-                "query_root_debugString"_attr = redact(query.root()->debugString()));
+                "Rated tree:\n{tree}",
+                "Rated tree",
+                "tree"_attr = redact(query.root()->debugString()));
 
     // If there is a GEO_NEAR it must have an index it can use directly.
     const MatchExpression* gnNode = nullptr;
@@ -755,7 +807,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         // No index for GEO_NEAR?  No query.
         RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
         if (!tag || (0 == tag->first.size() && 0 == tag->notFirst.size())) {
-            LOGV2_DEBUG(20973, 5, "Unable to find index for $geoNear query.");
+            LOGV2_DEBUG(20973, 5, "Unable to find index for $geoNear query");
             // Don't leave tags on query tree.
             query.root()->resetTag();
             return Status(ErrorCodes::NoQueryExecutionPlans,
@@ -764,8 +816,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
         LOGV2_DEBUG(20974,
                     5,
-                    "Rated tree after geonear processing:{query_root_debugString}",
-                    "query_root_debugString"_attr = redact(query.root()->debugString()));
+                    "Rated tree after geonear processing:{tree}",
+                    "Rated tree after geonear processing",
+                    "tree"_attr = redact(query.root()->debugString()));
     }
 
     // Likewise, if there is a TEXT it must have an index it can use directly.
@@ -804,8 +857,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
         LOGV2_DEBUG(20975,
                     5,
-                    "Rated tree after text processing:{query_root_debugString}",
-                    "query_root_debugString"_attr = redact(query.root()->debugString()));
+                    "Rated tree after text processing:{tree}",
+                    "Rated tree after text processing",
+                    "tree"_attr = redact(query.root()->debugString()));
     }
 
     std::vector<std::unique_ptr<QuerySolution>> out;
@@ -825,8 +879,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         while ((nextTaggedTree = isp.getNext()) && (out.size() < params.maxIndexedSolutions)) {
             LOGV2_DEBUG(20976,
                         5,
-                        "About to build solntree from tagged tree:\n{nextTaggedTree_debugString}",
-                        "nextTaggedTree_debugString"_attr = redact(nextTaggedTree->debugString()));
+                        "About to build solntree from tagged tree:\n{tree}",
+                        "About to build solntree from tagged tree",
+                        "tree"_attr = redact(nextTaggedTree->debugString()));
 
             // Store the plan cache index tree before calling prepareForAccessingPlanning(), so that
             // the PlanCacheIndexTree has the same sort as the MatchExpression used to generate the
@@ -837,9 +892,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             if (!statusWithCacheData.isOK()) {
                 LOGV2_DEBUG(20977,
                             5,
-                            "Query is not cachable: {statusWithCacheData_getStatus_reason}",
-                            "statusWithCacheData_getStatus_reason"_attr =
-                                redact(statusWithCacheData.getStatus().reason()));
+                            "Query is not cachable: {reason}",
+                            "Query is not cachable",
+                            "reason"_attr = redact(statusWithCacheData.getStatus().reason()));
             } else {
                 cacheData = std::move(statusWithCacheData.getValue());
             }
@@ -860,8 +915,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             if (soln) {
                 LOGV2_DEBUG(20978,
                             5,
-                            "Planner: adding solution:\n{soln}",
-                            "soln"_attr = redact(soln->toString()));
+                            "Planner: adding solution:\n{solution}",
+                            "Planner: adding solution",
+                            "solution"_attr = redact(soln->toString()));
                 if (statusWithCacheData.isOK()) {
                     SolutionCacheData* scd = new SolutionCacheData();
                     scd->tree = std::move(cacheData);
@@ -875,8 +931,11 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // Don't leave tags on query tree.
     query.root()->resetTag();
 
-    LOGV2_DEBUG(
-        20979, 5, "Planner: outputted {out_size} indexed solutions.", "out_size"_attr = out.size());
+    LOGV2_DEBUG(20979,
+                5,
+                "Planner: outputted {numSolutions} indexed solutions",
+                "Planner: outputted indexed solutions",
+                "numSolutions"_attr = out.size());
 
     // Produce legible error message for failed OR planning with a TEXT child.
     // TODO: support collection scan for non-TEXT children of OR.
@@ -911,7 +970,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Failed to build whole-index solution for $hint");
         }
-        LOGV2_DEBUG(20980, 5, "Planner: outputting soln that uses hinted index as scan.");
+        LOGV2_DEBUG(20980, 5, "Planner: outputting soln that uses hinted index as scan");
         std::vector<std::unique_ptr<QuerySolution>> out;
         out.push_back(std::move(soln));
         return {std::move(out)};
@@ -973,7 +1032,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
                 if (providesSort(query, kp)) {
                     LOGV2_DEBUG(
-                        20981, 5, "Planner: outputting soln that uses index to provide sort.");
+                        20981, 5, "Planner: outputting soln that uses index to provide sort");
                     auto soln = buildWholeIXSoln(fullIndexList[i], query, params);
                     if (soln) {
                         PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
@@ -991,7 +1050,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                     LOGV2_DEBUG(
                         20982,
                         5,
-                        "Planner: outputting soln that uses (reverse) index to provide sort.");
+                        "Planner: outputting soln that uses (reverse) index to provide sort");
                     auto soln = buildWholeIXSoln(fullIndexList[i], query, params, -1);
                     if (soln) {
                         PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
@@ -1026,7 +1085,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             auto soln = buildWholeIXSoln(index, query, paramsForCoveredIxScan);
             if (soln && !soln->root->fetched()) {
                 LOGV2_DEBUG(
-                    20983, 5, "Planner: outputting soln that uses index to provide projection.");
+                    20983, 5, "Planner: outputting soln that uses index to provide projection");
                 PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                 indexTree->setIndexEntry(index);
 
@@ -1070,8 +1129,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         if (collscan) {
             LOGV2_DEBUG(20984,
                         5,
-                        "Planner: outputting a collscan:\n{collscan}",
-                        "collscan"_attr = redact(collscan->toString()));
+                        "Planner: outputting a collection scan:\n{collectionScan}",
+                        "Planner: outputting a collection scan",
+                        "collectionScan"_attr = redact(collscan->toString()));
             SolutionCacheData* scd = new SolutionCacheData();
             scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
             collscan->cacheData.reset(scd);
@@ -1083,4 +1143,195 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     return {std::move(out)};
 }
 
+StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
+    OperationContext* opCtx,
+    const Collection* collection,
+    const PlanCache* planCache,
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params) {
+    invariant(query.root()->matchType() == MatchExpression::OR);
+    invariant(query.root()->numChildren(), "Cannot plan subqueries for an $or with no children");
+
+    SubqueriesPlanningResult planningResult{query.root()->shallowClone()};
+    for (size_t i = 0; i < params.indices.size(); ++i) {
+        const IndexEntry& ie = params.indices[i];
+        const auto insertionRes = planningResult.indexMap.insert(std::make_pair(ie.identifier, i));
+        // Be sure the key was not already in the map.
+        invariant(insertionRes.second);
+        LOGV2_DEBUG(20598, 5, "Subplanner: index {i} is {ie}", "i"_attr = i, "ie"_attr = ie);
+    }
+
+    for (size_t i = 0; i < planningResult.orExpression->numChildren(); ++i) {
+        // We need a place to shove the results from planning this branch.
+        planningResult.branches.push_back(
+            std::make_unique<SubqueriesPlanningResult::BranchPlanningResult>());
+        auto branchResult = planningResult.branches.back().get();
+        auto orChild = planningResult.orExpression->getChild(i);
+
+        // Turn the i-th child into its own query.
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, query, orChild);
+        if (!statusWithCQ.isOK()) {
+            str::stream ss;
+            ss << "Can't canonicalize subchild " << orChild->debugString() << " "
+               << statusWithCQ.getStatus().reason();
+            return Status(ErrorCodes::BadValue, ss);
+        }
+
+        branchResult->canonicalQuery = std::move(statusWithCQ.getValue());
+
+        // Plan the i-th child. We might be able to find a plan for the i-th child in the plan
+        // cache. If there's no cached plan, then we generate and rank plans using the MPS.
+
+        // Populate branchResult->cachedSolution if an active cachedSolution entry exists.
+        if (planCache && planCache->shouldCacheQuery(*branchResult->canonicalQuery)) {
+            auto planCacheKey = planCache->computeKey(*branchResult->canonicalQuery);
+            if (auto cachedSol = planCache->getCacheEntryIfActive(planCacheKey)) {
+                // We have a CachedSolution. Store it for later.
+                LOGV2_DEBUG(
+                    20599,
+                    5,
+                    "Subplanner: cached plan found for child {i} of {orExpression_numChildren}",
+                    "i"_attr = i,
+                    "orExpression_numChildren"_attr = planningResult.orExpression->numChildren());
+
+                branchResult->cachedSolution = std::move(cachedSol);
+            }
+        }
+
+        if (!branchResult->cachedSolution) {
+            // No CachedSolution found. We'll have to plan from scratch.
+            LOGV2_DEBUG(20600,
+                        5,
+                        "Subplanner: planning child {i} of {orExpression_numChildren}",
+                        "i"_attr = i,
+                        "orExpression_numChildren"_attr =
+                            planningResult.orExpression->numChildren());
+
+            // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
+            // considering any plan that's a collscan.
+            invariant(branchResult->solutions.empty());
+            auto solutions = QueryPlanner::plan(*branchResult->canonicalQuery, params);
+            if (!solutions.isOK()) {
+                str::stream ss;
+                ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
+                   << solutions.getStatus().reason();
+                return Status(ErrorCodes::BadValue, ss);
+            }
+            branchResult->solutions = std::move(solutions.getValue());
+
+            LOGV2_DEBUG(20601,
+                        5,
+                        "Subplanner: got {branchResult_solutions_size} solutions",
+                        "branchResult_solutions_size"_attr = branchResult->solutions.size());
+        }
+    }
+
+    return std::move(planningResult);
+}
+
+StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries(
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params,
+    QueryPlanner::SubqueriesPlanningResult planningResult,
+    std::function<StatusWith<std::unique_ptr<QuerySolution>>(
+        CanonicalQuery* cq, std::vector<unique_ptr<QuerySolution>>)> multiplanCallback) {
+    // This is the skeleton of index selections that is inserted into the cache.
+    std::unique_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());
+
+    for (size_t i = 0; i < planningResult.orExpression->numChildren(); ++i) {
+        auto orChild = planningResult.orExpression->getChild(i);
+        auto branchResult = planningResult.branches[i].get();
+
+        if (branchResult->cachedSolution.get()) {
+            // We can get the index tags we need out of the cache.
+            Status tagStatus =
+                tagOrChildAccordingToCache(cacheData.get(),
+                                           branchResult->cachedSolution->plannerData[0],
+                                           orChild,
+                                           planningResult.indexMap);
+            if (!tagStatus.isOK()) {
+                return tagStatus;
+            }
+        } else if (1 == branchResult->solutions.size()) {
+            QuerySolution* soln = branchResult->solutions.front().get();
+            Status tagStatus = tagOrChildAccordingToCache(
+                cacheData.get(), soln->cacheData.get(), orChild, planningResult.indexMap);
+            if (!tagStatus.isOK()) {
+                return tagStatus;
+            }
+        } else {
+            // N solutions, rank them.
+
+            invariant(!branchResult->solutions.empty());
+
+            auto multiPlanStatus = multiplanCallback(branchResult->canonicalQuery.get(),
+                                                     std::move(branchResult->solutions));
+            if (!multiPlanStatus.isOK()) {
+                return multiPlanStatus;
+            }
+
+            auto bestSoln = std::move(multiPlanStatus.getValue());
+
+            // Check that we have good cache data. For example, we don't cache things
+            // for 2d indices.
+
+            if (nullptr == bestSoln->cacheData.get()) {
+                str::stream ss;
+                ss << "No cache data for subchild " << orChild->debugString();
+                return Status(ErrorCodes::NoQueryExecutionPlans, ss);
+            }
+
+            if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
+                str::stream ss;
+                ss << "No indexed cache data for subchild " << orChild->debugString();
+                return Status(ErrorCodes::NoQueryExecutionPlans, ss);
+            }
+
+            // Add the index assignments to our original query.
+            Status tagStatus = QueryPlanner::tagAccordingToCache(
+                orChild, bestSoln->cacheData->tree.get(), planningResult.indexMap);
+            if (!tagStatus.isOK()) {
+                str::stream ss;
+                ss << "Failed to extract indices from subchild " << orChild->debugString();
+                return tagStatus.withContext(ss);
+            }
+
+            cacheData->children.push_back(bestSoln->cacheData->tree->clone());
+        }
+    }
+
+    // Must do this before using the planner functionality.
+    prepareForAccessPlanning(planningResult.orExpression.get());
+
+    // Use the cached index assignments to build solnRoot. Takes ownership of '_orExpression'.
+    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
+        query, std::move(planningResult.orExpression), params.indices, params));
+
+    if (!solnRoot) {
+        str::stream ss;
+        ss << "Failed to build indexed data path for subplanned query\n";
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
+    }
+
+    LOGV2_DEBUG(20602,
+                5,
+                "Subplanner: fully tagged tree is {solnRoot}",
+                "solnRoot"_attr = redact(solnRoot->toString()));
+
+    auto compositeSolution =
+        QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
+
+    if (nullptr == compositeSolution.get()) {
+        str::stream ss;
+        ss << "Failed to analyze subplanned query";
+        return Status(ErrorCodes::NoQueryExecutionPlans, ss);
+    }
+
+    LOGV2_DEBUG(20603,
+                5,
+                "Subplanner: Composite solution is {compositeSolution}",
+                "compositeSolution"_attr = redact(compositeSolution->toString()));
+
+    return std::move(compositeSolution);
+}
 }  // namespace mongo

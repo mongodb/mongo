@@ -30,10 +30,15 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <queue>
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/util/partitioned.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -45,10 +50,12 @@ struct CappedInsertNotifierData;
 class Collection;
 class PlanExecutor;
 class PlanStage;
-class PlanYieldPolicy;
 class RecordId;
-struct PlanStageStats;
 class WorkingSet;
+
+namespace sbe {
+class PlanStage;
+}  // namespace sbe
 
 /**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop
@@ -71,126 +78,30 @@ extern const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommitte
 class PlanExecutor {
 public:
     enum ExecState {
-        // We successfully populated the out parameter.
+        // Successfully returned the next document and/or record id.
         ADVANCED,
 
-        // We're EOF.  We won't return any more results (edge case exception: capped+tailable).
+        // Execution is complete. There is no next document to return.
         IS_EOF,
-
-        // getNext() was asked for data it cannot provide, or the underlying PlanStage had an
-        // unrecoverable error, or the executor died, usually due to a concurrent catalog event
-        // such as a collection drop.
-        //
-        // If the underlying PlanStage has any information on the error, it will be available in
-        // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
-        // details from the output BSON object.
-        //
-        // The PlanExecutor is no longer capable of executing. The caller may extract stats from the
-        // underlying plan stages, but should not attempt to do anything else with the executor
-        // other than dispose() and destroy it.
-        //
-        // N.B.: If the plan's YieldPolicy allows yielding, FAILURE can be returned on interrupt,
-        // and any locks acquired might possibly be released, regardless of the use of any RAII
-        // locking helpers such as AutoGetCollection.  Code must be written to expect this
-        // situation.
-        FAILURE,
     };
 
-    /**
-     * The yielding policy of the plan executor. By default, an executor does not yield itself
-     * (NO_YIELD).
-     */
-    enum YieldPolicy {
-        // Any call to getNext() may yield. In particular, the executor may die on any call to
-        // getNext() due to a required index or collection becoming invalid during yield. If this
-        // occurs, getNext() will produce an error during yield recovery and will return FAILURE.
-        // Additionally, this will handle all WriteConflictExceptions that occur while processing
-        // the query.  With this yield policy, it is possible for getNext() to return FAILURE with
-        // locks released, if the operation is killed while yielding.
-        YIELD_AUTO,
+    // Describes whether callers should acquire locks when using a PlanExecutor. Not all cursors
+    // have the same locking behavior. In particular, find executors using the legacy PlanStage
+    // engine require the caller to lock the collection in MODE_IS. Aggregate executors and SBE
+    // executors, on the other hand, may access multiple collections and acquire their own locks on
+    // any involved collections while producing query results. Therefore, the caller need not
+    // explicitly acquire any locks for such PlanExecutors.
+    //
+    // The policy is consulted on getMore in order to determine locking behavior, since during
+    // getMore we otherwise could not easily know what flavor of cursor we're using.
+    enum class LockPolicy {
+        // The caller is responsible for locking the collection over which this PlanExecutor
+        // executes.
+        kLockExternally,
 
-        // This will handle WriteConflictExceptions that occur while processing the query, but will
-        // not yield locks. abandonSnapshot() will be called if a WriteConflictException occurs so
-        // callers must be prepared to get a new snapshot. The caller must hold their locks
-        // continuously from construction to destruction. Callers which do not want auto-yielding,
-        // but may release their locks during query execution must use the YIELD_MANUAL policy.
-        WRITE_CONFLICT_RETRY_ONLY,
-
-        // Use this policy if you want to disable auto-yielding, but will release locks while using
-        // the PlanExecutor. Any WriteConflictExceptions will be raised to the caller of getNext().
-        //
-        // With this policy, an explicit call must be made to saveState() before releasing locks,
-        // and an explicit call to restoreState() must be made after reacquiring locks.
-        // restoreState() will throw if the PlanExecutor is now invalid due to a catalog operation
-        // (e.g. collection drop) during yield.
-        YIELD_MANUAL,
-
-        // Can be used in one of the following scenarios:
-        //  - The caller will hold a lock continuously for the lifetime of this PlanExecutor.
-        //  - This PlanExecutor doesn't logically belong to a Collection, and so does not need to be
-        //    locked during execution. For example, a PlanExecutor containing a PipelineProxyStage
-        //    which is being used to execute an aggregation pipeline.
-        NO_YIELD,
-
-        // Will not yield locks or storage engine resources, but will check for interrupt.
-        INTERRUPT_ONLY,
-
-        // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
-        // yield, returning FAILURE with an error object encoding a ErrorCodes::ExceededTimeLimit
-        // message.
-        ALWAYS_TIME_OUT,
-
-        // Used for testing, this yield policy will cause the PlanExecutor to be marked as killed on
-        // the first yield, returning FAILURE with an error object encoding a
-        // ErrorCodes::QueryPlanKilled message.
-        ALWAYS_MARK_KILLED,
+        // The caller need not hold no locks; this PlanExecutor acquires any necessary locks itself.
+        kLocksInternally,
     };
-
-    static std::string serializeYieldPolicy(YieldPolicy yieldPolicy) {
-        switch (yieldPolicy) {
-            case YIELD_AUTO:
-                return "YIELD_AUTO";
-            case WRITE_CONFLICT_RETRY_ONLY:
-                return "WRITE_CONFLICT_RETRY_ONLY";
-            case YIELD_MANUAL:
-                return "YIELD_MANUAL";
-            case NO_YIELD:
-                return "NO_YIELD";
-            case INTERRUPT_ONLY:
-                return "INTERRUPT_ONLY";
-            case ALWAYS_TIME_OUT:
-                return "ALWAYS_TIME_OUT";
-            case ALWAYS_MARK_KILLED:
-                return "ALWAYS_MARK_KILLED";
-        }
-        MONGO_UNREACHABLE;
-    }
-
-    static YieldPolicy parseFromBSON(const StringData& element) {
-        const std::string& yieldPolicy = element.toString();
-        if (yieldPolicy == "YIELD_AUTO") {
-            return YIELD_AUTO;
-        }
-        if (yieldPolicy == "WRITE_CONFLICT_RETRY_ONLY") {
-            return WRITE_CONFLICT_RETRY_ONLY;
-        }
-        if (yieldPolicy == "YIELD_MANUAL") {
-            return YIELD_MANUAL;
-        }
-        if (yieldPolicy == "NO_YIELD") {
-            return NO_YIELD;
-        }
-        if (yieldPolicy == "INTERRUPT_ONLY") {
-            return INTERRUPT_ONLY;
-        }
-        if (yieldPolicy == "ALWAYS_TIME_OUT") {
-            return ALWAYS_TIME_OUT;
-        }
-        if (yieldPolicy == "ALWAYS_MARK_KILLED") {
-            return ALWAYS_MARK_KILLED;
-        }
-        MONGO_UNREACHABLE;
-    }
 
     /**
      * This class will ensure a PlanExecutor is disposed before it is deleted.
@@ -266,7 +177,7 @@ public:
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         NamespaceString nss = NamespaceString(),
         std::unique_ptr<QuerySolution> qs = nullptr);
 
@@ -282,9 +193,26 @@ public:
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
         NamespaceString nss = NamespaceString(),
         std::unique_ptr<QuerySolution> qs = nullptr);
+
+    /**
+     * These overloads are for SBE.
+     */
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<CanonicalQuery> cq,
+        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+        NamespaceString nss,
+        std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<CanonicalQuery> cq,
+        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+        NamespaceString nss,
+        std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
+        std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
     /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen
@@ -397,6 +325,22 @@ public:
     virtual ExecState getNextSnapshotted(Snapshotted<Document>* objOut, RecordId* dlOut) = 0;
     virtual ExecState getNextSnapshotted(Snapshotted<BSONObj>* objOut, RecordId* dlOut) = 0;
 
+    /**
+     * Produces the next document from the query execution plan. The caller can request that the
+     * executor returns documents by passing a non-null pointer for the 'objOut' output parameter,
+     * and similarly can request the RecordId by passing a non-null pointer for 'dlOut'.
+     *
+     * If a query-fatal error occurs, this method will throw an exception. If an exception is
+     * thrown, then the PlanExecutor is no longer capable of executing. The caller may extract stats
+     * from the underlying plan stages, but should not attempt to do anything else with the executor
+     * other than dispose() and destroy it.
+     *
+     * If the plan's YieldPolicy allows yielding, then any call to this method can result in a
+     * yield. This relinquishes any locks that were previously acquired, regardless of the use of
+     * any RAII locking helpers such as 'AutoGetCollection'. Furthermore, if an error is encountered
+     * during yield recovery, an exception can be thrown while locks are not held. Callers cannot
+     * expect locks to be held when this method throws an exception.
+     */
     virtual ExecState getNext(Document* objOut, RecordId* dlOut) = 0;
 
     /**
@@ -413,16 +357,14 @@ public:
     virtual bool isEOF() = 0;
 
     /**
-     * Execute the plan to completion, throwing out the results.  Used when you want to work the
+     * Execute the plan to completion, throwing out the results. Used when you want to work the
      * underlying tree without getting results back.
      *
      * If a YIELD_AUTO policy is set on this executor, then this will automatically yield.
      *
-     * Returns ErrorCodes::QueryPlanKilled if the plan executor was killed during a yield. If this
-     * error occurs, it is illegal to subsequently access the collection, since it may have been
-     * dropped.
+     * Throws an exception if this plan results in a runtime error or is killed.
      */
-    virtual Status executePlan() = 0;
+    virtual void executePlan() = 0;
 
     //
     // Concurrency-related methods.
@@ -430,10 +372,9 @@ public:
 
     /**
      * Notifies a PlanExecutor that it should die. Callers must specify the reason for why this
-     * executor is being killed. Subsequent calls to getNext() will return FAILURE, and fill
-     * 'objOut'
+     * executor is being killed. Subsequent calls to getNext() will throw a query-fatal exception
      * with an error reflecting 'killStatus'. If this method is called multiple times, only the
-     * first 'killStatus' will be retained. It is an error to call this method with Status::OK.
+     * first 'killStatus' will be retained. It is illegal to call this method with Status::OK.
      */
     virtual void markAsKilled(Status killStatus) = 0;
 
@@ -489,11 +430,15 @@ public:
      */
     virtual BSONObj getPostBatchResumeToken() const = 0;
 
+    virtual LockPolicy lockPolicy() const = 0;
+
     /**
-     * Turns a Document representing an error status produced by getNext() into a Status.
+     * Returns true if this PlanExecutor proxies to a Pipeline of DocumentSources.
+     *
+     * TODO SERVER-48478 : Create a new PlanExecutor implementation specifically for executing the
+     * Pipeline, and delete PipelineProxyStage.
      */
-    virtual Status getMemberObjectStatus(const Document& memberObj) const = 0;
-    virtual Status getMemberObjectStatus(const BSONObj& memberObj) const = 0;
+    virtual bool isPipelineExecutor() const = 0;
 };
 
 }  // namespace mongo

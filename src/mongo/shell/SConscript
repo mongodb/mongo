@@ -32,7 +32,7 @@ env.Alias('generated-sources', generateJSErrorCodes)
 
 # Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
 js_header = env.JSHeader(
-    target="mongo.cpp",
+    target="mongojs.cpp",
     source=[
         "assert.js",
         "bulk_api.js",
@@ -75,7 +75,7 @@ env.Alias('generated-sources', "mongo-server.cpp")
 env.Library(
     target='mongojs',
     source=[
-        'mongo.cpp',
+        'mongojs.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -165,8 +165,8 @@ env.Library(
         "kms_shell.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/shell_core',
         'kms',
+        'shell_utils',
     ],
 )
 
@@ -187,6 +187,27 @@ scriptingEnv.Library(
         '$BUILD_DIR/mongo/shell/shell_options_register',
         '$BUILD_DIR/third_party/shim_mozjs',
         'kms',
+    ],
+)
+
+env.Library(
+    target="linenoise_utf8",
+    source=[
+        "linenoise_utf8.cpp",
+    ],
+)
+
+env.Library(
+    target="linenoise",
+    source=[
+        "linenoise.cpp",
+        "mk_wcwidth.cpp"
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        "linenoise_utf8",
     ],
 )
 

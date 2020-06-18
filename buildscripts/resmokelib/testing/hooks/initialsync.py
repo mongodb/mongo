@@ -7,12 +7,12 @@ import bson
 import bson.errors
 import pymongo.errors
 
-from . import cleanup
-from . import interface
-from . import jsfile
-from ..fixtures import interface as fixture_interface
-from ..fixtures import replicaset
-from ... import errors
+from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
+from buildscripts.resmokelib.testing.fixtures import replicaset
+from buildscripts.resmokelib.testing.hooks import cleanup
+from buildscripts.resmokelib.testing.hooks import interface
+from buildscripts.resmokelib.testing.hooks import jsfile
 
 
 class BackgroundInitialSync(interface.Hook):
@@ -50,7 +50,7 @@ class BackgroundInitialSync(interface.Hook):
         self.tests_run += 1
 
         hook_test_case = BackgroundInitialSyncTestCase.create_after_test(
-            self.logger.test_case_logger, test, self, self._shell_options)
+            self.logger, test, self, self._shell_options)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
@@ -171,8 +171,7 @@ class IntermediateInitialSync(interface.Hook):
         if not self._should_run_after_test():
             return
 
-        hook_test_case = IntermediateInitialSyncTestCase.create_after_test(
-            self.logger.test_case_logger, test, self)
+        hook_test_case = IntermediateInitialSyncTestCase.create_after_test(self.logger, test, self)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 

@@ -131,16 +131,18 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     int status = getSysctlByNameWithDefault("kern.version", std::string("unknown"), &osVersion);
     if (status != 0)
         LOGV2(23332,
-              "Unable to collect OS Version. (errno: {status} msg: {strerror_status})",
-              "status"_attr = status,
-              "strerror_status"_attr = strerror(status));
+              "Unable to collect OS Version. (errno: {errno} msg: {msg})",
+              "Unable to collect OS Version.",
+              "errno"_attr = status,
+              "msg"_attr = strerror(status));
 
     status = getSysctlByNameWithDefault("hw.machine_arch", std::string("unknown"), &cpuArch);
     if (status != 0)
         LOGV2(23333,
-              "Unable to collect Machine Architecture. (errno: {status} msg: {strerror_status})",
-              "status"_attr = status,
-              "strerror_status"_attr = strerror(status));
+              "Unable to collect Machine Architecture. (errno: {errno} msg: {msg})",
+              "Unable to collect Machine Architecture.",
+              "errno"_attr = status,
+              "msg"_attr = strerror(status));
     addrSize = cpuArch.find("64") != std::string::npos ? 64 : 32;
 
     uintptr_t numBuffer;
@@ -150,17 +152,19 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     memLimit = memSize;
     if (status != 0)
         LOGV2(23334,
-              "Unable to collect Physical Memory. (errno: {status} msg: {strerror_status})",
-              "status"_attr = status,
-              "strerror_status"_attr = strerror(status));
+              "Unable to collect Physical Memory. (errno: {errno} msg: {msg})",
+              "Unable to collect Physical Memory.",
+              "errno"_attr = status,
+              "msg"_attr = strerror(status));
 
     status = getSysctlByNameWithDefault("hw.ncpu", defaultNum, &numBuffer);
     numCores = numBuffer;
     if (status != 0)
         LOGV2(23335,
-              "Unable to collect Number of CPUs. (errno: {status} msg: {strerror_status})",
-              "status"_attr = status,
-              "strerror_status"_attr = strerror(status));
+              "Unable to collect Number of CPUs. (errno: {errno} msg: {msg})",
+              "Unable to collect Number of CPUs.",
+              "errno"_attr = status,
+              "msg"_attr = strerror(status));
 
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
 

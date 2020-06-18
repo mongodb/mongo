@@ -59,8 +59,8 @@ struct IndexScanParams {
         : IndexScanParams(descriptor,
                           descriptor->indexName(),
                           descriptor->keyPattern(),
-                          descriptor->getMultikeyPaths(opCtx),
-                          descriptor->isMultikey()) {}
+                          descriptor->getEntry()->getMultikeyPaths(opCtx),
+                          descriptor->getEntry()->isMultikey()) {}
 
     const IndexDescriptor* indexDescriptor;
 
@@ -109,6 +109,7 @@ public:
     };
 
     IndexScan(ExpressionContext* expCtx,
+              const Collection* collection,
               IndexScanParams params,
               WorkingSet* workingSet,
               const MatchExpression* filter);

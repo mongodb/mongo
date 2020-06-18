@@ -368,7 +368,7 @@ public:
                                                       std::move(ws),
                                                       std::move(root),
                                                       nullptr,
-                                                      PlanExecutor::NO_YIELD,
+                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                       cursorNss));
 
             for (long long objCount = 0; objCount < batchSize; objCount++) {
@@ -405,7 +405,6 @@ public:
                 opCtx->getWriteConcern(),
                 repl::ReadConcernArgs::get(opCtx),
                 jsobj,
-                ClientCursorParams::LockPolicy::kLocksInternally,
                 uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
                                     ->checkAuthorizedToListCollections(dbname, jsobj)),
                 false  // needsMerge always 'false' for listCollections.

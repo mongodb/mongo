@@ -197,9 +197,10 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     if (!id.isValid() || !systemViews->findDoc(opCtx, id, &oldView)) {
         LOGV2_DEBUG(22544,
                     2,
-                    "insert view {view} into {db_getSystemViewsName}",
+                    "Insert view {view} into {viewCatalog}",
+                    "Insert view to system views catalog",
                     "view"_attr = view,
-                    "db_getSystemViewsName"_attr = _db->getSystemViewsName());
+                    "viewCatalog"_attr = _db->getSystemViewsName());
         uassertStatusOK(
             systemViews->insertDocument(opCtx, InsertStatement(view), &CurOp::get(opCtx)->debug()));
     } else {
@@ -231,9 +232,10 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
 
     LOGV2_DEBUG(22545,
                 2,
-                "remove view {name} from {db_getSystemViewsName}",
-                "name"_attr = name,
-                "db_getSystemViewsName"_attr = _db->getSystemViewsName());
+                "Remove view {view} from {viewCatalog}",
+                "Remove view from system views catalog",
+                "view"_attr = name,
+                "viewCatalog"_attr = _db->getSystemViewsName());
     systemViews->deleteDocument(opCtx, kUninitializedStmtId, id, &CurOp::get(opCtx)->debug());
 }
 }  // namespace mongo

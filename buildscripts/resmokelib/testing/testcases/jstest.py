@@ -6,11 +6,12 @@ import os.path
 import sys
 import threading
 
-from . import interface
-from ... import config
-from ... import core
-from ... import utils
-from ...utils import registry
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib import core
+from buildscripts.resmokelib import logging
+from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.testing.testcases import interface
+from buildscripts.resmokelib.utils import registry
 
 
 class _SingleJSTestCase(interface.ProcessTestCase):
@@ -191,7 +192,8 @@ class JSTestCase(interface.ProcessTestCase):
         try:
             # If there are multiple clients, make a new thread for each client.
             for thread_id in range(self.num_clients):
-                logger = self.logger.new_test_thread_logger(self.test_kind, str(thread_id))
+                logger = logging.loggers.new_test_thread_logger(self.logger, self.test_kind,
+                                                                str(thread_id))
                 test_case = self._create_test_case_for_thread(logger, thread_id)
                 test_cases.append(test_case)
 

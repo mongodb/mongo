@@ -41,7 +41,7 @@ MONGO_FAIL_POINT_DEFINE(sdamServerSelectorIgnoreLatencyWindow);
 
 ServerSelector::~ServerSelector() {}
 
-SdamServerSelector::SdamServerSelector(const ServerSelectionConfiguration& config)
+SdamServerSelector::SdamServerSelector(const SdamConfiguration& config)
     : _config(config), _random(PseudoRandom(SecureRandom().nextInt64())) {}
 
 void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>* result,
@@ -164,7 +164,7 @@ boost::optional<std::vector<ServerDescriptionPtr>> SdamServerSelector::selectSer
             *std::min_element(results.begin(), results.end(), LatencyWindow::rttCompareFn);
 
         invariant(minServer->getRtt());
-        auto latencyWindow = LatencyWindow(*minServer->getRtt(), _config.getLocalThresholdMs());
+        auto latencyWindow = LatencyWindow(*minServer->getRtt(), _config.getLocalThreshold());
         latencyWindow.filterServers(&results);
 
         // latency window should always leave at least one result

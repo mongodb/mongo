@@ -89,12 +89,17 @@ KeyString::Value makeHashKey(BSONElement elt) {
     return keyString.release();
 }
 
-TEST(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
+struct HashKeyGeneratorTest : public unittest::Test {
+    SharedBufferFragmentBuilder allocator{KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+};
+
+TEST_F(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
     BSONObj obj = fromjson("{a: 'string'}");
     KeyStringSet actualKeys;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj indexSpec = fromjson("{a: 'hashed'}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -112,13 +117,14 @@ TEST(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
+TEST_F(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     BSONObj obj = fromjson("{a: 5}");
     KeyStringSet actualKeys;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
 
     BSONObj indexSpec = fromjson("{a: 'hashed'}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -135,14 +141,15 @@ TEST(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
+TEST_F(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
     BSONObj obj = fromjson("{a: {b: 'string'}}");
     BSONObj backwardsObj = fromjson("{a: {b: 'gnirts'}}");
     KeyStringSet actualKeys;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
 
     BSONObj indexSpec = fromjson("{a: 'hashed'}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -159,14 +166,15 @@ TEST(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, CollationAppliedforAllIndexFields) {
+TEST_F(HashKeyGeneratorTest, CollationAppliedforAllIndexFields) {
     BSONObj obj = fromjson("{a: {b: 'abc', c: 'def'}}");
     BSONObj backwardsObj = fromjson("{a: {b: 'cba', c: 'fed'}}");
     KeyStringSet actualKeys;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
 
     BSONObj indexSpec = fromjson("{'a.c': 1, 'a': 'hashed'}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -185,11 +193,12 @@ TEST(HashKeyGeneratorTest, CollationAppliedforAllIndexFields) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, NoCollation) {
+TEST_F(HashKeyGeneratorTest, NoCollation) {
     BSONObj obj = fromjson("{a: 'string'}");
     KeyStringSet actualKeys;
     BSONObj indexSpec = fromjson("{a: 'hashed'}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -206,11 +215,12 @@ TEST(HashKeyGeneratorTest, NoCollation) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, CompoundIndexEmptyObject) {
+TEST_F(HashKeyGeneratorTest, CompoundIndexEmptyObject) {
     BSONObj obj = fromjson("{}");
     KeyStringSet actualKeys;
     BSONObj indexSpec = fromjson("{a: 'hashed', b: 1, c: 1}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -233,11 +243,12 @@ TEST(HashKeyGeneratorTest, CompoundIndexEmptyObject) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, SparseIndex) {
+TEST_F(HashKeyGeneratorTest, SparseIndex) {
     BSONObj obj = fromjson("{k: 1}");
     KeyStringSet actualKeys;
     BSONObj indexSpec = fromjson("{a: 'hashed', b: 1, c: 1}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -251,11 +262,12 @@ TEST(HashKeyGeneratorTest, SparseIndex) {
     ASSERT(assertKeysetsEqual(KeyStringSet(), actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, SparseIndexWithAFieldPresent) {
+TEST_F(HashKeyGeneratorTest, SparseIndexWithAFieldPresent) {
     BSONObj obj = fromjson("{a: 2}");
     KeyStringSet actualKeys;
     BSONObj indexSpec = fromjson("{a: 'hashed', b: 1, c: 1}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -278,11 +290,12 @@ TEST(HashKeyGeneratorTest, SparseIndexWithAFieldPresent) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, ArrayAlongIndexFieldPathFails) {
+TEST_F(HashKeyGeneratorTest, ArrayAlongIndexFieldPathFails) {
     BSONObj obj = fromjson("{a: []}");
     KeyStringSet actualKeys;
     BSONObj indexSpec = fromjson("{'a.b.c': 'hashed'}");
-    ASSERT_THROWS_CODE(ExpressionKeysPrivate::getHashKeys(obj,
+    ASSERT_THROWS_CODE(ExpressionKeysPrivate::getHashKeys(allocator,
+                                                          obj,
                                                           indexSpec,
                                                           kHashSeed,
                                                           kHashVersion,
@@ -296,11 +309,12 @@ TEST(HashKeyGeneratorTest, ArrayAlongIndexFieldPathFails) {
                        16766);
 }
 
-TEST(HashKeyGeneratorTest, ArrayAlongIndexFieldPathDoesNotFailWhenIgnoreFlagIsSet) {
+TEST_F(HashKeyGeneratorTest, ArrayAlongIndexFieldPathDoesNotFailWhenIgnoreFlagIsSet) {
     BSONObj obj = fromjson("{a: []}");
     KeyStringSet actualKeys;
     BSONObj indexSpec = fromjson("{'a.b.c': 'hashed'}");
-    ExpressionKeysPrivate::getHashKeys(obj,
+    ExpressionKeysPrivate::getHashKeys(allocator,
+                                       obj,
                                        indexSpec,
                                        kHashSeed,
                                        kHashVersion,
@@ -317,11 +331,12 @@ TEST(HashKeyGeneratorTest, ArrayAlongIndexFieldPathDoesNotFailWhenIgnoreFlagIsSe
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-TEST(HashKeyGeneratorTest, ArrayAtTerminalPathAlwaysFails) {
+TEST_F(HashKeyGeneratorTest, ArrayAtTerminalPathAlwaysFails) {
     BSONObj obj = fromjson("{a : {b: {c: [1]}}}");
     KeyStringSet actualKeys;
     BSONObj indexSpec = fromjson("{'a.b.c': 'hashed'}");
-    ASSERT_THROWS_CODE(ExpressionKeysPrivate::getHashKeys(obj,
+    ASSERT_THROWS_CODE(ExpressionKeysPrivate::getHashKeys(allocator,
+                                                          obj,
                                                           indexSpec,
                                                           kHashSeed,
                                                           kHashVersion,

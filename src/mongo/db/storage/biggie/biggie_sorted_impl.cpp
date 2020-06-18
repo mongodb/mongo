@@ -193,7 +193,7 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
                                                        Ordering order,
                                                        const std::string& prefix,
                                                        const std::string& identEnd,
-                                                       const NamespaceString& collectionNamespace,
+                                                       const IndexDescriptor* desc,
                                                        const std::string& indexName,
                                                        const BSONObj& keyPattern,
                                                        const BSONObj& collation)
@@ -203,7 +203,7 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
       _order(order),
       _prefix(prefix),
       _identEnd(identEnd),
-      _collectionNamespace(collectionNamespace),
+      _desc(desc),
       _indexName(indexName),
       _keyPattern(keyPattern),
       _collation(collation),
@@ -242,11 +242,9 @@ Status SortedDataBuilderInterface::addKey(const KeyString::Value& keyString) {
         createKeyString(keyString, sizeWithoutRecordId, loc, _prefix, /* isUnique */ _unique);
 
     if (twoKeyCmp == 0 && twoRIDCmp != 0) {
-        if (!_dupsAllowed) {
-            auto key = KeyString::toBson(keyString, _order);
-            return buildDupKeyErrorStatus(
-                key, _collectionNamespace, _indexName, _keyPattern, _collation);
-        }
+        if (!_dupsAllowed)
+            return buildDupKeyErrorStatus(_opCtx, keyString, _order, _desc);
+
         // Duplicate index entries are allowed on this unique index, so we put the RecordId in the
         // KeyString until the unique constraint is resolved.
         workingCopyInsertKey =
@@ -280,7 +278,7 @@ SortedDataBuilderInterface* SortedDataInterface::getBulkBuilder(OperationContext
                                           _ordering,
                                           _prefix,
                                           _identEnd,
-                                          _collectionNamespace,
+                                          _desc,
                                           _indexName,
                                           _keyPattern,
                                           _collation);
@@ -297,7 +295,7 @@ SortedDataInterface::SortedDataInterface(OperationContext* opCtx,
       _prefix(ident.toString().append(1, '\1')),
       // Therefore, the string ident + \2 will be greater than all elements in this ident.
       _identEnd(ident.toString().append(1, '\2')),
-      _collectionNamespace(desc->getCollection()->ns()),
+      _desc(desc),
       _indexName(desc->indexName()),
       _keyPattern(desc->keyPattern()),
       _collation(desc->collation()),
@@ -338,6 +336,7 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
     //     - If the cursor didn't find anything, we index with this KeyString.
     //     - If the cursor found a value and it had differing RecordId's, then generate a KeyString
     //       with the RecordId in it.
+    invariant(_isUnique || dupsAllowed);
     if (_isUnique) {
         // Ensure that another index entry without the RecordId in its KeyString doesn't exist with
         // another RecordId already.
@@ -346,30 +345,19 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
             IndexKeyEntry entry =
                 keyStringToIndexKeyEntry(workingCopyIt->first, workingCopyIt->second, _ordering);
 
-            if (entry.loc != loc) {
-                if (dupsAllowed) {
-                    // Duplicate index entries are allowed on this unique index, so we put the
-                    // RecordId in the KeyString until the unique constraint is resolved.
-                    insertKeyString = createKeyString(keyString,
-                                                      sizeWithoutRecordId,
-                                                      loc,
-                                                      _prefix,
-                                                      /* isUnique */ false);
-                } else {
-                    // There was an attempt to create an index entry with a different RecordId while
-                    // dups were not allowed.
-                    auto key = KeyString::toBson(keyString, _ordering);
-                    return buildDupKeyErrorStatus(
-                        key, _collectionNamespace, _indexName, _keyPattern, _collation);
-                }
-            } else {
+            if (entry.loc == loc)
                 return Status::OK();
-            }
+            if (!dupsAllowed)
+                return buildDupKeyErrorStatus(opCtx, keyString, _ordering, _desc);
+            // Duplicate index entries are allowed on this unique index, so we put the
+            // RecordId in the KeyString until the unique constraint is resolved.
+            insertKeyString = createKeyString(keyString,
+                                              sizeWithoutRecordId,
+                                              loc,
+                                              _prefix,
+                                              /* isUnique */ false);
         }
-    } else {
-        invariant(dupsAllowed);
     }
-
     if (workingCopy->find(insertKeyString) != workingCopy->end())
         return Status::OK();
 
@@ -496,8 +484,7 @@ Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx, const KeyString
                            KeyString::sizeWithoutRecordIdAtEnd(next->keyString.getBuffer(),
                                                                next->keyString.getSize()),
                            key.getSize()) == 0) {
-        return buildDupKeyErrorStatus(
-            key, _collectionNamespace, _indexName, _keyPattern, _collation, _ordering);
+        return buildDupKeyErrorStatus(opCtx, key, _ordering, _desc);
     }
 
     return Status::OK();

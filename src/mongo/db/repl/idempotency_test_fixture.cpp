@@ -333,7 +333,7 @@ std::string IdempotencyTest::computeDataHash(Collection* collection) {
                                            BSONObj(),
                                            BSONObj(),
                                            BoundInclusion::kIncludeStartKeyOnly,
-                                           PlanExecutor::NO_YIELD,
+                                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH);
     ASSERT(nullptr != exec.get());
@@ -405,8 +405,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
         ASSERT_OK(
             CollectionValidation::validate(_opCtx.get(),
                                            nss,
-                                           CollectionValidation::ValidateOptions::kFullValidation,
-                                           false,
+                                           CollectionValidation::ValidateMode::kForegroundFull,
                                            &validateResults,
                                            &bob));
         ASSERT_TRUE(validateResults.valid);

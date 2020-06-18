@@ -241,7 +241,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
     // Get the set of shards on which we will run the query.
-    auto shardIds = getTargetedShardsForQuery(opCtx,
+    auto shardIds = getTargetedShardsForQuery(query.getExpCtx(),
                                               routingInfo,
                                               query.getQueryRequest().getFilter(),
                                               query.getQueryRequest().getCollation());
@@ -525,12 +525,13 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
             LOGV2_DEBUG(22839,
                         1,
-                        "Received error status for query {query_Short} on attempt {retries} of "
-                        "{kMaxRetries}: {ex}",
-                        "query_Short"_attr = redact(query.toStringShort()),
-                        "retries"_attr = retries,
-                        "kMaxRetries"_attr = kMaxRetries,
-                        "ex"_attr = redact(ex));
+                        "Received error status for query {query} on attempt {attemptNumber} of "
+                        "{maxRetries}: {error}",
+                        "Received error status for query",
+                        "query"_attr = redact(query.toStringShort()),
+                        "attemptNumber"_attr = retries,
+                        "maxRetries"_attr = kMaxRetries,
+                        "error"_attr = redact(ex));
 
             Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
                                                                      ex->getVersionReceived());
@@ -566,12 +567,13 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
             LOGV2_DEBUG(22840,
                         1,
-                        "Received error status for query {query_Short} on attempt {retries} of "
-                        "{kMaxRetries}: {ex}",
-                        "query_Short"_attr = redact(query.toStringShort()),
-                        "retries"_attr = retries,
-                        "kMaxRetries"_attr = kMaxRetries,
-                        "ex"_attr = redact(ex));
+                        "Received error status for query {query} on attempt {attemptNumber} of "
+                        "{maxRetries}: {error}",
+                        "Received error status for query",
+                        "query"_attr = redact(query.toStringShort()),
+                        "attemptNumber"_attr = retries,
+                        "maxRetries"_attr = kMaxRetries,
+                        "error"_attr = redact(ex));
 
             if (ex.code() != ErrorCodes::ShardInvalidatedForTargeting) {
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
@@ -846,7 +848,9 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
     }
 
-    auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    auto atClusterTime = !opCtx->inMultiDocumentTransaction()
+        ? repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()
+        : boost::none;
     return CursorResponse(request.nss,
                           idToReturn,
                           std::move(batch),

@@ -37,7 +37,7 @@
       !F_ISSET(dhandle, WT_DHANDLE_DROPPED))
 
 /* The metadata cursor's data handle. */
-#define WT_SESSION_META_DHANDLE(s) (((WT_CURSOR_BTREE *)((s)->meta_cursor))->btree->dhandle)
+#define WT_SESSION_META_DHANDLE(s) (((WT_CURSOR_BTREE *)((s)->meta_cursor))->dhandle)
 
 #define WT_DHANDLE_ACQUIRE(dhandle) (void)__wt_atomic_add32(&(dhandle)->session_ref, 1)
 

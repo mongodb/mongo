@@ -29,7 +29,6 @@
 #include <vector>
 
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/thread_safety_context.h"
@@ -78,15 +77,10 @@ DEATH_TEST_F(ThreadSafetyContextTest, CreateThreadsAfterForbidingMultiThreading,
 }
 
 DEATH_TEST_F(ThreadSafetyContextTest, ForbidMultiThreadingAfterCreatingThreads, "invariant") {
-    unittest::Barrier barrier(2);
+    auto thread = stdx::thread([]() {});
 
-    auto thread = stdx::thread([&]() mutable {
-        barrier.countDownAndWait();
-        sleepFor(Milliseconds(50));
-    });
-
-    // Wait for the thread to start before proceeding with the test
-    barrier.countDownAndWait();
+    // Wait for the thread to return before proceeding with the test
+    thread.join();
 
     ThreadSafetyContext::getThreadSafetyContext()->forbidMultiThreading();
     // Must never reach here or the test fails

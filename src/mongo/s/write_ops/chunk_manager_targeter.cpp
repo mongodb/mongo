@@ -31,20 +31,27 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/write_ops/chunk_manager_targeter.h"
-
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/write_ops/chunk_manager_targeter.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+#include "signal.h"
 
 namespace mongo {
 namespace {
@@ -112,9 +119,8 @@ UpdateType getUpdateExprType(const write_ops::UpdateOpEntry& updateDoc) {
  * generating the new document in the case of an upsert. It is therefore always correct to target
  * the operation on the basis of the combined updateExpr and query.
  */
-BSONObj getUpdateExprForTargeting(OperationContext* opCtx,
+BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> expCtx,
                                   const ShardKeyPattern& shardKeyPattern,
-                                  const NamespaceString& nss,
                                   UpdateType updateType,
                                   const write_ops::UpdateOpEntry& updateOp) {
     // We should never see an invalid update type here.
@@ -145,7 +151,7 @@ BSONObj getUpdateExprForTargeting(OperationContext* opCtx,
     // This will guarantee that we can target a single shard, but it is not necessarily fatal if no
     // exact _id can be found.
     const auto idFromQuery =
-        uassertStatusOK(kVirtualIdShardKey.extractShardKeyFromQuery(opCtx, nss, updateOp.getQ()));
+        uassertStatusOK(kVirtualIdShardKey.extractShardKeyFromQuery(expCtx, updateOp.getQ()));
     if (auto idElt = idFromQuery[kIdFieldName]) {
         updateExpr = updateExpr.addField(idElt);
     }
@@ -346,7 +352,6 @@ bool wasMetadataRefreshed(const std::shared_ptr<ChunkManager>& managerA,
 
     return false;
 }
-
 }  // namespace
 
 ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
@@ -398,8 +403,8 @@ ShardEndpoint ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
                          _routingInfo->db().databaseVersion());
 }
 
-std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(
-    OperationContext* opCtx, const write_ops::UpdateOpEntry& updateOp) const {
+std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* opCtx,
+                                                              const BatchItemRef& itemRef) const {
     // If the update is replacement-style:
     // 1. Attempt to target using the query. If this fails, AND the query targets more than one
     //    shard,
@@ -413,6 +418,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(
     // as if the the shard key values are specified as NULL. A replacement document is also allowed
     // to have a missing '_id', and if the '_id' exists in the query, it will be emplaced in the
     // replacement document for targeting purposes.
+    const auto& updateOp = itemRef.getUpdate();
     const auto updateType = getUpdateExprType(updateOp);
 
     // If the collection is not sharded, forward the update to the primary shard.
@@ -425,8 +431,15 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(
     const auto& shardKeyPattern = _routingInfo->cm()->getShardKeyPattern();
     const auto collation = write_ops::collationOf(updateOp);
 
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               _nss,
+                                                               collation,
+                                                               boost::none,  // explain
+                                                               itemRef.getLet(),
+                                                               itemRef.getRuntimeConstants());
+
     const auto updateExpr =
-        getUpdateExprForTargeting(opCtx, shardKeyPattern, _nss, updateType, updateOp);
+        getUpdateExprForTargeting(expCtx, shardKeyPattern, updateType, updateOp);
     const bool isUpsert = updateOp.getUpsert();
     const auto query = updateOp.getQ();
 
@@ -444,13 +457,13 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(
     // to target based on the replacement doc, it could result in an insertion even if a document
     // matching the query exists on another shard.
     if (isUpsert) {
-        return targetByShardKey(shardKeyPattern.extractShardKeyFromQuery(opCtx, _nss, query),
+        return targetByShardKey(shardKeyPattern.extractShardKeyFromQuery(expCtx, query),
                                 "Failed to target upsert by query");
     }
 
     // We first try to target based on the update's query. It is always valid to forward any update
     // or upsert to a single shard, so return immediately if we are able to target a single shard.
-    auto endPoints = uassertStatusOK(_targetQuery(opCtx, query, collation));
+    auto endPoints = uassertStatusOK(_targetQuery(expCtx, query, collation));
     if (endPoints.size() == 1) {
         return endPoints;
     }
@@ -484,20 +497,27 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(
     return endPoints;
 }
 
-std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(
-    OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteOp) const {
-    BSONObj shardKey;
+std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* opCtx,
+                                                              const BatchItemRef& itemRef) const {
+    const auto& deleteOp = itemRef.getDelete();
+    const auto collation = write_ops::collationOf(deleteOp);
 
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               _nss,
+                                                               collation,
+                                                               boost::none,  // explain
+                                                               itemRef.getLet(),
+                                                               itemRef.getRuntimeConstants());
+
+    BSONObj shardKey;
     if (_routingInfo->cm()) {
         // Sharded collections have the following further requirements for targeting:
         //
         // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
         shardKey =
             uassertStatusOK(_routingInfo->cm()->getShardKeyPattern().extractShardKeyFromQuery(
-                opCtx, _nss, deleteOp.getQ()));
+                expCtx, deleteOp.getQ()));
     }
-
-    const auto collation = write_ops::collationOf(deleteOp);
 
     // Target the shard key or delete query
     if (!shardKey.isEmpty()) {
@@ -515,7 +535,6 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
     }
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto cq = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
                                      std::move(qr),
@@ -534,11 +553,13 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(
             !_routingInfo->cm() || deleteOp.getMulti() ||
                 isExactIdQuery(opCtx, *cq, _routingInfo->cm().get()));
 
-    return uassertStatusOK(_targetQuery(opCtx, deleteOp.getQ(), collation));
+    return uassertStatusOK(_targetQuery(expCtx, deleteOp.getQ(), collation));
 }
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
-    OperationContext* opCtx, const BSONObj& query, const BSONObj& collation) const {
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const BSONObj& query,
+    const BSONObj& collation) const {
     if (!_routingInfo->cm()) {
         return std::vector<ShardEndpoint>{{_routingInfo->db().primaryId(),
                                            ChunkVersion::UNSHARDED(),
@@ -547,7 +568,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
 
     std::set<ShardId> shardIds;
     try {
-        _routingInfo->cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
+        _routingInfo->cm()->getShardIdsForQuery(expCtx, query, collation, &shardIds);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

@@ -139,7 +139,7 @@ serveronlyEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         'skipped_record_tracker',
-        '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )

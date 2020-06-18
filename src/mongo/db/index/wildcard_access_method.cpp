@@ -59,7 +59,7 @@ void WildcardAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBu
                                      KeyStringSet* multikeyMetadataKeys,
                                      MultikeyPaths* multikeyPaths,
                                      boost::optional<RecordId> id) const {
-    _keyGen.generateKeys(obj, keys, multikeyMetadataKeys, id);
+    _keyGen.generateKeys(pooledBufferBuilder, obj, keys, multikeyMetadataKeys, id);
 }
 
 FieldRef WildcardAccessMethod::extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
@@ -92,10 +92,7 @@ std::set<FieldRef> WildcardAccessMethod::_getMultikeyPathSet(
     const IndexBounds& indexBounds,
     MultikeyMetadataAccessStats* stats) const {
     return writeConflictRetry(
-        opCtx,
-        "wildcard multikey path retrieval",
-        _descriptor->parentNS().ns(),
-        [&]() -> std::set<FieldRef> {
+        opCtx, "wildcard multikey path retrieval", "", [&]() -> std::set<FieldRef> {
             stats->numSeeks = 0;
             stats->keysExamined = 0;
             auto cursor = newCursor(opCtx);
@@ -224,42 +221,40 @@ std::set<FieldRef> WildcardAccessMethod::getMultikeyPathSet(
 
 std::set<FieldRef> WildcardAccessMethod::getMultikeyPathSet(
     OperationContext* opCtx, MultikeyMetadataAccessStats* stats) const {
-    return writeConflictRetry(
-        opCtx, "wildcard multikey path retrieval", _descriptor->parentNS().ns(), [&]() {
-            invariant(stats);
-            stats->numSeeks = 0;
-            stats->keysExamined = 0;
+    return writeConflictRetry(opCtx, "wildcard multikey path retrieval", "", [&]() {
+        invariant(stats);
+        stats->numSeeks = 0;
+        stats->keysExamined = 0;
 
-            auto cursor = newCursor(opCtx);
+        auto cursor = newCursor(opCtx);
 
-            // All of the keys storing multikeyness metadata are prefixed by a value of 1. Establish
-            // an index cursor which will scan this range.
-            const BSONObj metadataKeyRangeBegin = BSON("" << 1 << "" << MINKEY);
-            const BSONObj metadataKeyRangeEnd = BSON("" << 1 << "" << MAXKEY);
+        // All of the keys storing multikeyness metadata are prefixed by a value of 1. Establish
+        // an index cursor which will scan this range.
+        const BSONObj metadataKeyRangeBegin = BSON("" << 1 << "" << MINKEY);
+        const BSONObj metadataKeyRangeEnd = BSON("" << 1 << "" << MAXKEY);
 
-            constexpr bool inclusive = true;
-            cursor->setEndPosition(metadataKeyRangeEnd, inclusive);
+        constexpr bool inclusive = true;
+        cursor->setEndPosition(metadataKeyRangeEnd, inclusive);
 
-            auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-                metadataKeyRangeBegin,
-                getSortedDataInterface()->getKeyStringVersion(),
-                getSortedDataInterface()->getOrdering(),
-                true, /* forward */
-                inclusive);
-            auto entry = cursor->seek(keyStringForSeek);
-            ++stats->numSeeks;
+        auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+            metadataKeyRangeBegin,
+            getSortedDataInterface()->getKeyStringVersion(),
+            getSortedDataInterface()->getOrdering(),
+            true, /* forward */
+            inclusive);
+        auto entry = cursor->seek(keyStringForSeek);
+        ++stats->numSeeks;
 
-            // Iterate the cursor, copying the multikey paths into an in-memory set.
-            std::set<FieldRef> multikeyPaths{};
-            while (entry) {
-                ++stats->keysExamined;
-                multikeyPaths.emplace(
-                    WildcardAccessMethod::extractMultikeyPathFromIndexKey(*entry));
+        // Iterate the cursor, copying the multikey paths into an in-memory set.
+        std::set<FieldRef> multikeyPaths{};
+        while (entry) {
+            ++stats->keysExamined;
+            multikeyPaths.emplace(WildcardAccessMethod::extractMultikeyPathFromIndexKey(*entry));
 
-                entry = cursor->next();
-            }
+            entry = cursor->next();
+        }
 
-            return multikeyPaths;
-        });
+        return multikeyPaths;
+    });
 }
 }  // namespace mongo

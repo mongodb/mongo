@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+using unittest::assertGet;
+
 void MigrationTestFixture::setUp() {
     setUpAndInitializeConfigDb();
 }

@@ -52,7 +52,7 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
@@ -61,9 +61,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
@@ -83,7 +80,6 @@
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -91,6 +87,8 @@
 #include "mongo/db/replica_set_aware_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -104,6 +102,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -125,11 +124,15 @@ MONGO_FAIL_POINT_DEFINE(hangAfterWaitingForTopologyChangeTimesOut);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 // Skip sending heartbeats to pre-check that a quorum is available before a reconfig.
 MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
+// Will cause signal drain complete to hang right before acquiring the RSTL.
+MONGO_FAIL_POINT_DEFINE(hangBeforeRSTLOnDrainComplete);
 // Will cause signal drain complete to hang after reconfig
 MONGO_FAIL_POINT_DEFINE(hangAfterReconfigOnDrainComplete);
 MONGO_FAIL_POINT_DEFINE(doNotRemoveNewlyAddedOnHeartbeats);
 // Will hang right after setting the currentOp info associated with an automatic reconfig.
 MONGO_FAIL_POINT_DEFINE(hangDuringAutomaticReconfig);
+// Make reconfig command hang before validating new config.
+MONGO_FAIL_POINT_DEFINE(ReconfigHangBeforeConfigValidationCheck);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -652,11 +655,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             lastOpTimeAndWallTime = lastOpTimeAndWallTimeStatus.getValue();
         }
     } else {
-        // The node is an arbiter hence will not need logical clock for external operations.
-        LogicalClock::get(getServiceContext())->disable();
-        if (auto validator = LogicalTimeValidator::get(getServiceContext())) {
-            validator->stopKeyManager();
-        }
+        ReplicaSetAwareServiceRegistry::get(_service).onBecomeArbiter();
     }
 
     const auto lastOpTime = lastOpTimeAndWallTime.opTime;
@@ -925,6 +924,8 @@ void ReplicationCoordinatorImpl::enterTerminalShutdown() {
 }
 
 bool ReplicationCoordinatorImpl::enterQuiesceModeIfSecondary() {
+    LOGV2_INFO(4794602, "Attempting to enter quiesce mode");
+
     stdx::lock_guard lk(_mutex);
 
     if (!_memberState.secondary()) {
@@ -1152,6 +1153,12 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     lk.unlock();
 
     _externalState->onDrainComplete(opCtx);
+    ReplicaSetAwareServiceRegistry::get(_service).onStepUpBegin(opCtx);
+
+    if (MONGO_unlikely(hangBeforeRSTLOnDrainComplete.shouldFail())) {
+        LOGV2(4712800, "Hanging due to hangBeforeRSTLOnDrainComplete failpoint");
+        hangBeforeRSTLOnDrainComplete.pauseWhileSet(opCtx);
+    }
 
     // Kill all user writes and user reads that encounter a prepare conflict. Also kills select
     // internal operations. Although secondaries cannot accept writes, a step up can kill writes
@@ -1221,6 +1228,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
 
         AllowNonLocalWritesBlock writesAllowed(opCtx);
         OpTime firstOpTime = _externalState->onTransitionToPrimary(opCtx);
+        ReplicaSetAwareServiceRegistry::get(_service).onStepUpComplete(opCtx);
         lk.lock();
 
         auto status = _topCoord->completeTransitionToPrimary(firstOpTime);
@@ -1243,9 +1251,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
     _updateMemberStateFromTopologyCoordinator(lk);
 
-    LOGV2_OPTIONS(21331,
-                  {logv2::LogTag::kRS},
-                  "Transition to primary complete; database writes are now permitted");
+    LOGV2(21331, "Transition to primary complete; database writes are now permitted");
     _drainFinishedCond.notify_all();
     _externalState->startNoopWriter(_getMyLastAppliedOpTime_inlock());
 }
@@ -1380,7 +1386,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
 
     // The last applied opTime should never advance beyond the global timestamp (i.e. the latest
     // cluster time). Not enforced if the logical clock is disabled, e.g. for arbiters.
-    dassert(!LogicalClock::get(getServiceContext())->isEnabled() ||
+    dassert(!VectorClock::get(getServiceContext())->isEnabled() ||
             _externalState->getGlobalTimestamp(getServiceContext()) >= opTime.getTimestamp());
 
     _topCoord->setMyLastAppliedOpTimeAndWallTime(
@@ -1983,7 +1989,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
         status = Status{ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
     }
 
-    if (getTestCommandsEnabled() && !status.isOK()) {
+    if (TestingProctor::instance().isEnabled() && !status.isOK()) {
         stdx::lock_guard lock(_mutex);
         LOGV2(21339,
               "Replication failed for write concern: {writeConcern}, waiting for optime: {opTime}, "
@@ -2355,28 +2361,6 @@ void ReplicationCoordinatorImpl::cancelCbkHandle(CallbackHandle activeHandle) {
     _replExecutor->cancel(activeHandle);
 }
 
-BSONObj ReplicationCoordinatorImpl::_runCmdOnSelfOnAlternativeClient(OperationContext* opCtx,
-                                                                     const std::string& dbName,
-                                                                     const BSONObj& cmdObj) {
-
-    auto client = opCtx->getServiceContext()->makeClient("DBDirectClientCmd");
-    // We want the command's opCtx that gets executed via DBDirectClient to be interruptible
-    // so that we don't block state transitions. Callers of this function might run opCtx
-    // in an uninterruptible mode. To be on safer side, run the command in AlternativeClientRegion,
-    // to make sure that the command's opCtx is interruptible.
-    AlternativeClientRegion acr(client);
-    auto uniqueNewOpCtx = cc().makeOperationContext();
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationKillable(lk);
-    }
-
-    DBDirectClient dbClient(uniqueNewOpCtx.get());
-    const auto commandResponse = dbClient.runCommand(OpMsgRequest::fromDBAndBody(dbName, cmdObj));
-
-    return commandResponse->getCommandReply();
-}
-
 BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     OperationContext* opCtx,
     const std::string& dbName,
@@ -2386,27 +2370,14 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     // About to make network and DBDirectClient (recursive) calls, so we should not hold any locks.
     invariant(!opCtx->lockState()->isLocked());
 
-    const auto myHostAndPort = getMyHostAndPort();
     const auto primaryHostAndPort = getCurrentPrimaryHostAndPort();
-
-    if (myHostAndPort.empty()) {
-        // Possibly because either rsconfig is uninitialized or the node got removed from config.
-        uassertStatusOK(Status{ErrorCodes::NodeNotFound, "Address unknown."});
-    }
-
     if (primaryHostAndPort.empty()) {
         uassertStatusOK(Status{ErrorCodes::NoConfigMaster, "Primary is unknown/down."});
     }
 
-    auto iAmPrimary = (myHostAndPort == primaryHostAndPort) ? true : false;
-
-    if (iAmPrimary) {
-        // Run command using DBDirectClient to avoid tcp connection.
-        return _runCmdOnSelfOnAlternativeClient(opCtx, dbName, cmdObj);
-    }
-
-    // Node is not primary, so we will run the remote command via AsyncDBClient. To use
-    // AsyncDBClient, we will be using repl task executor.
+    // Run the command via AsyncDBClient which performs a network call. This is also the desired
+    // behaviour when running this command locally as to avoid using the DBDirectClient which would
+    // provide additional management when trying to cancel the request with differing clients.
     executor::RemoteCommandRequest request(primaryHostAndPort, dbName, cmdObj, nullptr);
     executor::RemoteCommandResponse cbkResponse(
         Status{ErrorCodes::InternalError, "Uninitialized value"});
@@ -3140,25 +3111,22 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
 
     int curMaintenanceCalls = _topCoord->getMaintenanceCount();
     if (activate) {
-        LOGV2_OPTIONS(21350,
-                      {logv2::LogTag::kRS},
-                      "going into maintenance mode with {otherMaintenanceModeTasksInProgress} "
-                      "other maintenance mode tasks in progress",
-                      "Going into maintenance mode",
-                      "otherMaintenanceModeTasksInProgress"_attr = curMaintenanceCalls);
+        LOGV2(21350,
+              "going into maintenance mode with {otherMaintenanceModeTasksInProgress} "
+              "other maintenance mode tasks in progress",
+              "Going into maintenance mode",
+              "otherMaintenanceModeTasksInProgress"_attr = curMaintenanceCalls);
         _topCoord->adjustMaintenanceCountBy(1);
     } else if (curMaintenanceCalls > 0) {
         invariant(_topCoord->getRole() == TopologyCoordinator::Role::kFollower);
 
         _topCoord->adjustMaintenanceCountBy(-1);
 
-        LOGV2_OPTIONS(
-            21351,
-            {logv2::LogTag::kRS},
-            "leaving maintenance mode ({otherMaintenanceModeTasksOngoing} other maintenance mode "
-            "tasks ongoing)",
-            "Leaving maintenance mode",
-            "otherMaintenanceModeTasksOngoing"_attr = curMaintenanceCalls - 1);
+        LOGV2(21351,
+              "leaving maintenance mode ({otherMaintenanceModeTasksOngoing} other maintenance mode "
+              "tasks ongoing)",
+              "Leaving maintenance mode",
+              "otherMaintenanceModeTasksOngoing"_attr = curMaintenanceCalls - 1);
     } else {
         LOGV2_WARNING(21411, "Attempted to leave maintenance mode but it is not currently active");
         return Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
@@ -3206,6 +3174,19 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
     }
 
     return Status::OK();
+}
+
+bool ReplicationCoordinatorImpl::_supportsAutomaticReconfig() const {
+    if (!enableAutomaticReconfig) {
+        return false;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
+        return false;
+    }
+
+    return true;
 }
 
 Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCtx,
@@ -3258,62 +3239,60 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
             auto newMutableConfig = newConfig.getMutable();
             newMutableConfig.setConfigVersion(version);
             newConfig = ReplSetConfig(std::move(newMutableConfig));
-        } else {
-            // Only append 'newlyAdded' to nodes during safe reconfig.
-            if (enableAutomaticReconfig) {
-                boost::optional<MutableReplSetConfig> newMutableConfig;
+        }
 
-                // Set the 'newlyAdded' field to true for all new voting nodes.
-                for (int i = 0; i < newConfig.getNumMembers(); i++) {
-                    const auto newMem = newConfig.getMemberAt(i);
+        boost::optional<MutableReplSetConfig> newMutableConfig;
 
-                    // In a safe reconfig, the 'newlyAdded' flag should never already be set for
-                    // this member. If it is set, throw an error.
-                    if (newMem.isNewlyAdded()) {
-                        str::stream errmsg;
-                        errmsg << "Cannot provide " << MemberConfig::kNewlyAddedFieldName
-                               << " field to member config during safe reconfig.";
-                        LOGV2_ERROR(
-                            4634900,
+        // Set the 'newlyAdded' field to true for all new voting nodes.
+        for (int i = 0; i < newConfig.getNumMembers(); i++) {
+            const auto newMem = newConfig.getMemberAt(i);
+
+            // In a reconfig, the 'newlyAdded' flag should never already be set for
+            // this member. If it is set, throw an error.
+            if (newMem.isNewlyAdded()) {
+                str::stream errmsg;
+                errmsg << "Cannot provide " << MemberConfig::kNewlyAddedFieldName
+                       << " field to member config during reconfig.";
+                LOGV2_ERROR(4634900,
                             "Initializing 'newlyAdded' field to member has failed with bad status.",
                             "errmsg"_attr = std::string(errmsg));
-                        return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
-                    }
+                return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
+            }
 
-                    // We should never set the 'newlyAdded' field for arbiters.
-                    if (newMem.isArbiter()) {
-                        continue;
-                    }
-                    const auto newMemId = newMem.getId();
-                    const auto oldMem = oldConfig.findMemberByID(newMemId.getData());
+            // We should never set the 'newlyAdded' field for arbiters, or when automatic reconfig
+            // is disabled, or during force reconfigs.
+            if (newMem.isArbiter() || !_supportsAutomaticReconfig() || args.force) {
+                continue;
+            }
 
-                    const bool isNewVotingMember = (oldMem == nullptr && newMem.isVoter());
-                    const bool isCurrentlyNewlyAdded =
-                        (oldMem != nullptr && oldMem->isNewlyAdded());
+            const auto newMemId = newMem.getId();
+            const auto oldMem = oldConfig.findMemberByID(newMemId.getData());
 
-                    // Append the 'newlyAdded' field if the node:
-                    // 1) Is a new, voting node
-                    // 2) Already has a 'newlyAdded' field in the old config
-                    if (isNewVotingMember || isCurrentlyNewlyAdded) {
-                        if (!newMutableConfig) {
-                            newMutableConfig = newConfig.getMutable();
-                        }
-                        newMutableConfig->addNewlyAddedFieldForMember(newMemId);
-                    }
+            const bool isNewVotingMember = (oldMem == nullptr && newMem.isVoter());
+            const bool isCurrentlyNewlyAdded = (oldMem != nullptr && oldMem->isNewlyAdded());
+
+            // Append the 'newlyAdded' field if the node:
+            // 1) Is a new, voting node
+            // 2) Already has a 'newlyAdded' field in the old config
+            if (isNewVotingMember || isCurrentlyNewlyAdded) {
+                if (!newMutableConfig) {
+                    newMutableConfig = newConfig.getMutable();
                 }
-
-                if (newMutableConfig) {
-                    newConfig = ReplSetConfig(*std::move(newMutableConfig));
-                    LOGV2(4634400,
-                          "Appended the 'newlyAdded' field to a node in the new config. Nodes with "
-                          "the 'newlyAdded' field will be considered to have 'votes:0'. Upon "
-                          "transition to SECONDARY, this field will be automatically removed.",
-                          "newConfigObj"_attr = newConfig.toBSON(),
-                          "userProvidedConfig"_attr = args.newConfigObj,
-                          "oldConfig"_attr = oldConfig.toBSON());
-                }
+                newMutableConfig->addNewlyAddedFieldForMember(newMemId);
             }
         }
+
+        if (newMutableConfig) {
+            newConfig = ReplSetConfig(*std::move(newMutableConfig));
+            LOGV2(4634400,
+                  "Appended the 'newlyAdded' field to a node in the new config. Nodes with "
+                  "the 'newlyAdded' field will be considered to have 'votes:0'. Upon "
+                  "transition to SECONDARY, this field will be automatically removed.",
+                  "newConfigObj"_attr = newConfig.toBSON(),
+                  "userProvidedConfig"_attr = args.newConfigObj,
+                  "oldConfig"_attr = oldConfig.toBSON());
+        }
+
         return newConfig;
     };
 
@@ -3417,6 +3396,12 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     int myIndex = _selfIndex;
     lk.unlock();
 
+    // Automatic reconfig ("newlyAdded" field in repl config) is supported only from FCV4.6+.
+    // So, acquire FCV mutex lock in shared mode to block writers from modifying the fcv document
+    // to make sure fcv is not changed between getNewConfig() and storing the new config
+    // document locally.
+    FixedFCVRegion fixedFcvRegion(opCtx);
+
     // Call the callback to get the new config given the old one.
     auto newConfigStatus = getNewConfig(oldConfig, topCoordTerm);
     Status status = newConfigStatus.getStatus();
@@ -3436,6 +3421,47 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
                     "error"_attr = validateStatus,
                     "newConfig"_attr = newConfigObj);
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, validateStatus.reason());
+    }
+
+    // Since at this point, we have validated the new config, we are assuming the new config follows
+    // the safe reconfig rules.
+    auto needsFcvLock = [&]() -> bool {
+        int oldVoters = 0, newVoters = 0;
+        bool oldHasNewlyAdded = false, newHasNewlyAdded = false;
+
+        std::for_each(oldConfig.membersBegin(), oldConfig.membersEnd(), [&](const MemberConfig& m) {
+            if (m.isVoter())
+                oldVoters++;
+            oldHasNewlyAdded = oldHasNewlyAdded || m.isNewlyAdded();
+        });
+        std::for_each(newConfig.membersBegin(), newConfig.membersEnd(), [&](const MemberConfig& m) {
+            if (m.isVoter())
+                newVoters++;
+            newHasNewlyAdded = newHasNewlyAdded || m.isNewlyAdded();
+        });
+
+        // It's illegal for the new config to contain "newlyAdded" field when automatic reconfig is
+        // disabled. If the primary receives a new config with 'newlyAdded' field via
+        // replSetReconfig command, then the primary should have already uasserted earlier in
+        // getNewConfig().
+        invariant(_supportsAutomaticReconfig() || !newHasNewlyAdded);
+
+        return (!oldHasNewlyAdded && newHasNewlyAdded) || (newVoters > oldVoters);
+    };
+
+    // We need to take fcv lock only for 2 cases:
+    // 1) For fcv 4.4, addition of new voter nodes.
+    // 2) For fcv 4.6+, only if the current config doesn't contain the 'newlyAdded' field but the
+    // new config got mutated to append 'newlyAdded' field.
+    if (force || !needsFcvLock()) {
+        fixedFcvRegion.release();
+    }
+
+    if (MONGO_unlikely(ReconfigHangBeforeConfigValidationCheck.shouldFail())) {
+        LOGV2(4637900,
+              "ReconfigHangBeforeConfigValidationCheck fail point "
+              "enabled. Blocking until fail point is disabled.");
+        ReconfigHangBeforeConfigValidationCheck.pauseWhileSet(opCtx);
     }
 
     // Make sure we can find ourselves in the config. If the config contents have not changed, then
@@ -3596,9 +3622,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-
-    // Inform the index builds coordinator of the replica set reconfig.
-    IndexBuildsCoordinator::get(opCtx)->onReplicaSetReconfig();
 }
 
 Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx,
@@ -3697,7 +3720,7 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
         // only want to do an automatic reconfig where the base config is the one that specified
         // this memberId.
         if (oldConfig.getConfigVersionAndTerm() != versionAndTerm) {
-            return Status(ErrorCodes::StaleConfig,
+            return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                           str::stream()
                               << "Current config is no longer consistent with heartbeat "
                                  "data. Current config version: "
@@ -4119,12 +4142,11 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _cancelPriorityTakeover_inlock();
     }
 
-    LOGV2_OPTIONS(21358,
-                  {logv2::LogTag::kRS},
-                  "transition to {newState} from {oldState}",
-                  "Replica set state transition",
-                  "newState"_attr = newState,
-                  "oldState"_attr = _memberState);
+    LOGV2(21358,
+          "transition to {newState} from {oldState}",
+          "Replica set state transition",
+          "newState"_attr = newState,
+          "oldState"_attr = _memberState);
     _memberState = newState;
 
     _cancelAndRescheduleElectionTimeout_inlock();
@@ -4149,6 +4171,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         /* FALLTHROUGH */
         case kActionSteppedDown:
             _externalState->onStepDownHook();
+            ReplicaSetAwareServiceRegistry::get(_service).onStepDown();
             break;
         case kActionStartSingleNodeElection:
             _startElectSelfIfEligibleV1(StartElectionReasonEnum::kElectionTimeout);
@@ -4164,7 +4187,9 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
 void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) {
     invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
     _electionId = OID::fromTerm(_topCoord->getTerm());
-    auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
+    auto ts = VectorClockMutable::get(getServiceContext())
+                  ->tick(VectorClock::Component::ClusterTime, 1)
+                  .asTimestamp();
     _topCoord->processWinElection(_electionId, ts);
     const PostMemberStateUpdateAction nextAction = _updateMemberStateFromTopologyCoordinator(lk);
 
@@ -4474,11 +4499,10 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     // If the SplitHorizon has changed, reply to all waiting isMasters with an error.
     _errorOnPromisesIfHorizonChanged(lk, opCtx, oldConfig, newConfig, _selfIndex, myIndex);
 
-    LOGV2_OPTIONS(21392,
-                  {logv2::LogTag::kRS},
-                  "New replica set config in use: {config}",
-                  "New replica set config in use",
-                  "config"_attr = _rsConfig.toBSON());
+    LOGV2(21392,
+          "New replica set config in use: {config}",
+          "New replica set config in use",
+          "config"_attr = _rsConfig.toBSON());
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
         LOGV2(21393,
@@ -5239,6 +5263,25 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
             int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
             _scheduleHeartbeatToTarget_inlock(senderHost, senderIndex, now);
         }
+    } else if (result.isOK() && args.getPrimaryId() >= 0 &&
+               (!response->hasPrimaryId() || response->getPrimaryId() != args.getPrimaryId())) {
+        // If the sender thinks the primary is different from what we think and if the sender itself
+        // is the primary, then we want to update our view of primary by immediately sending out a
+        // new round of heartbeats, whose responses should inform us of the new primary. We only do
+        // this if the term of the heartbeat is greater than or equal to our own, to prevent
+        // updating our view to a stale primary.
+        if (args.hasSender() && args.getSenderId() == args.getPrimaryId() &&
+            args.getTerm() >= _topCoord->getTerm()) {
+            std::string myPrimaryId =
+                (response->hasPrimaryId() ? (str::stream() << response->getPrimaryId())
+                                          : std::string("none"));
+            LOGV2(2903000,
+                  "Restarting heartbeats after learning of a new primary",
+                  "myPrimaryId"_attr = myPrimaryId,
+                  "senderAndPrimaryId"_attr = args.getPrimaryId(),
+                  "senderTerm"_attr = args.getTerm());
+            _restartHeartbeats_inlock();
+        }
     }
     return result;
 }
@@ -5529,6 +5572,11 @@ int64_t ReplicationCoordinatorImpl::_nextRandomInt64_inlock(int64_t limit) {
 bool ReplicationCoordinatorImpl::setContainsArbiter() const {
     stdx::lock_guard<Latch> lock(_mutex);
     return _rsConfig.containsArbiter();
+}
+
+bool ReplicationCoordinatorImpl::replSetContainsNewlyAddedMembers() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.containsNewlyAddedMembers();
 }
 
 void ReplicationCoordinatorImpl::ReadWriteAbility::setCanAcceptNonLocalWrites(

@@ -253,6 +253,18 @@ std::string ShardKeyPattern::toString() const {
     return toBSON().toString();
 }
 
+std::string ShardKeyPattern::toKeyString(const BSONObj& shardKey) {
+    BSONObjBuilder strippedKeyValue;
+    for (const auto& elem : shardKey) {
+        strippedKeyValue.appendAs(elem, ""_sd);
+    }
+
+    KeyString::Builder ks(
+        KeyString::Version::V1, strippedKeyValue.done(), Ordering::allAscending());
+
+    return {ks.getBuffer(), ks.getSize()};
+}
+
 bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {
     const auto& keyPatternBSON = _keyPattern.toBSON();
 
@@ -385,6 +397,27 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx,
+                                     std::move(qr),
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!statusWithCQ.isOK()) {
+        return statusWithCQ.getStatus();
+    }
+
+    return extractShardKeyFromQuery(*statusWithCQ.getValue());
+}
+
+StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(
+    boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& basicQuery) const {
+    auto qr = std::make_unique<QueryRequest>(expCtx->ns);
+    qr->setFilter(basicQuery);
+    if (!expCtx->getCollatorBSON().isEmpty()) {
+        qr->setCollation(expCtx->getCollatorBSON());
+    }
+
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(expCtx->opCtx,
                                      std::move(qr),
                                      expCtx,
                                      ExtensionsCallbackNoop(),

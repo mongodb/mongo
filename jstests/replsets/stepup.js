@@ -55,7 +55,8 @@ const newSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverSt
 verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
                                               newSecondaryStatus.electionMetrics,
                                               "stepUpCmd",
-                                              numStepUpCmds);
+                                              numStepUpCmds, /* expectedNumCalled */
+                                              1 /* expectedNumSuccessful */);
 verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
                                               newSecondaryStatus.electionMetrics,
                                               "priorityTakeover",

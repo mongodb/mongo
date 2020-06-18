@@ -31,7 +31,6 @@
 
 #include <boost/optional/optional_io.hpp>
 #include <memory>
-
 #include <pcrecpp.h>
 
 #include "mongo/bson/util/builder.h"
@@ -47,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -56,19 +56,13 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
-
-ServiceContext::UniqueOperationContext makeOpCtx() {
-    return cc().makeOperationContext();
-}
 
 class DatabaseTest : public ServiceContextMongoDTest {
 private:
@@ -106,7 +100,7 @@ void DatabaseTest::setUp() {
     // repl::logOp(). repl::logOp() will also store the oplog entry's optime in ReplClientInfo.
     OpObserverRegistry* opObserverRegistry =
         dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
-    opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>());
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
 
     _nss = NamespaceString("test.foo");
 }
@@ -325,7 +319,8 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             WriteUnitOfWork wuow(opCtx);
             indexBuildBlock->success(opCtx, collection);
             wuow.commit();
-            indexBuildBlock->deleteTemporaryTables(opCtx);
+            indexBuildBlock->finalizeTemporaryTables(
+                opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
         });
 
         ASSERT_GREATER_THAN(indexCatalog->numIndexesInProgress(opCtx), 0);
@@ -553,5 +548,5 @@ TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdInde
                        });
 }
 
-
 }  // namespace
+}  // namespace mongo

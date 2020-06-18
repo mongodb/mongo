@@ -372,9 +372,9 @@ private:
             if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
                 return std::vector{targeter.targetInsert(opCtx, targetingBatchItem.getDocument())};
             } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-                return targeter.targetUpdate(opCtx, targetingBatchItem.getUpdate());
+                return targeter.targetUpdate(opCtx, targetingBatchItem);
             } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-                return targeter.targetDelete(opCtx, targetingBatchItem.getDelete());
+                return targeter.targetDelete(opCtx, targetingBatchItem);
             }
             MONGO_UNREACHABLE;
         }();

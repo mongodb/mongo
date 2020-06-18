@@ -65,6 +65,18 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
 std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(const BSONObj& obj);
 
 /**
+ * Makes an expression context suitable for canonicalization of queries that contain let parameters
+ * and runtimeConstants on mongos.
+ */
+boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTargeter(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& collation,
+    const boost::optional<ExplainOptions::Verbosity>& verbosity,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<RuntimeConstants>& runtimeConstants);
+
+/**
  * Consults the routing info to build requests for:
  * 1. If sharded, shards that own chunks for the namespace, or
  * 2. If unsharded, the primary shard for the database.
@@ -313,7 +325,7 @@ void createShardDatabase(OperationContext* opCtx, StringData dbName);
  * Returns the shards that would be targeted for the given query according to the given routing
  * info.
  */
-std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
+std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                                             const CachedCollectionRoutingInfo& routingInfo,
                                             const BSONObj& query,
                                             const BSONObj& collation);

@@ -150,18 +150,19 @@ TEST(GeoHash, UnhashFastMatchesUnhashSlow) {
 
 TEST(GeoHashConvertor, EdgeLength) {
     const double kError = 10E-15;
-    GeoHashConverter::Parameters params;
+    GeoHashConverter::Parameters params{};
     params.max = 200.0;
     params.min = 100.0;
     params.bits = 32;
     double numBuckets = (1024 * 1024 * 1024 * 4.0);
     params.scaling = numBuckets / (params.max - params.min);
 
-    GeoHashConverter converter(params);
+    auto converter = GeoHashConverter::createFromParams(params);
+    ASSERT_OK(converter.getStatus());
 
-    ASSERT_APPROX_EQUAL(100.0, converter.sizeEdge(0), kError);
-    ASSERT_APPROX_EQUAL(50.0, converter.sizeEdge(1), kError);
-    ASSERT_APPROX_EQUAL(25.0, converter.sizeEdge(2), kError);
+    ASSERT_APPROX_EQUAL(100.0, converter.getValue()->sizeEdge(0), kError);
+    ASSERT_APPROX_EQUAL(50.0, converter.getValue()->sizeEdge(1), kError);
+    ASSERT_APPROX_EQUAL(25.0, converter.getValue()->sizeEdge(2), kError);
 }
 
 /**
@@ -377,7 +378,7 @@ TEST(GeoHashConvertor, EdgeLength) {
  * We can get the maximum of the error by making max very large and min = -min, x -> max
  */
 TEST(GeoHashConverter, UnhashToBoxError) {
-    GeoHashConverter::Parameters params;
+    GeoHashConverter::Parameters params{};
     // Test max from 2^-20 to 2^20
     for (int times = -20; times <= 20; times += 2) {
         // Construct parameters
@@ -387,7 +388,9 @@ TEST(GeoHashConverter, UnhashToBoxError) {
         double numBuckets = (1024 * 1024 * 1024 * 4.0);
         params.scaling = numBuckets / (params.max - params.min);
 
-        GeoHashConverter converter(params);
+        auto converter = GeoHashConverter::createFromParams(params);
+        ASSERT_OK(converter.getStatus());
+
         // Assume level == 32, so we ignore the error of  edge length here.
         double delta_box = 7.0 / 8.0 * GeoHashConverter::calcUnhashToBoxError(params);
         double cellEdge = 1 / params.scaling;
@@ -400,8 +403,8 @@ TEST(GeoHashConverter, UnhashToBoxError) {
         x = params.max;
         while (x > params.max - cellEdge) {
             x = nextafter(x, params.min);
-            double x_prime =
-                converter.convertDoubleFromHashScale(converter.convertToDoubleHashScale(x));
+            double x_prime = converter.getValue()->convertDoubleFromHashScale(
+                converter.getValue()->convertToDoubleHashScale(x));
             double delta = fabs(x - x_prime);
             ASSERT_LESS_THAN(delta, delta_box);
         }
@@ -410,8 +413,8 @@ TEST(GeoHashConverter, UnhashToBoxError) {
         x = params.min + cellEdge;
         while (x > params.min) {
             x = nextafter(x, params.min);
-            double x_prime =
-                converter.convertDoubleFromHashScale(converter.convertToDoubleHashScale(x));
+            double x_prime = converter.getValue()->convertDoubleFromHashScale(
+                converter.getValue()->convertToDoubleHashScale(x));
             double delta = fabs(x - x_prime);
             ASSERT_LESS_THAN(delta, delta_box);
         }
@@ -420,19 +423,20 @@ TEST(GeoHashConverter, UnhashToBoxError) {
 
 // SERVER-15576 Verify a point is contained by its GeoHash box.
 TEST(GeoHashConverter, GeoHashBox) {
-    GeoHashConverter::Parameters params;
+    GeoHashConverter::Parameters params{};
     params.max = 100000000.3;
     params.min = -params.max;
     params.bits = 32;
     double numBuckets = (1024 * 1024 * 1024 * 4.0);
     params.scaling = numBuckets / (params.max - params.min);
 
-    GeoHashConverter converter(params);
+    auto converter = GeoHashConverter::createFromParams(params);
+    ASSERT_OK(converter.getStatus());
 
     // Without expanding the box, the following point is not contained by its GeoHash box.
     mongo::Point p(-7201198.6497758823, -0.1);
-    mongo::GeoHash hash = converter.hash(p);
-    mongo::Box box = converter.unhashToBoxCovering(hash);
+    mongo::GeoHash hash = converter.getValue()->hash(p);
+    mongo::Box box = converter.getValue()->unhashToBoxCovering(hash);
     ASSERT(box.inside(p));
 }
 

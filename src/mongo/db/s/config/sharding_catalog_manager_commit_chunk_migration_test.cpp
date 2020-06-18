@@ -33,11 +33,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config_server_test_fixture.h"
 
 namespace mongo {
 namespace {
@@ -248,8 +248,8 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
     ASSERT_EQ(mver.getValue(), chunkDoc0.getVersion());
-    // The history should be updated.
-    ASSERT_EQ(1UL, chunkDoc0.getHistory().size());
+    // The new history entry should be added, but the old one preserved.
+    ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
 }
 

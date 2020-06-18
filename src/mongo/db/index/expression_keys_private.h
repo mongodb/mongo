@@ -60,7 +60,8 @@ public:
     // 2d
     //
 
-    static void get2DKeys(const BSONObj& obj,
+    static void get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                          const BSONObj& obj,
                           const TwoDIndexingParams& params,
                           KeyStringSet* keys,
                           KeyString::Version keyStringVersion,
@@ -86,7 +87,8 @@ public:
     /**
      * Generates keys for hash access method.
      */
-    static void getHashKeys(const BSONObj& obj,
+    static void getHashKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                            const BSONObj& obj,
                             const BSONObj& keyPattern,
                             HashSeed seed,
                             int hashVersion,
@@ -112,7 +114,8 @@ public:
     /**
      * Generates keys for haystack access method.
      */
-    static void getHaystackKeys(const BSONObj& obj,
+    static void getHaystackKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                const BSONObj& obj,
                                 const std::string& geoField,
                                 const std::vector<std::string>& otherFields,
                                 double bucketSize,
@@ -140,7 +143,8 @@ public:
     /**
      * Generates keys for S2 access method.
      */
-    static void getS2Keys(const BSONObj& obj,
+    static void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                          const BSONObj& obj,
                           const BSONObj& keyPattern,
                           const S2IndexingParams& params,
                           KeyStringSet* keys,

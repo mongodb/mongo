@@ -46,9 +46,10 @@ public:
     MemberId() : _id(kUninitializedMemberId) {}
 
     explicit MemberId(int id) {
-        if (id < 0 || id > 255) {
+        if (id < 0) {
             uasserted(ErrorCodes::BadValue,
-                      str::stream() << "_id field value of " << id << " is out of range.");
+                      str::stream()
+                          << "_id field value of " << id << " can't be a negative number");
         }
         _id = id;
     }

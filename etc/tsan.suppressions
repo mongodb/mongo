@@ -1,1 +1,18 @@
+# Death test signal reports cause test failures because the report can't be
+# parsed as JSON. Suppress those messages specifically.
+signal:src/mongo/unittest/death_test.cpp
+
+# WiredTiger is known to cause false positives for data races because it uses a
+# nonstandard thread model that TSAN doesn't know how to deal with. We have
+# already blacklisted WiredTiger in TSAN, but that only affects threads created
+# within the WiredTiger source. For threads that call *into* WiredTiger, we
+# need to add suppressions so we still get any potential failures from
+# elsewhere.
 #
+# This is a temporary addition for now because it's possible that these are
+# real positives that we need to do something with. However, because we know
+# that false positives are more likely, we're deferring them until we have
+# fixed the ones we know are real.
+# TODO: https://jira.mongodb.org/browse/SERVER-48599
+race:src/third_party/wiredtiger/*
+

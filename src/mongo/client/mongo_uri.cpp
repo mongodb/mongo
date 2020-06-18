@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/mongo_uri.h"
@@ -322,13 +320,11 @@ std::string MongoURI::redact(StringData url) {
     return out.str();
 }
 
-MongoURI MongoURI::parseImpl(const std::string& url) {
-    const StringData urlSD(url);
-
+MongoURI MongoURI::parseImpl(StringData url) {
     // 1. Validate and remove the scheme prefix `mongodb://` or `mongodb+srv://`
-    const bool isSeedlist = urlSD.startsWith(kURISRVPrefix);
-    if (!(urlSD.startsWith(kURIPrefix) || isSeedlist)) {
-        return MongoURI(uassertStatusOK(ConnectionString::parse(url)));
+    const bool isSeedlist = url.startsWith(kURISRVPrefix);
+    if (!(url.startsWith(kURIPrefix) || isSeedlist)) {
+        return MongoURI(uassertStatusOK(ConnectionString::parse(url.toString())));
     }
 
     // 2. Split up the URI into its components for further parsing and validation
@@ -515,7 +511,7 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
                     std::move(options));
 }
 
-StatusWith<MongoURI> MongoURI::parse(const std::string& url) try {
+StatusWith<MongoURI> MongoURI::parse(StringData url) try {
     return parseImpl(url);
 } catch (const std::exception&) {
     return exceptionToStatus();
