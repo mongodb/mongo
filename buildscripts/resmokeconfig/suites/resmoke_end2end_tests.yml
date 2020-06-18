@@ -2,7 +2,7 @@ test_kind: py_test
 
 selector:
   roots:
-  - buildscripts/tests/resmokelib/end2end/**/test_*.py
+  - buildscripts/tests/resmoke_end2end/**/test_*.py
 
 
 executor: {}

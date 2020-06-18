@@ -33,6 +33,7 @@ class RemoteOperationsTestCase(unittest.TestCase):
 
 
 class RemoteOperationConnection(RemoteOperationsTestCase):
+    @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):
 
         self.assertTrue(self.rop.access_established())
@@ -104,6 +105,7 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 
 
 class RemoteOperationShell(RemoteOperationsTestCase):
+    @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):  # pylint: disable=too-many-statements
 
         # Shell connect
@@ -186,6 +188,7 @@ class RemoteOperationShell(RemoteOperationsTestCase):
 
 
 class RemoteOperationCopyTo(RemoteOperationsTestCase):
+    @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):  # pylint: disable=too-many-statements
 
         # Copy to remote
@@ -305,6 +308,7 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
 
 
 class RemoteOperationCopyFrom(RemoteOperationsTestCase):
+    @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):  # pylint: disable=too-many-statements
 
         # Copy from remote
@@ -440,7 +444,7 @@ class RemoteOperationCopyFrom(RemoteOperationsTestCase):
 
 
 class RemoteOperation(RemoteOperationsTestCase):
+    @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):
-
         # Invalid operation
         self.assertRaises(ValueError, lambda: self.rop.operation("invalid", None))

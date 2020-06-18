@@ -51,9 +51,10 @@ class TestArchivalOnFailure(_ResmokeSelftest):
         super(TestArchivalOnFailure, cls).setUpClass()
         cls.archival_file = os.path.join(cls.test_dir, "test_archival.txt")
 
+    @unittest.skip("Requires compile. SERVER-48969 tracks re-enabling.")
     def test_archival_on_task_failure(self):
         resmoke_args = [
-            "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_failure.yml",
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure.yml",
             "--taskId=123",
             "--internalParam=test_archival",
             "--repeatTests=2",
@@ -66,9 +67,10 @@ class TestArchivalOnFailure(_ResmokeSelftest):
         archival_dirs_to_expect = 4  # 2 tests * 2 nodes
         self.assert_dir_file_count(self.archival_file, archival_dirs_to_expect)
 
+    @unittest.skip("Requires compile. SERVER-48969 tracks re-enabling.")
     def test_archival_on_task_failure_no_passthrough(self):
         resmoke_args = [
-            "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
+            "--suites=buildscripts/tests/resmokelib/resmoke_end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
             "--taskId=123",
             "--internalParam=test_archival",
             "--repeatTests=2",
@@ -84,7 +86,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
     def test_no_archival_locally(self):
         # archival should not happen if --taskId is not set.
         resmoke_args = [
-            "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
             "--internalParam=test_archival",
             "--repeatTests=2",
             "--jobs=2",
@@ -127,9 +129,10 @@ class TestTimeout(_ResmokeSelftest):
 
         TestTimeout.signal_resmoke(resmoke_process)
 
+    @unittest.skip("Requires compile. SERVER-48969 tracks re-enabling.")
     def test_task_timeout(self):
         resmoke_args = [
-            "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_timeout.yml",
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout.yml",
             "--taskId=123",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
@@ -145,9 +148,10 @@ class TestTimeout(_ResmokeSelftest):
         # analysis_files_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
         # self.assert_dir_file_count(self.analysis_file, analysis_files_to_expect)
 
+    @unittest.skip("Requires compile. SERVER-48969 tracks re-enabling.")
     def test_task_timeout_no_passthrough(self):
         resmoke_args = [
-            "--suites=buildscripts/tests/resmokelib/end2end/suites/resmoke_selftest_task_timeout_no_passthrough.yml",
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout_no_passthrough.yml",
             "--taskId=123",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
