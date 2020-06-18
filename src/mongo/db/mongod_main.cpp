@@ -1105,14 +1105,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         lsc->joinOnShutDown();
     }
 
-    // Terminate the index consistency check.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        LOGV2_OPTIONS(4784904,
-                      {LogComponent::kSharding},
-                      "Shutting down the PeriodicShardedIndexConsistencyChecker");
-        PeriodicShardedIndexConsistencyChecker::get(serviceContext).onShutDown();
-    }
-
     // Shutdown the TransportLayer so that new connections aren't accepted
     if (auto tl = serviceContext->getTransportLayer()) {
         LOGV2_OPTIONS(
@@ -1157,6 +1149,14 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2_OPTIONS(
             4784909, {LogComponent::kReplication}, "Shutting down the ReplicationCoordinator");
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
+
+        // Terminate the index consistency check.
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            LOGV2_OPTIONS(4784904,
+                          {LogComponent::kSharding},
+                          "Shutting down the PeriodicShardedIndexConsistencyChecker");
+            PeriodicShardedIndexConsistencyChecker::get(serviceContext).onShutDown();
+        }
 
         LOGV2_OPTIONS(
             4784910, {LogComponent::kSharding}, "Shutting down the ShardingInitializationMongoD");
