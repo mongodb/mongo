@@ -483,9 +483,55 @@ Additionally:
 * Repair [will restore a missing](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L434) `featureCompatibilityVersion` document in the `admin.system.version` to the lower FCV version available.
 
 # Startup Recovery
-How the different storage engines startup and recovery
+There are three components to startup recovery. The first step, of course, is starting
+WiredTiger. WiredTiger will replay its log, if any, from a crash. While the WT log also contains
+entries that are specific to WT, most of its entries are to re-insert items into MongoDB's oplog
+collection. More detail about WiredTiger's log and its entries are [included in the
+appendix](#Cherry-picked-WT-log-Details).
 
-Any differences for standalone mode?
+The other two parts of storage startup recovery are for bringing the catalog back into a
+consistent state. The catalog typically refers to MongoDB's notion of collections
+and indexes, but it's important to note that WT has its own notion of a catalog. The MongoDB
+string that identifies a single storage engine table is called an "ident".
+
+The first step of recovering the catalog is to bring MongoDB's catalog in line with
+WiredTiger's. This is called reconciliation. Except for rare cases, every MongoDB collection is a
+RecordStore and a list of indexes (aka SortedDataInterface). Every record store and index maps to
+their own WT table. [The appendix](#Collection-and-Index-to-Table-relationship) describes the
+relationship between creating/dropping a collection and the underlying creation/deletion
+of a WT table which justifies the following logic. When reconciling, every WT table
+that is not "pointed to" by a MongoDB record store or index [gets
+dropped](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L406-L408
+"Github"). A MongoDB record store that points to a WT table that doesn't exist is considered [a
+fatal
+error](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L412-L425
+"Github"). An index that doesn't point to a WT table is [scheduled to be
+rebuilt](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L479
+"Github"). The index logic is more relaxed because indexes do not go through two-phase drop when
+running with enableMajorityReadConcern=false.
+
+The second step of recovering the catalog is [reconciling unfinished index builds](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L427-L432
+"Github"). In 4.6 the story will simplify, but right now there are a few outcomes:
+* An [unfinished FCV 4.2- background index build on the primary](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L527-L542 "Github") will be discarded (no oplog entry
+  was ever written saying the index exists).
+* An [unfinished FCV 4.2- background index build on a secondary](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L513-L525 "Github") will be rebuilt in the foreground
+  (an oplog entry was written saying the index exists).
+* An [unfinished FCV 4.4\+](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L483-L511 "Github") background index build will be restarted in the background.
+
+After storage completes its recovery, control is passed to [replication
+recovery](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#startup-recovery
+"Github"). While storage recovery is responsible for recovering the oplog to meet durability
+guarantees and getting the two catalogs in sync, replication recovery takes responsibility for
+getting collection data in sync with the oplog. Replication starts replaying oplog from the
+`recovery_timestamp + 1`. When WiredTiger takes a checkpoint, it uses the
+[`stable_timestamp`](https://github.com/mongodb/mongo/blob/87de9a0cb1/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L2011 "Github") (effectively a `read_timestamp`) for what data should be persisted in the
+checkpoint. Every "data write" (collection/index contents, _mdb_catalog contents) corresponding to an oplog entry with a
+timestamp <= the `stable_timestamp` will be included in this checkpoint. None of the data writes
+later than the `stable_timestamp` are included in the checkpoint. When the checkpoint is completed, the
+`stable_timestamp` is known as the checkpoint's [`checkpoint_timestamp`](https://github.com/mongodb/mongo/blob/834a3c49d9ea9bfe2361650475158fc0dbb374cd/src/third_party/wiredtiger/src/meta/meta_ckpt.c#L921 "Github"). When WiredTiger starts up on a checkpoint,
+that checkpoint's timestamp is known as the
+[`recovery_timestamp`](https://github.com/mongodb/mongo/blob/87de9a0cb1/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L684
+"Github").
 
 ## Recovery To A Stable Timestamp
 
@@ -802,3 +848,104 @@ startup recovery after an unclean shutdown. Tracks persisted oplog holes.
 [`BSONElement::compareElements`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonelement.cpp#L285
 [`Ordering`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/ordering.h
 [initial sync]: ../repl/README.md#initial-sync
+
+# Appendix
+
+## Collection and Index to Table relationship
+
+Creating a collection (record store) or index requires two WT operations that cannot be made
+atomic/transactional. A WT table must be created with
+[WT_SESSION::create](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a358ca4141d59c345f401c58501276bbb
+"WiredTiger Docs") and an insert/update must be made in the \_mdb\_catalog table (MongoDB's
+catalog). MongoDB orders these as such:
+1. Create the WT table
+1. Update \_mdb\_catalog to reference the table
+
+Note that if the process crashes in between those steps, the collection/index creation never
+succeeded. Upon a restart, the WT table is dangling and can be safely deleted.
+
+Dropping a collection/index follows the same pattern, but in reverse.
+1. Delete the table from the \_mdb\_catalog
+1. [Drop the WT table](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#adf785ef53c16d9dcc77e22cc04c87b70 "WiredTiger Docs")
+
+In this case, if a crash happens between these steps and the change to the \_mdb\_catalog was made
+durable (in modern versions, only possible via a checkpoint; the \_mdb\_catalog is not logged), the
+WT table is once again dangling on restart. Note that in the absense of a history, this state is
+indistinguishable from the creation case, establishing a strong invariant.
+
+## Cherry-picked WT log Details
+- The WT log is a write ahead log. Before a [transaction commit](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a712226eca5ade5bd123026c624468fa2 "WiredTiger Docs") returns to the application, logged writes
+must have their log entry bytes written into WiredTiger's log buffer. Depending on `sync` setting,
+those bytes may or may not be on disk.
+- MongoDB only chooses to log writes to a subset of WT's tables (e.g: the oplog).
+- MongoDB does not `sync` the log on transaction commit. But rather uses the [log
+  flush](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a1843292630960309129dcfe00e1a3817
+  "WiredTiger Docs") API. This optimization is two-fold. Writes that do not require to be
+  persisted do not need to wait for durability on disk. Second, this pattern allows for batching
+  of writes to go to disk for improved throughput.
+- WiredTiger's log is similar to MongoDB's oplog in that multiple writers can concurrently copy
+  their bytes representing a log record into WiredTiger's log buffer similar to how multiple
+  MongoDB writes can concurrently generate oplog entries.
+- MongoDB's optime generator for the oplog is analogous to WT's LSN (log sequence number)
+  generator. Both are a small critical section to ensure concurrent writes don't get the same
+  timestamp key/memory address to write an oplog entry value/log bytes into.
+- While MongoDB's oplog writes are logical (the key is a timestamp), WT's are obviously more
+physical (the key is a memory->disk location). WiredTiger is writing to a memory buffer. Thus before a
+transaction commit can go to the log buffer to "request a slot", it must know how many bytes it's
+going to write. Compare this to a multi-statement transaction replicating as a single applyOps
+versus each statement generating an individual oplog entry for each write that's part of the
+transaction.
+- MongoDB testing sometimes uses a [WT debugging
+  option](https://github.com/mongodb/mongo/blob/a7bd84dc5ad15694864526612bceb3877672d8a9/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L601
+  "Github") that will write "no-op" log entries for other operations performed on a
+  transaction. Such as setting a timestamp or writing to a table that is not configured to be
+  written to WT's log (e.g: a typical user collection and index).
+
+The most important WT log entry for MongoDB is one that represents an insert into the
+oplog.
+```
+  { "lsn" : [1,57984],
+    "hdr_flags" : "compressed",
+    "rec_len" : 384,
+    "mem_len" : 423,
+    "type" : "commit",
+    "txnid" : 118,
+    "ops": [
+		{ "optype": "row_put",
+		  "fileid": 14 0xe,
+		  "key": "\u00e8^\u00eat@\u00ff\u00ff\u00df\u00c2",
+		  "key-hex": "e85eea7440ffffdfc2",
+		  "value": "\u009f\u0000\u0000\u0000\u0002op\u0000\u0002\u0000\u0000\u0000i\u0000\u0002ns\u0000\n\u0000\u0000\u0000test.coll\u0000\u0005ui\u0000\u0010\u0000\u0000\u0000\u0004\u0017\u009d\u00b0\u00fc\u00b2,O\u0004\u0084\u00bdY\u00e9%\u001dm\u00ba\u0003o\u00002\u0000\u0000\u0000\u0007_id\u0000^\u00eatA\u00d4\u0098\u00b7\u008bD\u009b\u00b2\u008c\u0002payload\u0000\u000f\u0000\u0000\u0000data and bytes\u0000\u0000\u0011ts\u0000\u0002\u0000\u0000\u0000At\u00ea^\u0012t\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\twall\u0000\u0085\u001e\u00d6\u00c3r\u0001\u0000\u0000\u0012v\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+		  "value-bson": {
+				u'ns': u'test.coll',
+				u'o': {u'_id': ObjectId('5eea7441d498b78b449bb28c'), u'payload': u'data and bytes'},
+				u'op': u'i',
+				u't': 1L,
+				u'ts': Timestamp(1592423489, 2),
+				u'ui': UUID('179db0fc-b22c-4f04-84bd-59e9251d6dba'),
+				u'v': 2L,
+				u'wall': datetime.datetime(2020, 6, 17, 19, 51, 29, 157000)}
+      }
+    ]
+  }
+```
+- `lsn` is a log sequence number. The WiredTiger log files are named with numbers as a
+  suffix, e.g: `WiredTigerLog.0000000001`. In this example, the LSN's first value `1` maps to log
+  file `0000000001`. The second value `57984` is the byte offset in the file.
+- `hdr_flags` stands for header flags. Think HTTP headers. MongoDB configures WiredTiger to use
+  snappy compression on its journal entries. Small journal entries (< 128 bytes?) won't be
+  compressed.
+- `rec_len` is the number of bytes for the record
+- `type` is...the type of journal entry. The type will be `commit` for application's committing a
+  transaction. Other types are typically for internal WT operations. Examples include `file_sync`,
+  `checkpoint` and `system`.
+- `txnid` is WT's transaction id associated with the log record.
+- `ops` is a list of operations that are part of the transaction. A transaction that inserts two
+  documents and removes a third will see three entries. Two `row_put` operations followed by a
+  `row_remove`.
+- `ops.fileid` refers to the WT table that the operation is performed against. The fileid mapping
+  is held in the `WiredTiger.wt` file (a table within itself). This value is faked for WT's
+  logging debug mode for tables which MongoDB is not logging.
+- `ops.key` and `ops.value` are the binary representations of the inserted document (`value` is omitted
+  for removal).
+- `ops.key-hex` and `ops.value-bson` are specific to the pretty printing tool used.
