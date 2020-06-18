@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstdint>
+#include <ostream>
 #include <string>
 
 #if !defined(_MSC_VER) && !defined(__clang__)  // not windows or clang

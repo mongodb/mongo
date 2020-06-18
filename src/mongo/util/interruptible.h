@@ -317,7 +317,7 @@ public:
      * Raises a AssertionException if this operation is in a killed state.
      */
     void checkForInterrupt() {
-        uassertStatusOK(checkForInterruptNoAssert());
+        internalAssert(checkForInterruptNoAssert());
     }
 
     /**
@@ -395,7 +395,7 @@ public:
 
             if (!swResult.isOK()) {
                 _onWake(latchName, WakeReason::kInterrupt, speed);
-                uassertStatusOK(std::move(swResult));
+                internalAssert(std::move(swResult));
             }
 
             if (pred()) {
