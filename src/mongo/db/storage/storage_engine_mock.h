@@ -48,9 +48,6 @@ public:
     bool supportsDocLocking() const final {
         return false;
     }
-    bool supportsDBLocking() const final {
-        return true;
-    }
     bool supportsCappedCollections() const final {
         return true;
     }

@@ -275,13 +275,6 @@ public:
     /**
      * This must not change over the lifetime of the engine.
      */
-    virtual bool supportsDBLocking() const {
-        return true;
-    }
-
-    /**
-     * This must not change over the lifetime of the engine.
-     */
     virtual bool supportsCappedCollections() const {
         return true;
     }

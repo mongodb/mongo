@@ -390,21 +390,13 @@ void LockerImpl::lockGlobal(OperationContext* opCtx, LockMode mode, Date_t deadl
         _modeForTicket = mode;
     }
 
-    LockMode actualLockMode = mode;
-    if (opCtx) {
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        if (storageEngine && !storageEngine->supportsDBLocking()) {
-            actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
-        }
-    }
-
-    const LockResult result = _lockBegin(opCtx, resourceIdGlobal, actualLockMode);
+    const LockResult result = _lockBegin(opCtx, resourceIdGlobal, mode);
     // Fast, uncontended path
     if (result == LOCK_OK)
         return;
 
     invariant(result == LOCK_WAITING);
-    _lockComplete(opCtx, resourceIdGlobal, actualLockMode, deadline);
+    _lockComplete(opCtx, resourceIdGlobal, mode, deadline);
 }
 
 bool LockerImpl::unlockGlobal() {

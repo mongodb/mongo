@@ -194,11 +194,6 @@ public:
     virtual bool supportsDocLocking() const = 0;
 
     /**
-     * Returns whether the storage engine supports locking at a database level.
-     */
-    virtual bool supportsDBLocking() const = 0;
-
-    /**
      * Returns whether the storage engine supports capped collections.
      */
     virtual bool supportsCappedCollections() const = 0;
