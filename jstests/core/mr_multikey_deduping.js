@@ -1,5 +1,9 @@
 // Tests that the presence of an index does not impact the results of a mapReduce
 // @tags: [
+//   # MR commands may not see previous inserts because MR does not support causal consistency so we
+//   # add this tag to exclude transactional passthroughs which commit versions in an ascynchronos
+//   # fashion and can cause stale reads.
+//   assumes_unsharded_collection,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
