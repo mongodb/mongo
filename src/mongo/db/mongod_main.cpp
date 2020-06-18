@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
 
@@ -326,7 +326,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     if (kDebugBuild)
-        LOGV2_OPTIONS(20533, {LogComponent::kControl}, "DEBUG build (which is slower)");
+        LOGV2(20533, "DEBUG build (which is slower)");
 
 #if defined(_WIN32)
     VersionInfoInterface::instance().logTargetMinOS();
@@ -1101,7 +1101,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     // Join the logical session cache before the transport layer.
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {
-        LOGV2_OPTIONS(4784903, {LogComponent::kControl}, "Shutting down the LogicalSessionCache");
+        LOGV2(4784903, "Shutting down the LogicalSessionCache");
         lsc->joinOnShutDown();
     }
 
@@ -1276,7 +1276,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 #endif
 
-    LOGV2_OPTIONS(4784925, {LogComponent::kControl}, "Shutting down free monitoring");
+    LOGV2(4784925, "Shutting down free monitoring");
     stopFreeMonitoring();
 
     // Shutdown Full-Time Data Capture
@@ -1310,7 +1310,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2_OPTIONS(4784931, {LogComponent::kDefault}, "Dropping the scope cache for shutdown");
     ScriptEngine::dropScopeCache();
 
-    LOGV2_OPTIONS(20565, {LogComponent::kControl}, "Now exiting");
+    LOGV2(20565, "Now exiting");
 
     audit::logShutdown(client);
 
