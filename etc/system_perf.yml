@@ -1262,6 +1262,31 @@ buildvariants:
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
+- name: linux-3-node-1dayhistory-15gbwtcache
+  display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache
+  batchtime: 2880  # 48 hours
+  modules: *modules
+  expansions:
+    setup: replica-1dayhistory-15gbwtcache
+    cluster: replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+    - "rhel70-perf-replset"
+  depends_on:
+    - name: compile
+      variant: compile-amazon2
+    - name: genny_generate_all_tasks
+      variant: compile-amazon2
+  tasks:
+    - name: crud_workloads
+    - name: crud_workloads_majority
+    - name: smoke_test
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
+
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
   batchtime: 10080 # 7 days
