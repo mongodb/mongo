@@ -152,27 +152,27 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
     WT_DECL_ITEM(key);
     WT_DECL_RET;
     WT_ITEM full_value;
-    WT_UPDATE *hs_upd, *upd;
-    wt_timestamp_t durable_ts, hs_start_ts, hs_stop_ts;
-#ifdef HAVE_DIAGNOSTIC
-    wt_timestamp_t newer_hs_ts;
-#endif
+    WT_UPDATE *hs_upd, *tombstone, *upd;
+    wt_timestamp_t hs_durable_ts, hs_start_ts, hs_stop_durable_ts, newer_hs_durable_ts;
     uint64_t hs_counter, type_full;
     uint32_t hs_btree_id, session_flags;
     uint8_t type;
     int cmp;
     char ts_string[4][WT_TS_INT_STRING_SIZE];
     bool is_owner, valid_update_found;
+#ifdef HAVE_DIAGNOSTIC
+    bool first_record;
+#endif
 
     hs_cursor = NULL;
-    hs_upd = upd = NULL;
-    durable_ts = hs_start_ts = WT_TS_NONE;
-#ifdef HAVE_DIAGNOSTIC
-    newer_hs_ts = WT_TS_NONE;
-#endif
+    hs_upd = tombstone = upd = NULL;
+    hs_durable_ts = hs_start_ts = hs_stop_durable_ts = WT_TS_NONE;
     hs_btree_id = S2BT(session)->id;
     session_flags = 0;
     is_owner = valid_update_found = false;
+#ifdef HAVE_DIAGNOSTIC
+    first_record = true;
+#endif
 
     /* Allocate buffers for the data store and history store key. */
     WT_RET(__wt_scr_alloc(session, 0, &key));
@@ -183,12 +183,11 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
 
     /* Get the full update value from the data store. */
     WT_CLEAR(full_value);
-    if (!__wt_row_leaf_value(page, rip, &full_value)) {
-        unpack = &_unpack;
-        __wt_row_leaf_value_cell(session, page, rip, NULL, unpack);
-        WT_ERR(__wt_page_cell_data_ref(session, page, unpack, &full_value));
-    }
+    unpack = &_unpack;
+    __wt_row_leaf_value_cell(session, page, rip, NULL, unpack);
+    WT_ERR(__wt_page_cell_data_ref(session, page, unpack, &full_value));
     WT_ERR(__wt_buf_set(session, &full_value, full_value.data, full_value.size));
+    newer_hs_durable_ts = unpack->tw.durable_start_ts;
 
     /* Open a history store table cursor. */
     WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
@@ -228,7 +227,8 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
         cbt->compare = 0;
 
         /* Get current value and convert to full update if it is a modify. */
-        WT_ERR(hs_cursor->get_value(hs_cursor, &hs_stop_ts, &durable_ts, &type_full, hs_value));
+        WT_ERR(hs_cursor->get_value(
+          hs_cursor, &hs_stop_durable_ts, &hs_durable_ts, &type_full, hs_value));
         type = (uint8_t)type_full;
         if (type == WT_UPDATE_MODIFY)
             WT_ERR(__wt_modify_apply_item(
@@ -240,10 +240,15 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
 
         /*
          * Verify the history store timestamps are in order. The start timestamp may be equal to the
-         * stop timestamp if the original update's commit timestamp is out of order.
+         * stop timestamp if the original update's commit timestamp is out of order. We may see
+         * records newer than or equal to the onpage value if eviction runs concurrently with
+         * checkpoint. In that case, don't verify the first record.
          */
-        WT_ASSERT(session,
-          (newer_hs_ts == WT_TS_NONE || hs_stop_ts <= newer_hs_ts || hs_start_ts == hs_stop_ts));
+        WT_ASSERT(session, hs_stop_durable_ts <= newer_hs_durable_ts ||
+            hs_start_ts == hs_stop_durable_ts || first_record);
+
+        if (hs_stop_durable_ts < newer_hs_durable_ts)
+            WT_STAT_CONN_INCR(session, txn_rts_hs_stop_older_than_newer_start);
 
         /*
          * Stop processing when we find the newer version value of this key is stable according to
@@ -251,22 +256,22 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
          * update chain. Also it confirms that history store doesn't contains any newer version than
          * the current version for the key.
          */
-        if (!replace && hs_stop_ts <= rollback_timestamp) {
+        if (!replace && hs_stop_durable_ts <= rollback_timestamp) {
             __wt_verbose(session, WT_VERB_RTS,
               "history store update valid with stop timestamp: %s and stable timestamp: %s",
-              __wt_timestamp_to_string(hs_stop_ts, ts_string[0]),
+              __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[0]),
               __wt_timestamp_to_string(rollback_timestamp, ts_string[1]));
             break;
         }
 
         /* Stop processing when we find a stable update according to the given timestamp. */
-        if (durable_ts <= rollback_timestamp) {
+        if (hs_durable_ts <= rollback_timestamp) {
             __wt_verbose(session, WT_VERB_RTS,
               "history store update valid with start timestamp: %s, durable timestamp: %s, "
               "stop timestamp: %s and stable timestamp: %s",
               __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
-              __wt_timestamp_to_string(durable_ts, ts_string[1]),
-              __wt_timestamp_to_string(hs_stop_ts, ts_string[2]),
+              __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
+              __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]),
               __wt_timestamp_to_string(rollback_timestamp, ts_string[3]));
             valid_update_found = true;
             break;
@@ -276,21 +281,23 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
           "history store update aborted with start timestamp: %s, durable timestamp: %s, stop "
           "timestamp: %s and stable timestamp: %s",
           __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
-          __wt_timestamp_to_string(durable_ts, ts_string[1]),
-          __wt_timestamp_to_string(hs_stop_ts, ts_string[2]),
+          __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
+          __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]),
           __wt_timestamp_to_string(rollback_timestamp, ts_string[3]));
 
-#ifdef HAVE_DIAGNOSTIC
         /*
-         * Durable timestamp of the current record is used as stop timestamp of previous record.
-         * Save it to verify against previous record.
+         * Start time point of the current record may be used as stop time point of the previous
+         * record. Save it to verify against the previous record and check if we need to append the
+         * stop time point as a tombstone when we rollback the history store record.
          */
-        newer_hs_ts = durable_ts;
+        newer_hs_durable_ts = hs_durable_ts;
+#ifdef HAVE_DIAGNOSTIC
+        first_record = false;
 #endif
+
         WT_ERR(__wt_upd_alloc_tombstone(session, &hs_upd, NULL));
         WT_ERR(__wt_hs_modify(cbt, hs_upd));
         WT_STAT_CONN_INCR(session, txn_rts_hs_removed);
-        hs_upd = NULL;
     }
 
     if (replace) {
@@ -301,9 +308,9 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
         if (valid_update_found) {
             WT_ERR(__wt_upd_alloc(session, &full_value, WT_UPDATE_STANDARD, &upd, NULL));
 
-            upd->txnid = WT_TXN_NONE;
-            upd->durable_ts = durable_ts;
-            upd->start_ts = hs_start_ts;
+            upd->txnid = cbt->upd_value->tw.start_txn;
+            upd->durable_ts = cbt->upd_value->tw.durable_start_ts;
+            upd->start_ts = cbt->upd_value->tw.start_ts;
             __wt_verbose(session, WT_VERB_RTS, "update restored from history store (txnid: %" PRIu64
                                                ", start_ts: %s, durable_ts: %s",
               upd->txnid, __wt_timestamp_to_string(upd->start_ts, ts_string[0]),
@@ -314,6 +321,28 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
              * the rollback to stable operation.
              */
             F_SET(upd, WT_UPDATE_RESTORED_FROM_HS);
+
+            /*
+             * We have a tombstone on the original update chain and it is behind the stable
+             * timestamp, we need to restore that as well.
+             */
+            if (hs_stop_durable_ts <= rollback_timestamp &&
+              hs_stop_durable_ts < newer_hs_durable_ts) {
+                WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
+                tombstone->txnid = cbt->upd_value->tw.stop_txn;
+                tombstone->durable_ts = cbt->upd_value->tw.durable_stop_ts;
+                tombstone->start_ts = cbt->upd_value->tw.stop_ts;
+
+                /*
+                 * Set the flag to indicate that this update has been restored from history store
+                 * for the rollback to stable operation.
+                 */
+                F_SET(tombstone, WT_UPDATE_RESTORED_FROM_HS);
+
+                tombstone->next = upd;
+                upd = tombstone;
+                WT_STAT_CONN_INCR(session, txn_rts_hs_restore_tombstones);
+            }
         } else {
             WT_ERR(__wt_upd_alloc_tombstone(session, &upd, NULL));
             WT_STAT_CONN_INCR(session, txn_rts_keys_removed);
@@ -321,7 +350,6 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
         }
 
         WT_ERR(__rollback_row_add_update(session, page, rip, upd));
-        upd = NULL;
     }
 
     /* Finally remove that update from history store. */
@@ -329,18 +357,19 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
         WT_ERR(__wt_upd_alloc_tombstone(session, &hs_upd, NULL));
         WT_ERR(__wt_hs_modify(cbt, hs_upd));
         WT_STAT_CONN_INCR(session, txn_rts_hs_removed);
-        hs_upd = NULL;
     }
 
+    if (0) {
 err:
+        WT_ASSERT(session, tombstone == NULL || upd == tombstone);
+        __wt_free_update_list(session, &upd);
+        __wt_free_update_list(session, &hs_upd);
+    }
     __wt_scr_free(session, &key);
     __wt_scr_free(session, &hs_key);
     __wt_scr_free(session, &hs_value);
     __wt_buf_free(session, &full_value);
-    __wt_free(session, hs_upd);
-    __wt_free(session, upd);
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
-
     return (ret);
 }
 
