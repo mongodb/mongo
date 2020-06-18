@@ -65,6 +65,11 @@ assert.throws(function() {
     db.jstests_rename.renameCollection({fail: "fail fail fail"});
 }, [], "renameCollection should fail when passed a garbage object");
 
+// Users should not be able to create a collection beginning with '.' through renameCollection.
+// Auth suites throw InvalidNamespace and others throw IllegalOperation error.
+assert.commandFailedWithCode(b.renameCollection(".foo"),
+                             [ErrorCodes.InvalidNamespace, ErrorCodes.IllegalOperation]);
+
 db.jstests_rename_d.drop();
 db.jstests_rename_e.drop();
 

@@ -184,9 +184,9 @@ Status userAllowedCreateNS(const NamespaceString& ns) {
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace: " << ns);
     }
 
-    if (ns.ns().find('$') != std::string::npos) {
+    if (!NamespaceString::validCollectionName(ns.coll())) {
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "Cannot create a namespace containing '$': " << ns);
+                      str::stream() << "Invalid collection name: " << ns.coll());
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer && !ns.isOnInternalDb()) {
