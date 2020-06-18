@@ -321,19 +321,19 @@ for:
 * determining if the chunk should be auto-split
 * selecting the split points
 * committing the split points to the config server
-* refreshing the routing table cache 
+* refreshing the routing table cache
 * updating in memory chunk size estimates
 
 ### Deciding when to auto-split a chunk
 The server schedules an auto-split if:
-1. it detected that the chunk exceeds a threshold based on the maximum chunk size 
+1. it detected that the chunk exceeds a threshold based on the maximum chunk size
 2. there is not already a split in progress for the chunk
 
 Every time an update or insert gets routed to a chunk, the server tracks the bytes written to the
 chunk in memory through the collection's ChunkManager. The ChunkManager has a ChunkInfo object for
 each of the collection's entries in the local config.chunks. Through the ChunkManager, the server
 retrieves the chunk's ChunkInfo and uses its ChunkWritesTracker to increment the estimated chunk
-size. 
+size.
 
 Even if the new size estimate exceeds the maximum chunk size, the server still needs to check that
 there is not already a split in progress for the chunk. If the ChunkWritesTracker is locked, there
@@ -344,14 +344,14 @@ submits the chunk to the ChunkSplitter to be auto-split.
 ### The auto split task
 The ChunkSplitter is a replica set primary-only service that manages the process of auto-splitting
 chunks. The ChunkSplitter runs auto-split tasks asynchronously - thus, multiple chunks can undergo
-an auto-split concurrently, provided they don't overlap. 
+an auto-split concurrently, provided they don't overlap.
 
 To prepare for the split point selection process, the ChunkSplitter flags that an auto-split for the
 chunk is in progress. There may be incoming writes to the original chunk while the split is in
 progress. For this reason, the estimated data size in the ChunkWritesTracker for this chunk is
 reset, and the same counter is used to track the number of bytes written to the chunk while the
 auto-split is in progress.
- 
+
 splitVector manages the bulk of the split point selection logic. First, the data size and number of
 records are retrieved from the storage engine to approximate the number of keys that each chunk
 partition should have. This number is calculated such that if each document were uniform in size,
@@ -359,7 +359,7 @@ each chunk would be half of maxChunkSizeBytes.
 
 If the actual data size is less than the maximum chunk size, no splits are made at all.
 Additionally, if all documents in the chunk have the same shard key, no splits can be made. In this
-case, the chunk may be classified as a jumbo chunk. 
+case, the chunk may be classified as a jumbo chunk.
 
 In the general case, splitVector:
 * performs an index scan on the shard key index
@@ -373,7 +373,7 @@ auto-split task where the shard:
 * commits the split points to config.chunks on the config server by removing the document containing
   the original chunk and inserting new documents corresponding to the new chunks indicated by the
 split points
-* refreshes the routing table cache 
+* refreshes the routing table cache
 * replaces the original oversized chunk's ChunkInfo with a ChunkInfo object for each partition. The
   estimated data size for each new chunk is the number bytes written to the original chunk while the
 auto-split was in progress
@@ -843,8 +843,6 @@ to disk and [updates](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/
 * How mongod [assigns statement ids to insert operations](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/ops/write_ops_exec.cpp#L573)
 * [Retryable writes specifications](https://github.com/mongodb/specifications/blob/49589d66d49517f10cc8e1e4b0badd61dbb1917e/source/retryable-writes/retryable-writes.rst)
 
-## The historical routing table
-
 ## Transactions
 
 Cross-shard transactions provide ACID guarantees for multi-statement operations that involve documents on
@@ -941,6 +939,32 @@ to all participant shards.
 * [**TransactionRouter class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/transaction_router.h)
 * [**TransactionCoordinatorService class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/transaction_coordinator_service.h)
 * [**TransactionCoordinator class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/transaction_coordinator.h)
+
+## The historical routing table
+
+When a mongos or mongod executes a command that requires shard targeting, it must use routing information
+that matches the read concern of the command. If the command uses `"snapshot"` read concern, it must use
+the historical routing table at the selected read timestamp. If the command uses any other read concern,
+it must use the latest cached routing table.
+
+The [routing table cache](#the-routing-table-cache) provides an interface for obtaining the routing table
+at a particular timestamp and collection version, namely the `ChunkManager`. The `ChunkManager` has an
+optional clusterTime associated with it and a `RoutingTableHistory` that contains historical routing
+information for all chunks in the collection. That information is stored in an ordered map from the max
+key of each chunk to an entry that contains routing information for the chunk, such as chunk range,
+chunk version and chunk history. The chunk history contains the shard id for the shard that currently
+owns the chunk, and the shard id for any other shards that used to own the chunk in the past
+`minSnapshotHistoryWindowInSeconds` (defaults to 10 seconds). It corresponds to the chunk history in
+the `config.chunks` document for the chunk which gets updated whenever the chunk goes through an
+operation, such as merge or migration. The `ChunkManager` uses this information to determine the
+shards to target for a query. If the clusterTime is not provided, it will return the shards that
+currently own the target chunks. Otherwise, it will return the shards that owned the target chunks
+at that clusterTime and will throw a `StaleChunkHistory` error if it cannot find them.
+
+#### Code references
+* [**ChunkManager class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/chunk_manager.h#L233-L451)
+* [**RoutingTableHistory class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/chunk_manager.h#L70-L231)
+* [**ChunkHistory class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/catalog/type_chunk.h#L131-L145)
 
 ---
 
