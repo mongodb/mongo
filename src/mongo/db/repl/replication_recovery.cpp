@@ -728,9 +728,6 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
     }
 
     if (stableTimestamp && !stableTimestamp->isNull() && truncatePoint <= stableTimestamp) {
-        AutoGetCollectionForRead oplog(opCtx, NamespaceString::kRsOplogNamespace);
-        invariant(oplog.getCollection());
-
         LOGV2(21556,
               "The oplog truncation point ({truncatePoint}) is equal to or earlier than the stable "
               "timestamp ({stableTimestamp}), so truncating after the stable timestamp instead",
