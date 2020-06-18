@@ -14,6 +14,15 @@
  *
  */
 (function() {
+
+// Add replication-level logging.
+TestData.setParameters = TestData.setParameters || {};
+TestData.setParameters.logComponentVerbosity = TestData.setParameters.logComponentVerbosity || {};
+TestData.setParameters.logComponentVerbosity.replication =
+    TestData.setParameters.logComponentVerbosity.replication || {};
+TestData.setParameters.logComponentVerbosity.replication =
+    Object.merge(TestData.setParameters.logComponentVerbosity.replication, {verbosity: 2});
+
 // There are a limited number of voting nodes allowed in a replica set. We use as many voting nodes
 // as possible and fill in the rest with non-voting nodes.
 const numNodes = 12;
