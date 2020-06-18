@@ -61,7 +61,7 @@ const joinHungWrite = startParallelShell(() => {
         {_id: "b"}, {writeConcern: {w: "majority"}}));
 });
 
-if (isJsonLogNoConn()) {
+if (isJsonLog(db.getMongo())) {
     checkLog.containsJson(db.getMongo(), 20289);
 } else {
     checkLog.contains(
