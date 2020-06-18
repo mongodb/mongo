@@ -1988,7 +1988,6 @@ functions:
           commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
           echo "Git branch: $branch, commit: $commit"
 
-          sudo apt-get install leiningen
           lein install
     - command: shell.exec
       params:
