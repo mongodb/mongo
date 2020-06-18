@@ -1467,7 +1467,8 @@ functions:
             ${san_symbolizer}                             \
             ${snmp_config_path}                           \
             ${resmoke_wrapper}                            \
-            $python buildscripts/resmoke.py run   \
+            $python buildscripts/resmoke.py run           \
+                ${record_with}                            \
                 ${resmoke_args}                           \
                 $extra_args                               \
                 ${test_flags}                             \
@@ -1488,6 +1489,15 @@ functions:
                 --perfReportFile=perf.json
         resmoke_exit_code=$?
         set -o errexit
+
+        if [[ -n "${record_with}" ]]; then
+          recording_size=$(du -ch *.undo | grep total)
+          echo "UndoDB produced recordings that were $recording_size (uncompressed) on disk"
+          if [[ $resmoke_exit_code = 0 ]]; then
+            echo "Resmoke exited successfully. UndoDB recordings will not be saved."
+            rm *.undo
+          fi
+        fi
 
         # 74 is exit code for IOError on POSIX systems, which is raised when the machine is
         # shutting down.
@@ -3266,6 +3276,31 @@ functions:
   - *tar_system_resource_information
   - *archive_system_resource_information
 
+  "tar UndoDB recordings": &tar_undodb_recordings
+    command: archive.targz_pack
+    params:
+      target: undodb-recordings.tgz
+      source_dir: src
+      include:
+        - "./*.undo"
+
+  "archive UndoDB recordings": &archive_undodb_recordings
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: undodb-recordings.tgz
+      remote_file: ${project}/${build_variant}/${revision}/undo/undodb-recordings-${task_id}-execution-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/gzip
+      display_name: UndoDB Recordings - Execution ${execution}
+      optional: true
+
+  "save UndoDB recordings":
+  - *tar_undodb_recordings
+  - *archive_undodb_recordings
+
   ### Attach report & artifacts ###
   "attach scons logs":
     - command: s3.put
@@ -3348,6 +3383,7 @@ post:
   - func: "save hang analyzer debugger files"
   - func: "save disk statistics"
   - func: "save system resource information"
+  - func: "save UndoDB recordings"
   - func: "print OOM messages"
   - func: "umount shared scons directory"
   - func: "cleanup FUSE watchdog"
@@ -12332,3 +12368,40 @@ buildvariants:
     distros:
     - rhel62-large
   - name: validate_commit_message
+
+- name: live-record
+  display_name: "~ RHEL 6.2 Shared Library (with UndoDB live-record)"
+  batchtime: 1440 # 1 day
+  stepback: true
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    has_packages: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    target_resmoke_time: 10
+    max_sub_suites: 100
+    large_distro_name: rhel62-large
+    num_scons_link_jobs_available: 0.99
+    record_with: --recordWith /opt/undodb5/bin/live-record
+  tasks:
+  - name: compile_without_package_TG
+    distros:
+    - rhel62-large
+  - name: .jscore .common
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_op_query
+  - name: replica_sets_multi_stmt_txn_jscore_passthrough
+  - name: replica_sets_large_txns_format_jscore_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
+  - name: sharded_jscore_op_query_txns
+  - name: sharded_jscore_txns
+  - name: sharded_jscore_txns_sharded_collections
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_op_query_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
