@@ -1,0 +1,24 @@
+# -*- mode: python -*-
+
+Import('env')
+
+env = env.Clone()
+
+env.Library(
+    target='cst',
+    source=[
+        'c_node.cpp',
+    ],
+    LIBDEPS=[
+    ]
+)
+
+env.CppUnitTest(
+    target='cst_test',
+    source=[
+        'cst_test.cpp',
+    ],
+    LIBDEPS=[
+        'cst',
+    ]
+)

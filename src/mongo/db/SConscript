@@ -19,6 +19,7 @@ env.SConscript(
         'catalog',
         'commands',
         'concurrency',
+        'cst',
         'exec',
         'free_mon',
         'fts',
