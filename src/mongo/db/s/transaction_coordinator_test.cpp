@@ -1015,13 +1015,12 @@ TEST_F(TransactionCoordinatorTest,
 class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
 public:
     void setUp() override {
-        TransactionCoordinatorTestBase::setUp();
-
         getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-
         auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
         tickSource->reset(1);
         getServiceContext()->setTickSource(std::move(tickSource));
+
+        TransactionCoordinatorTestBase::setUp();
     }
 
     ServerTransactionCoordinatorsMetrics* metrics() {
