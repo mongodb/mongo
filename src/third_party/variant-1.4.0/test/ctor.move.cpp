@@ -22,8 +22,6 @@ TEST(Ctor_Move, Value) {
   // `w`
   mpark::variant<int, std::string> w(lib::move(v));
   EXPECT_EQ("hello", mpark::get<std::string>(w));
-  // Check `v`
-  EXPECT_TRUE(mpark::get<std::string>(v).empty());
 
   /* constexpr */ {
     // `cv`

@@ -30,4 +30,5 @@
 # build
 /build
 
+3rdparty/benchmark
 3rdparty/metabench

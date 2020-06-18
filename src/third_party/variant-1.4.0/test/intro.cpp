@@ -35,8 +35,8 @@ TEST(Variant, Intro) {
   v = 42;
 
   struct unary {
-    int operator()(int) const { return 0; }
-    int operator()(const std::string &) const { return 1; }
+    int operator()(int) const noexcept { return 0; }
+    int operator()(const std::string &) const noexcept { return 1; }
   };  // unary
 
   // single visitation.
@@ -53,10 +53,12 @@ TEST(Variant, Intro) {
   EXPECT_EQ(v, w);
 
   struct binary {
-    int operator()(int, int) const { return 0; }
-    int operator()(int, const std::string &) const { return 1; }
-    int operator()(const std::string &, int) const { return 2; }
-    int operator()(const std::string &, const std::string &) const { return 3; }
+    int operator()(int, int) const noexcept { return 0; }
+    int operator()(int, const std::string &) const noexcept { return 1; }
+    int operator()(const std::string &, int) const noexcept { return 2; }
+    int operator()(const std::string &, const std::string &) const noexcept {
+      return 3;
+    }
   };  // binary
 
   // binary visitation.

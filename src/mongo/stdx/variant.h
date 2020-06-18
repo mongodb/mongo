@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "third_party/variant-1.3.0/include/mpark/variant.hpp"
+#include "mpark/variant.hpp"
 
 namespace mongo::stdx {
 

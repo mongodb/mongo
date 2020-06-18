@@ -119,7 +119,9 @@ struct Obj {
   size_t *dtor_count_;
 };  // Obj
 
-static void swap(Obj &lhs, Obj &rhs) { std::swap(lhs.dtor_count_, rhs.dtor_count_); }
+static void swap(Obj &lhs, Obj &rhs) noexcept {
+  std::swap(lhs.dtor_count_, rhs.dtor_count_);
+}
 
 }  // namespace detail
 

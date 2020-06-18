@@ -21,6 +21,7 @@ env.InjectThirdParty(libraries=[
     'fmt',
     'pcre',
     'safeint',
+    'variant',
 ])
 
 # Run the core mongodb SConscript.

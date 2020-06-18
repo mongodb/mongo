@@ -36,12 +36,35 @@ struct copy_thrower_t {
   copy_thrower_t &operator=(copy_thrower_t &&) = default;
 };
 
-bool operator<(const copy_thrower_t &, const copy_thrower_t &) { return false; }
-bool operator>(const copy_thrower_t &, const copy_thrower_t &) { return false; }
-bool operator<=(const copy_thrower_t &, const copy_thrower_t &) { return true; }
-bool operator>=(const copy_thrower_t &, const copy_thrower_t &) { return true; }
-bool operator==(const copy_thrower_t &, const copy_thrower_t &) { return true; }
-bool operator!=(const copy_thrower_t &, const copy_thrower_t &) { return false; }
+inline bool operator<(const copy_thrower_t &,
+                      const copy_thrower_t &) noexcept {
+  return false;
+}
+
+inline bool operator>(const copy_thrower_t &,
+                      const copy_thrower_t &) noexcept {
+  return false;
+}
+
+inline bool operator<=(const copy_thrower_t &,
+                       const copy_thrower_t &) noexcept {
+  return true;
+}
+
+inline bool operator>=(const copy_thrower_t &,
+                       const copy_thrower_t &) noexcept {
+  return true;
+}
+
+inline bool operator==(const copy_thrower_t &,
+                       const copy_thrower_t &) noexcept {
+  return true;
+}
+
+inline bool operator!=(const copy_thrower_t &,
+                       const copy_thrower_t &) noexcept {
+  return false;
+}
 
 struct move_thrower_t {
   constexpr move_thrower_t() {}
@@ -51,10 +74,34 @@ struct move_thrower_t {
   move_thrower_t &operator=(move_thrower_t &&) { throw MoveAssignment{}; }
 };
 
-bool operator<(const move_thrower_t &, const move_thrower_t &) { return false; }
-bool operator>(const move_thrower_t &, const move_thrower_t &) { return false; }
-bool operator<=(const move_thrower_t &, const move_thrower_t &) { return true; }
-bool operator>=(const move_thrower_t &, const move_thrower_t &) { return true; }
-bool operator==(const move_thrower_t &, const move_thrower_t &) { return true; }
-bool operator!=(const move_thrower_t &, const move_thrower_t &) { return false; }
+inline bool operator<(const move_thrower_t &,
+                      const move_thrower_t &) noexcept {
+  return false;
+}
+
+inline bool operator>(const move_thrower_t &,
+                      const move_thrower_t &) noexcept {
+  return false;
+}
+
+inline bool operator<=(const move_thrower_t &,
+                       const move_thrower_t &) noexcept {
+  return true;
+}
+
+inline bool operator>=(const move_thrower_t &,
+                       const move_thrower_t &) noexcept {
+  return true;
+}
+
+inline bool operator==(const move_thrower_t &,
+                       const move_thrower_t &) noexcept {
+  return true;
+}
+
+inline bool operator!=(const move_thrower_t &,
+                       const move_thrower_t &) noexcept {
+  return false;
+}
+
 #endif

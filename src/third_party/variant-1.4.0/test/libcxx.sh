@@ -24,6 +24,7 @@ ${MPARK_VARIANT_LIT} \
     --param color_diagnostics \
     --param cxx_under_test="${MPARK_VARIANT_CXX_COMPILER}" \
     --param compile_flags=-I${MPARK_VARIANT_SOURCE_DIR}/include/mpark \
-    --param std=c++17 \
     --param libcxx_site_config=${MPARK_VARIANT_LIBCXX_SITE_CONFIG} \
+    --param std=c++17 \
+    --param use_clang_verify=false \
     ${MPARK_VARIANT_LIBCXX_SOURCE_DIR}/test/std/utilities/variant \

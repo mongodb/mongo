@@ -1,0 +1,72 @@
+# MPark.Variant
+#
+# Copyright Michael Park, 2015-2017
+#
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE.md or copy at http://boost.org/LICENSE_1_0.txt)
+
+build:
+  verbosity: detailed
+
+branches:
+  only:
+    - master
+    - dev
+
+clone_depth: 1
+
+platform: x64
+
+environment:
+  matrix:
+    # Visual Studio 2015
+    - GENERATOR: Visual Studio 14 2015 Win64
+      TESTS: mpark
+      SCRIPT: support/vs.py
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+
+    # Previous Visual Studio 2017
+    - GENERATOR: Visual Studio 15 2017 Win64
+      STDFLAGS: /std:c++14 /std:c++17 /std:c++latest
+      TESTS: mpark
+      SCRIPT: support/vs.py
+      APPVEYOR_BUILD_WORKER_IMAGE: Previous Visual Studio 2017
+
+    # Visual Studio 2017
+    - GENERATOR: Visual Studio 15 2017 Win64
+      STDFLAGS: /std:c++14 /std:c++17 /std:c++latest
+      TESTS: mpark
+      SCRIPT: support/vs.py
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+
+    # Clang/LLVM
+    - CC: clang-cl
+      CXX: clang-cl
+      STDFLAGS: /std:c++14 /std:c++17 /std:c++latest
+      TESTS: mpark
+      SCRIPT: support/ninja.py
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+
+install:
+  - git submodule -q update --init
+  # Directory for dependency installation.
+  - set DEPS=%APPVEYOR_BUILD_FOLDER%\deps
+  - mkdir %DEPS%
+  # Install Ninja
+  - set NINJA_URL="https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-win.zip"
+  - curl -fsSL %NINJA_URL% -o ninja.zip
+  - 7z x ninja.zip -o%DEPS%\ninja > nul
+  - set PATH=%DEPS%\ninja;%PATH%
+  - ninja --version
+
+before_build:
+  # Enable the Visual C++ toolset for command-line builds.
+  - IF "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2017" (
+      call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+    )
+  - IF "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2015" (
+      call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64
+    )
+
+build_script:
+  - python %SCRIPT%

@@ -48,7 +48,7 @@ a notice will be included in
 | [TomCrypt]                 | Public Domain     | 1.18.2           | 1.18.2            |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015  | 13.0.0           | 8.0.0             |          ✗           |                ✗                |
 | [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.15.0 | 3.11.0 | |             ✗                |
-| [variant]                  | BSL-1.0           | 1.4.0            | 1.3.0             |                      |                ✗                |
+| [variant]                  | BSL-1.0           | 1.4.0            | 1.4.0             |                      |                ✗                |
 | [wiredtiger]               |                   |                  | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
 | [yaml-cpp]                 | MIT               | 0.6.3            | 0.6.2             |                      |                ✗                |
 | [Zlib]                     | Zlib              | 1.2.11           | 1.2.11            |          ✗           |                ✗                |

@@ -7,7 +7,11 @@
 
 #include <mpark/variant.hpp>
 
+#include <string>
+
 #include <gtest/gtest.h>
+
+#include <mpark/config.hpp>
 
 #include "util.hpp"
 
@@ -28,7 +32,7 @@ TEST(Rel, SameTypeSameValue) {
   EXPECT_TRUE(w <= v);
   EXPECT_TRUE(w >= v);
 
-#if !defined(__GNUC__) || __GNUC__ >= 5
+#ifdef MPARK_CPP11_CONSTEXPR
   /* constexpr */ {
     constexpr mpark::variant<int, const char *> cv(0), cw(0);
     // `cv` op `cw`
@@ -66,7 +70,7 @@ TEST(Rel, SameTypeDiffValue) {
   EXPECT_FALSE(w <= v);
   EXPECT_TRUE(w >= v);
 
-#if !defined(__GNUC__) || __GNUC__ >= 5
+#ifdef MPARK_CPP11_CONSTEXPR
   /* constexpr */ {
     constexpr mpark::variant<int, const char *> cv(0), cw(1);
     // `cv` op `cw`
@@ -104,7 +108,7 @@ TEST(Rel, DiffTypeSameValue) {
   EXPECT_FALSE(w <= v);
   EXPECT_TRUE(w >= v);
 
-#if !defined(__GNUC__) || __GNUC__ >= 5
+#ifdef MPARK_CPP11_CONSTEXPR
   /* constexpr */ {
     constexpr mpark::variant<int, unsigned int> cv(0), cw(0u);
     // `cv` op `cw`
@@ -142,7 +146,7 @@ TEST(Rel, DiffTypeDiffValue) {
   EXPECT_FALSE(w <= v);
   EXPECT_TRUE(w >= v);
 
-#if !defined(__GNUC__) || __GNUC__ >= 5
+#ifdef MPARK_CPP11_CONSTEXPR
   /* constexpr */  {
     constexpr mpark::variant<int, unsigned int> cv(0), cw(1u);
     // `cv` op `cw`

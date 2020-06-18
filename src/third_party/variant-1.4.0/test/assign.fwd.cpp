@@ -7,8 +7,9 @@
 
 #include <mpark/variant.hpp>
 
-#include <string>
 #include <sstream>
+#include <string>
+#include <type_traits>
 
 #include <gtest/gtest.h>
 

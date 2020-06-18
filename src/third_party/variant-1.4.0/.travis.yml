@@ -1,0 +1,186 @@
+# MPark.Variant
+#
+# Copyright Michael Park, 2015-2017
+#
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE.md or copy at http://boost.org/LICENSE_1_0.txt)
+
+language: cpp
+dist: xenial
+sudo: false
+
+branches:
+  only:
+    - master
+    - dev
+
+git:
+  depth: 1
+
+env:
+  global:
+    - secure: jL8hAVoa2B512uGeoh5DL2YXrAznfKPz3GbcaUPzR6mR2Izj2yHFihLLeHrEY8vUdadS8zbn2CwtWnmJjNz5kIT/RxESxJJtgVNruwo0u4piIfxVI/tTRObMXKaGrfquDAHS/hjAhQlPSNNr+89oFSBvSfNpAVECd/ERhhnjIugD+MFFzaxi26qvM6li9toxPNJIxBq9jHRuZzlpWez6d6RcTsaqr30BaCEuJhVcg7J4SiSL8xeW2sokAG65pZ/aig23cCSJkhazbMd7Cy/OFNjQrhc2PQ+E0c2xEwdwCNA8qTnsMrUeo9NXc+lozOf23LWD1EvZtcNNG5arPhSuGGYs90T1GdL2jqyS1E+1Xf0cOWqB4VMho7H+vV55SgZb+TYDrmB63YvgxcUKgsDRvPI9bBv3S3uxgktbE6gwnrfQirKowbscC07X3R1RJiI6hSkVNdrLnQF28BHMRlCpyhDejIWm4qHgOrWCN+I6hZtk+nsRuJF8sCSFPUWuzlG+/kSwaBwm/eEy+ZI66ufJamHUqC8bxa+6kINxtJTMN79ZnbIPwOvey9cfVfzwxefaStwpQbCJuZlMbuo4738HxUQpscxgv6LA5ZEMz8hlKO82cWDZSEDxSrUowueu1Az0u5tfzBUXaU5pZCnGdK6aMGHcTznaeUFebq8uhLR3uc0=
+
+jobs:
+  include:
+    # ubuntu 16.04, gcc-4.8
+    - env: VER=4.8 STDFLAGS="-std=c++11 -std=c++1y" TESTS="mpark"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-4.8", "ninja-build"],
+                       sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 16.04, gcc-4.9
+    - env: VER=4.9 STDFLAGS="-std=c++11 -std=c++14" TESTS="mpark"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-4.9", "ninja-build"],
+                       sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 16.04, gcc-5
+    - env: VER=5 STDFLAGS="-std=c++11 -std=c++14 -std=c++1z" TESTS="mpark"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-5", "ninja-build"],
+                       sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 16.04, gcc-6
+    - env: VER=6 STDFLAGS="-std=c++11 -std=c++14 -std=c++1z" TESTS="mpark"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-6", "ninja-build"],
+                       sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 16.04, gcc-7
+    - env: VER=7 STDFLAGS="-std=c++11 -std=c++14 -std=c++17" TESTS="mpark libc++"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-7", "ninja-build"],
+                       sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 16.04, gcc-8
+    - env: VER=8 STDFLAGS="-std=c++11 -std=c++14 -std=c++17" TESTS="mpark libc++"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-8", "ninja-build"],
+                       sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 16.04, clang-3.6
+    - env: VER=3.6 STDFLAGS="-std=c++11 -std=c++14" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.6", "ninja-build"] } }
+
+    # ubuntu 16.04, clang-3.7
+    - env: VER=3.7 STDFLAGS="-std=c++11 -std=c++14" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.7", "ninja-build"] } }
+
+    # ubuntu 16.04, clang-3.8
+    - env: VER=3.8 STDFLAGS="-std=c++11 -std=c++14" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.8", "ninja-build"] } }
+
+    # ubuntu 16.04, clang-3.9
+    - env: VER=3.9 STDFLAGS="-std=c++11 -std=c++14 -std=c++1z" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.9", "ninja-build"] } }
+
+    # ubuntu 16.04, clang-4.0
+    - env: VER=4.0 STDFLAGS="-std=c++11 -std=c++14 -std=c++1z" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-4.0", "ninja-build"] } }
+
+    # ubuntu 16.04, clang-5.0
+    - env: VER=5.0 STDFLAGS="-std=c++11 -std=c++14 -std=c++17" TESTS="mpark libc++"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-5.0", "ninja-build"] } }
+
+    # ubuntu 16.04, clang-6.0
+    - env: VER=6.0 STDFLAGS="-std=c++11 -std=c++14 -std=c++17" TESTS="mpark libc++"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-6.0", "ninja-build"] } }
+
+    # ubuntu 16.04, clang-7
+    - env: VER=7 STDFLAGS="-std=c++11 -std=c++14 -std=c++17" TESTS="mpark libc++"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-7", "ninja-build"],
+                       sources: ["llvm-toolchain-xenial-7"] } }
+
+    # OS X El Capitan 10.11
+    - env: STDFLAGS="-std=c++11 -std=c++14 -std=c++1z" TESTS="mpark"
+      compiler: clang
+      os: osx
+      osx_image: xcode7.3
+
+    # OS X Sierra 10.12
+    - env: STDFLAGS="-std=c++11 -std=c++14 -std=c++1z" TESTS="mpark"
+      compiler: clang
+      os: osx
+      osx_image: xcode8.3
+
+    # OS X High Sierra 10.13
+    - env: STDFLAGS="-std=c++11 -std=c++14 -std=c++17" TESTS="mpark"
+      compiler: clang
+      os: osx
+      osx_image: xcode9.4
+
+    # OS X High Sierra 10.13
+    - env: STDFLAGS="-std=c++11 -std=c++14 -std=c++17" TESTS="mpark"
+      compiler: clang
+      os: osx
+      osx_image: xcode10.1
+
+    - stage: deploy
+      name: "Single Header"
+      if: branch = master AND type = push
+      install: skip
+      before_script:
+        - git config --global user.name "Travis CI"
+        - git config --global user.email "<>"
+        - travis_retry git clone https://$GITHUB_TOKEN@github.com/mpark/variant
+              --depth 1 --branch=single-header single-header &>/dev/null
+      script:
+        - SHA=$(git rev-parse --short HEAD)
+        - python support/single-header.py > single-header/master/variant.hpp
+        - pushd single-header
+        - |
+          if git diff-index --quiet HEAD --; then
+            echo "Nothing to do. No changes were made to 'variant.hpp'."
+          else
+            git add --all
+            git commit -m "Updated 'variant.hpp' @${SHA}."
+            travis_retry git pull --rebase && git push origin single-header &>/dev/null
+          fi
+        - popd
+
+install:
+  # Upgrade CMake and install Ninja on OS X.
+  - |
+    if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+      brew update
+      brew upgrade cmake
+      brew install ninja
+    fi
+  - cmake --version
+  - ninja --version
+  # Set the correct `CC` and `CXX` environment variables.
+  - |
+    if [ -n "${VER}" ]; then
+      export CC="${CC}-${VER}"
+      export CXX="${CXX}-${VER}"
+    fi
+  - ${CXX} --version
+
+script:
+  - python support/ninja.py
+
+notifications:
+  email: false
