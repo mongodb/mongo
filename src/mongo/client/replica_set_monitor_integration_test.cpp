@@ -147,13 +147,12 @@ protected:
 };
 
 TEST_F(ReplicaSetMonitorFixture, StreamableRSMWireVersion) {
-    auto rsm = StreamableReplicaSetMonitor::make(replSetUri, executor, connectionManager);
+    auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri);
 
-    // TODO (SERVER-47639): Make this test use getHostOrRefresh and remove the failpoint below.
-    // Wait until isMaster requests are sent and the TopologyDescription is finalized.
-    FailPointEnableBlock fpb("topologyDescriptionInstallServerDescription");
-    rsm->init();
-    fpb->waitForTimesEntered(fpb.initialTimesEntered() + numNodes);
+    // Schedule isMaster requests and wait for the responses.
+    auto primaryFuture =
+        rsm->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly));
+    primaryFuture.get();
 
     ASSERT_EQ(rsm->getMinWireVersion(), WireVersion::LATEST_WIRE_VERSION);
     ASSERT_EQ(rsm->getMaxWireVersion(), WireVersion::LATEST_WIRE_VERSION);

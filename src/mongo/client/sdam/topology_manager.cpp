@@ -147,6 +147,12 @@ void TopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, IsMasterRTT rt
           "replicaSet"_attr = getTopologyDescription()->getSetName());
 }
 
+SemiFuture<std::vector<HostAndPort>> TopologyManager::executeWithLock(
+    std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func) {
+    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    return func(_topologyDescription);
+}
+
 void TopologyManager::_publishTopologyDescriptionChanged(
     const TopologyDescriptionPtr& oldTopologyDescription,
     const TopologyDescriptionPtr& newTopologyDescription) const {
