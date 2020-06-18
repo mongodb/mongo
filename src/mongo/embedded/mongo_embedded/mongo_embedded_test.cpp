@@ -97,9 +97,6 @@ using MongoDBCAPIClientPtr = std::unique_ptr<mongo_embedded_v1_client, ClientDes
 class MongodbCAPITest : public mongo::unittest::Test {
 protected:
     void setUp() {
-        status = mongo_embedded_v1_status_create();
-        ASSERT(status != nullptr);
-
         if (!globalTempDir) {
             globalTempDir = std::make_unique<mongo::unittest::TempDir>("embedded_mongo");
         }
@@ -122,18 +119,27 @@ protected:
 
         params.yaml_config = yaml.c_str();
 
+        auto* status = mongo_embedded_v1_status_create();
+        ASSERT(status);
+
         lib = mongo_embedded_v1_lib_init(&params, status);
         ASSERT(lib != nullptr) << mongo_embedded_v1_status_get_explanation(status);
 
         db = mongo_embedded_v1_instance_create(lib, yaml.c_str(), status);
         ASSERT(db != nullptr) << mongo_embedded_v1_status_get_explanation(status);
+
+        mongo_embedded_v1_status_destroy(status);
     }
 
     void tearDown() {
+        auto* status = mongo_embedded_v1_status_create();
+        ASSERT(status);
+
         ASSERT_EQUALS(mongo_embedded_v1_instance_destroy(db, status), MONGO_EMBEDDED_V1_SUCCESS)
             << mongo_embedded_v1_status_get_explanation(status);
         ASSERT_EQUALS(mongo_embedded_v1_lib_fini(lib, status), MONGO_EMBEDDED_V1_SUCCESS)
             << mongo_embedded_v1_status_get_explanation(status);
+
         mongo_embedded_v1_status_destroy(status);
     }
 
@@ -142,8 +148,13 @@ protected:
     }
 
     MongoDBCAPIClientPtr createClient() const {
+        auto* status = mongo_embedded_v1_status_create();
+        ASSERT(status);
+
         MongoDBCAPIClientPtr client(mongo_embedded_v1_client_create(db, status));
         ASSERT(client.get() != nullptr) << mongo_embedded_v1_status_get_explanation(status);
+
+        mongo_embedded_v1_status_destroy(status);
         return client;
     }
 
@@ -161,10 +172,15 @@ protected:
         void* output;
         size_t outputSize;
 
+        auto* status = mongo_embedded_v1_status_create();
+        ASSERT(status);
+
         // call the wire protocol
         int err = mongo_embedded_v1_client_invoke(
             client.get(), inputMessage.buf(), inputMessage.size(), &output, &outputSize, status);
         ASSERT_EQUALS(err, MONGO_EMBEDDED_V1_SUCCESS);
+
+        mongo_embedded_v1_status_destroy(status);
 
         // convert the shared buffer to a mongo::message and ensure that it is valid
         auto outputMessage = messageFromBuffer(output, outputSize);
@@ -181,7 +197,6 @@ protected:
 protected:
     mongo_embedded_v1_lib* lib;
     mongo_embedded_v1_instance* db;
-    mongo_embedded_v1_status* status;
 };
 
 TEST_F(MongodbCAPITest, CreateAndDestroyDB) {
