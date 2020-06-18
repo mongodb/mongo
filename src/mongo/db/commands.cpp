@@ -560,37 +560,45 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     if (cmd->getName() == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
 
-    if (data.hasField("threadName") &&
-        (client->desc() !=
-         data.getStringField(
-             "threadName"))) {  // only activate failpoint on thread from certain client
-        return false;
-    }
-
-    if (data.hasField("appName")) {
-        const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-        if (clientMetadata &&
-            clientMetadata.get().getApplicationName() != data.getStringField("appName")) {
-            return false;  // only activate failpoint on connection with a certain appName
-        }
-    }
-
-    if (client->session() && (client->session()->getTags() & transport::Session::kInternalClient)) {
-        if (!data.hasField("failInternalCommands") || !data.getBoolField("failInternalCommands")) {
-            return false;
-        }
-    }
-
     if (!client->session()) {
         return false;
     }
 
-    if (data.hasField("namespace") && nss != NamespaceString(data.getStringField("namespace"))) {
+    auto threadName = client->desc();
+    auto appName = StringData();
+    if (const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata()) {
+        appName = clientMetadata.get().getApplicationName();
+    }
+    auto isInternalClient = client->session()->getTags() & transport::Session::kInternalClient;
+
+    if (data.hasField("threadName") && (threadName != data.getStringField("threadName"))) {
+        return false;  // only activate failpoint on thread from certain client
+    }
+
+    if (data.hasField("appName") && (appName != data.getStringField("appName"))) {
+        return false;  // only activate failpoint on connection with a certain appName
+    }
+
+    if (data.hasField("namespace") && (nss != NamespaceString(data.getStringField("namespace")))) {
+        return false;
+    }
+
+    if (!(data.hasField("failInternalCommands") && data.getBoolField("failInternalCommands")) &&
+        isInternalClient) {
         return false;
     }
 
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && cmd->hasAlias(failCommand.valueStringData())) {
+            LOGV2(4898500,
+                  "Should activate 'failCommand' failpoint",
+                  "data"_attr = data,
+                  "threadName"_attr = threadName,
+                  "appName"_attr = appName,
+                  "namespace"_attr = nss,
+                  "isInternalClient"_attr = isInternalClient,
+                  "command"_attr = cmd->getName());
+
             return true;
         }
     }
