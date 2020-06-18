@@ -269,6 +269,13 @@ MONGO_COMPILER_NOINLINE void msgassertedWithLocation(const Status& status,
     error_details::throwExceptionForStatus(status);
 }
 
+void internalAssertWithLocation(SourceLocationHolder loc, const Status& status) {
+    if (status.isOK())
+        return;
+    LOGV2_DEBUG(4892201, 3, "Internal assertion", "error"_attr = status, "location"_attr = loc);
+    error_details::throwExceptionForStatus(status);
+}
+
 std::string causedBy(StringData e) {
     constexpr auto prefix = " :: caused by :: "_sd;
     std::string out;

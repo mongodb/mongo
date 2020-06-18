@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"  // NOTE: This is safe as utils depend on base
 #include "mongo/base/status_with.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/platform/source_location.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 
@@ -433,6 +434,41 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
     if (MONGO_unlikely(!status.isOK())) {
         msgassertedWithLocation(status, file, line);
     }
+}
+
+/**
+ * `internalAssert` is provided as an alternative for `uassert` variants (e.g., `uassertStatusOK`)
+ * to support cases where we expect a failure, the failure is recoverable, or accounting for the
+ * failure, updating assertion counters, isn't desired. `internalAssert` logs at D3 instead of D1,
+ * which helps with reducing the noise of assertions in production. The goal is to keep one
+ * interface (i.e., `internalAssert(...)`) for all possible assertion variants, and use function
+ * overloading to expand type support as needed.
+ */
+#define internalAssert(...) \
+    ::mongo::internalAssertWithLocation(MONGO_SOURCE_LOCATION(), __VA_ARGS__)
+
+void internalAssertWithLocation(SourceLocationHolder loc, const Status& status);
+
+inline void internalAssertWithLocation(SourceLocationHolder loc, Status&& status) {
+    internalAssertWithLocation(std::move(loc), status);
+}
+
+inline void internalAssertWithLocation(SourceLocationHolder loc,
+                                       int msgid,
+                                       const std::string& msg,
+                                       bool expr) {
+    if (MONGO_unlikely(!expr))
+        internalAssertWithLocation(std::move(loc), Status(ErrorCodes::Error(msgid), msg));
+}
+
+template <typename T>
+inline void internalAssertWithLocation(SourceLocationHolder loc, const StatusWith<T>& sw) {
+    internalAssertWithLocation(std::move(loc), sw.getStatus());
+}
+
+template <typename T>
+inline void internalAssertWithLocation(SourceLocationHolder loc, StatusWith<T>&& sw) {
+    internalAssertWithLocation(std::move(loc), sw);
 }
 
 /**

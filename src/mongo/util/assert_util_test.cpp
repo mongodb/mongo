@@ -212,6 +212,45 @@ TEST(AssertUtils, UassertTypedExtraInfoWorks) {
     }
 }
 
+TEST(AssertUtils, UassertIncrementsUserAssertionCounter) {
+    auto userAssertions = assertionCount.user.load();
+    auto asserted = false;
+    try {
+        Status status = {ErrorCodes::BadValue, "Test"};
+        uassertStatusOK(status);
+    } catch (const DBException&) {
+        asserted = true;
+    }
+    ASSERT(asserted);
+    ASSERT_EQ(userAssertions + 1, assertionCount.user.load());
+}
+
+TEST(AssertUtils, InternalAssertWithStatus) {
+    auto userAssertions = assertionCount.user.load();
+    try {
+        Status status = {ErrorCodes::BadValue, "Test"};
+        internalAssert(status);
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::BadValue);
+        ASSERT_EQ(ex.reason(), "Test");
+    }
+    ASSERT_EQ(userAssertions, assertionCount.user.load());
+}
+
+TEST(AssertUtils, InternalAssertWithExpression) {
+    auto userAssertions = assertionCount.user.load();
+    try {
+        internalAssert(48922, "Test", false);
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), 48922);
+        ASSERT_EQ(ex.reason(), "Test");
+    }
+
+    internalAssert(48922, "Another test", true);
+
+    ASSERT_EQ(userAssertions, assertionCount.user.load());
+}
+
 TEST(AssertUtils, MassertTypedExtraInfoWorks) {
     try {
         msgasserted(ErrorExtraInfoExample(123), "");
