@@ -1051,8 +1051,11 @@ static const char *const __stats_connection_desc[] = {
   "transaction: read timestamp queue insert to empty",
   "transaction: read timestamp queue inserts to head",
   "transaction: read timestamp queue inserts total", "transaction: read timestamp queue length",
-  "transaction: rollback to stable calls", "transaction: rollback to stable keys removed",
-  "transaction: rollback to stable keys restored", "transaction: rollback to stable pages visited",
+  "transaction: rollback to stable calls",
+  "transaction: rollback to stable hs records with stop timestamps older than newer records",
+  "transaction: rollback to stable keys removed", "transaction: rollback to stable keys restored",
+  "transaction: rollback to stable pages visited",
+  "transaction: rollback to stable restored tombstones from history store",
   "transaction: rollback to stable skipping internal pages tree walk",
   "transaction: rollback to stable sweeping history store keys",
   "transaction: rollback to stable updates aborted",
@@ -1546,9 +1549,11 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_read_queue_inserts = 0;
     stats->txn_read_queue_len = 0;
     stats->txn_rts = 0;
+    stats->txn_rts_hs_stop_older_than_newer_start = 0;
     stats->txn_rts_keys_removed = 0;
     stats->txn_rts_keys_restored = 0;
     stats->txn_rts_pages_visited = 0;
+    stats->txn_rts_hs_restore_tombstones = 0;
     stats->txn_rts_skip_interal_pages_walk = 0;
     stats->txn_rts_sweep_hs_keys = 0;
     stats->txn_rts_upd_aborted = 0;
@@ -2051,9 +2056,12 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_read_queue_inserts += WT_STAT_READ(from, txn_read_queue_inserts);
     to->txn_read_queue_len += WT_STAT_READ(from, txn_read_queue_len);
     to->txn_rts += WT_STAT_READ(from, txn_rts);
+    to->txn_rts_hs_stop_older_than_newer_start +=
+      WT_STAT_READ(from, txn_rts_hs_stop_older_than_newer_start);
     to->txn_rts_keys_removed += WT_STAT_READ(from, txn_rts_keys_removed);
     to->txn_rts_keys_restored += WT_STAT_READ(from, txn_rts_keys_restored);
     to->txn_rts_pages_visited += WT_STAT_READ(from, txn_rts_pages_visited);
+    to->txn_rts_hs_restore_tombstones += WT_STAT_READ(from, txn_rts_hs_restore_tombstones);
     to->txn_rts_skip_interal_pages_walk += WT_STAT_READ(from, txn_rts_skip_interal_pages_walk);
     to->txn_rts_sweep_hs_keys += WT_STAT_READ(from, txn_rts_sweep_hs_keys);
     to->txn_rts_upd_aborted += WT_STAT_READ(from, txn_rts_upd_aborted);

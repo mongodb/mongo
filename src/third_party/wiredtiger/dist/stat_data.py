@@ -652,6 +652,8 @@ connection_stats = [
     TxnStat('txn_rollback', 'transactions rolled back'),
     TxnStat('txn_rts', 'rollback to stable calls'),
     TxnStat('txn_rts_hs_removed', 'rollback to stable updates removed from history store'),
+    TxnStat('txn_rts_hs_restore_tombstones', 'rollback to stable restored tombstones from history store'),
+    TxnStat('txn_rts_hs_stop_older_than_newer_start', 'rollback to stable hs records with stop timestamps older than newer records'),
     TxnStat('txn_rts_keys_removed', 'rollback to stable keys removed'),
     TxnStat('txn_rts_keys_restored', 'rollback to stable keys restored'),
     TxnStat('txn_rts_pages_visited', 'rollback to stable pages visited'),
