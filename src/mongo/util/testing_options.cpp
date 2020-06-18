@@ -42,7 +42,7 @@ namespace {
  * it is allowed to set (enables/disables) testing diagnostics.
  */
 MONGO_INITIALIZER_GENERAL(TestingDiagnostics,
-                          ("EndServerParameterRegistration"),
+                          ("EndStartupOptionStorage"),
                           ("DisableTestingDiagnosticsByDefault"))
 (InitializerContext*) {
     // Initialize testing diagnostics only if it has not been already initialized, or it must be
