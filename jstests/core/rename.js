@@ -81,3 +81,10 @@ assert.commandWorked(
 assert(db.getCollectionNames().indexOf("jstests_rename_d") >= 0);
 assert(db.getCollectionNames().indexOf("jstests_rename_e") < 0);
 assert.eq(db.jstests_rename_d.findOne().a, 222);
+
+db["jstests_rename_f"].drop();
+
+assert.commandWorked(db.createCollection("jstests_rename_f"));
+assert.commandFailedWithCode(
+    db.getCollection("jstests_rename_f").renameCollection({to: "jstests_rename_$cmd"}),
+    ErrorCodes.IllegalOperation);

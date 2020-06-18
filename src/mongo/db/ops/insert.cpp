@@ -184,6 +184,11 @@ Status userAllowedCreateNS(const NamespaceString& ns) {
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace: " << ns);
     }
 
+    if (ns.ns().find('$') != std::string::npos) {
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "Cannot create a namespace containing '$': " << ns);
+    }
+
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer && !ns.isOnInternalDb()) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream()
