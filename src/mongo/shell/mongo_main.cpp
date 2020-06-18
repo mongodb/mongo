@@ -971,9 +971,9 @@ int mongo_main(int argc, char* argv[]) {
                 std::cout
                     << "Welcome to the MongoDB shell.\n"
                        "For interactive help, type \"help\".\n"
-                       "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
-                       "Questions? Try the support "
-                       "group\n\thttp://groups.google.com/group/mongodb-user"
+                       "For more comprehensive documentation, see\n\thttps://docs.mongodb.com/\n"
+                       "Questions? Try the MongoDB Developer Community Forums\n"
+                       "\thttps://community.mongodb.com"
                     << std::endl;
                 File f;
                 f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
