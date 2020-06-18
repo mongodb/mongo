@@ -19,6 +19,7 @@ env.Library(
 env.Library(
     target='expressions',
     source=[
+        'doc_validation_error.cpp',
         'expression.cpp',
         'expression_algo.cpp',
         'expression_array.cpp',

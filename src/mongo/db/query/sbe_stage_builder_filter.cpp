@@ -53,6 +53,7 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/matcher/expression_where_noop.h"
+#include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
@@ -109,35 +110,6 @@ struct MatchExpressionVisitorContext {
     std::stack<sbe::value::SlotId> predicateVars;
     std::stack<std::pair<const MatchExpression*, size_t>> nestedLogicalExprs;
     sbe::value::SlotId inputVar;
-};
-
-/**
- * A match expression tree walker to be used with MatchExpression visitors in order to translate
- * a MatchExpression tree into an SBE plane stage sub-tree which implements the filter.
- */
-class MatchExpressionWalker final {
-public:
-    MatchExpressionWalker(MatchExpressionConstVisitor* preVisitor,
-                          MatchExpressionConstVisitor* inVisitor,
-                          MatchExpressionConstVisitor* postVisitor)
-        : _preVisitor{preVisitor}, _inVisitor{inVisitor}, _postVisitor{postVisitor} {}
-
-    void preVisit(const MatchExpression* expr) {
-        expr->acceptVisitor(_preVisitor);
-    }
-
-    void postVisit(const MatchExpression* expr) {
-        expr->acceptVisitor(_postVisitor);
-    }
-
-    void inVisit(long count, const MatchExpression* expr) {
-        expr->acceptVisitor(_inVisitor);
-    }
-
-private:
-    MatchExpressionConstVisitor* _preVisitor;
-    MatchExpressionConstVisitor* _inVisitor;
-    MatchExpressionConstVisitor* _postVisitor;
 };
 
 /**
