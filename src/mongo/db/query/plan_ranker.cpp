@@ -77,13 +77,13 @@ void logScoringPlan(std::function<std::string()> solution,
                 "Scoring plan {planIndex}:\n{querySolution}Stats:\n{stats}",
                 "Scoring plan",
                 "planIndex"_attr = planIndex,
-                "querySolution"_attr = [solution]() { return redact(solution()); }(),
-                "stats"_attr = [explain]() { return redact(explain()); }());
+                "querySolution"_attr = redact(solution()),
+                "stats"_attr = redact(explain()));
     LOGV2_DEBUG(20957,
                 2,
                 "Scoring query plan: {planSummary} planHitEOF={planHitEOF}",
                 "Scoring query plan",
-                "planSummary"_attr = [planSummary]() { return planSummary(); }(),
+                "planSummary"_attr = planSummary(),
                 "planHitEOF"_attr = isEOF);
 }
 
@@ -104,7 +104,7 @@ void logFailedPlan(std::function<std::string()> planSummary) {
                 2,
                 "Not scoring plan: {planSummary} because the plan failed",
                 "Not scoring a plan because the plan failed",
-                "planSummary"_attr = [&]() { return planSummary(); }());
+                "planSummary"_attr = planSummary());
 }
 }  // namespace log_detail
 
