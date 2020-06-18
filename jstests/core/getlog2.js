@@ -31,7 +31,7 @@ function contains(arr, func) {
 }
 
 function stringContains(haystack, needle) {
-    if (isJsonLogNoConn()) {
+    if (isJsonLog(db.getMongo())) {
         if (needle.indexOf(":"))
             needle = '"' + needle.replace(':', "\":");
         needle = needle.replace(/ /g, "");

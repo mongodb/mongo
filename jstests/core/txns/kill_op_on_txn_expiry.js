@@ -72,7 +72,7 @@ try {
     failPoint.wait();
 
     jsTestLog("Wait for the transaction to expire");
-    if (isJsonLogNoConn()) {
+    if (isJsonLog(db.getMongo())) {
         checkLog.contains(
             db.getMongo(),
             new RegExp(
