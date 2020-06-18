@@ -47,9 +47,8 @@ class Ordering {
 public:
     static constexpr size_t kMaxCompoundIndexKeys = size_t{32};
 
-    static const Ordering& allAscending() {
-        static Ordering allAscending{0};
-        return allAscending;
+    static Ordering allAscending() {
+        return {0};
     }
 
     Ordering(const Ordering& r) : bits(r.bits) {}
