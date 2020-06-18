@@ -283,17 +283,26 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefr
         return _makeUnsatisfiedReadPrefError(criteria);
     }
 
-    {
-        stdx::lock_guard lk(_mutex);
+    return _topologyManager->executeWithLock(
+        [this, criteria, deadline](const TopologyDescriptionPtr& topologyDescription)
+            -> SemiFuture<std::vector<HostAndPort>> {
+            stdx::lock_guard lk(_mutex);
 
-        // We check if we are closed under the mutex here since someone could have called
-        // close() concurrently with the code above.
-        if (_isDropped.load()) {
-            return _makeReplicaSetMonitorRemovedError();
-        }
+            // We check if we are closed under the mutex here since someone could have called
+            // close() concurrently with the code above.
+            if (_isDropped.load()) {
+                return _makeReplicaSetMonitorRemovedError();
+            }
+            // try to satisfy the query again while holding both the StreamableRSM mutex and
+            // TopologyManager mutex to avoid missing any topology change that has occurred
+            // since the last check.
+            auto immediateResult = _getHosts(topologyDescription, criteria);
+            if (immediateResult) {
+                return {*immediateResult};
+            }
 
-        return _enqueueOutstandingQuery(lk, criteria, deadline);
-    }
+            return _enqueueOutstandingQuery(lk, criteria, deadline);
+        });
 }
 
 SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutstandingQuery(
@@ -438,7 +447,8 @@ bool StreamableReplicaSetMonitor::isHostUp(const HostAndPort& host) const {
 
 int StreamableReplicaSetMonitor::getMinWireVersion() const {
     auto currentTopology = _currentTopology();
-    const std::vector<ServerDescriptionPtr>& servers = currentTopology->getServers();
+    const std::vector<ServerDescriptionPtr>& servers = currentTopology->findServers(
+        [](const ServerDescriptionPtr& s) { return s->getType() != ServerType::kUnknown; });
     if (servers.size() > 0) {
         const auto& serverDescription =
             *std::min_element(servers.begin(), servers.end(), minWireCompare);
@@ -450,7 +460,8 @@ int StreamableReplicaSetMonitor::getMinWireVersion() const {
 
 int StreamableReplicaSetMonitor::getMaxWireVersion() const {
     auto currentTopology = _currentTopology();
-    const std::vector<ServerDescriptionPtr>& servers = currentTopology->getServers();
+    const std::vector<ServerDescriptionPtr>& servers = currentTopology->findServers(
+        [](const ServerDescriptionPtr& s) { return s->getType() != ServerType::kUnknown; });
     if (servers.size() > 0) {
         const auto& serverDescription =
             *std::max_element(servers.begin(), servers.end(), maxWireCompare);

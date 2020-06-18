@@ -79,6 +79,12 @@ public:
      */
     const TopologyDescriptionPtr getTopologyDescription() const;
 
+    /**
+     * Executes the given function with the current TopologyDescription while holding the mutex.
+     */
+    SemiFuture<std::vector<HostAndPort>> executeWithLock(
+        std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func);
+
 private:
     void _publishTopologyDescriptionChanged(
         const TopologyDescriptionPtr& oldTopologyDescription,
