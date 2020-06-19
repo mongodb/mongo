@@ -758,7 +758,7 @@
 	);
 
 	$mapping = array();
-	
+
 	foreach ($zones as $zone) {
 		fprintf(STDERR, "Checking $zone: ");
 		if (!(preg_match( '@^([A-Z][a-z]+([_/-][A-Za-z]+)+)$@', $zone) || (preg_match( '@^[A-Z]{1,6}$@', $zone)))) {
@@ -814,7 +814,7 @@
 	}
 	$mapping["z|0|0"] = array(null);
 
-	//Special BC overrides 
+	//Special BC overrides
 	$mapping['cast|34200|0'] = array('Australia/Adelaide');
 
 	//Add UTC
@@ -848,7 +848,7 @@
 		}
 	}
 //var_dump($mapping2);
-	
+
 	foreach ($mapping2 as $abbr => $abbr_parts) {
 		ksort($abbr_parts);
 		foreach ($abbr_parts as $abbr_elements) {

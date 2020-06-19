@@ -2,17 +2,17 @@ FLAGS=-O0 -ggdb3 \
 	-Wall -Werror -Wextra -fsanitize=undefined -fsanitize=address \
 	-Wmaybe-uninitialized -Wmissing-field-initializers -Wshadow -Wno-unused-parameter \
 	-pedantic -Wno-implicit-fallthrough \
-	-DHAVE_STDINT_H -DHAVE_STRING_H -DHAVE_GETTIMEOFDAY -DHAVE_UNISTD_H -DHAVE_DIRENT_H -I.# -DDEBUG_PARSER
+	-DHAVE_STDINT_H -DHAVE_GETTIMEOFDAY -DHAVE_UNISTD_H -DHAVE_DIRENT_H -I.# -DDEBUG_PARSER
 
 CFLAGS=-Wdeclaration-after-statement ${FLAGS}
 
 CPPFLAGS=${FLAGS}
 
-LDFLAGS=-lm -fsanitize=undefined -l:libubsan.so.1
+LDFLAGS=-lm -fsanitize=undefined -l:libubsan.so
 
 TEST_LDFLAGS=-lCppUTest
 
-CC=gcc-8
+CC=gcc
 MANUAL_TESTS=tests/tester-parse-interval \
 	tests/tester-parse-tz tests/tester-iso-week tests/test-abbr-to-id \
 	tests/enumerate-timezones tests/date_from_isodate

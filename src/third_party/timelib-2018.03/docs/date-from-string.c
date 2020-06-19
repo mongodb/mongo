@@ -24,7 +24,7 @@
  */
 
 /*
- * Example that shows how to convert a date/time in its parts, to a 
+ * Example that shows how to convert a date/time in its parts, to a
  * Unix timestamp.
  *
  * Compile with:
@@ -81,12 +81,12 @@ int main(int argc, char *argv[])
 	timelib_tzinfo *tzi = NULL;
 	timelib_tzinfo *tzi_utc = NULL;
 	timelib_error_container *errors;
-	
+
 	if (argc < 2) {
 		printf("Usage:\n\tdate-from-string string [tzExpression]\n\n");
 		exit(-1);
 	}
-	
+
 	time_string = argv[1];
 
 	if (argc >= 3) {
