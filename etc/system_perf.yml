@@ -77,6 +77,7 @@ functions:
         dsi: ${dsi_rev}
         enterprise: ${enterprise_rev}
         linkbench: ${linkbench_rev}
+        linkbench2: ${linkbench2_rev}
         genny: ${genny_rev}
         workloads: ${workloads_rev}
         wtdevelop: ${wtdevelop_rev}
@@ -883,6 +884,12 @@ modules:
   prefix: linkbench
   branch: master
 
+- name: linkbench2
+  repo: git@github.com:mdcallag/linkbench.git
+  prefix: linkbench2
+  branch: master
+  ref: 63207190657737b32eb0e81c5b81ad1b8bad0e5a
+
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
@@ -978,6 +985,7 @@ buildvariants:
     - genny
     - workloads
     - linkbench
+    - linkbench2
     - signal-processing
   expansions:
     setup: single-replica
