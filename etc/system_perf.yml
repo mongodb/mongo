@@ -937,7 +937,7 @@ modules:
 
 - name: linkbench2
   repo: git@github.com:mdcallag/linkbench.git
-  prefix: linkbench
+  prefix: linkbench2
   branch: master
   ref: 63207190657737b32eb0e81c5b81ad1b8bad0e5a
 
@@ -1034,6 +1034,7 @@ buildvariants:
     - genny
     - workloads
     - linkbench
+    - linkbench2
     - signal-processing
   expansions:
     setup: single-replica
