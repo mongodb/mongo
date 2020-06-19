@@ -305,15 +305,19 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 !disableResumableRangeDeleter.load());
 
             // Make sure the collection metadata is up-to-date.
-            {
-                boost::optional<AutoGetCollection> autoColl;
-                autoColl.emplace(opCtx, deletionTask.getNss(), MODE_IS);
-                auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-                if (!deletionTaskUuidMatchesFilteringMetadataUuid(opCtx, csr, deletionTask)) {
+            while (true) {
+                {
+                    AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
+                    auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
+
+                    if (deletionTaskUuidMatchesFilteringMetadataUuid(opCtx, csr, deletionTask)) {
+                        break;
+                    }
+
                     // If the collection's filtering metadata is not known, is unsharded, or its
                     // UUID does not match the UUID of the deletion task, force a filtering metadata
-                    // refresh once, because this node may have just stepped up and therefore may
-                    // have a stale cache.
+                    // refresh, because this node may have just stepped up and therefore may have a
+                    // stale cache.
                     auto optCollDescr = csr->getCurrentMetadataIfKnown();
                     LOGV2(22024,
                           "Filtering metadata for this range deletion task may be outdated; "
@@ -327,9 +331,19 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                             : "Collection's sharding state is not known"),
                           "namespace"_attr = deletionTask.getNss(),
                           "migrationId"_attr = deletionTask.getId());
+                }
 
-                    autoColl.reset();
-                    refreshFilteringMetadataUntilSuccess(opCtx, deletionTask.getNss());
+                try {
+                    onShardVersionMismatch(opCtx, deletionTask.getNss(), boost::none);
+                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // If the database has been dropped, don't retry to get the shard version
+                    break;
+                }
+
+                AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
+                auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
+                if (csr->getCurrentMetadataIfKnown()) {
+                    break;
                 }
             }
 
@@ -772,28 +786,6 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     }
 }
 
-void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
-    retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
-        opCtx, "refreshFilteringMetadataUntilSuccess", [&nss](OperationContext* newOpCtx) {
-            hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(newOpCtx);
-
-            try {
-                forceShardFilteringMetadataRefresh(newOpCtx, nss, true);
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                // A filtering metadata refresh can throw NamespaceNotFound if the database was
-                // dropped from the cluster.
-            }
-
-            if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
-                    .shouldFail()) {
-                hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
-                    .pauseWhileSet();
-                uasserted(ErrorCodes::InternalError,
-                          "simulate an error response for forceShardFilteringMetadataRefresh");
-            }
-        });
-}
-
 void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
     LOGV2_DEBUG(47985010, 2, "Starting migration coordinator stepup recovery");
 
@@ -912,29 +904,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
                 auto* const csr = CollectionShardingRuntime::get(opCtx, doc.getNss());
 
                 auto optMetadata = csr->getCurrentMetadataIfKnown();
-
-                // We already have a shard version, make sure we're setting the latest
-                if (optMetadata) {
-                    const auto& metadata = *optMetadata;
-                    if (metadata.isSharded() &&
-                        metadata.getCollVersion().epoch() ==
-                            currentMetadata.getCollVersion().epoch() &&
-                        metadata.getCollVersion() >= currentMetadata.getCollVersion()) {
-                        LOGV2_DEBUG(4836501,
-                                    1,
-                                    "Skipping refresh of metadata for {namespace} "
-                                    "{latestCollectionVersion} with "
-                                    "an older {refreshedCollectionVersion}",
-                                    "Skipping metadata refresh because collection already has at "
-                                    "least as recent "
-                                    "metadata",
-                                    "namespace"_attr = doc.getNss(),
-                                    "latestCollectionVersion"_attr = metadata.getCollVersion(),
-                                    "refreshedCollectionVersion"_attr =
-                                        currentMetadata.getCollVersion());
-                        return;
-                    }
-                }
+                invariant(!optMetadata);
 
                 csr->setFilteringMetadata(opCtx, std::move(currentMetadata));
             };
