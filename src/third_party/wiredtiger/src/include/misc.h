@@ -114,12 +114,13 @@
  *     Common case allocate-and-grow function. Starts by allocating the requested number of items
  *     (at least 10), then doubles each time the list needs to grow.
  */
-#define __wt_realloc_def(session, sizep, number, addr)                                      \
-    (((number) * sizeof(**(addr)) <= *(sizep)) ?                                            \
-        0 :                                                                                 \
-        __wt_realloc(session, sizep, (F_ISSET(S2C(session), WT_CONN_DEBUG_REALLOC_EXACT)) ? \
-            (number) * sizeof(**(addr)) :                                                   \
-            WT_MAX(*(sizep)*2, WT_MAX(10, (number)) * sizeof(**(addr))),                    \
+#define __wt_realloc_def(session, sizep, number, addr)                          \
+    (((number) * sizeof(**(addr)) <= *(sizep)) ?                                \
+        0 :                                                                     \
+        __wt_realloc(session, sizep,                                            \
+          (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_REALLOC_EXACT)) ? \
+            (number) * sizeof(**(addr)) :                                       \
+            WT_MAX(*(sizep)*2, WT_MAX(10, (number)) * sizeof(**(addr))),        \
           addr))
 
 /*

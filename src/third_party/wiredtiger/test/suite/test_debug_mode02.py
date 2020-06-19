@@ -26,11 +26,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from suite_subprocess import suite_subprocess
 import fnmatch, os, time, wiredtiger, wttest
 
 # test_debug_mode02.py
 #    Test the debug mode settings. Test checkpoint_retention use.
-class test_debug_mode02(wttest.WiredTigerTestCase):
+class test_debug_mode02(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'file:test_debug'
 
     entries = 100
@@ -91,18 +92,41 @@ class test_debug_mode02(wttest.WiredTigerTestCase):
         self.assertTrue(os.path.exists(self.log1))
         self.advance_log_checkpoint()
         self.check_archive(self.log1)
+        self.conn.reconfigure("debug_mode=(table_logging=true)")
+        self.conn.reconfigure("verbose=(temporary)")
 
     # Test that both zero and one archive as usual. And test reconfigure.
-    def test_checkpoint_retain_off(self):
+    def test_checkpoint_retain_reconfig(self):
+        # We can turn checkpoint retention off.
+        # We can turn checkpoint retention on to some value.
+        # We can reconfigure checkpoint retention to the same value.
+        # We cannot reconfigure checkpoint retention to another value.
+        # We can turn checkpoint retention off again.
+        # We can reconfigure checkpoint retention to the original value.
         self.conn.reconfigure("debug_mode=(checkpoint_retention=0)")
         self.session.create(self.uri, 'key_format=i,value_format=i')
-
         self.advance_log_checkpoint()
         self.check_archive(self.log1)
 
-        self.conn.reconfigure("debug_mode=(checkpoint_retention=1)")
+        cfg = 'debug_mode=(checkpoint_retention=%d)' % self.retain
+        self.conn.reconfigure(cfg)
+        self.advance_log_checkpoint()
+        self.assertTrue(os.path.exists(self.log2))
+
+        self.conn.reconfigure(cfg)
+        self.advance_log_checkpoint()
+        self.assertTrue(os.path.exists(self.log2))
+
+        msg = '/Cannot change value/'
+        cfg1 = 'debug_mode=(checkpoint_retention=%d)' % (self.retain - 1)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.reconfigure(cfg1), msg)
+
+        self.conn.reconfigure("debug_mode=(checkpoint_retention=0)")
         self.advance_log_checkpoint()
         self.check_archive(self.log2)
+
+        self.conn.reconfigure(cfg)
 
 if __name__ == '__main__':
     wttest.run()

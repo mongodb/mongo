@@ -40,7 +40,8 @@ def timestamp_str(t):
 # test to ensure salvage, verify & simulating crash are working for prepared transactions.
 class test_prepare_hs03(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=50MB,statistics=(fast)'
+    conn_config = ('cache_size=50MB,statistics=(fast),'
+                   'eviction_dirty_trigger=50,eviction_updates_trigger=50')
 
     # Create a small table.
     uri = "table:test_prepare_hs03"

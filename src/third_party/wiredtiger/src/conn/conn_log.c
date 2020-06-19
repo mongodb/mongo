@@ -374,7 +374,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_LOG *log;
-    uint32_t min_lognum;
+    uint32_t dbg_val, min_lognum;
     u_int logcount;
     char **logfiles;
 
@@ -392,9 +392,11 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
                                     WT_MIN(log->ckpt_lsn.l.file, backup_file);
 
     /* Adjust the number of log files to retain based on debugging options. */
-    if (conn->debug_ckpt_cnt != 0)
-        min_lognum = WT_MIN(conn->debug_ckpt[conn->debug_ckpt_cnt - 1].l.file, min_lognum);
-    if (conn->debug_log_cnt != 0) {
+    WT_ORDERED_READ(dbg_val, conn->debug_ckpt_cnt);
+    if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_CKPT_RETAIN) && dbg_val != 0)
+        min_lognum = WT_MIN(conn->debug_ckpt[dbg_val - 1].l.file, min_lognum);
+    WT_ORDERED_READ(dbg_val, conn->debug_log_cnt);
+    if (dbg_val != 0) {
         /*
          * If we're performing checkpoints, apply the retain value as a minimum, increasing the
          * number the log files we keep. If not performing checkpoints, it's an absolute number of
@@ -404,12 +406,12 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
          *
          * Check for N+1, that is, we retain N full log files, and one partial.
          */
-        if ((conn->debug_log_cnt + 1) >= log->fileid)
+        if ((dbg_val + 1) >= log->fileid)
             return (0);
         if (log->ckpt_lsn.l.file == 1 && log->ckpt_lsn.l.offset == 0)
-            min_lognum = log->fileid - (conn->debug_log_cnt + 1);
+            min_lognum = log->fileid - (dbg_val + 1);
         else
-            min_lognum = WT_MIN(log->fileid - (conn->debug_log_cnt + 1), min_lognum);
+            min_lognum = WT_MIN(log->fileid - (dbg_val + 1), min_lognum);
     }
     __wt_verbose(session, WT_VERB_LOG, "log_archive: archive to log number %" PRIu32, min_lognum);
 

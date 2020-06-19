@@ -379,7 +379,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
         WT_ERR(__wt_cursor_kv_not_set(cursor, true));
 
     /* Force an allocated copy when using cursor copy debug. */
-    if (F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY))
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY))
         WT_ERR(__wt_buf_grow(session, &cursor->key, cursor->key.size));
 
     if (WT_CURSOR_RECNO(cursor)) {
@@ -484,7 +484,7 @@ err:
      * memory in the meantime, free it.
      */
     if (tmp.mem != NULL) {
-        if (buf->mem == NULL && !F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY)) {
+        if (buf->mem == NULL && !FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY)) {
             buf->mem = tmp.mem;
             buf->memsize = tmp.memsize;
             F_SET(cursor, WT_CURSTD_DEBUG_COPY_KEY);
@@ -528,7 +528,7 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
         WT_ERR(__wt_cursor_kv_not_set(cursor, false));
 
     /* Force an allocated copy when using cursor copy debug. */
-    if (F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY))
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY))
         WT_ERR(__wt_buf_grow(session, &cursor->value, cursor->value.size));
 
     /* Fast path some common cases. */
@@ -624,7 +624,7 @@ err:
      * memory in the meantime, free it.
      */
     if (tmp.mem != NULL) {
-        if (buf->mem == NULL && !F_ISSET(S2C(session), WT_CONN_DEBUG_CURSOR_COPY)) {
+        if (buf->mem == NULL && !FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY)) {
             buf->mem = tmp.mem;
             buf->memsize = tmp.memsize;
             F_SET(cursor, WT_CURSTD_DEBUG_COPY_VALUE);
