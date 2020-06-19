@@ -42,7 +42,7 @@ void
 __wt_cond_auto_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool progress,
   bool (*run_func)(WT_SESSION_IMPL *), bool *signalled)
 {
-    uint64_t delta;
+    uint64_t delta, saved_prev_wait;
 
     /*
      * Catch cases where this function is called with a condition variable that wasn't initialized
@@ -55,7 +55,15 @@ __wt_cond_auto_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool prog
         cond->prev_wait = cond->min_wait;
     else {
         delta = WT_MAX(1, (cond->max_wait - cond->min_wait) / 10);
-        cond->prev_wait = WT_MIN(cond->max_wait, cond->prev_wait + delta);
+        /*
+         * Try to update the previous wait value for the condition variable. There can be multiple
+         * threads doing this concurrently, so use atomic operations to make sure the value remains
+         * within the bounds of the maximum configured. Don't retry if our update didn't make it in
+         * - it's not necessary for the previous wait time to be updated every time.
+         */
+        WT_ORDERED_READ(saved_prev_wait, cond->prev_wait);
+        __wt_atomic_cas64(
+          &cond->prev_wait, saved_prev_wait, WT_MIN(cond->max_wait, saved_prev_wait + delta));
     }
 
     __wt_cond_wait_signal(session, cond, cond->prev_wait, run_func, signalled);

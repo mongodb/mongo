@@ -763,7 +763,8 @@ extern int __wt_hs_cursor_close(WT_SESSION_IMPL *session, uint32_t session_flags
 extern int __wt_hs_cursor_open(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_cursor_position(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t btree_id,
-  const WT_ITEM *key, wt_timestamp_t timestamp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  const WT_ITEM *key, wt_timestamp_t timestamp, WT_ITEM *user_srch_key)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_delete_key_from_ts(WT_SESSION_IMPL *session, uint32_t btree_id,
   const WT_ITEM *key, wt_timestamp_t ts) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_get_btree(WT_SESSION_IMPL *session, WT_BTREE **hs_btreep)

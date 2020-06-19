@@ -45,9 +45,12 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
     table_nots_nolog = 'table:ts04_nots_nologged'
 
     conncfg = [
-        ('nolog', dict(conn_config='', using_log=False)),
-        ('V1', dict(conn_config=',log=(enabled),compatibility=(release="2.9")', using_log=True)),
-        ('V2', dict(conn_config=',log=(enabled)', using_log=True)),
+        ('nolog', dict(conn_config=',eviction_dirty_trigger=50,eviction_updates_trigger=50',
+         using_log=False)),
+        ('V1', dict(conn_config=',eviction_dirty_trigger=50,eviction_updates_trigger=50,' \
+         'log=(enabled),compatibility=(release="2.9")', using_log=True)),
+        ('V2', dict(conn_config=',eviction_dirty_trigger=50,eviction_updates_trigger=50,' \
+         'log=(enabled)', using_log=True)),
     ]
     session_config = 'isolation=snapshot'
 

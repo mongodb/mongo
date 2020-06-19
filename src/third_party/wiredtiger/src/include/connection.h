@@ -208,10 +208,6 @@ struct __wt_connection_impl {
     WT_SPINLOCK optrack_map_spinlock; /* Translation file spinlock. */
     uintmax_t optrack_pid;            /* Cache the process ID. */
 
-    WT_LSN *debug_ckpt;      /* Debug mode checkpoint LSNs. */
-    uint32_t debug_ckpt_cnt; /* Checkpoint log file retention number */
-    uint32_t debug_log_cnt;  /* Log file retention count */
-
     void **foc;      /* Free-on-close array */
     size_t foc_cnt;  /* Array entries */
     size_t foc_size; /* Array size */
@@ -448,6 +444,18 @@ struct __wt_connection_impl {
     bool mmap_all; /* use mmap for all I/O on data files */
     int page_size; /* OS page size for mmap alignment */
 
+    WT_LSN *debug_ckpt;      /* Debug mode checkpoint LSNs. */
+    size_t debug_ckpt_alloc; /* Checkpoint retention allocated. */
+    uint32_t debug_ckpt_cnt; /* Checkpoint retention number. */
+    uint32_t debug_log_cnt;  /* Log file retention count */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_CONN_DEBUG_CKPT_RETAIN 0x1u
+#define WT_CONN_DEBUG_CURSOR_COPY 0x2u
+#define WT_CONN_DEBUG_REALLOC_EXACT 0000u
+#define WT_CONN_DEBUG_SLOW_CKPT 0x8u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint64_t debug_flags;
+
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_VERB_API 0x0000000001u
 #define WT_VERB_BACKUP 0x0000000002u
@@ -527,30 +535,27 @@ struct __wt_connection_impl {
 #define WT_CONN_CLOSING_TIMESTAMP 0x00000020u
 #define WT_CONN_COMPATIBILITY 0x00000040u
 #define WT_CONN_DATA_CORRUPTION 0x00000080u
-#define WT_CONN_DEBUG_CURSOR_COPY 0x00000100u
-#define WT_CONN_DEBUG_REALLOC_EXACT 0x00000200u
-#define WT_CONN_DEBUG_SLOW_CKPT 0x00000400u
-#define WT_CONN_EVICTION_RUN 0x00000800u
-#define WT_CONN_FILE_CLOSE_SYNC 0x00001000u
-#define WT_CONN_HS_OPEN 0x00002000u
-#define WT_CONN_INCR_BACKUP 0x00004000u
-#define WT_CONN_IN_MEMORY 0x00008000u
-#define WT_CONN_LEAK_MEMORY 0x00010000u
-#define WT_CONN_LSM_MERGE 0x00020000u
-#define WT_CONN_OPTRACK 0x00040000u
-#define WT_CONN_PANIC 0x00080000u
-#define WT_CONN_READONLY 0x00100000u
-#define WT_CONN_RECONFIGURING 0x00200000u
-#define WT_CONN_RECOVERING 0x00400000u
-#define WT_CONN_SALVAGE 0x00800000u
-#define WT_CONN_SERVER_ASYNC 0x01000000u
-#define WT_CONN_SERVER_CAPACITY 0x02000000u
-#define WT_CONN_SERVER_CHECKPOINT 0x04000000u
-#define WT_CONN_SERVER_LOG 0x08000000u
-#define WT_CONN_SERVER_LSM 0x10000000u
-#define WT_CONN_SERVER_STATISTICS 0x20000000u
-#define WT_CONN_SERVER_SWEEP 0x40000000u
-#define WT_CONN_WAS_BACKUP 0x80000000u
+#define WT_CONN_EVICTION_RUN 0x00000100u
+#define WT_CONN_FILE_CLOSE_SYNC 0x00000200u
+#define WT_CONN_HS_OPEN 0x00000400u
+#define WT_CONN_INCR_BACKUP 0x00000800u
+#define WT_CONN_IN_MEMORY 0x00001000u
+#define WT_CONN_LEAK_MEMORY 0x00002000u
+#define WT_CONN_LSM_MERGE 0x00004000u
+#define WT_CONN_OPTRACK 0x00008000u
+#define WT_CONN_PANIC 0x00010000u
+#define WT_CONN_READONLY 0x00020000u
+#define WT_CONN_RECONFIGURING 0x00040000u
+#define WT_CONN_RECOVERING 0x00080000u
+#define WT_CONN_SALVAGE 0x00100000u
+#define WT_CONN_SERVER_ASYNC 0x00200000u
+#define WT_CONN_SERVER_CAPACITY 0x00400000u
+#define WT_CONN_SERVER_CHECKPOINT 0x00800000u
+#define WT_CONN_SERVER_LOG 0x01000000u
+#define WT_CONN_SERVER_LSM 0x02000000u
+#define WT_CONN_SERVER_STATISTICS 0x04000000u
+#define WT_CONN_SERVER_SWEEP 0x08000000u
+#define WT_CONN_WAS_BACKUP 0x10000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };

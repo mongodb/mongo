@@ -711,6 +711,7 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
 
     /* If the history store record has a valid stop time point, append it. */
     if (hs_stop_durable_ts != WT_TS_MAX) {
+        WT_ASSERT(session, hs_cbt->upd_value->tw.stop_ts != WT_TS_MAX);
         WT_ERR(__wt_upd_alloc(session, NULL, WT_UPDATE_TOMBSTONE, &tombstone, &size));
         tombstone->durable_ts = hs_cbt->upd_value->tw.durable_stop_ts;
         tombstone->start_ts = hs_cbt->upd_value->tw.stop_ts;
@@ -945,8 +946,8 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
          * Scan the history store for the given btree and key with maximum start timestamp to let
          * the search point to the last version of the key.
          */
-        WT_ERR_NOTFOUND_OK(
-          __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, &op->u.op_row.key, WT_TS_MAX),
+        WT_ERR_NOTFOUND_OK(__wt_hs_cursor_position(
+                             session, hs_cursor, hs_btree_id, &op->u.op_row.key, WT_TS_MAX, NULL),
           true);
 
         if (ret == 0)

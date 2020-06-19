@@ -169,6 +169,7 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
     hs_durable_ts = hs_start_ts = hs_stop_durable_ts = WT_TS_NONE;
     hs_btree_id = S2BT(session)->id;
     session_flags = 0;
+    WT_CLEAR(full_value);
     is_owner = valid_update_found = false;
 #ifdef HAVE_DIAGNOSTIC
     first_record = true;
@@ -182,7 +183,6 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
     WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
 
     /* Get the full update value from the data store. */
-    WT_CLEAR(full_value);
     unpack = &_unpack;
     __wt_row_leaf_value_cell(session, page, rip, NULL, unpack);
     WT_ERR(__wt_page_cell_data_ref(session, page, unpack, &full_value));
@@ -201,7 +201,7 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
      * into data store and removed from history store. If none of the history store records satisfy
      * the given timestamp, the key is removed from data store.
      */
-    ret = __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, key, WT_TS_MAX);
+    ret = __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, key, WT_TS_MAX, NULL);
     for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
         WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
 
@@ -365,9 +365,9 @@ err:
         __wt_free_update_list(session, &upd);
         __wt_free_update_list(session, &hs_upd);
     }
-    __wt_scr_free(session, &key);
     __wt_scr_free(session, &hs_key);
     __wt_scr_free(session, &hs_value);
+    __wt_scr_free(session, &key);
     __wt_buf_free(session, &full_value);
     WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
     return (ret);
@@ -389,7 +389,9 @@ __rollback_abort_row_ondisk_kv(
     bool prepared;
 
     vpack = &_vpack;
+    WT_CLEAR(buf);
     upd = NULL;
+
     __wt_row_leaf_value_cell(session, page, rip, NULL, vpack);
     prepared = vpack->tw.prepare;
     if (WT_IS_HS(S2BT(session))) {
@@ -429,18 +431,15 @@ __rollback_abort_row_ondisk_kv(
         /*
          * Clear the remove operation from the key by inserting the original on-disk value as a
          * standard update.
-         */
-        WT_CLEAR(buf);
-
-        /*
-         * If a value is simple(no compression), and is globally visible at the time of reading a
-         * page into cache, we encode its location into the WT_ROW.
+         *
+         * Take the value from the original page cell. If a value is simple(no compression), and is
+         * globally visible at the time of reading a page into cache, we encode its location into
+         * the WT_ROW. Otherwise, read it from the page.
          */
         if (!__wt_row_leaf_value(page, rip, &buf))
-            /* Take the value from the original page cell. */
             WT_RET(__wt_page_cell_data_ref(session, page, vpack, &buf));
 
-        WT_RET(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, NULL));
+        WT_ERR(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, NULL));
         upd->txnid = vpack->tw.start_txn;
         upd->durable_ts = vpack->tw.durable_start_ts;
         upd->start_ts = vpack->tw.start_ts;
@@ -459,9 +458,10 @@ __rollback_abort_row_ondisk_kv(
         return (0);
 
     WT_ERR(__rollback_row_add_update(session, page, rip, upd));
-    return (0);
+    upd = NULL;
 
 err:
+    __wt_buf_free(session, &buf);
     __wt_free(session, upd);
     return (ret);
 }

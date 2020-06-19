@@ -1777,21 +1777,32 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     txn_global = &conn->txn_global;
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.checkpoint_retention", &cval));
-    conn->debug_ckpt_cnt = (uint32_t)cval.val;
-    if (cval.val == 0) {
-        if (conn->debug_ckpt != NULL)
-            __wt_free(session, conn->debug_ckpt);
-        conn->debug_ckpt = NULL;
-    } else if (conn->debug_ckpt != NULL)
-        WT_RET(__wt_realloc(session, NULL, conn->debug_ckpt_cnt, &conn->debug_ckpt));
-    else
-        WT_RET(__wt_calloc_def(session, conn->debug_ckpt_cnt, &conn->debug_ckpt));
+
+    /*
+     * Checkpoint retention has some rules to avoid needing a lock to coordinate with the archive
+     * thread and avoid memory issues. You can turn it on to some value. You can turn it off. You
+     * can reconfigure to the same value again. You cannot change the non-zero value. Once it was on
+     * in the past and then turned off, you cannot turn it back on again.
+     */
+    if (cval.val != 0) {
+        if (conn->debug_ckpt_cnt != 0 && cval.val != conn->debug_ckpt_cnt)
+            WT_RET_MSG(session, EINVAL, "Cannot change value for checkpoint retention");
+        WT_RET(
+          __wt_realloc_def(session, &conn->debug_ckpt_alloc, (size_t)cval.val, &conn->debug_ckpt));
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CKPT_RETAIN);
+    } else
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CKPT_RETAIN);
+    /*
+     * We need to make sure all writes to other fields are visible before setting the count because
+     * the archive thread may walk the array using this value.
+     */
+    WT_PUBLISH(conn->debug_ckpt_cnt, (uint32_t)cval.val);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.cursor_copy", &cval));
     if (cval.val)
-        F_SET(conn, WT_CONN_DEBUG_CURSOR_COPY);
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CURSOR_COPY);
     else
-        F_CLR(conn, WT_CONN_DEBUG_CURSOR_COPY);
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CURSOR_COPY);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.eviction", &cval));
     if (cval.val)
@@ -1804,18 +1815,18 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.realloc_exact", &cval));
     if (cval.val)
-        F_SET(conn, WT_CONN_DEBUG_REALLOC_EXACT);
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_REALLOC_EXACT);
     else
-        F_CLR(conn, WT_CONN_DEBUG_REALLOC_EXACT);
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_REALLOC_EXACT);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.rollback_error", &cval));
     txn_global->debug_rollback = (uint64_t)cval.val;
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.slow_checkpoint", &cval));
     if (cval.val)
-        F_SET(conn, WT_CONN_DEBUG_SLOW_CKPT);
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT);
     else
-        F_CLR(conn, WT_CONN_DEBUG_SLOW_CKPT);
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.table_logging", &cval));
     if (cval.val)
