@@ -345,41 +345,40 @@ TEST(DiffSerializationTest, SubArrayDiffAbandon) {
 }
 
 TEST(DiffSerializationTest, ValidateComputeApproxSize) {
+    const auto storage = BSON("num" << 4 << "str"
+                                    << "val"
+                                    << "emptyStr"
+                                    << ""
+                                    << "null" << BSONNULL << "array"
+                                    << BSON_ARRAY("val1"
+                                                  << "val2" << 3)
+                                    << "subObj"
+                                    << BSON(""
+                                            << "update"));
+
     DocumentDiffBuilder builder;
     builder.addDelete("deleteField");
-    builder.addInsert("insert", BSON("" << 4).firstElement());
-    builder.addUpdate("update1",
-                      BSON(""
-                           << "update")
-                          .firstElement());
+    builder.addInsert("insert", storage["num"]);
+    builder.addUpdate("update1", storage["subObj"]);
     builder.addDelete("");
     {
         // Ensure size of the sub-array diff is included.
         auto subDiff = builder.startSubArrDiff("subArray");
         subDiff.setResize(5);
-        subDiff.addUpdate(2, BSON("" << 4).firstElement());
-        subDiff.addUpdate(2,
-                          BSON(""
-                               << "value")
-                              .firstElement());
+        subDiff.addUpdate(2, storage["num"]);
+        subDiff.addUpdate(2, storage["str"]);
 
         auto subSubDiff = subDiff.startSubObjDiff(22);
-        subSubDiff.addInsert("insert2",
-                             BSON(""
-                                  << "")
-                                 .firstElement());
-        subSubDiff.addUpdate("update3", BSON("" << BSONNULL).firstElement());
+        subSubDiff.addInsert("insert2", storage["emptyStr"]);
+        subSubDiff.addUpdate("update3", storage["null"]);
     }
     {
         // Ensure size of the sub-object diff is included.
         auto subDiff = builder.startSubObjDiff("subObj");
-        subDiff.addUpdate("setArray",
-                          BSON("" << BSON_ARRAY("val1"
-                                                << "val2" << 3))
-                              .firstElement());
+        subDiff.addUpdate("setArray", storage["array"]);
     }
     // Update with a sub-object.
-    builder.addUpdate("update4", BSON("" << BSON("nestedObj" << 4LL)).firstElement());
+    builder.addUpdate("update4", storage["subObj"]);
 
     auto computedSize = builder.computeApproxSize();
     auto out = builder.release();
