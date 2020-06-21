@@ -42,6 +42,7 @@
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/future.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -1389,9 +1390,9 @@ TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
     BSONObjBuilder result;
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
-    stdx::thread reconfigThread;
-    reconfigThread = stdx::thread(
-        [&] { status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result); });
+    auto reconfigResult = stdx::async(stdx::launch::async, [&] {
+        status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
+    });
 
     getNet()->enterNetwork();
     // Wait for the next heartbeat of quorum check and blackhole it.
@@ -1407,10 +1408,13 @@ TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
     ASSERT(updateTermEvh.isValid());
     getReplExec()->waitForEvent(updateTermEvh);
 
-    // Respond to quorum check to resume the reconfig.
-    respondToAllHeartbeats();
+    // Respond to quorum check to resume the reconfig. We keep responding until the reconfig thread
+    // finishes.
+    while (stdx::future_status::ready !=
+           reconfigResult.wait_for(Milliseconds::zero().toSystemDuration())) {
+        respondToAllHeartbeats();
+    }
 
-    reconfigThread.join();
     ASSERT_EQ(status.code(), ErrorCodes::NotMaster);
     ASSERT_EQ(status.reason(), "Stepped down when persisting new config");
 }
