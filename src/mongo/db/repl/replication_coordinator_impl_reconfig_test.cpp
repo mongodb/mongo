@@ -1449,8 +1449,11 @@ TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
     ASSERT(updateTermEvh.isValid());
     getReplExec()->waitForEvent(updateTermEvh);
 
-    // Respond to quorum check to resume the reconfig.
-    respondToAllHeartbeats();
+    // Respond to quorum check to resume the reconfig. We keep responding until the reconfig thread
+    // finishes.
+    while (status == ErrorCodes::InternalError) {
+        respondToAllHeartbeats();
+    }
 
     reconfigThread.join();
     ASSERT_EQ(status.code(), ErrorCodes::NotMaster);
