@@ -331,6 +331,12 @@ Status MigrationSourceManager::enterCriticalSection() {
         return status;
     }
 
+    LOGV2_DEBUG_OPTIONS(4817402,
+                        2,
+                        {logv2::LogComponent::kShardMigrationPerf},
+                        "Starting critical section",
+                        "migrationId"_attr = _coordinator->getMigrationId());
+
     _critSec.emplace(_opCtx, _args.getNss());
 
     _state = kCriticalSection;
@@ -457,8 +463,26 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     }
 
     try {
+        LOGV2_DEBUG_OPTIONS(4817404,
+                            2,
+                            {logv2::LogComponent::kShardMigrationPerf},
+                            "Starting post-migration commit refresh on the shard",
+                            "migrationId"_attr = _coordinator->getMigrationId());
+
         forceShardFilteringMetadataRefresh(_opCtx, getNss(), true);
+
+        LOGV2_DEBUG_OPTIONS(4817405,
+                            2,
+                            {logv2::LogComponent::kShardMigrationPerf},
+                            "Finished post-migration commit refresh on the shard",
+                            "migrationId"_attr = _coordinator->getMigrationId());
     } catch (const DBException& ex) {
+        LOGV2_DEBUG_OPTIONS(4817410,
+                            2,
+                            {logv2::LogComponent::kShardMigrationPerf},
+                            "Finished post-migration commit refresh on the shard with error",
+                            "migrationId"_attr = _coordinator->getMigrationId(),
+                            "error"_attr = redact(ex));
         {
             UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
             AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
@@ -495,6 +519,12 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     // Exit the critical section and ensure that all the necessary state is fully persisted before
     // scheduling orphan cleanup.
     _cleanup(true);
+
+    LOGV2_DEBUG_OPTIONS(4817403,
+                        2,
+                        {logv2::LogComponent::kShardMigrationPerf},
+                        "Finished critical section",
+                        "migrationId"_attr = _coordinator->getMigrationId());
 
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,

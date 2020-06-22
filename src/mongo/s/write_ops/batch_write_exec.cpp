@@ -425,12 +425,30 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
         bool targeterChanged = false;
         try {
+            LOGV2_DEBUG_OPTIONS(4817406,
+                                2,
+                                {logv2::LogComponent::kShardMigrationPerf},
+                                "Starting post-migration commit refresh on the router");
             targeter.refreshIfNeeded(opCtx, &targeterChanged);
+            LOGV2_DEBUG_OPTIONS(4817407,
+                                2,
+                                {logv2::LogComponent::kShardMigrationPerf},
+                                "Finished post-migration commit refresh on the router");
         } catch (const ExceptionFor<ErrorCodes::StaleEpoch>& ex) {
+            LOGV2_DEBUG_OPTIONS(4817408,
+                                2,
+                                {logv2::LogComponent::kShardMigrationPerf},
+                                "Finished post-migration commit refresh on the router with error",
+                                "error"_attr = redact(ex));
             batchOp.abortBatch(errorFromStatus(
                 ex.toStatus("collection was dropped in the middle of the operation")));
             break;
         } catch (const DBException& ex) {
+            LOGV2_DEBUG_OPTIONS(4817409,
+                                2,
+                                {logv2::LogComponent::kShardMigrationPerf},
+                                "Finished post-migration commit refresh on the router with error",
+                                "error"_attr = redact(ex));
             // It's okay if we can't refresh, we'll just record errors for the ops if needed
             LOGV2_WARNING(22911,
                           "Could not refresh targeter due to {error}",

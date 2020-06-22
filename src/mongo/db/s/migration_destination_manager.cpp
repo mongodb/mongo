@@ -1079,6 +1079,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         LOGV2(22004,
               "Waiting for replication to catch up before entering critical section",
               "migrationId"_attr = _migrationId.toBSON());
+        LOGV2_DEBUG_OPTIONS(4817411,
+                            2,
+                            {logv2::LogComponent::kShardMigrationPerf},
+                            "Starting majority commit wait on recipient",
+                            "migrationId"_attr = _migrationId.toBSON());
 
         auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
             opCtx, lastOpApplied, _writeConcern);
@@ -1088,6 +1093,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         LOGV2(22005,
               "Chunk data replicated successfully.",
               "migrationId"_attr = _migrationId.toBSON());
+        LOGV2_DEBUG_OPTIONS(4817412,
+                            2,
+                            {logv2::LogComponent::kShardMigrationPerf},
+                            "Finished majority commit wait on recipient",
+                            "migrationId"_attr = _migrationId.toBSON());
     }
 
     {
