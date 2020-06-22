@@ -19,7 +19,8 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
+    nodeOptions: {setParameter: {logComponentVerbosity: tojson({storage: 1})}}
 });
 const nodes = rst.startSet();
 rst.initiate();
