@@ -760,11 +760,10 @@ bool runQuery(OperationContext* opCtx,
     // Caller expects exceptions thrown in certain cases.
     if (PlanExecutor::FAILURE == state) {
         LOGV2_ERROR(20919,
-                    "Plan executor error during find: {PlanExecutor_statestr_state}, stats: "
-                    "{Explain_getWinningPlanStats_exec_get}",
-                    "PlanExecutor_statestr_state"_attr = PlanExecutor::statestr(state),
-                    "Explain_getWinningPlanStats_exec_get"_attr =
-                        redact(Explain::getWinningPlanStats(exec.get())));
+                    "Plan executor error during find: {executorState}, stats: {stats}",
+                    "Plan executor error during find",
+                    "executorState"_attr = PlanExecutor::statestr(state),
+                    "stats"_attr = redact(Explain::getWinningPlanStats(exec.get())));
         uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(doc),
                                    "Executor error during OP_QUERY find");
         MONGO_UNREACHABLE;
