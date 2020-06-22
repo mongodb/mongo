@@ -4,8 +4,6 @@ const configuredMaxConns = 5;
 const configuredReadyAdminThreads = 3;
 let conn = MongoRunner.runMongod({
     config: "jstests/noPassthrough/libs/max_conns_override_config.yaml",
-    // We check a specific field in this executor's serverStatus section
-    serviceExecutor: "synchronous",
 });
 
 // Use up all the maxConns with junk connections, all of these should succeed

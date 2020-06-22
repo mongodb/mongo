@@ -728,9 +728,6 @@ class RunPlugin(PluginInterface):
             help=("Seed for the random number generator. Useful in combination with the"
                   " --shuffle option for producing a consistent test execution order."))
 
-        parser.add_argument("--serviceExecutor", dest="service_executor", metavar="EXECUTOR",
-                            help="The service executor used by jstests")
-
         parser.add_argument("--transportLayer", dest="transport_layer", metavar="TRANSPORT",
                             help="The transport layer used by jstests")
 

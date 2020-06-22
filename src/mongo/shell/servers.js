@@ -1161,12 +1161,6 @@ function appendSetParameterArgs(argArray) {
 
         // New options in 3.5.x
         if (!programMajorMinorVersion || programMajorMinorVersion >= 305) {
-            if (jsTest.options().serviceExecutor) {
-                if (!argArrayContains("--serviceExecutor")) {
-                    argArray.push(...["--serviceExecutor", jsTest.options().serviceExecutor]);
-                }
-            }
-
             if (jsTest.options().transportLayer) {
                 if (!argArrayContains("--transportLayer")) {
                     argArray.push(...["--transportLayer", jsTest.options().transportLayer]);

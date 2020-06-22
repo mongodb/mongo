@@ -35,9 +35,9 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/service_executor_task_names.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -52,36 +52,6 @@ constexpr Milliseconds kWorkerThreadRunTime{1000};
 // Run time + generous scheduling time slice
 const Milliseconds kShutdownTime = kWorkerThreadRunTime + Milliseconds{50};
 }  // namespace
-
-struct TestOptions : public ServiceExecutorAdaptive::Options {
-    int reservedThreads() const final {
-        return 1;
-    }
-
-    Milliseconds workerThreadRunTime() const final {
-        return kWorkerThreadRunTime;
-    }
-
-    int runTimeJitter() const final {
-        return 0;
-    }
-
-    Milliseconds stuckThreadTimeout() const final {
-        return Milliseconds{100};
-    }
-
-    Microseconds maxQueueLatency() const final {
-        return duration_cast<Microseconds>(Milliseconds{5});
-    }
-
-    int idlePctThreshold() const final {
-        return 0;
-    }
-
-    int recursionLimit() const final {
-        return 0;
-    }
-};
 
 /* This implements the portions of the transport::Reactor based on ASIO, but leaves out
  * the methods not needed by ServiceExecutors.
@@ -149,23 +119,6 @@ private:
     asio::io_context _ioContext;
 };
 
-class ServiceExecutorAdaptiveFixture : public unittest::Test {
-protected:
-    void setUp() override {
-        auto scOwned = ServiceContext::make();
-        setGlobalServiceContext(std::move(scOwned));
-
-        auto configOwned = std::make_unique<TestOptions>();
-        executorConfig = configOwned.get();
-        executor = std::make_unique<ServiceExecutorAdaptive>(
-            getGlobalServiceContext(), std::make_shared<ASIOReactor>(), std::move(configOwned));
-    }
-
-    ServiceExecutorAdaptive::Options* executorConfig;
-    std::unique_ptr<ServiceExecutorAdaptive> executor;
-    std::shared_ptr<asio::io_context> asioIOCtx;
-};
-
 class ServiceExecutorSynchronousFixture : public unittest::Test {
 protected:
     void setUp() override {
@@ -195,17 +148,6 @@ void scheduleBasicTask(ServiceExecutor* exec, bool expectSuccess) {
     } else {
         ASSERT_NOT_OK(status);
     }
-}
-
-TEST_F(ServiceExecutorAdaptiveFixture, BasicTaskRuns) {
-    ASSERT_OK(executor->start());
-    auto guard = makeGuard([this] { ASSERT_OK(executor->shutdown(kShutdownTime)); });
-
-    scheduleBasicTask(executor.get(), true);
-}
-
-TEST_F(ServiceExecutorAdaptiveFixture, ScheduleFailsBeforeStartup) {
-    scheduleBasicTask(executor.get(), false);
 }
 
 TEST_F(ServiceExecutorSynchronousFixture, BasicTaskRuns) {

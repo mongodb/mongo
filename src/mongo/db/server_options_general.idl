@@ -105,12 +105,6 @@ configs:
         arg_vartype: String
         default: asio
         hidden: true
-    'net.serviceExecutor':
-        description: 'Sets the service executor implementation'
-        short_name: serviceExecutor
-        arg_vartype: String
-        default: synchronous
-        hidden: true
     'processManagement.pidFilePath':
         description: 'Full path to pidfile (if not set, no pidfile is created)'
         short_name: pidfilepath

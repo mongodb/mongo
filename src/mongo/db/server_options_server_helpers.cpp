@@ -304,17 +304,6 @@ Status storeServerOptions(const moe::Environment& params) {
         }
     }
 
-    if (params.count("net.serviceExecutor")) {
-        auto value = params["net.serviceExecutor"].as<std::string>();
-        const auto valid = {"synchronous"_sd, "adaptive"_sd};
-        if (std::find(valid.begin(), valid.end(), value) == valid.end()) {
-            return {ErrorCodes::BadValue, "Unsupported value for serviceExecutor"};
-        }
-        serverGlobalParams.serviceExecutor = value;
-    } else {
-        serverGlobalParams.serviceExecutor = "synchronous";
-    }
-
     if (params.count("security.transitionToAuth")) {
         serverGlobalParams.transitionToAuth = params["security.transitionToAuth"].as<bool>();
     }

@@ -41,7 +41,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_asio.h"
@@ -133,34 +132,15 @@ std::unique_ptr<TransportLayer> TransportLayerManager::makeAndStartDefaultEgress
 
 std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     const ServerGlobalParams* config, ServiceContext* ctx) {
-    std::unique_ptr<TransportLayer> transportLayer;
     auto sep = ctx->getServiceEntryPoint();
 
     transport::TransportLayerASIO::Options opts(config);
-    if (config->serviceExecutor == "adaptive") {
-        LOGV2_OPTIONS(4870401,
-                      {logv2::LogTag::kStartupWarnings},
-                      "The adaptive service executor implementation is deprecated, please leave "
-                      "--serviceExecutor unspecified");
-        opts.transportMode = transport::Mode::kAsynchronous;
-    } else if (config->serviceExecutor == "synchronous") {
-        opts.transportMode = transport::Mode::kSynchronous;
-    } else {
-        MONGO_UNREACHABLE;
-    }
+    opts.transportMode = transport::Mode::kSynchronous;
 
-    auto transportLayerASIO = std::make_unique<transport::TransportLayerASIO>(opts, sep);
-
-    if (config->serviceExecutor == "adaptive") {
-        auto reactor = transportLayerASIO->getReactor(TransportLayer::kIngress);
-        ctx->setServiceExecutor(std::make_unique<ServiceExecutorAdaptive>(ctx, std::move(reactor)));
-    } else if (config->serviceExecutor == "synchronous") {
-        ctx->setServiceExecutor(std::make_unique<ServiceExecutorSynchronous>(ctx));
-    }
-    transportLayer = std::move(transportLayerASIO);
+    ctx->setServiceExecutor(std::make_unique<ServiceExecutorSynchronous>(ctx));
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
-    retVector.emplace_back(std::move(transportLayer));
+    retVector.emplace_back(std::make_unique<transport::TransportLayerASIO>(opts, sep));
     return std::make_unique<TransportLayerManager>(std::move(retVector));
 }
 

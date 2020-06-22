@@ -972,47 +972,6 @@ mongod \-\-timeZoneInfo timezonedb\-2017b/
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-serviceExecutor <string>
-\fIDefault\fP: synchronous
-.sp
-New in version 3.6.
-
-.sp
-Determines the threading and execution model \fBmongod\fP uses to
-execute client requests. The \fB\-\-serviceExecutor\fP option accepts one
-of the following values:
-.TS
-center;
-|l|l|.
-_
-T{
-Value
-T}	T{
-Description
-T}
-_
-T{
-\fBsynchronous\fP
-T}	T{
-The \fBmongod\fP uses synchronous networking and manages its
-networking thread pool on a per connection basis. Previous
-versions of MongoDB managed threads in this way.
-T}
-_
-T{
-\fBadaptive\fP
-T}	T{
-The \fBmongod\fP uses the new experimental asynchronous
-networking mode with an adaptive thread pool which manages
-threads on a per request basis. This mode should have more
-consistent performance and use less resources when there are
-more inactive connections than database requests.
-T}
-_
-.TE
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-\-outputConfig
 New in version 4.2.
 

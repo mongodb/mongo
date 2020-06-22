@@ -214,7 +214,6 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     shortcut_opts = {
         "enableMajorityReadConcern": config.MAJORITY_READ_CONCERN,
         "nojournal": config.NO_JOURNAL,
-        "serviceExecutor": config.SERVICE_EXECUTOR,
         "storageEngine": config.STORAGE_ENGINE,
         "transportLayer": config.TRANSPORT_LAYER,
         "wiredTigerCollectionConfigString": config.WT_COLL_CONFIG,
@@ -327,7 +326,6 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
         "enableMajorityReadConcern": (config.MAJORITY_READ_CONCERN, True),
         "mixedBinVersions": (config.MIXED_BIN_VERSIONS, ""),
         "noJournal": (config.NO_JOURNAL, False),
-        "serviceExecutor": (config.SERVICE_EXECUTOR, ""),
         "storageEngine": (config.STORAGE_ENGINE, ""),
         "storageEngineCacheSizeGB": (config.STORAGE_ENGINE_CACHE_SIZE, ""),
         "testName": (test_name, ""),

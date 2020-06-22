@@ -85,7 +85,6 @@ env.Library(
 tlEnv.Library(
     target='service_executor',
     source=[
-        'service_executor_adaptive.cpp',
         'service_executor_reserved.cpp',
         'service_executor_synchronous.cpp',
         env.Idlc('service_executor.idl')[0],
@@ -175,8 +174,6 @@ tlEnv.CppUnitTest(
         'message_compressor_registry_test.cpp',
         'transport_layer_asio_test.cpp',
         'service_executor_test.cpp',
-        # Disable this test until SERVER-30475 and associated build failure tickets are resolved.
-        # 'service_executor_adaptive_test.cpp',
         'max_conns_override_test.cpp',
         'service_state_machine_test.cpp',
     ],

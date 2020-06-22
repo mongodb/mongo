@@ -273,7 +273,6 @@ jsTestOptions = function() {
             testingDiagnosticsEnabled: TestData.hasOwnProperty('testingDiagnosticsEnabled')
                 ? TestData.testingDiagnosticsEnabled
                 : true,
-            serviceExecutor: TestData.serviceExecutor,
             setParameters: TestData.setParameters,
             setParametersMongos: TestData.setParametersMongos,
             storageEngine: TestData.storageEngine,
