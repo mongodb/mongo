@@ -44,7 +44,7 @@ namespace {
 std::shared_ptr<MongoProcessInterface> MongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
     if (ShardingState::get(opCtx)->enabled()) {
         return std::make_shared<ShardServerProcessInterface>(
-            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
+            opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
     } else if (auto executor = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx)) {
         return std::make_shared<ReplicaSetNodeProcessInterface>(std::move(executor));
     }

@@ -231,12 +231,22 @@ std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
     const std::set<ErrorCodes::Error>& ignorableErrors = {});
 
 /**
- * Utility for dispatching commands against the primary of a database and attach the appropriate
- * database version.
- *
- * Does not retry on StaleDbVersion.
+ * Utility for dispatching commands against the primary of a database and attaching the appropriate
+ * database version. Does not retry on StaleDbVersion.
  */
 AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
+    OperationContext* opCtx,
+    StringData dbName,
+    const CachedDatabaseInfo& dbInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
+
+/**
+ * Utility for dispatching commands against the primary of a database. Does not attach a database or
+ * shard version to the command object, but instead issues it exactly as provided. Does not retry.
+ */
+AsyncRequestsSender::Response executeRawCommandAgainstDatabasePrimary(
     OperationContext* opCtx,
     StringData dbName,
     const CachedDatabaseInfo& dbInfo,
