@@ -16,6 +16,7 @@ load('jstests/replsets/rslib.js');
 const expectedDocs = 1000;
 const dbName = 'test';
 const collName = 'foo';
+const otherCollName = "bar";
 const DDLDbName = 'DDLTest';
 const DDLCollName = 'DDLFoo';
 let str = 'a';
@@ -81,6 +82,43 @@ const CRUDCommands = {
             assert.eq(4500, res.cursor.firstBatch[0].sum);
         }
     },
+    aggregateWithLookup: {
+        command: {
+            aggregate: collName,
+            pipeline: [
+                {$sort: {j: 1}},
+                {$lookup: {from: otherCollName, localField: "j", foreignField: "i", as: "lookedUp"}}
+            ],
+            cursor: {}
+        },
+        assertFunc: (res) => {
+            assert.commandWorked(res);
+            assert.eq(res.cursor.firstBatch[0].lookedUp.length, 10);
+        }
+    },
+    aggregateWithGraphLookup: {
+        command: {
+            aggregate: collName,
+            pipeline: [
+                {$sort: {j: 1}},
+                {
+                    $graphLookup: {
+                        from: otherCollName,
+                        startWith: "$j",
+                        connectFromField: "j",
+                        connectToField: "i",
+                        as: "graphLookedUp",
+                        maxDepth: 10
+                    }
+                }
+            ],
+            cursor: {}
+        },
+        assertFunc: (res) => {
+            assert.commandWorked(res);
+            assert.eq(res.cursor.firstBatch[0].graphLookedUp.length, 100);
+        }
+    },
     insert: {
         command: {insert: collName, documents: [{a: 1, i: 1, j: 1}]},
         assertFunc: (res) => {
@@ -112,8 +150,6 @@ const CRUDCommands = {
             assert.eq(1, res.n);
         }
     },
-    // TODO SERVER-48128: once the mapreduce with output is fixed, uncomment this command
-    /*
     mapreduceWithWrite: {
         command: {mapreduce: collName, map: map, reduce: reduce, out: 'mrOutput'},
         assertFunc: (res, testDB) => {
@@ -125,7 +161,7 @@ const CRUDCommands = {
             testDB.mrOutput.remove({});
         }
     },
-    aggregateWithWrite: {
+    aggregateWithOut: {
         command: {
             aggregate: collName,
             pipeline:
@@ -139,8 +175,24 @@ const CRUDCommands = {
         post: (testDB) => {
             testDB.aggOutput.remove({});
         }
+    },
+    aggregateWithMerge: {
+        command: {
+            aggregate: collName,
+            pipeline: [{
+                $merge: {
+                    into: otherCollName,
+                    whenMatched: [{$set: {merged: true}}],
+                    whenNotMatched: "fail"
+                }
+            }],
+            cursor: {}
+        },
+        assertFunc: (res, testDB) => {
+            assert.commandWorked(res);
+            assert.eq(testDB[otherCollName].findOne().merged, true);
+        }
     }
-    */
 };
 
 const DDLCommands = {
@@ -245,6 +297,9 @@ for (var i = 0; i < 100; i++) {
     }
     assert.commandWorked(bulk.execute({w: "majority"}));
 }
+// Create collection 'otherCollName' as a duplicate of the original collection. This is just an easy
+// way of providing a second collection for $lookup, $graphLookup and $merge aggregations.
+assert.commandWorked(coll.runCommand("aggregate", {pipeline: [{$out: otherCollName}], cursor: {}}));
 
 jsTest.log("Runing control tests.");
 checkCRUDCommands(rst0.getPrimary().getDB(dbName));

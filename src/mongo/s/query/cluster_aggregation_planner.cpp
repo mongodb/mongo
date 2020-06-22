@@ -146,10 +146,16 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
         mergeCmd.remove("readConcern");
     }
 
+    // Attach the IGNORED chunk version to the command. On the shard, this will skip the actual
+    // version check but will nonetheless mark the operation as versioned, indicating that any
+    // internal operations executed by the pipeline should also be appropriately versioned.
+    auto mergeCmdObj = appendShardVersion(mergeCmd.freeze().toBson(), ChunkVersion::IGNORED());
+
+    // Attach the read and write concerns if needed, and return the final command object.
     return applyReadWriteConcern(mergeCtx->opCtx,
                                  !(txnRouter && mergingShardContributesData), /* appendRC */
                                  !mergeCtx->explain,                          /* appendWC */
-                                 mergeCmd.freeze().toBson());
+                                 mergeCmdObj);
 }
 
 Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,

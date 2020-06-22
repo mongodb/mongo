@@ -67,6 +67,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
@@ -352,11 +353,28 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
     return Status::OK();
 }
 
+// A 4.6 mongoS issues $mergeCursors pipelines with ChunkVersion::IGNORED. On the shard, this will
+// skip the versioning check but also marks the operation as versioned, so the shard knows that any
+// sub-operations executed by the merging pipeline should also be versioned. We manually set the
+// IGNORED version here if we are running a $mergeCursors pipeline and the operation is not already
+// versioned. This can happen in the case where we are running in a cluster with a 4.4 mongoS, which
+// does not set any shard version on a $mergeCursors pipeline.
+void setIgnoredShardVersionForMergeCursors(OperationContext* opCtx,
+                                           const AggregationRequest& request) {
+    auto isMergeCursors = request.isFromMongos() && request.getPipeline().size() > 0 &&
+        request.getPipeline().front().firstElementFieldNameStringData() == "$mergeCursors"_sd;
+    if (isMergeCursors && !OperationShardingState::isOperationVersioned(opCtx)) {
+        OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+            request.getNamespaceString(), ChunkVersion::IGNORED(), boost::none);
+    }
+}
+
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const AggregationRequest& request,
     std::unique_ptr<CollatorInterface> collator,
     boost::optional<UUID> uuid) {
+    setIgnoredShardVersionForMergeCursors(opCtx, request);
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
                               request,

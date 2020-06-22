@@ -32,6 +32,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
+#include "mongo/s/catalog_cache.h"
 
 namespace mongo {
 
@@ -41,6 +42,9 @@ namespace mongo {
 class ShardServerProcessInterface final : public CommonMongodProcessInterface {
 public:
     using CommonMongodProcessInterface::CommonMongodProcessInterface;
+
+    ShardServerProcessInterface(OperationContext* opCtx,
+                                std::shared_ptr<executor::TaskExecutor> executor);
 
     /**
      * Note: Cannot be called while holding a lock. Refreshes from the config servers if the
@@ -126,6 +130,25 @@ public:
     void setExpectedShardVersion(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  boost::optional<ChunkVersion> chunkVersion) final;
+
+private:
+    // If the current operation is versioned, then we attach the DB version to the command object;
+    // otherwise, it is returned unmodified. Used when running internal commands, as the parent
+    // operation may be unversioned if run by a client connecting directly to the shard. If a shard
+    // version is supplied it will be set on the command, otherwise no shard version is attached.
+    // This allows sub-operations to set a version where necessary (e.g. to enforce that only
+    // unsharded collections can be renamed) while omitting it in cases where it is not relevant
+    // (e.g. obtaining a list of indexes for a collection that may be sharded or unsharded).
+    BSONObj _versionCommandIfAppropriate(BSONObj cmdObj,
+                                         const CachedDatabaseInfo& cachedDbInfo,
+                                         boost::optional<ChunkVersion> shardVersion = boost::none);
+
+    // Records whether the initial operation which creates this MongoProcessInterface is versioned.
+    // We want to avoid applying versions to sub-operations in cases where the client has connected
+    // directly to a shard. Since getMores are never versioned, we must retain the versioning state
+    // of the original operation so that we can decide whether we should version sub-operations
+    // across the entire lifetime of the pipeline that owns this MongoProcessInterface.
+    bool _opIsVersioned = false;
 };
 
 }  // namespace mongo

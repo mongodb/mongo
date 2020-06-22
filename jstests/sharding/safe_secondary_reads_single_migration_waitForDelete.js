@@ -452,7 +452,8 @@ for (let command of commands) {
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: recipientShardSecondary.getDB(db),
             filter: Object.extend({
-                "command.shardVersion": {"$exists": true},
+                "command.shardVersion":
+                    {"$exists": true, $ne: [Timestamp(0, 0), ObjectId("00000000ffffffffffffffff")]},
                 "command.$readPreference": {"mode": "secondary"},
                 "command.readConcern": {"level": "local"},
                 "errCode": {"$ne": ErrorCodes.StaleConfig},
