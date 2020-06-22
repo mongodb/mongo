@@ -151,6 +151,10 @@ var workerThread = (function() {
                     assert(!TestData.hasOwnProperty('networkErrorAndTxnOverrideConfig'), TestData);
                     TestData.networkErrorAndTxnOverrideConfig = {retryOnNetworkErrors: true};
                     load('jstests/libs/override_methods/network_error_and_txn_override.js');
+
+                    // After a step-up to primary, background index builds started on a secondary
+                    // may not be complete. Use this override to ensure causality.
+                    load('jstests/libs/override_methods/causally_consistent_index_builds.js');
                 }
 
                 // Operations that run after a "dropDatabase" command has been issued may fail with
