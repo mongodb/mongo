@@ -50,23 +50,16 @@ const auto getIsMigrating = OperationContext::declareDecoration<bool>();
  * restarted.
  */
 void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
-                                        CollectionShardingRuntime* csr,
+                                        CollectionMetadata const& metadata,
                                         const BSONObj& doc) {
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     if (!atClusterTime)
         return;
 
-    // TODO (SERVER-47701): As part of enabling transition from a replica-set to sharded cluster,
-    // without requiring application downtime, these checks need to be revisited. Ideally this code
-    // should not be reached upon direct writes to a shard.
-    auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded())
-        return;
-
-    auto shardKey = metadata->getShardKeyPattern().extractShardKeyFromDoc(doc);
+    auto shardKey = metadata.getShardKeyPattern().extractShardKeyFromDoc(doc);
 
     // We can assume the simple collation because shard keys do not support non-simple collations.
-    ChunkManager chunkManagerAtClusterTime(metadata->getChunkManager()->getRoutingHistory(),
+    ChunkManager chunkManagerAtClusterTime(metadata.getChunkManager()->getRoutingHistory(),
                                            atClusterTime->asTimestamp());
     auto chunk = chunkManagerAtClusterTime.findIntersectingChunkWithSimpleCollation(shardKey);
 
@@ -110,8 +103,12 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
     csr->checkShardVersionOrThrow(opCtx);
 
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded())
+        return;
+
     if (inMultiDocumentTransaction) {
-        assertIntersectingChunkHasNotMoved(opCtx, csr, insertedDoc);
+        assertIntersectingChunkHasNotMoved(opCtx, *metadata, insertedDoc);
         return;
     }
 
@@ -132,8 +129,12 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
     csr->checkShardVersionOrThrow(opCtx);
 
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded())
+        return;
+
     if (inMultiDocumentTransaction) {
-        assertIntersectingChunkHasNotMoved(opCtx, csr, postImageDoc);
+        assertIntersectingChunkHasNotMoved(opCtx, *metadata, postImageDoc);
         return;
     }
 
@@ -153,8 +154,12 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
     csr->checkShardVersionOrThrow(opCtx);
 
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded())
+        return;
+
     if (inMultiDocumentTransaction) {
-        assertIntersectingChunkHasNotMoved(opCtx, csr, documentKey);
+        assertIntersectingChunkHasNotMoved(opCtx, *metadata, documentKey);
         return;
     }
 

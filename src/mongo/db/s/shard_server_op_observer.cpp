@@ -235,9 +235,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end,
                                       bool fromMigrate) {
-    // TODO (SERVER-47701): As part of enabling transition from a replica-set to sharded cluster,
-    // without requiring application downtime, these checks need to be revisited. Ideally this code
-    // should not be reached upon direct writes to a shard.
     const auto metadata = CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
 
     for (auto it = begin; it != end; ++it) {
@@ -392,9 +389,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    // TODO (SERVER-47701): As part of enabling transition from a replica-set to sharded cluster,
-    // without requiring application downtime, these checks need to be revisited. Ideally this code
-    // should not be reached upon direct writes to a shard.
     auto* const csr = CollectionShardingRuntime::get(opCtx, args.nss);
     const auto metadata = csr->getCurrentMetadataIfKnown();
     if (metadata && metadata->isSharded()) {
