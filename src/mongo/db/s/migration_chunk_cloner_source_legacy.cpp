@@ -163,10 +163,10 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
 
     for (const auto& stmt : _stmts) {
         const auto& nss = stmt.getNss();
-
-        auto csr = CollectionShardingRuntime::get_UNSAFE(_svcCtx, nss);
-
         auto opCtx = cc().getOperationContext();
+
+        auto csr = CollectionShardingRuntime::get(opCtx, nss);
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
         auto msm = MigrationSourceManager::get(csr, csrLock);
