@@ -63,7 +63,7 @@ class ReplicationProcess {
     ReplicationProcess& operator=(const ReplicationProcess&) = delete;
 
 public:
-    static const int kUninitializedRollbackId = -1;
+    constexpr static int kUninitializedRollbackId = -1;
 
     // Operation Context binding.
     static ReplicationProcess* get(ServiceContext* service);

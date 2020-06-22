@@ -491,12 +491,20 @@ void BackgroundSync::_produce() {
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
     Status fetcherReturnStatus = Status::OK();
+    int syncSourceRBID = syncSourceResp.rbid;
+
     DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
         _replCoord, _replicationCoordinatorExternalState, this);
     OplogFetcher* oplogFetcher;
     try {
-        auto onOplogFetcherShutdownCallbackFn = [&fetcherReturnStatus](const Status& status) {
+        auto onOplogFetcherShutdownCallbackFn = [&fetcherReturnStatus,
+                                                 &syncSourceRBID](const Status& status, int rbid) {
             fetcherReturnStatus = status;
+            // If the syncSourceResp rbid is uninitialized, syncSourceRBID will be set to the
+            // rbid obtained in the oplog fetcher.
+            if (syncSourceRBID == ReplicationProcess::kUninitializedRollbackId) {
+                syncSourceRBID = rbid;
+            }
         };
         // The construction of OplogFetcher has to be outside bgsync mutex, because it calls
         // replication coordinator.
@@ -574,8 +582,7 @@ void BackgroundSync::_produce() {
     } else if (fetcherReturnStatus.code() == ErrorCodes::OplogStartMissing) {
         auto opCtx = cc().makeOperationContext();
         auto storageInterface = StorageInterface::get(opCtx.get());
-        _runRollback(
-            opCtx.get(), fetcherReturnStatus, source, syncSourceResp.rbid, storageInterface);
+        _runRollback(opCtx.get(), fetcherReturnStatus, source, syncSourceRBID, storageInterface);
 
         if (bgSyncHangAfterRunRollback.shouldFail()) {
             LOGV2(21095, "bgSyncHangAfterRunRollback failpoint is set");

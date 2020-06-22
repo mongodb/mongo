@@ -61,7 +61,7 @@ OplogFetcherMock::OplogFetcherMock(
                    // Pass a dummy EnqueueDocumentsFn to the base OplogFetcher.
                    [](const auto& a1, const auto& a2, const auto& a3) { return Status::OK(); },
                    // Pass a dummy OnShutdownCallbackFn to the base OplogFetcher.
-                   [](const auto& a) {},
+                   [](const auto& a, const int b) {},
                    batchSize,
                    startingPoint),
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
@@ -210,7 +210,7 @@ void OplogFetcherMock::_finishCallback(Status status) {
     invariant(isActive());
 
     // Call _onShutdownCallbackFn outside of the mutex.
-    _onShutdownCallbackFn(status);
+    _onShutdownCallbackFn(status, ReplicationProcess::kUninitializedRollbackId);
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;

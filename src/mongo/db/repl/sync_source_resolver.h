@@ -37,6 +37,7 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -73,8 +74,9 @@ struct SyncSourceResolverResponse {
 
     // Rollback ID of the selected sync source.
     // The rbid is fetched before the required optime so callers can be sure that as long as the
-    // rbid is the same, the required optime is still present.
-    int rbid;
+    // rbid is the same, the required optime is still present. The rbid will remain set to
+    // 'kUninitializedRollbackId' if _requiredOpTime is null.
+    int rbid = ReplicationProcess::kUninitializedRollbackId;
 
     bool isOK() {
         return syncSourceStatus.isOK();

@@ -41,6 +41,7 @@
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -84,10 +85,13 @@ public:
      * The status will be Status::OK() if we have processed the last batch of operations from the
      * cursor.
      *
+     * rbid will be set to the rollback id of the oplog query metadata for the first batch fetched
+     * from the sync source.
+     *
      * This function will be called 0 times if startup() fails and at most once after startup()
      * returns success.
      */
-    using OnShutdownCallbackFn = std::function<void(const Status& shutdownStatus)>;
+    using OnShutdownCallbackFn = std::function<void(const Status& shutdownStatus, int rbid)>;
 
     /**
      * Container for BSON documents extracted from cursor results.
@@ -350,8 +354,7 @@ private:
      * Checks the first batch of results from query.
      * 'documents' are the first batch of results returned from tailing the remote oplog.
      * 'remoteLastOpApplied' is the last OpTime applied on the sync source.
-     * 'remoteRBID' is a RollbackId for the sync source returned in this oplog query. This is
-     * optional for compatibility with 3.4 servers that do not send OplogQueryMetadata.
+     * 'remoteRBID' is a RollbackId for the sync source returned in this oplog query.
      *
      * Returns TooStaleToSyncFromSource if we are too stale to sync from our source.
      * Returns OplogStartMissing if we should go into rollback.
@@ -377,7 +380,8 @@ private:
     // Namespace of the oplog to read.
     const NamespaceString _nss = NamespaceString::kRsOplogNamespace;
 
-    // Rollback ID that the sync source is required to have after the first batch.
+    // Rollback ID that the sync source is required to have after the first batch. If the value is
+    // uninitialized, the oplog fetcher has not contacted the sync source yet.
     int _requiredRBID;
 
     // Indicates whether the current batch is the first received via this cursor.
