@@ -332,6 +332,11 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
                 tombstone->txnid = cbt->upd_value->tw.stop_txn;
                 tombstone->durable_ts = cbt->upd_value->tw.durable_stop_ts;
                 tombstone->start_ts = cbt->upd_value->tw.stop_ts;
+                __wt_verbose(session, WT_VERB_RTS,
+                  "tombstone restored from history store (txnid: %" PRIu64
+                  ", start_ts: %s, durable_ts: %s",
+                  tombstone->txnid, __wt_timestamp_to_string(tombstone->start_ts, ts_string[0]),
+                  __wt_timestamp_to_string(tombstone->durable_ts, ts_string[1]));
 
                 /*
                  * Set the flag to indicate that this update has been restored from history store

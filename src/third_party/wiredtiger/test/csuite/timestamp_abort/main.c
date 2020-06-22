@@ -85,7 +85,7 @@ static volatile uint64_t global_ts = 1;
 #define ENV_CONFIG_DEF                                        \
     "cache_size=20M,create,"                                  \
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
-    "eviction_dirty_trigger=50,eviction_updates_trigger=50,"  \
+    "eviction_updates_trigger=95,eviction_updates_target=80," \
     "log=(archive=true,file_max=10M,enabled),session_max=%d," \
     "statistics=(fast),statistics_log=(wait=1,json=true),"
 #define ENV_CONFIG_TXNSYNC \
