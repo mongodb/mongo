@@ -1267,7 +1267,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
 TEST_F(DConcurrencyTestFixture, Stress) {
     const int kNumIterations = 5000;
 
-    ProgressMeter progressMeter(kNumIterations * kMaxStressThreads);
+    ProgressMeter progressMeter(kNumIterations);
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients = makeKClientsWithLockers(kMaxStressThreads);
 
@@ -1283,7 +1283,7 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                 ;
 
             for (int i = 0; i < kNumIterations; i++) {
-                const bool sometimes = (std::rand() % 15 == 0);
+                const bool sometimes = (i % 15 == 0);
 
                 if (i % 7 == 0 && threadId == 0 /* Only one upgrader legal */) {
                     Lock::GlobalWrite w(clients[threadId].second.get());
@@ -1375,7 +1375,8 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                     }
                 }
 
-                progressMeter.hit();
+                if (threadId == kMaxStressThreads - 1)
+                    progressMeter.hit();
             }
         });
     }
@@ -1391,7 +1392,7 @@ TEST_F(DConcurrencyTestFixture, Stress) {
 TEST_F(DConcurrencyTestFixture, StressPartitioned) {
     const int kNumIterations = 5000;
 
-    ProgressMeter progressMeter(kNumIterations * kMaxStressThreads);
+    ProgressMeter progressMeter(kNumIterations);
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients = makeKClientsWithLockers(kMaxStressThreads);
 
@@ -1425,7 +1426,8 @@ TEST_F(DConcurrencyTestFixture, StressPartitioned) {
                     Lock::DBLock y(clients[threadId].second.get(), "local", MODE_IX);
                 }
 
-                progressMeter.hit();
+                if (threadId == kMaxStressThreads - 1)
+                    progressMeter.hit();
             }
         });
     }
