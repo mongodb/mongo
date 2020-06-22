@@ -574,12 +574,16 @@ RecordStore::SizeAdjuster::SizeAdjuster(OperationContext* opCtx, RecordStore* rs
       _origDataSize(_workingCopy->dataSize()) {}
 
 RecordStore::SizeAdjuster::~SizeAdjuster() {
+    // SERVER-48981 This implementation of fastcount results in inaccurate values. This storage
+    // engine emits write conflict exceptions at commit-time leading to the fastcount to be
+    // inaccurate until the rollback happens.
+    // If proper local isolation is implemented, SERVER-38883 can also be fulfulled for this storage
+    // engine where we can invariant for correct fastcount in updateStatsAfterRepair()
     int64_t deltaNumRecords = _workingCopy->size() - _origNumRecords;
     int64_t deltaDataSize = _workingCopy->dataSize() - _origDataSize;
     _rs->_numRecords.fetchAndAdd(deltaNumRecords);
     _rs->_dataSize.fetchAndAdd(deltaDataSize);
     RecoveryUnit::get(_opCtx)->onRollback([rs = _rs, deltaNumRecords, deltaDataSize]() {
-        invariant(rs->_numRecords.load() >= deltaNumRecords);
         rs->_numRecords.fetchAndSubtract(deltaNumRecords);
         rs->_dataSize.fetchAndSubtract(deltaDataSize);
     });
