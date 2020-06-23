@@ -241,8 +241,6 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                             opKey{std::move(opKey)}](
                                                const executor::TaskExecutor::CallbackArgs& args) {
                         if (!args.status.isOK()) {
-                            invariant(0);
-                            uasserted(ErrorCodes::CallbackCanceled, "YOOO");
                             LOGV2_WARNING(48038,
                                           "Failed to schedule remote cursor cleanup: {error}",
                                           "Failed to schedule remote cursor cleanup",
