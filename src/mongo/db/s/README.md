@@ -735,9 +735,10 @@ four steps to this process:
 
 ### Periodic cleanup of the session catalog and transactions table
 
-The logical session cache class holds the periodic job to clean up the session catalog and
-transactions table. Inside the class, this is known as the "reap" function. Every five (5) minutes
-(user-configurable), the following steps will be performed:
+The logical session cache class holds the periodic job to clean up the
+[session catalog](#the-logical-session-catalog) and [transactions table](#the-transactions-table].
+Inside the class, this is known as the "reap" function. Every five (5) minutes (user-configurable),
+the following steps will be performed:
 
 1. Find all sessions in the session catalog that were last checked out more than thirty minutes ago (default session expiration time).
 1. For each session gathered in step 1, if the session no longer exists in the sessions collection (i.e. the session has expired or was explicitly ended), remove the session from the session catalog.
@@ -772,18 +773,23 @@ or yield the session.
 
 The runtime state for a session consists of the last checkout time and operation, the number of operations
 waiting to check out the session, and the number of kills requested. The last checkout time is used by
-the periodic job inside the logical session cache to determine when a session should be reaped from the
-session catalog, whereas the number of operations waiting to check out a session is used to block reaping
-of sessions that are still in use. The last checkout operation is used to determine the operation to kill
-when a session is killed, whereas the number of kills requested is used to make sure that sessions
-are only killed on the first kill request.
+the [periodic job inside the logical session cache](#periodic-cleanup-of-the-session-catalog-and-transactions-table)
+to determine when a session should be reaped from the session catalog, whereas the number of
+operations waiting to check out a session is used to block reaping of sessions that are still in
+use. The last checkout operation is used to determine the operation to kill when a session is
+killed, whereas the number of kills requested is used to make sure that sessions are only killed on
+the first kill request.
 
-To keep the in-memory transaction state of all sessions in sync with the content of the `config.transactions`
-collection (the collection that stores documents used to support retryable writes and transactions, also
-referred to as the transaction table), the transaction state and the session catalog on each mongod is
-[invalidated](https://github.com/mongodb/mongo/blob/56655b06ac46825c5937ccca5947dc84ccbca69c/src/mongo/db/session_catalog_mongod.cpp#L324) whenever the `config.transactions` collection is dropped and whenever
-there is a rollback. When invalidation occurs, all active sessions are killed, and the in-memory transaction
-state is marked as invalid to force it to be [reloaded from storage the next time a session is checked out](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog_mongod.cpp#L426).
+### The transactions table
+
+The runtime state in a node's in-memory session catalog is made durable in the node's
+`config.transactions` collection, also called its transactions table. The in-memory session catalog
+ is
+[invalidated](https://github.com/mongodb/mongo/blob/56655b06ac46825c5937ccca5947dc84ccbca69c/src/mongo/db/session_catalog_mongod.cpp#L324)
+if the `config.transactions` collection is dropped and whenever there is a rollback. When
+invalidation occurs, all active sessions are killed, and the in-memory transaction state is marked
+as invalid to force it to be
+[reloaded from storage the next time a session is checked out](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog_mongod.cpp#L426).
 
 #### Code references
 * [**SessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog.h)
