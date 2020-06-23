@@ -94,9 +94,10 @@ __rollback_row_add_update(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
 {
     WT_DECL_RET;
     WT_PAGE_MODIFY *mod;
-    WT_UPDATE *old_upd, **upd_entry;
+    WT_UPDATE *last_upd, *old_upd, **upd_entry;
     size_t upd_size;
 
+    last_upd = NULL;
     /* If we don't yet have a modify structure, we'll need one. */
     WT_RET(__wt_page_modify_init(session, page));
     mod = page->modify;
@@ -108,9 +109,13 @@ __rollback_row_add_update(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
     upd_entry = &mod->mod_row_update[WT_ROW_SLOT(page, rip)];
     upd_size = __wt_update_list_memsize(upd);
 
+    /* If there are existing updates, append them after the new updates. */
+    for (last_upd = upd; last_upd->next != NULL; last_upd = last_upd->next)
+        ;
+    last_upd->next = *upd_entry;
+
     /*
-     * If it's a full update list, we're trying to instantiate the row. Otherwise, it's just a
-     * single update that we'd like to append to the update list.
+     * We can either put a tombstone plus an update or a single update on the update chain.
      *
      * Set the "old" entry to the second update in the list so that the serialization function
      * succeeds in swapping the first update into place.
@@ -131,7 +136,12 @@ __rollback_row_add_update(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
      */
     WT_ERR(__wt_update_serial(session, NULL, page, upd_entry, &upd, upd_size, true));
 
+    if (0) {
 err:
+        if (last_upd != NULL)
+            last_upd->next = NULL;
+    }
+
     return (ret);
 }
 

@@ -770,11 +770,9 @@ __wt_rec_row_leaf(
 
         /*
          * If we reconcile an on disk key with a globally visible stop time point and there are no
-         * new updates for that key, skip writing that key. Don't do this additional cleanup work if
-         * a checkpoint is doing the work - we need that to be as streamlined as possible.
+         * new updates for that key, skip writing that key.
          */
-        if (upd == NULL && !F_ISSET(r, WT_REC_CHECKPOINT) &&
-          __wt_txn_tw_stop_visible_all(session, &tw))
+        if (upd == NULL && __wt_txn_tw_stop_visible_all(session, &tw))
             upd = &upd_tombstone;
 
         /* Build value cell. */
