@@ -53,6 +53,8 @@ class OptionSection;
 class Environment;
 }  // namespace optionenvironment
 
+constexpr auto kSSLCipherConfigDefault = "HIGH:!EXPORT:!aNULL@STRENGTH"_sd;
+
 struct SSLParams {
     using TLSCATrusts = std::map<SHA256Block, std::set<RoleName>>;
 
@@ -96,7 +98,7 @@ struct SSLParams {
         false;  // --setParameter suppressNoTLSPeerCertificateWarning
     bool tlsWithholdClientCertificate = false;  // --setParameter tlsWithholdClientCertificate
 
-    SSLParams() {
+    SSLParams() : sslCipherConfig(kSSLCipherConfigDefault) {
         sslMode.store(SSLMode_disabled);
     }
 

@@ -141,7 +141,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
         LOGV2_WARNING(
             23286,
             "net.tls.tlsCipherConfig is deprecated. It will be removed in a future release.");
-        if (!sslGlobalParams.sslCipherConfig.empty()) {
+        if (sslGlobalParams.sslCipherConfig != kSSLCipherConfigDefault) {
             return {ErrorCodes::BadValue,
                     "net.tls.tlsCipherConfig is incompatible with the openTLSCipherConfig "
                     "setParameter"};
@@ -223,7 +223,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
     } else if (sslGlobalParams.sslPEMKeyFile.size() || sslGlobalParams.sslPEMKeyPassword.size() ||
                sslGlobalParams.sslClusterFile.size() || sslGlobalParams.sslClusterPassword.size() ||
                sslGlobalParams.sslCAFile.size() || sslGlobalParams.sslCRLFile.size() ||
-               sslGlobalParams.sslCipherConfig.size() ||
+               sslGlobalParams.sslCipherConfig != kSSLCipherConfigDefault ||
                params.count("net.tls.disabledProtocols") ||
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
                params.count("net.tls.certificateSelector") ||
@@ -252,6 +252,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
                     "cannot have x.509 cluster authentication in allowTLS mode"};
         }
     }
+
     return Status::OK();
 }
 
