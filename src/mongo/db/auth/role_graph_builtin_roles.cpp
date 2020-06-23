@@ -375,11 +375,6 @@ void addUserAdminAnyDbPrivileges(PrivilegeVector* privileges) {
             readRoleActions));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
-        Privilege(
-            ResourcePattern::forExactNamespace(AuthorizationManager::usersAltCollectionNamespace),
-            readRoleActions));
-    Privilege::addPrivilegeToPrivilegeVector(
-        privileges,
         Privilege(ResourcePattern::forExactNamespace(
                       AuthorizationManager::usersBackupCollectionNamespace),
                   readRoleActions));
@@ -528,12 +523,6 @@ void addQueryableBackupPrivileges(PrivilegeVector* privileges) {
 
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
-        Privilege(
-            ResourcePattern::forExactNamespace(AuthorizationManager::usersAltCollectionNamespace),
-            ActionType::find));
-
-    Privilege::addPrivilegeToPrivilegeVector(
-        privileges,
         Privilege(ResourcePattern::forExactNamespace(
                       AuthorizationManager::usersBackupCollectionNamespace),
                   ActionType::find));
@@ -622,12 +611,6 @@ void addRestorePrivileges(PrivilegeVector* privileges) {
         Privilege(ResourcePattern::forExactNamespace(
                       AuthorizationManager::defaultTempRolesCollectionNamespace),
                   ActionType::find));
-
-    Privilege::addPrivilegeToPrivilegeVector(
-        privileges,
-        Privilege(
-            ResourcePattern::forExactNamespace(AuthorizationManager::usersAltCollectionNamespace),
-            actions));
 
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,

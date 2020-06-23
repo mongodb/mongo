@@ -50,7 +50,6 @@ constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
 
 const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd");
 const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles");
-const NamespaceString AuthorizationManager::usersAltCollectionNamespace("admin.system.new_users");
 const NamespaceString AuthorizationManager::usersBackupCollectionNamespace(
     "admin.system.backup_users");
 const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
