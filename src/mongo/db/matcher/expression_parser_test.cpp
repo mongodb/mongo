@@ -427,6 +427,86 @@ TEST(MatchesExpressionParserTest, InternalExprEqComparisonToUndefinedDoesNotPars
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 }
 
+TEST(MatchExpressionParserTest, SampleRateDesugarsToExprAndExpressionRandom) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    // Test parsing of argument in incements of 0.001.
+    for (int i = 0; i <= 1000; i++) {
+        BSONObj query = BSON("$sampleRate" << i / 1000.0);
+        StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+        ASSERT_TRUE(result.isOK());
+    }
+
+    // Does the implicit double conversion work for a large decimal?
+    BSONObj query = fromjson("{$sampleRate: 0.999999999999999999999}");
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_TRUE(result.isOK());
+}
+
+TEST(MatchExpressionParserTest, SampleRateMatchingBehaviorStats) {
+    // Test that the average number of sampled docs is within 10 standard deviations using the
+    // binomial distribution over k runs, 10 * sqrt(N * p * (1 - p) / k).
+    constexpr double p = 0.5;
+    constexpr int k = 1000;
+    constexpr int N = 3000;  // Simulated collection size.
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression expr = MatchExpressionParser::parse(BSON("$sampleRate" << p), expCtx);
+
+    // Average the number of docs sampled over k iterations.
+    int sum = 0;
+    for (int i = 0; i < k; i++) {
+        for (int j = 0; j < N; j++) {
+            if (expr.getValue()->matchesBSON(BSON("a" << 1))) {
+                sum++;
+            }
+        }
+    }
+    const double avg = static_cast<double>(sum) / k;
+
+    const double mu = p * N;
+    const double err = 10.0 * std::sqrt(mu * (1 - p) / k);
+    ASSERT_TRUE(mu - err <= avg && mu + err >= avg);
+
+    // Test that $sampleRate args 0.0 and 1.0 return 0 and all hits, respectively.
+    expr = MatchExpressionParser::parse(BSON("$sampleRate" << 0.0), expCtx);
+    for (int j = 0; j < N; j++) {
+        ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 1)));
+    }
+
+    expr = MatchExpressionParser::parse(BSON("$sampleRate" << 1.0), expCtx);
+    for (int j = 0; j < N; j++) {
+        ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 1)));
+    }
+}
+
+TEST(MatchExpressionParserTest, SampleRateFailureCases) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    auto result = MatchExpressionParser::parse(fromjson("{$sampleRate: -0.25}}"), expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: 2.5}}"), expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: 2}}"), expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: -2}}"), expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: {$const: 0.25}}"), expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: NaN}"), expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: inf}"), expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: -inf}"), expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
 TEST(InternalBinDataSubTypeMatchExpressionTest, SubTypeParsesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query = BSON("a" << BSON("$_internalSchemaBinDataSubType" << BinDataType::bdtCustom));

@@ -346,6 +346,47 @@ StatusWithMatchExpression parseWhere(StringData name,
     return extensionsCallback->parseWhere(expCtx, elem);
 }
 
+StatusWithMatchExpression parseSampleRate(StringData name,
+                                          BSONElement elem,
+                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          const ExtensionsCallback* extensionsCallback,
+                                          MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+                                          DocumentParseLevel currentLevel) {
+    if (currentLevel == DocumentParseLevel::kUserSubDocument) {
+        return {Status(ErrorCodes::BadValue,
+                       "$sampleRate can only be applied to the top-level document")};
+    }
+    if (!elem.isNumber()) {
+        return {Status(ErrorCodes::BadValue, "argument to $sampleRate must be a numeric type")};
+    }
+
+    constexpr double kRandomMinValue = 0.0;
+    constexpr double kRandomMaxValue = 1.0;
+
+    // Here we validate that the argument to $sampleRate is in [0, 1], we simplify 0.0 and 1.0 to a
+    // contradiction or a tautology, respectively. Everything in between is desugared into
+    // {$expr: {$lt: [{$rand: {}}, x]}}.
+    const double x = elem.numberDouble();
+    if (!(x >= kRandomMinValue && x <= kRandomMaxValue)) {
+        // This conditional is negated intentionally to handle NaN correctly.  If you apply
+        // DeMorgan's law here you will be suprised that $sampleRate will accept NaN as a valid
+        // argument.
+        return {Status(ErrorCodes::BadValue, "numeric argument to $sampleRate must be in [0, 1]")};
+    } else if (x == kRandomMinValue) {
+        return std::make_unique<ExprMatchExpression>(
+            ExpressionConstant::create(expCtx.get(), Value(false)), expCtx);
+    } else if (x == kRandomMaxValue) {
+        return std::make_unique<ExprMatchExpression>(
+            ExpressionConstant::create(expCtx.get(), Value(true)), expCtx);
+    } else {
+        return std::make_unique<ExprMatchExpression>(
+            Expression::parseExpression(expCtx.get(),
+                                        BSON("$lt" << BSON_ARRAY(BSON("$rand" << BSONObj()) << x)),
+                                        expCtx->variablesParseState),
+            expCtx);
+    }
+}
+
 StatusWithMatchExpression parseText(StringData name,
                                     BSONElement elem,
                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1789,6 +1830,7 @@ MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
             {"nor", &parseTreeTopLevel<NorMatchExpression>},
             {"or", &parseTreeTopLevel<OrMatchExpression>},
             {"ref", &parseDBRef},
+            {"sampleRate", &parseSampleRate},
             {"text", &parseText},
             {"where", &parseWhere},
         });
