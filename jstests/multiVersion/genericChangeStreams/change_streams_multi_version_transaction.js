@@ -11,7 +11,7 @@ load("jstests/replsets/rslib.js");              // For startSetIfSupportsReadMaj
 
 const rst = new ReplSetTest({
     nodes: 2,
-    nopeOptions: {binVersion: "last-stable"},
+    nodeOptions: {binVersion: "last-stable"},
 });
 
 if (!startSetIfSupportsReadMajority(rst)) {
