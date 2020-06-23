@@ -26,6 +26,7 @@ env.Library(
         'auth_decorations.cpp',
         'user_name.cpp',
         'role_name.cpp',
+        'role_name_or_string.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -46,10 +46,6 @@
 
 namespace mongo {
 
-namespace auth {
-struct CreateOrUpdateRoleArgs;
-}
-
 class Client;
 
 /**
@@ -144,7 +140,7 @@ public:
 
     bool isAuthorizedToParseNamespaceElement(const BSONElement& elem) override;
 
-    bool isAuthorizedToCreateRole(const auth::CreateOrUpdateRoleArgs& args) override;
+    bool isAuthorizedToCreateRole(const RoleName& roleName) override;
 
     bool isAuthorizedToGrantRole(const RoleName& role) override;
 

@@ -228,11 +228,11 @@ public:
      * @param result: contains data returned from config servers
      * Returns true on success.
      */
-    virtual bool runUserManagementWriteCommand(OperationContext* opCtx,
-                                               const std::string& commandName,
-                                               const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               BSONObjBuilder* result) = 0;
+    virtual Status runUserManagementWriteCommand(OperationContext* opCtx,
+                                                 StringData commandName,
+                                                 StringData dbname,
+                                                 const BSONObj& cmdObj,
+                                                 BSONObjBuilder* result) = 0;
 
     /**
      * Runs a user management related read-only command on a config server.

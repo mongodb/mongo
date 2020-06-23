@@ -584,16 +584,14 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        bool ok = catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                                 "dropUser",
-                                                                 "test",
-                                                                 BSON("dropUser"
-                                                                      << "test"),
-                                                                 &responseBuilder);
-        ASSERT_FALSE(ok);
-
-        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-        ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
+        auto status = catalogClient()->runUserManagementWriteCommand(operationContext(),
+                                                                     "dropUser",
+                                                                     "test",
+                                                                     BSON("dropUser"
+                                                                          << "test"),
+                                                                     &responseBuilder);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::UserNotFound, status);
     });
 
     onCommand([](const RemoteCommandRequest& request) {
@@ -625,7 +623,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConce
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONObjBuilder responseBuilder;
-    bool ok =
+    auto status =
         catalogClient()->runUserManagementWriteCommand(operationContext(),
                                                        "dropUser",
                                                        "test",
@@ -633,11 +631,9 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConce
                                                             << "test"
                                                             << "writeConcern" << BSON("w" << 2)),
                                                        &responseBuilder);
-    ASSERT_FALSE(ok);
-
-    Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-    ASSERT_EQUALS(ErrorCodes::InvalidOptions, commandStatus);
-    ASSERT_STRING_CONTAINS(commandStatus.reason(), "Invalid replication write concern");
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "Invalid replication write concern");
 }
 
 TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConcern) {
@@ -654,7 +650,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
     auto future =
         launchAsync([this] {
             BSONObjBuilder responseBuilder;
-            bool ok =
+            auto status =
                 catalogClient()->runUserManagementWriteCommand(
                     operationContext(),
                     "dropUser",
@@ -663,10 +659,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
                          << "test"
                          << "writeConcern" << BSON("w" << 1 << "wtimeout" << 30)),
                     &responseBuilder);
-            ASSERT_FALSE(ok);
-
-            Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-            ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
+            ASSERT_NOT_OK(status);
+            ASSERT_EQUALS(ErrorCodes::UserNotFound, status);
         });
 
     onCommand([](const RemoteCommandRequest& request) {
@@ -698,16 +692,14 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        bool ok = catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                                 "dropUser",
-                                                                 "test",
-                                                                 BSON("dropUser"
-                                                                      << "test"),
-                                                                 &responseBuilder);
-        ASSERT_FALSE(ok);
-
-        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-        ASSERT_EQUALS(ErrorCodes::NotMaster, commandStatus);
+        auto status = catalogClient()->runUserManagementWriteCommand(operationContext(),
+                                                                     "dropUser",
+                                                                     "test",
+                                                                     BSON("dropUser"
+                                                                          << "test"),
+                                                                     &responseBuilder);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::NotMaster, status);
     });
 
     for (int i = 0; i < 3; ++i) {
@@ -731,16 +723,13 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuc
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        bool ok = catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                                 "dropUser",
-                                                                 "test",
-                                                                 BSON("dropUser"
-                                                                      << "test"),
-                                                                 &responseBuilder);
-        ASSERT_TRUE(ok);
-
-        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-        ASSERT_OK(commandStatus);
+        auto status = catalogClient()->runUserManagementWriteCommand(operationContext(),
+                                                                     "dropUser",
+                                                                     "test",
+                                                                     BSON("dropUser"
+                                                                          << "test"),
+                                                                     &responseBuilder);
+        ASSERT_OK(status);
     });
 
     onCommand([&](const RemoteCommandRequest& request) {

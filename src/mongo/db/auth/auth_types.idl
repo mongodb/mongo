@@ -30,7 +30,9 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/auth/user_name.h"
+    - "mongo/db/auth/privilege.h"
     - "mongo/db/auth/role_name.h"
+    - "mongo/db/auth/role_name_or_string.h"
 
 imports:
   - "mongo/idl/basic_types.idl"
@@ -49,3 +51,17 @@ types:
     cpp_type: "RoleName"
     deserializer: "mongo::RoleName::parseFromBSON"
     serializer: "mongo::RoleName::serializeToBSON"
+
+  RoleNameOrString:
+    bson_serialization_type: any
+    description: Wrapper for RoleName which allows specifying just a string.
+    cpp_type: "RoleNameOrString"
+    deserializer: "mongo::RoleNameOrString::parseFromBSON"
+    serializer: "mongo::RoleNameOrString::serializeToBSON"
+
+  Privilege:
+    bson_serialization_type: object
+    description: "A struct representing a privilege grant"
+    cpp_type: "Privilege"
+    deserializer: "mongo::Privilege::fromBSON"
+    serializer: "mongo::Privilege::toBSON"

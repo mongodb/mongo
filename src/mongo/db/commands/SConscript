@@ -146,6 +146,7 @@ env.Library(
         'user_management_commands_common.cpp',
         env.Idlc('drop_connections.idl')[0],
         env.Idlc('rwc_defaults_commands.idl')[0],
+        env.Idlc('user_management_commands.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',

@@ -1,0 +1,263 @@
+# Copyright (C) 2020-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/db/auth/auth_types.idl"
+    - "mongo/db/auth/address_restriction.idl"
+
+structs:
+    dropAllUsersFromDatabaseReply:
+        description: "Response for dropAllUsersFromDatabase command"
+        strict: false
+        fields:
+            n:
+                description: "Number of users dropped from database"
+                type: int
+                cpp_name: count
+
+    dropAllRolesFromDatabaseReply:
+        description: "Response for dropAllRolesFromDatabase command"
+        strict: false
+        fields:
+            n:
+                description: "Number of roles dropped from database"
+                type: int
+                cpp_name: count
+
+commands:
+    createUser:
+        description: "Create a user"
+        namespace: type
+        type: string
+        cpp_name: CreateUserCommand
+        strict: true
+        fields:
+            pwd:
+                description: "Initial user password"
+                type: string
+                optional: true
+            customData:
+                description: "Any arbitrary data"
+                type: object
+                optional: true
+            roles:
+                description: "Initial roles to grant to the user"
+                type: array<RoleNameOrString>
+            digestPassword:
+                description: "True if the server should digest the password, false for pre-digested"
+                type: bool
+                default: true
+            writeConcern:
+                description: "The level of write concern for the creation operation"
+                type: object
+                optional: true
+            authenticationRestrictions:
+                description: "Authentication restrictions to enforce on the user"
+                type: array<address_restriction>
+                optional: true
+            mechanisms:
+                description: "List of valid authentication mechanisms for the user"
+                type: array<string>
+                optional: true
+
+    updateUser:
+        description: "Modify a user"
+        namespace: type
+        type: string
+        cpp_name: UpdateUserCommand
+        strict: true
+        fields:
+            pwd:
+                description: "New user password"
+                type: string
+                optional: true
+            customData:
+                description: "Any arbitrary data"
+                type: object
+                optional: true
+            roles:
+                description: "New set of roles for the user"
+                type: array<RoleNameOrString>
+                optional: true
+            digestPassword:
+                description: "True if the server should digest the password, false for pre-digested"
+                type: bool
+                default: true
+            writeConcern:
+                description: "The level of write concern for the update operation"
+                type: object
+                optional: true
+            authenticationRestrictions:
+                description: "Authentication restrictions to enforce on the user"
+                type: array<address_restriction>
+                optional: true
+            mechanisms:
+                description: "List of valid authentication mechanisms for the user"
+                type: array<string>
+                optional: true
+
+    dropUser:
+        description: "Drop a single user"
+        namespace: type
+        type: string
+        cpp_name: DropUserCommand
+        strict: true
+
+    dropAllUsersFromDatabase:
+        description: "Drop all users in the database"
+        namespace: ignored
+        cpp_name: DropAllUsersFromDatabaseCommand
+        strict: true
+
+    grantRolesToUser:
+        description: "Grant additional roles to a user"
+        namespace: type
+        type: string
+        cpp_name: GrantRolesToUserCommand
+        strict: true
+        fields:
+            roles:
+                description: "Roles to grant to the user"
+                type: array<RoleNameOrString>
+
+    revokeRolesFromUser:
+        description: "Revoke previously assigned roles from a user"
+        namespace: type
+        type: string
+        cpp_name: RevokeRolesFromUserCommand
+        strict: true
+        fields:
+            roles:
+                description: "Roles to revoke from the user"
+                type: array<RoleNameOrString>
+
+    createRole:
+        description: "Create a new role"
+        namespace: type
+        type: string
+        cpp_name: CreateRoleCommand
+        strict: true
+        fields:
+            privileges:
+                description: "Actions explicitly granted to this role"
+                type: array<Privilege>
+            roles:
+                description: "Roles to inherit additional privileges from"
+                type: array<RoleNameOrString>
+            authenticationRestrictions:
+                description: "Authentication restrictions to enforce on the user"
+                type: array<address_restriction>
+                optional: true
+
+    updateRole:
+        description: "Update an existing role"
+        namespace: type
+        type: string
+        cpp_name: UpdateRoleCommand
+        strict: true
+        fields:
+            privileges:
+                description: "Actions explicitly granted to this role"
+                type: array<Privilege>
+                optional: true
+            roles:
+                description: "Roles to inherit additional privileges from"
+                type: array<RoleNameOrString>
+                optional: true
+            authenticationRestrictions:
+                description: "Authentication restrictions to enforce on the user"
+                type: array<address_restriction>
+                optional: true
+
+    grantPrivilegesToRole:
+        description: "Grants privileges to a role"
+        namespace: type
+        type: string
+        cpp_name: GrantPrivilegesToRoleCommand
+        strict: true
+        fields:
+            privileges:
+                description: "Privileges to grant to this role"
+                type: array<Privilege>
+
+    revokePrivilegesFromRole:
+        description: "Grants privileges to a role"
+        namespace: type
+        type: string
+        cpp_name: RevokePrivilegesFromRoleCommand
+        strict: true
+        fields:
+            privileges:
+                description: "Privileges to revoke from this role"
+                type: array<Privilege>
+
+    grantRolesToRole:
+        description: "Grant roles to a role"
+        namespace: type
+        type: string
+        cpp_name: GrantRolesToRoleCommand
+        strict: true
+        fields:
+            roles:
+                description: "Roles to grant to this role"
+                type: array<RoleNameOrString>
+
+    revokeRolesFromRole:
+        description: "Revoke roles from a role"
+        namespace: type
+        type: string
+        cpp_name: RevokeRolesFromRoleCommand
+        strict: true
+        fields:
+            roles:
+                description: "Roles to revoke from this role"
+                type: array<RoleNameOrString>
+
+    dropRole:
+        description: >-
+            Drops a single role.  Before deleting the role completely it must remove it
+            from any users or roles that reference it.  If any errors occur in the middle
+            of that process it's possible to be left in a state where the role has been
+            removed from some user/roles but otherwise still exists.
+        namespace: type
+        type: string
+        cpp_name: DropRoleCommand
+        strict: true
+
+    dropAllRolesFromDatabase:
+        description: >-
+            Drops all roles from the given database.  Before deleting the roles completely
+            it must remove them from any users or other roles that reference them.  If any
+            errors occur in the middle of that process it's possible to be left in a state
+            where the roles have been removed from some user/roles but otherwise still exist.
+        namespace: ignored
+        cpp_name: DropAllRolesFromDatabaseCommand
+        strict: true

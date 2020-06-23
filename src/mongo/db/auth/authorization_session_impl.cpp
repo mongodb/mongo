@@ -533,12 +533,11 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONEle
     return true;
 }
 
-bool AuthorizationSessionImpl::isAuthorizedToCreateRole(
-    const struct auth::CreateOrUpdateRoleArgs& args) {
+bool AuthorizationSessionImpl::isAuthorizedToCreateRole(const RoleName& roleName) {
     // A user is allowed to create a role under either of two conditions.
 
     // The user may create a role if the authorization system says they are allowed to.
-    if (isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(args.roleName.getDB()),
+    if (isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(roleName.getDB()),
                                          ActionType::createRole)) {
         return true;
     }
@@ -547,7 +546,7 @@ bool AuthorizationSessionImpl::isAuthorizedToCreateRole(
     // role. This implies they have obtained the role through an external authorization mechanism.
     if (_externalState->shouldAllowLocalhost()) {
         for (const auto& user : _authenticatedUsers) {
-            if (user->hasRole(args.roleName)) {
+            if (user->hasRole(roleName)) {
                 return true;
             }
         }
@@ -555,7 +554,7 @@ bool AuthorizationSessionImpl::isAuthorizedToCreateRole(
               "Not authorized to create the first role in the system using the "
               "localhost exception. The user needs to acquire the role through "
               "external authentication first.",
-              "role"_attr = args.roleName);
+              "role"_attr = roleName);
     }
 
     return false;

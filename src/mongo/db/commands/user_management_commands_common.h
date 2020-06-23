@@ -32,10 +32,12 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/commands/user_management_commands_gen.h"
 
 namespace mongo {
 
@@ -46,6 +48,16 @@ class Client;
 class OperationContext;
 
 namespace auth {
+
+/**
+ * User management commands accept rolenames as either `{ role: 'x', db: 'y' }`
+ * or as simply a string implying the role name and the dbname is inferred from the command.
+ *
+ * This method takes a vector of RoleNameOrString values parsed via IDL
+ * and normalizes them to a vector of RoleNames using a passed dbname fallback.
+ */
+std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& possibleRoles,
+                                       StringData dbname);
 
 //
 // checkAuthorizedTo* methods
@@ -67,62 +79,24 @@ Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
 // checkAuthFor*Command methods
 //
 
-Status checkAuthForCreateUserCommand(Client* client,
-                                     const std::string& dbname,
-                                     const BSONObj& cmdObj);
-
-Status checkAuthForUpdateUserCommand(Client* client,
-                                     const std::string& dbname,
-                                     const BSONObj& cmdObj);
-
-Status checkAuthForGrantRolesToUserCommand(Client* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
-
-Status checkAuthForCreateRoleCommand(Client* client,
-                                     const std::string& dbname,
-                                     const BSONObj& cmdObj);
-
-Status checkAuthForUpdateRoleCommand(Client* client,
-                                     const std::string& dbname,
-                                     const BSONObj& cmdObj);
-
-Status checkAuthForGrantRolesToRoleCommand(Client* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
-
-Status checkAuthForGrantPrivilegesToRoleCommand(Client* client,
-                                                const std::string& dbname,
-                                                const BSONObj& cmdObj);
-
-Status checkAuthForDropAllUsersFromDatabaseCommand(Client* client, const std::string& dbname);
-
-Status checkAuthForRevokeRolesFromUserCommand(Client* client,
-                                              const std::string& dbname,
-                                              const BSONObj& cmdObj);
-
-Status checkAuthForRevokeRolesFromRoleCommand(Client* client,
-                                              const std::string& dbname,
-                                              const BSONObj& cmdObj);
-
-Status checkAuthForDropUserCommand(Client* client,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj);
-
-Status checkAuthForDropRoleCommand(Client* client,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj);
-
+void checkAuthForTypedCommand(Client*, const CreateUserCommand&);
+void checkAuthForTypedCommand(Client*, const UpdateUserCommand&);
+void checkAuthForTypedCommand(Client*, const GrantRolesToUserCommand&);
+void checkAuthForTypedCommand(Client*, const CreateRoleCommand&);
+void checkAuthForTypedCommand(Client*, const UpdateRoleCommand&);
+void checkAuthForTypedCommand(Client*, const GrantRolesToRoleCommand&);
+void checkAuthForTypedCommand(Client*, const GrantPrivilegesToRoleCommand&);
+void checkAuthForTypedCommand(Client*, const DropAllUsersFromDatabaseCommand&);
+void checkAuthForTypedCommand(Client*, const RevokeRolesFromUserCommand&);
+void checkAuthForTypedCommand(Client*, const RevokeRolesFromRoleCommand&);
+void checkAuthForTypedCommand(Client*, const DropUserCommand&);
+void checkAuthForTypedCommand(Client*, const DropRoleCommand&);
+void checkAuthForTypedCommand(Client*, const RevokePrivilegesFromRoleCommand&);
+void checkAuthForTypedCommand(Client*, const DropAllRolesFromDatabaseCommand&);
 
 Status checkAuthForUsersInfoCommand(Client* client,
                                     const std::string& dbname,
                                     const BSONObj& cmdObj);
-
-Status checkAuthForRevokePrivilegesFromRoleCommand(Client* client,
-                                                   const std::string& dbname,
-                                                   const BSONObj& cmdObj);
-
-Status checkAuthForDropAllRolesFromDatabaseCommand(Client* client, const std::string& dbname);
 
 Status checkAuthForRolesInfoCommand(Client* client,
                                     const std::string& dbname,

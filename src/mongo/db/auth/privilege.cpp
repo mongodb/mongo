@@ -84,6 +84,37 @@ BSONObj Privilege::toBSON() const {
     return pp.toBSON();
 }
 
+Privilege Privilege::fromBSON(BSONObj obj) {
+    ParsedPrivilege pp;
+    std::string errmsg;
+    if (!pp.parseBSON(obj, &errmsg)) {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "Unable to parse privilege document: " << obj
+                                << ", error: " << errmsg);
+    }
+    Privilege ret;
+    std::vector<std::string> unrecognized;
+    uassertStatusOK(ParsedPrivilege::parsedPrivilegeToPrivilege(pp, &ret, &unrecognized));
+
+    if (!unrecognized.empty()) {
+        StringBuilder sb;
+        sb << "Unrecognized action";
+        if (unrecognized.size() > 1) {
+            sb << 's';
+        }
+        sb << ": ";
+        for (std::size_t i = 0; i < unrecognized.size(); ++i) {
+            if (i > 0) {
+                sb << ", ";
+            }
+            sb << unrecognized[i];
+        }
+        uasserted(ErrorCodes::BadValue, sb.str());
+    }
+
+    return ret;
+}
+
 Status Privilege::getBSONForPrivileges(const PrivilegeVector& privileges,
                                        mutablebson::Element resultArray) try {
     for (auto& currPriv : privileges) {

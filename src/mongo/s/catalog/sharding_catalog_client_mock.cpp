@@ -118,14 +118,6 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-bool ShardingCatalogClientMock::runUserManagementWriteCommand(OperationContext* opCtx,
-                                                              const string& commandName,
-                                                              const string& dbname,
-                                                              const BSONObj& cmdObj,
-                                                              BSONObjBuilder* result) {
-    return true;
-}
-
 bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* opCtx,
                                                              const string& dbname,
                                                              const BSONObj& cmdObj,

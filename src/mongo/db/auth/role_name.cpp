@@ -90,5 +90,10 @@ void RoleName::_serializeToSubObj(BSONObjBuilder* sub) const {
     sub->append(AuthorizationManager::ROLE_DB_FIELD_NAME, getDB());
 }
 
+BSONObj RoleName::toBSON() const {
+    BSONObjBuilder bob;
+    _serializeToSubObj(&bob);
+    return bob.obj();
+}
 
 }  // namespace mongo

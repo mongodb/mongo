@@ -580,11 +580,11 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
                                                     findStatus.getValue().opTime};
 }
 
-bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* opCtx,
-                                                              const std::string& commandName,
-                                                              const std::string& dbname,
-                                                              const BSONObj& cmdObj,
-                                                              BSONObjBuilder* result) {
+Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* opCtx,
+                                                                StringData commandName,
+                                                                StringData dbname,
+                                                                const BSONObj& cmdObj,
+                                                                BSONObjBuilder* result) {
     BSONObj cmdToRun = cmdObj;
     {
         // Make sure that if the command has a write concern that it is w:1 or w:majority, and
@@ -596,18 +596,16 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         if (initialCmdHadWriteConcern) {
             auto sw = WriteConcernOptions::parse(writeConcernElement.Obj());
             if (!sw.isOK()) {
-                return CommandHelpers::appendCommandStatusNoThrow(*result, sw.getStatus());
+                return sw.getStatus();
             }
             writeConcern = sw.getValue();
 
-            if (!(writeConcern.wNumNodes == 1 ||
-                  writeConcern.wMode == WriteConcernOptions::kMajority)) {
-                return CommandHelpers::appendCommandStatusNoThrow(
-                    *result,
-                    {ErrorCodes::InvalidOptions,
-                     str::stream() << "Invalid replication write concern. User management write "
-                                      "commands may only use w:1 or w:'majority', got: "
-                                   << writeConcern.toBSON()});
+            if ((writeConcern.wNumNodes != 1) &&
+                (writeConcern.wMode != WriteConcernOptions::kMajority)) {
+                return {ErrorCodes::InvalidOptions,
+                        str::stream() << "Invalid replication write concern. User management write "
+                                         "commands may only use w:1 or w:'majority', got: "
+                                      << writeConcern.toBSON()};
             }
         }
 
@@ -631,29 +629,31 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         cmdToRun = modifiedCmd.obj();
     }
 
-    auto response =
+    auto swResponse =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            dbname,
+            dbname.toString(),
             cmdToRun,
             Shard::kDefaultConfigCommandTimeout,
             Shard::RetryPolicy::kNotIdempotent);
 
-    if (!response.isOK()) {
-        return CommandHelpers::appendCommandStatusNoThrow(*result, response.getStatus());
-    }
-    if (!response.getValue().commandStatus.isOK()) {
-        return CommandHelpers::appendCommandStatusNoThrow(*result,
-                                                          response.getValue().commandStatus);
-    }
-    if (!response.getValue().writeConcernStatus.isOK()) {
-        return CommandHelpers::appendCommandStatusNoThrow(*result,
-                                                          response.getValue().writeConcernStatus);
+    if (!swResponse.isOK()) {
+        return swResponse.getStatus();
     }
 
-    CommandHelpers::filterCommandReplyForPassthrough(response.getValue().response, result);
-    return true;
+    auto response = std::move(swResponse.getValue());
+
+    if (!response.commandStatus.isOK()) {
+        return response.commandStatus;
+    }
+
+    if (!response.writeConcernStatus.isOK()) {
+        return response.writeConcernStatus;
+    }
+
+    CommandHelpers::filterCommandReplyForPassthrough(response.response, result);
+    return Status::OK();
 }
 
 bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* opCtx,

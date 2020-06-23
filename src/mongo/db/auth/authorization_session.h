@@ -48,10 +48,6 @@
 
 namespace mongo {
 
-namespace auth {
-
-struct CreateOrUpdateRoleArgs;
-}  // namespace auth
 class Client;
 
 /**
@@ -258,7 +254,7 @@ public:
     virtual bool isAuthorizedToParseNamespaceElement(const BSONElement& elem) = 0;
 
     // Checks if this connection has the privileges necessary to create a new role
-    virtual bool isAuthorizedToCreateRole(const auth::CreateOrUpdateRoleArgs& args) = 0;
+    virtual bool isAuthorizedToCreateRole(const RoleName& roleName) = 0;
 
     // Utility function for isAuthorizedForActionsOnResource(
     //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)

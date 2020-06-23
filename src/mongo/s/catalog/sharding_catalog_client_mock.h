@@ -83,11 +83,13 @@ public:
     StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
         OperationContext* opCtx, repl::ReadConcernLevel readConcern) override;
 
-    bool runUserManagementWriteCommand(OperationContext* opCtx,
-                                       const std::string& commandName,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       BSONObjBuilder* result) override;
+    Status runUserManagementWriteCommand(OperationContext* opCtx,
+                                         StringData commandName,
+                                         StringData dbname,
+                                         const BSONObj& cmdObj,
+                                         BSONObjBuilder* result) override {
+        return Status::OK();
+    }
 
     bool runUserManagementReadCommand(OperationContext* opCtx,
                                       const std::string& dbname,

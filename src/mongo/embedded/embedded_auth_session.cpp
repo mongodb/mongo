@@ -173,7 +173,7 @@ public:
         return true;
     }
 
-    bool isAuthorizedToCreateRole(const auth::CreateOrUpdateRoleArgs&) override {
+    bool isAuthorizedToCreateRole(const RoleName&) override {
         return true;
     }
 
