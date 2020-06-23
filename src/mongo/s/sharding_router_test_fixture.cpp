@@ -187,6 +187,9 @@ ShardingTestFixture::ShardingTestFixture()
 
 ShardingTestFixture::~ShardingTestFixture() {
     CatalogCacheLoader::clearForTests(getServiceContext());
+    if (Grid::get(getServiceContext()) && Grid::get(getServiceContext())->getExecutorPool()) {
+        Grid::get(getServiceContext())->getExecutorPool()->shutdownAndJoin();
+    }
 }
 
 std::shared_ptr<RemoteCommandTargeterMock> ShardingTestFixture::configTargeter() {
