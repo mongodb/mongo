@@ -1268,7 +1268,7 @@ public:
         unique_ptr<DBClientCursor> cursor = _client.query(NamespaceString(ns), Query().sort("7"));
         while (cursor->more()) {
             BSONObj o = cursor->next();
-            verify(o.valid(BSONVersion::kLatest));
+            verify(o.valid());
         }
     }
     void run() {

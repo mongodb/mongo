@@ -624,7 +624,7 @@ void assertEquals(const std::string& json,
 }
 
 void checkEquivalence(const std::string& json, const BSONObj& bson) {
-    ASSERT(fromjson(json).valid(BSONVersion::kLatest));
+    ASSERT(fromjson(json).valid());
     assertEquals(json, bson, fromjson(json), "mode: json-to-bson");
     assertEquals(json, bson, fromjson(tojson(bson)), "mode: <default>");
     assertEquals(json, bson, fromjson(tojson(bson, LegacyStrict)), "mode: strict");

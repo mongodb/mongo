@@ -92,8 +92,7 @@ BSONObj DbMessage::nextJsObj() {
             _nextjsobj != nullptr && _theEnd - _nextjsobj >= 5);
 
     if (serverGlobalParams.objcheck) {
-        Status status = validateBSON(
-            _nextjsobj, _theEnd - _nextjsobj, Validator<BSONObj>::enabledBSONVersion());
+        Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj);
         uassert(ErrorCodes::InvalidBSON,
                 str::stream() << "Client Error: bad object in message: " << status.reason(),
                 status.isOK());

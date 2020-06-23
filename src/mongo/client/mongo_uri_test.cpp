@@ -582,7 +582,7 @@ BSONObj getBsonFromJsonFile(std::string fileName) {
     std::ifstream infile(filename.c_str());
     std::string data((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
     BSONObj obj = fromjson(data);
-    ASSERT_TRUE(obj.valid(BSONVersion::kLatest));
+    ASSERT_TRUE(obj.valid());
     ASSERT_TRUE(obj.hasField("tests"));
     BSONObj arr = obj.getField("tests").embeddedObject().getOwned();
     ASSERT_TRUE(arr.couldBeArray());

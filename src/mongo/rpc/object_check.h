@@ -45,16 +45,9 @@ class Status;
  */
 template <>
 struct Validator<BSONObj> {
-    inline static BSONVersion enabledBSONVersion() {
-        // The enabled BSON version is always the latest BSON version if no new BSON types have been
-        // added during the release. Otherwise, the BSON version returned should be controlled
-        // through the featureCompatibilityVersion.
-        return BSONVersion::kLatest;
-    }
 
     inline static Status validateLoad(const char* ptr, size_t length) {
-        return serverGlobalParams.objcheck ? validateBSON(ptr, length, enabledBSONVersion())
-                                           : Status::OK();
+        return serverGlobalParams.objcheck ? validateBSON(ptr, length) : Status::OK();
     }
 
     static Status validateStore(const BSONObj& toStore);

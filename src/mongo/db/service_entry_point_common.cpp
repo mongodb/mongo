@@ -131,7 +131,7 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
                                       Message* response) {
     curop->debug().errInfo = exception.toStatus();
 
-    if (queryMessage.query.valid(BSONVersion::kLatest))
+    if (queryMessage.query.valid())
         LOGV2_OPTIONS(51777,
                       {logv2::LogComponent::kQuery},
                       "Assertion {error} ns: {namespace} query: {query}",

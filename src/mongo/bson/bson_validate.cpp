@@ -70,8 +70,8 @@ MONGO_COMPILER_NOINLINE Status makeError(StringData baseMsg,
 
 class Buffer {
 public:
-    Buffer(const char* buffer, uint64_t maxLength, BSONVersion version)
-        : _buffer(buffer), _position(0), _maxLength(maxLength), _version(version) {}
+    Buffer(const char* buffer, uint64_t maxLength)
+        : _buffer(buffer), _position(0), _maxLength(maxLength) {}
 
     template <typename N>
     bool readNumber(N* out) {
@@ -149,10 +149,6 @@ public:
         return _buffer;
     }
 
-    BSONVersion version() const {
-        return _version;
-    }
-
     /**
      * WARNING: only pass in a non-EOO idElem if it has been fully validated already!
      */
@@ -165,7 +161,6 @@ private:
     uint64_t _position;
     uint64_t _maxLength;
     BSONElement _idElem;
-    BSONVersion _version;
 };
 
 struct ValidationState {
@@ -417,12 +412,12 @@ Status validateBSONIterative(Buffer* buffer) {
 
 }  // namespace
 
-Status validateBSON(const char* originalBuffer, uint64_t maxLength, BSONVersion version) {
+Status validateBSON(const char* originalBuffer, uint64_t maxLength) {
     if (maxLength < 5) {
         return Status(ErrorCodes::InvalidBSON, "bson data has to be at least 5 bytes");
     }
 
-    Buffer buf(originalBuffer, maxLength, version);
+    Buffer buf(originalBuffer, maxLength);
     return validateBSONIterative(&buf);
 }
 

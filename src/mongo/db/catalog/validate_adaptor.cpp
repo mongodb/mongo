@@ -78,8 +78,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         LOGV2(46666001, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
     }
 
-    const Status status = validateBSON(
-        recordBson.objdata(), recordBson.objsize(), Validator<BSONObj>::enabledBSONVersion());
+    const Status status = validateBSON(recordBson.objdata(), recordBson.objsize());
     if (status.isOK()) {
         *dataSize = recordBson.objsize();
     } else {

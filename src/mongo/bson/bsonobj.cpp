@@ -264,8 +264,8 @@ BSONObj BSONObj::jsonStringBuffer(JsonStringFormat format,
     }
 }
 
-bool BSONObj::valid(BSONVersion version) const {
-    return validateBSON(objdata(), objsize(), version).isOK();
+bool BSONObj::valid() const {
+    return validateBSON(objdata(), objsize()).isOK();
 }
 
 int BSONObj::woCompare(const BSONObj& r,

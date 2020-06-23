@@ -576,10 +576,9 @@ public:
     bool hasFieldNames() const;
 
     /**
-     * Returns true if this object is valid according to the specified BSON version, and returns
-     * false otherwise.
+     * Returns true if this object is valid and returns false otherwise.
      */
-    bool valid(BSONVersion version) const;
+    bool valid() const;
 
     /** add all elements of the object to the specified vector */
     void elems(std::vector<BSONElement>&) const;

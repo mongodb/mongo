@@ -429,7 +429,7 @@ BSONObj readDumpFile(const BSONObj& a, void*) {
         uassertStatusOK(swObj);
 
         const auto obj = swObj.getValue();
-        uassertStatusOK(validateBSON(obj.objdata(), valid, BSONVersion::kLatest));
+        uassertStatusOK(validateBSON(obj.objdata(), valid));
 
         array.append(obj);
     }

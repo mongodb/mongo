@@ -301,7 +301,6 @@ private:
     std::string _scopedHost;
     std::string _lazyHost;
     bool wasError;
-    BSONVersion _enabledBSONVersion;
     bool _useFindCommand = true;
     bool _connectionHasPendingReplies = false;
     int _lastRequestId = 0;

@@ -136,7 +136,7 @@ BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
     // Check the document is valid BSON, with only the expected fields.
     // Use the latest BSON validation version. Existing view definitions are allowed to contain
     // decimal data even if decimal is disabled.
-    fassert(40224, validateBSON(recordData.data(), recordData.size(), BSONVersion::kLatest));
+    fassert(40224, validateBSON(recordData.data(), recordData.size()));
     BSONObj viewDefinition = recordData.toBson();
 
     bool valid = true;

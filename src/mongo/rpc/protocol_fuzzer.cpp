@@ -52,7 +52,7 @@ struct CompressionInfrastructure {
 };
 
 void validateBSON(const BSONObj& obj) {
-    validateBSON(obj.objdata(), obj.objsize(), BSONVersion::kLatest).ignore();
+    validateBSON(obj.objdata(), obj.objsize()).ignore();
 }
 
 void doFuzzing(ConstDataRangeCursor fuzzedData) try {

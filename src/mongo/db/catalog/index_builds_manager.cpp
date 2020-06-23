@@ -160,9 +160,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
             for (int i = 0; record && i < internalInsertMaxBatchSize.load(); i++) {
                 RecordId id = record->id;
                 RecordData& data = record->data;
-                // Use the latest BSON validation version. We retain decimal data when repairing
-                // database even if decimal is disabled.
-                auto validStatus = validateBSON(data.data(), data.size(), BSONVersion::kLatest);
+                // We retain decimal data when repairing database even if decimal is disabled.
+                auto validStatus = validateBSON(data.data(), data.size());
                 if (!validStatus.isOK()) {
                     if (repair == RepairData::kNo) {
                         LOGV2_FATAL(31396,

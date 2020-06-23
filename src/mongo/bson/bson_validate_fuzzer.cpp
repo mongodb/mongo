@@ -30,6 +30,6 @@
 #include "mongo/bson/bson_validate.h"
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
-    mongo::Status ret = mongo::validateBSON(Data, Size, mongo::BSONVersion::kLatest);
+    mongo::Status ret = mongo::validateBSON(Data, Size);
     return 0;
 }

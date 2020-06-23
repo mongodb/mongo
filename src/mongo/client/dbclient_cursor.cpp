@@ -583,7 +583,6 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       cursorId(cursorId),
       _ownCursor(true),
       wasError(false),
-      _enabledBSONVersion(Validator<BSONObj>::enabledBSONVersion()),
       _readConcernObj(readConcernObj) {
     if (queryOptions & QueryOptionLocal_forceOpQuery) {
         // Legacy OP_QUERY does not support UUIDs.

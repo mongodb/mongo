@@ -54,10 +54,10 @@ void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
 
 TEST(BSONValidate, Basic) {
     BSONObj x;
-    ASSERT_TRUE(x.valid(BSONVersion::kLatest));
+    ASSERT_TRUE(x.valid());
 
     x = BSON("x" << 1);
-    ASSERT_TRUE(x.valid(BSONVersion::kLatest));
+    ASSERT_TRUE(x.valid());
 }
 
 TEST(BSONValidate, RandomData) {
@@ -83,12 +83,12 @@ TEST(BSONValidate, RandomData) {
 
         ASSERT_EQUALS(size, o.objsize());
 
-        if (o.valid(BSONVersion::kLatest)) {
+        if (o.valid()) {
             numValid++;
             jsonSize += o.jsonString().size();
-            ASSERT_OK(validateBSON(o.objdata(), o.objsize(), BSONVersion::kLatest));
+            ASSERT_OK(validateBSON(o.objdata(), o.objsize()));
         } else {
-            ASSERT_NOT_OK(validateBSON(o.objdata(), o.objsize(), BSONVersion::kLatest));
+            ASSERT_NOT_OK(validateBSON(o.objdata(), o.objsize()));
         }
 
         delete[] x;
@@ -134,12 +134,12 @@ TEST(BSONValidate, MuckingData1) {
         data[i] = 0xc8U;
 
         numToRun++;
-        if (mine.valid(BSONVersion::kLatest)) {
+        if (mine.valid()) {
             numValid++;
             jsonSize += mine.jsonString().size();
-            ASSERT_OK(validateBSON(mine.objdata(), mine.objsize(), BSONVersion::kLatest));
+            ASSERT_OK(validateBSON(mine.objdata(), mine.objsize()));
         } else {
-            ASSERT_NOT_OK(validateBSON(mine.objdata(), mine.objsize(), BSONVersion::kLatest));
+            ASSERT_NOT_OK(validateBSON(mine.objdata(), mine.objsize()));
         }
     }
 
@@ -191,29 +191,29 @@ TEST(BSONValidate, Fuzz) {
         // to compare outputs against (BSONObj::valid() is a wrapper for validateBSON()).
         // Thus, the reason for this test is to ensure that validateBSON() doesn't trip
         // any ASAN or UBSAN check when fed fuzzed input.
-        validateBSON(fuzzed.objdata(), fuzzed.objsize(), BSONVersion::kLatest).isOK();
+        validateBSON(fuzzed.objdata(), fuzzed.objsize()).isOK();
     }
 }
 
 TEST(BSONValidateFast, Empty) {
     BSONObj x;
-    ASSERT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
+    ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
 }
 
 TEST(BSONValidateFast, RegEx) {
     BSONObjBuilder b;
     b.appendRegex("foo", "i");
     BSONObj x = b.obj();
-    ASSERT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
+    ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
 }
 
 TEST(BSONValidateFast, Simple0) {
     BSONObj x;
-    ASSERT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
+    ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
 
     x = BSON("foo" << 17 << "bar"
                    << "eliot");
-    ASSERT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
+    ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
 }
 
 TEST(BSONValidateFast, Simple2) {
@@ -225,7 +225,7 @@ TEST(BSONValidateFast, Simple2) {
         sprintf(buf, "bar%d", i);
         b.appendMaxForType(buf, i);
         BSONObj x = b.obj();
-        ASSERT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
+        ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
     }
 }
 
@@ -240,15 +240,15 @@ TEST(BSONValidateFast, Simple3) {
         b.appendMaxForType(buf, i);
     }
     BSONObj x = b.obj();
-    ASSERT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
+    ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
 }
 
 TEST(BSONValidateFast, NestedObject) {
     BSONObj x = BSON("a" << 1 << "b"
                          << BSON("c" << 2 << "d" << BSONArrayBuilder().obj() << "e"
                                      << BSON_ARRAY("1" << 2 << 3)));
-    ASSERT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
-    ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize() / 2, BSONVersion::kLatest));
+    ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
+    ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize() / 2));
 }
 
 TEST(BSONValidateFast, ErrorWithId) {
@@ -257,7 +257,7 @@ TEST(BSONValidateFast, ErrorWithId) {
     ob.append("_id", 1);
     appendInvalidStringElement("not_id", &bb);
     const BSONObj x = ob.done();
-    const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
+    const Status status = validateBSON(x.objdata(), x.objsize());
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(
         status.reason(),
@@ -270,7 +270,7 @@ TEST(BSONValidateFast, ErrorBeforeId) {
     appendInvalidStringElement("not_id", &bb);
     ob.append("_id", 1);
     const BSONObj x = ob.done();
-    const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
+    const Status status = validateBSON(x.objdata(), x.objsize());
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
                   "not null terminated string in element with field name 'not_id' in object with "
@@ -282,7 +282,7 @@ TEST(BSONValidateFast, ErrorNoId) {
     BSONObjBuilder ob(bb);
     appendInvalidStringElement("not_id", &bb);
     const BSONObj x = ob.done();
-    const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
+    const Status status = validateBSON(x.objdata(), x.objsize());
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
                   "not null terminated string in element with field name 'not_id' in object with "
@@ -294,7 +294,7 @@ TEST(BSONValidateFast, ErrorIsInId) {
     BSONObjBuilder ob(bb);
     appendInvalidStringElement("_id", &bb);
     const BSONObj x = ob.done();
-    const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
+    const Status status = validateBSON(x.objdata(), x.objsize());
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(
         status.reason(),
@@ -309,7 +309,7 @@ TEST(BSONValidateFast, NonTopLevelId) {
                    << "not the real _id"));
     appendInvalidStringElement("not_id2", &bb);
     const BSONObj x = ob.done();
-    const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
+    const Status status = validateBSON(x.objdata(), x.objsize());
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
                   "not null terminated string in element with field name 'not_id2' in object with "
@@ -329,14 +329,14 @@ TEST(BSONValidateFast, StringHasSomething) {
                       + 4  // size
                   ,
                   x.objsize());
-    ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
+    ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize()));
 }
 
 TEST(BSONValidateBool, BoolValuesAreValidated) {
     BSONObjBuilder bob;
     bob.append("x", false);
     const BSONObj obj = bob.done();
-    ASSERT_OK(validateBSON(obj.objdata(), obj.objsize(), BSONVersion::kLatest));
+    ASSERT_OK(validateBSON(obj.objdata(), obj.objsize()));
     const BSONElement x = obj["x"];
     // Legal, because we know that the BufBuilder gave
     // us back some heap memory, which isn't oringinally const.
@@ -346,9 +346,9 @@ TEST(BSONValidateBool, BoolValuesAreValidated) {
          ++val) {
         *writable = static_cast<char>(val);
         if ((val == 0) || (val == 1)) {
-            ASSERT_OK(validateBSON(obj.objdata(), obj.objsize(), BSONVersion::kLatest));
+            ASSERT_OK(validateBSON(obj.objdata(), obj.objsize()));
         } else {
-            ASSERT_NOT_OK(validateBSON(obj.objdata(), obj.objsize(), BSONVersion::kLatest));
+            ASSERT_NOT_OK(validateBSON(obj.objdata(), obj.objsize()));
         }
     }
 }
@@ -361,7 +361,7 @@ TEST(BSONValidateFast, InvalidType) {
     BSONObj obj(buffer);
 
     // Validate fails.
-    ASSERT_NOT_OK(validateBSON(obj.objdata(), obj.objsize(), BSONVersion::kLatest));
+    ASSERT_NOT_OK(validateBSON(obj.objdata(), obj.objsize()));
     ASSERT_THROWS_CODE(obj.woCompare(BSON("A" << 1)), DBException, 10320);
 }
 

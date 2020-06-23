@@ -284,8 +284,7 @@ TEST_F(KeyStringBuilderTest, ExceededBSONDepth) {
         nestedObj = BSON("" << nestedObj);
     }
     // This BSON object should not be valid.
-    auto validateStatus =
-        validateBSON(nestedObj.objdata(), nestedObj.objsize(), BSONVersion::kV1_1);
+    auto validateStatus = validateBSON(nestedObj.objdata(), nestedObj.objsize());
     ASSERT_EQ(ErrorCodes::Overflow, validateStatus.code());
 
     // Construct a KeyString from the invalid BSON, and confirm that it fails to convert back to

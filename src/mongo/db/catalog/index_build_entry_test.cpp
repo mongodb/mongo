@@ -124,7 +124,7 @@ TEST(IndexBuildEntryTest, SerializeAndDeserialize) {
     entry.setCommitReadyMembers(generateCommitReadyMembers(3));
 
     BSONObj obj = entry.toBSON();
-    ASSERT_TRUE(obj.valid(BSONVersion::kLatest));
+    ASSERT_TRUE(obj.valid());
 
     IDLParserErrorContext ctx("IndexBuildsEntry Parser");
     IndexBuildEntry rebuiltEntry = IndexBuildEntry::parse(ctx, obj);

@@ -162,9 +162,8 @@ struct Cloner::Fun {
             BSONObj tmp = i.nextSafe();
 
             /* assure object is valid.  note this will slow us down a little. */
-            // Use the latest BSON validation version. We allow cloning of collections containing
-            // decimal data even if decimal is disabled.
-            const Status status = validateBSON(tmp.objdata(), tmp.objsize(), BSONVersion::kLatest);
+            // We allow cloning of collections containing decimal data even if decimal is disabled.
+            const Status status = validateBSON(tmp.objdata(), tmp.objsize());
             if (!status.isOK()) {
                 if (gSkipCorruptDocumentsWhenCloning.load()) {
                     LOGV2_WARNING(20423,
