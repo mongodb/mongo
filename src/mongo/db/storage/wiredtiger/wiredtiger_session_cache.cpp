@@ -111,9 +111,7 @@ void _openCursor(WT_SESSION* session,
 }
 }  // namespace
 
-WT_CURSOR* WiredTigerSession::getCachedCursor(const std::string& uri,
-                                              uint64_t id,
-                                              const char* config) {
+WT_CURSOR* WiredTigerSession::getCachedCursor(const std::string& uri, uint64_t id) {
     // Find the most recently used cursor
     for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
         if (i->_id == id) {
@@ -123,11 +121,7 @@ WT_CURSOR* WiredTigerSession::getCachedCursor(const std::string& uri,
             return c;
         }
     }
-
-    WT_CURSOR* cursor = nullptr;
-    _openCursor(_session, uri, config, &cursor);
-    _cursorsOut++;
-    return cursor;
+    return nullptr;
 }
 
 WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* config) {

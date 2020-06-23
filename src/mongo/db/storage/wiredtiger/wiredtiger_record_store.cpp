@@ -1550,7 +1550,8 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     auto sessRaii = cache->getSession();
     WT_CURSOR* cursor = writeConflictRetry(opCtx, "getLatestOplogTimestamp", "local.oplog.rs", [&] {
-        return sessRaii->getCachedCursor(_uri, _tableId, nullptr);
+        auto cachedCursor = sessRaii->getCachedCursor(_uri, _tableId);
+        return cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
     });
     ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor); });
     int ret = cursor->prev(cursor);
@@ -1575,7 +1576,8 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
         auto sessRaii = cache->getSession();
         WT_CURSOR* cursor =
             writeConflictRetry(opCtx, "getEarliestOplogTimestamp", "local.oplog.rs", [&] {
-                return sessRaii->getCachedCursor(_uri, _tableId, nullptr);
+                auto cachedCursor = sessRaii->getCachedCursor(_uri, _tableId);
+                return cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
             });
         ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor); });
         auto ret = cursor->next(cursor);

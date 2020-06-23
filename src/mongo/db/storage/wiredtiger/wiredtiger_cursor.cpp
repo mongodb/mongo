@@ -48,6 +48,16 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
     _session = _ru->getSession();
     _readOnce = _ru->getReadOnce();
 
+    // Attempt to retrieve the cursor from the cache. Cursors using the 'read_once' option will
+    // not be in the cache.
+    if (!_readOnce) {
+        _cursor = _session->getCachedCursor(uri, tableID);
+        if (_cursor) {
+            return;
+        }
+    }
+
+    // Construct a new cursor with the provided options.
     str::stream builder;
     if (_readOnce) {
         builder << "read_once=true,";
@@ -60,11 +70,7 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
 
     const std::string config = builder;
     try {
-        if (_readOnce) {
-            _cursor = _session->getNewCursor(uri, config.c_str());
-        } else {
-            _cursor = _session->getCachedCursor(uri, tableID, config.c_str());
-        }
+        _cursor = _session->getNewCursor(uri, config.c_str());
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         LOGV2_FATAL_NOTRACE(50883, "{ex}", "Cursor not found", "error"_attr = ex);
     }

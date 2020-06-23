@@ -144,8 +144,11 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(OperationContext* opCt
 
     WT_CURSOR* cursor = nullptr;
     try {
-        cursor = session->getCachedCursor(
-            "metadata:create", WiredTigerSession::kMetadataCreateTableId, NULL);
+        const std::string metadataURI = "metadata:create";
+        cursor = session->getCachedCursor(metadataURI, WiredTigerSession::kMetadataCreateTableId);
+        if (!cursor) {
+            cursor = session->getNewCursor(metadataURI);
+        }
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         LOGV2_FATAL_NOTRACE(51257, "Cursor not found", "error"_attr = ex);
     }
@@ -171,7 +174,11 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, Str
     auto session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
     WT_CURSOR* cursor = nullptr;
     try {
-        cursor = session->getCachedCursor("metadata:", WiredTigerSession::kMetadataTableId, NULL);
+        const std::string metadataURI = "metadata:";
+        cursor = session->getCachedCursor(metadataURI, WiredTigerSession::kMetadataTableId);
+        if (!cursor) {
+            cursor = session->getNewCursor(metadataURI);
+        }
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         LOGV2_FATAL_NOTRACE(31293, "Cursor not found", "error"_attr = ex);
     }

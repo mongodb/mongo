@@ -93,15 +93,10 @@ public:
     /**
      * Gets a cursor on the table id 'id'.
      *
-     * The config string specifies optional arguments for the cursor. For example, when
-     * the config contains 'read_once=true', this is intended for operations that will be
-     * sequentially scanning large amounts of data. If no cursor is currently available in the
-     * cursor cache, then a new cached cursor will be created with the given config specification.
-     *
      * This may return a cursor from the cursor cache and these cursors should *always* be released
      * into the cache by calling releaseCursor().
      */
-    WT_CURSOR* getCachedCursor(const std::string& uri, uint64_t id, const char* config);
+    WT_CURSOR* getCachedCursor(const std::string& uri, uint64_t id);
 
 
     /**
@@ -115,6 +110,13 @@ public:
      * released into the cache by calling releaseCursor(). Use closeCursor() instead.
      */
     WT_CURSOR* getNewCursor(const std::string& uri, const char* config);
+
+    /**
+     * Wrapper for getNewCursor() without a config string.
+     */
+    WT_CURSOR* getNewCursor(const std::string& uri) {
+        return getNewCursor(uri, nullptr);
+    }
 
     /**
      * Release a cursor into the cursor cache and close old cursors if the number of cursors in the
