@@ -21,6 +21,12 @@ const rst = new ReplSetTest({
                 priority: 0,
             },
         },
+        {
+            // Disallow elections on secondary.
+            rsConfig: {
+                priority: 0,
+            },
+        }
     ]
 });
 
