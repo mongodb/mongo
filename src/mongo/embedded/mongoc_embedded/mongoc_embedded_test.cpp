@@ -285,8 +285,7 @@ int main(int argc, char** argv) {
     ::mongo::serverGlobalParams.noUnixSocket = true;
 
     // See comment by the same code block in mongo_embedded_test.cpp
-    const char* null_argv[1] = {nullptr};
-    ret = mongo::runGlobalInitializers(0, null_argv, nullptr);
+    ret = mongo::runGlobalInitializers(std::vector<std::string>{});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
         return EXIT_FAILURE;
