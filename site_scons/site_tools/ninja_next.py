@@ -152,16 +152,39 @@ def get_dependencies(node, skip_sources=False):
     return [get_path(src_file(child)) for child in node.children()]
 
 
-def get_inputs(node):
-    """Collect the Ninja inputs for node."""
+def get_inputs(node, skip_unknown_types=False):
+    """
+    Collect the Ninja inputs for node.
+    
+    If the given node has inputs which can not be converted into something
+    Ninja can process, this will throw an exception. Optionally, those nodes
+    that are not processable can be skipped as inputs with the 
+    skip_unknown_types keyword arg.
+    """
     executor = node.get_executor()
     if executor is not None:
         inputs = executor.get_all_sources()
     else:
         inputs = node.sources
 
-    inputs = [get_path(src_file(o)) for o in inputs]
-    return inputs
+    # Some Nodes (e.g. Python.Value Nodes) won't have files associated. We allow these to be
+    # optionally skipped to enable the case where we will re-invoke SCons for things
+    # like TEMPLATE. Otherwise, we have no direct way to express the behavior for such
+    # Nodes in Ninja, so we raise a hard error
+    ninja_nodes = []
+    for input_node in inputs:
+        if isinstance(input_node, (SCons.Node.FS.Base, SCons.Node.Alias.Alias)):
+            ninja_nodes.append(input_node)
+        else:
+            if skip_unknown_types:
+                continue
+            raise Exception("Can't process {} node '{}' as an input for '{}'".format(
+                type(input_node), 
+                str(input_node), 
+                str(node)))
+
+    # convert node items into raw paths/aliases for ninja
+    return [get_path(src_file(o)) for o in ninja_nodes]
 
 
 def get_outputs(node):
@@ -250,11 +273,14 @@ class SConsToNinjaTranslator:
         # dependencies don't really matter when we're going to shove these to
         # the bottom of ninja's DAG anyway and Textfile builders can have text
         # content as their source which doesn't work as an implicit dep in
-        # ninja.
+        # ninja. We suppress errors on input Nodes types that we cannot handle 
+        # since we expect that the re-invocation of SCons will handle dependency 
+        # tracking for those Nodes and their dependents.
         if name == "_action":
             return {
                 "rule": "TEMPLATE",
                 "outputs": get_outputs(node),
+                "inputs": get_inputs(node, skip_unknown_types=True),
                 "implicit": get_dependencies(node, skip_sources=True),
             }
 
@@ -683,13 +709,13 @@ class NinjaState:
 
             # Special handling for outputs and implicit since we need to
             # aggregate not replace for each builder.
-            for agg_key in ["outputs", "implicit"]:
+            for agg_key in ["outputs", "implicit", "inputs"]:
                 new_val = template_builds.get(agg_key, [])
 
                 # Use pop so the key is removed and so the update
                 # below will not overwrite our aggregated values.
                 cur_val = template_builder.pop(agg_key, [])
-                if isinstance(cur_val, list):
+                if is_List(cur_val):
                     new_val += cur_val
                 else:
                     new_val.append(cur_val)
