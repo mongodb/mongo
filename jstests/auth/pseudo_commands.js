@@ -116,10 +116,11 @@ function runTest(conn) {
             var passed = true;
             try {
                 var opid;
+                const maxOpId = Math.pow(2, 31) - 1;  // Operation id cannot exceed INT_MAX.
                 if (isMongos(db)) {  // opid format different between mongos and mongod
-                    opid = arbitraryShard._id + ":1234";
+                    opid = arbitraryShard._id + ":" + maxOpId.toString();
                 } else {
-                    opid = 1234;
+                    opid = maxOpId;
                 }
                 var res = db.killOp(opid);
                 printjson(res);
