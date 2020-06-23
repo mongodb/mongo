@@ -33,13 +33,11 @@
 
 namespace mongo {
 
-// todo: ideally move to db/ instead of bson/, but elim any dependencies first
-
 /** A precomputation of a BSON index or sort key pattern.  That is something like:
-       { a : 1, b : -1 }
-    The constructor is private to make conversion more explicit so we notice where we call make().
-    Over time we should push this up higher and higher.
-*/
+ *     { a : 1, b : -1 }
+ *   The constructor is private to make conversion more explicit so we notice where we call make().
+ *   Over time we should push this up higher and higher.
+ */
 class Ordering {
     unsigned bits;
     Ordering(unsigned b) : bits(b) {}
@@ -57,9 +55,9 @@ public:
     }
 
     /** so, for key pattern { a : 1, b : -1 }
-        get(0) == 1
-        get(1) == -1
-    */
+     *   get(0) == 1
+     *   get(1) == -1
+     */
     int get(int i) const {
         uassert(ErrorCodes::Overflow,
                 str::stream() << "Ordering offset is out of bounds: " << i,
@@ -67,17 +65,9 @@ public:
         return ((1 << i) & bits) ? -1 : 1;
     }
 
-    // for woCompare...
     unsigned descending(unsigned mask) const {
         return bits & mask;
     }
-
-    /*operator std::string() const {
-        StringBuilder buf;
-        for ( unsigned i=0; i<nkeys; i++)
-            buf.append( get(i) > 0 ? "+" : "-" );
-        return buf.str();
-    }*/
 
     static Ordering make(const BSONObj& obj) {
         unsigned b = 0;
