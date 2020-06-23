@@ -26,7 +26,7 @@ const rst = new ReplSetTest({
     useBridge: true,
     // We shorten the election timeout period so the tests with an unhealthy set run and recover
     // faster.
-    settings: {electionTimeoutMillis: 2000}
+    settings: {electionTimeoutMillis: 2000, heartbeatIntervalMillis: 400}
 });
 rst.startSet();
 rst.initiate();
