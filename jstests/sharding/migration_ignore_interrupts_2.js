@@ -30,8 +30,13 @@ jsTest.log("Set up complete, now proceeding to test that migration interruption 
 
 // Start a migration between shard0 and shard1 on coll1, pause in steady state before commit.
 pauseMoveChunkAtStep(shard0, moveChunkStepNames.reachedSteadyState);
-var joinMoveChunk = moveChunkParallel(
-    staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+var joinMoveChunk = moveChunkParallel(staticMongod,
+                                      st.s0.host,
+                                      {a: 0},
+                                      null,
+                                      coll1.getFullName(),
+                                      st.shard1.shardName,
+                                      true /**Parallel should expect success */);
 waitForMoveChunkStep(shard0, moveChunkStepNames.reachedSteadyState);
 
 jsTest.log('Sending false commit command....');
@@ -45,9 +50,7 @@ assert.eq(true, res.state === "steady", "False commit command succeeded.");
 
 // Finish migration.
 unpauseMoveChunkAtStep(shard0, moveChunkStepNames.reachedSteadyState);
-assert.doesNotThrow(function() {
-    joinMoveChunk();
-});
+joinMoveChunk();
 
 assert.eq(0, shard0Coll1.find().itcount());
 assert.eq(1, shard1Coll1.find().itcount());

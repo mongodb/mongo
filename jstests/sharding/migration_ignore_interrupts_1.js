@@ -44,8 +44,13 @@ jsTest.log("Set up complete, now proceeding to test that migration interruptions
 
 // Start a migration between shard0 and shard1 on coll1 and then pause it
 pauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
-var joinMoveChunk = moveChunkParallel(
-    staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+var joinMoveChunk = moveChunkParallel(staticMongod,
+                                      st.s0.host,
+                                      {a: 0},
+                                      null,
+                                      coll1.getFullName(),
+                                      st.shard1.shardName,
+                                      true /**Parallel should expect success */);
 waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
 assert.commandFailedWithCode(
@@ -65,9 +70,7 @@ assert.commandFailedWithCode(
 
 // Finish migration
 unpauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
-assert.doesNotThrow(function() {
-    joinMoveChunk();
-});
+joinMoveChunk();
 assert.eq(1, shard0Coll1.find().itcount());
 assert.eq(1, shard1Coll1.find().itcount());
 assert.eq(1, shard2Coll1.find().itcount());

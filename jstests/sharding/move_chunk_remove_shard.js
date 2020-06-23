@@ -26,8 +26,13 @@ st._configServers.forEach((conn) => {
     });
 });
 
-let joinMoveChunk =
-    moveChunkParallel(staticMongod, st.s.host, {x: 0}, null, 'test.user', st.shard1.shardName);
+let joinMoveChunk = moveChunkParallel(staticMongod,
+                                      st.s.host,
+                                      {x: 0},
+                                      null,
+                                      'test.user',
+                                      st.shard1.shardName,
+                                      false /**parallel should expect failure */);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -39,9 +44,7 @@ assert.soon(function() {
 unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
 // moveChunk will fail because the destination shard no longer exists.
-assert.throws(function() {
-    joinMoveChunk();
-});
+joinMoveChunk();
 
 // All shard0 should now own all chunks
 st.s.getDB('config').chunks.find().forEach(function(chunk) {
