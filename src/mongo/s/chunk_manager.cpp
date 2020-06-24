@@ -51,12 +51,19 @@ namespace {
 // Used to generate sequence numbers to assign to each newly created ChunkManager
 AtomicUInt32 nextCMSequenceNumber(0);
 
-void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
-    for (auto&& element : o) {
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Not all elements of " << o << " are of type " << typeName(type),
-                element.type() == type);
+bool allElementsAreOfType(BSONType type, const BSONObj& obj) {
+    for (auto&& elem : obj) {
+        if (elem.type() != type) {
+            return false;
+        }
     }
+    return true;
+}
+
+void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Not all elements of " << o << " are of type " << typeName(type),
+            allElementsAreOfType(type, o));
 }
 
 }  // namespace
@@ -184,6 +191,12 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
     uassert(ErrorCodes::BadValue,
             "The range's max value is smaller than its min",
             SimpleBSONObjComparator::kInstance.evaluate(min <= max));
+
+    // If our range is [MinKey, MaxKey], we can simply return all shard ids right away.
+    if (allElementsAreOfType(MinKey, min) && allElementsAreOfType(MaxKey, max)) {
+        getAllShardIds(shardIds);
+        return;
+    }
 
     auto it = _chunkMapViews.chunkRangeMap.upper_bound(min);
     auto end = _chunkMapViews.chunkRangeMap.upper_bound(max);
