@@ -1004,12 +1004,15 @@ CommandRegistry* globalCommandRegistry();
  * Prefer this syntax to using MONGO_INITIALIZER directly.
  * The created Command object is "leaked" intentionally, since it will register itself.
  */
-#define MONGO_REGISTER_TEST_COMMAND(CmdType)                                \
-    MONGO_INITIALIZER(RegisterTestCommand_##CmdType)(InitializerContext*) { \
-        if (getTestCommandsEnabled()) {                                     \
-            new CmdType();                                                  \
-        }                                                                   \
-        return Status::OK();                                                \
+#define MONGO_REGISTER_TEST_COMMAND(CmdType)                                     \
+    MONGO_INITIALIZER_WITH_PREREQUISITES(                                        \
+        RegisterTestCommand_##CmdType,                                           \
+        (::mongo::defaultInitializerName().c_str(), "EndStartupOptionHandling")) \
+    (InitializerContext*) {                                                      \
+        if (getTestCommandsEnabled()) {                                          \
+            new CmdType();                                                       \
+        }                                                                        \
+        return Status::OK();                                                     \
     }
 
 }  // namespace mongo
