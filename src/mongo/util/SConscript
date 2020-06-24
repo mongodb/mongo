@@ -658,7 +658,7 @@ if use_libunwind:
         # you must add new libdeps here, or for the similar cases
         # below, do it as follows:
         #
-        # LIBDEPS=(stacktraceEnv['LIBDEPS'] + [
+        # LIBDEPS=(stacktraceEnv.get('LIBDEPS', []) + [
         #     some_new_libdep,
         #     another_new_libdep,
         # ]),
@@ -671,8 +671,9 @@ if use_libunwind:
 stacktraceEnv.CppUnitTest(
     target='stacktrace_test',
     source='stacktrace_test.cpp',
-    # See above for how to handle any future LIBDEPS additions here.
-    # LIBDEPS=...
+    LIBDEPS=(stacktraceEnv.get('LIBDEPS', []) + [
+        '$BUILD_DIR/third_party/shim_pcrecpp'
+    ]),
 )
 
 stacktraceEnv.Benchmark(

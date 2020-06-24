@@ -40,6 +40,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <pcrecpp.h>
 
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/log_manager.h"
@@ -79,6 +80,10 @@ auto& suitesMap() {
 }
 
 }  // namespace
+
+bool searchRegex(const std::string& pattern, const std::string& string) {
+    return pcrecpp::RE(pattern).PartialMatch(string);
+}
 
 class Result {
 public:

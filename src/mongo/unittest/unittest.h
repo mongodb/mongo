@@ -280,7 +280,7 @@
 
 #define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX)                                           \
     if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(REGEX));                    \
-        pcrecpp::RE(std::get<1>(tup_)).PartialMatch(std::get<0>(tup_))) {                       \
+        ::mongo::unittest::searchRegex(std::get<1>(tup_), std::get<0>(tup_))) {                 \
     } else                                                                                      \
         FAIL(([&] {                                                                             \
             const auto& [haystack, sub] = tup_;                                                 \
@@ -344,6 +344,8 @@
     UnitTest_SuiteName##SUITE_NAME##TestName##TEST_NAME
 
 namespace mongo::unittest {
+
+bool searchRegex(const std::string& pattern, const std::string& string);
 
 class Result;
 
