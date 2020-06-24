@@ -97,6 +97,8 @@ __version__ = "1.0"
 
 LOGGER = logging.getLogger(__name__)
 
+ONE_HOUR_SECS = 60 * 60
+
 REPORT_JSON = {}  # type: ignore
 REPORT_JSON_FILE = ""
 REPORT_JSON_SUCCESS = False
@@ -796,21 +798,19 @@ class ProcessControl(object):
                                 proc.pid)
 
 
-# pylint: disable=undefined-variable,unused-variable
+# pylint: disable=undefined-variable,unused-variable,too-many-instance-attributes
 class WindowsService(object):
     """Windows service control class."""
 
-    def __init__(self, name, bin_path, bin_options, start_type=None):
+    def __init__(self, name, bin_path, bin_options, db_path):
         """Initialize WindowsService."""
 
         self.name = name
         self.bin_name = os.path.basename(bin_path)
         self.bin_path = bin_path
         self.bin_options = bin_options
-        if start_type is not None:
-            self.start_type = start_type
-        else:
-            self.start_type = win32service.SERVICE_DEMAND_START
+        self.db_path = db_path
+        self.start_type = win32service.SERVICE_DEMAND_START
         self.pids = []
         self._states = {
             win32service.SERVICE_CONTINUE_PENDING: "continue pending",
@@ -945,12 +945,13 @@ class PosixService(object):
     i.e., mongod with '--fork'.
     """
 
-    def __init__(self, name, bin_path, bin_options):
+    def __init__(self, name, bin_path, bin_options, db_path):
         """Initialize PosixService."""
         self.name = name
         self.bin_path = bin_path
         self.bin_name = os.path.basename(bin_path)
         self.bin_options = bin_options
+        self.db_path = db_path
         self.pids = []
 
     def create(self):  # pylint: disable=no-self-use
@@ -975,17 +976,33 @@ class PosixService(object):
         return ret, output
 
     def stop(self, timeout):  # pylint: disable=unused-argument
-        """Stop process. Returns (code, output) tuple."""
+        """Crash the posix process process. Empty "pids" to signal to `status` the process was terminated. Returns (code, output) tuple."""
         proc = ProcessControl(name=self.bin_name)
         proc.kill()
         self.pids = []
         return 0, None
 
     def status(self):
-        """Return status of service."""
-        if self.get_pids():
+        """Return status of service. If "pids" is empty due to a `stop` call, return that the process is stopped. Otherwise only return `stopped` when the lock file is removed."""
+        if not self.get_pids():
+            return "stopped"
+
+        # Wait for the lock file to be deleted which concludes a clean shutdown.
+        lock_file = os.path.join(self.db_path, "mongod.lock")
+        if not os.path.exists(lock_file):
+            self.pids = []
+            return "stopped"
+
+        try:
+            if os.stat(lock_file).st_size == 0:
+                self.pids = []
+                return "stopped"
+        except OSError:
+            # The lock file was probably removed. Instead of being omnipotent with exception
+            # interpretation, have a follow-up call observe the file does not exist.
             return "running"
-        return "stopped"
+
+        return "running"
 
     def get_pids(self):
         """Return list of pids for process."""
@@ -1025,7 +1042,8 @@ class MongodControl(object):  # pylint: disable=too-many-instance-attributes
             self._service = PosixService
         # After mongod has been installed, self.bin_path is defined.
         if self.bin_path:
-            self.service = self._service("mongod-powertest", self.bin_path, self.mongod_options())
+            self.service = self._service("mongod-powertest", self.bin_path, self.mongod_options(),
+                                         db_path)
 
     def set_mongod_option(self, option, option_value=None, option_form="--"):
         """Set mongod command line option."""
@@ -1064,7 +1082,8 @@ class MongodControl(object):  # pylint: disable=too-many-instance-attributes
         self.bin_path = os.path.join(self.bin_dir, self.process_name)
         # We need to instantiate the Service when installing, since the bin_path
         # is only known after install_mongod runs.
-        self.service = self._service("mongod-powertest", self.bin_path, self.mongod_options())
+        self.service = self._service("mongod-powertest", self.bin_path, self.mongod_options(),
+                                     db_path=None)
         ret, output = self.service.create()
         return ret, output
 
@@ -1209,8 +1228,10 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
             if ret:
                 LOGGER.error("kill_mongod failed %s", output)
                 return ret
-            # Ensure the mongod service is not in a running state.
-            mongod.stop(timeout=30)
+            # Ensure the mongod service is not in a running state. WT can take 10+ minutes to
+            # cleanly shutdown. Prefer to hit the evergreen timeout which will run the hang
+            # analyzer.
+            mongod.stop(timeout=2 * ONE_HOUR_SECS)
             status = mongod.status()
             if status != "stopped":
                 LOGGER.error("Unable to stop the mongod service, in state '%s'", status)
@@ -1495,7 +1516,7 @@ def crash_server_or_kill_mongod(  # pylint: disable=too-many-arguments,,too-many
     return ret, output
 
 
-def wait_for_mongod_shutdown(mongod_control, timeout=120):
+def wait_for_mongod_shutdown(mongod_control, timeout=2 * ONE_HOUR_SECS):
     """Wait for for mongod to shutdown; return 0 if shutdown occurs within 'timeout', else 1."""
     start = time.time()
     status = mongod_control.status()
@@ -1515,8 +1536,9 @@ def wait_for_mongod_shutdown(mongod_control, timeout=120):
     return 0
 
 
-def get_mongo_client_args(host=None, port=None, options=None, server_selection_timeout_ms=600000,
-                          socket_timeout_ms=600000):
+def get_mongo_client_args(host=None, port=None, options=None,
+                          server_selection_timeout_ms=2 * ONE_HOUR_SECS * 1000,
+                          socket_timeout_ms=2 * ONE_HOUR_SECS * 1000):
     """Return keyword arg dict used in PyMongo client."""
     # Set the default serverSelectionTimeoutMS & socketTimeoutMS to 10 minutes.
     mongo_args = {
@@ -2279,7 +2301,7 @@ Examples:
     validate_canary_cmd = ""
 
     # Set the Pymongo connection timeout to 1 hour for canary insert & validation.
-    one_hour_ms = 60 * 60 * 1000
+    one_hour_ms = ONE_HOUR_SECS * 1000
 
     # The remote mongod host comes from the ssh_user_host,
     # which may be specified as user@host.
