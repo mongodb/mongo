@@ -1164,6 +1164,19 @@ env.Library(
 )
 
 env.Library(
+    target='migrating_tenant_access_blocker',
+    source=[
+        'migrating_tenant_access_blocker.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        'optime',
+        'repl_coordinator_impl'
+    ],
+)
+
+env.Library(
     target="serveronly_repl",
     source=[
         'noop_writer.cpp',
@@ -1196,6 +1209,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         'bgsync',
         'drop_pending_collection_reaper',
+        'migrating_tenant_access_blocker',
         'oplog_application',
         'oplog_buffer_collection',
         'oplog_interface_remote',

@@ -382,6 +382,9 @@ error_codes:
     - {code: 318,name: ForTestingOptionalErrorExtraInfo,extra: OptionalErrorExtraInfoExample,extraIsOptional: True}
     - {code: 319,name: MovePrimaryIsInProgress}
 
+    - {code: 320, name: TenantMigrationConflict}
+    - {code: 321, name: TenantMigrationCommitted}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
