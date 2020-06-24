@@ -355,6 +355,18 @@ public:
     bool isIgnoringInterrupts() const;
 
     /**
+     * Clears metadata associated with a multi-document transaction.
+     */
+    void resetMultiDocumentTransactionState() {
+        invariant(_inMultiDocumentTransaction);
+        invariant(!_writeUnitOfWork);
+        invariant(_ruState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        _inMultiDocumentTransaction = false;
+        _lsid = boost::none;
+        _txnNumber = boost::none;
+    }
+
+    /**
      * Returns whether this operation is part of a multi-document transaction. Specifically, it
      * indicates whether the user asked for a multi-document transaction.
      */
