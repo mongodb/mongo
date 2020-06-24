@@ -455,6 +455,16 @@ let viewsCommandTests = {
     replSetTestEgress: {skip: isUnrelated},
     replSetUpdatePosition: {skip: isUnrelated},
     replSetResizeOplog: {skip: isUnrelated},
+    reshardCollection: {
+        command: {reshardCollection: "test.view", key: {_id: 1}},
+        setup: function(conn) {
+            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+        },
+        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+        skipStandalone: true,
+        expectFailure: true,
+        isAdminCommand: true,
+    },
     resetError: {skip: isUnrelated},
     revokePrivilegesFromRole: {
         command: {

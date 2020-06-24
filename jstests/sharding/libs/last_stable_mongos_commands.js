@@ -7,4 +7,4 @@ const commandsRemovedFromMongosIn46 = [];
 // These commands were added in mongos 4.6, so will not appear in the listCommands output of a
 // 4.4 mongos. We will allow these commands to have a test defined without always existing on the
 // mongos being used.
-const commandsAddedToMongosIn46 = [];
+const commandsAddedToMongosIn46 = ["reshardCollection"];
