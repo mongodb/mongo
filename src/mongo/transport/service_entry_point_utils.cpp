@@ -61,7 +61,7 @@ void* runFunc(void* ctx) {
 }
 }  // namespace
 
-Status launchServiceWorkerThread(std::function<void()> task) {
+Status launchServiceWorkerThread(std::function<void()> task) noexcept {
 
     try {
 #if defined(_WIN32)
@@ -123,8 +123,10 @@ Status launchServiceWorkerThread(std::function<void()> task) {
         ctx.release();
 #endif
 
-    } catch (...) {
-        return {ErrorCodes::InternalError, "failed to create service entry worker thread"};
+    } catch (std::exception& e) {
+        std::string errormsg = "failed to create service entry worker thread, exception: ";
+        errormsg += e.what();
+        return {ErrorCodes::InternalError, errormsg};
     }
 
     return Status::OK();
