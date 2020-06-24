@@ -31,15 +31,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include <algorithm>
-#include <random>
-
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/db/update/document_diff_test_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -47,7 +43,6 @@
 
 namespace mongo::doc_diff {
 namespace {
-
 
 // We use the same seed and random number generator throughout the tests to be able to reproduce a
 // failure easily.
@@ -58,43 +53,6 @@ auto getSeed() {
 PseudoRandom* getRNG() {
     static auto rng = PseudoRandom(getSeed());
     return &rng;
-}
-
-BSONObj createObjWithLargePrefix(StringData suffix, int len = 100) {
-    const static auto largeObj = BSON("prefixLargeField" << std::string(len, 'a'));
-    return largeObj.addFields(fromjson(suffix.rawData()));
-}
-
-std::string getFieldName(int level, int fieldNum) {
-    return str::stream() << "f" << level << fieldNum;
-}
-
-Value getScalarFieldValue() {
-    auto rng = getRNG();
-    switch (rng->nextInt64(10)) {
-        case 0:
-            return Value("val"_sd);
-        case 1:
-            return Value(BSONNULL);
-        case 2:
-            return Value(-1LL);
-        case 3:
-            return Value(0);
-        case 4:
-            return Value(1.10);
-        case 5:
-            return Value(false);
-        case 6:
-            return Value(BSONRegEx("p"));
-        case 7:
-            return Value(Date_t());
-        case 8:
-            return Value(UUID::gen());
-        case 9:
-            return Value(BSONBinData("asdf", 4, BinDataGeneral));
-        default:
-            MONGO_UNREACHABLE;
-    }
 }
 
 std::vector<BSONObj> getDocumentsRepo() {
@@ -149,10 +107,13 @@ void runTest(std::vector<BSONObj> documents, size_t numSimulations) {
         std::shuffle(documents.begin(), documents.end(), rng->urbg());
 
         auto preDoc = documents[0];
+        std::vector<BSONObj> diffs;
+        diffs.reserve(documents.size() - 1);
         for (size_t i = 1; i < documents.size(); ++i) {
             const auto diff = computeDiff(preDoc, documents[i]);
 
             ASSERT(diff);
+            diffs.push_back(*diff);
             const auto postObj = applyDiff(preDoc, *diff);
             ASSERT_BSONOBJ_BINARY_EQ(documents[i], postObj);
 
@@ -161,57 +122,29 @@ void runTest(std::vector<BSONObj> documents, size_t numSimulations) {
 
             preDoc = documents[i];
         }
+
+        // Verify that re-applying any suffix of the diffs in the sequence order will end produce
+        // the same end state.
+        for (size_t start = 0; start < diffs.size(); ++start) {
+            auto endObj = documents.back();
+            for (size_t i = start; i < diffs.size(); ++i) {
+                endObj = applyDiff(endObj, diffs[i]);
+            }
+            ASSERT_BSONOBJ_BINARY_EQ(endObj, documents.back());
+        }
     }
 }
 TEST(DocumentDiffTest, PredefinedDocumentsTest) {
     runTest(getDocumentsRepo(), 10);
 }
 
-BSONObj generateDoc(MutableDocument* doc, int depthLevel) {
-    // Append a large field at each level so that the likelihood of generating a sub-diff is high.
-    doc->reset(createObjWithLargePrefix("{}", 100), true);
-
-    // Reduce the probabilty of generated nested objects as we go deeper. After depth level 6, we
-    // should not be generating anymore nested objects.
-    const double subObjProbability = 0.3 - (depthLevel * 0.05);
-    const double subArrayProbability = 0.2 - (depthLevel * 0.05);
-
-    auto rng = getRNG();
-    const int numFields = (5 - depthLevel) + rng->nextInt32(4);
-    for (int fieldNum = 0; fieldNum < numFields; ++fieldNum) {
-        const auto fieldName = getFieldName(depthLevel, fieldNum);
-        auto num = rng->nextCanonicalDouble();
-        if (num <= subObjProbability) {
-            MutableDocument subDoc;
-            doc->addField(fieldName, Value(generateDoc(&subDoc, depthLevel + 1)));
-        } else if (num <= (subObjProbability + subArrayProbability)) {
-            std::uniform_int_distribution<int> arrayLengthGen(0, 10);
-            const auto length = arrayLengthGen(rng->urbg());
-            std::vector<Value> values;
-
-            // Make sure that only one array element is a document to avoid exponentially bloating
-            // up the document.
-            if (length) {
-                MutableDocument subDoc;
-                values.push_back(Value(generateDoc(&subDoc, depthLevel + 1)));
-            }
-            for (auto i = 1; i < length; i++) {
-                values.push_back(getScalarFieldValue());
-            }
-            doc->addField(fieldName, Value(values));
-        } else {
-            doc->addField(fieldName, getScalarFieldValue());
-        }
-    }
-    return doc->freeze().toBson();
-}
-
 TEST(DocumentDiffTest, RandomizedDocumentBuilderTest) {
     const auto numDocs = 20;
     std::vector<BSONObj> documents(numDocs);
+    auto rng = getRNG();
     for (int i = 0; i < numDocs; ++i) {
         MutableDocument doc;
-        documents[i] = generateDoc(&doc, 0);
+        documents[i] = generateDoc(rng, &doc, 0);
     }
     runTest(std::move(documents), 10);
 }
