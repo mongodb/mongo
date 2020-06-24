@@ -136,6 +136,10 @@ public:
     OpTime getMyLastDurableOpTime() const final;
     OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const final;
 
+    Status waitUntilMajorityOpTime(OperationContext* opCtx,
+                                   OpTime targetOpTime,
+                                   boost::optional<Date_t> deadline) final;
+
     Status waitUntilOpTimeForReadUntil(OperationContext*,
                                        const ReadConcernArgs&,
                                        boost::optional<Date_t>) final;

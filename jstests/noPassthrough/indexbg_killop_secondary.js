@@ -1,7 +1,7 @@
 /**
  * Confirms that aborting a background index builds on a secondary does not leave node in an
  * inconsistent state.
- * @tags: [requires_replication]
+ * @tags: [requires_replication, resumable_index_build_incompatible]
  */
 (function() {
 "use strict";

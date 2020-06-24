@@ -11,7 +11,7 @@
  *
  * All of this requires support for committed reads, so this test will be skipped if the storage
  * engine does not support them.
- * @tags: [requires_majority_read_concern]
+ * @tags: [requires_majority_read_concern, resumable_index_build_incompatible]
  */
 
 load("jstests/libs/analyze_plan.js");

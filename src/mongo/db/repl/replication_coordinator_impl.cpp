@@ -1633,9 +1633,9 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status ReplicationCoordinatorImpl::_waitUntilMajorityOpTime(mongo::OperationContext* opCtx,
-                                                            mongo::repl::OpTime targetOpTime,
-                                                            boost::optional<Date_t> deadline) {
+Status ReplicationCoordinatorImpl::waitUntilMajorityOpTime(mongo::OperationContext* opCtx,
+                                                           mongo::repl::OpTime targetOpTime,
+                                                           boost::optional<Date_t> deadline) {
     if (!_externalState->snapshotsEnabled()) {
         return {ErrorCodes::CommandNotSupported,
                 "Current storage engine does not support majority committed reads"};
@@ -1721,7 +1721,7 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
          readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern);
 
     if (isMajorityCommittedRead) {
-        return _waitUntilMajorityOpTime(opCtx, targetOpTime, deadline);
+        return waitUntilMajorityOpTime(opCtx, targetOpTime, deadline);
     } else {
         return _waitUntilOpTime(opCtx, targetOpTime, deadline);
     }
@@ -1735,7 +1735,7 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTimeForReadDeprecated(
 
     const auto targetOpTime = readConcern.getArgsOpTime().value_or(OpTime());
     if (isMajorityCommittedRead) {
-        return _waitUntilMajorityOpTime(opCtx, targetOpTime);
+        return waitUntilMajorityOpTime(opCtx, targetOpTime);
     } else {
         return _waitUntilOpTime(opCtx, targetOpTime);
     }
@@ -1746,7 +1746,7 @@ Status ReplicationCoordinatorImpl::awaitTimestampCommitted(OperationContext* opC
     // its timestamp. This allows us to wait only on the timestamp of the commit point surpassing
     // this timestamp, without worrying about terms.
     OpTime waitOpTime(ts, OpTime::kUninitializedTerm);
-    return _waitUntilMajorityOpTime(opCtx, waitOpTime);
+    return waitUntilMajorityOpTime(opCtx, waitOpTime);
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTimeAndWallTime_inlock() const {

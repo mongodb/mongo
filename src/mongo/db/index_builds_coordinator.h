@@ -589,6 +589,14 @@ protected:
                                    Collection* collection);
 
     /**
+     * Waits for the last optime before the interceptors were installed on the node to be majority
+     * committed and sets that the collection scan for the index build should use a majority read
+     * cursor. If no such optime was recorded, it will do nothing.
+     */
+    void _awaitLastOpTimeBeforeInterceptorsMajorityCommitted(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
+
+    /**
      * Modularizes the _indexBuildsManager calls part of _runIndexBuildInner. Throws on error.
      */
     void _buildIndex(OperationContext* opCtx,

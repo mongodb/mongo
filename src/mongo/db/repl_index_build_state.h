@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/future.h"
@@ -313,6 +314,11 @@ struct ReplIndexBuildState {
 
     // Represents the callback handle for scheduled remote command "voteCommitIndexBuild".
     executor::TaskExecutor::CallbackHandle voteCmdCbkHandle;
+
+    // The last optime in the oplog before the interceptors were installed. If this is a single
+    // phase index build, isn't running a hybrid index build, or isn't running during oplog
+    // application, this will be null.
+    repl::OpTime lastOpTimeBeforeInterceptors;
 
 private:
     std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs) {

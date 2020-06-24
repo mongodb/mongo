@@ -297,6 +297,12 @@ OpTime ReplicationCoordinatorMock::getMyLastDurableOpTime() const {
     return _myLastDurableOpTime;
 }
 
+Status ReplicationCoordinatorMock::waitUntilMajorityOpTime(mongo::OperationContext* opCtx,
+                                                           mongo::repl::OpTime targetOpTime,
+                                                           boost::optional<Date_t> deadline) {
+    return Status::OK();
+}
+
 Status ReplicationCoordinatorMock::waitUntilOpTimeForRead(OperationContext* opCtx,
                                                           const ReadConcernArgs& settings) {
     return Status::OK();

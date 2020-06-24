@@ -44,6 +44,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/op_observer.h"
@@ -337,6 +338,26 @@ void updateCurOpForCommitOrAbort(OperationContext* opCtx, StringData fieldName, 
     curOp->setLogicalOp_inlock(LogicalOp::opCommand);
     curOp->setOpDescription_inlock(opDescObj);
     curOp->ensureStarted();
+}
+
+/**
+ * Fetches the latest oplog entry's optime. Bypasses the oplog visibility rules.
+ */
+repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
+    // Reset the snapshot so that it is ensured to see the latest oplog entries.
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    // Helpers::getLast will bypass the oplog visibility rules by doing a backwards collection
+    // scan.
+    BSONObj oplogEntryBSON;
+    invariant(
+        Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntryBSON));
+
+    auto optime = repl::OpTime::parseFromOplogEntry(oplogEntryBSON);
+    invariant(optime.isOK(),
+              str::stream() << "Found an invalid oplog entry: " << oplogEntryBSON
+                            << ", error: " << optime.getStatus());
+    return optime.getValue();
 }
 
 }  // namespace
@@ -1863,6 +1884,19 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
 
         throw;
     }
+
+    if (replState->protocol == IndexBuildProtocol::kTwoPhase &&
+        indexBuildOptions.applicationMode == ApplicationMode::kNormal &&
+        opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
+        // We should only set this value if this is a hybrid index build.
+        invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
+
+        // After the interceptors are set, get the latest optime in the oplog that could have
+        // contained a write to this collection. We need to be holding the collection lock in X mode
+        // so that we ensure that there are not any uncommitted transactions on this collection.
+        replState->lastOpTimeBeforeInterceptors = getLatestOplogOpTime(opCtx);
+    }
+
     return PostSetupAction::kContinueIndexBuild;
 }
 
@@ -2121,12 +2155,40 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     uassertStatusOK(status);
 }
 
+void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
+    // The last optime could be null if the node is in initial sync while building the index.
+    if (!serverGlobalParams.enableMajorityReadConcern ||
+        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeNone ||
+        replState->lastOpTimeBeforeInterceptors.isNull()) {
+        return;
+    }
+
+    LOGV2(4847600,
+          "Index build: waiting for last optime before interceptors to be majority committed",
+          "buildUUID"_attr = replState->buildUUID,
+          "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors);
+
+    auto status =
+        replCoord->waitUntilMajorityOpTime(opCtx, replState->lastOpTimeBeforeInterceptors);
+    uassertStatusOK(status);
+
+    // Since we waited for all the writes before the interceptors were established to be majority
+    // committed, if we read at the majority commit point for the collection scan, then none of the
+    // documents put into the sorter can be rolled back.
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
+}
+
 void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          std::shared_ptr<ReplIndexBuildState> replState,
                                          const IndexBuildOptions& indexBuildOptions) {
     // Read without a timestamp. When we commit, we block writes which guarantees all writes are
     // visible.
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    // The collection scan might read with a kMajorityCommitted read source, but will restore
+    // kNoTimestamp afterwards.
     _scanCollectionAndInsertKeysIntoSorter(opCtx, replState);
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     _signalPrimaryForCommitReadiness(opCtx, replState);
@@ -2142,6 +2204,16 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     // Collection scan and insert into index.
     {
+
+        auto scopeGuard = makeGuard([&] {
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        });
+
+        // Wait for the last optime before the interceptors are established to be majority committed
+        // while we aren't holding any locks. This will set the read source to be kMajorityCommitted
+        // if it waited.
+        _awaitLastOpTimeBeforeInterceptorsMajorityCommitted(opCtx, replState);
+
         Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);

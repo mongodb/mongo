@@ -19,6 +19,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
+ *   resumable_index_build_incompatible,
  * ]
  */
 (function() {

@@ -143,6 +143,9 @@ public:
     repl::OpTime getMyLastDurableOpTime() const override;
     repl::OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;
 
+    Status waitUntilMajorityOpTime(OperationContext* opCtx,
+                                   repl::OpTime targetOpTime,
+                                   boost::optional<Date_t> deadline) override;
     Status waitUntilOpTimeForReadUntil(OperationContext*,
                                        const repl::ReadConcernArgs&,
                                        boost::optional<Date_t>) override;

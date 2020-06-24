@@ -154,6 +154,10 @@ public:
     virtual OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const;
     virtual OpTime getMyLastDurableOpTime() const;
 
+    virtual Status waitUntilMajorityOpTime(OperationContext* opCtx,
+                                           OpTime targetOpTime,
+                                           boost::optional<Date_t> deadline) override;
+
     virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
                                           const ReadConcernArgs& settings) override;
 

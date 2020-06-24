@@ -1,4 +1,5 @@
 // Tests the $out and read concern majority.
+// @tags: [resumable_index_build_incompatible]
 (function() {
 "use strict";
 
