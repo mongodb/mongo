@@ -177,7 +177,10 @@ public:
                  EnqueueDocumentsFn enqueueDocumentsFn,
                  OnShutdownCallbackFn onShutdownCallbackFn,
                  const int batchSize,
-                 StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
+                 StartingPoint startingPoint = StartingPoint::kSkipFirstDoc,
+                 BSONObj filter = BSONObj(),
+                 ReadConcernArgs readConcern = ReadConcernArgs(),
+                 StringData name = "oplog fetcher"_sd);
 
     virtual ~OplogFetcher();
 
@@ -430,6 +433,13 @@ private:
 
     // Indicates if we want to skip the first document during oplog fetching or not.
     StartingPoint _startingPoint;
+
+    // Predicate with additional filtering to be done on oplog entries.
+    BSONObj _queryFilter;
+
+    // Read concern to use for reading the oplog.  Empty read concern means we use a default
+    // of "afterClusterTime: Timestamp(0,1)".
+    ReadConcernArgs _queryReadConcern;
 
     // Handle to currently scheduled _runQuery task.
     executor::TaskExecutor::CallbackHandle _runQueryHandle;
