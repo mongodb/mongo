@@ -790,12 +790,11 @@ bool DocumentSourceGroup::canRunInParallelBeforeWriteStage(
 
 std::unique_ptr<GroupFromFirstDocumentTransformation>
 DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
-    if (!_idFieldNames.empty()) {
+    if (_idExpressions.size() != 1) {
         // This transformation is only intended for $group stages that group on a single field.
         return nullptr;
     }
 
-    invariant(_idExpressions.size() == 1);
     auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(_idExpressions.front().get());
     if (!fieldPathExpr || !fieldPathExpr->isRootFieldPath()) {
         return nullptr;
@@ -822,7 +821,18 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
     }
 
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fields;
-    fields.push_back(std::make_pair("_id", ExpressionFieldPath::create(pExpCtx, groupId)));
+
+    boost::intrusive_ptr<Expression> idField;
+    // The _id field can be specified either as a fieldpath (ex. _id: "$a") or as a singleton
+    // object (ex. _id: {v: "$a"}).
+    if (_idFieldNames.empty()) {
+        idField = ExpressionFieldPath::create(pExpCtx.get(), groupId);
+    } else {
+        invariant(_idFieldNames.size() == 1);
+        idField = ExpressionObject::create(pExpCtx.get(),
+                                           {{_idFieldNames.front(), _idExpressions.front()}});
+    }
+    fields.push_back(std::make_pair("_id", idField));
 
     for (auto&& accumulator : _accumulatedFields) {
         fields.push_back(std::make_pair(accumulator.fieldName, accumulator.expr.argument));
