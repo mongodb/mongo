@@ -160,7 +160,12 @@ public:
     }
 
     void setUp() override {
+        WireSpec::instance().isInternalClient = true;
         startNet(std::make_unique<WaitForIsMasterHook>(this));
+    }
+
+    void tearDown() override {
+        WireSpec::instance().isInternalClient = false;
     }
 
     RemoteCommandRequest makeTestCommand(
@@ -667,8 +672,8 @@ TEST_F(NetworkInterfaceTest, StartCommandOnAny) {
     auto deferred = runCommandOnAny(makeCallbackHandle(), std::move(request));
     auto res = deferred.get();
 
-    auto cmdObj = res.data.getObjectField("echo");
     uassertStatusOK(res.status);
+    auto cmdObj = res.data.getObjectField("echo");
     ASSERT_EQ(1, cmdObj.getIntField("echo"));
     ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
     ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
