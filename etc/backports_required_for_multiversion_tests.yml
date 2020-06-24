@@ -39,6 +39,8 @@ replica_sets_jscore_multiversion_passthrough:
   test_file: jstests/core/geo_near_tailable.js
 - ticket: SERVER-48614
   test_file: jstests/core/wildcard_index_partial_index.js
+- ticket: SERVER-48993
+  test_file: jstests/core/explode_for_sort_collation.js
 
 replica_sets_multiversion:
 - ticket: SERVER-42825
@@ -81,6 +83,8 @@ sharding_multiversion:
   test_file: jstests/sharding/retryable_writes.js
 - ticket: SERVER-31368
   test_file: jstests/sharding/log_remote_op_wait.js
+- ticket: SERVER-48993
+  test_file: jstests/core/explode_for_sort_collation.js
 
 sharding_jscore_multiversion_passthrough:
 - ticket: SERVER-46196
@@ -89,6 +93,8 @@ sharding_jscore_multiversion_passthrough:
   test_file: jstests/core/geo_near_tailable.js
 - ticket: SERVER-48614
   test_file: jstests/core/wildcard_index_partial_index.js
+- ticket: SERVER-48993
+  test_file: jstests/core/explode_for_sort_collation.js
 
 sharded_collections_jscore_multiversion_passthrough:
 - ticket: SERVER-46196
@@ -97,3 +103,5 @@ sharded_collections_jscore_multiversion_passthrough:
   test_file: jstests/core/geo_near_tailable.js
 - ticket: SERVER-48614
   test_file: jstests/core/wildcard_index_partial_index.js
+- ticket: SERVER-48993
+  test_file: jstests/core/explode_for_sort_collation.js

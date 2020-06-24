@@ -218,6 +218,7 @@ if (typeof _threadInject != "undefined") {
         // The following tests cannot run when shell readMode is legacy.
         if (db.getMongo().readMode() === "legacy") {
             var requires_find_command = [
+                "explode_for_sort_collation.js",
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",
                 "views/dbref_projection.js",
