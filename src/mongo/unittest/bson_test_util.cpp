@@ -56,6 +56,26 @@ GENERATE_BSON_CMP_FUNC(BSONObj, GT, SimpleBSONObjComparator::kInstance, >);
 GENERATE_BSON_CMP_FUNC(BSONObj, GTE, SimpleBSONObjComparator::kInstance, >=);
 GENERATE_BSON_CMP_FUNC(BSONObj, NE, SimpleBSONObjComparator::kInstance, !=);
 
+// This comparator checks for binary equality. Useful when logical equality (through woCompare()) is
+// not strong enough.
+class BSONObjBinaryComparator final : public BSONObj::ComparatorInterface {
+public:
+    static const BSONObjBinaryComparator kInstance;
+
+    /**
+     * The function only supports equals to operation.
+     */
+    int compare(const BSONObj& lhs, const BSONObj& rhs) const final {
+        return !lhs.binaryEqual(rhs);
+    }
+    void hash_combine(size_t& seed, const BSONObj& toHash) const final {
+        MONGO_UNREACHABLE;
+    }
+};
+const BSONObjBinaryComparator BSONObjBinaryComparator::kInstance{};
+
+GENERATE_BSON_CMP_FUNC(BSONObj, BINARY_EQ, BSONObjBinaryComparator::kInstance, ==);
+
 GENERATE_BSON_CMP_FUNC(BSONElement, EQ, SimpleBSONElementComparator::kInstance, ==);
 GENERATE_BSON_CMP_FUNC(BSONElement, LT, SimpleBSONElementComparator::kInstance, <);
 GENERATE_BSON_CMP_FUNC(BSONElement, LTE, SimpleBSONElementComparator::kInstance, <=);

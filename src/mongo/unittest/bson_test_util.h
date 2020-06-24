@@ -59,6 +59,9 @@
 #define ASSERT_BSONELT_GTE(a, b) ASSERT_BSON_COMPARISON(BSONElementGTE, a, b, #a, #b)
 #define ASSERT_BSONELT_NE(a, b) ASSERT_BSON_COMPARISON(BSONElementNE, a, b, #a, #b)
 
+#define ASSERT_BSONOBJ_BINARY_EQ(a, b) \
+    ::mongo::unittest::assertComparison_BSONObjBINARY_EQ(__FILE__, __LINE__, #a, #b, a, b)
+
 namespace mongo {
 namespace unittest {
 
@@ -76,6 +79,8 @@ DECLARE_BSON_CMP_FUNC(BSONObj, LTE);
 DECLARE_BSON_CMP_FUNC(BSONObj, GT);
 DECLARE_BSON_CMP_FUNC(BSONObj, GTE);
 DECLARE_BSON_CMP_FUNC(BSONObj, NE);
+
+DECLARE_BSON_CMP_FUNC(BSONObj, BINARY_EQ);
 
 DECLARE_BSON_CMP_FUNC(BSONElement, EQ);
 DECLARE_BSON_CMP_FUNC(BSONElement, LT);

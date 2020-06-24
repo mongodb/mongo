@@ -61,12 +61,6 @@ Document fromBson(BSONObj obj) {
     return Document(obj);
 }
 
-/** Check binary equality, ensuring use of the same numeric types. */
-static void assertBinaryEqual(const BSONObj& expected, const BSONObj& actual) {
-    ASSERT_BSONOBJ_EQ(expected, actual);
-    ASSERT(expected.binaryEqual(actual));
-}
-
 namespace FieldPath {
 
 /** The provided field path does not pass validation. */
@@ -227,7 +221,8 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a");
-        assertBinaryEqual(fromjson("{}"), toBson(expression->evaluate({}, &expCtx.variables)));
+        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{}"),
+                                 toBson(expression->evaluate({}, &expCtx.variables)));
     }
 };
 
@@ -237,7 +232,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{'':123}"),
             toBson(expression->evaluate(fromBson(BSON("a" << 123)), &expCtx.variables)));
     }
@@ -249,7 +244,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{}"),
             toBson(expression->evaluate(fromBson(fromjson("{a:null}")), &expCtx.variables)));
     }
@@ -261,7 +256,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{}"),
             toBson(expression->evaluate(fromBson(fromjson("{a:undefined}")), &expCtx.variables)));
     }
@@ -273,7 +268,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{}"),
             toBson(expression->evaluate(fromBson(fromjson("{z:1}")), &expCtx.variables)));
     }
@@ -285,7 +280,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{}"),
             toBson(expression->evaluate(fromBson(BSON("a" << 2)), &expCtx.variables)));
     }
@@ -297,9 +292,9 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(BSON("" << 55),
-                          toBson(expression->evaluate(fromBson(BSON("a" << BSON("b" << 55))),
-                                                      &expCtx.variables)));
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("" << 55),
+                                 toBson(expression->evaluate(fromBson(BSON("a" << BSON("b" << 55))),
+                                                             &expCtx.variables)));
     }
 };
 
@@ -309,7 +304,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{}"),
             toBson(expression->evaluate(fromBson(BSON("a" << BSONObj())), &expCtx.variables)));
     }
@@ -321,7 +316,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             BSON("" << BSONArray()),
             toBson(expression->evaluate(fromBson(BSON("a" << BSONArray())), &expCtx.variables)));
     }
@@ -333,7 +328,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{'':[]}"),
             toBson(expression->evaluate(fromBson(fromjson("{a:[null]}")), &expCtx.variables)));
     }
@@ -345,7 +340,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{'':[]}"),
             toBson(expression->evaluate(fromBson(fromjson("{a:[undefined]}")), &expCtx.variables)));
     }
@@ -357,7 +352,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{'':[]}"),
             toBson(expression->evaluate(fromBson(fromjson("{a:[1]}")), &expCtx.variables)));
     }
@@ -369,7 +364,7 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(
+        ASSERT_BSONOBJ_BINARY_EQ(
             fromjson("{'':[9]}"),
             toBson(expression->evaluate(fromBson(fromjson("{a:[{b:9}]}")), &expCtx.variables)));
     }
@@ -381,10 +376,11 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b");
-        assertBinaryEqual(fromjson("{'':[9,20]}"),
-                          toBson(expression->evaluate(
-                              fromBson(fromjson("{a:[{b:9},null,undefined,{g:4},{b:20},{}]}")),
-                              &expCtx.variables)));
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':[9,20]}"),
+            toBson(expression->evaluate(
+                fromBson(fromjson("{a:[{b:9},null,undefined,{g:4},{b:20},{}]}")),
+                &expCtx.variables)));
     }
 };
 
@@ -394,13 +390,14 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b.c");
-        assertBinaryEqual(fromjson("{'':[[1,2],3,[4],[[5]],[6,7]]}"),
-                          toBson(expression->evaluate(fromBson(fromjson("{a:[{b:[{c:1},{c:2}]},"
-                                                                        "{b:{c:3}},"
-                                                                        "{b:[{c:4}]},"
-                                                                        "{b:[{c:[5]}]},"
-                                                                        "{b:{c:[6,7]}}]}")),
-                                                      &expCtx.variables)));
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':[[1,2],3,[4],[[5]],[6,7]]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[{b:[{c:1},{c:2}]},"
+                                                          "{b:{c:3}},"
+                                                          "{b:[{c:4}]},"
+                                                          "{b:[{c:[5]}]},"
+                                                          "{b:{c:[6,7]}}]}")),
+                                        &expCtx.variables)));
     }
 };
 
@@ -410,9 +407,9 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b.c");
-        assertBinaryEqual(BSON("foo"
-                               << "$a.b.c"),
-                          BSON("foo" << expression->serialize(false)));
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("foo"
+                                      << "$a.b.c"),
+                                 BSON("foo" << expression->serialize(false)));
     }
 };
 
@@ -424,7 +421,7 @@ public:
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(&expCtx, "a.b.c");
         BSONArrayBuilder bab;
         bab << expression->serialize(false);
-        assertBinaryEqual(BSON_ARRAY("$a.b.c"), bab.arr());
+        ASSERT_BSONOBJ_BINARY_EQ(BSON_ARRAY("$a.b.c"), bab.arr());
     }
 };
 

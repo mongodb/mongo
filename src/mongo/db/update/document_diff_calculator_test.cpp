@@ -36,19 +36,11 @@
 namespace mongo {
 namespace {
 
-void assertBinaryEq(const BSONObj& objA, const BSONObj& objB) {
-    // This *MUST* check for binary equality, which is what we enforce between replica set
-    // members. Logical equality (through woCompare() or assertBinaryEq) is not strong enough.
-    if (!objA.binaryEqual(objB)) {
-        FAIL(str::stream() << "Objects not equal. Expected " << objA << " == " << objB);
-    }
-}
-
 TEST(DocumentDiffTest, SameObjectsNoDiff) {
     auto assertDiffEmpty = [](const BSONObj& doc) {
         auto diff = doc_diff::computeDiff(doc, doc);
         ASSERT(diff);
-        assertBinaryEq(*diff, BSONObj());
+        ASSERT_BSONOBJ_BINARY_EQ(*diff, BSONObj());
     };
     assertDiffEmpty(fromjson("{field1: 1}"));
     assertDiffEmpty(fromjson("{field1: []}"));
@@ -79,21 +71,21 @@ TEST(DocumentDiffTest, DeleteAndInsertFieldAtTheEnd) {
     auto diff = doc_diff::computeDiff(fromjson("{a: 1, b: 2, c: 3, d: 4}"),
                                       fromjson("{b: 2, c: 3, d: 4, a: 1}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{i: {a: 1}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{i: {a: 1}}"));
 }
 
 TEST(DocumentDiffTest, DeletesRecordedInAscendingOrderOfFieldNames) {
     auto diff = doc_diff::computeDiff(fromjson("{b: 1, a: 2, c: 3, d: 4, e: 'value'}"),
                                       fromjson("{c: 3, d: 4, e: 'value'}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{d: {a: false, b: false}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{d: {a: false, b: false}}"));
 
     // Delete at the end still follow the order.
     diff = doc_diff::computeDiff(
         fromjson("{b: 1, a: 2, c: 'value', d: 'value', e: 'value', g: 1, f: 1}"),
         fromjson("{c: 'value', d: 'value', e: 'value'}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{d: {g: false, f: false, a: false, b: false}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{d: {g: false, f: false, a: false, b: false}}"));
 }
 
 TEST(DocumentDiffTest, DataTypeChangeRecorded) {
@@ -104,15 +96,15 @@ TEST(DocumentDiffTest, DataTypeChangeRecorded) {
         fromjson("{a: 1, b: 2, c: {subField1: 1, subField2: NumberLong(3)}, d: 4}");
     auto diff = doc_diff::computeDiff(objWithDoubleValue, objWithIntValue);
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{s: {c: {u: {subField2: 3}} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {c: {u: {subField2: 3}} }}"));
 
     diff = doc_diff::computeDiff(objWithIntValue, objWithLongValue);
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{s: {c: {u: {subField2: NumberLong(3)}} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {c: {u: {subField2: NumberLong(3)}} }}"));
 
     diff = doc_diff::computeDiff(objWithLongValue, objWithDoubleValue);
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{s: {c: {u: {subField2: 3.0}} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {c: {u: {subField2: 3.0}} }}"));
 }
 
 TEST(DocumentDiffTest, NullAndMissing) {
@@ -122,21 +114,21 @@ TEST(DocumentDiffTest, NullAndMissing) {
     diff = doc_diff::computeDiff(fromjson("{a: null, b: undefined, c: null, d: 'someVal'}"),
                                  fromjson("{a: null, b: undefined, c: undefined, d: 'someVal'}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{u: {c: undefined}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{u: {c: undefined}}"));
 }
 
 TEST(DocumentDiffTest, FieldOrder) {
     auto diff = doc_diff::computeDiff(fromjson("{a: 1, b: 2, c: {p: 1, q: 1, s: 1, r: 2}, d: 4}"),
                                       fromjson("{a: 1, b: 2, c: {p: 1, q: 1, r: 2, s: 1}, d: 4}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{s: {c: {i: {s: 1}} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {c: {i: {s: 1}} }}"));
 }
 
 TEST(DocumentDiffTest, SimpleArrayPush) {
     auto diff = doc_diff::computeDiff(fromjson("{field1: 'abcd', field2: [1, 2, 3]}"),
                                       fromjson("{field1: 'abcd', field2: [1, 2, 3, 4]}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{s: {field2: {a: true, '3': {u: 4}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field2: {a: true, '3': {u: 4}}}}"));
 }
 
 TEST(DocumentDiffTest, NestedArray) {
@@ -145,15 +137,15 @@ TEST(DocumentDiffTest, NestedArray) {
     ASSERT(diff);
     // When the sub-array delta is larger than the size of the sub-array, we record it as an update
     // operation.
-    assertBinaryEq(*diff, fromjson("{s: {field2: {a: true, '3': {u: [[4]]}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field2: {a: true, '3': {u: [[4]]}}}}"));
 
     diff = doc_diff::computeDiff(
         fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [2], 4, 5, 6], 5, 5, 5]}"),
         fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [4], 4], 5, 6]}"));
     ASSERT(diff);
-    assertBinaryEq(*diff,
-                   fromjson("{s: {field2: {a: true, l: 6, '3': {s: {a: true, l: 4, "
-                            "'2': {u: [4]}}}, '5': {u: 6}} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff,
+                             fromjson("{s: {field2: {a: true, l: 6, '3': {s: {a: true, l: 4, "
+                                      "'2': {u: [4]}}}, '5': {u: 6}} }}"));
 }
 
 TEST(DocumentDiffTest, SubObjInSubArrayUpdateElements) {
@@ -165,9 +157,9 @@ TEST(DocumentDiffTest, SubObjInSubArrayUpdateElements) {
                  "5]}]}"));
 
     ASSERT(diff);
-    assertBinaryEq(*diff,
-                   fromjson("{s: {field2: {a: true, '3': {s: {s: {field3: {a: true, '2': "
-                            "{u: 4}, '3': {u: 3}, '4': {u: 5}} }} }} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff,
+                             fromjson("{s: {field2: {a: true, '3': {s: {s: {field3: {a: true, '2': "
+                                      "{u: 4}, '3': {u: 3}, '4': {u: 5}} }} }} }}"));
 }
 
 TEST(DocumentDiffTest, SubObjInSubArrayDeleteElements) {
@@ -175,9 +167,10 @@ TEST(DocumentDiffTest, SubObjInSubArrayDeleteElements) {
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {'field3': ['largeString', 2, 3, 4, 5]}]}"),
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {'field3': ['largeString', 2, 3, 5]}]}"));
     ASSERT(diff);
-    assertBinaryEq(*diff,
-                   fromjson("{s: {field2: {a: true, '3': {s: {s: {field3: {a: true, l: 4, '3': "
-                            "{u: 5}} }} }} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(
+        *diff,
+        fromjson("{s: {field2: {a: true, '3': {s: {s: {field3: {a: true, l: 4, '3': "
+                 "{u: 5}} }} }} }}"));
 }
 
 TEST(DocumentDiffTest, NestedSubObjs) {
@@ -187,9 +180,10 @@ TEST(DocumentDiffTest, NestedSubObjs) {
         fromjson("{level1Field1: 'abcd', level1Field2: {level2Field1: {level3Field1: {q: 1}, "
                  "level3Field2: {q: 1}}, level2Field2: 2}, level1Field3: '3'}"));
     ASSERT(diff);
-    assertBinaryEq(*diff,
-                   fromjson("{u: {level1Field3: '3'}, s: {level1Field2: {s: {'level2Field1': "
-                            "{u: {level3Field1: {q: 1}}} }} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(
+        *diff,
+        fromjson("{u: {level1Field3: '3'}, s: {level1Field2: {s: {'level2Field1': "
+                 "{u: {level3Field1: {q: 1}}} }} }}"));
 }
 
 TEST(DocumentDiffTest, SubArrayInSubArrayLargeDelta) {
@@ -197,8 +191,8 @@ TEST(DocumentDiffTest, SubArrayInSubArrayLargeDelta) {
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {field3: [2, 3, 4, 5]}]}"),
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {field3: [1, 2, 3, 4, 5]}]}"));
     ASSERT(diff);
-    assertBinaryEq(*diff,
-                   fromjson("{s: {field2: {a: true, '3': {u: {field3: [1, 2, 3, 4, 5]}}} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(
+        *diff, fromjson("{s: {field2: {a: true, '3': {u: {field3: [1, 2, 3, 4, 5]}}} }}"));
 }
 
 TEST(DocumentDiffTest, SubObjInSubArrayLargeDelta) {
@@ -206,7 +200,7 @@ TEST(DocumentDiffTest, SubObjInSubArrayLargeDelta) {
         doc_diff::computeDiff(fromjson("{field1: [1, 2, 3, 4, 5, 6, {a: 1, b: 2, c: 3, d: 4}, 7]}"),
                               fromjson("{field1: [1, 2, 3, 4, 5, 6, {p: 1, q: 2}, 7]}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{s: {field1: {a: true, '6': {u: {p: 1, q: 2} }} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field1: {a: true, '6': {u: {p: 1, q: 2} }} }}"));
 }
 
 TEST(DocumentDiffTest, SubObjInSubObjLargeDelta) {
@@ -214,14 +208,14 @@ TEST(DocumentDiffTest, SubObjInSubObjLargeDelta) {
         fromjson("{field: {p: 1, q: 2, r: {a: 1, b: 2, c: 3, 'd': 4}, s: 3}}"),
         fromjson("{field: {p: 1, q: 2, r: {p: 1, q: 2}, s: 3}}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{s: {field: {u: {r: {p: 1, q: 2} }} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field: {u: {r: {p: 1, q: 2} }} }}"));
 }
 
 TEST(DocumentDiffTest, SubArrayInSubObjLargeDelta) {
     auto diff = doc_diff::computeDiff(fromjson("{field: {p: 1, q: 2, r: [1, 3, 4, 5], s: 3}}"),
                                       fromjson("{field: {p: 1, q: 2, r: [1, 2, 3, 4], s: 3}}"));
     ASSERT(diff);
-    assertBinaryEq(*diff, fromjson("{s: {field: {u: {r: [1, 2, 3, 4]}} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field: {u: {r: [1, 2, 3, 4]}} }}"));
 }
 
 }  // namespace

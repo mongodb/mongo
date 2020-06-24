@@ -37,13 +37,6 @@
 
 namespace mongo::doc_diff {
 namespace {
-void assertBinaryEq(const BSONObj& objA, const BSONObj& objB) {
-    // This *MUST* check for binary equality, which is what we enforce between replica set
-    // members. Logical equality (through woCompare() or ASSERT_BSONOBJ_EQ) is not strong enough.
-    if (!objA.binaryEqual(objB)) {
-        FAIL(str::stream() << "Objects not equal. Expected " << objA << " == " << objB);
-    }
-}
 
 // Convenient (but inefficient) way to rename a BSONElement. The returned BSONElement is not safe
 // to use after another call to withFieldName(). Note that this is not thread-safe so do not
@@ -62,7 +55,7 @@ TEST(DiffSerializationTest, DeleteSimple) {
     builder.addDelete("f3"_sd);
 
     auto out = builder.release();
-    assertBinaryEq(fromjson("{d: {f1: false, f2: false, f3: false}}"), out);
+    ASSERT_BSONOBJ_BINARY_EQ(fromjson("{d: {f1: false, f2: false, f3: false}}"), out);
 
     DocumentDiffReader reader(out);
     ASSERT_EQ(*reader.nextDelete(), "f1");
@@ -84,7 +77,7 @@ TEST(DiffSerializationTest, InsertSimple) {
     builder.addInsert("f2"_sd, kDummyObj["b"]);
 
     auto out = builder.release();
-    assertBinaryEq(out, fromjson("{'i': {f1: 1, f2: 'foo' }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{'i': {f1: 1, f2: 'foo' }}"));
 
     DocumentDiffReader reader(out);
     ASSERT(reader.nextInsert()->binaryEqual(withFieldName(kDummyObj["a"], "f1")));
@@ -105,7 +98,7 @@ TEST(DiffSerializationTest, UpdateSimple) {
     builder.addUpdate("f2"_sd, kDummyObj["b"]);
 
     auto out = builder.release();
-    assertBinaryEq(out, fromjson("{'u': { f1: 1, f2: 'foo'}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{'u': { f1: 1, f2: 'foo'}}"));
 
     DocumentDiffReader reader(out);
     ASSERT(reader.nextUpdate()->binaryEqual(withFieldName(kDummyObj["a"], "f1")));
@@ -131,7 +124,7 @@ TEST(DiffSerializationTest, SubDiff) {
     }
 
     auto out = builder.release();
-    assertBinaryEq(
+    ASSERT_BSONOBJ_BINARY_EQ(
         out,
         fromjson("{s :"
                  "{obj: {d : { dField: false }, u : { uField: 'foo' }, i : { iField: 1}}}}"));
@@ -179,11 +172,11 @@ TEST(DiffSerializationTest, SubArrayWithSubDiff) {
     }
 
     auto out = builder.release();
-    assertBinaryEq(out,
-                   fromjson("{s: {arr: {a: true, l: 6,"
-                            "'0': {'u': {foo: 'bar'}}, "
-                            "'2': {s: {'d': {dField: false}}},"
-                            "'5': {u: 1}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(out,
+                             fromjson("{s: {arr: {a: true, l: 6,"
+                                      "'0': {'u': {foo: 'bar'}}, "
+                                      "'2': {s: {'d': {dField: false}}},"
+                                      "'5': {u: 1}}}}"));
 
     DocumentDiffReader reader(out);
     ASSERT(reader.nextUpdate() == boost::none);
@@ -252,9 +245,9 @@ TEST(DiffSerializationTest, SubArrayNestedObject) {
     }
 
     const auto out = builder.release();
-    assertBinaryEq(out,
-                   fromjson("{s: {arr: {a: true, '1': {s: {u: {a: 1}}},"
-                            "'2': {s: {u: {b: 2}}}, '3': {s: {u: {c: 3}}}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(out,
+                             fromjson("{s: {arr: {a: true, '1': {s: {u: {a: 1}}},"
+                                      "'2': {s: {u: {b: 2}}}, '3': {s: {u: {c: 3}}}}}}"));
 }
 
 TEST(DiffSerializationTest, SubArrayHighIndex) {
@@ -269,7 +262,7 @@ TEST(DiffSerializationTest, SubArrayHighIndex) {
     }
 
     auto out = builder.release();
-    assertBinaryEq(out, fromjson("{s: {arr: {a: true, '254': {u: 'foo'}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{s: {arr: {a: true, '254': {u: 'foo'}}}}"));
 
     DocumentDiffReader reader(out);
     ASSERT(reader.nextUpdate() == boost::none);
@@ -314,9 +307,10 @@ TEST(DiffSerializationTest, SubDiffAbandon) {
     }
 
     auto out = builder.release();
-    assertBinaryEq(out,
-                   fromjson("{d : {dField1: false, dField2: false}, u: {uField: 1}, s: {obj2: {d: "
-                            "{dField2: false}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(
+        out,
+        fromjson("{d : {dField1: false, dField2: false}, u: {uField: 1}, s: {obj2: {d: "
+                 "{dField2: false}}}}"));
 }
 
 TEST(DiffSerializationTest, SubArrayDiffAbandon) {
@@ -339,9 +333,9 @@ TEST(DiffSerializationTest, SubArrayDiffAbandon) {
         sub.setResize(5);
     }
     auto out = builder.release();
-    assertBinaryEq(out,
-                   fromjson("{d : {dField1: false, dField2: false}, u: {uField: 1},"
-                            "s: {arr2: {a: true, l: 5}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(out,
+                             fromjson("{d : {dField1: false, dField2: false}, u: {uField: 1},"
+                                      "s: {arr2: {a: true, l: 5}}}"));
 }
 
 TEST(DiffSerializationTest, ValidateComputeApproxSize) {

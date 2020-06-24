@@ -83,6 +83,7 @@ env.CppUnitTest(
         'document_diff_calculator_test.cpp',
         'document_diff_serialization_test.cpp',
         'document_diff_applier_test.cpp',
+        'document_diff_test.cpp',
         'field_checker_test.cpp',
         'log_builder_test.cpp',
         'modifier_table_test.cpp',

@@ -48,18 +48,10 @@ void checkDiff(const BSONObj& preImage, const BSONObj& expectedPost, const Diff&
     // This *MUST* check for binary equality, which is what we enforce between replica set
     // members. Logical equality (through woCompare() or ASSERT_BSONOBJ_EQ) is not enough to show
     // that the applier actually works.
-    if (!expectedPost.binaryEqual(postImage)) {
-        FAIL(str::stream() << "Post image does not match expected "
-                           << "Expected " << expectedPost << " == " << postImage
-                           << ". Pre image is " << preImage);
-    }
+    ASSERT_BSONOBJ_BINARY_EQ(postImage, expectedPost);
 
     BSONObj postImageAgain = applyDiff(postImage, diff);
-    if (!expectedPost.binaryEqual(postImageAgain)) {
-        FAIL(str::stream() << "Diff is not idempotent"
-                           << "Expected diff to be idempotent, but applying it once gives "
-                           << expectedPost << " and applying it twice gives " << postImageAgain);
-    }
+    ASSERT_BSONOBJ_BINARY_EQ(postImageAgain, expectedPost);
 }
 
 TEST(DiffApplierTest, DeleteSimple) {

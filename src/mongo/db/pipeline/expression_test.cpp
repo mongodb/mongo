@@ -113,12 +113,6 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
     return bob.obj();
 }
 
-/** Check binary equality, ensuring use of the same numeric types. */
-static void assertBinaryEqual(const BSONObj& expected, const BSONObj& actual) {
-    ASSERT_BSONOBJ_EQ(expected, actual);
-    ASSERT(expected.binaryEqual(actual));
-}
-
 /** Convert Value to a wrapped BSONObj with an empty string field name. */
 static BSONObj toBson(const Value& value) {
     BSONObjBuilder bob;
@@ -573,7 +567,7 @@ public:
             ExpressionCoerceToBool::create(&expCtx, ExpressionFieldPath::create(&expCtx, "foo"));
 
         // serialized as $and because CoerceToBool isn't an ExpressionNary
-        assertBinaryEqual(fromjson("{field:{$and:['$foo']}}"), toBsonObj(expression));
+        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{field:{$and:['$foo']}}"), toBsonObj(expression));
     }
 
 private:
@@ -591,7 +585,7 @@ public:
             ExpressionCoerceToBool::create(&expCtx, ExpressionFieldPath::create(&expCtx, "foo"));
 
         // serialized as $and because CoerceToBool isn't an ExpressionNary
-        assertBinaryEqual(BSON_ARRAY(fromjson("{$and:['$foo']}")), toBsonArray(expression));
+        ASSERT_BSONOBJ_BINARY_EQ(BSON_ARRAY(fromjson("{$and:['$foo']}")), toBsonArray(expression));
     }
 
 private:
@@ -615,7 +609,8 @@ public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value(5));
-        assertBinaryEqual(BSON("" << 5), toBson(expression->evaluate({}, &expCtx.variables)));
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("" << 5),
+                                 toBson(expression->evaluate({}, &expCtx.variables)));
     }
 };
 
@@ -629,9 +624,9 @@ public:
         BSONElement specElement = spec.firstElement();
         VariablesParseState vps = expCtx.variablesParseState;
         intrusive_ptr<Expression> expression = ExpressionConstant::parse(&expCtx, specElement, vps);
-        assertBinaryEqual(BSON(""
-                               << "foo"),
-                          toBson(expression->evaluate({}, &expCtx.variables)));
+        ASSERT_BSONOBJ_BINARY_EQ(BSON(""
+                                      << "foo"),
+                                 toBson(expression->evaluate({}, &expCtx.variables)));
     }
 };
 
@@ -667,7 +662,7 @@ public:
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value(5));
         // The constant is replaced with a $ expression.
-        assertBinaryEqual(BSON("field" << BSON("$const" << 5)), toBsonObj(expression));
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << BSON("$const" << 5)), toBsonObj(expression));
     }
 
 private:
@@ -683,7 +678,7 @@ public:
         auto expCtx = ExpressionContextForTest{};
         intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value(5));
         // The constant is copied out as is.
-        assertBinaryEqual(constify(BSON_ARRAY(5)), toBsonArray(expression));
+        ASSERT_BSONOBJ_BINARY_EQ(constify(BSON_ARRAY(5)), toBsonArray(expression));
     }
 
 private:
@@ -697,7 +692,7 @@ private:
 TEST(ExpressionConstantTest, ConstantOfValueMissingRemovesField) {
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value());
-    assertBinaryEqual(
+    ASSERT_BSONOBJ_BINARY_EQ(
         BSONObj(),
         toBson(expression->evaluate(Document{{"foo", Value("bar"_sd)}}, &expCtx.variables)));
 }
@@ -705,9 +700,9 @@ TEST(ExpressionConstantTest, ConstantOfValueMissingRemovesField) {
 TEST(ExpressionConstantTest, ConstantOfValueMissingSerializesToRemoveSystemVar) {
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value());
-    assertBinaryEqual(BSON("field"
-                           << "$$REMOVE"),
-                      BSON("field" << expression->serialize(false)));
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("field"
+                                  << "$$REMOVE"),
+                             BSON("field" << expression->serialize(false)));
 }
 
 }  // namespace Constant
