@@ -2142,7 +2142,7 @@ TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) 
     std::pair<ReplSetHeartbeatArgsV1, Milliseconds> uppingRequest =
         getTopoCoord().prepareHeartbeatRequestV1(requestDate, "myset", target);
     auto action = getTopoCoord().processHeartbeatResponse(
-        requestDate, Milliseconds(0), target, makeStatusWith<ReplSetHeartbeatResponse>());
+        requestDate, Milliseconds(0), target, StatusWith(ReplSetHeartbeatResponse()));
     Date_t expected(now() + Milliseconds(2500));
     ASSERT_EQUALS(expected, action.getNextHeartbeatStartDate());
 }
@@ -7123,7 +7123,7 @@ public:
         std::pair<ReplSetHeartbeatArgsV1, Milliseconds> uppingRequest =
             getTopoCoord().prepareHeartbeatRequestV1(_upRequestDate, "rs0", _target);
         HeartbeatResponseAction upAction = getTopoCoord().processHeartbeatResponse(
-            _upRequestDate, Milliseconds(0), _target, makeStatusWith<ReplSetHeartbeatResponse>());
+            _upRequestDate, Milliseconds(0), _target, StatusWith(ReplSetHeartbeatResponse()));
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, upAction.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
 

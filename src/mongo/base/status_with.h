@@ -188,11 +188,6 @@ private:
     boost::optional<T> _t;
 };
 
-template <typename T, typename... Args>
-StatusWith<T> makeStatusWith(Args&&... args) {
-    return StatusWith<T>{T(std::forward<Args>(args)...)};
-}
-
 template <typename T>
 auto operator<<(std::ostream& stream, const StatusWith<T>& sw)
     -> decltype(stream << sw.getValue())  // SFINAE on T streamability.

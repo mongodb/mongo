@@ -922,7 +922,7 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     // Don't mind potential asynchronous stepdown as this is the last step of
     // liveness check.
     lk = _handleHeartbeatResponseAction_inlock(
-        action, makeStatusWith<ReplSetHeartbeatResponse>(), std::move(lk));
+        action, StatusWith(ReplSetHeartbeatResponse()), std::move(lk));
 
     _scheduleNextLivenessUpdate_inlock();
 }
