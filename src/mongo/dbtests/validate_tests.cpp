@@ -1805,7 +1805,9 @@ public:
         add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, false>>();
         add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
         add<ValidateWildCardIndex<false, false>>();
+        add<ValidateWildCardIndex<false, true>>();
         add<ValidateWildCardIndexWithProjection<false, false>>();
+        add<ValidateWildCardIndexWithProjection<false, true>>();
 
         // Tests for index validation.
         add<ValidateIndexEntry<false, false>>();
