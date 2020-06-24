@@ -1128,7 +1128,7 @@ int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
             dassert(DurableCatalog::get(opCtx)->getTotalIndexCount(
                         opCtx, _collection->getCatalogId()) == count);
         } catch (const WriteConflictException& ex) {
-            if (opCtx->lockState()->isWriteLocked()) {
+            if (opCtx->lockState()->inAWriteUnitOfWork()) {
                 // Must abort this write transaction now.
                 throw;
             }
