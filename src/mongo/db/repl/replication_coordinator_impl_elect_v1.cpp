@@ -55,7 +55,7 @@ public:
         if (_dismissed) {
             return;
         }
-        LOGV2(21434, "Lost election due to internal error", "isDryRun"_attr = _isDryRun);
+        LOGV2(21434, "Lost election", "isDryRun"_attr = _isDryRun);
         _replCoord->_topCoord->processLoseElection();
         _replCoord->_voteRequester.reset(nullptr);
         if (_isDryRun && _replCoord->_electionDryRunFinishedEvent.isValid()) {
