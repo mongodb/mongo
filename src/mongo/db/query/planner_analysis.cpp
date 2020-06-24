@@ -438,6 +438,20 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             }
         }
 
+        // An index whose collation does not match the query's cannot provide a sort if sort-by
+        // fields can contain collatable values.
+        if (!CollatorInterface::collatorsMatch(isn->index.collator, query.getCollator())) {
+            auto fieldsWithStringBounds =
+                IndexScanNode::getFieldsWithStringBounds(bounds, isn->index.keyPattern);
+            for (auto&& element : desiredSort) {
+                if (fieldsWithStringBounds.count(element.fieldNameStringData()) > 0) {
+                    // The field can contain collatable values and therefore we cannot use the index
+                    // to provide the sort.
+                    return false;
+                }
+            }
+        }
+
         // Do some bookkeeping to see how many ixscans we'll create total.
         totalNumScans += numScans;
 
