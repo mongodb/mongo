@@ -1082,26 +1082,32 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                 (opCtx->getServiceContext()->getPreciseClockSource()->now() - stepDownStartTime));
     }
 
-    if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
-        replCoord && replCoord->enterQuiesceModeIfSecondary(shutdownTimeout)) {
-        ServiceContext::UniqueOperationContext uniqueOpCtx;
-        OperationContext* opCtx = client->getOperationContext();
-        if (!opCtx) {
-            uniqueOpCtx = client->makeOperationContext();
-            opCtx = uniqueOpCtx.get();
-        }
-        if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {
-            LOGV2_OPTIONS(
-                4695101, {LogComponent::kReplication}, "hangDuringQuiesceMode failpoint enabled");
-            hangDuringQuiesceMode.pauseWhileSet(opCtx);
-        }
+    // TODO SERVER-49138: Remove this FCV check once we branch for 4.8.
+    if (serverGlobalParams.featureCompatibility.isVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46)) {
+        if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
+            replCoord && replCoord->enterQuiesceModeIfSecondary(shutdownTimeout)) {
+            ServiceContext::UniqueOperationContext uniqueOpCtx;
+            OperationContext* opCtx = client->getOperationContext();
+            if (!opCtx) {
+                uniqueOpCtx = client->makeOperationContext();
+                opCtx = uniqueOpCtx.get();
+            }
+            if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {
+                LOGV2_OPTIONS(4695101,
+                              {LogComponent::kReplication},
+                              "hangDuringQuiesceMode failpoint enabled");
+                hangDuringQuiesceMode.pauseWhileSet(opCtx);
+            }
 
-        LOGV2_OPTIONS(4695102,
-                      {LogComponent::kReplication},
-                      "Entering quiesce mode for shutdown",
-                      "quiesceTime"_attr = shutdownTimeout);
-        opCtx->sleepFor(shutdownTimeout);
-        LOGV2_OPTIONS(4695103, {LogComponent::kReplication}, "Exiting quiesce mode for shutdown");
+            LOGV2_OPTIONS(4695102,
+                          {LogComponent::kReplication},
+                          "Entering quiesce mode for shutdown",
+                          "quiesceTime"_attr = shutdownTimeout);
+            opCtx->sleepFor(shutdownTimeout);
+            LOGV2_OPTIONS(
+                4695103, {LogComponent::kReplication}, "Exiting quiesce mode for shutdown");
+        }
     }
 
     LOGV2_OPTIONS(4784901, {LogComponent::kCommand}, "Shutting down the MirrorMaestro");

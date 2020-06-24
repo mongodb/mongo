@@ -287,7 +287,11 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         // Enter quiesce mode so that existing and new short operations are allowed to finish.
         // At this point, we will start responding to any isMaster request with ShutdownInProgress
         // so that clients can re-route their operations.
-        if (auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx)) {
+        //
+        // TODO SERVER-49138: Remove this FCV check once we branch for 4.8.
+        if (serverGlobalParams.featureCompatibility.isVersion(
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
+            auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx)) {
             mongosTopCoord->enterQuiesceModeAndWait(opCtx, quiesceTime);
         }
 
