@@ -15,14 +15,7 @@ var Explainable = (function() {
             return "queryPlanner";
         }
 
-        // If we're here, then the verbosity is a string. We reject invalid strings.
-        if (verbosity !== "queryPlanner" && verbosity !== "executionStats" &&
-            verbosity !== "allPlansExecution") {
-            throw Error("explain verbosity must be one of {" +
-                        "'queryPlanner'," +
-                        "'executionStats'," +
-                        "'allPlansExecution'}");
-        }
+        // All verbosity strings are passed through. Server validates if it is a known option.
 
         return verbosity;
     };
