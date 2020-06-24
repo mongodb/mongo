@@ -43,8 +43,10 @@ assert.soon(
     function() {
         return t.count() === 6 && t.find({x: {$lt: new Date(now - 20000000)}}).count() === 0;
     },
-    "TTL index did not successfully delete expired documents, all documents: " +
-        tojson(t.find().toArray()),
+    function() {
+        return "TTL index did not successfully delete expired documents, all documents: " +
+            tojson(t.find().toArray());
+    },
     70 * 1000);
 
 // now lets check things explicily on each shard
