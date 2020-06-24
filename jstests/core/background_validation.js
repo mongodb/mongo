@@ -4,6 +4,20 @@
  * Checks that {full:true} cannot be run with {background:true}.
  * Checks that {background:true} runs.
  * Checks that {background:true} can run concurrently with CRUD ops on the same collection.
+ *
+ * @tags: [
+ *   # A failpoint is set that only exists on the mongod.
+ *   assumes_against_mongod_not_mongos,
+ *   # A failpoint is set against the primary only.
+ *   does_not_support_stepdowns,
+ *   # Checkpoint cursors cannot be open in lsm.
+ *   does_not_support_wiredtiger_lsm,
+ *   # inMemory does not have checkpoints; background validation only runs on a checkpoint.
+ *   requires_persistence,
+ *   # Background validation is only supported by WT.
+ *   requires_wiredtiger,
+ *   uses_parallel_shell,
+ * ]
  */
 
 (function() {
