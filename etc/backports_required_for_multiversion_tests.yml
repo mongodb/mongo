@@ -42,6 +42,8 @@ replica_sets_jscore_multiversion_passthrough:
   test_file: jstests/core/wildcard_index_partial_index.js
 - ticket: SERVER-48518
   test_file: jstests/replsets/rollback_via_refetch_anomaly.js
+- ticket: SERVER-48993
+  test_file: jstests/core/explode_for_sort_collation.js
 
 sharding_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
@@ -50,6 +52,8 @@ sharding_jscore_multiversion_passthrough:
   test_file: jstests/core/apply_ops_system_dot_views.js
 - ticket: SERVER-48614
   test_file: jstests/core/wildcard_index_partial_index.js
+- ticket: SERVER-48993
+  test_file: jstests/core/explode_for_sort_collation.js
 
 sharded_collections_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
@@ -58,3 +62,5 @@ sharded_collections_jscore_multiversion_passthrough:
   test_file: jstests/core/apply_ops_system_dot_views.js
 - ticket: SERVER-48614
   test_file: jstests/core/wildcard_index_partial_index.js
+- ticket: SERVER-48993
+  test_file: jstests/core/explode_for_sort_collation.js
