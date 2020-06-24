@@ -422,14 +422,6 @@ assert.eq(10, t.count());
 // Error cases.
 //
 
-// Invalid verbosity string.
-assert.throws(function() {
-    t.explain("foobar").find().finish();
-});
-assert.throws(function() {
-    t.find().explain("foobar");
-});
-
 // Can't explain an update without a query.
 assert.throws(function() {
     t.explain().update();
