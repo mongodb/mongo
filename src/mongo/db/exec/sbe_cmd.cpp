@@ -38,6 +38,7 @@
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_executor_factory.h"
 
 namespace mongo {
 /**
@@ -77,7 +78,7 @@ public:
 
         NamespaceString nss{dbname};
 
-        exec = uassertStatusOK(PlanExecutor::make(
+        exec = uassertStatusOK(plan_executor_factory::make(
             opCtx,
             nullptr,
             {std::move(root), stage_builder::PlanStageData{resultSlot, recordIdSlot}},
@@ -110,16 +111,13 @@ public:
         exec->detachFromOperationContext();
         const auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
-            {
-                std::move(exec),
-                nss,
-                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                opCtx->getWriteConcern(),
-                repl::ReadConcernArgs::get(opCtx),
-                cmdObj,
-                {},
-                false  // needsMerge always 'false' for sbe.
-            });
+            {std::move(exec),
+             nss,
+             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->getWriteConcern(),
+             repl::ReadConcernArgs::get(opCtx),
+             cmdObj,
+             {}});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), &result);

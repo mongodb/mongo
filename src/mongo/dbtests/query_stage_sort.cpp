@@ -43,7 +43,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -113,6 +113,7 @@ public:
         Collection* coll) {
         // Build the mock scan stage which feeds the data.
         auto ws = std::make_unique<WorkingSet>();
+        _workingSet = ws.get();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
@@ -130,7 +131,7 @@ public:
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
-        auto statusWithPlanExecutor = PlanExecutor::make(
+        auto statusWithPlanExecutor = plan_executor_factory::make(
             _expCtx, std::move(ws), std::move(ss), coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
         return std::move(statusWithPlanExecutor.getValue());
@@ -173,11 +174,12 @@ public:
             _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
-        auto statusWithPlanExecutor = PlanExecutor::make(_expCtx,
-                                                         std::move(ws),
-                                                         std::move(fetchStage),
-                                                         coll,
-                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
+        auto statusWithPlanExecutor =
+            plan_executor_factory::make(_expCtx,
+                                        std::move(ws),
+                                        std::move(fetchStage),
+                                        coll,
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -242,6 +244,7 @@ protected:
     boost::intrusive_ptr<ExpressionContext> _expCtx =
         new ExpressionContext(&_opCtx, nullptr, nss());
     DBDirectClient _client;
+    WorkingSet* _workingSet = nullptr;
 };
 
 
@@ -417,7 +420,7 @@ public:
             if (PlanStage::ADVANCED != status) {
                 continue;
             }
-            WorkingSetMember* member = exec->getWorkingSet()->get(id);
+            WorkingSetMember* member = _workingSet->get(id);
             ASSERT(member->hasObj());
             if (member->doc.value().getField("_id").getOid() == updatedId) {
                 ASSERT(idBeforeUpdate == member->doc.snapshotId());
@@ -510,7 +513,7 @@ public:
             if (PlanStage::ADVANCED != status) {
                 continue;
             }
-            WorkingSetMember* member = exec->getWorkingSet()->get(id);
+            WorkingSetMember* member = _workingSet->get(id);
             ASSERT(member->hasObj());
             ++count;
         }
@@ -590,11 +593,12 @@ public:
             _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
 
         // We don't get results back since we're sorting some parallel arrays.
-        auto statusWithPlanExecutor = PlanExecutor::make(_expCtx,
-                                                         std::move(ws),
-                                                         std::move(fetchStage),
-                                                         coll,
-                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
+        auto statusWithPlanExecutor =
+            plan_executor_factory::make(_expCtx,
+                                        std::move(ws),
+                                        std::move(fetchStage),
+                                        coll,
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         ASSERT_THROWS_CODE(exec->getNext(static_cast<BSONObj*>(nullptr), nullptr),

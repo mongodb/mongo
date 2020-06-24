@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/plan_executor_sbe.h"
@@ -36,57 +34,8 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/logv2/log.h"
 
 namespace mongo {
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    OperationContext* opCtx,
-    std::unique_ptr<CanonicalQuery> cq,
-    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-    NamespaceString nss,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
-
-    auto&& [rootStage, data] = root;
-
-    LOGV2_DEBUG(4822860,
-                5,
-                "SBE plan",
-                "slots"_attr = data.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(rootStage.get()));
-
-    rootStage->prepare(data.ctx);
-
-    auto exec = new PlanExecutorSBE(opCtx,
-                                    std::move(cq),
-                                    std::move(root),
-                                    std::move(nss),
-                                    false,
-                                    boost::none,
-                                    std::move(yieldPolicy));
-    return {{exec, PlanExecutor::Deleter{opCtx}}};
-}
-
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    OperationContext* opCtx,
-    std::unique_ptr<CanonicalQuery> cq,
-    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-    NamespaceString nss,
-    std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
-
-    auto&& [rootStage, data] = root;
-
-    LOGV2_DEBUG(4822861,
-                5,
-                "SBE plan",
-                "slots"_attr = data.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(rootStage.get()));
-
-    auto exec = new PlanExecutorSBE(
-        opCtx, std::move(cq), std::move(root), std::move(nss), true, stash, std::move(yieldPolicy));
-    return {{exec, PlanExecutor::Deleter{opCtx}}};
-}
-
 PlanExecutorSBE::PlanExecutorSBE(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
@@ -178,16 +127,12 @@ void PlanExecutorSBE::dispose(OperationContext* opCtx) {
     _root.reset();
 }
 
-void PlanExecutorSBE::enqueue(const Document& obj) {
-    enqueue(obj.toBson());
-}
-
 void PlanExecutorSBE::enqueue(const BSONObj& obj) {
     invariant(_state == State::kOpened);
     _stash.push({obj.getOwned(), boost::none});
 }
 
-PlanExecutor::ExecState PlanExecutorSBE::getNext(Document* objOut, RecordId* dlOut) {
+PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, RecordId* dlOut) {
     invariant(_root);
 
     BSONObj obj;

@@ -61,8 +61,7 @@ struct ClientCursorParams {
                        WriteConcernOptions writeConcernOptions,
                        repl::ReadConcernArgs readConcernArgs,
                        BSONObj originatingCommandObj,
-                       PrivilegeVector originatingPrivileges,
-                       bool needsMerge)
+                       PrivilegeVector originatingPrivileges)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
           writeConcernOptions(std::move(writeConcernOptions)),
@@ -71,8 +70,7 @@ struct ClientCursorParams {
                            ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
                            : 0),
           originatingCommandObj(originatingCommandObj.getOwned()),
-          originatingPrivileges(std::move(originatingPrivileges)),
-          needsMerge(needsMerge) {
+          originatingPrivileges(std::move(originatingPrivileges)) {
         while (authenticatedUsersIter.more()) {
             authenticatedUsers.emplace_back(authenticatedUsersIter.next());
         }
@@ -100,7 +98,6 @@ struct ClientCursorParams {
     int queryOptions = 0;
     BSONObj originatingCommandObj;
     PrivilegeVector originatingPrivileges;
-    const bool needsMerge;
 };
 
 /**
@@ -150,10 +147,6 @@ public:
 
     WriteConcernOptions getWriteConcernOptions() const {
         return _writeConcernOptions;
-    }
-
-    bool needsMerge() const {
-        return _needsMerge;
     }
 
     /**
@@ -386,13 +379,6 @@ private:
 
     // See the QueryOptions enum in dbclientinterface.h.
     const int _queryOptions = 0;
-
-    // The value of a flag specified on the originating command which indicates whether the result
-    // of this cursor will be consumed by a merging node (mongos or a mongod selected to perform a
-    // merge). Note that this flag is only set for aggregate() commands, and not for find()
-    // commands. It is therefore possible that 'needsMerge' is false when in fact there will be a
-    // merge performed.
-    const bool _needsMerge;
 
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();

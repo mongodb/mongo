@@ -147,7 +147,7 @@ void DocumentSourceCursor::loadBatch() {
     try {
         ON_BLOCK_EXIT([this] { recordPlanSummaryStats(); });
 
-        while ((state = _exec->getNext(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
+        while ((state = _exec->getNextDocument(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
             _currentBatch.enqueue(transformDoc(std::move(resultObj)));
 
             // As long as we're waiting for inserts, we shouldn't do any batching at this level we
@@ -244,7 +244,8 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
 }
 
 void DocumentSourceCursor::detachFromOperationContext() {
-    if (_exec && !_exec->isDetached()) {
+    // Only detach the underlying executor if it hasn't been detached already.
+    if (_exec && _exec->getOpCtx()) {
         _exec->detachFromOperationContext();
     }
 }

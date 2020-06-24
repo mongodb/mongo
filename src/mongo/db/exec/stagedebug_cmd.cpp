@@ -62,7 +62,7 @@
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -182,11 +182,12 @@ public:
         unique_ptr<PlanStage> rootFetch = std::make_unique<FetchStage>(
             expCtx.get(), ws.get(), std::move(userRoot), nullptr, collection);
 
-        auto statusWithPlanExecutor = PlanExecutor::make(expCtx,
-                                                         std::move(ws),
-                                                         std::move(rootFetch),
-                                                         collection,
-                                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        auto statusWithPlanExecutor =
+            plan_executor_factory::make(expCtx,
+                                        std::move(ws),
+                                        std::move(rootFetch),
+                                        collection,
+                                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         fassert(28536, statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

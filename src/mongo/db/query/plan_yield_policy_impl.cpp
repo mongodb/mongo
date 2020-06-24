@@ -44,7 +44,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(setInterruptOnlyPlansCheckForInterruptHang);
 }  // namespace
 
-PlanYieldPolicyImpl::PlanYieldPolicyImpl(PlanExecutor* exec, PlanYieldPolicy::YieldPolicy policy)
+PlanYieldPolicyImpl::PlanYieldPolicyImpl(PlanExecutorImpl* exec,
+                                         PlanYieldPolicy::YieldPolicy policy)
     : PlanYieldPolicy(exec->getOpCtx()->lockState()->isGlobalLockedRecursively()
                           ? PlanYieldPolicy::YieldPolicy::NO_YIELD
                           : policy,

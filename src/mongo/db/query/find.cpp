@@ -165,10 +165,9 @@ void generateBatch(int ntoreturn,
     PlanExecutor* exec = cursor->getExecutor();
 
     try {
-        Document doc;
+        BSONObj obj;
         while (!FindCommon::enoughForGetMore(ntoreturn, *numResults) &&
-               PlanExecutor::ADVANCED == (*state = exec->getNext(&doc, nullptr))) {
-            BSONObj obj = doc.toBson();
+               PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, nullptr))) {
 
             // If we can't fit this result inside the current batch, then we stash it for later.
             if (!FindCommon::haveSpaceForNext(obj, *numResults, bb->len())) {
@@ -697,10 +696,7 @@ bool runQuery(OperationContext* opCtx,
     }
 
     try {
-        Document doc;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
-            obj = doc.toBson();
-
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
             // If we can't fit this result inside the current batch, then we stash it for later.
             if (!FindCommon::haveSpaceForNext(obj, numResults, bb.len())) {
                 exec->enqueue(obj);
@@ -749,16 +745,13 @@ bool runQuery(OperationContext* opCtx,
         // Allocate a new ClientCursor and register it with the cursor manager.
         ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
-            {
-                std::move(exec),
-                nss,
-                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                opCtx->getWriteConcern(),
-                readConcernArgs,
-                upconvertedQuery,
-                {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
-                false  // needsMerge always 'false' for find().
-            });
+            {std::move(exec),
+             nss,
+             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->getWriteConcern(),
+             readConcernArgs,
+             upconvertedQuery,
+             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
         ccId = pinnedCursor.getCursor()->cursorid();
 
         LOGV2_DEBUG(

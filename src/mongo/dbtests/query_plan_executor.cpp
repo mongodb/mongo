@@ -51,7 +51,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -119,8 +119,8 @@ public:
             new CollectionScan(cq->getExpCtxRaw(), coll, csparams, ws.get(), cq.get()->root()));
 
         // Hand the plan off to the executor.
-        auto statusWithPlanExecutor =
-            PlanExecutor::make(std::move(cq), std::move(ws), std::move(root), coll, yieldPolicy);
+        auto statusWithPlanExecutor = plan_executor_factory::make(
+            std::move(cq), std::move(ws), std::move(root), coll, yieldPolicy);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -165,11 +165,11 @@ public:
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor =
-            PlanExecutor::make(std::move(cq),
-                               std::move(ws),
-                               std::move(root),
-                               coll,
-                               PlanYieldPolicy::YieldPolicy::YIELD_MANUAL);
+            plan_executor_factory::make(std::move(cq),
+                                        std::move(ws),
+                                        std::move(root),
+                                        coll,
+                                        PlanYieldPolicy::YieldPolicy::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -227,11 +227,12 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     auto ws = std::make_unique<WorkingSet>();
     auto proxy = std::make_unique<PipelineProxyStage>(_expCtx.get(), std::move(pipeline), ws.get());
 
-    auto statusWithPlanExecutor = PlanExecutor::make(_expCtx,
-                                                     std::move(ws),
-                                                     std::move(proxy),
-                                                     collection,
-                                                     PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    auto statusWithPlanExecutor =
+        plan_executor_factory::make(_expCtx,
+                                    std::move(ws),
+                                    std::move(proxy),
+                                    collection,
+                                    PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto outerExec = std::move(statusWithPlanExecutor.getValue());
 

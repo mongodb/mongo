@@ -443,16 +443,15 @@ public:
                 options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
             }
             CursorResponseBuilder firstBatch(result, options);
-            Document doc;
+            BSONObj obj;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             std::uint64_t numResults = 0;
 
             try {
                 while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
-                       PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
+                       PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
                     // If we can't fit this result inside the current batch, then we stash it for
                     // later.
-                    BSONObj obj = doc.toBson();
                     if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
                         exec->enqueue(obj);
                         break;
@@ -490,8 +489,7 @@ public:
                      opCtx->getWriteConcern(),
                      repl::ReadConcernArgs::get(opCtx),
                      _request.body,
-                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
-                     expCtx->needsMerge});
+                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
                 cursorId = pinnedCursor.getCursor()->cursorid();
 
                 invariant(!exec);

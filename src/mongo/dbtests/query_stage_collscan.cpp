@@ -46,7 +46,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -104,11 +104,12 @@ public:
         unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
             _expCtx.get(), collection, params, ws.get(), filterExpr.get());
 
-        auto statusWithPlanExecutor = PlanExecutor::make(_expCtx,
-                                                         std::move(ws),
-                                                         std::move(ps),
-                                                         collection,
-                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
+        auto statusWithPlanExecutor =
+            plan_executor_factory::make(_expCtx,
+                                        std::move(ws),
+                                        std::move(ps),
+                                        collection,
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -197,7 +198,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
     unique_ptr<PlanStage> ps =
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
-    auto statusWithPlanExecutor = PlanExecutor::make(
+    auto statusWithPlanExecutor = plan_executor_factory::make(
         _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -226,7 +227,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
     unique_ptr<PlanStage> ps =
         std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
 
-    auto statusWithPlanExecutor = PlanExecutor::make(
+    auto statusWithPlanExecutor = plan_executor_factory::make(
         _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -379,7 +380,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
     ASSERT_EQUALS(PlanStage::NEED_TIME, ps->work(&id));
 
     // Run the rest of the scan and verify the results.
-    auto statusWithPlanExecutor = PlanExecutor::make(
+    auto statusWithPlanExecutor = plan_executor_factory::make(
         _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());

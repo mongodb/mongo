@@ -1117,6 +1117,7 @@ env.Library(
         'query/internal_plans.cpp',
         'query/plan_executor_impl.cpp',
         'query/plan_executor_sbe.cpp',
+        'query/plan_executor_factory.cpp',
         'query/plan_ranker.cpp',
         'query/plan_yield_policy_impl.cpp',
         'query/plan_yield_policy_sbe.cpp',

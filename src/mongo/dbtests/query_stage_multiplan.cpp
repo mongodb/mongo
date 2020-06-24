@@ -49,7 +49,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
-#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -255,11 +255,12 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     ASSERT_EQUALS(0, mps->bestPlanIdx());
 
     // Takes ownership of arguments other than 'collection'.
-    auto statusWithPlanExecutor = PlanExecutor::make(std::move(cq),
-                                                     std::move(sharedWs),
-                                                     std::move(mps),
-                                                     coll,
-                                                     PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    auto statusWithPlanExecutor =
+        plan_executor_factory::make(std::move(cq),
+                                    std::move(sharedWs),
+                                    std::move(mps),
+                                    coll,
+                                    PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -494,11 +495,12 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     mps->addPlan(std::make_unique<QuerySolution>(), std::move(secondPlan), ws.get());
 
     // Making a PlanExecutor chooses the best plan.
-    auto exec = uassertStatusOK(PlanExecutor::make(_expCtx,
-                                                   std::move(ws),
-                                                   std::move(mps),
-                                                   ctx.getCollection(),
-                                                   PlanYieldPolicy::YieldPolicy::NO_YIELD));
+    auto exec =
+        uassertStatusOK(plan_executor_factory::make(_expCtx,
+                                                    std::move(ws),
+                                                    std::move(mps),
+                                                    ctx.getCollection(),
+                                                    PlanYieldPolicy::YieldPolicy::NO_YIELD));
 
     auto root = static_cast<MultiPlanStage*>(exec->getRootStage());
     ASSERT_TRUE(root->bestPlanChosen());

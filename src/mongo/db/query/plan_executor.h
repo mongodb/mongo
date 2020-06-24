@@ -29,33 +29,17 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <queue>
-
 #include "mongo/base/status.h"
-#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/plan_yield_policy_sbe.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/storage/snapshot.h"
-#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
 class BSONObj;
-class CappedInsertNotifier;
-struct CappedInsertNotifierData;
-class Collection;
-class PlanExecutor;
 class PlanStage;
 class RecordId;
-class WorkingSet;
-
-namespace sbe {
-class PlanStage;
-}  // namespace sbe
 
 /**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop
@@ -149,86 +133,18 @@ public:
         bool _dismissed = false;
     };
 
-    //
-    // Factory methods.
-    //
-    // On success, return a new PlanExecutor, owned by the caller.
-    //
-    // Passing YIELD_AUTO to any of these factories will construct a yielding executor which may
-    // yield in the following circumstances:
-    //   - During plan selection inside the call to make().
-    //   - On any call to getNext().
-    //   - On any call to restoreState().
-    //   - While executing the plan inside executePlan().
-    //
-    // If auto-yielding is enabled, a yield during make() may result in the PlanExecutor being
-    // killed, in which case this method will return a non-OK status.
-    //
-    // All callers of these factory methods should provide either a non-null value for 'collection'
-    // or a non-empty 'nss' NamespaceString but not both.
-    //
-
     /**
-     * Note that the PlanExecutor will use the ExpressionContext associated with 'cq' and the
-     * OperationContext associated with that ExpressionContext.
+     * Helper method to aid in displaying an ExecState for debug or other recreational purposes.
      */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
-        std::unique_ptr<CanonicalQuery> cq,
-        std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<PlanStage> rt,
-        const Collection* collection,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        NamespaceString nss = NamespaceString(),
-        std::unique_ptr<QuerySolution> qs = nullptr);
-
-    /**
-     * This overload is provided for executors that do not need a CanonicalQuery. For example, the
-     * outer plan executor for an aggregate command does not have a CanonicalQuery.
-     *
-     * Note that the PlanExecutor will use the OperationContext associated with the 'expCtx'
-     * ExpressionContext.
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<PlanStage> rt,
-        const Collection* collection,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        NamespaceString nss = NamespaceString(),
-        std::unique_ptr<QuerySolution> qs = nullptr);
-
-    /**
-     * These overloads are for SBE.
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
-        OperationContext* opCtx,
-        std::unique_ptr<CanonicalQuery> cq,
-        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-        NamespaceString nss,
-        std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
-        OperationContext* opCtx,
-        std::unique_ptr<CanonicalQuery> cq,
-        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-        NamespaceString nss,
-        std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
-        std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+    static std::string statestr(ExecState s);
 
     /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen
      * automatically through a PlanExecutor::Deleter or a ClientCursor.
      */
     PlanExecutor() = default;
+
     virtual ~PlanExecutor() = default;
-
-    //
-    // Accessors
-    //
-
-    /**
-     * Get the working set used by this executor, without transferring ownership.
-     */
-    virtual WorkingSet* getWorkingSet() const = 0;
 
     /**
      * Get the stage tree wrapped by this executor, without transferring ownership.
@@ -241,7 +157,11 @@ public:
     virtual CanonicalQuery* getCanonicalQuery() const = 0;
 
     /**
-     * Return the NS that the query is running over.
+     * Return the namespace that the query is running over.
+     *
+     * WARNING: In general, a query execution plan can involve multiple collections, and therefore
+     * there is not a single namespace associated with a PlanExecutor. This method is here for
+     * legacy reasons, and new call sites should not be added.
      */
     virtual const NamespaceString& nss() const = 0;
 
@@ -249,15 +169,6 @@ public:
      * Return the OperationContext that the plan is currently executing within.
      */
     virtual OperationContext* getOpCtx() const = 0;
-
-    /**
-     * Return the ExpressionContext that the plan is currently executing with.
-     */
-    virtual const boost::intrusive_ptr<ExpressionContext>& getExpCtx() const = 0;
-
-    //
-    // Methods that just pass down to the PlanStage tree.
-    //
 
     /**
      * Save any state required to recover from changes to the underlying collection's data.
@@ -299,33 +210,6 @@ public:
     virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
 
     /**
-     * Same as restoreState but without the logic to retry if a WriteConflictException is
-     * thrown.
-     *
-     * This is only public for PlanYieldPolicy. DO NOT CALL ANYWHERE ELSE.
-     */
-    virtual void restoreStateWithoutRetrying() = 0;
-
-    //
-    // Running Support
-    //
-
-    /**
-     * Return the next result from the underlying execution tree.
-     *
-     * For read operations, objOut or dlOut are populated with another query result.
-     *
-     * For write operations, the return depends on the particulars of the write stage.
-     *
-     * If a YIELD_AUTO policy is set, then this method may yield.
-     *
-     * The Documents returned by this method may not be owned. If the caller wants to ensure a
-     * returned Document is preserved across a yield, getOwned() should be called.
-     */
-    virtual ExecState getNextSnapshotted(Snapshotted<Document>* objOut, RecordId* dlOut) = 0;
-    virtual ExecState getNextSnapshotted(Snapshotted<BSONObj>* objOut, RecordId* dlOut) = 0;
-
-    /**
      * Produces the next document from the query execution plan. The caller can request that the
      * executor returns documents by passing a non-null pointer for the 'objOut' output parameter,
      * and similarly can request the RecordId by passing a non-null pointer for 'dlOut'.
@@ -341,12 +225,16 @@ public:
      * during yield recovery, an exception can be thrown while locks are not held. Callers cannot
      * expect locks to be held when this method throws an exception.
      */
-    virtual ExecState getNext(Document* objOut, RecordId* dlOut) = 0;
+    virtual ExecState getNext(BSONObj* out, RecordId* dlOut) = 0;
 
     /**
-     * Will perform the Document -> BSON conversion for the caller.
+     * Similar to 'getNext()', but returns a Document rather than a BSONObj.
+     *
+     * Callers should generally prefer the BSONObj variant, since not all implementations of
+     * PlanExecutor use Document/Value as their runtime value format. These implementations will
+     * typically just convert the BSON to Document on behalf of the caller.
      */
-    virtual ExecState getNext(BSONObj* out, RecordId* dlOut) = 0;
+    virtual ExecState getNextDocument(Document* objOut, RecordId* dlOut) = 0;
 
     /**
      * Returns 'true' if the plan is done producing results (or writing), 'false' otherwise.
@@ -393,11 +281,6 @@ public:
     virtual void dispose(OperationContext* opCtx) = 0;
 
     /**
-     * Helper method to aid in displaying an ExecState for debug or other recreational purposes.
-     */
-    static std::string statestr(ExecState s);
-
-    /**
      * Stash the BSONObj so that it gets returned from the PlanExecutor on a later call to
      * getNext().
      *
@@ -405,18 +288,13 @@ public:
      * generating further results from the underlying query plan.
      *
      * Subsequent calls to getNext() must request the BSONObj and *not* the RecordId.
-     *
-     * If used in combination with getNextSnapshotted(), then the SnapshotId associated with
-     * 'obj' will be null when 'obj' is dequeued.
      */
-    virtual void enqueue(const Document& obj) = 0;
     virtual void enqueue(const BSONObj& obj) = 0;
 
     virtual bool isMarkedAsKilled() const = 0;
     virtual Status getKillStatus() = 0;
 
     virtual bool isDisposed() const = 0;
-    virtual bool isDetached() const = 0;
 
     /**
      * If the last oplog timestamp is being tracked for this PlanExecutor, return it.

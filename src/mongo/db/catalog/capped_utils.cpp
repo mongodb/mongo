@@ -173,16 +173,17 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                                         PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY,
                                         InternalPlanner::FORWARD);
 
-    Snapshotted<BSONObj> objToClone;
+    BSONObj objToClone;
     RecordId loc;
 
     DisableDocumentValidation validationDisabler(opCtx);
 
     int retries = 0;  // non-zero when retrying our last document.
     while (true) {
+        auto beforeGetNextSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
         PlanExecutor::ExecState state = PlanExecutor::IS_EOF;
         if (!retries) {
-            state = exec->getNextSnapshotted(&objToClone, &loc);
+            state = exec->getNext(&objToClone, &loc);
         }
 
         switch (state) {
@@ -191,7 +192,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             case PlanExecutor::ADVANCED: {
                 if (excessSize > 0) {
                     // 4x is for padding, power of 2, etc...
-                    excessSize -= (4 * objToClone.value().objsize());
+                    excessSize -= (4 * objToClone.objsize());
                     continue;
                 }
                 break;
@@ -199,18 +200,25 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         }
 
         try {
-            // Make sure we are working with the latest version of the document.
-            if (objToClone.snapshotId() != opCtx->recoveryUnit()->getSnapshotId() &&
-                !fromCollection->findDoc(opCtx, loc, &objToClone)) {
-                // doc was deleted so don't clone it.
-                retries = 0;
-                continue;
+            // If the snapshot id changed while using the 'PlanExecutor' to retrieve the next
+            // document from the collection scan, then it's possible that the document retrieved
+            // from the scan may have since been deleted or modified in our current snapshot.
+            if (beforeGetNextSnapshotId != opCtx->recoveryUnit()->getSnapshotId()) {
+                // The snapshot has changed. Fetch the document again from the collection in order
+                // to check whether it has been deleted.
+                Snapshotted<BSONObj> snapshottedObj;
+                if (!fromCollection->findDoc(opCtx, loc, &snapshottedObj)) {
+                    // Doc was deleted so don't clone it.
+                    retries = 0;
+                    continue;
+                }
+                objToClone = std::move(snapshottedObj.value());
             }
 
             WriteUnitOfWork wunit(opCtx);
             OpDebug* const nullOpDebug = nullptr;
             uassertStatusOK(toCollection->insertDocument(
-                opCtx, InsertStatement(objToClone.value()), nullOpDebug, true));
+                opCtx, InsertStatement(objToClone), nullOpDebug, true));
             wunit.commit();
 
             // Go to the next document

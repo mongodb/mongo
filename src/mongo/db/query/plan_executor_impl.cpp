@@ -85,7 +85,7 @@ MONGO_FAIL_POINT_DEFINE(planExecutorHangWhileYieldedInWaitForInserts);
 /**
  * Constructs a PlanYieldPolicy based on 'policy'.
  */
-std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutor* exec,
+std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutorImpl* exec,
                                                  PlanYieldPolicy::YieldPolicy policy) {
     switch (policy) {
         case PlanYieldPolicy::YieldPolicy::YIELD_AUTO:
@@ -126,77 +126,6 @@ PlanStage* getStageByType(PlanStage* root, StageType type) {
     return nullptr;
 }
 }  // namespace
-
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    std::unique_ptr<CanonicalQuery> cq,
-    std::unique_ptr<WorkingSet> ws,
-    std::unique_ptr<PlanStage> rt,
-    const Collection* collection,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    NamespaceString nss,
-    std::unique_ptr<QuerySolution> qs) {
-    auto expCtx = cq->getExpCtx();
-    return PlanExecutorImpl::make(expCtx->opCtx,
-                                  std::move(ws),
-                                  std::move(rt),
-                                  std::move(qs),
-                                  std::move(cq),
-                                  expCtx,
-                                  collection,
-                                  nss,
-                                  yieldPolicy);
-}
-
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::unique_ptr<WorkingSet> ws,
-    std::unique_ptr<PlanStage> rt,
-    const Collection* collection,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    NamespaceString nss,
-    std::unique_ptr<QuerySolution> qs) {
-    return PlanExecutorImpl::make(expCtx->opCtx,
-                                  std::move(ws),
-                                  std::move(rt),
-                                  std::move(qs),
-                                  nullptr,
-                                  expCtx,
-                                  collection,
-                                  nss,
-                                  yieldPolicy);
-}
-
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutorImpl::make(
-    OperationContext* opCtx,
-    unique_ptr<WorkingSet> ws,
-    unique_ptr<PlanStage> rt,
-    unique_ptr<QuerySolution> qs,
-    unique_ptr<CanonicalQuery> cq,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const Collection* collection,
-    NamespaceString nss,
-    PlanYieldPolicy::YieldPolicy yieldPolicy) {
-
-    auto execImpl = new PlanExecutorImpl(opCtx,
-                                         std::move(ws),
-                                         std::move(rt),
-                                         std::move(qs),
-                                         std::move(cq),
-                                         expCtx,
-                                         collection,
-                                         std::move(nss),
-                                         yieldPolicy);
-    PlanExecutor::Deleter planDeleter(opCtx);
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(execImpl, std::move(planDeleter));
-
-    // Perform plan selection, if necessary.
-    Status status = execImpl->_pickBestPlan();
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return std::move(exec);
-}
 
 PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    unique_ptr<WorkingSet> ws,
@@ -241,6 +170,8 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
         invariant(_cq);
         _nss = _cq->getQueryRequest().nss();
     }
+
+    uassertStatusOK(_pickBestPlan());
 }
 
 Status PlanExecutorImpl::_pickBestPlan() {
@@ -296,10 +227,6 @@ std::string PlanExecutor::statestr(ExecState execState) {
     MONGO_UNREACHABLE;
 }
 
-WorkingSet* PlanExecutorImpl::getWorkingSet() const {
-    return _workingSet.get();
-}
-
 PlanStage* PlanExecutorImpl::getRootStage() const {
     return _root.get();
 }
@@ -314,10 +241,6 @@ const NamespaceString& PlanExecutorImpl::nss() const {
 
 OperationContext* PlanExecutorImpl::getOpCtx() const {
     return _opCtx;
-}
-
-const boost::intrusive_ptr<ExpressionContext>& PlanExecutorImpl::getExpCtx() const {
-    return _expCtx;
 }
 
 void PlanExecutorImpl::saveState() {
@@ -360,7 +283,6 @@ void PlanExecutorImpl::detachFromOperationContext() {
         _expCtx->opCtx = nullptr;
     }
     _currentState = kDetached;
-    _everDetachedFromOperationContext = true;
 }
 
 void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
@@ -379,14 +301,15 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
-    const auto state = getNext(&_docOutput, dlOut);
+    const auto state = getNextDocument(&_docOutput, dlOut);
     if (objOut) {
-        *objOut = _docOutput.toBson();
+        const bool includeMetadata = _expCtx && _expCtx->needsMerge;
+        *objOut = includeMetadata ? _docOutput.toBsonWithMetaData() : _docOutput.toBson();
     }
     return state;
 }
 
-PlanExecutor::ExecState PlanExecutorImpl::getNext(Document* objOut, RecordId* dlOut) {
+PlanExecutor::ExecState PlanExecutorImpl::getNextDocument(Document* objOut, RecordId* dlOut) {
     Snapshotted<Document> snapshotted;
     if (objOut) {
         snapshotted.value() = std::move(*objOut);
@@ -398,27 +321,6 @@ PlanExecutor::ExecState PlanExecutorImpl::getNext(Document* objOut, RecordId* dl
     }
 
     return state;
-}
-
-PlanExecutor::ExecState PlanExecutorImpl::getNextSnapshotted(Snapshotted<Document>* objOut,
-                                                             RecordId* dlOut) {
-    // Detaching from the OperationContext means that the returned snapshot ids could be invalid.
-    invariant(!_everDetachedFromOperationContext);
-    return _getNextImpl(objOut, dlOut);
-}
-
-PlanExecutor::ExecState PlanExecutorImpl::getNextSnapshotted(Snapshotted<BSONObj>* objOut,
-                                                             RecordId* dlOut) {
-    // Detaching from the OperationContext means that the returned snapshot ids could be invalid.
-    invariant(!_everDetachedFromOperationContext);
-    Snapshotted<Document> docOut;
-    docOut.value() = std::move(_docOutput);
-    const auto status = _getNextImpl(&docOut, dlOut);
-    if (objOut) {
-        *objOut = {docOut.snapshotId(), docOut.value().toBson()};
-    }
-    _docOutput = std::move(docOut.value());
-    return status;
 }
 
 bool PlanExecutorImpl::_shouldListenForInserts() {
@@ -651,7 +553,7 @@ void PlanExecutorImpl::executePlan() {
     Document obj;
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
     while (PlanExecutor::ADVANCED == state) {
-        state = this->getNext(&obj, nullptr);
+        state = this->getNextDocument(&obj, nullptr);
     }
 
     if (isMarkedAsKilled()) {
@@ -662,12 +564,8 @@ void PlanExecutorImpl::executePlan() {
     invariant(PlanExecutor::IS_EOF == state);
 }
 
-void PlanExecutorImpl::enqueue(const Document& obj) {
-    _stash.push(obj.getOwned());
-}
-
 void PlanExecutorImpl::enqueue(const BSONObj& obj) {
-    enqueue(Document{obj});
+    _stash.push(Document{obj.getOwned()});
 }
 
 bool PlanExecutorImpl::isMarkedAsKilled() const {
@@ -681,10 +579,6 @@ Status PlanExecutorImpl::getKillStatus() {
 
 bool PlanExecutorImpl::isDisposed() const {
     return _currentState == kDisposed;
-}
-
-bool PlanExecutorImpl::isDetached() const {
-    return _currentState == kDetached;
 }
 
 Timestamp PlanExecutorImpl::getLatestOplogTimestamp() const {

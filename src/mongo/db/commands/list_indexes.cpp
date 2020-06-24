@@ -47,6 +47,7 @@
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -173,29 +174,29 @@ public:
                 root->pushBack(id);
             }
 
-            exec = uassertStatusOK(PlanExecutor::make(expCtx,
-                                                      std::move(ws),
-                                                      std::move(root),
-                                                      nullptr,
-                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                      nss));
+            exec =
+                uassertStatusOK(plan_executor_factory::make(expCtx,
+                                                            std::move(ws),
+                                                            std::move(root),
+                                                            nullptr,
+                                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                            nss));
 
             for (long long objCount = 0; objCount < batchSize; objCount++) {
-                Document nextDoc;
+                BSONObj nextDoc;
                 PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
                 if (state == PlanExecutor::IS_EOF) {
                     break;
                 }
                 invariant(state == PlanExecutor::ADVANCED);
 
-                BSONObj next = nextDoc.toBson();
                 // If we can't fit this result inside the current batch, then we stash it for later.
-                if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
-                    exec->enqueue(next);
+                if (!FindCommon::haveSpaceForNext(nextDoc, objCount, firstBatch.len())) {
+                    exec->enqueue(nextDoc);
                     break;
                 }
 
-                firstBatch.append(next);
+                firstBatch.append(nextDoc);
             }
 
             if (exec->isEOF()) {
@@ -210,16 +211,13 @@ public:
 
         const auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
-            {
-                std::move(exec),
-                nss,
-                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                opCtx->getWriteConcern(),
-                repl::ReadConcernArgs::get(opCtx),
-                cmdObj,
-                {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)},
-                false  // needsMerge always 'false' for listIndexes.
-            });
+            {std::move(exec),
+             nss,
+             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->getWriteConcern(),
+             repl::ReadConcernArgs::get(opCtx),
+             cmdObj,
+             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)}});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), &result);

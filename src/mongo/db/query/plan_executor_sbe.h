@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo {
 class PlanExecutorSBE final : public PlanExecutor {
@@ -46,10 +47,6 @@ public:
         bool isOpen,
         boost::optional<std::queue<std::pair<BSONObj, boost::optional<RecordId>>>> stash,
         std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
-
-    WorkingSet* getWorkingSet() const override {
-        MONGO_UNREACHABLE;
-    }
 
     PlanStage* getRootStage() const override {
         return nullptr;
@@ -67,31 +64,14 @@ public:
         return _opCtx;
     }
 
-    const boost::intrusive_ptr<ExpressionContext>& getExpCtx() const override {
-        static boost::intrusive_ptr<ExpressionContext> unused;
-        return unused;
-    }
-
     void saveState();
     void restoreState();
 
     void detachFromOperationContext();
     void reattachToOperationContext(OperationContext* opCtx);
 
-    void restoreStateWithoutRetrying() override {
-        MONGO_UNREACHABLE;
-    }
-
-    ExecState getNextSnapshotted(Snapshotted<Document>* objOut, RecordId* dlOut) override {
-        MONGO_UNREACHABLE;
-    }
-
-    ExecState getNextSnapshotted(Snapshotted<BSONObj>* objOut, RecordId* dlOut) override {
-        MONGO_UNREACHABLE;
-    }
-
-    ExecState getNext(Document* objOut, RecordId* dlOut) override;
     ExecState getNext(BSONObj* out, RecordId* dlOut) override;
+    ExecState getNextDocument(Document* objOut, RecordId* dlOut) override;
 
     bool isEOF() override {
         return _state == State::kClosed;
@@ -105,7 +85,6 @@ public:
 
     void dispose(OperationContext* opCtx);
 
-    void enqueue(const Document& obj);
     void enqueue(const BSONObj& obj);
 
     bool isMarkedAsKilled() const override {
@@ -119,10 +98,6 @@ public:
 
     bool isDisposed() const override {
         return !_root;
-    }
-
-    bool isDetached() const override {
-        return !_opCtx;
     }
 
     Timestamp getLatestOplogTimestamp() const override;

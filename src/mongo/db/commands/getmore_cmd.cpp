@@ -302,15 +302,11 @@ public:
             // If an awaitData getMore is killed during this process due to our max time expiring at
             // an interrupt point, we just continue as normal and return rather than reporting a
             // timeout to the user.
-            Document doc;
+            BSONObj obj;
             PlanExecutor::ExecState state;
             try {
                 while (!FindCommon::enoughForGetMore(request.batchSize.value_or(0), *numResults) &&
-                       PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
-                    // Note that "needsMerge" implies a find or aggregate operation, which should
-                    // always have a non-NULL 'expCtx' value.
-                    BSONObj obj = cursor->needsMerge() ? doc.toBsonWithMetaData() : doc.toBson();
-
+                       PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
                     // If adding this object will cause us to exceed the message size limit, then we
                     // stash it for later.
                     if (!FindCommon::haveSpaceForNext(obj, *numResults, nextBatch->bytesUsed())) {
