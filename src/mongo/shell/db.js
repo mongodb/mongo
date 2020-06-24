@@ -1828,12 +1828,3 @@ DB.prototype.getSession = function() {
 };
 })(Object.prototype.hasOwnProperty);
 }());
-
-DB.prototype._sbe = function(query) {
-    const res = this.runCommand({sbe: query});
-    if (!res.ok) {
-        throw _getErrorWithCode(res, "sbe failed: " + tojson(res));
-    }
-
-    return new DBCommandCursor(this, res);
-};
