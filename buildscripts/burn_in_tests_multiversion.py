@@ -16,7 +16,7 @@ import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
 import buildscripts.evergreen_generate_resmoke_tasks as gen_resmoke
 from buildscripts.burn_in_tests import GenerateConfig, DEFAULT_PROJECT, CONFIG_FILE, _configure_logging, RepeatConfig, \
     _get_evg_api, EVERGREEN_FILE, DEFAULT_REPO_LOCATIONS, _set_resmoke_cmd, create_tests_by_task, \
-    run_tests
+    find_changed_tests, run_tests
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.patch_builds.task_generation import validate_task_generation_limit
 from buildscripts.resmokelib.suitesconfig import get_named_suites_with_root_level_key
@@ -166,7 +166,8 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
 
     resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
 
-    tests_by_task = create_tests_by_task(generate_config.build_variant, repos, evg_conf)
+    changed_tests = find_changed_tests(repos)
+    tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests)
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
     if generate_tasks_file:
