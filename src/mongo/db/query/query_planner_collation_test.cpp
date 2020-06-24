@@ -612,6 +612,159 @@ TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasDifferentNonSimpleCollationTh
         "{sortKeyGen:{node: {cscan: {dir: 1}}}}}}}}");
 }
 
+// This test verifies that an in-memory sort stage is added and sort provided by an index is not
+// used when the collection has a compound index with a non-simple collation and we issue a
+// non-collatable point-query on the prefix of the index key together with a sort on a suffix of the
+// index key. This is a test for SERVER-48993.
+TEST_F(QueryPlannerTest,
+       MustSortInMemoryWhenPointPrefixQueryHasSimpleCollationButIndexHasNonSimpleCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    // No explicit collation on the query. This will implicitly use the simple collation since the
+    // collection does not have a default collation.
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {a: 2}, sort: {b: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{fetch: {node: "
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+
+    // A query with an explicit simple collation.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 2}, sort: {b: 1}, collation: {locale: 'simple'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{fetch: {node: "
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+}
+
+// This test verifies that an in-memory sort stage is added and sort provided by an index is not
+// used when the collection has a compound index with a non-specified collation and we issue a
+// non-collatable point-query on the prefix of the index key together with a sort on the suffix and
+// an explicit non-simple collation. This is a test for SERVER-48993.
+TEST_F(QueryPlannerTest,
+       MustSortInMemoryWhenPointPrefixQueryHasNonSimpleCollationButIndexHasSimpleCollation) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 2}, sort: {b: 1}, collation: {locale: "
+                 "'reverse'}}"));
+
+    assertSolutionExists(
+        "{fetch: {node: "
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+}
+
+// This test verifies that an in-memory sort stage is added and sort provided by indexes is not used
+// when the collection has a compound index with a non-simple collation and we issue a
+// non-collatable point-query on the prefix of the index key together with a sort on the suffix and
+// an explicit non-simple collation that differs from the index collation. This is a test for
+// SERVER-48993.
+TEST_F(QueryPlannerTest, MustSortInMemoryWhenPointPrefixQueryCollationDoesNotMatchIndexCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 2}, sort: {b: 1}, collation: {locale: 'reverse'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{fetch: {node: "
+        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+}
+
+// This test verifies that a sort is provided by an index when the collection has a compound index
+// with a non-simple collation and we issue a query with a different non-simple collation is a
+// non-collatable point-query on the prefix, a non-collatable range-query on the suffix, and a sort
+// on the suffix key. This is a test for SERVER-48993.
+TEST_F(QueryPlannerTest,
+       IndexCanSortWhenPointPrefixQueryCollationDoesNotMatchIndexButSortRangeIsNonCollatable) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 2, b: {$gte: 0, $lt: 10}}, sort: {b: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: "
+        "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[2, 2, true, true]], b: [[0, 10, true, "
+        "false]]}}}}}");
+}
+
+// This test verifies that an in-memory sort stage is added when the collection has a compound index
+// with a non-simple collation and we issue a query with a different non-simple collation is a
+// non-collatable point-query on the prefix, a collatable range-query on the suffix, and a sort on
+// the suffix key. This is a test for SERVER-48993.
+TEST_F(QueryPlannerTest,
+       MustSortInMemoryWhenPointPrefixQueryCollationDoesNotMatchIndexAndSortRangeIsCollatable) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 2, b: {$gte: 'B', $lt: 'T'}}, sort: {b: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{cscan: {dir: 1}}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node:"
+        "{fetch: {node: "
+        "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[2, 2, true, true]]}}}}}}}}}");
+}
+
+// This test verifies that a SORT_MERGE stage is added when the collection has a compound index with
+// a non-simple collation and we issue a query with a different non-simple collation is a
+// non-collatable multi-point query on the prefix, a non-collatable range-query on the suffix, and a
+// sort on the suffix key.This is a test for SERVER-48993.
+TEST_F(QueryPlannerTest,
+       CanExplodeForSortWhenPointPrefixQueryCollationDoesNotMatchIndexButSortRangeIsNonCollatable) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    addIndex(fromjson("{a: 1, b: 1, c: 1}"), &collator);
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {a: {$in: [2, 5]}, b: {$gte: 0, $lt: 10}}, sort: {b: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {node: "
+        "{mergeSort: {nodes: {"
+        "n0: {ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: {a: [[2, 2, true, true]], b: [[0, 10, "
+        "true, false]]}}}, "
+        "n1: {ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: {a: [[5, 5, true, true]], b: [[0, 10, "
+        "true, false]]}}} "
+        "}}}}}");
+}
+
 /**
  * This test confirms that we place a fetch stage before sortKeyGen in the case where both query
  * and index have the same non-simple collation. To handle this scenario without this fetch would
