@@ -202,7 +202,7 @@ CREATE_TEST_MEMBERSHIP_MAP = {
 class TestAcceptance(unittest.TestCase):
     @patch(ns("write_file_to_dir"))
     @patch(ns("_create_evg_build_variant_map"))
-    @patch(burn_in_tests_ns("find_changed_tests"))
+    @patch(ns("find_changed_tests"))
     def test_no_tests_run_if_none_changed(self, find_changed_tests_mock,
                                           create_evg_build_variant_map_mock, write_to_file_mock):
         """
@@ -225,7 +225,7 @@ class TestAcceptance(unittest.TestCase):
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(ns("write_file_to_dir"))
     @patch(ns("_create_evg_build_variant_map"))
-    @patch(burn_in_tests_ns("find_changed_tests"))
+    @patch(ns("find_changed_tests"))
     @patch(burn_in_tests_ns("create_test_membership_map"))
     def test_tests_generated_if_a_file_changed(
             self, create_test_membership_map_mock, find_changed_tests_mock,

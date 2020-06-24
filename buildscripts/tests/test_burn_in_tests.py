@@ -93,10 +93,9 @@ class TestAcceptance(unittest.TestCase):
             variant,
             "project",
         )  # yapf: disable
-        evg_conf_mock = MagicMock()
-        evg_conf_mock.get_task_names_by_tag.return_value = set()
 
-        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, None, repos, None)
+        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, None, repos, None,
+                           None)
 
         write_json_mock.assert_called_once()
         written_config = json.loads(write_json_mock.call_args[0][1])
@@ -127,7 +126,7 @@ class TestAcceptance(unittest.TestCase):
         evg_config = get_evergreen_config("etc/evergreen.yml")
 
         under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_config, repos,
-                           None)
+                           None, None)
 
         write_json_mock.assert_called_once()
         written_config = json.loads(write_json_mock.call_args[0][1])
@@ -886,3 +885,18 @@ class TestFindChangedTests(unittest.TestCase):
         self.assertIn(file_list[2], found_tests)
         self.assertNotIn(file_list[1], found_tests)
         self.assertEqual(2, len(found_tests))
+
+
+class TestGetRevisionMap(unittest.TestCase):
+    def test_get_revision_map(self):
+        repos = [
+            MagicMock(git_dir="/mongo/.git", working_dir="/mongo"),
+            MagicMock(git_dir="/enterprise/.git", working_dir="/enterprise")
+        ]
+        revision_map = under_test.get_revision_map(repos, "sha")
+        assert revision_map == {"/mongo/.git": "sha"}
+
+    def test_no_mongo_repo(self):
+        repos = [MagicMock(git_dir="/enterprise/.git", working_dir="/enterprise")]
+        with self.assertRaises(Exception):
+            under_test.get_revision_map(repos, "sha")

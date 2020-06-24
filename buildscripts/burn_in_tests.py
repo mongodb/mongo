@@ -37,6 +37,7 @@ from buildscripts.util.teststats import TestStats
 from buildscripts.util.taskname import name_generated_task
 from buildscripts.patch_builds.task_generation import (resmoke_commands, TimeoutInfo,
                                                        validate_task_generation_limit)
+
 # pylint: enable=wrong-import-position
 
 structlog.configure(logger_factory=LoggerFactory())
@@ -200,7 +201,25 @@ def is_file_a_test_file(file_path: str) -> bool:
     return True
 
 
-def find_changed_tests(repos: Iterable[Repo]) -> Set[str]:
+def get_revision_map(repos: Iterable[Repo], origin_rev: Optional[str] = None) -> Set[str]:
+    """
+    If origin_rev is specified, compare changes against this revision in the mongo repo.
+
+    :param repos: List of repos containing changed files.
+    :param origin_rev: The revision that local changes will be compared against.
+    :returns: Set of changed tests.
+    """
+    if origin_rev:
+        mongo_repo_dir = [
+            repo.git_dir for repo in repos if os.path.basename(repo.working_dir) == "mongo"
+        ]
+        if len(mongo_repo_dir) != 1:
+            raise Exception("Mongo repo not found in repos list")
+        return {mongo_repo_dir[0]: origin_rev}
+    return None
+
+
+def find_changed_tests(repos: Iterable[Repo], origin_rev: Optional[str] = None) -> Set[str]:
     """
     Find the changed tests.
 
@@ -208,9 +227,12 @@ def find_changed_tests(repos: Iterable[Repo]) -> Set[str]:
     The returned file paths are in normalized form (see os.path.normpath(path)).
 
     :param repos: List of repos containing changed files.
+    :param origin_rev: The revision that local changes will be compared against.
     :returns: Set of changed tests.
     """
-    changed_files = find_changed_files_in_repos(repos)
+    revision_map = get_revision_map(repos, origin_rev)
+    LOGGER.info("Calculated revision map", revision_map=revision_map)
+    changed_files = find_changed_files_in_repos(repos, revision_map)
     return {os.path.normpath(path) for path in changed_files if is_file_a_test_file(path)}
 
 
@@ -629,18 +651,16 @@ def create_task_list_for_tests(
     return create_task_list(evg_conf, build_variant, tests_by_executor, exclude_tasks)
 
 
-def create_tests_by_task(build_variant: str, repos: Iterable[Repo],
-                         evg_conf: EvergreenProjectConfig) -> Dict:
+def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
+                         changed_tests: Set[str]) -> Dict:
     """
     Create a list of tests by task.
 
     :param build_variant: Build variant to collect tasks from.
-    :param repos: Git repositories being tracked.
     :param evg_conf: Evergreen configuration.
+    :param changed_tests: Set of changed test files.
     :return: Tests by task.
     """
-    changed_tests = find_changed_tests(repos)
-    LOGGER.debug("Found changed tests", files=changed_tests)
     exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
@@ -735,7 +755,7 @@ def _get_evg_api(evg_api_config: str, local_mode: bool) -> Optional[EvergreenApi
 
 def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmoke_args: str,
             generate_tasks_file: str, no_exec: bool, evg_conf: EvergreenProjectConfig,
-            repos: Iterable[Repo], evg_api: EvergreenApi) -> None:
+            repos: Iterable[Repo], evg_api: EvergreenApi, origin_rev: Optional[str]) -> None:
     """
     Run burn_in_tests with the given configuration.
 
@@ -747,11 +767,16 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
     :param evg_conf: Evergreen configuration.
     :param repos: Git repositories to check.
     :param evg_api: Evergreen API client.
+    :param project: Evergreen project to query.
+    :param origin_rev: The revision that local changes will be compared against.
     """
+    changed_tests = find_changed_tests(repos, origin_rev)
+    LOGGER.info("Found changed tests", files=changed_tests)
+
     # Populate the config values in order to use the helpers from resmokelib.suitesconfig.
     resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
 
-    tests_by_task = create_tests_by_task(generate_config.build_variant, repos, evg_conf)
+    tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests)
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
     if generate_tasks_file:
@@ -792,16 +817,25 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
 @click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.option("--task_id", "task_id", default=None, metavar='TASK_ID',
               help="The evergreen task id.")
+@click.option(
+    "--origin-rev", "origin_rev", default=None,
+    help="The revision in the mongo repo that changes will be compared against if specified.")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant, run_build_variant, distro, project, generate_tasks_file, no_exec,
          repeat_tests_num, repeat_tests_min, repeat_tests_max, repeat_tests_secs, resmoke_args,
-         local_mode, evg_api_config, verbose, task_id):
+         local_mode, evg_api_config, verbose, task_id, origin_rev):
     """
     Run new or changed tests in repeated mode to validate their stability.
 
     burn_in_tests detects jstests that are new or changed since the last git command and then
     runs those tests in a loop to validate their reliability.
+
+    The `--origin-rev` argument allows users to specify which revision should be used as the last
+    git command to compare against to find changed files. If the `--origin-rev` argument is provided,
+    we find changed files by comparing your latest changes to this revision. If not provided, we
+    find changed test files by comparing your latest changes to HEAD. The revision provided must
+    be a revision that exists in the mongodb repository.
 
     The `--repeat-*` arguments allow configuration of how burn_in_tests repeats tests. Tests can
     either be repeated a specified number of times with the `--repeat-tests` option, or they can
@@ -837,6 +871,7 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     :param local_mode: Don't call out to the evergreen API (used for testing).
     :param evg_api_config: Location of configuration file to connect to evergreen.
     :param verbose: Log extra debug information.
+    :param origin_rev: The revision that local changes will be compared against.
     """
     _configure_logging(verbose)
 
@@ -858,7 +893,7 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
 
     burn_in(repeat_config, generate_config, resmoke_args, generate_tasks_file, no_exec, evg_conf,
-            repos, evg_api)
+            repos, evg_api, origin_rev)
 
 
 if __name__ == "__main__":

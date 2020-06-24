@@ -22,7 +22,7 @@ import buildscripts.util.read_config as read_config
 from buildscripts.ciconfig import evergreen
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, Variant
 from buildscripts.burn_in_tests import create_generate_tasks_config, create_tests_by_task, \
-    GenerateConfig, RepeatConfig, DEFAULT_REPO_LOCATIONS
+    find_changed_tests, GenerateConfig, RepeatConfig, DEFAULT_REPO_LOCATIONS
 # pylint: enable=wrong-import-position
 
 CONFIG_DIRECTORY = "generated_burn_in_tags_config"
@@ -135,7 +135,8 @@ def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject
     """
     for build_variant, run_build_variant in build_variant_map.items():
         config_options = _get_config_options(task_expansions, build_variant, run_build_variant)
-        tests_by_task = create_tests_by_task(build_variant, repos, evg_conf)
+        changed_tests = find_changed_tests(repos)
+        tests_by_task = create_tests_by_task(build_variant, evg_conf, changed_tests)
         if tests_by_task:
             shrub_build_variant = _generate_evg_build_variant(
                 evg_conf.get_variant(build_variant), run_build_variant,
@@ -153,7 +154,14 @@ def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject
 
 def burn_in(task_expansions: Dict[str, Any], evg_conf: EvergreenProjectConfig,
             evergreen_api: RetryingEvergreenApi, repos: Iterable[Repo]):
-    """Execute Main program."""
+    """
+    Execute main program.
+
+    :param task_expansions: Dictionary of expansions for the running task.
+    :param evergreen_conf: Evergreen configuration.
+    :param evergreen_api: Evergreen.py object.
+    :param repos: Git repositories.
+    """
     shrub_project = ShrubProject.empty()
     build_variant_map = _create_evg_build_variant_map(task_expansions, evg_conf)
     _generate_evg_tasks(evergreen_api, shrub_project, task_expansions, build_variant_map, repos,
