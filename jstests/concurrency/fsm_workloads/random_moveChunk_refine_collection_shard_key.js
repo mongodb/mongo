@@ -53,7 +53,7 @@ var $config = extendWorkload($config, function($config, $super) {
     // migrated back in. The particular error code is replaced with a more generic one, so this
     // is identified by the failed migration's error message.
     $config.data.isMoveChunkErrorAcceptable = (err) => {
-        const codes = [ErrorCodes.LockBusy, ErrorCodes.ShardKeyNotFound];
+        const codes = [ErrorCodes.LockBusy, ErrorCodes.ShardKeyNotFound, ErrorCodes.LockTimeout];
         return (err.code && codes.includes(err.code)) ||
             (err.message &&
              (err.message.includes("CommandFailed") ||
