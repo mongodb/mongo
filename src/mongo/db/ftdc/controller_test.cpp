@@ -61,6 +61,9 @@ public:
 
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) final {
         _state = State::kStarted;
+
+        stdx::unique_lock<Latch> lck(_mutex);
+
         ++_counter;
 
         // Generate document to return for collector
