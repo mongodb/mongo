@@ -160,7 +160,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     }
     net->exitNetwork();
 
-    // _startElectSelfV1_inlock is called when election timeout expires, so election
+    // ElectionState::start is called when election timeout expires, so election
     // finished event has been set.
     getReplCoord()->waitForElectionFinish_forTest();
 
@@ -2243,6 +2243,72 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
     ASSERT(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
 }
 
+TEST_F(ReplCoordTest, NodeCancelsElectionWhenWritingLastVoteInDryRun) {
+    // Start up and become electable.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "protocolVersion" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))
+                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateEnoughHeartbeatsForAllNodesUp();
+    // Set a failpoint to hang after checking the results for the dry run but before we initiate the
+    // vote request for the real election.
+    const auto hangInWritingLastVoteForDryRun =
+        globalFailPointRegistry().find("hangInWritingLastVoteForDryRun");
+    const auto timesEnteredFailPoint = hangInWritingLastVoteForDryRun->setMode(FailPoint::alwaysOn);
+    stdx::thread electionThread([&] { simulateSuccessfulDryRun(); });
+    // Wait to hit the failpoint.
+    hangInWritingLastVoteForDryRun->waitForTimesEntered(timesEnteredFailPoint + 1);
+    ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
+
+    // Cancel the election after the dry-run has already completed but before we create a new
+    // VoteRequester.
+    startCapturingLogMessages();
+    getReplCoord()->cancelElection_forTest();
+    hangInWritingLastVoteForDryRun->setMode(FailPoint::off, 0);
+    electionThread.join();
+
+    // Finish the election. We will receive the requested votes, but the election should still be
+    // canceled.
+    NetworkInterfaceMock* net = getNet();
+    net->enterNetwork();
+    while (net->hasReadyRequests()) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        LOGV2(4825602,
+              "{request_target} processing {request_cmdObj}",
+              "request_target"_attr = request.target.toString(),
+              "request_cmdObj"_attr = request.cmdObj);
+        if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
+            net->blackHole(noi);
+        } else {
+            net->scheduleResponse(
+                noi,
+                net->now(),
+                makeResponseStatus(
+                    BSON("ok" << 1 << "term" << 1 << "voteGranted" << true << "reason"
+                              << "The election should be canceled even if I give you votes")));
+        }
+        net->runReadyNetworkOperations();
+    }
+    net->exitNetwork();
+
+    getReplCoord()->waitForElectionFinish_forTest();
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1, countTextFormatLogLinesContaining("Not becoming primary, election has been cancelled"));
+    ASSERT(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
+}
+
 class PrimaryCatchUpTest : public ReplCoordTest {
 protected:
     using NetworkOpIter = NetworkInterfaceMock::NetworkOperationIterator;
@@ -3002,59 +3068,6 @@ TEST_F(PrimaryCatchUpTest, CatchUpFailsDueToPrimaryStepDown) {
     ASSERT_EQ(0,
               ReplicationMetrics::get(opCtx.get())
                   .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
-}
-
-class VoteRequesterRunnerTest : public ReplCoordTest {
-protected:
-    void testVoteRequesterCancellation(bool dryRun) {
-        auto configObj = configWithMembers(
-            2, 1, BSON_ARRAY(member(1, "node1:12345") << member(2, "node2:12345")));
-        assertStartSuccess(configObj, {"node1", 12345});
-        // Clean up existing heartbeat requests on startup.
-        replyToReceivedHeartbeatV1();
-
-        auto config = ReplSetConfig::parse(configObj);
-        auto selfIndex = 0;
-        auto newTerm = 2;
-        OpTime lastApplied{Timestamp(1, 1), 1};
-        VoteRequester voteRequester;
-        auto endEvh = voteRequester.start(
-            getReplExec(), config, selfIndex, newTerm, dryRun, lastApplied, -1 /* primaryIndex */);
-        ASSERT_OK(endEvh.getStatus());
-
-        // Process a vote request.
-        enterNetwork();
-        auto noi = getNet()->getNextReadyRequest();
-        auto& request = noi->getRequest();
-        LOGV2(
-            214650, "processing", "target"_attr = request.target, "request"_attr = request.cmdObj);
-        ASSERT_EQ(request.cmdObj.firstElement().fieldNameStringData(), "replSetRequestVotes");
-
-        ReplSetRequestVotesResponse response;
-        response.setVoteGranted(true);
-        response.setTerm(newTerm);
-        auto responseObj = (BSONObjBuilder(response.toBSON()) << "ok" << 1).obj();
-        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));
-        getNet()->runReadyNetworkOperations();
-        exitNetwork();
-
-        // Election succeeds.
-        ASSERT(voteRequester.getResult() == VoteRequester::Result::kSuccessfullyElected);
-
-        voteRequester.cancel();
-        ASSERT(voteRequester.getResult() == VoteRequester::Result::kCancelled);
-
-        // The event should be signaled, so this returns immediately.
-        getReplExec()->waitForEvent(endEvh.getValue());
-    }
-};
-
-TEST_F(VoteRequesterRunnerTest, DryRunCancel) {
-    testVoteRequesterCancellation(true);
-}
-
-TEST_F(VoteRequesterRunnerTest, Cancel) {
-    testVoteRequesterCancellation(false);
 }
 
 }  // namespace

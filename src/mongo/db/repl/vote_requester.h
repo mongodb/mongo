@@ -133,7 +133,6 @@ public:
 private:
     std::shared_ptr<Algorithm> _algorithm;
     std::unique_ptr<ScatterGatherRunner> _runner;
-    bool _isCanceled = false;
 };
 
 }  // namespace repl

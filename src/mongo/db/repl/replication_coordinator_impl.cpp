@@ -1082,7 +1082,7 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
                       "Cannot set follower mode when node is currently the leader");
     }
 
-    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded(lk)) {
         // We were a candidate, which means _topCoord believed us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
         // the old and new state were equal. So, try again after the election is over to
@@ -3543,7 +3543,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     executor::TaskExecutor::EventHandle electionFinishedEvent;
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        electionFinishedEvent = _cancelElectionIfNeeded_inlock();
+        electionFinishedEvent = _cancelElectionIfNeeded(lk);
     }
 
     // If there is an election in-progress, there can be at most one. No new election can happen as
@@ -5548,14 +5548,26 @@ void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
 }
 
 void ReplicationCoordinatorImpl::waitForElectionFinish_forTest() {
-    if (_electionFinishedEvent.isValid()) {
-        _replExecutor->waitForEvent(_electionFinishedEvent);
+    EventHandle finishedEvent;
+    {
+        stdx::lock_guard lk(_mutex);
+        if (_electionState) {
+            finishedEvent = _electionState->getElectionFinishedEvent(lk);
+        }
+    }
+    if (finishedEvent.isValid()) {
+        _replExecutor->waitForEvent(finishedEvent);
     }
 }
 
 void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
-    if (_electionDryRunFinishedEvent.isValid()) {
-        _replExecutor->waitForEvent(_electionDryRunFinishedEvent);
+    EventHandle finishedEvent;
+    if (_electionState) {
+        stdx::lock_guard lk(_mutex);
+        finishedEvent = _electionState->getElectionDryRunFinishedEvent(lk);
+    }
+    if (finishedEvent.isValid()) {
+        _replExecutor->waitForEvent(finishedEvent);
     }
 }
 
@@ -5621,7 +5633,10 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
     EventHandle finishEvent;
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        finishEvent = _electionFinishedEvent;
+        // A null _electionState indicates that the election has already completed.
+        if (_electionState) {
+            finishEvent = _electionState->getElectionFinishedEvent(lk);
+        }
     }
     if (finishEvent.isValid()) {
         _replExecutor->waitForEvent(finishEvent);
@@ -5639,13 +5654,14 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
     return Status::OK();
 }
 
-executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inlock() {
+executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded(
+    WithLock lk) {
     if (_topCoord->getRole() != TopologyCoordinator::Role::kCandidate) {
         return {};
     }
-    invariant(_voteRequester);
-    _voteRequester->cancel();
-    return _electionFinishedEvent;
+    invariant(_electionState);
+    _electionState->cancel(lk);
+    return _electionState->getElectionFinishedEvent(lk);
 }
 
 int64_t ReplicationCoordinatorImpl::_nextRandomInt64_inlock(int64_t limit) {

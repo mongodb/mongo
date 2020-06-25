@@ -196,7 +196,7 @@ stdx::unordered_set<HostAndPort> VoteRequester::Algorithm::getResponders() const
     return _responders;
 }
 
-VoteRequester::VoteRequester() : _isCanceled(false) {}
+VoteRequester::VoteRequester() {}
 VoteRequester::~VoteRequester() {}
 
 StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
@@ -214,14 +214,10 @@ StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
 }
 
 void VoteRequester::cancel() {
-    _isCanceled = true;
     _runner->cancel();
 }
 
 VoteRequester::Result VoteRequester::getResult() const {
-    if (_isCanceled)
-        return Result::kCancelled;
-
     return _algorithm->getResult();
 }
 

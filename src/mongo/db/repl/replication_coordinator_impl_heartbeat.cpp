@@ -742,7 +742,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // "kConfigReconfiguring" which prevents new elections from happening.
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
+        if (auto electionFinishedEvent = _cancelElectionIfNeeded(lk)) {
             LOGV2_FOR_HEARTBEATS(4615629,
                                  0,
                                  "Waiting for election to complete before finishing reconfig to "
@@ -1069,7 +1069,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionReason
     _startElectSelfIfEligibleV1(lock, reason);
 }
 
-void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock,
+void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock lk,
                                                              StartElectionReasonEnum reason) {
     // If it is not a single node replica set, no need to start an election after stepdown timeout.
     if (reason == StartElectionReasonEnum::kSingleNodePromptElection &&
@@ -1173,7 +1173,10 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(WithLock,
             MONGO_UNREACHABLE;
     }
 
-    _startElectSelfV1_inlock(reason);
+    invariant(!_electionState);
+
+    _electionState = std::make_unique<ElectionState>(this);
+    _electionState->start(lk, reason);
 }
 
 }  // namespace repl

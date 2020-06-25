@@ -47,6 +47,7 @@
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/db/repl/vote_requester.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
@@ -82,7 +83,6 @@ class ReplSetConfig;
 class SyncSourceFeedback;
 class StorageInterface;
 class TopologyCoordinator;
-class VoteRequester;
 
 class ReplicationCoordinatorImpl : public ReplicationCoordinator {
     ReplicationCoordinatorImpl(const ReplicationCoordinatorImpl&) = delete;
@@ -466,13 +466,13 @@ public:
         long long term, TopologyCoordinator::UpdateTermResult* updateResult);
 
     /**
-     * If called after _startElectSelfV1_inlock(), blocks until all asynchronous
+     * If called after ElectionState::start(), blocks until all asynchronous
      * activities associated with election complete.
      */
     void waitForElectionFinish_forTest();
 
     /**
-     * If called after _startElectSelfV1_inlock(), blocks until all asynchronous
+     * If called after ElectionState::start(), blocks until all asynchronous
      * activities associated with election dry run complete, including writing
      * last vote and scheduling the real election.
      */
@@ -483,6 +483,12 @@ public:
      * won't fully complete before this method is called, or this method may never return.
      */
     void waitForStepDownAttempt_forTest();
+
+    /**
+     * Cancels all future processing work of the VoteRequester and sets the election state to
+     * kCanceled.
+     */
+    void cancelElection_forTest();
 
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;
@@ -495,9 +501,6 @@ private:
         const executor::TaskExecutor::CallbackFn& work)>;
 
     using SharedPromiseOfIsMasterResponse = SharedPromise<std::shared_ptr<const IsMasterResponse>>;
-
-    class LoseElectionGuardV1;
-    class LoseElectionDryRunGuardV1;
 
     /**
      * Configuration states for a replica set node.
@@ -726,6 +729,112 @@ private:
         SharedWaiterHandle _waiter;
         // Counter for the number of ops applied during catchup.
         long _numCatchUpOps = 0;
+    };
+
+    class ElectionState {
+    public:
+        ElectionState(ReplicationCoordinatorImpl* repl)
+            : _repl(repl),
+              _topCoord(repl->_topCoord.get()),
+              _replExecutor(repl->_replExecutor.get()) {}
+
+        /**
+         * Begins an attempt to elect this node.
+         * Called after an incoming heartbeat changes this node's view of the set such that it
+         * believes it can be elected PRIMARY.
+         * For proper concurrency, start methods must be called while holding _mutex.
+         *
+         * For V1 (raft) style elections the election path is:
+         *      _processDryRunResult() (may skip)
+         *      _startRealElection()
+         *      _writeLastVoteForMyElection()
+         *      _requestVotesForRealElection()
+         *      _onVoteRequestComplete()
+         */
+        void start(WithLock lk, StartElectionReasonEnum reason);
+
+        // Returns the election finished event.
+        executor::TaskExecutor::EventHandle getElectionFinishedEvent(WithLock);
+
+        // Returns the election dry run finished event.
+        executor::TaskExecutor::EventHandle getElectionDryRunFinishedEvent(WithLock);
+
+        // Notifies the VoteRequester to cancel further processing. Sets the election state to
+        // canceled.
+        void cancel(WithLock lk);
+
+    private:
+        class LoseElectionGuardV1;
+        class LoseElectionDryRunGuardV1;
+
+        /**
+         * Returns the election result from the VoteRequester.
+         */
+        VoteRequester::Result _getElectionResult(WithLock) const;
+
+        /**
+         * Starts the VoteRequester and requests votes from known members of the replica set.
+         */
+        StatusWith<executor::TaskExecutor::EventHandle> _startVoteRequester(
+            WithLock, long long term, bool dryRun, OpTime lastAppliedOpTime, int primaryIndex);
+
+        /**
+         * Starts VoteRequester to run the real election when last vote write has completed.
+         */
+        void _requestVotesForRealElection(WithLock lk,
+                                          long long newTerm,
+                                          StartElectionReasonEnum reason);
+
+        /**
+         * Callback called when the dryRun VoteRequester has completed; checks the results and
+         * decides whether to conduct a proper election.
+         * "originalTerm" was the term during which the dry run began, if the term has since
+         * changed, do not run for election.
+         */
+        void _processDryRunResult(long long originalTerm, StartElectionReasonEnum reason);
+
+        /**
+         * Begins executing a real election. This is called either a successful dry run, or when the
+         * dry run was skipped (which may be specified for a ReplSetStepUp).
+         */
+        void _startRealElection(WithLock lk,
+                                long long originalTerm,
+                                StartElectionReasonEnum reason);
+
+        /**
+         * Writes the last vote in persistent storage after completing dry run successfully.
+         * This job will be scheduled to run in DB worker threads.
+         */
+        void _writeLastVoteForMyElection(LastVote lastVote,
+                                         const executor::TaskExecutor::CallbackArgs& cbData,
+                                         StartElectionReasonEnum reason);
+
+        /**
+         * Callback called when the VoteRequester has completed; checks the results and
+         * decides whether to change state to primary and alert other nodes of our primary-ness.
+         * "originalTerm" was the term during which the election began, if the term has since
+         * changed, do not step up as primary.
+         */
+        void _onVoteRequestComplete(long long originalTerm, StartElectionReasonEnum reason);
+
+        // Not owned.
+        ReplicationCoordinatorImpl* _repl;
+        // The VoteRequester used to start and gather results from the election voting process.
+        std::unique_ptr<VoteRequester> _voteRequester;
+        // Flag that indicates whether the election has been canceled.
+        bool _isCanceled = false;
+        // Event that the election code will signal when the in-progress election completes.
+        executor::TaskExecutor::EventHandle _electionFinishedEvent;
+
+        // Event that the election code will signal when the in-progress election dry run completes,
+        // which includes writing the last vote and scheduling the real election.
+        executor::TaskExecutor::EventHandle _electionDryRunFinishedEvent;
+
+        // Pointer to the TopologyCoordinator owned by ReplicationCoordinator.
+        TopologyCoordinator* _topCoord;
+
+        // Pointer to the executor owned by ReplicationCoordinator.
+        executor::TaskExecutor* _replExecutor;
     };
 
     // Inner class to manage the concurrency of _canAcceptNonLocalWrites and _canServeNonLocalReads.
@@ -1079,57 +1188,6 @@ private:
     void _onFollowerModeStateChange();
 
     /**
-     * Begins an attempt to elect this node.
-     * Called after an incoming heartbeat changes this node's view of the set such that it
-     * believes it can be elected PRIMARY.
-     * For proper concurrency, start methods must be called while holding _mutex.
-     *
-     * For V1 (raft) style elections the election path is:
-     *      _startElectSelfIfEligibleV1()
-     *      _processDryRunResult() (may skip)
-     *      _startRealElection_inlock()
-     *      _writeLastVoteForMyElection()
-     *      _startVoteRequester_inlock()
-     *      _onVoteRequestComplete()
-     */
-    void _startElectSelfV1_inlock(StartElectionReasonEnum reason);
-
-    /**
-     * Callback called when the dryRun VoteRequester has completed; checks the results and
-     * decides whether to conduct a proper election.
-     * "originalTerm" was the term during which the dry run began, if the term has since
-     * changed, do not run for election.
-     */
-    void _processDryRunResult(long long originalTerm, StartElectionReasonEnum reason);
-
-    /**
-     * Begins executing a real election. This is called either a successful dry run, or when the
-     * dry run was skipped (which may be specified for a ReplSetStepUp).
-     */
-    void _startRealElection_inlock(long long originalTerm, StartElectionReasonEnum reason);
-
-    /**
-     * Writes the last vote in persistent storage after completing dry run successfully.
-     * This job will be scheduled to run in DB worker threads.
-     */
-    void _writeLastVoteForMyElection(LastVote lastVote,
-                                     const executor::TaskExecutor::CallbackArgs& cbData,
-                                     StartElectionReasonEnum reason);
-
-    /**
-     * Starts VoteRequester to run the real election when last vote write has completed.
-     */
-    void _startVoteRequester_inlock(long long newTerm, StartElectionReasonEnum reason);
-
-    /**
-     * Callback called when the VoteRequester has completed; checks the results and
-     * decides whether to change state to primary and alert other nodes of our primary-ness.
-     * "originalTerm" was the term during which the election began, if the term has since
-     * changed, do not step up as primary.
-     */
-    void _onVoteRequestComplete(long long originalTerm, StartElectionReasonEnum reason);
-
-    /**
      * Removes 'host' from the sync source blacklist. If 'host' isn't found, it's simply
      * ignored and no error is thrown.
      *
@@ -1402,7 +1460,7 @@ private:
      * canceled election completes. If there is no running election, returns an invalid event
      * handle.
      */
-    executor::TaskExecutor::EventHandle _cancelElectionIfNeeded_inlock();
+    executor::TaskExecutor::EventHandle _cancelElectionIfNeeded(WithLock);
 
     /**
      * Waits until the lastApplied opTime is at least the 'targetOpTime'.
@@ -1551,15 +1609,6 @@ private:
     // This member's index position in the current config.
     int _selfIndex;  // (M)
 
-    std::unique_ptr<VoteRequester> _voteRequester;  // (M)
-
-    // Event that the election code will signal when the in-progress election completes.
-    executor::TaskExecutor::EventHandle _electionFinishedEvent;  // (M)
-
-    // Event that the election code will signal when the in-progress election dry run completes,
-    // which includes writing the last vote and scheduling the real election.
-    executor::TaskExecutor::EventHandle _electionDryRunFinishedEvent;  // (M)
-
     // Whether we slept last time we attempted an election but possibly tied with other nodes.
     bool _sleptLastElection;  // (M)
 
@@ -1638,6 +1687,10 @@ private:
     // The catchup state including all catchup logic. The presence of a non-null pointer indicates
     // that the node is currently in catchup mode.
     std::unique_ptr<CatchupState> _catchupState;  // (X)
+
+    // The election state that includes logic to start and return information from the election
+    // voting process.
+    std::unique_ptr<ElectionState> _electionState;  // (M)
 
     // Atomic-synchronized copy of Topology Coordinator's _term, for use by the public getTerm()
     // function.
