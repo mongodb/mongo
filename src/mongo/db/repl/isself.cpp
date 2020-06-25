@@ -226,13 +226,25 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
         // a replica set configuration document, but the 'isMaster' command requires a lock on the
         // replication coordinator to execute. As such we call we call 'connectSocketOnly', which
         // does not call 'isMaster'.
-        if (!conn.connectSocketOnly(hostAndPort).isOK()) {
+        auto connectSocketResult = conn.connectSocketOnly(hostAndPort);
+        if (!connectSocketResult.isOK()) {
+            LOGV2(4834700,
+                  "isSelf could not connect via connectSocketOnly",
+                  "hostAndPort"_attr = hostAndPort,
+                  "error"_attr = connectSocketResult);
             return false;
         }
 
-        if (auth::isInternalAuthSet() &&
-            !conn.authenticateInternalUser(auth::StepDownBehavior::kKeepConnectionOpen).isOK()) {
-            return false;
+        if (auth::isInternalAuthSet()) {
+            auto authInternalUserResult =
+                conn.authenticateInternalUser(auth::StepDownBehavior::kKeepConnectionOpen);
+            if (!authInternalUserResult.isOK()) {
+                LOGV2(4834701,
+                      "isSelf could not authenticate internal user",
+                      "hostAndPort"_attr = hostAndPort,
+                      "error"_attr = authInternalUserResult);
+                return false;
+            }
         }
         BSONObj out;
         bool ok = conn.simpleCommand("admin", &out, "_isSelf");
