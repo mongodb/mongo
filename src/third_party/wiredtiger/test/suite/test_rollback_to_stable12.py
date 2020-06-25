@@ -132,7 +132,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
         pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
-        pages_walk_skipped = stat_cursor[stat.conn.txn_rts_skip_interal_pages_walk][2]
+        pages_walk_skipped = stat_cursor[stat.conn.txn_rts_tree_walk_skip_pages][2]
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
         stat_cursor.close()
 

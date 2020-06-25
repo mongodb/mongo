@@ -57,8 +57,8 @@ smoke_list=(
     # Temporarily disabled
 	# "$smoke_base_1 file_type=row data_source=lsm"
 
-	# Force tree rebalance and the statistics server.
-	"$smoke_base_1 file_type=row statistics_server=1 rebalance=1"
+	# Force the statistics server.
+	"$smoke_base_1 file_type=row statistics_server=1"
 
 	# Overflow testing.
 	"$smoke_base_2 file_type=row key_min=256"

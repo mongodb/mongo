@@ -766,31 +766,6 @@ __rollback_page_needs_abort(
     return (result);
 }
 
-#ifdef HAVE_DIAGNOSTIC
-/*
- * __rollback_verify_ondisk_page --
- *     Verify the on-disk page that it doesn't have updates newer than the timestamp.
- */
-static void
-__rollback_verify_ondisk_page(
-  WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t rollback_timestamp)
-{
-    WT_CELL_UNPACK_KV *vpack, _vpack;
-    WT_ROW *rip;
-    uint32_t i;
-
-    vpack = &_vpack;
-
-    /* Review updates that belong to keys that are on the disk image. */
-    WT_ROW_FOREACH (page, rip, i) {
-        __wt_row_leaf_value_cell(session, page, rip, NULL, vpack);
-        WT_ASSERT(session, vpack->tw.durable_start_ts <= rollback_timestamp);
-        WT_ASSERT(session, vpack->tw.durable_stop_ts == WT_TS_NONE ||
-            vpack->tw.durable_stop_ts <= rollback_timestamp);
-    }
-}
-#endif
-
 /*
  * __rollback_abort_newer_updates --
  *     Abort updates on this page newer than the timestamp.
@@ -799,11 +774,7 @@ static int
 __rollback_abort_newer_updates(
   WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
 {
-    WT_DECL_RET;
     WT_PAGE *page;
-    bool local_read;
-
-    local_read = false;
 
     /* Review deleted page saved to the ref. */
     if (ref->page_del != NULL && rollback_timestamp < ref->page_del->durable_timestamp) {
@@ -812,32 +783,18 @@ __rollback_abort_newer_updates(
     }
 
     /*
-     * If we have a ref with no page, or the page is clean, find out whether the page has any
-     * modifications that are newer than the given timestamp. As eviction writes the newest version
-     * to page, even a clean page may also contain modifications that need rollback. Such pages are
-     * read back into memory and processed like other modified pages.
+     * If we have a ref with clean page, find out whether the page has any modifications that are
+     * newer than the given timestamp. As eviction writes the newest version to page, even a clean
+     * page may also contain modifications that need rollback.
      */
-    if ((page = ref->page) == NULL || !__wt_page_is_modified(page)) {
-        if (!__rollback_page_needs_abort(session, ref, rollback_timestamp)) {
-            __wt_verbose(session, WT_VERB_RTS, "%p: page skipped", (void *)ref);
-#ifdef HAVE_DIAGNOSTIC
-            if (ref->page == NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
-                WT_RET(__wt_page_in(session, ref, 0));
-                if (ref->page->type == WT_PAGE_ROW_LEAF)
-                    __rollback_verify_ondisk_page(session, ref->page, rollback_timestamp);
-                WT_TRET_BUSY_OK(__wt_page_release_evict(session, ref, WT_READ_NO_SPLIT));
-            }
-#endif
-            return (0);
-        }
-
-        /* Page needs rollback, read it into cache. */
-        if (page == NULL) {
-            WT_RET(__wt_page_in(session, ref, 0));
-            local_read = true;
-        }
-        page = ref->page;
+    WT_ASSERT(session, ref->page != NULL);
+    page = ref->page;
+    if (!__wt_page_is_modified(page) &&
+      !__rollback_page_needs_abort(session, ref, rollback_timestamp)) {
+        __wt_verbose(session, WT_VERB_RTS, "%p: page skipped", (void *)ref);
+        return (0);
     }
+
     WT_STAT_CONN_INCR(session, txn_rts_pages_visited);
     __wt_verbose(session, WT_VERB_RTS, "%p: page rolled back when page is modified: %s",
       (void *)ref, __wt_page_is_modified(page) ? "true" : "false");
@@ -858,16 +815,30 @@ __rollback_abort_newer_updates(
          */
         break;
     case WT_PAGE_ROW_LEAF:
-        WT_ERR(__rollback_abort_newer_row_leaf(session, page, rollback_timestamp));
+        WT_RET(__rollback_abort_newer_row_leaf(session, page, rollback_timestamp));
         break;
     default:
-        WT_ERR(__wt_illegal_value(session, page->type));
+        WT_RET(__wt_illegal_value(session, page->type));
     }
 
-err:
-    if (local_read)
-        WT_TRET_BUSY_OK(__wt_page_release_evict(session, ref, WT_READ_NO_SPLIT));
-    return (ret);
+    return (0);
+}
+
+/*
+ * __rollback_abort_fast_truncate --
+ *     Abort fast truncate on this page newer than the timestamp.
+ */
+static int
+__rollback_abort_fast_truncate(
+  WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
+{
+    /* Review deleted page saved to the ref. */
+    if (ref->page_del != NULL && rollback_timestamp < ref->page_del->durable_timestamp) {
+        __wt_verbose(session, WT_VERB_RTS, "%p: deleted page rolled back", (void *)ref);
+        WT_RET(__wt_delete_page_rollback(session, ref));
+    }
+
+    return (0);
 }
 
 /*
@@ -882,23 +853,15 @@ __wt_rts_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *s
     rollback_timestamp = *(wt_timestamp_t *)(context);
     *skipp = false; /* Default to reading */
 
-    /* If the page is in-memory, we want to look at it. */
+    /* If the page state is other than on disk, we want to look at it. */
     if (ref->state != WT_REF_DISK)
-        return (0);
-
-    /*
-     * Rollback to stable doesn't read leaf pages into memory as part of the tree walk. The leaf
-     * page is loaded into memory in the caller functions if it has newer updates that are need to
-     * be aborted. Don't process further on leaf pages as part of tree walk function.
-     */
-    if (!F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         return (0);
 
     /* Check whether this ref has any possible updates to be aborted. */
     if (!__rollback_page_needs_abort(session, ref, rollback_timestamp)) {
         *skipp = true;
-        __wt_verbose(session, WT_VERB_RTS, "%p: internal page walk skipped", (void *)ref);
-        WT_STAT_CONN_INCR(session, txn_rts_skip_interal_pages_walk);
+        __wt_verbose(session, WT_VERB_RTS, "%p: page walk skipped", (void *)ref);
+        WT_STAT_CONN_INCR(session, txn_rts_tree_walk_skip_pages);
     }
 
     return (0);
@@ -917,30 +880,17 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
     while ((ret = __wt_tree_walk_custom_skip(session, &ref, __wt_rts_page_skip, &rollback_timestamp,
-              WT_READ_CACHE_LEAF | WT_READ_NO_EVICT | WT_READ_WONT_NEED)) == 0 &&
+              WT_READ_NO_EVICT | WT_READ_WONT_NEED)) == 0 &&
       ref != NULL)
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
             WT_INTL_FOREACH_BEGIN (session, ref->page, child_ref) {
-                WT_RET(__rollback_abort_newer_updates(session, child_ref, rollback_timestamp));
+                WT_RET(__rollback_abort_fast_truncate(session, child_ref, rollback_timestamp));
             }
             WT_INTL_FOREACH_END;
-        }
+        } else
+            WT_RET(__rollback_abort_newer_updates(session, ref, rollback_timestamp));
 
     return (ret);
-}
-
-/*
- * __rollback_eviction_drain --
- *     Wait for eviction to drain from a tree.
- */
-static int
-__rollback_eviction_drain(WT_SESSION_IMPL *session, const char *cfg[])
-{
-    WT_UNUSED(cfg);
-
-    WT_RET(__wt_evict_file_exclusive_on(session));
-    __wt_evict_file_exclusive_off(session);
-    return (0);
 }
 
 /*
@@ -983,15 +933,8 @@ __rollback_to_stable_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
     /* There is nothing to do on an empty tree. */
     if (btree->root.page == NULL)
         return (0);
-    /*
-     * Ensure the eviction server is out of the file - we don't want it messing with us. This step
-     * shouldn't be required, but it simplifies some of the reasoning about what state trees can be
-     * in.
-     */
-    WT_RET(__wt_evict_file_exclusive_on(session));
-    WT_WITH_PAGE_INDEX(session, ret = __rollback_to_stable_btree_walk(session, rollback_timestamp));
-    __wt_evict_file_exclusive_off(session);
 
+    WT_WITH_PAGE_INDEX(session, ret = __rollback_to_stable_btree_walk(session, rollback_timestamp));
     return (ret);
 }
 
@@ -1302,15 +1245,12 @@ err:
  *     Rollback all modifications with timestamps more recent than the passed in timestamp.
  */
 static int
-__rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
+__rollback_to_stable(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
 
     conn = S2C(session);
-
-    /* Mark that a rollback operation is in progress and wait for eviction to drain. */
-    WT_RET(__wt_conn_btree_apply(session, NULL, __rollback_eviction_drain, NULL, cfg));
 
     WT_RET(__rollback_to_stable_check(session));
 
@@ -1333,6 +1273,8 @@ __wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckp
 {
     WT_DECL_RET;
 
+    WT_UNUSED(cfg);
+
     /*
      * Don't use the connection's default session: we are working on data handles and (a) don't want
      * to cache all of them forever, plus (b) can't guarantee that no other method will be called
@@ -1347,7 +1289,7 @@ __wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckp
      * entire table sequentially.
      */
     F_SET(session, WT_SESSION_ROLLBACK_TO_STABLE);
-    ret = __rollback_to_stable(session, cfg);
+    ret = __rollback_to_stable(session);
     F_CLR(session, WT_SESSION_ROLLBACK_TO_STABLE);
     WT_RET(ret);
 
