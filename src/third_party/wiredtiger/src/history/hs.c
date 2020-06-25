@@ -1105,14 +1105,14 @@ err:
 }
 
 /*
- * __wt_find_hs_upd --
+ * __wt_hs_find_upd --
  *     Scan the history store for a record the btree cursor wants to position on. Create an update
  *     for the record and return to the caller. The caller may choose to optionally allow prepared
  *     updates to be returned regardless of whether prepare is being ignored globally. Otherwise, a
  *     prepare conflict will be returned upon reading a prepared update.
  */
 int
-__wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_format, uint64_t recno,
+__wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_format, uint64_t recno,
   WT_UPDATE_VALUE *upd_value, bool allow_prepare, WT_ITEM *on_disk_buf)
 {
     WT_CURSOR *hs_cursor;
@@ -1201,6 +1201,13 @@ __wt_find_hs_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
         if (cmp != 0)
             goto done;
 
+        /*
+         * If the stop time pair on the tombstone in the history store is already globally visible
+         * we can skip it.
+         */
+        if (__wt_txn_visible_all(
+              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts))
+            continue;
         /*
          * If the stop time point of a record is visible to us, we won't be able to see anything for
          * this entire key. Just jump straight to the end.
@@ -1521,10 +1528,17 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
         WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, &hs_key, &hs_ts, &hs_counter));
         if (hs_btree_id != btree->id)
             break;
+
         WT_ERR(__wt_compare(session, NULL, &hs_key, key, &cmp));
         if (cmp != 0)
             break;
-
+        /*
+         * If the stop time pair on the tombstone in the history store is already globally visible
+         * we can skip it.
+         */
+        if (__wt_txn_visible_all(
+              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts))
+            continue;
         /*
          * If we got here, we've got out-of-order updates in the history store.
          *
@@ -1617,6 +1631,14 @@ __hs_delete_key_from_pos(
         WT_RET(__wt_compare(session, NULL, &hs_key, key, &cmp));
         if (cmp != 0)
             break;
+
+        /*
+         * If the stop time pair on the tombstone in the history store is already globally visible
+         * we can skip it.
+         */
+        if (__wt_txn_visible_all(
+              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts))
+            continue;
         /*
          * Since we're using internal functions to modify the row structure, we need to manually set
          * the comparison to an exact match.

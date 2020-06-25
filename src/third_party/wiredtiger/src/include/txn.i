@@ -854,10 +854,12 @@ __wt_txn_read_upd_list(
         /*
          * If the cursor is configured to ignore tombstones, copy the timestamps from the tombstones
          * to the stop time window of the update value being returned to the caller. Caller can
-         * process the stop time window to decide if there was a tombstone on the update chain.
+         * process the stop time window to decide if there was a tombstone on the update chain. If
+         * the time window already has a stop time set then we must've seen a tombstone prior to
+         * ours in the update list, and therefore don't need to do this again.
          */
         if (type == WT_UPDATE_TOMBSTONE && F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&
-          !__wt_txn_upd_visible_all(session, upd)) {
+          !WT_TIME_WINDOW_HAS_STOP(&cbt->upd_value->tw)) {
             cbt->upd_value->tw.durable_stop_ts = upd->durable_ts;
             cbt->upd_value->tw.stop_ts = upd->start_ts;
             cbt->upd_value->tw.stop_txn = upd->txnid;
@@ -918,7 +920,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
 {
     WT_TIME_WINDOW tw;
     WT_UPDATE *prepare_upd;
-
+    bool have_stop_tw;
     prepare_upd = NULL;
 
     WT_RET(__wt_txn_read_upd_list(session, cbt, upd, &prepare_upd));
@@ -932,6 +934,12 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
         cbt->upd_value->type = WT_UPDATE_TOMBSTONE;
         return (0);
     }
+
+    /*
+     * When we inspected the update list we may have seen a tombstone leaving us with a valid stop
+     * time window, we don't want to overwrite this stop time window.
+     */
+    have_stop_tw = WT_TIME_WINDOW_HAS_STOP(&cbt->upd_value->tw);
 
     /* Check the ondisk value. */
     if (vpack == NULL) {
@@ -949,9 +957,8 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
      * return "not found", except scanning the history store during rollback to stable and when we
      * are told to ignore non-globally visible tombstones.
      */
-    if (__wt_txn_tw_stop_visible(session, &tw) &&
-      (!F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) ||
-          (__wt_txn_tw_stop_visible_all(session, &tw) && !WT_CURSOR_IS_DUMP(&cbt->iface)))) {
+    if (!have_stop_tw && __wt_txn_tw_stop_visible(session, &tw) &&
+      !F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE)) {
         cbt->upd_value->buf.data = NULL;
         cbt->upd_value->buf.size = 0;
         cbt->upd_value->tw.durable_stop_ts = tw.durable_stop_ts;
@@ -963,7 +970,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
     }
 
     /* Store the stop time pair of the history store record that is returning. */
-    if (WT_TIME_WINDOW_HAS_STOP(&tw) && WT_IS_HS(S2BT(session))) {
+    if (!have_stop_tw && WT_TIME_WINDOW_HAS_STOP(&tw) && WT_IS_HS(S2BT(session))) {
         cbt->upd_value->tw.durable_stop_ts = tw.durable_stop_ts;
         cbt->upd_value->tw.stop_ts = tw.stop_ts;
         cbt->upd_value->tw.stop_txn = tw.stop_txn;
@@ -986,7 +993,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
 
     /* If there's no visible update in the update chain or ondisk, check the history store file. */
     if (F_ISSET(S2C(session), WT_CONN_HS_OPEN) && !F_ISSET(S2BT(session), WT_BTREE_HS))
-        WT_RET_NOTFOUND_OK(__wt_find_hs_upd(session, key, cbt->iface.value_format, recno,
+        WT_RET_NOTFOUND_OK(__wt_hs_find_upd(session, key, cbt->iface.value_format, recno,
           cbt->upd_value, false, &cbt->upd_value->buf));
 
     /*
