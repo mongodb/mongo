@@ -85,7 +85,7 @@ namespace {
  */
 TopologyVersion appendReplicationInfo(OperationContext* opCtx,
                                       BSONObjBuilder& result,
-                                      int level,
+                                      bool appendReplicationProcess,
                                       boost::optional<TopologyVersion> clientTopologyVersion,
                                       boost::optional<long long> maxAwaitTimeMS) {
     TopologyVersion topologyVersion;
@@ -101,7 +101,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         auto isMasterResponse =
             replCoord->awaitIsMasterResponse(opCtx, horizonParams, clientTopologyVersion, deadline);
         result.appendElements(isMasterResponse->toBSON());
-        if (level) {
+        if (appendReplicationProcess) {
             replCoord->appendSlaveInfoData(&result);
         }
         invariant(isMasterResponse->getTopologyVersion());
@@ -137,77 +137,6 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
     result.appendBool("ismaster",
                       ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
 
-    if (level) {
-        BSONObjBuilder sources(result.subarrayStart("sources"));
-
-        DecimalCounter<unsigned> n;
-        list<BSONObj> src;
-        {
-            const NamespaceString localSources{"local.sources"};
-            AutoGetCollectionForReadCommand ctx(opCtx, localSources);
-            auto exec = InternalPlanner::collectionScan(opCtx,
-                                                        localSources.ns(),
-                                                        ctx.getCollection(),
-                                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
-            BSONObj obj;
-            PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
-                src.push_back(obj.getOwned());
-            }
-
-            // Non-yielding collection scans from InternalPlanner will never error.
-            invariant(PlanExecutor::IS_EOF == state);
-        }
-
-        for (list<BSONObj>::const_iterator i = src.begin(); i != src.end(); i++) {
-            BSONObj s = *i;
-            BSONObjBuilder bb;
-            bb.append(s["host"]);
-            string sourcename = s["source"].valuestr();
-            if (sourcename != "main")
-                bb.append(s["source"]);
-            {
-                BSONElement e = s["syncedTo"];
-                BSONObjBuilder t(bb.subobjStart("syncedTo"));
-                t.appendDate("time", e.timestampTime());
-                t.append("inc", static_cast<int>(e.timestampInc()));
-                t.done();
-            }
-
-            if (level > 1) {
-                invariant(!opCtx->lockState()->isLocked());
-                // note: there is no so-style timeout on this connection; perhaps we should have
-                // one.
-                ScopedDbConnection conn(s["host"].valuestr());
-
-                DBClientConnection* cliConn = dynamic_cast<DBClientConnection*>(&conn.conn());
-                if (cliConn && replAuthenticate(cliConn).isOK()) {
-                    BSONObj first = conn->findOne((string) "local.oplog.$" + sourcename,
-                                                  Query().sort(BSON("$natural" << 1)),
-                                                  nullptr /* fieldsToReturn */,
-                                                  0 /* queryOptions */,
-                                                  ReadConcernArgs::kImplicitDefault);
-                    BSONObj last = conn->findOne((string) "local.oplog.$" + sourcename,
-                                                 Query().sort(BSON("$natural" << -1)),
-                                                 nullptr /* fieldsToReturn */,
-                                                 0 /* queryOptions */,
-                                                 ReadConcernArgs::kImplicitDefault);
-                    bb.appendDate("masterFirst", first["ts"].timestampTime());
-                    bb.appendDate("masterLast", last["ts"].timestampTime());
-                    const auto lag = (last["ts"].timestampTime() - s["syncedTo"].timestampTime());
-                    bb.append("lagSeconds", durationCount<Milliseconds>(lag) / 1000.0);
-                }
-                conn.done();
-            }
-
-            sources.append(StringData{n}, bb.obj());
-            ++n;
-        }
-
-        sources.done();
-
-        replCoord->appendSlaveInfoData(&result);
-    }
 
     BSONObjBuilder topologyVersionBuilder(result.subobjStart("topologyVersion"));
     currentTopologyVersion.serialize(&topologyVersionBuilder);
@@ -229,12 +158,12 @@ public:
             return BSONObj();
         }
 
-        int level = configElement.numberInt();
+        bool appendReplicationProcess = configElement.numberInt() > 0;
 
         BSONObjBuilder result;
         appendReplicationInfo(opCtx,
                               result,
-                              level,
+                              appendReplicationProcess,
                               boost::none /* clientTopologyVersion */,
                               boost::none /* maxAwaitTimeMS */);
 
