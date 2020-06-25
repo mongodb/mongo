@@ -60,3 +60,12 @@ class ProcessError(ResmokeError):
     """
 
     pass
+
+
+class UnsafeExitError(ResmokeError):
+    """Exception raised by process test cases.
+
+    Raised if a process terminates in such a way that further test execution may be unsafe.
+    """
+
+    pass

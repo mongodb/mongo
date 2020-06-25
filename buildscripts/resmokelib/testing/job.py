@@ -168,6 +168,9 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
 
         test(self.report)
         try:
+            if test.propagate_error is not None:
+                raise test.propagate_error
+
             # We are intentionally only checking the individual 'test' status and not calling
             # report.wasSuccessful() here. It is possible that a thread running in the background as
             # part of a hook has added a failed test case to 'self.report'. Checking the individual
