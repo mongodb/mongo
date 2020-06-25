@@ -18,6 +18,9 @@ selector:
 
 # Multiversion tests start their own mongod's.
 executor:
+  archive:
+    tests:
+      - src/mongo/db/modules/enterprise/jstests/hot_backups/*.js
   config:
     shell_options:
       nodb: ''
