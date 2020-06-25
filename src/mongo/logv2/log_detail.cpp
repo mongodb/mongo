@@ -31,12 +31,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include <fmt/format.h>
+
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_source.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo::logv2::detail {
 
@@ -99,12 +102,39 @@ private:
     std::deque<std::string> _storage;
 };
 
+static void checkUniqueAttrs(int32_t id, const TypeErasedAttributeStorage& attrs) {
+    if (attrs.size() <= 1)
+        return;
+    // O(N^2), but N is small and this avoids alloc, sort, and operator<.
+    auto first = attrs.begin();
+    auto last = attrs.end();
+    while (first != last) {
+        auto it = first;
+        ++first;
+        if (std::find_if(first, last, [&](auto&& a) { return a.name == it->name; }) == last)
+            continue;
+        StringData sep;
+        std::string msg;
+        for (auto&& a : attrs) {
+            msg.append(sep.rawData(), sep.size())
+                .append("\"")
+                .append(a.name.rawData(), a.name.size())
+                .append("\"");
+            sep = ","_sd;
+        }
+        uasserted(4793301, format(FMT_STRING("LOGV2 (id={}) attribute collision: [{}]"), id, msg));
+    }
+}
+
 void doLogImpl(int32_t id,
                LogSeverity const& severity,
                LogOptions const& options,
                StringData message,
                TypeErasedAttributeStorage const& attrs) {
     dassert(options.component() != LogComponent::kNumLogComponents);
+    if (TestingProctor::instance().isEnabled())
+        checkUniqueAttrs(id, attrs);
+
     auto& source = options.domain().internal().source();
     auto record = source.open_record(id,
                                      severity,
