@@ -365,6 +365,7 @@ error_codes:
     - {code: 312,name: OperationIsKilledAndDelisted,categories: [CancelationError]}
 
     - {code: 313,name: ResumableRangeDeleterDisabled}
+    - {code: 319,name: MovePrimaryIsInProgress}
 
     # Error codes 4000-8999 are reserved.
 
