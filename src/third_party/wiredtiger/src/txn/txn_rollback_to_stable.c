@@ -228,6 +228,14 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
             break;
 
         /*
+         * If the stop time pair on the tombstone in the history store is already globally visible
+         * we can skip it.
+         */
+        if (__wt_txn_visible_all(
+              session, cbt->upd_value->tw.stop_txn, cbt->upd_value->tw.durable_stop_ts))
+            continue;
+
+        /*
          * As part of the history store search, we never get an exact match based on our search
          * criteria as we always search for a maximum record for that key. Make sure that we set the
          * comparison result as an exact match to remove this key as part of rollback to stable. In
@@ -1073,6 +1081,14 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
         /* Stop crossing into the next btree boundary. */
         if (btree_id != hs_btree_id)
             break;
+
+        /*
+         * If the stop time pair on the tombstone in the history store is already globally visible
+         * we can skip it.
+         */
+        if (__wt_txn_visible_all(
+              session, cbt->upd_value->tw.stop_txn, cbt->upd_value->tw.durable_stop_ts))
+            continue;
 
         /* Set this comparison as exact match of the search for later use. */
         cbt->compare = 0;

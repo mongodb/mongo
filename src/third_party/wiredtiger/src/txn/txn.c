@@ -654,23 +654,37 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
     WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
     WT_ERR(__wt_scr_alloc(session, 0, &hs_value));
 
-    WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
+    for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
+        WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
 
-    /* Not found if we cross the tree boundary. */
-    if (hs_btree_id != S2BT(session)->id) {
-        ret = WT_NOTFOUND;
-        goto done;
+        /* Stop before crossing over to the next btree */
+        if (hs_btree_id != S2BT(session)->id) {
+            ret = WT_NOTFOUND;
+            goto done;
+        }
+
+        /*
+         * Keys are sorted in an order, skip the ones before the desired key, and bail out if we
+         * have crossed over the desired key and not found the record we are looking for.
+         */
+        WT_ERR(__wt_compare(session, NULL, hs_key, key, &cmp));
+        if (cmp != 0) {
+            ret = WT_NOTFOUND;
+            goto done;
+        }
+
+        /*
+         * If the stop time pair on the tombstone in the history store is already globally visible
+         * we can skip it.
+         */
+        if (!__wt_txn_visible_all(
+              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts))
+            break;
     }
 
-    /*
-     * Keys are sorted in an order, skip the ones before the desired key, and bail out if we have
-     * crossed over the desired key and not found the record we are looking for.
-     */
-    WT_ERR(__wt_compare(session, NULL, hs_key, key, &cmp));
-    if (cmp != 0) {
-        ret = WT_NOTFOUND;
+    /* We walked off the top of the history store. */
+    if (ret == WT_NOTFOUND)
         goto done;
-    }
 
     /*
      * As part of the history store search, we never get an exact match based on our search criteria
