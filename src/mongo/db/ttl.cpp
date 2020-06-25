@@ -333,6 +333,11 @@ private:
 
         Status result = exec->executePlan();
         if (!result.isOK()) {
+            if (result == ErrorCodes::QueryPlanKilled) {
+                // It is expected that a collection drop can kill a query plan while the TTL monitor
+                // is deleting an old document, so ignore this error.
+                return;
+            }
             LOGV2_ERROR(22543,
                         "ttl query execution for index {index} failed with status: {error}",
                         "TTL query execution failed",
