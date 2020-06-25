@@ -380,6 +380,10 @@ private:
 
         try {
             exec->executePlan();
+        } catch (const ExceptionFor<ErrorCodes::QueryPlanKilled>&) {
+            // It is expected that a collection drop can kill a query plan while the TTL monitor is
+            // deleting an old document, so ignore this error.
+            return;
         } catch (const DBException& exception) {
             LOGV2_WARNING(22543,
                           "ttl query execution for index {index} failed with status: {error}",
