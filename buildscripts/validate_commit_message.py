@@ -32,6 +32,9 @@ import os
 import re
 import subprocess
 import sys
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 COMMON_PUBLIC_PATTERN = r'''
     ((?P<revert>Revert)\s+[\"\']?)?                         # Revert (optional)
@@ -118,13 +121,6 @@ def main(argv=None):
         usage="Validate the commit message. "
         "It validates the latest message when no arguments are provided.")
     parser.add_argument(
-        "-i",
-        action="store_true",
-        dest="ignore_warnings",
-        help="Ignore all warnings.",
-        default=False,
-    )
-    parser.add_argument(
         "message",
         metavar="commit message",
         nargs="*",
@@ -140,15 +136,14 @@ def main(argv=None):
         message = " ".join(args.message)
 
     if any(valid_pattern.match(message) for valid_pattern in VALID_PATTERNS):
-        status = STATUS_OK
-    elif any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
-        print("ERROR: found a reference to a private project\n{message}".format(message=message))
-        status = STATUS_ERROR
+        return STATUS_OK
     else:
-        print("{message_type}: found a commit without a ticket\n{message}".format(
-            message_type="WARNING" if args.ignore_warnings else "ERROR", message=message))
-        status = STATUS_OK if args.ignore_warnings else STATUS_ERROR
-    return status
+        if any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
+            error_type = "Found a reference to a private project"
+        else:
+            error_type = "Found a commit without a ticket"
+        LOGGER.error(f"{error_type}\n{message}")  # pylint: disable=logging-fstring-interpolation
+        return STATUS_ERROR
 
 
 if __name__ == "__main__":

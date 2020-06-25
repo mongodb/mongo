@@ -61,12 +61,6 @@ class ValidateCommitMessageTest(unittest.TestCase):
                 main([message]) == STATUS_ERROR
                 for message in interleave_new_format(INVALID_MESSAGES)))
 
-    def test_ignore_warnings(self):
-        self.assertTrue(
-            all(
-                main(["-i"] + [message]) == STATUS_OK
-                for message in interleave_new_format(INVALID_MESSAGES)))
-
     def test_last_git_commit_success(self):
         with patch(
                 ns("subprocess.check_output"),
