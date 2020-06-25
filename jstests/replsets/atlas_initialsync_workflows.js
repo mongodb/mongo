@@ -4,6 +4,8 @@
 (function() {
 "use strict";
 
+load('jstests/replsets/rslib.js');  // waitForState.
+
 const testName = TestData.testName;
 // Set up a standard 3-node replica set.  Note the two secondaries are priority 0; this is
 // different than the real Atlas configuration where the secondaries would be electable.
@@ -93,37 +95,59 @@ function testAddWithInitialSync(secondariesDown) {
     rst.reInitiate();
 }
 
-function testReplaceWithInitialSync(node, secondariesDown) {
+function testReplaceWithInitialSync(secondariesDown) {
+    const nodeToBeReplaced = rst.getSecondaries()[2];
     secondariesDown = secondariesDown || 0;
     const useForce = secondariesDown > 1;
-    let config = rst.getReplSetConfigFromNode();
+    let config = rst.getReplSetConfigFromNode(primary.nodeId);
     disconnectSecondaries(secondariesDown);
     if (useForce) {
         // Wait for the set to become unhealthy.
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);
     }
-    const nodeId = rst.getNodeId(node);
+
+    let nodeId = rst.getNodeId(nodeToBeReplaced);
     const nodeVotes = config.members[nodeId].votes;
+    const highestMemberId = config.members[nodeId]._id;
     if (nodeVotes > 0) {
-        jsTestLog("Reconfiguring node to have 0 votes.");
+        jsTestLog("Reconfiguring to remove the node.");
         config.version += 1;
-        config.members[nodeId].votes = 0;
+        config.members.splice(nodeId, 1);
         assert.commandWorked(primary.adminCommand(
             {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: useForce}));
     }
-    jsTestLog("Stopping node for replacement of data");
-    rst.stop(node, undefined, undefined, {forRestart: true});
+
+    jsTestLog("Stopping node for replacement");
+    rst.stop(nodeToBeReplaced, undefined, {skipValidation: true}, {forRestart: true});
+    rst.remove(nodeToBeReplaced);
     if (!useForce) {
         // Add some data.  This can't work in a majority-down situation, so we don't do it then.
         assert.commandWorked(testDb[testName].insert({replaceWithInitialSync: secondariesDown},
                                                      {writeConcern: {w: 1}}));
     }
-    jsTestLog("Restarting replacement node with empty data directory.");
-    rst.start(node, {startClean: true}, true /* restart */);
-    // We can't use awaitSecondaryNodes because the set might not be healthy.
-    assert.soonNoExcept(() => node.adminCommand({isMaster: 1}).secondary);
+
+    jsTestLog("Starting a new replacement node with empty data directory.");
+    const replacementNode = rst.add({rsConfig: {votes: 0, priority: 0}});
+    // The second disconnect ensures we can't reach the replacement node from the 'down' nodes.
+    disconnectSecondaries(secondariesDown);
+
+    nodeId = rst.getNodeId(replacementNode);
+    config = rst.getReplSetConfigFromNode(primary.nodeId);
+    const newConfig = rst.getReplSetConfig();
+    config.members = newConfig.members;
+    // Don't recycle the member id.
+    config.members[nodeId]._id = highestMemberId + 1;
+    config.version += 1;
+    jsTestLog("Reconfiguring set to add the replacement node.");
+    assert.commandWorked(primary.adminCommand(
+        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: useForce}));
+
+    jsTestLog("Waiting for the replacement node to sync.");
+    rst.waitForState(replacementNode, ReplSetTest.State.SECONDARY);
+
     if (nodeVotes > 0) {
-        jsTestLog("Reconfiguring node to have votes.");
+        jsTestLog("Reconfiguring the replacement node to have votes.");
+        config = rst.getReplSetConfigFromNode(primary.nodeId);
         config.version += 1;
         config.members[nodeId].votes = nodeVotes;
         assert.commandWorked(primary.adminCommand(
@@ -131,7 +155,7 @@ function testReplaceWithInitialSync(node, secondariesDown) {
     }
     if (!useForce) {
         // Make sure we can replicate to it, if the set is otherwise healthy.
-        rst.awaitReplication(undefined, undefined, [node]);
+        rst.awaitReplication(undefined, undefined, [replacementNode]);
     }
     // Make sure the set is still consistent after resyncing the node.
     reconnectSecondaries();
@@ -151,17 +175,19 @@ jsTestLog("Test adding a node with initial sync with two secondaries unreachable
 testAddWithInitialSync(2);
 
 jsTestLog("Adding node for replace-node scenarios");
-let newNode = rst.add({rsConfig: {priority: 0}});
+const newNode = rst.add({rsConfig: {priority: 0}});
 rst.reInitiate();
+// Wait for the node to to become secondary.
+waitForState(newNode, ReplSetTest.State.SECONDARY);
 
 jsTestLog("Test replacing a node with initial sync in a healthy system.");
-testReplaceWithInitialSync(newNode, 0);
+testReplaceWithInitialSync(0);
 
 jsTestLog("Test replacing a node with initial sync with one secondary unreachable.");
-testReplaceWithInitialSync(newNode, 1);
+testReplaceWithInitialSync(1);
 
 jsTestLog("Test replacing a node with initial sync with two secondaries unreachable.");
-testReplaceWithInitialSync(newNode, 2);
+testReplaceWithInitialSync(2);
 
 rst.stopSet();
 })();
