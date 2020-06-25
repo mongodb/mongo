@@ -299,6 +299,11 @@ InitialSyncerOptions createInitialSyncerOptions(
                                               ReplicationCoordinator::DataConsistency consistency) {
         // Note that setting the last applied opTime forward also advances the global timestamp.
         replCoord->setMyLastAppliedOpTimeAndWallTimeForward(opTimeAndWallTime, consistency);
+        // The oplog application phase of initial sync starts timestamping writes, causing
+        // WiredTiger to pin this data in memory. Advancing the oldest timestamp in step with the
+        // last applied optime here will permit WiredTiger to evict this data as it sees fit.
+        replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
+            opTimeAndWallTime.opTime.getTimestamp());
     };
     options.resetOptimes = [replCoord]() { replCoord->resetMyLastOpTimes(); };
     options.syncSourceSelector = replCoord;
@@ -1440,11 +1445,6 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
             !serverGlobalParams.enableMajorityReadConcern) {
             _setStableTimestampForStorage(lk);
         }
-    } else if (_getMemberState_inlock().startup2()) {
-        // The oplog application phase of initial sync starts timestamping writes, causing
-        // WiredTiger to pin this data in memory. Advancing the oldest timestamp in step with the
-        // last applied optime here will permit WiredTiger to evict this data as it sees fit.
-        _service->getStorageEngine()->setOldestTimestamp(opTime.getTimestamp());
     }
 }
 
