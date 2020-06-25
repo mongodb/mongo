@@ -19,6 +19,7 @@ executor:
     tests:
       - jstests/noPassthrough/backup*.js
       - jstests/noPassthrough/wt_unclean_shutdown.js
+      - src/mongo/db/modules/enterprise/jstests/hot_backups/*.js
   config:
     shell_options:
       nodb: ''
