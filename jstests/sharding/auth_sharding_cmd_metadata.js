@@ -5,42 +5,43 @@
 
 "use strict";
 
-// TODO: SERVER-43938 Make auth_sharding_cmd_metadata.js start shards as replica sets.
-var st =
-    new ShardingTest({shards: 1, other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}});
+function getConfigOpTime() {
+    var srvStatus = assert.commandWorked(shardTestDB.serverStatus());
+    assert.hasFields(srvStatus, ['sharding']);
+    return srvStatus.sharding.lastSeenConfigServerOpTime.t;
+}
 
-var adminUser = {db: "admin", username: "foo", password: "bar"};
+var st = new ShardingTest({shards: 1, other: {keyFile: 'jstests/libs/key1'}});
 
-st.s.getDB(adminUser.db).createUser({user: 'foo', pwd: 'bar', roles: jsTest.adminUserRoles});
-
-st.s.getDB('admin').auth('foo', 'bar');
+const mongosAdminDB = st.s.getDB('admin');
+mongosAdminDB.createUser({user: 'foo', pwd: 'bar', roles: jsTest.adminUserRoles});
+mongosAdminDB.auth('foo', 'bar');
 
 st.adminCommand({enableSharding: 'test'});
 st.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 
-st.d0.getDB('admin').createUser({user: 'user', pwd: 'pwd', roles: jsTest.adminUserRoles});
-st.d0.getDB('admin').auth('user', 'pwd');
+const shardAdminDB = st.rs0.getPrimary().getDB('admin');
+const shardTestDB = st.rs0.getPrimary().getDB('test');
+const maxSecs = Math.pow(2, 32) - 1;
+const metadata = {
+    $configServerState: {opTime: {ts: Timestamp(maxSecs, 0), t: maxSecs}}
+};
 
-var maxSecs = Math.pow(2, 32) - 1;
-var metadata = {$configServerState: {opTime: {ts: Timestamp(maxSecs, 0), t: maxSecs}}};
-var res = st.d0.getDB('test').runCommandWithMetadata({ping: 1}, metadata);
-
+// ConfigOpTime can't be advanced without the correct permissions
+shardAdminDB.createUser({user: 'user', pwd: 'pwd', roles: jsTest.adminUserRoles});
+shardAdminDB.auth('user', 'pwd');
+var res = shardTestDB.runCommandWithMetadata({ping: 1}, metadata);
 assert.commandFailedWithCode(res.commandReply, ErrorCodes.Unauthorized);
+assert.lt(getConfigOpTime(), maxSecs, "Unexpected ConfigOpTime advancement");
 
-// Make sure that the config server optime did not advance.
-var status = st.d0.getDB('test').runCommand({serverStatus: 1});
-assert.neq(null, status.sharding);
-assert.lt(status.sharding.lastSeenConfigServerOpTime.t, maxSecs);
-
-st.d0.getDB('admin').createUser({user: 'internal', pwd: 'pwd', roles: ['__system']});
-st.d0.getDB('admin').auth('internal', 'pwd');
-
-res = st.d0.getDB('test').runCommandWithMetadata({ping: 1}, metadata);
+// Advance configOpTime
+shardAdminDB.createUser({user: 'internal', pwd: 'pwd', roles: ['__system']});
+shardAdminDB.auth('internal', 'pwd');
+res = shardTestDB.runCommandWithMetadata({ping: 1}, metadata);
 assert.commandWorked(res.commandReply);
+assert.eq(getConfigOpTime(), maxSecs, "ConfigOpTime did not advanced as expected");
 
-status = st.d0.getDB('test').runCommand({serverStatus: 1});
-assert.neq(null, status.sharding);
-assert.eq(status.sharding.lastSeenConfigServerOpTime.t, maxSecs);
-
+mongosAdminDB.logout();
+shardAdminDB.logout();
 st.stop();
 })();
