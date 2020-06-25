@@ -719,8 +719,8 @@ struct __wt_connection_stats {
     int64_t txn_rts_keys_restored;
     int64_t txn_rts_pages_visited;
     int64_t txn_rts_hs_restore_tombstones;
-    int64_t txn_rts_skip_interal_pages_walk;
     int64_t txn_rts_sweep_hs_keys;
+    int64_t txn_rts_tree_walk_skip_pages;
     int64_t txn_rts_upd_aborted;
     int64_t txn_rts_hs_removed;
     int64_t txn_set_ts;
