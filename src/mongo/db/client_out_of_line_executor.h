@@ -55,6 +55,8 @@ public:
 
     using Task = OutOfLineExecutor::Task;
 
+    void shutdown();
+
     void schedule(Task) override;
 
     // Blocks until the executor is done running all scheduled tasks.
@@ -84,6 +86,9 @@ private:
     std::unique_ptr<Impl> _impl;
 
     std::shared_ptr<QueueType> _taskQueue;
+
+    // Provides the means to ensure `shutdown()` always precedes the destructor.
+    bool _isShutdown = false;
 };
 
 }  // namespace mongo

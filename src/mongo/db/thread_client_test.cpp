@@ -72,8 +72,8 @@ TEST_F(ThreadClientTest, TestDifferentArgs) {
     }
     {
         ASSERT_FALSE(haveClient());
-        ServiceContext sc;
-        ThreadClient tc("Test", &sc, nullptr);
+        auto sc = ServiceContext::make();
+        ThreadClient tc("Test", sc.get(), nullptr);
         ASSERT_TRUE(haveClient());
     }
 }

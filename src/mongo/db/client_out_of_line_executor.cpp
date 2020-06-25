@@ -33,6 +33,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
@@ -54,6 +55,12 @@ ClientOutOfLineExecutor::ClientOutOfLineExecutor() noexcept
     : _impl{std::make_unique<Impl>()}, _taskQueue{std::make_shared<QueueType>()} {}
 
 ClientOutOfLineExecutor::~ClientOutOfLineExecutor() noexcept {
+    invariant(_isShutdown);
+}
+
+void ClientOutOfLineExecutor::shutdown() {
+    ON_BLOCK_EXIT([this]() mutable { _isShutdown = true; });
+
     // Force producers to consume their tasks beyond this point.
     _taskQueue->closeProducerEnd();
 
@@ -117,4 +124,28 @@ void ClientOutOfLineExecutor::QueueHandle::schedule(Task&& task) {
     }
 }
 
+namespace {
+
+/**
+ * The observer ensures that `ClientOutOfLineExecutor` is always stopped before the client object is
+ * destroyed. This is necessary to guarantee that `ClientOutOfLineExecutor::shutdown()` is executed
+ * before the client decorations are destroyed. See SERVER-48901 for more details.
+ */
+class ClientOutOfLineExecutorClientObserver final : public ServiceContext::ClientObserver {
+    void onCreateClient(Client*) {}
+    void onDestroyClient(Client* client) {
+        ClientOutOfLineExecutor::get(client)->shutdown();
+    }
+    void onCreateOperationContext(OperationContext*) {}
+    void onDestroyOperationContext(OperationContext*) {}
+};
+
+ServiceContext::ConstructorActionRegisterer
+    registerClientOutOfLineExecutorClientObserverConstructor{
+        "ClientOutOfLineExecutorClientObserverConstructor", [](ServiceContext* service) {
+            service->registerClientObserver(
+                std::make_unique<ClientOutOfLineExecutorClientObserver>());
+        }};
+
+}  // namespace
 }  // namespace mongo
