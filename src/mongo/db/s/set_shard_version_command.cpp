@@ -239,15 +239,20 @@ public:
 
         // Step 6
 
-        // Note: The forceRefresh flag controls whether we make sure to do our own refresh or if
-        // we're okay with joining another thread
         const auto status = [&] {
             try {
-                forceShardFilteringMetadataRefresh(opCtx, nss, forceRefresh);
-                return Status::OK();
+                // TODO SERVER-48990 remove this if-else: just call onShardVersionMismatch
+                if (requestedVersion == requestedVersion.DROPPED()) {
+                    // Note: The forceRefresh flag controls whether we make sure to do our own
+                    // refresh or if we're okay with joining another thread
+                    forceShardFilteringMetadataRefresh(opCtx, nss, forceRefresh);
+                } else {
+                    onShardVersionMismatch(opCtx, nss, requestedVersion);
+                }
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
+            return Status::OK();
         }();
 
         {
