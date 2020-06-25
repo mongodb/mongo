@@ -155,6 +155,7 @@
 #include "mongo/db/system_index.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl.h"
+#include "mongo/db/unclean_shutdown.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -432,7 +433,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     startWatchdog(serviceContext);
 
-    if (!storageGlobalParams.readOnly) {
+    // When starting up after an unclean shutdown, we do not attempt to use any of the temporary
+    // files left from the previous run. Thus, we remove them in this case.
+    if (!storageGlobalParams.readOnly && startingAfterUncleanShutdown(serviceContext)) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
     }
 
@@ -462,6 +465,14 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             "error"_attr = error.toStatus().reason());
         exitCleanly(EXIT_NEED_DOWNGRADE);
     }
+
+    // This flag is used during storage engine initialization to perform behavior that is specific
+    // to recovering from an unclean shutdown. It is also used to determine whether temporary files
+    // should be removed. The last of these uses is done by repairDatabasesAndCheckVersion() above,
+    // so we reset the flag to false here. We reset the flag so that other users of these functions
+    // outside of startup do not perform behavior that is specific to starting up after an unclean
+    // shutdown.
+    startingAfterUncleanShutdown(serviceContext) = false;
 
     auto replProcess = repl::ReplicationProcess::get(serviceContext);
     invariant(replProcess);
