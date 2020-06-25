@@ -146,7 +146,7 @@ env.Command(objects,
             ' $SOURCES')
 
 #light: link .objs into an msi
-msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
+pre_msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.pre.msi"
 
 # Suppress VC140_CRT_CRT.MSM Internal Consistency Errors
 # ICE03 - Supress "String overflow"
@@ -158,30 +158,33 @@ msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
 #    so this consistency check can be ignored.
 # -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa368954(v=vs.85).aspx
 
-msi_cmd = env.Command(msi,
+pre_msi_cmd = env.Command(pre_msi,
             objects,
             '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null -sice:ICE82  -sice:ICE03 -sice:ICE30'
             ' -ext "$WIXUIEXT"'
             ' -ext "$WIXUTILEXT"'
             ' ${SOURCES}')
-env.NoCache(msi_cmd)
+env.NoCache(pre_msi_cmd)
 
 # Generated Dependencies
-env.Depends(msi_cmd, '$BUILD_DIR/mongo/mongo.exe')
-env.Depends(msi_cmd, '$BUILD_DIR/mongo/mongod.exe')
-env.Depends(msi_cmd, '$BUILD_DIR/mongo/mongos.exe')
-env.Depends(msi_cmd, '$BUILD_DIR/mongo/installer/msi/ca/mongoca.dll')
-env.Depends(msi_cmd, '$BUILD_DIR/mongo/installer/compass/Install-Compass.ps1')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongo.exe')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongod.exe')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongos.exe')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/installer/msi/ca/mongoca.dll')
+env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/installer/compass/Install-Compass.ps1')
 
 # Source Dependencies
-env.Depends(msi_cmd, '#buildscripts/packaging/msi/mongod.yaml')
+env.Depends(pre_msi_cmd, '#buildscripts/packaging/msi/mongod.yaml')
 
 if 'enterprise' in env['MONGO_MODULES']:
-    env.Depends(msi_cmd, "#" + enterpriseToolBuildDir + "/mongodecrypt.exe")
-    env.Depends(msi_cmd, "#" + enterpriseToolBuildDir + "/mongoldap.exe")
-    env.Depends(msi_cmd, "#" + enterpriseToolBuildDir + "/mongocryptd.exe")
+    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongodecrypt.exe")
+    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongoldap.exe")
+    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongocryptd.exe")
 
 msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
+env.Command(msi,
+            pre_msi,
+            r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}')
 env.AlwaysBuild(msi)
 env.NoCache(msi)
 
