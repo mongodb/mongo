@@ -337,7 +337,8 @@ void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
 
     ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbname, cmdObj));
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid input resource " << inputResource.toString(),
+            str::stream() << "Invalid input namespace " << inputResource.databaseToMatch() << "."
+                          << cmdObj["mapReduce"].String(),
             inputResource.isExactNamespacePattern());
     out->push_back(Privilege(inputResource, ActionType::find));
 
