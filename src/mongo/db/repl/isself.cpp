@@ -228,22 +228,20 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
         // does not call 'isMaster'.
         auto connectSocketResult = conn.connectSocketOnly(hostAndPort);
         if (!connectSocketResult.isOK()) {
-            LOGV2_DEBUG(4834700,
-                        1,
-                        "isSelf could not connect via connectSocketOnly",
-                        "hostAndPort"_attr = hostAndPort,
-                        "error"_attr = connectSocketResult);
+            LOGV2(4834700,
+                  "isSelf could not connect via connectSocketOnly",
+                  "hostAndPort"_attr = hostAndPort,
+                  "error"_attr = connectSocketResult);
             return false;
         }
 
         if (auth::isInternalAuthSet()) {
             auto authInternalUserResult = conn.authenticateInternalUser();
             if (!authInternalUserResult.isOK()) {
-                LOGV2_DEBUG(4834701,
-                            1,
-                            "isSelf could not authenticate internal user",
-                            "hostAndPort"_attr = hostAndPort,
-                            "error"_attr = authInternalUserResult);
+                LOGV2(4834701,
+                      "isSelf could not authenticate internal user",
+                      "hostAndPort"_attr = hostAndPort,
+                      "error"_attr = authInternalUserResult);
                 return false;
             }
         }
