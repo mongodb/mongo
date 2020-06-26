@@ -884,6 +884,7 @@ static const char *const __stats_connection_desc[] = {
   "capacity: time waiting during eviction (usecs)", "capacity: time waiting during logging (usecs)",
   "capacity: time waiting during read (usecs)", "connection: auto adjusting condition resets",
   "connection: auto adjusting condition wait calls",
+  "connection: auto adjusting condition wait raced to update timeout and skipped updating",
   "connection: detected system time went backwards", "connection: files currently open",
   "connection: memory allocations", "connection: memory frees", "connection: memory re-allocations",
   "connection: pthread mutex condition wait calls",
@@ -1313,6 +1314,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->capacity_time_read = 0;
     stats->cond_auto_wait_reset = 0;
     stats->cond_auto_wait = 0;
+    stats->cond_auto_wait_skipped = 0;
     stats->time_travel = 0;
     /* not clearing file_open */
     stats->memory_allocation = 0;
@@ -1814,6 +1816,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->capacity_time_read += WT_STAT_READ(from, capacity_time_read);
     to->cond_auto_wait_reset += WT_STAT_READ(from, cond_auto_wait_reset);
     to->cond_auto_wait += WT_STAT_READ(from, cond_auto_wait);
+    to->cond_auto_wait_skipped += WT_STAT_READ(from, cond_auto_wait_skipped);
     to->time_travel += WT_STAT_READ(from, time_travel);
     to->file_open += WT_STAT_READ(from, file_open);
     to->memory_allocation += WT_STAT_READ(from, memory_allocation);
