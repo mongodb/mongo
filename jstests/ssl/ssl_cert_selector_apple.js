@@ -50,7 +50,7 @@ requireSSLProvider('apple', function() {
             const certOK = log.search('\"name\":\"' + cert.name) >= 0;
             const clusOK = log.search('\"name\":\"' + cluster.name) >= 0;
             return certOK && clusOK;
-        }, "Starting Mongod with " + tojson(opts), 10000);
+        }, "Starting Mongod with " + tojson(opts), 60000);
 
         try {
             MongoRunner.stopMongod(mongod);
