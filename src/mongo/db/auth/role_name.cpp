@@ -70,7 +70,7 @@ RoleName RoleName::parseFromBSON(const BSONElement& elem) {
     uassert(ErrorCodes::BadValue,
             str::stream() << "role name must contain a string field named: "
                           << AuthorizationManager::ROLE_DB_FIELD_NAME,
-            nameField.type() == String);
+            dbField.type() == String);
 
     return RoleName(nameField.valueStringData(), dbField.valueStringData());
 }
