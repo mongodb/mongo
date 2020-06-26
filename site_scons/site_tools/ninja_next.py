@@ -866,7 +866,13 @@ def get_command_env(env):
         if windows:
             command_env += "set '{}={}' && ".format(key, value)
         else:
-            command_env += "{}={} ".format(key, value)
+            # We address here *only* the specific case that a user might have
+            # an environment variable which somehow gets included and has
+            # spaces in the value. These are escapes that Ninja handles. This
+            # doesn't make builds on paths with spaces (Ninja and SCons issues)
+            # nor expanding response file paths with spaces (Ninja issue) work.
+            value = value.replace(r' ', r'$ ')
+            command_env += "{}='{}' ".format(key, value)
 
     env["NINJA_ENV_VAR_CACHE"] = command_env
     return command_env
