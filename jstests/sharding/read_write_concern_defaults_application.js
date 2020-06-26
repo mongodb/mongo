@@ -26,7 +26,6 @@
  *   requires_majority_read_concern,
  *   requires_profiling,
  *   uses_transactions,
- *   need_fixing_for_46
  * ]
  */
 (function() {
@@ -34,6 +33,7 @@
 
 load('jstests/libs/profiler.js');
 load("jstests/libs/logv2_helpers.js");
+load('jstests/sharding/libs/last_stable_mongod_commands.js');
 
 let db = "test";
 let coll = "foo";
@@ -652,6 +652,10 @@ let testCases = {
     whatsmysni: {skip: "does not accept read or write concern"},
     whatsmyuri: {skip: "internal command"},
 };
+
+commandsRemovedFromMongodIn46.forEach(function(cmd) {
+    testCases[cmd] = {skip: "must define test coverage for 4.4 backwards compatibility"};
+});
 
 // Running setDefaultRWConcern in the middle of a scenario would define defaults when there
 // shouldn't be for subsequently-tested commands. Thus it is special-cased to be run at the end of
