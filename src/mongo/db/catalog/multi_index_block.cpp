@@ -231,7 +231,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                 // encounter this error because callers filter out ready/in-progress indexes and
                 // start the build while holding a lock throughout.
                 if (status == ErrorCodes::IndexBuildAlreadyInProgress) {
-                    invariant(indexSpecs.size() > 1);
+                    invariant(indexSpecs.size() > 1,
+                              str::stream() << "Collection: " << ns << " (" << _collectionUUID
+                                            << "), Index spec: " << indexSpecs.front());
                     return {
                         ErrorCodes::OperationFailed,
                         "Cannot build two identical indexes. Try again without duplicate indexes."};
