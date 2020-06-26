@@ -37,6 +37,7 @@
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/config.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -257,6 +258,10 @@ public:
      *    connections are authenticated and log them before returning them to the pool.
      */
     static void setAuthPooledSecondaryConn(bool setting);
+
+#ifdef MONGO_CONFIG_SSL
+    const SSLConfiguration* getSSLConfiguration() override;
+#endif
 
 protected:
     /** Authorize.  Authorizes all nodes as needed

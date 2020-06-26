@@ -40,6 +40,7 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/config.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/write_concern_options.h"
@@ -754,6 +755,13 @@ public:
 
     // This is only for DBClientCursor.
     static void (*withConnection_do_not_use)(std::string host, std::function<void(DBClientBase*)>);
+
+#ifdef MONGO_CONFIG_SSL
+    /**
+     * Get the SSL configuration of this client.
+     */
+    virtual const SSLConfiguration* getSSLConfiguration() = 0;
+#endif
 
 protected:
     /** if the result of a command is ok*/

@@ -52,6 +52,7 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -153,8 +154,9 @@ Future<void> AsyncDBClient::authenticate(const BSONObj& params) {
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
-    if (getSSLManager()) {
-        clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
+    auto sslConfiguration = _session->getSSLConfiguration();
+    if (sslConfiguration) {
+        clientName = sslConfiguration->clientSubjectName.toString();
     }
 #endif
 
@@ -169,8 +171,9 @@ Future<void> AsyncDBClient::authenticateInternal(boost::optional<std::string> me
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
-    if (getSSLManager()) {
-        clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
+    auto sslConfiguration = _session->getSSLConfiguration();
+    if (sslConfiguration) {
+        clientName = sslConfiguration->clientSubjectName.toString();
     }
 #endif
 

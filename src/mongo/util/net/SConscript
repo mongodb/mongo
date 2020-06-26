@@ -96,7 +96,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
         'ssl_options',
     ]
 )
@@ -122,6 +121,7 @@ if not get_option('ssl') == 'off':
             "ssl_parameters.cpp",
             "ssl_manager_%s.cpp" % (ssl_provider),
             "ssl_stream.cpp",
+            "ssl_peer_info.cpp",
             env.Idlc('ssl_parameters.idl')[0],
             "ocsp/ocsp_manager.cpp",
         ],

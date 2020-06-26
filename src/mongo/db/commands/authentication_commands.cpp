@@ -61,6 +61,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/text.h"
 
@@ -88,7 +89,9 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
             "No verified subject name available from client",
             !clientName.empty());
 
-    if (!getSSLManager()->getSSLConfiguration().hasCA) {
+    auto sslConfiguration = opCtx->getClient()->session()->getSSLConfiguration();
+
+    if (!sslConfiguration->hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "Unable to verify x.509 certificate, as no CA has been provided.");
     } else if (user.getUser() != clientName.toString()) {
@@ -96,7 +99,7 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
                       "There is no x.509 client certificate matching the user.");
     } else {
         // Handle internal cluster member auth, only applies to server-server connections
-        if (getSSLManager()->getSSLConfiguration().isClusterMember(clientName)) {
+        if (sslConfiguration->isClusterMember(clientName)) {
             int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
             if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
                 clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {

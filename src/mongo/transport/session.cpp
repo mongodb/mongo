@@ -31,9 +31,13 @@
 
 #include "mongo/transport/session.h"
 
+#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/transport_layer.h"
+#ifdef MONGO_CONFIG_SSL
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_types.h"
+#endif
 
 namespace mongo {
 namespace transport {

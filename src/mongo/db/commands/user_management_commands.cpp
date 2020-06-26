@@ -843,7 +843,8 @@ void CmdUMCTyped<CreateUserCommand, void>::Invocation::typedRun(OperationContext
             "Cannot create an x.509 user with a subjectname that would be "
             "recognized as an internal cluster member",
             (dbname != "$external") || !getSSLManager() ||
-                !getSSLManager()->getSSLConfiguration().isClusterMember(userName.getUser()));
+                !opCtx->getClient()->session()->getSSLConfiguration()->isClusterMember(
+                    userName.getUser()));
 #endif
 
     // Synthesize a user document

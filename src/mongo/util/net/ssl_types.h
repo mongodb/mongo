@@ -34,7 +34,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/transport/session.h"
 
 namespace mongo {
 
@@ -110,36 +109,24 @@ inline bool operator<(const SSLX509Name::Entry& lhs, const SSLX509Name::Entry& r
     return lhs.equalityLens() < rhs.equalityLens();
 }
 
-/**
- * Contains information extracted from the peer certificate which is consumed by subsystems
- * outside of the networking stack.
- */
-struct SSLPeerInfo {
-    explicit SSLPeerInfo(SSLX509Name subjectName,
-                         boost::optional<std::string> sniName = {},
-                         stdx::unordered_set<RoleName> roles = {})
-        : isTLS(true),
-          subjectName(std::move(subjectName)),
-          sniName(std::move(sniName)),
-          roles(std::move(roles)) {}
-    SSLPeerInfo() = default;
+class SSLConfiguration {
+public:
+    bool isClusterMember(StringData subjectName) const;
+    bool isClusterMember(SSLX509Name subjectName) const;
+    void getServerStatusBSON(BSONObjBuilder*) const;
+    Status setServerSubjectName(SSLX509Name name);
 
-    explicit SSLPeerInfo(boost::optional<std::string> sniName)
-        : isTLS(true), sniName(std::move(sniName)) {}
+    const SSLX509Name& serverSubjectName() const {
+        return _serverSubjectName;
+    }
 
-    /**
-     * This flag is used to indicate if the underlying socket is using TLS or not. A default
-     * constructor of SSLPeerInfo indicates that TLS is not being used, and the other
-     * constructors set its value to true.
-     */
-    bool isTLS = false;
+    SSLX509Name clientSubjectName;
+    Date_t serverCertificateExpirationDate;
+    bool hasCA = false;
 
-    SSLX509Name subjectName;
-    boost::optional<std::string> sniName;
-    stdx::unordered_set<RoleName> roles;
-
-    static SSLPeerInfo& forSession(const transport::SessionHandle& session);
-    static const SSLPeerInfo& forSession(const transport::ConstSessionHandle& session);
+private:
+    SSLX509Name _serverSubjectName;
+    std::vector<SSLX509Name::Entry> _canonicalServerSubjectName;
 };
 
 }  // namespace mongo

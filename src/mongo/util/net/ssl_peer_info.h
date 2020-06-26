@@ -27,16 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
+#include "mongo/transport/session.h"
 #include "mongo/util/net/ssl_types.h"
 
-#include "mongo/util/net/ssl_options.h"
-
 namespace mongo {
+/**
+ * Contains information extracted from the peer certificate which is consumed by subsystems
+ * outside of the networking stack.
+ */
+struct SSLPeerInfo {
+    explicit SSLPeerInfo(SSLX509Name subjectName,
+                         boost::optional<std::string> sniName = {},
+                         stdx::unordered_set<RoleName> roles = {})
+        : isTLS(true),
+          subjectName(std::move(subjectName)),
+          sniName(std::move(sniName)),
+          roles(std::move(roles)) {}
+    SSLPeerInfo() = default;
 
-const SSLParams& getSSLGlobalParams() {
-    return sslGlobalParams;
-}
+    explicit SSLPeerInfo(boost::optional<std::string> sniName)
+        : isTLS(true), sniName(std::move(sniName)) {}
 
+    /**
+     * This flag is used to indicate if the underlying socket is using TLS or not. A default
+     * constructor of SSLPeerInfo indicates that TLS is not being used, and the other
+     * constructors set its value to true.
+     */
+    bool isTLS = false;
+
+    SSLX509Name subjectName;
+    boost::optional<std::string> sniName;
+    stdx::unordered_set<RoleName> roles;
+
+    static SSLPeerInfo& forSession(const transport::SessionHandle& session);
+    static const SSLPeerInfo& forSession(const transport::ConstSessionHandle& session);
+};
 }  // namespace mongo

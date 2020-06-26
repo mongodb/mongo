@@ -35,6 +35,7 @@
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/client/dbclient_base.h"
+#include "mongo/config.h"
 #include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/symmetric_crypto.h"
@@ -644,6 +645,12 @@ std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKeyFromDisk(const UU
     return std::make_shared<SymmetricKey>(
         std::move(decryptedKey), crypto::aesAlgorithm, "kms_encryption");
 }
+
+#ifdef MONGO_CONFIG_SSL
+const SSLConfiguration* EncryptedDBClientBase::getSSLConfiguration() {
+    return _conn->getSSLConfiguration();
+}
+#endif
 
 namespace {
 

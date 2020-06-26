@@ -41,6 +41,7 @@
 #include "mongo/util/net/socket_utils.h"
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
 #endif
 
@@ -239,6 +240,16 @@ public:
 
         return false;
     }
+
+#ifdef MONGO_CONFIG_SSL
+    virtual const SSLConfiguration* getSSLConfiguration() const override {
+        auto sslManager = getSSLManager();
+        if (!sslManager) {
+            return nullptr;
+        }
+        return &sslManager->getSSLConfiguration();
+    }
+#endif
 
 protected:
     friend class TransportLayerASIO;

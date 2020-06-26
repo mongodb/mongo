@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/client/dbclient_base.h"
+#include "mongo/config.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/util/net/hostandport.h"
@@ -106,6 +107,13 @@ public:
     bool isMongos() const final {
         return false;
     }
+
+#ifdef MONGO_CONFIG_SSL
+    const SSLConfiguration* getSSLConfiguration() override {
+        invariant(false);
+        return nullptr;
+    }
+#endif
 
 private:
     OperationContext* _opCtx;

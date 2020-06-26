@@ -29,14 +29,18 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/net/ssl_types.h"
-
-#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_peer_info.h"
 
 namespace mongo {
-
-const SSLParams& getSSLGlobalParams() {
-    return sslGlobalParams;
+namespace {
+const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
+    transport::Session::declareDecoration<SSLPeerInfo>();
+}
+SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
+    return peerInfoForSession(session.get());
 }
 
+const SSLPeerInfo& SSLPeerInfo::forSession(const transport::ConstSessionHandle& session) {
+    return peerInfoForSession(session.get());
+}
 }  // namespace mongo

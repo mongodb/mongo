@@ -77,6 +77,7 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
@@ -822,6 +823,12 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
 
     _markFailed(kSetFlag);
 }
+
+#ifdef MONGO_CONFIG_SSL
+const SSLConfiguration* DBClientConnection::getSSLConfiguration() {
+    return _session->getSSLConfiguration();
+}
+#endif
 
 AtomicWord<int> DBClientConnection::_numConnections;
 

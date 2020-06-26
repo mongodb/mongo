@@ -42,6 +42,7 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
@@ -1208,5 +1209,11 @@ void DBClientReplicaSet::resetSlaveOkConn() {
 
     _lastSlaveOkHost = HostAndPort();
 }
+
+#ifdef MONGO_CONFIG_SSL
+const SSLConfiguration* DBClientReplicaSet::getSSLConfiguration() {
+    return checkMaster()->getSSLConfiguration();
+}
+#endif
 
 }  // namespace mongo
