@@ -561,18 +561,18 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
 
 TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     Timestamp previous = Timestamp();
-    int timesNotified = 0;
+    AtomicWord<int> timesNotified{0};
 
     TimestampListener listener(stable, [&](Timestamp timestamp) {
         ASSERT_TRUE(previous < timestamp);
         previous = timestamp;
-        timesNotified++;
+        timesNotified.fetchAndAdd(1);
     });
     _storageEngine->getTimestampMonitor()->addListener(&listener);
 
     // Let three rounds of notifications happen while ensuring that each new notification produces
     // an increasing timestamp.
-    while (timesNotified < 3) {
+    while (timesNotified.load() < 3) {
         sleepmillis(100);
     }
 
