@@ -1461,9 +1461,6 @@ private:
     Node* _begin(Node* root) const noexcept {
         Node* node = root;
         while (!node->_data) {
-            if (node->_children.empty())
-                return nullptr;
-
             for (auto child : node->_children) {
                 if (child != nullptr) {
                     node = child.get();
