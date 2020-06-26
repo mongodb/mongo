@@ -8,7 +8,8 @@ load("jstests/libs/logv2_helpers.js");
 (function() {
 'use strict';
 
-const rst = new ReplSetTest({nodes: 2});
+const numNodes = 2;
+const rst = new ReplSetTest({nodes: numNodes});
 
 rst.startSet();
 rst.initiate();
@@ -18,7 +19,7 @@ rst.awaitReplication();
 var conn = new Mongo(rst.getURL());
 
 let coll = conn.getCollection("test.foo");
-assert.commandWorked(coll.insert({_id: 1}));
+assert.commandWorked(coll.insert({_id: 1}, {writeConcern: {w: numNodes, wtimeout: 5000}}));
 
 const predicate =
     /Slow query.*test.foo.*"appName":"MongoDB Shell".*"command":{"find":"foo","filter":{"\$where":{"\$code":"function\(\)/;
