@@ -67,7 +67,7 @@ RoleName RoleName::parseFromBSON(const BSONElement& elem) {
     const auto& dbField = fields[1];
     uassert(ErrorCodes::BadValue,
             "role name must contain a string field named: db",
-            nameField.type() == String);
+            dbField.type() == String);
 
     return RoleName(nameField.valueStringData(), dbField.valueStringData());
 }
