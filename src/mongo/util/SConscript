@@ -373,12 +373,7 @@ env.Library(
     ],
 )
 
-signalEnv = env.Clone()
-
-if use_libunwind:
-    signalEnv.InjectThirdParty('unwind')
-
-signalEnv.Library(
+env.Library(
     target="signal_handlers",
     source=[
         "signal_handlers.cpp",
@@ -644,21 +639,13 @@ env.Benchmark(
 stacktraceEnv = env.Clone()
 if use_libunwind:
     stacktraceEnv.InjectThirdParty(libraries=['unwind'])
+    stacktraceEnv.AppendUnique(
+        LIBDEPS=[
+            '$BUILD_DIR/third_party/shim_unwind',
+        ],
+    )
 
-stacktraceEnv.CppUnitTest(
-    target='stacktrace_test',
-    source='stacktrace_test.cpp',
-)
-
-stacktraceEnv.Benchmark(
-    target='stacktrace_bm',
-    source='stacktrace_bm.cpp',
-)
-
-if use_libunwind:
-    unwindTestEnv = env.Clone()
-    unwindTestEnv.InjectThirdParty(libraries=['unwind'])
-    unwindTestEnv.CppUnitTest(
+    stacktraceEnv.CppUnitTest(
         target=[
             'stacktrace_libunwind_test',
         ],
@@ -666,7 +653,31 @@ if use_libunwind:
             'stacktrace_libunwind_test_functions.cpp',
             'stacktrace_libunwind_test.cpp',
         ],
-        LIBDEPS=[
-            '$BUILD_DIR/third_party/shim_unwind',
-        ],
+        # Do not add LIBDEPS the ordinary way here, as they will override
+        # the LIBDEPS settings for stacktraceEnv, configured above. If
+        # you must add new libdeps here, or for the similar cases
+        # below, do it as follows:
+        #
+        # LIBDEPS=(stacktraceEnv['LIBDEPS'] + [
+        #     some_new_libdep,
+        #     another_new_libdep,
+        # ]),
+        #
+        # to ensure that the new library dependency is added to the
+        # existing LIBDEPS state in the environment and does not
+        # overwrite it.
     )
+
+stacktraceEnv.CppUnitTest(
+    target='stacktrace_test',
+    source='stacktrace_test.cpp',
+    # See above for how to handle any future LIBDEPS additions here.
+    # LIBDEPS=...
+)
+
+stacktraceEnv.Benchmark(
+    target='stacktrace_bm',
+    source='stacktrace_bm.cpp',
+    # See above for how to handle any future LIBDEPS additions here.
+    # LIBDEPS=...
+)

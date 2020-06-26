@@ -31,7 +31,7 @@ def exists(env):
 
 
 def build_cpp_integration_test(env, target, source, **kwargs):
-    libdeps = kwargs.get("LIBDEPS", [])
+    libdeps = kwargs.get("LIBDEPS", env.get("LIBDEPS", [])).copy()
     libdeps.append("$BUILD_DIR/mongo/unittest/integration_test_main")
 
     kwargs["LIBDEPS"] = libdeps

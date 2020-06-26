@@ -383,7 +383,7 @@ libenv.AppendUnique(
 libenv.Library(
     target='intel_decimal128',
     source=source_files,
-    LIBS=libs,
+    LIBS=libenv['LIBS'] + libs,
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',
     ]
@@ -410,7 +410,7 @@ readtest = readtestEnv.Program(
     LIBDEPS=[
         'intel_decimal128',
     ],
-    LIBS=libs,
+    LIBS=readtestEnv['LIBS'] + libs,
     AIB_COMPONENT="intel-test",
     AIB_COMPONENTS_EXTRA=[
         "unittests",

@@ -41,7 +41,7 @@ def exists(env):
 
 def build_cpp_unit_test(env, target, source, **kwargs):
     if not kwargs.get("UNITTEST_HAS_CUSTOM_MAINLINE", False):
-        libdeps = kwargs.get("LIBDEPS", [])
+        libdeps = kwargs.get("LIBDEPS", env.get("LIBDEPS", [])).copy()
         libdeps.append("$BUILD_DIR/mongo/unittest/unittest_main")
         kwargs["LIBDEPS"] = libdeps
 

@@ -41,7 +41,7 @@ def build_cpp_libfuzzer_test(env, target, source, **kwargs):
     if not myenv.IsSanitizerEnabled("fuzzer"):
         return []
 
-    libdeps = kwargs.get("LIBDEPS", [])
+    libdeps = kwargs.get("LIBDEPS", myenv.get("LIBDEPS", [])).copy()
     kwargs["LIBDEPS"] = libdeps
     kwargs["INSTALL_ALIAS"] = ["tests"]
     sanitizer_option = "-fsanitize=fuzzer"

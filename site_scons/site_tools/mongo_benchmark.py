@@ -38,12 +38,12 @@ def build_benchmark(env, target, source, **kwargs):
     if bmEnv.TargetOSIs("windows"):
         bmEnv.Append(LIBS=["ShLwApi.lib"])
 
-    libdeps = kwargs.get("LIBDEPS", [])
+    libdeps = kwargs.get("LIBDEPS", bmEnv.get("LIBDEPS", [])).copy()
     libdeps.append("$BUILD_DIR/mongo/unittest/benchmark_main")
 
     kwargs["LIBDEPS"] = libdeps
     benchmark_test_components = {"tests", "benchmarks"}
-    primary_component = kwargs.get("AIB_COMPONENT", env.get("AIB_COMPONENT", ""))
+    primary_component = kwargs.get("AIB_COMPONENT", bmEnv.get("AIB_COMPONENT", ""))
     if primary_component and not primary_component.endswith("-benchmark"):
         kwargs["AIB_COMPONENT"] += "-benchmark"
     elif primary_component:

@@ -194,7 +194,6 @@ if use_system_libunwind:
     }
 elif use_vendored_libunwind:
     thirdPartyEnvironmentModifications['unwind'] = {
-        'LIBDEPS' : ['$BUILD_DIR/third_party/shim_unwind'],
         'SYSLIBDEPS' : ['lzma'],
     }
 
