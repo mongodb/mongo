@@ -23,20 +23,28 @@ const largeNum = 1000 * 1000 * 1000;
 // possible.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
 
-// Insert documents.
+// Insert documents into both collections. We populate the output collection to verify that
+// updates behave as expected when the source collection isn't the same as the target collection.
+//
 // Note that the largeArray field is included to force documents to be written to disk and not
 // simply be updated in the cache. This is crucial to exposing the halloween problem as the
-// physical location of each document needs to change for each document to visited and updated
+// physical location of each document needs to change for each document to be visited and updated
 // multiple times.
-var bulk = coll.initializeUnorderedBulkOp();
-for (let i = 0; i < nDocs; i++) {
-    bulk.insert({_id: i, a: i * largeNum, largeArray: (new Array(1024 * 1024).join("a"))});
+function insertDocuments(collObject) {
+    const bulk = collObject.initializeUnorderedBulkOp();
+    for (let i = 0; i < nDocs; i++) {
+        bulk.insert({_id: i, a: i * largeNum, largeArray: (new Array(1024 * 1024).join("a"))});
+    }
+    assert.commandWorked(bulk.execute());
 }
-assert.commandWorked(bulk.execute());
+
+insertDocuments(coll);
+insertDocuments(out);
 
 // Build an index over a, the field to be updated, so that updates will push modified documents
 // forward in the index when outputting to the collection being aggregated.
 assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(out.createIndex({a: 1}));
 
 // Returns a pipeline which outputs to the specified collection.
 function pipeline(outColl) {
@@ -49,10 +57,20 @@ function pipeline(outColl) {
 const differentCollPipeline = pipeline(out.getName());
 const sameCollPipeline = pipeline(coll.getName());
 
-// Outputting the result of this pipeline to a different collection will not time out nor will any
-// of the computed values overflow.
-assert.commandWorked(db.runCommand(
-    {aggregate: coll.getName(), pipeline: differentCollPipeline, cursor: {}, maxTimeMS: 2500}));
+// Targeting a collection that is not the collection being agggregated over will result in each
+// document's value of 'a' being updated exactly once.
+assert.commandWorked(
+    db.runCommand({aggregate: coll.getName(), pipeline: differentCollPipeline, cursor: {}}));
+
+// Filter out 'largeArray' as we are only interested in verifying the value of "a" in each
+// document.
+const result = out.find({}, {largeArray: 0}).toArray();
+
+for (const doc of result) {
+    assert(doc.hasOwnProperty("a"), doc);
+    const expectedVal = doc["_id"] * 2 * largeNum;
+    assert.eq(doc["a"], expectedVal, doc);
+}
 
 // Because this pipeline writes to the collection being aggregated, it will cause documents to be
 // updated and pushed forward indefinitely. This will cause the computed values to eventually
