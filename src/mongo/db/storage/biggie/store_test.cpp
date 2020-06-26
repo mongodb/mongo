@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <deque>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/biggie/store.h"
@@ -39,6 +41,8 @@ using value_type = StringStore::value_type;
 
 class RadixStoreTest : public unittest::Test {
 public:
+    using node_type = StringStore::Node;
+
     virtual ~RadixStoreTest() {
         checkValid(thisStore);
         checkValid(parallelStore);
@@ -70,6 +74,45 @@ public:
         }
         ASSERT_EQ(store.size(), actualSize);
         ASSERT_EQ(store.dataSize(), actualDataSize);
+
+        checkNumChildrenValid(store);
+    }
+
+    /**
+     * Returns all nodes in "store" with level order traversal.
+     */
+    std::vector<std::shared_ptr<node_type>> allNodes(StringStore& store) const {
+        std::deque<std::shared_ptr<node_type>> level(1, store._root);
+        std::vector<std::shared_ptr<node_type>> result(1, store._root);
+        while (!level.empty()) {
+            auto node = level.front().get();
+            for (int i = 0; i < 256; ++i) {
+                auto child = node->_children[i];
+                if (child.get()) {
+                    level.push_back(child);
+                    result.push_back(child);
+                }
+            }
+            level.pop_front();
+        }
+        return result;
+    }
+
+    /**
+     * Checks if the number of children and _numChildren are equal in each node of the 'store'.
+     */
+    void checkNumChildrenValid(StringStore& store) const {
+        auto nodes = allNodes(store);
+        for (const auto& node : nodes) {
+            uint16_t numChildren = 0;
+            auto children = node.get()->_children;
+            for (uint16_t i = 0; i < children.size(); ++i) {
+                if (children[i]) {
+                    ++numChildren;
+                }
+            }
+            ASSERT_EQ(numChildren, node.get()->numChildren());
+        }
     }
 
 protected:
@@ -888,15 +931,15 @@ TEST_F(RadixStoreTest, EraseNodeWithUniquelyOwnedParent) {
 TEST_F(RadixStoreTest, EraseNodeWithSharedParent) {
     value_type value1 = std::make_pair("foo", "1");
     value_type value2 = std::make_pair("fod", "2");
-    value_type value5 = std::make_pair("feed", "5");
+    value_type value3 = std::make_pair("feed", "3");
 
     thisStore.insert(value_type(value1));
     thisStore.insert(value_type(value2));
-    thisStore.insert(value_type(value5));
+    thisStore.insert(value_type(value3));
 
     otherStore = thisStore;
 
-    StringStore::size_type success = otherStore.erase(value5.first);
+    StringStore::size_type success = otherStore.erase(value3.first);
     ASSERT_TRUE(success);
     ASSERT_EQ(thisStore.size(), StringStore::size_type(3));
     ASSERT_EQ(otherStore.size(), StringStore::size_type(2));
@@ -906,7 +949,7 @@ TEST_F(RadixStoreTest, EraseNodeWithSharedParent) {
 
     // 'thisStore' should still have the 'feed' object whereas 'otherStore' should point to the
     // 'fod' object.
-    ASSERT_TRUE(this_it->first == value5.first);
+    ASSERT_TRUE(this_it->first == value3.first);
     ASSERT_TRUE(other_it->first == value2.first);
     this_it++;
 
@@ -928,12 +971,12 @@ TEST_F(RadixStoreTest, EraseNonLeafNodeWithSharedParent) {
     value_type value1 = std::make_pair("foo", "1");
     value_type value2 = std::make_pair("fod", "2");
     value_type value3 = std::make_pair("fee", "3");
-    value_type value5 = std::make_pair("feed", "5");
+    value_type value4 = std::make_pair("feed", "4");
 
     thisStore.insert(value_type(value1));
     thisStore.insert(value_type(value2));
     thisStore.insert(value_type(value3));
-    thisStore.insert(value_type(value5));
+    thisStore.insert(value_type(value4));
 
     otherStore = thisStore;
 
@@ -949,11 +992,11 @@ TEST_F(RadixStoreTest, EraseNonLeafNodeWithSharedParent) {
     // 'thisStore' should still have the 'fee' object whereas 'otherStore' should point to the
     // 'feed' object.
     ASSERT_TRUE(this_it->first == value3.first);
-    ASSERT_TRUE(other_it->first == value5.first);
+    ASSERT_TRUE(other_it->first == value4.first);
 
     // 'thisStore' should have a 'feed' node.
     this_it++;
-    ASSERT_TRUE(this_it->first == value5.first);
+    ASSERT_TRUE(this_it->first == value4.first);
 
     // Both iterators should point to different 'feed' objects because erasing 'fee' from
     // 'otherStore' caused 'feed' to be compressed.

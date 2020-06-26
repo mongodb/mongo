@@ -624,6 +624,7 @@ public:
 
         // Handle the deleted node, as it is a leaf.
         parent->_children[deleted->_trieKey.front()] = nullptr;
+        --parent->_numChildren;
 
         // 'parent' may only have one child, in which case we need to evaluate whether or not
         // this node is redundant.
@@ -790,6 +791,7 @@ public:
 private:
     class Node {
         friend class RadixStore;
+        friend class RadixStoreTest;
 
     public:
         Node() = default;
@@ -803,6 +805,7 @@ private:
             if (other._data)
                 _data.emplace(other._data->first, other._data->second);
             _children = other._children;
+            _numChildren = other._numChildren;
         }
 
         Node(Node&& other) {
@@ -810,6 +813,7 @@ private:
             _trieKey = std::move(other._trieKey);
             _data = std::move(other._data);
             _children = std::move(other._children);
+            _numChildren = std::move(other._numChildren);
         }
 
         virtual ~Node() = default;
@@ -827,11 +831,11 @@ private:
         }
 
         bool isLeaf() const {
-            for (auto child : _children) {
-                if (child != nullptr)
-                    return false;
-            }
-            return true;
+            return !_numChildren;
+        }
+
+        uint16_t numChildren() const {
+            return _numChildren;
         }
 
     protected:
@@ -839,6 +843,8 @@ private:
         std::vector<uint8_t> _trieKey;
         boost::optional<value_type> _data;
         std::array<std::shared_ptr<Node>, 256> _children;
+        // TODO SERVER-36709: Updating to uint8_t after using adaptive nodes.
+        uint16_t _numChildren = 0;
     };
 
     /**
@@ -1053,6 +1059,7 @@ private:
                 // Change the current node's trieKey and make a child of the new node.
                 newKey = _makeKey(node->_trieKey, mismatchIdx, node->_trieKey.size() - mismatchIdx);
                 newNode->_children[newKey.front()] = node;
+                ++newNode->_numChildren;
 
                 node->_trieKey = newKey;
                 node->_depth = newNode->_depth + newNode->_trieKey.size();
@@ -1132,7 +1139,12 @@ private:
         if (value) {
             newNode->_data.emplace(value->first, value->second);
         }
-        node->_children[key.front()] = newNode;
+        auto& child = node->_children[key.front()];
+        if (!child) {
+            // Only increment the number of children if the node didn't have one at the position.
+            ++node->_numChildren;
+        }
+        child = newNode;
         return newNode.get();
     }
 
@@ -1182,8 +1194,9 @@ private:
      * in a node with no value and only one child.
      */
     void _compressOnlyChild(Node* node) {
-        // Don't compress if this node has an actual value associated with it or is the root.
-        if (node->_data || node->_trieKey.empty()) {
+        // Don't compress if this node has an actual value associated with it or is the root
+        // or doesn't have only one child.
+        if (node->_data || node->_trieKey.empty() || node->numChildren() != 1) {
             return;
         }
 
@@ -1192,10 +1205,8 @@ private:
 
         for (size_t i = 0; i < node->_children.size(); ++i) {
             if (node->_children[i] != nullptr) {
-                if (onlyChild != nullptr) {
-                    return;
-                }
                 onlyChild = node->_children[i];
+                break;
             }
         }
 
@@ -1208,6 +1219,7 @@ private:
             node->_data.emplace(onlyChild->_data->first, onlyChild->_data->second);
         }
         node->_children = onlyChild->_children;
+        node->_numChildren = onlyChild->_numChildren;
     }
 
     /**
@@ -1387,6 +1399,7 @@ private:
                     _rebuildContext(context, trieKeyIndex);
 
                     current->_children[key] = other->_children[key];
+                    ++current->_numChildren;
                 } else if (!otherNode || (baseNode && baseNode != otherNode)) {
                     // Either the master tree and working tree remove the same branch, or the master
                     // tree updated the branch while the working tree removed the branch, resulting
@@ -1400,6 +1413,7 @@ private:
                     current = _makeBranchUnique(context);
                     _rebuildContext(context, trieKeyIndex);
                     current->_children[key] = nullptr;
+                    --current->_numChildren;
                 } else if (baseNode && otherNode && baseNode == node) {
                     // If base and current point to the same node, then master changed.
                     current = _makeBranchUnique(context);
@@ -1430,6 +1444,7 @@ private:
                         // need to compress if we have only one child.
                         if (updatedNode->isLeaf()) {
                             current->_children[key] = nullptr;
+                            --current->_numChildren;
                         } else {
                             _compressOnlyChild(updatedNode);
                         }
