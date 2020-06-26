@@ -187,6 +187,10 @@ var _bulk_api_module = (function() {
                 result.writeError = {};
                 result.writeError.code = this.getWriteError().code;
                 result.writeError.errmsg = this.getWriteError().errmsg;
+                let errInfo = this.getWriteError().errInfo;
+                if (errInfo) {
+                    result.writeError.errInfo = errInfo;
+                }
             }
 
             if (this.getWriteConcernError() != null) {
@@ -438,6 +442,9 @@ var _bulk_api_module = (function() {
         defineReadOnlyProperty(this, "code", err.code);
         defineReadOnlyProperty(this, "index", err.index);
         defineReadOnlyProperty(this, "errmsg", err.errmsg);
+        // errInfo field is optional.
+        if (err.hasOwnProperty("errInfo"))
+            defineReadOnlyProperty(this, "errInfo", err.errInfo);
 
         //
         // Define access methods
@@ -851,6 +858,10 @@ var _bulk_api_module = (function() {
                         errmsg: result.writeErrors[i].errmsg,
                         op: batch.operations[result.writeErrors[i].index]
                     };
+                    var errInfo = result.writeErrors[i].errInfo;
+                    if (errInfo) {
+                        writeError['errInfo'] = errInfo;
+                    }
 
                     bulkResult.writeErrors.push(new WriteError(writeError));
                 }
