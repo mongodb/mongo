@@ -65,7 +65,6 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
  * Performs a snapshot getmore. This function is to be used in conjunction with doSnapshotFind.
  */
 function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionErrorCodes) {
-    // doSnapshotGetMore may be called even if doSnapshotFind fails to obtain a cursor.
     if (bsonWoCompare({_: data.cursorId}, {_: NumberLong(0)}) === 0) {
         return;
     }
@@ -94,6 +93,71 @@ function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionE
     res = data.sessionDb.adminCommand(commitCmd);
     assert.commandWorkedOrFailedWithCode(
         res, commitTransactionErrorCodes, () => `cmd: ${tojson(commitCmd)}`);
+}
+
+/**
+ * Performs a find with readConcern {level: "snapshot"} and optionally atClusterTime, if specified.
+ */
+function doSnapshotFindAtClusterTime(
+    db, collName, data, findErrorCodes, sortOrder, checkSnapshotCorrectness) {
+    const findCmd = {
+        find: collName,
+        sort: sortOrder,
+        batchSize: data.batchSize,
+        readConcern: {level: "snapshot"}
+    };
+    if (data.atClusterTime) {
+        findCmd.readConcern.atClusterTime = data.atClusterTime;
+    }
+
+    let res = db.runCommand(findCmd);
+    assert.commandWorkedOrFailedWithCode(
+        res, findErrorCodes, () => `cmd: ${tojson(findCmd)}, res: ${tojson(res)}`);
+    const cursor = parseCursor(res);
+
+    if (!cursor) {
+        data.cursorId = NumberLong(0);
+    } else {
+        assert(cursor.hasOwnProperty("firstBatch"), tojson(res));
+        assert(cursor.hasOwnProperty("atClusterTime"), tojson(res));
+        // Store the cursorId and cursor in the data object.
+        assert.neq(cursor.id, 0);
+        data.cursorId = cursor.id;
+        // checkSnapshotCorrectness verifies that the snapshot sees the correct documents.
+        if (typeof checkSnapshotCorrectness === "function") {
+            checkSnapshotCorrectness(res);
+        }
+    }
+}
+
+/**
+ * Performs a getMore on a previously established snapshot cursor. This function is to be used in
+ * conjunction with doSnapshotFindAtClusterTime.
+ */
+function doSnapshotGetMoreAtClusterTime(
+    db, collName, data, getMoreErrorCodes, checkSnapshotCorrectness) {
+    const getMoreCmd = {
+        getMore: data.cursorId,
+        collection: collName,
+        batchSize: data.batchSize,
+    };
+    let res = db.runCommand(getMoreCmd);
+    assert.commandWorkedOrFailedWithCode(
+        res, getMoreErrorCodes, () => `cmd: ${tojson(getMoreCmd)}, res: ${tojson(res)}`);
+    const cursor = parseCursor(res);
+    if (cursor) {
+        data.cursorId = cursor.id;
+        if (bsonWoCompare({_: data.cursorId}, {_: NumberLong(0)}) === 0) {
+            return;
+        }
+        // checkSnapshotCorrectness verifies that the snapshot sees the correct documents.
+        if (typeof checkSnapshotCorrectness === "function") {
+            assert(cursor.hasOwnProperty("nextBatch"), tojson(res));
+            checkSnapshotCorrectness(res);
+        }
+    } else {
+        data.cursorId = NumberLong(0);
+    }
 }
 
 /**
