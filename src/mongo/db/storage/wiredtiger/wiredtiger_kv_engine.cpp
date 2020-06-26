@@ -2400,10 +2400,6 @@ Timestamp WiredTigerKVEngine::getCheckpointTimestamp() const {
     return Timestamp(_getCheckpointTimestamp());
 }
 
-Timestamp WiredTigerKVEngine::getInitialDataTimestamp() const {
-    return Timestamp(_initialDataTimestamp.load());
-}
-
 std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
     invariantWTOK(_conn->query_timestamp(_conn, buf, "get=last_checkpoint"));

@@ -429,12 +429,46 @@ function RollbackTest(name = "RollbackTest", replSet) {
     };
 
     /**
+     * Insert on primary until its lastApplied is >= the rollback node's.
+     */
+    const _awaitPrimaryAppliedSurpassesRollbackApplied = function() {
+        log(`Waiting for lastApplied on sync source ${curPrimary.host} to surpass lastApplied` +
+            ` on rollback node ${curSecondary.host}`);
+
+        function lastApplied(node) {
+            const reply = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+            return reply.optimes.appliedOpTime.ts;
+        }
+
+        const rollbackApplied = lastApplied(curSecondary);
+        assert.soon(() => {
+            const primaryApplied = lastApplied(curPrimary);
+            jsTestLog(
+                `lastApplied on sync source ${curPrimary.host}:` +
+                ` ${tojson(primaryApplied)}, lastApplied on rollback node ${curSecondary.host}:` +
+                ` ${tojson(rollbackApplied)}`);
+
+            if (timestampCmp(primaryApplied, rollbackApplied) >= 0) {
+                return true;
+            }
+
+            let crudColl = curPrimary.getDB("test")["awaitPrimaryAppliedSurpassesRollbackApplied"];
+            assert.commandWorked(crudColl.insertOne({}));
+        }, "primary's lastApplied never surpassed rollback node's");
+    };
+
+    /**
      * Transition to the second stage of rollback testing, where we isolate the old primary and
      * elect the old secondary as the new primary. Then, operations can be performed on the new
      * primary so that that optimes diverge and previous operations on the old primary will be
      * rolled back.
+     *
+     * If awaitPrimaryAppliedSurpassesRollbackApplied, insert on new primary until its lastApplied
+     * is >= the rollback node's. Useful for testing rollback via refetch, which completes rollback
+     * recovery when new lastApplied >= old top of oplog.
      */
-    this.transitionToSyncSourceOperationsBeforeRollback = function() {
+    this.transitionToSyncSourceOperationsBeforeRollback = function(
+        {awaitPrimaryAppliedSurpassesRollbackApplied = false} = {}) {
         const start = new Date();
 
         transitionIfAllowed(State.kSyncSourceOpsBeforeRollback);
@@ -498,6 +532,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
 
+        if (awaitPrimaryAppliedSurpassesRollbackApplied) {
+            _awaitPrimaryAppliedSurpassesRollbackApplied();
+        }
+
         log(`RollbackTest transition to ${curState} took ${(new Date() - start)} ms`);
         // The current primary, which is the old secondary, will later become the sync source.
         return curPrimary;
@@ -548,6 +586,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
     this.getSecondary = function() {
         return curSecondary;
+    };
+
+    this.getTieBreaker = function() {
+        return tiebreakerNode;
     };
 
     this.restartNode = function(nodeId, signal, startOptions, allowedExitCode) {
