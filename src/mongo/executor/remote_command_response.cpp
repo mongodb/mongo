@@ -77,7 +77,10 @@ bool RemoteCommandResponseBase::isOK() const {
 
 std::string RemoteCommandResponse::toString() const {
     return str::stream() << "RemoteResponse -- "
-                         << " cmd:" << data.toString();
+                         << " cmd:" << data.toString() << " status: " << status.toString()
+                         << " elapsedMillis: "
+                         << (elapsedMillis != boost::none ? elapsedMillis.get().toString() : "n/a")
+                         << " moreToCome: " << moreToCome;
 }
 
 bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {
@@ -148,7 +151,10 @@ bool RemoteCommandOnAnyResponse::operator!=(const RemoteCommandOnAnyResponse& rh
 std::string RemoteCommandOnAnyResponse::toString() const {
     return str::stream() << "RemoteOnAnyResponse -- "
                          << " cmd:" << data.toString() << " target: "
-                         << (!target ? StringData("[none]") : StringData(target->toString()));
+                         << (!target ? StringData("[none]") : StringData(target->toString()))
+                         << " status: " << status.toString() << " elapsedMillis: "
+                         << (elapsedMillis != boost::none ? elapsedMillis.get().toString() : "n/a")
+                         << " moreToCome: " << moreToCome;
 }
 
 std::ostream& operator<<(std::ostream& os, const RemoteCommandOnAnyResponse& response) {
