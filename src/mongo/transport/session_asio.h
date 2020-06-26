@@ -109,6 +109,9 @@ public:
 
         _local = HostAndPort(_localAddr.toString(true));
         _remote = HostAndPort(_remoteAddr.toString(true));
+#ifdef MONGO_CONFIG_SSL
+        _sslManager = tl->getSSLManager();
+#endif
     } catch (const DBException&) {
         throw;
     } catch (const asio::system_error& error) {
@@ -242,12 +245,15 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    virtual const SSLConfiguration* getSSLConfiguration() const override {
-        auto sslManager = getSSLManager();
-        if (!sslManager) {
-            return nullptr;
+    const SSLConfiguration* getSSLConfiguration() const override {
+        if (_sslManager) {
+            return &_sslManager->getSSLConfiguration();
         }
-        return &sslManager->getSSLConfiguration();
+        return nullptr;
+    }
+
+    const std::shared_ptr<SSLManagerInterface> getSSLManager() const override {
+        return _sslManager;
     }
 #endif
 
@@ -793,6 +799,7 @@ private:
 #ifdef MONGO_CONFIG_SSL
     boost::optional<asio::ssl::stream<decltype(_socket)>> _sslSocket;
     bool _ranHandshake = false;
+    std::shared_ptr<SSLManagerInterface> _sslManager;
 #endif
 
     TransportLayerASIO* const _tl;

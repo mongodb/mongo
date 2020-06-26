@@ -73,7 +73,7 @@ static constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication
 
 #ifdef MONGO_CONFIG_SSL
 Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj) {
-    if (!getSSLManager()) {
+    if (!opCtx->getClient()->session()->getSSLManager()) {
         return Status(ErrorCodes::ProtocolError,
                       "SSL support is required for the MONGODB-X509 mechanism.");
     }

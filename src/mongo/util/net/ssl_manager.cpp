@@ -55,7 +55,7 @@
 
 namespace mongo {
 
-SSLManagerInterface* theSSLManager = nullptr;
+SSLManagerCoordinator* theSSLManagerCoordinator;
 
 namespace {
 
@@ -336,6 +336,19 @@ boost::optional<std::vector<SSLX509Name::Entry>> getClusterMemberDNOverrideParam
 }
 }  // namespace
 
+SSLManagerCoordinator* SSLManagerCoordinator::get() {
+    return theSSLManagerCoordinator;
+}
+
+std::shared_ptr<SSLManagerInterface> SSLManagerCoordinator::getSSLManager() {
+    return *_manager;
+}
+
+void SSLManagerCoordinator::rotate() {}
+
+SSLManagerCoordinator::SSLManagerCoordinator()
+    : _manager(SSLManagerInterface::create(sslGlobalParams, isSSLServer)) {}
+
 void ClusterMemberDNOverride::append(OperationContext* opCtx,
                                      BSONObjBuilder& b,
                                      const std::string& name) {
@@ -551,7 +564,7 @@ TLSVersionCounts& TLSVersionCounts::get(ServiceContext* serviceContext) {
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLogManager"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
-        const auto& config = theSSLManager->getSSLConfiguration();
+        const auto& config = SSLManagerCoordinator::get()->getSSLManager()->getSSLConfiguration();
         if (!config.clientSubjectName.empty()) {
             LOGV2_DEBUG(23214,
                         1,
@@ -1207,10 +1220,6 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
               "tlsVersion"_attr = versionString,
               "remoteHost"_attr = hostForLogging);
     }
-}
-
-SSLManagerInterface* getSSLManager() {
-    return theSSLManager;
 }
 
 // TODO SERVER-11601 Use NFC Unicode canonicalization

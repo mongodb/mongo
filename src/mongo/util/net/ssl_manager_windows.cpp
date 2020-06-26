@@ -70,6 +70,7 @@
 namespace mongo {
 
 extern SSLManagerInterface* theSSLManager;
+extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
 namespace {
 
@@ -355,14 +356,14 @@ GlobalInitializerRegisterer sslManagerInitializer(
     "SSLManager",
     [](InitializerContext*) {
         if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
-            theSSLManager = new SSLManagerWindows(sslGlobalParams, isSSLServer);
+            theSSLManagerCoordinator = new SSLManagerCoordinator();
         }
         return Status::OK();
     },
     [](DeinitializerContext* context) {
-        if (theSSLManager) {
-            delete theSSLManager;
-            theSSLManager = nullptr;
+        if (theSSLManagerCoordinator) {
+            delete theSSLManagerCoordinator;
+            theSSLManagerCoordinator = nullptr;
         }
 
         return Status::OK();

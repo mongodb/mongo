@@ -143,6 +143,12 @@ public:
     BatonHandle makeBaton(OperationContext* opCtx) const override;
 #endif
 
+#ifdef MONGO_CONFIG_SSL
+    std::shared_ptr<SSLManagerInterface> getSSLManager() {
+        return _sslManager;
+    }
+#endif
+
 private:
     class BatonASIO;
     class ASIOSession;
@@ -196,6 +202,7 @@ private:
 #ifdef MONGO_CONFIG_SSL
     std::unique_ptr<asio::ssl::context> _ingressSSLContext;
     std::unique_ptr<asio::ssl::context> _egressSSLContext;
+    std::shared_ptr<SSLManagerInterface> _sslManager;
 #endif
 
     std::vector<std::pair<SockAddr, GenericAcceptor>> _acceptors;

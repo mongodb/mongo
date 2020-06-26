@@ -33,12 +33,16 @@
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/config.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
+#ifdef MONGO_CONFIG_SSL
+#include "mongo/util/net/ssl_manager.h"
+#endif
 
 namespace mongo {
 

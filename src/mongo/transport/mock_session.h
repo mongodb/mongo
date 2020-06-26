@@ -125,7 +125,11 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    virtual const SSLConfiguration* getSSLConfiguration() const override {
+    const SSLConfiguration* getSSLConfiguration() const override {
+        return nullptr;
+    }
+
+    const std::shared_ptr<SSLManagerInterface> getSSLManager() const override {
         return nullptr;
     }
 #endif

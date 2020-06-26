@@ -839,12 +839,12 @@ void CmdUMCTyped<CreateUserCommand, void>::Invocation::typedRun(OperationContext
             (cmd.getMechanisms() == boost::none) || !cmd.getMechanisms()->empty());
 
 #ifdef MONGO_CONFIG_SSL
+    auto configuration = opCtx->getClient()->session()->getSSLConfiguration();
     uassert(ErrorCodes::BadValue,
             "Cannot create an x.509 user with a subjectname that would be "
             "recognized as an internal cluster member",
-            (dbname != "$external") || !getSSLManager() ||
-                !opCtx->getClient()->session()->getSSLConfiguration()->isClusterMember(
-                    userName.getUser()));
+            (dbname != "$external") || !configuration ||
+                !configuration->isClusterMember(userName.getUser()));
 #endif
 
     // Synthesize a user document

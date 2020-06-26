@@ -858,6 +858,11 @@ Status validateFastOpenOnce() noexcept {
 }  // namespace
 
 Status TransportLayerASIO::setup() {
+#ifdef MONGO_CONFIG_SSL
+    if (SSLManagerCoordinator::get()) {
+        _sslManager = SSLManagerCoordinator::get()->getSSLManager();
+    }
+#endif
     std::vector<std::string> listenAddrs;
     if (_listenerOptions.ipList.empty() && _listenerOptions.isIngress()) {
         listenAddrs = {"127.0.0.1"};
@@ -1009,14 +1014,14 @@ Status TransportLayerASIO::setup() {
         _ingressSSLContext = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
         Status status =
-            getSSLManager()->initSSLContext(_ingressSSLContext->native_handle(),
-                                            sslParams,
-                                            SSLManagerInterface::ConnectionDirection::kIncoming);
+            _sslManager->initSSLContext(_ingressSSLContext->native_handle(),
+                                        sslParams,
+                                        SSLManagerInterface::ConnectionDirection::kIncoming);
         if (!status.isOK()) {
             return status;
         }
 
-        auto resp = getSSLManager()->stapleOCSPResponse(_ingressSSLContext->native_handle());
+        auto resp = _sslManager->stapleOCSPResponse(_ingressSSLContext->native_handle());
         if (!resp.isOK()) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream()
@@ -1024,12 +1029,12 @@ Status TransportLayerASIO::setup() {
         }
     }
 
-    if (_listenerOptions.isEgress() && getSSLManager()) {
+    if (_listenerOptions.isEgress() && _sslManager) {
         _egressSSLContext = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
         Status status =
-            getSSLManager()->initSSLContext(_egressSSLContext->native_handle(),
-                                            sslParams,
-                                            SSLManagerInterface::ConnectionDirection::kOutgoing);
+            _sslManager->initSSLContext(_egressSSLContext->native_handle(),
+                                        sslParams,
+                                        SSLManagerInterface::ConnectionDirection::kOutgoing);
         if (!status.isOK()) {
             return status;
         }

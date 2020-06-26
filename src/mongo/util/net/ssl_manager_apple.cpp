@@ -1740,6 +1740,7 @@ SSLInformationToLog SSLManagerApple::getSSLInformationToLog() const {
 bool isSSLServer = false;
 
 extern SSLManagerInterface* theSSLManager;
+extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
@@ -1752,7 +1753,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
         nullptr, mongodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
 
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
-        theSSLManager = new SSLManagerApple(sslGlobalParams, isSSLServer);
+        theSSLManagerCoordinator = new SSLManagerCoordinator();
     }
     return Status::OK();
 }

@@ -46,6 +46,9 @@
 #endif
 
 namespace mongo {
+
+class SSLManagerInterface;
+
 namespace transport {
 
 class TransportLayer;
@@ -193,6 +196,11 @@ public:
      * Get the configuration from the SSL manager.
      */
     virtual const SSLConfiguration* getSSLConfiguration() const = 0;
+
+    /**
+     * Get the SSL manager associated with this session.
+     */
+    virtual const std::shared_ptr<SSLManagerInterface> getSSLManager() const = 0;
 #endif
 
 protected:

@@ -1194,11 +1194,12 @@ private:
 bool isSSLServer = false;
 
 extern SSLManagerInterface* theSSLManager;
+extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
-        theSSLManager = new SSLManagerOpenSSL(sslGlobalParams, isSSLServer);
+        theSSLManagerCoordinator = new SSLManagerCoordinator();
     }
     return Status::OK();
 }
@@ -1307,8 +1308,7 @@ SSLConnectionOpenSSL::SSLConnectionOpenSSL(SSL_CTX* context,
     : socket(sock) {
     ssl = SSL_new(context);
 
-    std::string sslErr =
-        nullptr != getSSLManager() ? getSSLManager()->getSSLErrorMessage(ERR_get_error()) : "";
+    std::string sslErr = SSLManagerInterface::getSSLErrorMessage(ERR_get_error());
     massert(15861, "Error creating new SSL object " + sslErr, ssl);
 
     BIO_new_bio_pair(&internalBIO, BUFFER_SIZE, &networkBIO, BUFFER_SIZE);

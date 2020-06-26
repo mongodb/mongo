@@ -284,8 +284,33 @@ public:
     virtual SSLInformationToLog getSSLInformationToLog() const = 0;
 };
 
-// Access SSL functions through this instance.
-SSLManagerInterface* getSSLManager();
+/**
+ * Manages changes in the SSL configuration, such as certificate rotation, and updates a manager
+ * appropriately.
+ */
+class SSLManagerCoordinator {
+public:
+    SSLManagerCoordinator();
+
+    /**
+     * Get the global SSLManagerCoordinator instance.
+     */
+    static SSLManagerCoordinator* get();
+
+    /**
+     * Access the current SSLManager safely.
+     */
+    std::shared_ptr<SSLManagerInterface> getSSLManager();
+
+    /**
+     * Perform certificate rotation safely.
+     */
+    void rotate();
+
+private:
+    Mutex _lock = MONGO_MAKE_LATCH("SSLManagerCoordinator::_lock");
+    synchronized_value<std::shared_ptr<SSLManagerInterface>> _manager;
+};
 
 extern bool isSSLServer;
 

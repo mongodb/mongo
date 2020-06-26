@@ -110,8 +110,11 @@ public:
         result.append("authentication", auth.obj());
 
 #ifdef MONGO_CONFIG_SSL
-        if (getSSLManager()) {
-            getSSLManager()->getSSLConfiguration().getServerStatusBSON(&result);
+        if (SSLManagerCoordinator::get()) {
+            SSLManagerCoordinator::get()
+                ->getSSLManager()
+                ->getSSLConfiguration()
+                .getServerStatusBSON(&result);
         }
 #endif
 
