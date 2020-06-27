@@ -717,7 +717,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     _performPostMemberStateUpdateAction(action);
 
     if (!isArbiter) {
-        _externalState->startThreads(_settings);
+        _externalState->startThreads();
         _startDataReplication(opCtx.get());
     }
 }
@@ -3923,7 +3923,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     // A configuration passed to replSetInitiate() with the current node as an arbiter
     // will fail validation with a "replSet initiate got ... while validating" reason.
     invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
-    _externalState->startThreads(_settings);
+    _externalState->startThreads();
     _startDataReplication(opCtx);
 
     configStateGuard.dismiss();

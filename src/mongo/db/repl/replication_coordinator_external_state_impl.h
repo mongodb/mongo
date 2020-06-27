@@ -66,7 +66,7 @@ public:
         StorageInterface* storageInterface,
         ReplicationProcess* replicationProcess);
     virtual ~ReplicationCoordinatorExternalStateImpl();
-    virtual void startThreads(const ReplSettings& settings) override;
+    virtual void startThreads() override;
     virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) override;
     virtual void stopDataReplication(OperationContext* opCtx) override;

@@ -77,7 +77,7 @@ public:
      *
      * NOTE: Only starts threads if they are not already started,
      */
-    virtual void startThreads(const ReplSettings& settings) = 0;
+    virtual void startThreads() = 0;
 
     /**
      * Returns true if an incomplete initial sync is detected.

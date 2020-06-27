@@ -317,7 +317,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
 }
 
 
-void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& settings) {
+void ReplicationCoordinatorExternalStateImpl::startThreads() {
     stdx::lock_guard<Latch> lk(_threadMutex);
     if (_startedThreads) {
         return;

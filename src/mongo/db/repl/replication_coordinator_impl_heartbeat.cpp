@@ -709,7 +709,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     if (shouldStartDataReplication) {
         auto opCtx = cc().makeOperationContext();
         _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx.get());
-        _externalState->startThreads(_settings);
+        _externalState->startThreads();
         _startDataReplication(opCtx.get());
     }
 }
