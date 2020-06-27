@@ -397,12 +397,10 @@ void ServiceStateMachine::_sourceCallback(Status status) {
         _state.store(State::EndSession);
     } else {
         LOGV2(22988,
-              "Error receiving request from client: {error}. Ending connection from {remote} "
-              "(connection id: {connnection_id})",
               "Error receiving request from client. Ending connection from remote",
               "error"_attr = status,
               "remote"_attr = remote,
-              "connection_id"_attr = _session()->id());
+              "connectionId"_attr = _session()->id());
         _state.store(State::EndSession);
     }
 
@@ -425,12 +423,10 @@ void ServiceStateMachine::_sinkCallback(Status status) {
     // scheduleNext() to unwind the stack and do the next step.
     if (!status.isOK()) {
         LOGV2(22989,
-              "Error sending response to client: {error}. Ending connection from {remote} "
-              "(connection id: {connection_id})",
               "Error sending response to client. Ending connection from remote",
               "error"_attr = status,
               "remote"_attr = _session()->remote(),
-              "connection_id"_attr = _session()->id());
+              "connectionId"_attr = _session()->id());
         _state.store(State::EndSession);
         return _runNextInGuard(std::move(guard));
     } else if (_inExhaust) {
@@ -641,9 +637,8 @@ void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask t
     // set, then skip the termination check.
     if ((sessionTags & tags) || (sessionTags & transport::Session::kPending)) {
         LOGV2(22991,
-              "Skip closing connection for connection # {connection_id}",
               "Skip closing connection for connection",
-              "connection_id"_attr = _session()->id());
+              "connectionId"_attr = _session()->id());
         return;
     }
 
