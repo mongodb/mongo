@@ -84,7 +84,6 @@ bool canRunDbCheckOn(const NamespaceString& nss) {
     // TODO: SERVER-30826.
     const std::set<StringData> replicatedSystemCollections{"system.backup_users",
                                                            "system.js",
-                                                           "system.new_users",
                                                            "system.roles",
                                                            "system.users",
                                                            "system.version",

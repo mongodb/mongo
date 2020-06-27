@@ -73,7 +73,7 @@ assert.commandWorked(primaryAdminDB.runCommand({
 assert.commandWorked(primaryAdminDB.runCommand(
     {createUser: "root2", pwd: "pwd", roles: [{role: "root", db: "admin"}]}));
 
-// TODO: Test system.backup_users & system.new_users.
+// TODO: Test system.backup_users
 
 // Truncate the admin system.roles collection.
 assert.commandFailedWithCode(primaryAdminDB.runCommand({emptycapped: "system.roles"}),

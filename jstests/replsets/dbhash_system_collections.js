@@ -16,7 +16,6 @@ assert.commandWorked(testDB.system.js.insert({js: 1}));
 var adminDB = primary.getDB('admin');
 assert.commandWorked(adminDB.system.roles.insert({roles: 1}));
 assert.commandWorked(adminDB.system.version.insert({version: 1}));
-assert.commandWorked(adminDB.system.new_users.insert({new_users: 1}));
 assert.commandWorked(adminDB.system.backup_users.insert({backup_users: 1}));
 
 rst.awaitReplication();
@@ -33,7 +32,6 @@ function checkDbHash(mongo) {
     var replicatedAdminSystemCollections = [
         'system.backup_users',
         'system.keys',
-        'system.new_users',
         'system.roles',
         'system.version',
     ];
