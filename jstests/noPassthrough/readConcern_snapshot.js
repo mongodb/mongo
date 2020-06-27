@@ -1,6 +1,11 @@
 // Test parsing of readConcern level 'snapshot' and the presence of the 'atClusterTime' field in
 // snapshot cursor responses.
-// @tags: [requires_majority_read_concern, requires_replication, uses_transactions]
+// @tags: [
+//   requires_majority_read_concern,
+//   requires_persistence,
+//   requires_replication,
+//   uses_transactions,
+// ]
 (function() {
 "use strict";
 

@@ -5,6 +5,7 @@
  * @tags: [
  *   requires_fcv_46,
  *   requires_majority_read_concern,
+ *   requires_persistence,
  * ]
  *
  * - Create a sharded collection and insert a document.

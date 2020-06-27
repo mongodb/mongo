@@ -1,5 +1,9 @@
 // Tests readConcern level metrics in the serverStatus output.
-// @tags: [uses_transactions, requires_majority_read_concern]
+// @tags: [
+//   requires_majority_read_concern,
+//   requires_persistence,
+//   uses_transactions,
+// ]
 (function() {
 "use strict";
 

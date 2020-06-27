@@ -1,7 +1,11 @@
 /* Tests readConcern level snapshot outside of transactions is not supported when
  * enableMajorityReadConcern is false.
  *
- * @tags: [requires_replication, requires_fcv_46]
+ * @tags: [
+ *   requires_fcv_46,
+ *   requires_persistence,
+ *   requires_replication,
+ * ]
  */
 (function() {
 "use strict";

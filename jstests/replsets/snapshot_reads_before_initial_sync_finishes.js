@@ -2,7 +2,11 @@
  * Tests that reading at an atClusterTime earlier than the timestamp when initial sync finishes
  * would result in SnapshotTooOld error regardless of the snapshot history window.
  *
- * @tags: [requires_majority_read_concern, requires_fcv_46]
+ * @tags: [
+ *   requires_fcv_46,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ * ]
  */
 (function() {
 "use strict";

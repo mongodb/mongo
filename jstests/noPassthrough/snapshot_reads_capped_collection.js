@@ -1,6 +1,10 @@
 /* Test that snapshot reads on capped collections are not allowed.
  *
- * @tags: [requires_majority_read_concern, requires_replication]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ *   requires_replication,
+ * ]
  */
 (function() {
 "use strict";

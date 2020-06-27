@@ -2,7 +2,11 @@
  * Verify that readConcern: snapshot is not permitted for writes outside transactions.
  *
  * // TODO(SERVER-47915): remove assumes_against_mongod_not_mongos
- * @tags: [uses_transactions, assumes_against_mongod_not_mongos]
+ * @tags: [
+ *   assumes_against_mongod_not_mongos,
+ *   requires_persistence,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

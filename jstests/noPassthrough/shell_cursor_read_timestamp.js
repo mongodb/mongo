@@ -1,7 +1,11 @@
 /**
  * Tests readConcern level snapshot outside of transactions.
  *
- * @tags: [requires_majority_read_concern, requires_replication]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ *   requires_replication,
+ * ]
  */
 (function() {
 "use strict";
