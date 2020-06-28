@@ -401,7 +401,7 @@ public:
 
         interruptible->waitForConditionOrInterrupt(*cv, lk, [&] {
             // The mx locking above is insufficient to establish an acquire if state transitions to
-            // kFinished before we get here, but we aquire mx before the producer does.
+            // kFinished before we get here, but we acquire mx before the producer does.
             return state.load(std::memory_order_acquire) == SSBState::kFinished;
         });
     }
