@@ -122,7 +122,10 @@ void BM_IncrementalRefreshOfPessimalBalancedDistribution(benchmark::State& state
     }
 }
 
-BENCHMARK(BM_IncrementalRefreshOfPessimalBalancedDistribution)->Args({2, 50000});
+BENCHMARK(BM_IncrementalRefreshOfPessimalBalancedDistribution)
+    ->Args({2, 50000})
+    ->Args({2, 250000})
+    ->Args({2, 500000});
 
 template <typename ShardSelectorFn>
 auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectShard) {
