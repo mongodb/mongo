@@ -344,9 +344,9 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         if (transactionTime >= std::max(1, serverGlobalParams.slowMS)) {
             LOGV2_DEBUG(22411,
                         kSlowTransactionSeverity.toInt(),
-                        "Slow WT transaction. Lifetime of SnapshotId {getSnapshotId_toNumber} was "
+                        "Slow WT transaction. Lifetime of SnapshotId {snapshotId} was "
                         "{transactionTime}ms",
-                        "getSnapshotId_toNumber"_attr = getSnapshotId().toNumber(),
+                        "snapshotId"_attr = getSnapshotId().toNumber(),
                         "transactionTime"_attr = transactionTime);
         }
     }
@@ -376,15 +376,15 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         wtRet = s->commit_transaction(s, conf.str().c_str());
         LOGV2_DEBUG(22412,
                     3,
-                    "WT commit_transaction for snapshot id {getSnapshotId_toNumber}",
-                    "getSnapshotId_toNumber"_attr = getSnapshotId().toNumber());
+                    "WT commit_transaction for snapshot id {snapshotId}",
+                    "snapshotId"_attr = getSnapshotId().toNumber());
     } else {
         wtRet = s->rollback_transaction(s, nullptr);
         invariant(!wtRet);
         LOGV2_DEBUG(22413,
                     3,
-                    "WT rollback_transaction for snapshot id {getSnapshotId_toNumber}",
-                    "getSnapshotId_toNumber"_attr = getSnapshotId().toNumber());
+                    "WT rollback_transaction for snapshot id {snapshotId}",
+                    "snapshotId"_attr = getSnapshotId().toNumber());
     }
 
     if (_isTimestamped) {

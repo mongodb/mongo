@@ -133,8 +133,8 @@ public:
      * Should be called through WriteUnitOfWork rather than directly.
      */
     void commitUnitOfWork() {
-        assignNextSnapshotId();
         doCommitUnitOfWork();
+        assignNextSnapshotId();
     }
 
     /**
@@ -145,8 +145,8 @@ public:
      * Should be called through WriteUnitOfWork rather than directly.
      */
     void abortUnitOfWork() {
-        assignNextSnapshotId();
         doAbortUnitOfWork();
+        assignNextSnapshotId();
     }
 
     /**
@@ -215,8 +215,8 @@ public:
      * cannot be called inside of a WriteUnitOfWork, and should fail if it is.
      */
     void abandonSnapshot() {
-        assignNextSnapshotId();
         doAbandonSnapshot();
+        assignNextSnapshotId();
     }
 
     /**
