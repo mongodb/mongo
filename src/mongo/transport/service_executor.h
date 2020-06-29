@@ -34,7 +34,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/bitwise_enum_operators.h"
-#include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/transport_mode.h"
 #include "mongo/util/duration.h"
 
@@ -81,7 +80,7 @@ public:
      * If defer is true, then the executor may defer execution of this Task until an available
      * thread is available.
      */
-    virtual Status schedule(Task task, ScheduleFlags flags, ServiceExecutorTaskName taskName) = 0;
+    virtual Status schedule(Task task, ScheduleFlags flags) = 0;
 
     /*
      * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any

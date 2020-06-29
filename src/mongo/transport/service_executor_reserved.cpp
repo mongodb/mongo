@@ -37,7 +37,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_gen.h"
-#include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {
@@ -166,9 +165,7 @@ Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
                  "reserved executor couldn't shutdown all worker threads within time limit.");
 }
 
-Status ServiceExecutorReserved::schedule(Task task,
-                                         ScheduleFlags flags,
-                                         ServiceExecutorTaskName taskName) {
+Status ServiceExecutorReserved::schedule(Task task, ScheduleFlags flags) {
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }

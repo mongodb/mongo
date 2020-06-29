@@ -36,7 +36,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor_synchronous.h"
-#include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -140,8 +139,7 @@ void scheduleBasicTask(ServiceExecutor* exec, bool expectSuccess) {
     };
 
     stdx::unique_lock<Latch> lk(mutex);
-    auto status = exec->schedule(
-        std::move(task), ServiceExecutor::kEmptyFlags, ServiceExecutorTaskName::kSSMStartSession);
+    auto status = exec->schedule(std::move(task), ServiceExecutor::kEmptyFlags);
     if (expectSuccess) {
         ASSERT_OK(status);
         cond.wait(lk);

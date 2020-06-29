@@ -42,7 +42,6 @@
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_mode.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -181,7 +180,6 @@ private:
      */
     void _scheduleNextWithGuard(ThreadGuard guard,
                                 transport::ServiceExecutor::ScheduleFlags flags,
-                                transport::ServiceExecutorTaskName taskName,
                                 Ownership ownershipModel = Ownership::kOwned);
 
     /*
