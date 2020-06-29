@@ -76,11 +76,15 @@ bool RemoteCommandResponseBase::isOK() const {
 }
 
 std::string RemoteCommandResponse::toString() const {
-    return str::stream() << "RemoteResponse -- "
-                         << " cmd:" << data.toString() << " status: " << status.toString()
-                         << " elapsedMillis: "
-                         << (elapsedMillis != boost::none ? elapsedMillis.get().toString() : "n/a")
-                         << " moreToCome: " << moreToCome;
+    return format(FMT_STRING("RemoteResponse --"
+                             " cmd: {}"
+                             " status: {}"
+                             " elapsedMillis: {}"
+                             " moreToCome: {}"),
+                  data.toString(),
+                  status.toString(),
+                  elapsedMillis ? StringData(elapsedMillis->toString()) : "n/a"_sd,
+                  moreToCome);
 }
 
 bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {
@@ -149,12 +153,17 @@ bool RemoteCommandOnAnyResponse::operator!=(const RemoteCommandOnAnyResponse& rh
 }
 
 std::string RemoteCommandOnAnyResponse::toString() const {
-    return str::stream() << "RemoteOnAnyResponse -- "
-                         << " cmd:" << data.toString() << " target: "
-                         << (!target ? StringData("[none]") : StringData(target->toString()))
-                         << " status: " << status.toString() << " elapsedMillis: "
-                         << (elapsedMillis != boost::none ? elapsedMillis.get().toString() : "n/a")
-                         << " moreToCome: " << moreToCome;
+    return format(FMT_STRING("RemoteOnAnyResponse -- "
+                             " cmd: {}"
+                             " target: {}"
+                             " status: {}"
+                             " elapsedMillis: {}"
+                             " moreToCome: {}"),
+                  data.toString(),
+                  target ? StringData(target->toString()) : "[none]"_sd,
+                  status.toString(),
+                  elapsedMillis ? StringData(elapsedMillis.get().toString()) : "n/a"_sd,
+                  moreToCome);
 }
 
 std::ostream& operator<<(std::ostream& os, const RemoteCommandOnAnyResponse& response) {
