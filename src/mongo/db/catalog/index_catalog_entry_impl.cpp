@@ -362,7 +362,7 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
         }
     }
     if (indexMetadataHasChanged && _queryInfo) {
-        LOGV2_DEBUG(47187005,
+        LOGV2_DEBUG(4718705,
                     1,
                     "Index set to multi key, clearing query plan cache",
                     "namespace"_attr = ns(),

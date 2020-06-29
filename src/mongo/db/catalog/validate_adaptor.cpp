@@ -74,7 +74,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     }
 
     if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
-        LOGV2(46666001, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
+        LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
     }
 
     const Status status = validateBSON(

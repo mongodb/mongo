@@ -838,7 +838,7 @@ void ReplSetConfig::_addInternalWriteConcernModes() {
     } else if (status != ErrorCodes::NoSuchKey) {
         // NoSuchKey means we have no $voter-tagged nodes in this config;
         // other errors are unexpected.
-        fassert(46712003, status);
+        fassert(4671203, status);
     }
 
     // $stepDownCheck: one electable node plus ourselves

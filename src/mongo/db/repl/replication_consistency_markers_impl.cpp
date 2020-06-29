@@ -514,7 +514,7 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     invariant(truncateOplogEntryBSON, "Found no oplog entry lte " + truncateTimestamp.toString());
 
     return fassert(
-        44555001,
+        4455501,
         OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(truncateOplogEntryBSON.get()));
 }
 

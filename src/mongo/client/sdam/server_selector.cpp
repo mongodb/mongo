@@ -218,7 +218,7 @@ void SdamServerSelector::filterTags(std::vector<ServerDescriptionPtr>* servers,
                 }
             } else {
                 LOGV2_WARNING(
-                    46712002,
+                    4671202,
                     "Invalid tags specified for server selection; tags should be specified as "
                     "bson Objects",
                     "tag"_attr = *it);

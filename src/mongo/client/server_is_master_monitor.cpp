@@ -226,7 +226,7 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
 
     if (!swCbHandle.isOK()) {
         _onIsMasterFailure(swCbHandle.getStatus(), BSONObj());
-        uasserted(46156012, swCbHandle.getStatus().toString());
+        uasserted(4615612, swCbHandle.getStatus().toString());
     }
 
     _isMasterOutstanding = true;

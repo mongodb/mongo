@@ -210,7 +210,7 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
         indexInfo->numRecords++;
 
         if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
-            LOGV2(46666002, "[validate](record) {hash_num}", "hash_num"_attr = hash);
+            LOGV2(4666602, "[validate](record) {hash_num}", "hash_num"_attr = hash);
             const BSONObj& keyPatternBson = indexInfo->keyPattern;
             auto keyStringBson = KeyString::toBsonSafe(
                 ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
@@ -253,7 +253,7 @@ void IndexConsistency::addIndexKey(const KeyString::Value& ks,
         indexInfo->numKeys++;
 
         if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
-            LOGV2(46666003, "[validate](index) {hash_num}", "hash_num"_attr = hash);
+            LOGV2(4666603, "[validate](index) {hash_num}", "hash_num"_attr = hash);
             const BSONObj& keyPatternBson = indexInfo->keyPattern;
             auto keyStringBson = KeyString::toBsonSafe(
                 ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
