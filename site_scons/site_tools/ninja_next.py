@@ -19,6 +19,7 @@ import importlib
 import io
 import shutil
 import shlex
+import textwrap
 
 from glob import glob
 from os.path import join as joinpath
@@ -748,8 +749,8 @@ class NinjaState:
             pool="console",
             implicit=[ninja_file],
             variables={
-                "cmd": "ninja -f {} -t compdb CC CXX > compile_commands.json".format(
-                    ninja_file
+                "cmd": "ninja -f {} -t compdb {}CC CXX > compile_commands.json".format(
+                    ninja_file, '-x ' if self.env.get('NINJA_COMPDB_EXPAND') else ''
                 )
             },
         )
@@ -1108,6 +1109,27 @@ def ninja_contents(original):
 
     return wrapper
 
+def CheckNinjaCompdbExpand(env, context):
+    """ Configure check testing if ninja's compdb can expand response files"""
+
+    context.Message('Checking if ninja compdb can expand response files... ')
+    ret, output = context.TryAction(
+        action='ninja -f $SOURCE -t compdb -x CMD_RSP > $TARGET', 
+        extension='.ninja',
+        text=textwrap.dedent("""
+            rule CMD_RSP
+              command = $cmd @$out.rsp > fake_output.txt
+              description = Building $out
+              rspfile = $out.rsp
+              rspfile_content = $rspc
+            build fake_output.txt: CMD_RSP fake_input.txt
+              cmd = echo 
+              pool = console
+              rspc = "test"
+            """))
+    result = '@fake_output.txt.rsp' not in output
+    context.Result(result)
+    return result
 
 def ninja_stat(_self, path):
     """
@@ -1230,6 +1252,8 @@ def generate(env):
         env.Append(CCFLAGS=["/showIncludes"])
     else:
         env.Append(CCFLAGS=["-MMD", "-MF", "${TARGET}.d"])
+
+    env.AddMethod(CheckNinjaCompdbExpand, "CheckNinjaCompdbExpand")
 
     # Provide a way for custom rule authors to easily access command
     # generation.

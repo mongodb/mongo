@@ -3898,6 +3898,13 @@ if get_option('ninja') != 'disabled':
     else:
         ninja_builder = Tool("ninja_next")
         ninja_builder.generate(env)
+        
+        ninjaConf = Configure(env, help=False, custom_tests = {
+            'CheckNinjaCompdbExpand': env.CheckNinjaCompdbExpand,
+        })
+        env['NINJA_COMPDB_EXPAND'] = ninjaConf.CheckNinjaCompdbExpand()
+        ninjaConf.Finish()
+        
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
