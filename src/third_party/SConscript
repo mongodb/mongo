@@ -20,7 +20,7 @@ mozjsSuffix = '-60'
 yamlSuffix = '-0.6.2'
 icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.7'
-timelibSuffix = '-2018.03'
+timelibSuffix = '-2018.01'
 tomcryptSuffix = '-1.18.2'
 variantSuffix = '-1.4.0'
 

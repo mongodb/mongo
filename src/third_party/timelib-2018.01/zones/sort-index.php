@@ -10,7 +10,7 @@
 		$na = $ma[1];
 		preg_match('@"([^"]+)"@', $b, $mb);
 		$nb = $mb[1];
-
+		
 		$val = strcasecmp($na, $nb);
 		return $val;
 	}
