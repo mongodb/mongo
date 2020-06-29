@@ -43,10 +43,8 @@ namespace mongo::projection_executor {
  */
 class InclusionNode : public ProjectionNode {
 public:
-    InclusionNode(ProjectionPolicies policies,
-                  bool containsComputedFields,
-                  std::string pathToNode = "")
-        : ProjectionNode(policies, containsComputedFields, std::move(pathToNode)) {}
+    InclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
+        : ProjectionNode(policies, std::move(pathToNode)) {}
 
     InclusionNode* addOrGetChild(const std::string& field) {
         return static_cast<InclusionNode*>(ProjectionNode::addOrGetChild(field));
@@ -85,9 +83,7 @@ protected:
     }
     std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const override {
         return std::make_unique<InclusionNode>(
-            _policies,
-            _subtreeContainsComputedFields,
-            FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
+            _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
     }
     MutableDocument initializeOutputDocument(const Document& inputDoc) const final {
         // Technically this value could be min(number of projected fields, size of input
@@ -116,19 +112,15 @@ protected:
  */
 class FastPathEligibleInclusionNode final : public InclusionNode {
 public:
-    FastPathEligibleInclusionNode(ProjectionPolicies policies,
-                                  bool containsComputedFields,
-                                  std::string pathToNode = "")
-        : InclusionNode(policies, containsComputedFields, std::move(pathToNode)) {}
+    FastPathEligibleInclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
+        : InclusionNode(policies, std::move(pathToNode)) {}
 
     Document applyToDocument(const Document& inputDoc) const final;
 
 protected:
     std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const final {
         return std::make_unique<FastPathEligibleInclusionNode>(
-            _policies,
-            _subtreeContainsComputedFields,
-            FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
+            _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
     }
 
 private:
@@ -155,8 +147,8 @@ public:
         : InclusionProjectionExecutor(
               expCtx,
               policies,
-              allowFastPath ? std::make_unique<FastPathEligibleInclusionNode>(policies, false)
-                            : std::make_unique<InclusionNode>(policies, false)) {}
+              allowFastPath ? std::make_unique<FastPathEligibleInclusionNode>(policies)
+                            : std::make_unique<InclusionNode>(policies)) {}
 
     TransformerType getType() const final {
         return TransformerType::kInclusionProjection;

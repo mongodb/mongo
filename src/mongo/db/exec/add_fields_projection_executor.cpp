@@ -280,14 +280,14 @@ void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
                                                  const VariablesParseState& variablesParseState,
                                                  InclusionNode* node) {
     for (auto&& elem : subObj) {
-        std::string fieldName = elem.fieldName();
-        invariant(fieldName[0] != '$');
+        invariant(elem.fieldName()[0] != '$');
         // Dotted paths in a sub-object have already been detected and disallowed by the function
         // ProjectionSpecValidator::validate().
-        invariant(fieldName.find('.') == std::string::npos);
+        invariant(elem.fieldNameStringData().find('.') == std::string::npos);
 
         if (elem.type() == BSONType::Object) {
             // This is either an expression, or a nested specification.
+            auto fieldName = elem.fieldNameStringData().toString();
             if (!parseObjectAsExpression(
                     FieldPath::getFullyQualifiedPath(node->getPath(), fieldName),
                     elem.Obj(),
