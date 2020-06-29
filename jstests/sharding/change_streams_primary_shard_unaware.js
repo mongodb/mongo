@@ -39,6 +39,11 @@ const st = new ShardingTest({
     },
 });
 
+// Disable checking for index consistency to ensure that the config server doesn't trigger a
+// StaleShardVersion exception on shard0 and cause it to refresh its sharding metadata.
+st._configServers.forEach(
+    config => config.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
+
 const mongosDB = st.s0.getDB(testName);
 
 // Ensure that shard0 is the primary shard.
