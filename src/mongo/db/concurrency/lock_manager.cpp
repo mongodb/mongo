@@ -462,7 +462,6 @@ LockManager::~LockManager() {
 
 LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mode) {
     // Sanity check that requests are not being reused without proper cleanup
-    invariant(request->status == LockRequest::STATUS_NEW);
     invariant(request->recursiveCount == 1);
 
     request->partitioned = (mode == MODE_IX || mode == MODE_IS);
@@ -472,6 +471,7 @@ LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mo
     if (request->partitioned) {
         Partition* partition = _getPartition(request);
         stdx::lock_guard<SimpleMutex> scopedLock(partition->mutex);
+        invariant(request->status == LockRequest::STATUS_NEW);
 
         // Fast path for intent locks
         PartitionedLockHead* partitionedLock = partition->find(resId);
@@ -488,6 +488,7 @@ LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mo
     // Use regular LockHead, maybe start partitioning
     LockBucket* bucket = _getBucket(resId);
     stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
+    invariant(request->status == LockRequest::STATUS_NEW);
 
     LockHead* lock = bucket->findOrInsert(resId);
 
@@ -514,7 +515,6 @@ LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mo
 LockResult LockManager::convert(ResourceId resId, LockRequest* request, LockMode newMode) {
     // If we are here, we already hold the lock in some mode. In order to keep it simple, we do
     // not allow requesting a conversion while a lock is already waiting or pending conversion.
-    invariant(request->status == LockRequest::STATUS_GRANTED);
     invariant(request->recursiveCount > 0);
 
     request->recursiveCount++;
@@ -536,6 +536,7 @@ LockResult LockManager::convert(ResourceId resId, LockRequest* request, LockMode
 
     LockBucket* bucket = _getBucket(resId);
     stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
+    invariant(request->status == LockRequest::STATUS_GRANTED);
 
     LockBucket::Map::iterator it = bucket->data.find(resId);
     invariant(it != bucket->data.end());
@@ -586,24 +587,21 @@ LockResult LockManager::convert(ResourceId resId, LockRequest* request, LockMode
 }
 
 bool LockManager::unlock(LockRequest* request) {
-    // Fast path for decrementing multiple references of the same lock. It is safe to do this
-    // without locking, because 1) all calls for the same lock request must be done on the same
-    // thread and 2) if there are lock requests hanging of a given LockHead, then this lock
-    // will never disappear.
     invariant(request->recursiveCount > 0);
     request->recursiveCount--;
-    if ((request->status == LockRequest::STATUS_GRANTED) && (request->recursiveCount > 0)) {
-        return false;
-    }
 
     if (request->partitioned) {
         // Unlocking a lock that was acquired as partitioned. The lock request may since have
         // moved to the lock head, but there is no safe way to find out without synchronizing
         // thorough the partition mutex. Migrations are expected to be rare.
-        invariant(request->status == LockRequest::STATUS_GRANTED ||
-                  request->status == LockRequest::STATUS_CONVERTING);
         Partition* partition = _getPartition(request);
         stdx::lock_guard<SimpleMutex> scopedLock(partition->mutex);
+        invariant(request->status == LockRequest::STATUS_GRANTED ||
+                  request->status == LockRequest::STATUS_CONVERTING);
+
+        if (request->status == LockRequest::STATUS_GRANTED && request->recursiveCount > 0)
+            return false;
+
         //  Fast path: still partitioned.
         if (request->partitionedLock) {
             request->partitionedLock->grantedList.remove(request);
@@ -619,6 +617,9 @@ bool LockManager::unlock(LockRequest* request) {
     stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
     if (request->status == LockRequest::STATUS_GRANTED) {
+        if (request->recursiveCount > 0)
+            return false;
+
         // This releases a currently held lock and is the most common path, so it should be
         // as efficient as possible. The fast path for decrementing multiple references did
         // already ensure request->recursiveCount == 0.
@@ -667,7 +668,6 @@ bool LockManager::unlock(LockRequest* request) {
 
 void LockManager::downgrade(LockRequest* request, LockMode newMode) {
     invariant(request->lock);
-    invariant(request->status == LockRequest::STATUS_GRANTED);
     invariant(request->recursiveCount > 0);
 
     // The conflict set of the newMode should be a subset of the conflict set of the old mode.
@@ -679,6 +679,7 @@ void LockManager::downgrade(LockRequest* request, LockMode newMode) {
 
     LockBucket* bucket = _getBucket(lock->resourceId);
     stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
+    invariant(request->status == LockRequest::STATUS_GRANTED);
 
     lock->incGrantedModeCount(newMode);
     lock->decGrantedModeCount(request->mode);
