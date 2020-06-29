@@ -405,6 +405,9 @@ struct __wt_connection_stats {
     int64_t cache_hs_insert_restart;
     int64_t cache_hs_ondisk_max;
     int64_t cache_hs_ondisk;
+    int64_t cache_hs_order_lose_durable_timestamp;
+    int64_t cache_hs_order_fixup_move;
+    int64_t cache_hs_order_fixup_insert;
     int64_t cache_hs_read;
     int64_t cache_hs_read_miss;
     int64_t cache_hs_read_squash;

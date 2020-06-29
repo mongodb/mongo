@@ -843,6 +843,9 @@ static const char *const __stats_connection_desc[] = {
   "cache: history store score", "cache: history store table insert calls",
   "cache: history store table insert calls that returned restart",
   "cache: history store table max on-disk size", "cache: history store table on-disk size",
+  "cache: history store table out-of-order resolved updates that lose their durable timestamp",
+  "cache: history store table out-of-order updates that were fixed up by moving existing records",
+  "cache: history store table out-of-order updates that were fixed up during insertion",
   "cache: history store table reads", "cache: history store table reads missed",
   "cache: history store table reads requiring squashed modifies",
   "cache: history store table remove calls due to key truncation",
@@ -1252,6 +1255,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_hs_insert_restart = 0;
     /* not clearing cache_hs_ondisk_max */
     /* not clearing cache_hs_ondisk */
+    stats->cache_hs_order_lose_durable_timestamp = 0;
+    stats->cache_hs_order_fixup_move = 0;
+    stats->cache_hs_order_fixup_insert = 0;
     stats->cache_hs_read = 0;
     stats->cache_hs_read_miss = 0;
     stats->cache_hs_read_squash = 0;
@@ -1744,6 +1750,10 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_hs_insert_restart += WT_STAT_READ(from, cache_hs_insert_restart);
     to->cache_hs_ondisk_max += WT_STAT_READ(from, cache_hs_ondisk_max);
     to->cache_hs_ondisk += WT_STAT_READ(from, cache_hs_ondisk);
+    to->cache_hs_order_lose_durable_timestamp +=
+      WT_STAT_READ(from, cache_hs_order_lose_durable_timestamp);
+    to->cache_hs_order_fixup_move += WT_STAT_READ(from, cache_hs_order_fixup_move);
+    to->cache_hs_order_fixup_insert += WT_STAT_READ(from, cache_hs_order_fixup_insert);
     to->cache_hs_read += WT_STAT_READ(from, cache_hs_read);
     to->cache_hs_read_miss += WT_STAT_READ(from, cache_hs_read_miss);
     to->cache_hs_read_squash += WT_STAT_READ(from, cache_hs_read_squash);
