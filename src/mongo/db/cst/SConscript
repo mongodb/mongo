@@ -13,6 +13,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
     ]
 )
 

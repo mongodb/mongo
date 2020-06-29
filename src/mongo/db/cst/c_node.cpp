@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/cst/c_node.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/visit_helper.h"
+
 #include <numeric>
 #include <type_traits>
-
-#include "mongo/db/cst/c_node.h"
-#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 using namespace std::string_literals;
@@ -92,7 +95,66 @@ std::string CNode::toStringHelper(int numTabs) const {
             },
             [numTabs](const UserString& userString) {
                 return tabs(numTabs) + "<UserString " + userString + ">";
-            }},
+            },
+            [numTabs](const UserBinary& userBinary) {
+                return tabs(numTabs) + "<UserBinary " + typeName(userBinary.type) + ", " +
+                    toHex(userBinary.data, userBinary.length) + ">";
+            },
+            [numTabs](const UserUndefined& userUndefined) {
+                return tabs(numTabs) + "<UserUndefined>";
+            },
+            [numTabs](const UserObjectId& userObjectId) {
+                return tabs(numTabs) + "<UserObjectId " + userObjectId.toString() + ">";
+            },
+            [numTabs](const UserBoolean& userBoolean) {
+                return tabs(numTabs) + "<UserBoolean " + std::to_string(userBoolean) + ">";
+            },
+            [numTabs](const UserDate& userDate) {
+                return tabs(numTabs) + "<UserDate " +
+                    [&] {
+                        if (auto string = TimeZoneDatabase::utcZone().formatDate(
+                                "%Y-%m-%dT%H:%M:%S.%LZ", userDate);
+                            string.isOK())
+                            return string.getValue();
+                        else
+                            return "illegal date"s;
+                    }() +
+                    ">";
+            },
+            [numTabs](const UserNull& userNull) { return tabs(numTabs) + "<UserNull>"; },
+            [numTabs](const UserRegex& userRegex) {
+                return tabs(numTabs) + "<UserRegex " + "/" + userRegex.pattern + "/" +
+                    userRegex.flags + ">";
+            },
+            [numTabs](const UserDBPointer& userDBPointer) {
+                return tabs(numTabs) + "<UserDBPointer " + userDBPointer.ns + ", " +
+                    userDBPointer.oid.toString() + ">";
+            },
+            [numTabs](const UserJavascript& userJavascript) {
+                return tabs(numTabs) + "<UserJavascript " + userJavascript.code + ">";
+            },
+            [numTabs](const UserSymbol& userSymbol) {
+                return tabs(numTabs) + "<UserSymbol " + userSymbol.symbol + ">";
+            },
+            [numTabs](const UserJavascriptWithScope& userJavascriptWithScope) {
+                return tabs(numTabs) + "<UserJavascriptWithScope " + userJavascriptWithScope.code +
+                    ", ";
+                userJavascriptWithScope.scope.toString() + ">";
+            },
+            [numTabs](const UserInt& userInt) {
+                return tabs(numTabs) + "<UserInt " + std::to_string(userInt) + ">";
+            },
+            [numTabs](const UserTimestamp& userTimestamp) {
+                return tabs(numTabs) + "<UserTimestamp " + userTimestamp.toString() + ">";
+            },
+            [numTabs](const UserLong& userLong) {
+                return tabs(numTabs) + "<UserLong " + std::to_string(userLong) + ">";
+            },
+            [numTabs](const UserDecimal& userDecimal) {
+                return tabs(numTabs) + "<UserDecimal " + userDecimal.toString() + ">";
+            },
+            [numTabs](const UserMinKey& userMinKey) { return tabs(numTabs) + "<UserMinKey>"; },
+            [numTabs](const UserMaxKey& userMaxKey) { return tabs(numTabs) + "<UserMaxKey>"; }},
         payload);
 }
 

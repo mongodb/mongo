@@ -35,15 +35,38 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 using UserFieldname = std::string;
+// These are the non-compound types from bsonspec.org.
 using UserDouble = double;
 using UserString = std::string;
+using UserBinary = BSONBinData;
+struct UserUndefined {};
+using UserObjectId = OID;
+using UserBoolean = bool;
+using UserDate = Date_t;
+struct UserNull {};
+using UserRegex = BSONRegEx;
+using UserDBPointer = BSONDBRef;
+using UserJavascript = BSONCode;
+using UserSymbol = BSONSymbol;
+using UserJavascriptWithScope = BSONCodeWScope;
+using UserInt = int;
+using UserTimestamp = Timestamp;
+using UserLong = long long;
+using UserDecimal = Decimal128;
+struct UserMinKey {};
+struct UserMaxKey {};
 
 struct CNode {
     static auto noopLeaf() {
@@ -60,7 +83,28 @@ private:
 public:
     using Fieldname = stdx::variant<KeyFieldname, UserFieldname>;
     using Children = std::vector<std::pair<Fieldname, CNode>>;
-    stdx::variant<Children, KeyValue, UserDouble, UserString> payload;
+    stdx::variant<Children,
+                  KeyValue,
+                  UserDouble,
+                  UserString,
+                  UserBinary,
+                  UserUndefined,
+                  UserObjectId,
+                  UserBoolean,
+                  UserDate,
+                  UserNull,
+                  UserRegex,
+                  UserDBPointer,
+                  UserJavascript,
+                  UserSymbol,
+                  UserJavascriptWithScope,
+                  UserInt,
+                  UserTimestamp,
+                  UserLong,
+                  UserDecimal,
+                  UserMinKey,
+                  UserMaxKey>
+        payload;
 };
 
 }  // namespace mongo
