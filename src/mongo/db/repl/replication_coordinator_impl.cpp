@@ -3116,6 +3116,9 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.
         _startHeartbeats_inlock();
+    } else {
+        // If we're still REMOVED, clear the seedList.
+        _seedList.clear();
     }
     _updateLastCommittedOpTime_inlock();
 
