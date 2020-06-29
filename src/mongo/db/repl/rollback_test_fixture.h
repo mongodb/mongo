@@ -158,7 +158,7 @@ public:
     Timestamp recoverToStableTimestamp(OperationContext* opCtx) override {
         stdx::lock_guard<Latch> lock(_mutex);
         if (_recoverToTimestampStatus) {
-            fassert(45847000, _recoverToTimestampStatus.get());
+            fassert(4584700, _recoverToTimestampStatus.get());
         }
 
         _currTimestamp = _stableTimestamp;

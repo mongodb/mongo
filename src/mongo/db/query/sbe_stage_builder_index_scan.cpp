@@ -212,11 +212,11 @@ makeIntervalsFromIndexBounds(const IndexBounds& bounds,
     }();
 
     LOGV2_DEBUG(
-        47429005, 5, "Number of generated interval(s) for ixscan", "num"_attr = intervals.size());
+        4742905, 5, "Number of generated interval(s) for ixscan", "num"_attr = intervals.size());
     std::vector<std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>
         result;
     for (auto&& [lowKey, highKey] : intervals) {
-        LOGV2_DEBUG(47429006,
+        LOGV2_DEBUG(4742906,
                     5,
                     "Generated interval [lowKey, highKey]",
                     "lowKey"_attr = lowKey,

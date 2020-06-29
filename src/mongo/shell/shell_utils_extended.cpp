@@ -439,7 +439,7 @@ BSONObj readDumpFile(const BSONObj& a, void*) {
 }
 
 BSONObj shellGetEnv(const BSONObj& a, void*) {
-    uassert(46712006,
+    uassert(4671206,
             "_getEnv() takes one argument: the name of the environment variable",
             a.nFields() == 1 && a.firstElementType() == String);
     const auto envName = a.firstElement().String();

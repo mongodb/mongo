@@ -787,7 +787,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
 }
 
 void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
-    LOGV2_DEBUG(47985010, 2, "Starting migration coordinator stepup recovery");
+    LOGV2_DEBUG(4798510, 2, "Starting migration coordinator stepup recovery");
 
     unsigned long long unfinishedMigrationsCount = 0;
     PersistentTaskStore<MigrationCoordinatorDocument> store(
@@ -797,7 +797,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                   query,
                   [&opCtx, &unfinishedMigrationsCount](const MigrationCoordinatorDocument& doc) {
                       unfinishedMigrationsCount++;
-                      LOGV2_DEBUG(47985011,
+                      LOGV2_DEBUG(4798511,
                                   3,
                                   "Found unfinished migration on step-up",
                                   "migrationCoordinatorDoc"_attr = redact(doc.toBSON()),
@@ -826,7 +826,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                                   opCtx.get(), nss, boost::none /* shardVersionReceived */);
                           })
                           .onError([](const Status& status) {
-                              LOGV2_WARNING(47985012,
+                              LOGV2_WARNING(4798512,
                                             "Error on deferred shardVersion recovery execution",
                                             "error"_attr = redact(status));
                           })
@@ -837,14 +837,14 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
 
     ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(
         unfinishedMigrationsCount);
-    LOGV2_DEBUG(47985013,
+    LOGV2_DEBUG(4798513,
                 2,
                 "Finished migration coordinator stepup recovery",
                 "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
 }
 
 void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss) {
-    LOGV2_DEBUG(47985001, 2, "Starting migration recovery", "namespace"_attr = nss);
+    LOGV2_DEBUG(4798501, 2, "Starting migration recovery", "namespace"_attr = nss);
 
     unsigned migrationRecoveryCount = 0;
     PersistentTaskStore<MigrationCoordinatorDocument> store(
@@ -853,7 +853,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
         opCtx,
         QUERY(MigrationCoordinatorDocument::kNssFieldName << nss.toString()),
         [&opCtx, &migrationRecoveryCount](const MigrationCoordinatorDocument& doc) {
-            LOGV2_DEBUG(47985002,
+            LOGV2_DEBUG(4798502,
                         2,
                         "Recovering migration",
                         "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
@@ -912,7 +912,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
             if (!currentMetadata.isSharded() ||
                 !currentMetadata.uuidMatches(doc.getCollectionUuid())) {
                 if (!currentMetadata.isSharded()) {
-                    LOGV2(47985003,
+                    LOGV2(4798503,
                           "During migration recovery the collection was discovered to have been "
                           "dropped."
                           "Deleting the range deletion tasks on the donor and the recipient "
@@ -920,7 +920,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
                           "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
                 } else {
                     // UUID don't match
-                    LOGV2(47985004,
+                    LOGV2(4798504,
                           "During migration recovery the collection was discovered to have been "
                           "dropped and recreated. Collection has a UUID that "
                           "does not match the one in the migration coordinator "

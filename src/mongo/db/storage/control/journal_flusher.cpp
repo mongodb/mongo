@@ -75,7 +75,7 @@ void JournalFlusher::set(ServiceContext* serviceCtx, std::unique_ptr<JournalFlus
 
 void JournalFlusher::run() {
     ThreadClient tc(name(), getGlobalServiceContext());
-    LOGV2_DEBUG(45847001, 1, "starting {name} thread", "name"_attr = name());
+    LOGV2_DEBUG(4584701, 1, "starting {name} thread", "name"_attr = name());
 
     // Initialize the thread's opCtx.
     _uniqueCtx.emplace(tc->makeOperationContext());
@@ -131,7 +131,7 @@ void JournalFlusher::run() {
         _flushJournalNow = false;
 
         if (_shuttingDown) {
-            LOGV2_DEBUG(45847002, 1, "stopping {name} thread", "name"_attr = name());
+            LOGV2_DEBUG(4584702, 1, "stopping {name} thread", "name"_attr = name());
             _nextSharedPromise->setError(
                 Status(ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."));
             stdx::lock_guard<Latch> lk(_opCtxMutex);

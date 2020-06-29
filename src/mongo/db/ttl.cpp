@@ -155,14 +155,14 @@ public:
      * Signals the thread to quit and then waits until it does.
      */
     void shutdown() {
-        LOGV2(36841000, "Shutting down TTL collection monitor thread");
+        LOGV2(3684100, "Shutting down TTL collection monitor thread");
         {
             stdx::lock_guard<Latch> lk(_stateMutex);
             _shuttingDown = true;
             _shuttingDownCV.notify_one();
         }
         wait();
-        LOGV2(36841001, "Finished shutting down TTL collection monitor thread");
+        LOGV2(3684101, "Finished shutting down TTL collection monitor thread");
     }
 
 private:

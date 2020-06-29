@@ -1119,7 +1119,7 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
             // This will log a message about the conflict initially and then every 5 seconds, with
             // the current rather arbitrary settings.
             if (retries % 10 == 0) {
-                LOGV2(47959000,
+                LOGV2(4795900,
                       "Reading the oplog collection conflicts with a validate cmd. Continuing to "
                       "retry.",
                       "retries"_attr = retries);

@@ -647,7 +647,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                   "config"_attr = config);
             int ret = wiredtiger_open(
                 path.c_str(), _eventHandler.getWtEventHandler(), config.c_str(), &_conn);
-            LOGV2(47959011, "Recovery complete", "duration"_attr = Date_t::now() - start);
+            LOGV2(4795911, "Recovery complete", "duration"_attr = Date_t::now() - start);
             if (ret == EINVAL) {
                 fassertFailedNoTrace(28717);
             } else if (ret != 0) {
@@ -656,7 +656,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             }
             start = Date_t::now();
             invariantWTOK(_conn->close(_conn, nullptr));
-            LOGV2(47959010,
+            LOGV2(4795910,
                   "WiredTiger closed. Removing journal files",
                   "duration"_attr = Date_t::now() - start);
             // After successful recovery, remove the journal directory.
@@ -672,7 +672,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                             "duration"_attr = Date_t::now() - start);
                 throw;
             }
-            LOGV2(47959008, "Journal files removed", "duration"_attr = Date_t::now() - start);
+            LOGV2(4795908, "Journal files removed", "duration"_attr = Date_t::now() - start);
         }
         // This setting overrides the earlier setting because it is later in the config string.
         ss << ",log=(enabled=false),";
@@ -682,7 +682,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     LOGV2(22315, "Opening WiredTiger", "config"_attr = config);
     auto startTime = Date_t::now();
     _openWiredTiger(path, config);
-    LOGV2(47959006, "WiredTiger opened", "duration"_attr = Date_t::now() - startTime);
+    LOGV2(4795906, "WiredTiger opened", "duration"_attr = Date_t::now() - startTime);
     _eventHandler.setStartupSuccessful();
     _wtOpenConfig = config;
 
@@ -808,7 +808,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
             StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(nullptr);
         }
         LOGV2_FATAL_NOTRACE(
-            46712005,
+            4671205,
             "This version of MongoDB is too recent to start up on the existing data files. "
             "Try MongoDB 4.2 or earlier.");
     }
@@ -928,23 +928,23 @@ void WiredTigerKVEngine::cleanShutdown() {
               "Closing WiredTiger in preparation for reconfiguring",
               "closeConfig"_attr = closeConfig);
         invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
-        LOGV2(47959005, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
+        LOGV2(4795905, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
 
         startTime = Date_t::now();
         invariantWTOK(wiredtiger_open(
             _path.c_str(), _eventHandler.getWtEventHandler(), _wtOpenConfig.c_str(), &_conn));
-        LOGV2(47959004, "WiredTiger re-opened", "duration"_attr = Date_t::now() - startTime);
+        LOGV2(4795904, "WiredTiger re-opened", "duration"_attr = Date_t::now() - startTime);
 
         startTime = Date_t::now();
         LOGV2(22325, "Reconfiguring", "newConfig"_attr = _fileVersion.getDowngradeString());
         invariantWTOK(_conn->reconfigure(_conn, _fileVersion.getDowngradeString().c_str()));
-        LOGV2(47959003, "Reconfigure complete", "duration"_attr = Date_t::now() - startTime);
+        LOGV2(4795903, "Reconfigure complete", "duration"_attr = Date_t::now() - startTime);
     }
 
     auto startTime = Date_t::now();
-    LOGV2(47959002, "Closing WiredTiger", "closeConfig"_attr = closeConfig);
+    LOGV2(4795902, "Closing WiredTiger", "closeConfig"_attr = closeConfig);
     invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
-    LOGV2(47959001, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
+    LOGV2(4795901, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
     _conn = nullptr;
 }
 
@@ -1589,7 +1589,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
     WT_SESSION* session = sessionWrapper.getSession();
     status =
         wtRCToStatus(session->salvage(session, _uri(ident).c_str(), nullptr), "Salvage failed: ");
-    LOGV2(47959007, "Salvage complete", "duration"_attr = Date_t::now() - start);
+    LOGV2(4795907, "Salvage complete", "duration"_attr = Date_t::now() - start);
     if (status.isOK()) {
         return {ErrorCodes::DataModifiedByRepair,
                 str::stream() << "Salvaged data for ident " << ident};

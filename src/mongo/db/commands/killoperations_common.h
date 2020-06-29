@@ -64,7 +64,7 @@ public:
             auto opKeys = Base::request().getOperationKeys();
 
             for (auto& opKey : opKeys) {
-                LOGV2(46156011, "Attempting to kill operation", "operationKey"_attr = opKey);
+                LOGV2(4615602, "Attempting to kill operation", "operationKey"_attr = opKey);
                 opKiller.killOperation(OperationKey(opKey));
             }
             Derived::killCursors(opCtx, opKeys);

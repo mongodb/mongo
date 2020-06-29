@@ -51,7 +51,7 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
     LUID luid;
     if (!LookupPrivilegeValueW(nullptr, name, &luid)) {
         auto str = errnoWithPrefix("Failed to LookupPrivilegeValue");
-        LOGV2_WARNING(47187001, "{str}", "str"_attr = str);
+        LOGV2_WARNING(4718701, "{str}", "str"_attr = str);
         return false;
     }
 
@@ -59,7 +59,7 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
     HANDLE accessToken;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &accessToken)) {
         auto str = errnoWithPrefix("Failed to OpenProcessToken");
-        LOGV2_WARNING(47187002, "{str}", "str"_attr = str);
+        LOGV2_WARNING(4718702, "{str}", "str"_attr = str);
         return false;
     }
 
@@ -75,7 +75,7 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
 
     if (!PrivilegeCheck(accessToken, &privileges, &ret)) {
         auto str = errnoWithPrefix("Failed to PrivilegeCheck");
-        LOGV2_WARNING(47187003, "{str}", "str"_attr = str);
+        LOGV2_WARNING(4718703, "{str}", "str"_attr = str);
         return false;
     }
 
@@ -168,7 +168,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
 #ifdef _WIN32
     if (!CheckPrivilegeEnabled(SE_INC_WORKING_SET_NAME)) {
         LOGV2_OPTIONS(
-            47187004,
+            4718704,
             {logv2::LogTag::kStartupWarnings},
             "SeIncreaseWorkingSetPrivilege privilege is not granted to the process. Secure memory "
             "allocation for SCRAM and/or Encrypted Storage Engine may fail.");

@@ -205,7 +205,7 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
 void CollectionShardingRuntime::clearFilteringMetadata() {
     stdx::lock_guard lk(_metadataManagerLock);
     if (!isNamespaceAlwaysUnsharded(_nss)) {
-        LOGV2_DEBUG(47985030,
+        LOGV2_DEBUG(4798530,
                     1,
                     "Clearing metadata for collection {namespace}",
                     "Clearing collection metadata",
