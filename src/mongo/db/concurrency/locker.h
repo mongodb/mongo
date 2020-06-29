@@ -162,7 +162,6 @@ public:
     virtual void lockGlobal(OperationContext* opCtx,
                             LockMode mode,
                             Date_t deadline = Date_t::max()) = 0;
-    virtual void lockGlobal(LockMode mode, Date_t deadline = Date_t::max()) = 0;
 
     /**
      * Decrements the reference count on the global lock.  If the reference count on the

@@ -2247,6 +2247,8 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardResilientToExceptionThrownBeforeWai
 }
 
 TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleGlobalNonIntentLocks) {
+    auto opCtx = makeOperationContext();
+
     FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
 
     LockerImpl locker1;
@@ -2254,12 +2256,12 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleGlobalN
     LockerImpl locker3;
 
     {
-        locker1.lockGlobal(MODE_IX);
+        locker1.lockGlobal(opCtx.get(), MODE_IX);
 
         // MODE_S attempt.
         stdx::thread t2([&]() {
             UninterruptibleLockGuard noInterrupt(&locker2);
-            locker2.lockGlobal(MODE_S);
+            locker2.lockGlobal(opCtx.get(), MODE_S);
         });
 
         // Wait for the thread to attempt to acquire the global lock in MODE_S.
@@ -2271,12 +2273,12 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleGlobalN
     }
 
     {
-        locker1.lockGlobal(MODE_IX);
+        locker1.lockGlobal(opCtx.get(), MODE_IX);
 
         // MODE_X attempt.
         stdx::thread t3([&]() {
             UninterruptibleLockGuard noInterrupt(&locker3);
-            locker3.lockGlobal(MODE_X);
+            locker3.lockGlobal(opCtx.get(), MODE_X);
         });
 
         // Wait for the thread to attempt to acquire the global lock in MODE_X.
@@ -2289,6 +2291,8 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleGlobalN
 }
 
 TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonIntentLocks) {
+    auto opCtx = makeOperationContext();
+
     FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
 
     LockerImpl locker1;
@@ -2298,7 +2302,7 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
     // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
     const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
 
-    locker1.lockGlobal(MODE_IX);
+    locker1.lockGlobal(opCtx.get(), MODE_IX);
 
     {
         locker1.lock(resId, MODE_X);
@@ -2306,7 +2310,7 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
         // MODE_S attempt.
         stdx::thread t2([&]() {
             UninterruptibleLockGuard noInterrupt(&locker2);
-            locker2.lockGlobal(MODE_IS);
+            locker2.lockGlobal(opCtx.get(), MODE_IS);
             locker2.lock(resId, MODE_S);
         });
 
@@ -2325,7 +2329,7 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
         // MODE_X attempt.
         stdx::thread t3([&]() {
             UninterruptibleLockGuard noInterrupt(&locker3);
-            locker3.lockGlobal(MODE_IX);
+            locker3.lockGlobal(opCtx.get(), MODE_IX);
             locker3.lock(resId, MODE_X);
         });
 

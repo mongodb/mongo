@@ -36,8 +36,8 @@ namespace mongo {
 
 class LockerForTests : public LockerImpl {
 public:
-    explicit LockerForTests(LockMode globalLockMode) {
-        lockGlobal(globalLockMode);
+    explicit LockerForTests(OperationContext* opCtx, LockMode globalLockMode) {
+        lockGlobal(opCtx, globalLockMode);
     }
 
     ~LockerForTests() {

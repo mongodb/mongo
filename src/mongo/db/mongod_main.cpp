@@ -1307,13 +1307,15 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     shutdownTTLMonitor(serviceContext);
 
     // We should always be able to acquire the global lock at shutdown.
+    // An OperationContext is not necessary to call lockGlobal() during shutdown, as it's only used
+    // to check that lockGlobal() is not called after a transaction timestamp has been set.
     //
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
     // of this function to prevent any operations from running that need a lock.
     //
     LOGV2(4784929, "Acquiring the global lock for shutdown");
     LockerImpl* globalLocker = new LockerImpl();
-    globalLocker->lockGlobal(MODE_X);
+    globalLocker->lockGlobal(nullptr, MODE_X);
 
     // Global storage engine may not be started in all cases before we exit
     if (serviceContext->getStorageEngine()) {

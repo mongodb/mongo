@@ -135,9 +135,6 @@ public:
     virtual void lockGlobal(OperationContext* opCtx,
                             LockMode mode,
                             Date_t deadline = Date_t::max());
-    virtual void lockGlobal(LockMode mode, Date_t deadline = Date_t::max()) {
-        return lockGlobal(nullptr, mode, deadline);
-    }
 
     virtual bool unlockGlobal();
 
