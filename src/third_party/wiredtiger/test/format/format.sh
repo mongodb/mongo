@@ -17,7 +17,7 @@ onintr()
 trap 'onintr' 2
 
 usage() {
-	echo "usage: $0 [-aEFSv] [-b format-binary] [-c config] [-e env-var]"
+	echo "usage: $0 [-aEFRSv] [-b format-binary] [-c config] [-e env-var]"
 	echo "    [-h home] [-j parallel-jobs] [-n total-jobs] [-t minutes] [format-configuration]"
 	echo
 	echo "    -a           abort/recovery testing (defaults to off)"
@@ -225,7 +225,7 @@ skip_known_errors()
 	# skip_error_list is a list of errors to skip. Each array entry can have multiple signatures
 	# for finger-grained matching. For example:
 	#
-	#	err_1=("heap-buffer-overflow" "__split_parent")
+	#       err_1=("heap-buffer-overflow" "__split_parent")
 	skip_error_list=( err_1[@] )
 
 	# Loop through the skip list and search in the log file.
@@ -250,6 +250,7 @@ skip_known_errors()
 # $1 directory name
 report_failure()
 {
+	# Note the directory may not yet exist, only the log file.
 	dir=$1
 	log="$dir.log"
 
@@ -257,37 +258,41 @@ report_failure()
 	#skip_known_errors $log
 	#skip_ret=$?
 
-	echo "$name: failure status reported" > $dir/$status
 	failure=$(($failure + 1))
 
 	# Forcibly quit if first-failure configured.
 	[[ $first_failure -ne 0 ]] && force_quit=1
 
 	echo "$name: job in $dir failed"
-	echo "$name: $dir log:"
 	sed 's/^/    /' < $log
+
+	# Note the directory may not yet exist, only the log file. If the directory doesn't exist,
+	# quit, we don't have any way to track that we've already reported this failure and it's
+	# not worth the effort to try and figure one out, in all likelihood the configuration is
+	# invalid.
+	[[ -d "$dir" ]] || {
+	    echo "$name: $dir does not exist, $name unable to continue"
+	    force_quit=1
+	    return
+	}
 	echo "$name: $dir/CONFIG:"
 	sed 's/^/    /' < $dir/CONFIG
+
+	echo "$name: failure status reported" > $dir/$status
 }
 
 # Resolve/cleanup completed jobs.
 resolve()
 {
 	running=0
-	list=$(ls $home | grep '^RUNDIR.[0-9]*$')
+	list=$(ls $home | grep '^RUNDIR.[0-9]*.log')
 	for i in $list; do
-		dir="$home/$i"
-		log="$dir.log"
-
-		# Skip directories that aren't ours.
-		[[ -f "$log" ]] || continue
+		# Note the directory may not yet exist, only the log file.
+		dir="$home/${i%.*}"
+		log="$home/$i"
 
 		# Skip failures we've already reported.
 		[[ -f "$dir/$status" ]] && continue
-
-		# Get the process ID, ignore any jobs that aren't yet running.
-		pid=`grep -E 'process.*running' $log | awk '{print $3}'`
-		[[ "$pid" =~ ^[1-9][0-9]*$ ]] || continue
 
 		# Leave any process waiting for a gdb attach running, but report it as a failure.
 		grep -E 'waiting for debugger' $log > /dev/null && {
@@ -295,7 +300,12 @@ resolve()
 			continue
 		}
 
-		# If the job is still running, ignore it unless we're forcibly quitting.
+		# Get the process ID. There is a window where the PID might not yet be written, in
+		# which case we ignore the log file. If the job is still running, ignore it unless
+		# we're forcibly quitting. If it's not still running, wait for it and get an exit
+		# status.
+		pid=`awk '/process.*running/{print $3}' $log`
+		[[ "$pid" =~ ^[1-9][0-9]*$ ]] || continue
 		kill -s 0 $pid > /dev/null 2>&1 && {
 			[[ $force_quit -eq 0 ]] && {
 				running=$((running + 1))
@@ -311,8 +321,6 @@ resolve()
 			verbose "$name: job in $dir killed"
 			continue
 		}
-
-		# Wait for the job and get an exit status.
 		wait $pid
 		eret=$?
 
@@ -410,7 +418,6 @@ resolve()
 		# a problem in this script.
 		echo "$name: job in $dir exited with status $eret for an unknown reason"
 		echo "$name: reporting job in $dir as a failure"
-		echo "$name: $name needs to be updated"
 		report_failure $dir
 	done
 	return 0
@@ -449,7 +456,7 @@ format()
 
 	# Disassociate the command from the shell script so we can exit and let the command
 	# continue to run.
-	# Run format in its own session so child processes are in their own process gorups
+	# Run format in its own session so child processes are in their own process groups
 	# and we can individually terminate (and clean up) running jobs and their children.
 	nohup setsid $cmd > $log 2>&1 &
 
@@ -479,30 +486,23 @@ while :; do
 		}
 	}
 
-	# Start more jobs.
-	while :; do
-		# Check if we're only running the smoke-tests and we're done.
-		[[ $smoke_test -ne 0 ]] && [[ $smoke_next -ge ${#smoke_list[@]} ]] && quit=1
+	# Check if we're only running the smoke-tests and we're done.
+	[[ $smoke_test -ne 0 ]] && [[ $smoke_next -ge ${#smoke_list[@]} ]] && quit=1
 	
-		# Check if the total number of jobs has been reached.
-		[[ $total_jobs -ne 0 ]] && [[ $count_jobs -ge $total_jobs ]] && quit=1
+	# Check if the total number of jobs has been reached.
+	[[ $total_jobs -ne 0 ]] && [[ $count_jobs -ge $total_jobs ]] && quit=1
 
-		# Check if less than 60 seconds left on any timer. The goal is to avoid killing
-		# jobs that haven't yet configured signal handlers, because we rely on handler
-		# output to determine their final status.
-		[[ $seconds -ne 0 ]] && [[ $(($seconds - $elapsed)) -lt 60 ]] && quit=1
+	# Check if less than 60 seconds left on any timer. The goal is to avoid killing jobs that
+	# haven't yet configured signal handlers, because we rely on handler output to determine
+	# their final status.
+	[[ $seconds -ne 0 ]] && [[ $(($seconds - $elapsed)) -lt 60 ]] && quit=1
 
-		# Don't create more jobs if we're quitting for any reason.
-		[[ $force_quit -ne 0 ]] || [[ $quit -ne 0 ]] && break;
-
-		# Check if the maximum number of jobs in parallel has been reached.
-		[[ $running -ge $parallel_jobs ]] && break
+	# Start another job if we're not quitting for any reason and the maximum number of jobs
+	# in parallel has not yet been reached.
+	[[ $force_quit -eq 0 ]] && [[ $quit -eq 0 ]] && [[ $running -lt $parallel_jobs ]] && {
 		running=$(($running + 1))
-
-		# Start another job, but don't pound on the system.
 		format
-		sleep 2
-	done
+	}
 
 	# Clean up and update status.
 	success_save=$success
@@ -514,8 +514,10 @@ while :; do
 	# Quit if we're done and there aren't any jobs left to wait for.
 	[[ $quit -ne 0 ]] || [[ $force_quit -ne 0 ]] && [[ $running -eq 0 ]] && break
 
-	# Wait for awhile, unless we're killing everything or there are jobs to start.
-	[[ $force_quit -eq 0 ]] && [[ $running -ge $parallel_jobs ]] && sleep 10
+	# Wait for awhile, unless we're killing everything or there are jobs to start. Always wait
+	# for a short period so we don't pound the system creating new jobs.
+	[[ $force_quit -eq 0 ]] && [[ $running -ge $parallel_jobs ]] && sleep 8
+	sleep 2
 done
 
 echo "$name: $success successful jobs, $failure failed jobs"

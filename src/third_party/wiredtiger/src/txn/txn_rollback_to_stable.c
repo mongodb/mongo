@@ -232,8 +232,10 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
          * we can skip it.
          */
         if (__wt_txn_visible_all(
-              session, cbt->upd_value->tw.stop_txn, cbt->upd_value->tw.durable_stop_ts))
+              session, cbt->upd_value->tw.stop_txn, cbt->upd_value->tw.durable_stop_ts)) {
+            WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone_rts);
             continue;
+        }
 
         /*
          * As part of the history store search, we never get an exact match based on our search
@@ -1030,8 +1032,10 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
          * we can skip it.
          */
         if (__wt_txn_visible_all(
-              session, cbt->upd_value->tw.stop_txn, cbt->upd_value->tw.durable_stop_ts))
+              session, cbt->upd_value->tw.stop_txn, cbt->upd_value->tw.durable_stop_ts)) {
+            WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone_rts);
             continue;
+        }
 
         /* Set this comparison as exact match of the search for later use. */
         cbt->compare = 0;

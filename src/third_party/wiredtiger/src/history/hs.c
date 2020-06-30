@@ -1216,8 +1216,10 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
          * we can skip it.
          */
         if (__wt_txn_visible_all(
-              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts))
+              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts)) {
+            WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone);
             continue;
+        }
         /*
          * If the stop time point of a record is visible to us, we won't be able to see anything for
          * this entire key. Just jump straight to the end.
@@ -1548,8 +1550,10 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
          * we can skip it.
          */
         if (__wt_txn_visible_all(
-              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts))
+              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts)) {
+            WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone);
             continue;
+        }
         /*
          * If we got here, we've got out-of-order updates in the history store.
          *
@@ -1666,8 +1670,10 @@ __hs_delete_key_from_pos(
          * we can skip it.
          */
         if (__wt_txn_visible_all(
-              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts))
+              session, hs_cbt->upd_value->tw.stop_txn, hs_cbt->upd_value->tw.durable_stop_ts)) {
+            WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone);
             continue;
+        }
         /*
          * Since we're using internal functions to modify the row structure, we need to manually set
          * the comparison to an exact match.

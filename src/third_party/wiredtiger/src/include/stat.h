@@ -499,6 +499,8 @@ struct __wt_connection_stats {
     int64_t cursor_next_skip_lt_100;
     int64_t cursor_restart;
     int64_t cursor_prev;
+    int64_t cursor_prev_hs_tombstone;
+    int64_t cursor_prev_hs_tombstone_rts;
     int64_t cursor_prev_skip_ge_100;
     int64_t cursor_prev_skip_lt_100;
     int64_t cursor_remove;

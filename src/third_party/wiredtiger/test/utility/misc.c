@@ -61,7 +61,7 @@ testutil_die(int e, const char *fmt, ...)
     if (e != 0)
         fprintf(stderr, ": %s", wiredtiger_strerror(e));
     fprintf(stderr, "\n");
-    fprintf(stderr, "process aborting\n");
+    fprintf(stderr, "%s: process aborting\n", progname);
 
     abort();
 }
