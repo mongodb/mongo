@@ -1273,6 +1273,7 @@ env.Library(
         'oplog_buffer_collection',
         'oplog_interface_remote',
         'optime',
+        'primary_only_service',
         'repl_coordinator_interface',
         'repl_settings',
         'replication_consistency_markers_impl',
@@ -1331,6 +1332,7 @@ env.CppUnitTest(
         'oplog_fetcher_test.cpp',
         'oplog_test.cpp',
         'optime_extract_test.cpp',
+        'primary_only_service_test.cpp',
         'read_concern_args_test.cpp',
         'repl_set_config_checks_test.cpp',
         'repl_set_config_test.cpp',
@@ -1409,6 +1411,7 @@ env.CppUnitTest(
         'oplog_interface_mock',
         'oplog_interface_remote',
         'optime',
+        'primary_only_service',
         'repl_coordinator_impl',
         'repl_server_parameters',
         'replica_set_messages',
@@ -1562,5 +1565,23 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+    ],
+)
+
+env.Library(
+    target='primary_only_service',
+    source=[
+        'primary_only_service.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        'replica_set_aware_service',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/executor/scoped_task_executor',
+        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+        'wait_for_majority_service',
     ],
 )
