@@ -4472,11 +4472,13 @@ Value ExpressionSubstrBytes::evaluate(const Document& root, Variables* variables
             str::stream() << getOpName()
                           << ":  starting index must be a numeric type (is BSON type "
                           << typeName(pLower.getType()) << ")",
-            pLower.numeric());
+            (pLower.getType() == NumberInt || pLower.getType() == NumberLong ||
+             pLower.getType() == NumberDouble));
     uassert(16035,
             str::stream() << getOpName() << ":  length must be a numeric type (is BSON type "
                           << typeName(pLength.getType()) << ")",
-            pLength.numeric());
+            (pLength.getType() == NumberInt || pLength.getType() == NumberLong ||
+             pLength.getType() == NumberDouble));
 
     const long long signedLower = pLower.coerceToLong();
 
