@@ -47,16 +47,15 @@ enum DiffType : uint8_t { kDocument, kArray };
 
 // Below are string constants used in the diff format.
 constexpr StringData kArrayHeader = "a"_sd;
-constexpr StringData kDeleteSectionFieldName = "d"_sd;
-constexpr StringData kInsertSectionFieldName = "i"_sd;
-constexpr StringData kUpdateSectionFieldName = "u"_sd;
+constexpr char kDeleteSectionFieldName = 'd';
+constexpr char kInsertSectionFieldName = 'i';
+constexpr char kUpdateSectionFieldName = 'u';
+constexpr char kSubDiffSectionFieldPrefix = 's';
 // 'l' for length.
 constexpr StringData kResizeSectionFieldName = "l"_sd;
-constexpr StringData kSubDiffSectionFieldName = "s"_sd;
 
 // Below are constants used for computation of Diff size. Note that the computed size is supposed to
 // be an approximate value.
-constexpr size_t kAdditionalPaddingForObjectSize = 5;
 constexpr size_t kSizeOfEmptyDocumentDiffBuilder = 5;
 // Size of empty object(5) + kArrayHeader(1) + null terminator + type byte + bool size.
 constexpr size_t kSizeOfEmptyArrayDiffBuilder = 9;
@@ -168,7 +167,7 @@ public:
         // BSON only has signed 4 byte integers. The new size must fit into that type.
         invariant(index <= static_cast<uint32_t>(std::numeric_limits<int32_t>::max()));
         _newSize = static_cast<int32_t>(index);
-        sizeTracker.addEntry(kResizeSectionFieldName.size(), sizeof(uint32_t) /* size of value */);
+        sizeTracker.addEntry(1 /* kResizeSectionFieldName */, sizeof(uint32_t) /* size of value */);
     }
 
     /*
@@ -205,7 +204,7 @@ private:
     void finishChild() override {
         invariant(!_modifications.empty());
         sizeTracker.addEntry(
-            _modifications.back().first.size() + kSubDiffSectionFieldName.size(),
+            _modifications.back().first.size() + 1 /* kSubDiffSectionFieldPrefix */,
             stdx::get<std::unique_ptr<DiffBuilderBase>>(_modifications.back().second)
                 ->getObjSize());
     }
@@ -225,7 +224,11 @@ private:
  */
 class DocumentDiffBuilder final : public DiffBuilderBase {
 public:
-    DocumentDiffBuilder(size_t padding = kAdditionalPaddingForObjectSize)
+    /**
+     * The 'padding' is the additional size that needs to be added to the diff builder while
+     * tracking the overall size of the diff.
+     */
+    DocumentDiffBuilder(size_t padding = 0)
         : DiffBuilderBase(kSizeOfEmptyDocumentDiffBuilder + padding) {}
 
     /**
@@ -284,10 +287,11 @@ private:
         invariant(!_subDiffs.empty());
 
         // Add the size of 'field' + 'value'.
-        sizeTracker.addEntry(_subDiffs.back().first.size(),
+        sizeTracker.addEntry(1 /*kSubDiffSectionFieldPrefix */ + _subDiffs.back().first.size(),
                              _subDiffs.back().second->getObjSize(),
-                             _subDiffs.size() == 1);
+                             false);
     }
+
     std::vector<std::pair<StringData, BSONElement>> _updates;
     std::vector<std::pair<StringData, BSONElement>> _inserts;
     std::vector<StringData> _deletes;

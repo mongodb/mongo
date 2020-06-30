@@ -36,6 +36,7 @@
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/document_diff_test_helpers.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -110,7 +111,8 @@ void runTest(std::vector<BSONObj> documents, size_t numSimulations) {
         std::vector<BSONObj> diffs;
         diffs.reserve(documents.size() - 1);
         for (size_t i = 1; i < documents.size(); ++i) {
-            const auto diff = computeDiff(preDoc, documents[i]);
+            const auto diff = computeDiff(
+                preDoc, documents[i], update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
 
             ASSERT(diff);
             diffs.push_back(*diff);

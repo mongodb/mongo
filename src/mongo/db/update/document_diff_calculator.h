@@ -37,8 +37,11 @@ namespace mongo::doc_diff {
 /**
  * Returns the delta between 'pre' and 'post' by recursively iterating the object. If the size
  * of the computed delta is larger than the 'post' object then the function returns
- * 'boost::none'.
+ * 'boost::none'. The 'paddingForDiff' represents the additional size that needs be added to the
+ * size of the diff, while comparing whether the diff is viable.
  */
-boost::optional<doc_diff::Diff> computeDiff(const BSONObj& pre, const BSONObj& post);
+boost::optional<doc_diff::Diff> computeDiff(const BSONObj& pre,
+                                            const BSONObj& post,
+                                            size_t paddingForDiff);
 
 };  // namespace mongo::doc_diff

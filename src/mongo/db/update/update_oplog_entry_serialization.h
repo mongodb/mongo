@@ -38,6 +38,8 @@
  */
 namespace mongo::update_oplog_entry {
 
+constexpr size_t kSizeOfDeltaOplogEntryMetadata = 15;
+
 /**
  * Given a diff, produce the contents for the 'o' field of a $v: 2 delta-style oplog entry.
  */

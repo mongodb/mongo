@@ -372,7 +372,7 @@ TEST(DiffApplierTest, DuplicateFieldNames) {
     ASSERT_THROWS_CODE(
         applyDiff(BSONObj(), fromjson("{i: {a: {}, a: null}}")), DBException, 4728000);
     ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{s: {a: {d: {p: false}}, a: {a: true, d: {p: false}}}}")),
+        applyDiff(BSONObj(), fromjson("{sa: {d: {p: false}}, sa: {a: true, d: {p: false}}}")),
         DBException,
         4728000);
 
@@ -383,9 +383,8 @@ TEST(DiffApplierTest, DuplicateFieldNames) {
     ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u: {b: false}, i: {a: {}, b: null}}")),
                        DBException,
                        4728000);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u: {a: {}}, s: {a: {d : {k: false}}}}")),
-                       DBException,
-                       4728000);
+    ASSERT_THROWS_CODE(
+        applyDiff(BSONObj(), fromjson("{u: {a: {}}, sa: {d : {k: false}}}")), DBException, 4728000);
 }
 
 }  // namespace

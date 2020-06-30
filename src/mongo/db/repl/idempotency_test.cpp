@@ -44,6 +44,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/document_diff_test_helpers.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
@@ -267,7 +268,8 @@ void RandomizedIdempotencyTest::runUpdateV2IdempotencyTestCase(double v2Probabil
                 // computing the input objects) would break idempotency. So we do a dry run of what
                 // the collection state would look like and compute diffs based on that.
                 generatedDoc = generateDocWithId(kDocId);
-                auto diff = doc_diff::computeDiff(oldDoc, *generatedDoc);
+                auto diff = doc_diff::computeDiff(
+                    oldDoc, *generatedDoc, update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
                 ASSERT(diff);
                 oplogDiff = BSON("$v" << 2 << "diff" << *diff);
             } else {

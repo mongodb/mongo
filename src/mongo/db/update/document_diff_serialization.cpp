@@ -36,10 +36,6 @@
 
 namespace mongo::doc_diff {
 namespace {
-static const StringDataSet kDocumentDiffSections = {kInsertSectionFieldName,
-                                                    kUpdateSectionFieldName,
-                                                    kDeleteSectionFieldName,
-                                                    kSubDiffSectionFieldName};
 
 void assertDiffNonEmpty(const BSONObjIterator& it) {
     uassert(4770500, "Expected diff to be non-empty", it.more());
@@ -80,7 +76,7 @@ SubBuilderGuard<ArrayDiffBuilder> ArrayDiffBuilder::startSubArrDiff(size_t idx) 
 
 void ArrayDiffBuilder::addUpdate(size_t idx, BSONElement elem) {
     auto fieldName = std::to_string(idx);
-    sizeTracker.addEntry(fieldName.size() + kUpdateSectionFieldName.size(), elem.valuesize());
+    sizeTracker.addEntry(fieldName.size() + 1 /* kUpdateSectionFieldName */, elem.valuesize());
     _modifications.push_back({std::move(fieldName), elem});
 }
 
@@ -97,7 +93,7 @@ void ArrayDiffBuilder::serializeTo(BSONObjBuilder* output) const {
             visit_helper::Overloaded{
                 [&idx, output](const std::unique_ptr<DiffBuilderBase>& subDiff) {
                     BSONObjBuilder subObjBuilder =
-                        output->subobjStart(kSubDiffSectionFieldName + idx);
+                        output->subobjStart(kSubDiffSectionFieldPrefix + idx);
                     subDiff->serializeTo(&subObjBuilder);
                 },
                 [&idx, output](BSONElement elt) {
@@ -109,30 +105,30 @@ void ArrayDiffBuilder::serializeTo(BSONObjBuilder* output) const {
 
 void DocumentDiffBuilder::serializeTo(BSONObjBuilder* output) const {
     if (!_deletes.empty()) {
-        BSONObjBuilder subBob(output->subobjStart(kDeleteSectionFieldName));
+        BSONObjBuilder subBob(output->subobjStart(StringData(&kDeleteSectionFieldName, 1)));
         for (auto&& del : _deletes) {
             subBob.append(del, false);
         }
     }
 
     if (!_updates.empty()) {
-        BSONObjBuilder subBob(output->subobjStart(kUpdateSectionFieldName));
+        BSONObjBuilder subBob(output->subobjStart(StringData(&kUpdateSectionFieldName, 1)));
         for (auto&& update : _updates) {
             subBob.appendAs(update.second, update.first);
         }
     }
 
     if (!_inserts.empty()) {
-        BSONObjBuilder subBob(output->subobjStart(kInsertSectionFieldName));
+        BSONObjBuilder subBob(output->subobjStart(StringData(&kInsertSectionFieldName, 1)));
         for (auto&& insert : _inserts) {
             subBob.appendAs(insert.second, insert.first);
         }
     }
 
     if (!_subDiffs.empty()) {
-        BSONObjBuilder subBob(output->subobjStart(kSubDiffSectionFieldName));
         for (auto&& subDiff : _subDiffs) {
-            BSONObjBuilder subDiffBuilder(subBob.subobjStart(subDiff.first));
+            BSONObjBuilder subDiffBuilder(
+                output->subobjStart(std::string(1, kSubDiffSectionFieldPrefix) + subDiff.first));
             subDiff.second->serializeTo(&subDiffBuilder);
         }
     }
@@ -152,31 +148,31 @@ SubBuilderGuard<ArrayDiffBuilder> DocumentDiffBuilder::startSubArrDiff(StringDat
 }
 
 namespace {
-void checkSection(BSONObjIterator* it, StringData sectionName, BSONType expectedType) {
+void checkSection(BSONElement element, char sectionName, BSONType expectedType) {
     uassert(4770507,
             str::stream() << "Expected " << sectionName << " section to be type " << expectedType,
-            (**it).type() == expectedType);
+            element.type() == expectedType);
 }
 }  // namespace
 
 ArrayDiffReader::ArrayDiffReader(const Diff& diff) : _diff(diff), _it(_diff) {
     assertDiffNonEmpty(_it);
-
+    auto field = *_it;
     uassert(4770504,
             str::stream() << "Expected first field to be array header " << kArrayHeader
                           << " but found " << (*_it).fieldNameStringData(),
-            (*_it).fieldNameStringData() == kArrayHeader);
+            field.fieldNameStringData() == kArrayHeader);
     uassert(4770519,
             str::stream() << "Expected array header to be bool but got " << (*_it),
-            (*_it).type() == BSONType::Bool);
+            field.type() == BSONType::Bool);
     uassert(4770520,
             str::stream() << "Expected array header to be value true but got " << (*_it),
-            (*_it).Bool());
+            field.Bool());
     ++_it;
-
-    if (_it.more() && (*_it).fieldNameStringData() == kResizeSectionFieldName) {
-        checkSection(&_it, kResizeSectionFieldName, BSONType::NumberInt);
-        _newSize.emplace((*_it).numberInt());
+    field = *_it;
+    if (_it.more() && field.fieldNameStringData() == kResizeSectionFieldName) {
+        checkSection(field, kResizeSectionFieldName[0], BSONType::NumberInt);
+        _newSize.emplace(field.numberInt());
         ++_it;
     }
 }
@@ -198,19 +194,16 @@ boost::optional<std::pair<size_t, ArrayDiffReader::ArrayModification>> ArrayDiff
     auto next = _it.next();
     auto fieldName = next.fieldNameStringData();
 
-    static_assert(kUpdateSectionFieldName.size() == 1 && kSubDiffSectionFieldName.size() == 1,
-                  "The code below assumes that the field names used in the diff format are single "
-                  "character long");
     uassert(4770521,
             str::stream() << "expected field name to be at least two characters long, but found: "
                           << fieldName,
             fieldName.size() > 1);
     const size_t idx = extractArrayIndex(fieldName.substr(1, fieldName.size()));
 
-    if (fieldName[0] == kUpdateSectionFieldName[0]) {
+    if (fieldName[0] == kUpdateSectionFieldName) {
         // It's an update.
         return {{idx, next}};
-    } else if (fieldName[0] == kSubDiffSectionFieldName[0]) {
+    } else if (fieldName[0] == kSubDiffSectionFieldPrefix) {
         // It's a sub diff...But which type?
         uassert(4770501,
                 str::stream() << "expected sub diff at index " << idx << " but got " << next,
@@ -233,42 +226,49 @@ DocumentDiffReader::DocumentDiffReader(const Diff& diff) : _diff(diff) {
     BSONObjIterator it(diff);
     assertDiffNonEmpty(it);
 
-    // Find each seection of the diff and initialize an iterator.
+    // Find each section of the diff and initialize an iterator.
     struct Section {
-        StringData fieldName;
         boost::optional<BSONObjIterator>* outIterator;
+        int order;
     };
 
-    const std::array<Section, 4> sections{
-        Section{kDeleteSectionFieldName, &_deletes},
-        Section{kUpdateSectionFieldName, &_updates},
-        Section{kInsertSectionFieldName, &_inserts},
-        Section{kSubDiffSectionFieldName, &_subDiffs},
-    };
+    const std::map<char, Section> sections{{kDeleteSectionFieldName, Section{&_deletes, 1}},
+                                           {kUpdateSectionFieldName, Section{&_updates, 2}},
+                                           {kInsertSectionFieldName, Section{&_inserts, 3}},
+                                           {kSubDiffSectionFieldPrefix, Section{&_subDiffs, 4}}};
 
-    for (size_t i = 0; i < sections.size(); ++i) {
-        if (!it.more()) {
-            break;
+    char prev = 0;
+    bool hasSubDiffSections = false;
+    for (; it.more(); ++it) {
+        const auto field = *it;
+        uassert(4770505,
+                str::stream() << "Expected sections field names in diff to be non-empty ",
+                field.fieldNameStringData().size());
+        const auto sectionName = field.fieldNameStringData()[0];
+        auto section = sections.find(sectionName);
+        if ((section != sections.end()) && (section->second.order > prev)) {
+            checkSection(field, sectionName, BSONType::Object);
+
+            // Once we encounter a sub-diff section, we break and save the iterator for later use.
+            if (sectionName == kSubDiffSectionFieldPrefix) {
+                section->second.outIterator->emplace(it);
+                hasSubDiffSections = true;
+                break;
+            } else {
+                section->second.outIterator->emplace(field.embeddedObject());
+            }
+        } else {
+            uasserted(4770503,
+                      str::stream()
+                          << "Unexpected section: " << sectionName << " in document diff");
         }
-
-        const auto fieldName = (*it).fieldNameStringData();
-        if (fieldName != sections[i].fieldName) {
-            uassert(4770503,
-                    str::stream() << "Unexpected section: " << fieldName << " in document diff",
-                    kDocumentDiffSections.count(fieldName) != 0);
-
-            continue;
-        }
-
-        checkSection(&it, sections[i].fieldName, BSONType::Object);
-        sections[i].outIterator->emplace((*it).embeddedObject());
-        ++it;
+        prev = section->second.order;
     }
 
     uassert(4770513,
             str::stream() << "Did not expect more sections in diff but found one: "
                           << (*it).fieldNameStringData(),
-            !it.more());
+            hasSubDiffSections || !it.more());
 }
 
 boost::optional<StringData> DocumentDiffReader::nextDelete() {
@@ -300,10 +300,16 @@ DocumentDiffReader::nextSubDiff() {
     }
 
     auto next = _subDiffs->next();
+    const auto fieldName = next.fieldNameStringData();
+    uassert(4770514,
+            str::stream() << "Did not expect more sections in diff but found one: "
+                          << next.fieldNameStringData(),
+            fieldName.size() > 0 && fieldName[0] == kSubDiffSectionFieldPrefix);
+
     uassert(470510,
             str::stream() << "Subdiffs should be objects, got " << next,
             next.type() == BSONType::Object);
 
-    return {{next.fieldNameStringData(), getReader(next.embeddedObject())}};
+    return {{fieldName.substr(1, fieldName.size()), getReader(next.embeddedObject())}};
 }
 }  // namespace mongo::doc_diff

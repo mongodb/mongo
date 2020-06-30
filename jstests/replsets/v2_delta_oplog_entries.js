@@ -79,7 +79,7 @@ function checkOplogEntry(node, expectedOplogEntryType, expectedId) {
         // Do some cursory/weak checks about the format of the 'o' field.
         assert.eq(Object.keys(oplogEntry.o), ["$v", "diff"]);
         for (let key of Object.keys(oplogEntry.o.diff)) {
-            assert.contains(key, ["i", "u", "s", "d"]);
+            assert.contains(key[0], ["i", "u", "s", "d"]);
         }
     } else if (expectedOplogEntryType === kExpectReplacementEntry) {
         assert.eq(oplogEntry.op, "u");
@@ -119,18 +119,18 @@ testUpdateReplicates({
 // Adding a field and updating an existing one.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, x: 0, y: 0},
+    preImage: {_id: id, x: "notSoLargeString", y: 0},
     pipeline: [{$set: {a: "foo", y: 999}}],
-    postImage: {_id: id, x: 0, y: 999, a: "foo"},
+    postImage: {_id: id, x: "notSoLargeString", y: 999, a: "foo"},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
 // Updating a subfield to a string.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, x: 4, subObj: {a: 1, b: 2}},
+    preImage: {_id: id, x: "notSoLargeString", subObj: {a: 1, b: 2}},
     pipeline: [{$set: {"subObj.a": "foo", y: 1}}],
-    postImage: {_id: id, x: 4, subObj: {a: "foo", b: 2}, y: 1},
+    postImage: {_id: id, x: "notSoLargeString", subObj: {a: "foo", b: 2}, y: 1},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
@@ -139,18 +139,18 @@ testUpdateReplicates({
 // than a weak BSON type insensitive comparison.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, x: 4, subObj: {a: NumberLong(1), b: 2}},
+    preImage: {_id: id, x: "notSoLargeString", subObj: {a: NumberLong(1), b: 2}},
     pipeline: [{$set: {"subObj.a": 1, y: 1}}],
-    postImage: {_id: id, x: 4, subObj: {a: 1, b: 2}, y: 1},
+    postImage: {_id: id, x: "notSoLargeString", subObj: {a: 1, b: 2}, y: 1},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
 // Update a subfield to an object.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, x: 4, subObj: {a: NumberLong(1), b: 2}},
+    preImage: {_id: id, x: "notSoLargeString", subObj: {a: NumberLong(1), b: 2}},
     pipeline: [{$set: {"subObj.a": {$const: {newObj: {subField: 1}}}, y: 1}}],
-    postImage: {_id: id, x: 4, subObj: {a: {newObj: {subField: 1}}, b: 2}, y: 1},
+    postImage: {_id: id, x: "notSoLargeString", subObj: {a: {newObj: {subField: 1}}, b: 2}, y: 1},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
@@ -328,6 +328,24 @@ testUpdateReplicates({
     preImage: {_id: id, padding: kGiantStr, a: [1, 2, 999, 3, 4]},
     pipeline: [{$set: {a: [1, 2, 3, 4]}}],
     postImage: {_id: id, padding: kGiantStr, a: [1, 2, 3, 4]},
+    expectedOplogEntry: kExpectDeltaEntry
+});
+
+function generateDeepObj(depth, maxDepth, value) {
+    return {
+        "padding": kGiantStr,
+        "subObj": (depth >= maxDepth) ? value : generateDeepObj(depth + 1, maxDepth, value)
+    };
+}
+
+// Verify that diffing the deepest objects allowed by the js client, can produce a delta op-log
+// entries.
+id = generateId();
+let path = "subObj.".repeat(146) + "subObj";
+testUpdateReplicates({
+    preImage: Object.assign({_id: id}, generateDeepObj(1, 147, 1)),
+    pipeline: [{$set: {[path]: 2}}],
+    postImage: Object.assign({_id: id}, generateDeepObj(1, 147, 2)),
     expectedOplogEntry: kExpectDeltaEntry
 });
 

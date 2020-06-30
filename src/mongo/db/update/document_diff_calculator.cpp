@@ -162,8 +162,10 @@ void calculateSubDiffHelper(const BSONElement& preVal,
 }
 }  // namespace
 
-boost::optional<doc_diff::Diff> computeDiff(const BSONObj& pre, const BSONObj& post) {
-    doc_diff::DocumentDiffBuilder diffBuilder;
+boost::optional<doc_diff::Diff> computeDiff(const BSONObj& pre,
+                                            const BSONObj& post,
+                                            size_t padding) {
+    doc_diff::DocumentDiffBuilder diffBuilder(padding);
     if (computeDocDiff(pre, post, &diffBuilder)) {
         auto diff = diffBuilder.serialize();
         if (diff.objsize() < post.objsize()) {

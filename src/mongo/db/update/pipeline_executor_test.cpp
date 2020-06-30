@@ -157,18 +157,17 @@ TEST_F(PipelineExecutorTest, ComplexDoc) {
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {a: 1, b: [0, 1, 2], c: {d: 1}}}")};
     PipelineExecutor exec(expCtx, pipeline);
 
-    mutablebson::Document doc(fromjson("{a: 1, b: [0, 2, 2], e: []}"));
+    mutablebson::Document doc(fromjson("{a: 1, b: [0, 2, 2], e: ['val1', 'val2']}"));
     auto result = exec.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], e: [], c: {d: 1}}"), doc);
+    ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], e: ['val1', 'val2'], c: {d: 1}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     if (deltaOplogEntryAllowed()) {
-        ASSERT_BSONOBJ_BINARY_EQ(
-            fromjson("{$v: 2, diff: {i: {c: {d: 1}}, s: {b: {a: true, u1: 1} }}}"),
-            result.oplogEntry);
+        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {c: {d: 1}}, sb: {a: true, u1: 1} }}"),
+                                 result.oplogEntry);
     } else {
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 1, b: [0, 1, 2], e: [], c: {d: 1}}"),
+        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 1, b: [0, 1, 2], e: ['val1', 'val2'], c: {d: 1}}"),
                                  result.oplogEntry);
     }
 }
