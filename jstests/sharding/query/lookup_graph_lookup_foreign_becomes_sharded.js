@@ -3,7 +3,7 @@
  * sharded, or if it becomes sharded mid-iteration.
  *
  *@tags: [
- *   requires_fcv_46,
+ *   requires_fcv_46, requires_persistence
  * ]
  */
 (function() {
