@@ -380,7 +380,7 @@ error_codes:
     - {code: 317,name: ConnectionPoolExpired,categories: [NetworkError,RetriableError]}
     
     - {code: 318,name: ForTestingOptionalErrorExtraInfo,extra: OptionalErrorExtraInfoExample,extraIsOptional: True}
-    - {code: 319,name: MovePrimaryIsInProgress}
+    - {code: 319,name: MovePrimaryInProgress}
 
     - {code: 320, name: TenantMigrationConflict}
     - {code: 321, name: TenantMigrationCommitted}
