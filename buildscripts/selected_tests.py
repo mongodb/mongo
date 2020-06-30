@@ -240,6 +240,7 @@ def _get_evg_task_config(
     :param build_variant_config: Config of build variant to collect task info from.
     :return: Task configuration values.
     """
+    LOGGER.info("Calculating evg_task_config values for task", task=task.name)
     if task.is_generate_resmoke_task:
         task_vars = task.generate_resmoke_tasks_command["vars"]
     else:
@@ -302,7 +303,6 @@ def _get_task_configs_for_test_mappings(selected_tests_variant_expansions: Dict[
             evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task,
                                                    build_variant_config)
             evg_task_config.update({"selected_tests_to_run": set(test_list_info["tests"])})
-            LOGGER.debug("Calculated evg_task_config values", evg_task_config=evg_task_config)
             evg_task_configs[task.name] = evg_task_config
 
     return evg_task_configs
@@ -325,7 +325,6 @@ def _get_task_configs_for_task_mappings(selected_tests_variant_expansions: Dict[
         if task and not _exclude_task(task):
             evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task,
                                                    build_variant_config)
-            LOGGER.debug("Calculated evg_task_config values", evg_task_config=evg_task_config)
             evg_task_configs[task.name] = evg_task_config
 
     return evg_task_configs
@@ -363,21 +362,21 @@ def _get_task_configs(evg_conf: EvergreenProjectConfig,
     task_configs = {}
 
     related_test_files = _find_selected_test_files(selected_tests_service, changed_files)
-    LOGGER.debug("related test files found", related_test_files=related_test_files,
-                 variant=build_variant_config.name)
+    LOGGER.info("related test files found", related_test_files=related_test_files,
+                variant=build_variant_config.name)
 
     if related_test_files:
         tests_by_task = create_task_list_for_tests(related_test_files, build_variant_config.name,
                                                    evg_conf)
-        LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
+        LOGGER.info("tests and tasks found", tests_by_task=tests_by_task)
 
         test_mapping_task_configs = _get_task_configs_for_test_mappings(
             selected_tests_variant_expansions, tests_by_task, build_variant_config)
         task_configs.update(test_mapping_task_configs)
 
     related_tasks = _find_selected_tasks(selected_tests_service, changed_files)
-    LOGGER.debug("related tasks found", related_tasks=related_tasks,
-                 variant=build_variant_config.name)
+    LOGGER.info("related tasks found", related_tasks=related_tasks,
+                variant=build_variant_config.name)
     if related_tasks:
         task_mapping_task_configs = _get_task_configs_for_task_mappings(
             selected_tests_variant_expansions, related_tasks, build_variant_config)
@@ -389,11 +388,9 @@ def _get_task_configs(evg_conf: EvergreenProjectConfig,
     return task_configs
 
 
-# pylint: disable=too-many-arguments
 def run(evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
         selected_tests_service: SelectedTestsService,
-        selected_tests_variant_expansions: Dict[str, str], repos: List[Repo],
-        origin_build_variants: List[str]) -> Dict[str, str]:
+        selected_tests_variant_expansions: Dict[str, str], repos: List[Repo]) -> Dict[str, str]:
     # pylint: disable=too-many-locals
     """
     Run code to select tasks to run based on test and task mappings for each of the build variants.
@@ -403,19 +400,17 @@ def run(evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
     :param selected_tests_service: Selected-tests service.
     :param selected_tests_variant_expansions: Expansions of the selected-tests variant.
     :param repos: List of repos containing changed files.
-    :param origin_build_variants: Build variants to collect task info from.
     :return: Dict of files and file contents for generated tasks.
     """
     config_dict_of_suites_and_tasks = {}
 
     changed_files = find_changed_files_in_repos(repos)
     changed_files = {_remove_repo_path_prefix(file_path) for file_path in changed_files}
-    LOGGER.debug("Found changed files", files=changed_files)
+    LOGGER.info("Found changed files", files=changed_files)
 
     shrub_project = ShrubProject()
-    for build_variant in origin_build_variants:
-        shrub_build_variant = BuildVariant(build_variant)
-        build_variant_config = evg_conf.get_variant(build_variant)
+    for build_variant_config in evg_conf.get_required_variants():
+        shrub_build_variant = BuildVariant(build_variant_config.name)
         origin_variant_expansions = build_variant_config.expansions
 
         task_configs = _get_task_configs(evg_conf, selected_tests_service,
@@ -487,10 +482,9 @@ def main(
     buildscripts.resmokelib.parser.set_run_options()
 
     task_expansions = read_config.read_config_file(expansion_file)
-    origin_build_variants = task_expansions["selected_tests_buildvariants"].split(" ")
 
     config_dict_of_suites_and_tasks = run(evg_api, evg_conf, selected_tests_service,
-                                          task_expansions, repos, origin_build_variants)
+                                          task_expansions, repos)
     write_file_dict(SELECTED_TESTS_CONFIG_DIR, config_dict_of_suites_and_tasks)
 
 

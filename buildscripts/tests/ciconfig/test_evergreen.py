@@ -52,6 +52,11 @@ class TestEvergreenProjectConfig(unittest.TestCase):
         self.assertIsNotNone(variant)
         self.assertEqual("osx-108", variant.name)
 
+    def test_get_required_variants(self):
+        variants = self.conf.get_required_variants()
+
+        self.assertEqual(len(variants), 2)
+
     def test_list_distro_names(self):
         self.assertEqual(5, len(self.conf.distro_names))
         self.assertIn("localtestdistro", self.conf.distro_names)
@@ -386,6 +391,15 @@ class TestVariant(unittest.TestCase):
 
         variant_osx = self.conf.get_variant("osx-108")
         self.assertIsNone(variant_osx.batchtime)
+
+    def test_is_required_variant(self):
+        variant_debian = self.conf.get_variant("debian")
+        is_required_variant = variant_debian.is_required_variant()
+        self.assertEqual(is_required_variant, True)
+
+        variant_ubuntu = self.conf.get_variant("ubuntu")
+        is_required_variant = variant_ubuntu.is_required_variant()
+        self.assertEqual(is_required_variant, False)
 
     def test_expansion(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")

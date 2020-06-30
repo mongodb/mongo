@@ -1557,7 +1557,7 @@ functions:
           else
 
             ${activate_virtualenv}
-            PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --verbose --selected-tests-config .selected_tests.yml
+            PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --selected-tests-config .selected_tests.yml
 
           fi
     - command: archive.targz_pack

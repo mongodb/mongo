@@ -57,15 +57,12 @@ class TestAcceptance(unittest.TestCase):
             "build_id": "my_build_id", "project": "mongodb-mongo-master"
         }
         repos = [mock_changed_git_files([])]
-        origin_build_variants = ["enterprise-rhel-62-64-bit"]
 
         config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, repos,
-                                     origin_build_variants)
+                                     selected_tests_variant_expansions, repos)
 
-        self.assertEqual(
-            json.loads(config_dict["selected_tests_config.json"]),
-            empty_build_variant(origin_build_variants[0]))
+        # assert that config_dict does not contain keys for any generated task configs
+        self.assertEqual(config_dict.keys(), {"selected_tests_config.json"})
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_when_test_mappings_are_found_for_changed_files(self):
@@ -83,23 +80,25 @@ class TestAcceptance(unittest.TestCase):
             "build_id": "my_build_id", "project": "mongodb-mongo-master"
         }
         repos = [mock_changed_git_files(["src/file1.cpp"])]
-        origin_build_variants = ["enterprise-rhel-62-64-bit"]
 
         config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, repos,
-                                     origin_build_variants)
+                                     selected_tests_variant_expansions, repos)
 
         self.assertIn("selected_tests_config.json", config_dict)
+
+        # assert that tasks are generated on all required build variants
+        build_variants_with_generated_tasks = json.loads(
+            config_dict["selected_tests_config.json"])["buildvariants"]
+        self.assertEqual(
+            len(build_variants_with_generated_tasks), len(evg_config.get_required_variants()))
+
         # jstests/auth/auth1.js belongs to two suites, auth and auth_audit, each of which has
         # fallback_num_sub_suites = 4 in their resmoke args, resulting in 4 subtasks being generated
-        # for each
-        self.assertEqual(len(config_dict), 9)
-        self.assertEqual(
-            sorted(config_dict.keys()), [
-                "auth_0.yml", "auth_1.yml", "auth_2.yml", "auth_3.yml", "auth_audit_4.yml",
-                "auth_audit_5.yml", "auth_audit_6.yml", "auth_audit_7.yml",
-                "selected_tests_config.json"
-            ])
+        # for each, hence 8 tasks total
+        rhel_62_with_generated_tasks = next(
+            (variant for variant in build_variants_with_generated_tasks
+             if variant["name"] == "enterprise-rhel-62-64-bit-dynamic-required"), None)
+        self.assertEqual(len(rhel_62_with_generated_tasks["tasks"]), 8)
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_when_task_mappings_are_found_for_changed_files(self):
@@ -117,21 +116,21 @@ class TestAcceptance(unittest.TestCase):
             "build_id": "my_build_id", "project": "mongodb-mongo-master"
         }
         repos = [mock_changed_git_files(["src/file1.cpp"])]
-        origin_build_variants = ["enterprise-rhel-62-64-bit"]
 
         config_dict = under_test.run(evg_api_mock, evg_config, selected_tests_service_mock,
-                                     selected_tests_variant_expansions, repos,
-                                     origin_build_variants)
+                                     selected_tests_variant_expansions, repos)
 
         self.assertIn("selected_tests_config.json", config_dict)
+
         # the auth task's generator task, auth_gen, has fallback_num_sub_suites = 4 in
-        # its resmoke args, resulting in 4 subtasks being generated, plus a _misc task
-        self.assertEqual(len(config_dict), 6)
-        self.assertEqual(
-            sorted(config_dict.keys()), [
-                "auth_0.yml", "auth_1.yml", "auth_2.yml", "auth_3.yml", "auth_misc.yml",
-                "selected_tests_config.json"
-            ])
+        # its resmoke args, resulting in 4 subtasks being generated, plus a _misc task, hence 5
+        # tasks total
+        build_variants_with_generated_tasks = json.loads(
+            config_dict["selected_tests_config.json"])["buildvariants"]
+        rhel_62_with_generated_tasks = next(
+            (variant for variant in build_variants_with_generated_tasks
+             if variant["name"] == "enterprise-rhel-62-64-bit-dynamic-required"), None)
+        self.assertEqual(len(rhel_62_with_generated_tasks["tasks"]), 5)
 
 
 class TestSelectedTestsConfigOptions(unittest.TestCase):

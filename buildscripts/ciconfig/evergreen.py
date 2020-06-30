@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime
 import distutils.spawn  # pylint: disable=no-name-in-module
 import re
+from typing import Set
 
 import yaml
 
@@ -83,6 +84,10 @@ class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attri
     def get_variant(self, variant_name: str) -> Variant:
         """Return the variant with the given name as a Variant instance."""
         return self._variants_by_name.get(variant_name)
+
+    def get_required_variants(self) -> Set[Variant]:
+        """Get the list of required build variants."""
+        return {variant for variant in self.variants if variant.is_required_variant()}
 
     def get_task_names_by_tag(self, tag):
         """Return the list of tasks that have the given tag."""
@@ -303,6 +308,10 @@ class Variant(object):
     def task_names(self):
         """Get list of task names."""
         return [t.name for t in self.tasks]
+
+    def is_required_variant(self) -> bool:
+        """Return True if the variant is a required variant."""
+        return self.display_name.startswith("! ")
 
     def get_task(self, task_name):
         """Return the task with the given name as an instance of VariantTask.
