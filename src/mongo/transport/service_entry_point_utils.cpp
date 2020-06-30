@@ -35,6 +35,7 @@
 
 #include <functional>
 #include <memory>
+#include <fmt/format.h>
 
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
@@ -112,10 +113,8 @@ Status launchServiceWorkerThread(std::function<void()> task) noexcept {
         pthread_attr_destroy(&attrs);
 
         if (failed) {
-            LOGV2(22948,
-                  "pthread_create failed: {errno}",
-                  "pthread_create failed",
-                  "error"_attr = errnoWithDescription(failed));
+            using namespace fmt::literals;
+            uassert(48509, "pthread_create failed: {}"_format(errnoWithDescription(failed)), failed);
             throw std::system_error(
                 std::make_error_code(std::errc::resource_unavailable_try_again));
         }
@@ -123,10 +122,14 @@ Status launchServiceWorkerThread(std::function<void()> task) noexcept {
         ctx.release();
 #endif
 
-    } catch (std::exception& e) {
-        std::string errormsg = "failed to create service entry worker thread, exception: ";
-        errormsg += e.what();
-        return {ErrorCodes::InternalError, errormsg};
+    } catch (const std::exception& e) {
+        LOGV2_ERROR(22948,
+                  "pthread_create failed: {errno}",
+                  "pthread_create failed");
+        return {
+            ErrorCodes::InternalError, 
+            str::stream() << "Failed to create service entry worker thread: "
+            << e.what()};
     }
 
     return Status::OK();
