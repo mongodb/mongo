@@ -189,6 +189,8 @@ public:
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
+    Timestamp getInitialDataTimestamp() const override;
+
     /**
      * This method will set the oldest timestamp and commit timestamp to the input value. Callers
      * must be serialized along with `setStableTimestamp`. If force=false, this function does not
@@ -379,9 +381,5 @@ private:
     AtomicWord<std::uint64_t> _oldestTimestamp;
     AtomicWord<std::uint64_t> _stableTimestamp;
     AtomicWord<std::uint64_t> _oplogNeededForRollback{Timestamp::min().asULL()};
-
-    // Timestamp of data at startup. Used internally to advise checkpointing and recovery to a
-    // timestamp. Provided by replication layer because WT does not persist timestamps.
-    AtomicWord<std::uint64_t> _initialDataTimestamp;
 };
 }

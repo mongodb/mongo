@@ -286,6 +286,9 @@ struct FixUpInfo {
     // after rollback the in-memory transaction table is cleared.
     bool refetchTransactionDocs = false;
 
+    // The local node's top of oplog prior to entering rollback.
+    OpTime localTopOfOplog;
+
     OpTime commonPoint;
     RecordId commonPointOurDiskloc;
 

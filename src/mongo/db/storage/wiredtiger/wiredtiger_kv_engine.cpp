@@ -1555,6 +1555,14 @@ void WiredTigerKVEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp)
     }
 }
 
+Timestamp WiredTigerKVEngine::getInitialDataTimestamp() const {
+    if (_checkpointThread) {
+        return Timestamp(_checkpointThread->getInitialDataTimestamp());
+    }
+
+    return Timestamp();
+}
+
 bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
     if (_ephemeral || !_keepDataHistory) {
         return false;
