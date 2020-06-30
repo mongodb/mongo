@@ -114,8 +114,7 @@ assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: 1}));
 assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));  // end the stepdown period.
 
 jsTestLog("Stepping the primary back up.");
-rst.stepUpNoAwaitReplication(primary);
-assert.eq(primary, rst.getPrimary());
+rst.stepUp(primary, {awaitReplicationBeforeStepUp: false});
 
 // Reconfig should now fail since the primary has not yet committed an op in its term.
 assert.eq(isConfigCommitted(primary), false);

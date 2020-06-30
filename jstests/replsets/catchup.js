@@ -65,9 +65,7 @@ let initialNewPrimaryStatus =
     assert.commandWorked(rst.getSecondary().adminCommand({serverStatus: 1}));
 
 // Should complete transition to primary immediately.
-var newPrimary = rst.stepUpNoAwaitReplication(rst.getSecondary());
-// Should win an election and finish the transition very quickly.
-assert.eq(newPrimary, rst.getPrimary());
+var newPrimary = rst.stepUp(rst.getSecondary(), {awaitReplicationBeforeStepUp: false});
 rst.awaitReplication();
 
 // Check that the 'numCatchUps' field has not been incremented in serverStatus.

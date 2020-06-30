@@ -948,7 +948,7 @@ var ReplSetTest = function(opts) {
 
             print("AwaitNodesAgreeOnPrimary: Nodes agreed on primary " + nodes[primary].name);
             return true;
-        }, "Awaiting nodes to agree on primary", timeout);
+        }, "Awaiting nodes to agree on primary timed out", timeout);
     };
 
     /**
@@ -1435,53 +1435,56 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * Steps up 'node' as primary.
-     * Waits for all nodes to reach the same optime before sending the replSetStepUp command
-     * to 'node'.
+     * Steps up 'node' as primary and by default it waits for the stepped up node to become a
+     * writable primary and waits for all nodes to reach the same optime before sending the
+     * replSetStepUp command to 'node'.
+     *
      * Calls awaitReplication() which requires all connections in 'nodes' to be authenticated.
+     * This stepUp() assumes that there is no network partition in the replica set.
      */
-    this.stepUp = function(node) {
-        assert.soon(() => {
+    this.stepUp = function(node, {
+        awaitReplicationBeforeStepUp: awaitReplicationBeforeStepUp = true,
+        awaitWritablePrimary: awaitWritablePrimary = true
+    } = {}) {
+        jsTest.log("ReplSetTest stepUp: Stepping up " + node.host);
+
+        if (awaitReplicationBeforeStepUp) {
             this.awaitReplication();
-            this.awaitNodesAgreeOnAppliedOpTime();
-            this.awaitNodesAgreeOnPrimary();
-            if (this.getPrimary() === node) {
-                return true;
-            }
+        }
 
-            jsTest.log("Stepping up: " + node.host + " in stepUp");
-
-            try {
-                assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
-            } catch (e) {
-                jsTestLog('Failed to step up node ' + node.host + ' in stepUp');
-                return false;
+        assert.soonNoExcept(() => {
+            const res = node.adminCommand({replSetStepUp: 1});
+            // This error is possible if we are running mongoDB binary < 3.4 as
+            // part of multi-version upgrade test. So, for those older branches,
+            // simply wait for the requested node to get elected as primary due
+            // to election timeout.
+            if (!res.ok && res.code === ErrorCodes.CommandNotFound) {
+                jsTest.log(
+                    'replSetStepUp command not supported on node ' + node.host +
+                    " ; so wait for the requested node to get elected due to election timeout.");
+                if (this.getPrimary() === node) {
+                    return true;
+                }
             }
-            this.awaitNodesAgreeOnPrimary();
-            if (this.getPrimary() === node) {
+            assert.commandWorked(res);
+
+            // Since assert.soon() timeout is 10 minutes (default), setting
+            // awaitNodesAgreeOnPrimary() timeout as 1 minute to allow retry of replSetStepUp
+            // command on failure of the replica set to agree on the primary.
+            const timeout = 60 * 100;
+            this.awaitNodesAgreeOnPrimary(timeout, this.nodes, this.getNodeId(node));
+
+            // getPrimary() guarantees that there will be only one writable primary for a replica
+            // set.
+            if (!awaitWritablePrimary || this.getPrimary() === node) {
                 return true;
             }
 
             jsTest.log(node.host + ' is not primary after stepUp command');
             return false;
         }, "Timed out while waiting for stepUp to succeed on node in port: " + node.port);
-    };
 
-    /**
-     * Steps up 'node' as primary.
-     */
-    this.stepUpNoAwaitReplication = function(node) {
-        jsTest.log("Stepping up: " + node.host + " in stepUpNoAwaitReplication");
-        assert.soonNoExcept(
-            function() {
-                assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
-                self.awaitNodesAgreeOnPrimary(
-                    self.kDefaultTimeoutMS, self.nodes, self.getNodeId(node));
-                return node.adminCommand('replSetGetStatus').myState === ReplSetTest.State.PRIMARY;
-            },
-            'failed to step up node ' + node.host + ' in stepUpNoAwaitReplication',
-            self.kDefaultTimeoutMS);
-
+        jsTest.log("ReplSetTest stepUp: Finished stepping up " + node.host);
         return node;
     };
 
@@ -3298,7 +3301,11 @@ var ReplSetTest = function(opts) {
 
         var existingNodes = conf.members.map(member => member.host);
         self.ports = existingNodes.map(node => node.split(':')[1]);
-        self.nodes = existingNodes.map(node => new Mongo(node));
+        self.nodes = existingNodes.map(node => {
+            let conn = new Mongo(node);
+            conn.name = conn.host;
+            return conn;
+        });
         self.waitForKeys = false;
         self.host = existingNodes[0].split(':')[0];
         self.name = conf._id;
