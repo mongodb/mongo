@@ -480,6 +480,11 @@ public:
     virtual void setInitialDataTimestamp(Timestamp timestamp) = 0;
 
     /**
+     * Returns the initial data timestamp.
+     */
+    virtual Timestamp getInitialDataTimestamp() = 0;
+
+    /**
      * Uses the current stable timestamp to set the oldest timestamp for which the storage engine
      * must maintain snapshot history through.
      *

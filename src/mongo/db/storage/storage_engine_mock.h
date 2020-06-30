@@ -137,6 +137,9 @@ public:
     }
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) final {}
     void setInitialDataTimestamp(Timestamp timestamp) final {}
+    Timestamp getInitialDataTimestamp() {
+        return Timestamp();
+    }
     void setOldestTimestampFromStable() final {}
     void setOldestTimestamp(Timestamp timestamp) final {}
     void setOldestActiveTransactionTimestampCallback(
