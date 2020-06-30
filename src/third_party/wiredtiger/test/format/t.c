@@ -159,6 +159,10 @@ main(int argc, char *argv[])
 
     (void)testutil_set_progname(argv);
 
+    /* The monitoring program looks for this line in the log file, push it out quickly. */
+    printf("%s: process %" PRIdMAX " running\n", progname, (intmax_t)getpid());
+    fflush(stdout);
+
     format_process_env();
 
     /* Set values from the command line. */
@@ -256,8 +260,6 @@ main(int argc, char *argv[])
 
     testutil_check(__wt_thread_str(g.tidbuf, sizeof(g.tidbuf)));
 
-    printf("%s: process %" PRIdMAX " running\n", progname, (intmax_t)getpid());
-    fflush(stdout);
     while (++g.run_cnt <= g.c_runs || g.c_runs == 0) {
         __wt_seconds(NULL, &start);
         track("starting up", 0ULL, NULL);
