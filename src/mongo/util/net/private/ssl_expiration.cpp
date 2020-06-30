@@ -34,20 +34,29 @@
 #include <string>
 
 #include "mongo/logv2/log.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 static const auto oneDay = Hours(24);
 
-CertificateExpirationMonitor::CertificateExpirationMonitor(Date_t date)
-    : _certExpiration(date), _lastCheckTime(Date_t::now()) {}
+std::unique_ptr<CertificateExpirationMonitor::CertificateExpirationMonitorTask>
+    CertificateExpirationMonitor::_task;
 
-std::string CertificateExpirationMonitor::taskName() const {
+void CertificateExpirationMonitor::updateExpirationDeadline(Date_t date) {
+    if (!_task) {
+        _task = std::make_unique<CertificateExpirationMonitorTask>();
+    }
+    stdx::lock_guard<Mutex> lock(_task->_mutex);
+    _task->_certExpiration = date;
+}
+
+std::string CertificateExpirationMonitor::CertificateExpirationMonitorTask::taskName() const {
     return "CertificateExpirationMonitor";
 }
 
-void CertificateExpirationMonitor::taskDoWork() {
+void CertificateExpirationMonitor::CertificateExpirationMonitorTask::taskDoWork() {
     const Milliseconds timeSinceLastCheck = Date_t::now() - _lastCheckTime;
 
     if (timeSinceLastCheck < oneDay)
@@ -56,6 +65,7 @@ void CertificateExpirationMonitor::taskDoWork() {
     const Date_t now = Date_t::now();
     _lastCheckTime = now;
 
+    stdx::lock_guard<Mutex> lock(_mutex);
     if (_certExpiration <= now) {
         // The certificate has expired.
         LOGV2_WARNING(23785,
@@ -68,7 +78,7 @@ void CertificateExpirationMonitor::taskDoWork() {
     const auto remainingValidDuration = _certExpiration - now;
 
     if (remainingValidDuration <= 30 * oneDay) {
-        // The certificate will expire in the next 30 days.
+        // The certificate will expire in the next 30 days
         LOGV2_WARNING(23786,
                       "Server certificate will expire on {certExpiration} in "
                       "{validDuration}.",

@@ -1294,8 +1294,8 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
             uassertStatusOK(
                 _sslConfiguration.setServerSubjectName(uassertStatusOK(certificateGetSubject(
                     _serverCtx.certs.get(), &_sslConfiguration.serverCertificateExpirationDate))));
-            static auto task =
-                CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
+            CertificateExpirationMonitor::updateExpirationDeadline(
+                _sslConfiguration.serverCertificateExpirationDate);
         }
     }
 

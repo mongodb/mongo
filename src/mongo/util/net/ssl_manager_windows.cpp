@@ -435,8 +435,8 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
         }
 
         // Monitor the server certificate's expiration
-        static CertificateExpirationMonitor task =
-            CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
+        CertificateExpirationMonitor::updateExpirationDeadline(
+            _sslConfiguration.serverCertificateExpirationDate);
     }
 
     uassertStatusOK(_initChainEngines(&_serverEngine));

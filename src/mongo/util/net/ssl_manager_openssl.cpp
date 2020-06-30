@@ -1381,8 +1381,8 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
 
         uassertStatusOK(_sslConfiguration.setServerSubjectName(std::move(serverSubjectName)));
 
-        static CertificateExpirationMonitor task =
-            CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
+        CertificateExpirationMonitor::updateExpirationDeadline(
+            _sslConfiguration.serverCertificateExpirationDate);
     }
 }
 
