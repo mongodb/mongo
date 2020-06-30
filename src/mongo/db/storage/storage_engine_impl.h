@@ -120,6 +120,8 @@ public:
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
+    virtual Timestamp getInitialDataTimestamp() override;
+
     virtual void setOldestTimestampFromStable() override;
 
     virtual void setOldestTimestamp(Timestamp newOldestTimestamp) override;
