@@ -78,4 +78,9 @@ server_parameters:
         default: 2048
         validator:
             gte: 1
+    disableLockFreeReads:
+        description: "Disables the lock-free reads feature."
+        set_at: [ startup ]
+        cpp_varname: 'storageGlobalParams.disableLockFreeReads'
+        default: true
 

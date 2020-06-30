@@ -499,11 +499,41 @@ Status storeMongodOptions(const moe::Environment& params) {
         // storage engines will continue to perform regular capped collection handling for the oplog
         // collection, regardless of this parameter setting.
         storageGlobalParams.allowOplogTruncation = false;
+
+        // Standalone mode does not currently support lock-free reads, so we disable it. If the user
+        // tries to explicitly enable it by specifying --disableLockFreeReads=false, log a warning
+        // so that the user knows the feature will not run in standalone mode.
+        if (!storageGlobalParams.disableLockFreeReads) {
+            LOGV2_WARNING(
+                4788400,
+                "Lock-free reads is not supported in standalone mode: disabling lock-free reads.");
+            storageGlobalParams.disableLockFreeReads = true;
+        }
     }
 
     if (params.count("replication.enableMajorityReadConcern")) {
         serverGlobalParams.enableMajorityReadConcern =
             params["replication.enableMajorityReadConcern"].as<bool>();
+
+        if (!serverGlobalParams.enableMajorityReadConcern) {
+            // Lock-free reads are not supported with enableMajorityReadConcern=false, so we disable
+            // them. If the user tries to explicitly enable lock-free reads by specifying
+            // disableLockFreeReads=false, log a warning so that the user knows these are not
+            // compatible settings.
+            if (!storageGlobalParams.disableLockFreeReads) {
+                LOGV2_WARNING(4788401,
+                              "Lock-free reads is not compatible with "
+                              "enableMajorityReadConcern=false: disabling lock-free reads.");
+                storageGlobalParams.disableLockFreeReads = true;
+            }
+        }
+    }
+
+    // TODO (SERVER-49464): remove this development only extra logging.
+    if (storageGlobalParams.disableLockFreeReads) {
+        LOGV2(4788402, "Lock-free reads is disabled.");
+    } else {
+        LOGV2(4788403, "Lock-free reads is enabled.");
     }
 
     if (params.count("replication.oplogSizeMB")) {
