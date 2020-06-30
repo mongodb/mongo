@@ -144,15 +144,6 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     return {std::move(optMetadata)};
 }
 
-ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription_DEPRECATED() {
-    auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
-
-    if (!optMetadata)
-        return {kUnshardedCollection};
-
-    return {std::move(optMetadata)};
-}
-
 boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadataIfKnown() {
     auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
     if (!optMetadata)

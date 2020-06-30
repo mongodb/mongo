@@ -55,9 +55,6 @@ public:
     ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override {
         return {kUnshardedCollection};
     }
-    ScopedCollectionDescription getCollectionDescription_DEPRECATED() override {
-        return {kUnshardedCollection};
-    }
     ScopedCollectionFilter getOwnershipFilter(OperationContext*,
                                               OrphanCleanupPolicy orphanCleanupPolicy) override {
         return {kUnshardedCollection};

@@ -76,7 +76,6 @@ public:
                                               OrphanCleanupPolicy orphanCleanupPolicy) override;
 
     ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override;
-    ScopedCollectionDescription getCollectionDescription_DEPRECATED() override;
 
     void checkShardVersionOrThrow(OperationContext* opCtx) override;
 

@@ -93,11 +93,6 @@ public:
      */
     virtual ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) = 0;
 
-    // TODO (SERVER-32198): This method must not be used in any new code because it does not provide
-    // the necessary guarantees that getCollectionDescription above does. Specifically, it silently
-    // treats UNKNOWN metadata as UNSHARDED, which can lead to data loss.
-    virtual ScopedCollectionDescription getCollectionDescription_DEPRECATED() = 0;
-
     /**
      * This method must be called with an OperationShardingState, which specifies an expected shard
      * version for the collection and it will invariant otherwise.
