@@ -98,10 +98,18 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
                   "repair",
                   "Dropping unfinished index after collection was modified by repair",
                   "index"_attr = indexName);
+
             WriteUnitOfWork wuow(opCtx);
-            catalog::removeIndex(
-                opCtx, indexName, collection->getCatalogId(), collection->uuid(), collection->ns());
+            // There are no concurrent users of the index while --repair is running, so it is OK to
+            // pass in a nullptr for the index 'ident', promising that the index is not in use.
+            catalog::removeIndex(opCtx,
+                                 indexName,
+                                 collection->getCatalogId(),
+                                 collection->uuid(),
+                                 collection->ns(),
+                                 nullptr /*ident */);
             wuow.commit();
+
             StorageRepairObserver::get(opCtx->getServiceContext())
                 ->invalidatingModification(str::stream()
                                            << "Dropped unfinished index '" << indexName << "' on "

@@ -297,6 +297,11 @@ public:
     virtual const RecordStore* getRecordStore() const = 0;
     virtual RecordStore* getRecordStore() = 0;
 
+    /**
+     * Fetches the Ident for this collection.
+     */
+    virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
+
     virtual const BSONObj getValidatorDoc() const = 0;
 
     virtual bool requiresIdIndex() const = 0;

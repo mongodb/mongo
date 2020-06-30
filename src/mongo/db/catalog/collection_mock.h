@@ -85,6 +85,9 @@ public:
     RecordStore* getRecordStore() {
         std::abort();
     }
+    std::shared_ptr<Ident> getSharedIdent() const {
+        std::abort();
+    }
 
     const BSONObj getValidatorDoc() const {
         std::abort();

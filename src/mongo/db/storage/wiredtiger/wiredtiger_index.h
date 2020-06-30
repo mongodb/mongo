@@ -93,6 +93,7 @@ public:
 
     WiredTigerIndex(OperationContext* ctx,
                     const std::string& uri,
+                    StringData ident,
                     const IndexDescriptor* desc,
                     KVPrefix prefix,
                     bool readOnly);
@@ -196,6 +197,7 @@ class WiredTigerIndexUnique : public WiredTigerIndex {
 public:
     WiredTigerIndexUnique(OperationContext* ctx,
                           const std::string& uri,
+                          StringData ident,
                           const IndexDescriptor* desc,
                           KVPrefix prefix,
                           bool readOnly = false);
@@ -256,6 +258,7 @@ class WiredTigerIndexStandard : public WiredTigerIndex {
 public:
     WiredTigerIndexStandard(OperationContext* ctx,
                             const std::string& uri,
+                            StringData ident,
                             const IndexDescriptor* desc,
                             KVPrefix prefix,
                             bool readOnly = false);

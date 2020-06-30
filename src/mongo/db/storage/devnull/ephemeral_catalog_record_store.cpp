@@ -266,12 +266,13 @@ private:
 //
 
 EphemeralForTestRecordStore::EphemeralForTestRecordStore(StringData ns,
+                                                         StringData identName,
                                                          std::shared_ptr<void>* dataInOut,
                                                          bool isCapped,
                                                          int64_t cappedMaxSize,
                                                          int64_t cappedMaxDocs,
                                                          CappedCallback* cappedCallback)
-    : RecordStore(ns),
+    : RecordStore(ns, identName),
       _isCapped(isCapped),
       _cappedMaxSize(cappedMaxSize),
       _cappedMaxDocs(cappedMaxDocs),

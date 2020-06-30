@@ -167,7 +167,7 @@ public:
     }
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
-                             StringData ident) final {}
+                             std::shared_ptr<Ident> ident) final {}
     Status currentFilesCompatible(OperationContext* opCtx) const final {
         return Status::OK();
     }

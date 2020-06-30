@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+class Ident;
 class OperationContext;
 class NamespaceString;
 
@@ -45,12 +46,18 @@ namespace catalog {
  * Passthrough to DurableCatalog::removeIndex to execute the first phase of drop by removing the
  * index catalog entry, then registers an onCommit hook to schedule the second phase of drop to
  * delete the index data.
+ *
+ * Uses 'ident' shared_ptr to ensure that the second phase of drop (data table drop) will not
+ * execute until no users of the index (shared owners) remain. 'ident' is allowed to be a nullptr,
+ * in which case the caller guarantees that there are no remaining users of the index. This handles
+ * situations wherein there is no in-memory state available for an index, such as during repair.
  */
 void removeIndex(OperationContext* opCtx,
                  StringData indexName,
                  RecordId collectionCatalogId,
                  UUID collectionUUID,
-                 const NamespaceString& nss);
+                 const NamespaceString& nss,
+                 std::shared_ptr<Ident> ident);
 
 /**
  * Performs two-phase collection drop.
@@ -58,11 +65,15 @@ void removeIndex(OperationContext* opCtx,
  * Passthrough to DurableCatalog::dropCollection to execute the first phase of drop by removing the
  * collection entry, then registers and onCommit hook to schedule the second phase of drop to delete
  * the collection data.
+ *
+ * Uses 'ident' shared_ptr to ensure that the second phase of drop (data table drop) will not
+ * execute until no users of the collection record store (shared owners) remain. 'ident' is not
+ * allowed to be nullptr.
  */
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       RecordId collectionCatalogId,
-                      StringData ident);
+                      std::shared_ptr<Ident> ident);
 
 
 }  // namespace catalog

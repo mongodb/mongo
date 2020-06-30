@@ -36,6 +36,7 @@
 #include "mongo/db/storage/storage_util.h"
 
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
@@ -47,12 +48,20 @@ void removeIndex(OperationContext* opCtx,
                  StringData indexName,
                  RecordId collectionCatalogId,
                  UUID collectionUUID,
-                 const NamespaceString& nss) {
-    const std::string indexIdent =
-        DurableCatalog::get(opCtx)->getIndexIdent(opCtx, collectionCatalogId, indexName);
+                 const NamespaceString& nss,
+                 std::shared_ptr<Ident> ident) {
+    auto durableCatalog = DurableCatalog::get(opCtx);
+
+    // If a nullptr was passed in for 'ident', then there is no in-memory state. In that case,
+    // create an otherwise unreferenced Ident for the ident reaper to use: the reaper will not need
+    // to wait for existing users to finish.
+    if (!ident) {
+        ident = std::make_shared<Ident>(
+            durableCatalog->getIndexIdent(opCtx, collectionCatalogId, indexName));
+    }
 
     // Run the first phase of drop to remove the catalog entry.
-    DurableCatalog::get(opCtx)->removeIndex(opCtx, collectionCatalogId, indexName);
+    durableCatalog->removeIndex(opCtx, collectionCatalogId, indexName);
 
     // The OperationContext may not be valid when the RecoveryUnit executes the onCommit handlers.
     // Therefore, anything that would normally be fetched from the opCtx must be passed in
@@ -71,7 +80,7 @@ void removeIndex(OperationContext* opCtx,
                                      collectionUUID,
                                      nss,
                                      indexNameStr = indexName.toString(),
-                                     indexIdent](boost::optional<Timestamp> commitTimestamp) {
+                                     ident](boost::optional<Timestamp> commitTimestamp) {
         if (storageEngine->supportsPendingDrops() && commitTimestamp) {
             LOGV2(22206,
                   "Deferring table drop for index '{index}' on collection "
@@ -80,12 +89,12 @@ void removeIndex(OperationContext* opCtx,
                   "index"_attr = indexNameStr,
                   logAttrs(nss),
                   "uuid"_attr = collectionUUID,
-                  "ident"_attr = indexIdent,
+                  "ident"_attr = ident->getIdent(),
                   "commitTimestamp"_attr = commitTimestamp);
-            storageEngine->addDropPendingIdent(*commitTimestamp, nss, indexIdent);
+            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident);
         } else {
             auto kvEngine = storageEngine->getEngine();
-            kvEngine->dropIdent(opCtx, recoveryUnit, indexIdent).ignore();
+            kvEngine->dropIdent(opCtx, recoveryUnit, ident->getIdent()).ignore();
         }
     });
 }
@@ -93,7 +102,9 @@ void removeIndex(OperationContext* opCtx,
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       RecordId collectionCatalogId,
-                      StringData ident) {
+                      std::shared_ptr<Ident> ident) {
+    invariant(ident);
+
     // Run the first phase of drop to remove the catalog entry.
     Status status = DurableCatalog::get(opCtx)->dropCollection(opCtx, collectionCatalogId);
     if (!status.isOK()) {
@@ -111,25 +122,24 @@ Status dropCollection(OperationContext* opCtx,
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successuflly committed.
-    opCtx->recoveryUnit()->onCommit(
-        [opCtx, recoveryUnit, storageEngine, nss, identStr = ident.toString()](
-            boost::optional<Timestamp> commitTimestamp) {
-            if (storageEngine->supportsPendingDrops() && commitTimestamp) {
-                LOGV2(22214,
-                      "Deferring table drop for collection '{namespace}'. Ident: {ident}, "
-                      "commit timestamp: {commitTimestamp}",
-                      "Deferring table drop for collection",
-                      logAttrs(nss),
-                      "ident"_attr = identStr,
-                      "commitTimestamp"_attr = commitTimestamp);
-                storageEngine->addDropPendingIdent(*commitTimestamp, nss, identStr);
-            } else {
-                // Intentionally ignoring failure here. Since we've removed the metadata pointing to
-                // the collection, we should never see it again anyway.
-                auto kvEngine = storageEngine->getEngine();
-                kvEngine->dropIdent(opCtx, recoveryUnit, identStr).ignore();
-            }
-        });
+    opCtx->recoveryUnit()->onCommit([opCtx, recoveryUnit, storageEngine, nss, ident](
+                                        boost::optional<Timestamp> commitTimestamp) {
+        if (storageEngine->supportsPendingDrops() && commitTimestamp) {
+            LOGV2(22214,
+                  "Deferring table drop for collection '{namespace}'. Ident: {ident}, "
+                  "commit timestamp: {commitTimestamp}",
+                  "Deferring table drop for collection",
+                  logAttrs(nss),
+                  "ident"_attr = ident->getIdent(),
+                  "commitTimestamp"_attr = commitTimestamp);
+            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident);
+        } else {
+            // Intentionally ignoring failure here. Since we've removed the metadata pointing to
+            // the collection, we should never see it again anyway.
+            auto kvEngine = storageEngine->getEngine();
+            kvEngine->dropIdent(opCtx, recoveryUnit, ident->getIdent()).ignore();
+        }
+    });
 
     return Status::OK();
 }

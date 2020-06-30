@@ -57,18 +57,14 @@ public:
 
 class DevNullRecordStore : public RecordStore {
 public:
-    DevNullRecordStore(StringData ns, const CollectionOptions& options)
-        : RecordStore(ns), _options(options) {
+    DevNullRecordStore(StringData ns, StringData identName, const CollectionOptions& options)
+        : RecordStore(ns, identName), _options(options) {
         _numInserts = 0;
         _dummy = BSON("_id" << 1);
     }
 
     virtual const char* name() const {
         return "devnull";
-    }
-
-    const std::string& getIdent() const override {
-        return _ident;
     }
 
     virtual void setCappedCallback(CappedCallback*) {}
@@ -154,7 +150,6 @@ private:
     CollectionOptions _options;
     long long _numInserts;
     BSONObj _dummy;
-    std::string _ident;
 };
 
 class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
@@ -171,8 +166,9 @@ public:
 
 class DevNullSortedDataInterface : public SortedDataInterface {
 public:
-    DevNullSortedDataInterface()
-        : SortedDataInterface(KeyString::Version::kLatestVersion, Ordering::make(BSONObj())) {}
+    DevNullSortedDataInterface(StringData identName)
+        : SortedDataInterface(
+              identName, KeyString::Version::kLatestVersion, Ordering::make(BSONObj())) {}
 
     virtual ~DevNullSortedDataInterface() {}
 
@@ -228,19 +224,19 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
                                                              StringData ident,
                                                              const CollectionOptions& options) {
     if (ident == "_mdb_catalog") {
-        return std::make_unique<EphemeralForTestRecordStore>(ns, &_catalogInfo);
+        return std::make_unique<EphemeralForTestRecordStore>(ns, ident, &_catalogInfo);
     }
-    return std::make_unique<DevNullRecordStore>(ns, options);
+    return std::make_unique<DevNullRecordStore>(ns, ident, options);
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                        StringData ident) {
-    return std::make_unique<DevNullRecordStore>("", CollectionOptions());
+    return std::make_unique<DevNullRecordStore>("" /* ns */, ident, CollectionOptions());
 }
 
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
     OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
-    return std::make_unique<DevNullSortedDataInterface>();
+    return std::make_unique<DevNullSortedDataInterface>(ident);
 }
 
 namespace {

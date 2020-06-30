@@ -493,10 +493,8 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
           "namespace"_attr = nss,
           "uuid"_attr = uuid);
 
-    auto status = catalog::dropCollection(opCtx,
-                                          collection->ns(),
-                                          collection->getCatalogId(),
-                                          collection->getRecordStore()->getIdent());
+    auto status = catalog::dropCollection(
+        opCtx, collection->ns(), collection->getCatalogId(), collection->getSharedIdent());
     if (!status.isOK())
         return status;
 

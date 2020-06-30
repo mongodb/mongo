@@ -42,9 +42,11 @@
 
 namespace mongo {
 
+class Ident;
+
 /**
  * This class manages idents in the KV storage engine that are marked as drop-pending by the
- * two-phase algorithm.
+ * two-phase index/collection drop algorithm.
  *
  * Replicated collections and indexes that are dropped are not permanently removed from the storage
  * system when the drop request is first processed. The catalog entry is removed to render the
@@ -55,6 +57,11 @@ namespace mongo {
  * On receiving a notification that the oldest timestamp queued has advanced and become part of the
  * checkpoint, some drop-pending idents will become safe to remove permanently. The function
  * dropldentsOlderThan() is provided for this purpose.
+ *
+ * Additionally, the reaper will not drop an ident (record store) while any other references to the
+ * Ident passed in via addDropPendingIdent remain. This ensures that there are no remaining
+ * concurrent operations still using the record store, which is essential because a data drop is
+ * unversioned: once it is dropped, it is gone for all readers.
  */
 class KVDropPendingIdentReaper {
     KVDropPendingIdentReaper(const KVDropPendingIdentReaper&) = delete;
@@ -67,10 +74,14 @@ public:
     /**
      * Adds a new drop-pending ident, with its drop timestamp and namespace, to be managed by this
      * class.
+     *
+     * When the timestamp is old enough -- the op cannot be rolled back nor new users access the
+     * record store data -- and no remaining operations reference the 'ident', then the
+     * index/collection data will be safe to drop unversioned.
      */
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
-                             StringData ident);
+                             std::shared_ptr<Ident> ident);
 
     /**
      * Returns earliest drop timestamp in '_dropPendingIdents'.
@@ -82,13 +93,11 @@ public:
      * Returns drop-pending idents in a sorted set.
      * Used by the storage engine during catalog reconciliation.
      */
-    std::set<std::string> getAllIdents() const;
+    std::set<std::string> getAllIdentNames() const;
 
     /**
      * Notifies this class that the storage engine has advanced its oldest timestamp.
-     * Drops all drop-pending idents with drop timestamps before 'ts'.
-     * After this function returns, all entries in '_dropPendingIdents' will have drop
-     * timestamps more recent than 'ts'.
+     * Drops all unreferenced drop-pending idents with drop timestamps before 'ts'.
      */
     void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts);
 
@@ -99,14 +108,24 @@ public:
     void clearDropPendingState();
 
 private:
+    // Contains information identifying what collection/index data to drop as well as determining
+    // when to do so.
+    using IdentInfo = struct {
+        // Used for logging purposes.
+        NamespaceString nss;
+
+        // Identifier for the storage to drop the associated collection or index data.
+        std::string identName;
+
+        // The collection or index data can be safely dropped when no references to this token
+        // remain.
+        std::weak_ptr<void> dropToken;
+    };
+
     // Container type for drop-pending namespaces. We use a multimap so that we can order the
     // namespaces by drop optime. Additionally, it is possible for certain user operations (such
     // as renameCollection across databases) to generate more than one drop-pending namespace for
     // the same drop optime.
-    using IdentInfo = struct {
-        NamespaceString nss;
-        std::string ident;
-    };
     using DropPendingIdents = std::multimap<Timestamp, IdentInfo>;
 
     // Used to access the KV engine for the purposes of dropping the ident.

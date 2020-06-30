@@ -91,7 +91,7 @@ public:
         string uri = "table:" + ns;
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
-        return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc, prefix);
+        return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, "" /* ident */, &desc, prefix);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) final {
@@ -123,8 +123,10 @@ public:
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique)
-            return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc, prefix);
-        return std::make_unique<WiredTigerIndexStandard>(&opCtx, uri, &desc, prefix);
+            return std::make_unique<WiredTigerIndexUnique>(
+                &opCtx, uri, "" /* ident */, &desc, prefix);
+        return std::make_unique<WiredTigerIndexStandard>(
+            &opCtx, uri, "" /* ident */, &desc, prefix);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

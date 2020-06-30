@@ -58,7 +58,6 @@ public:
     ~RecordStore() = default;
 
     virtual const char* name() const;
-    virtual const std::string& getIdent() const;
     virtual long long dataSize(OperationContext* opCtx) const;
     virtual long long numRecords(OperationContext* opCtx) const;
     virtual bool isCapped() const;
@@ -134,7 +133,6 @@ private:
     const int64_t _cappedMaxSize;
     const int64_t _cappedMaxDocs;
 
-    std::string _identStr;
     StringData _ident;
 
     std::string _prefix;

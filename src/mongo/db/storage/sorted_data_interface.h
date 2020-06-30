@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
 
@@ -51,10 +52,10 @@ struct ValidateResults;
  * queries. The actual implementation is up to the storage engine. All the storage engines must
  * support an index key size up to the maximum document size.
  */
-class SortedDataInterface {
+class SortedDataInterface : public Ident {
 public:
-    SortedDataInterface(KeyString::Version keyStringVersion, Ordering ordering)
-        : _keyStringVersion(keyStringVersion), _ordering(ordering) {}
+    SortedDataInterface(StringData ident, KeyString::Version keyStringVersion, Ordering ordering)
+        : Ident(ident), _keyStringVersion(keyStringVersion), _ordering(ordering) {}
 
     virtual ~SortedDataInterface() {}
 

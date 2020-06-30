@@ -428,7 +428,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     }
     std::set<std::string> internalIdentsToDrop;
 
-    auto dropPendingIdents = _dropPendingIdentReaper.getAllIdents();
+    auto dropPendingIdents = _dropPendingIdentReaper.getAllIdentNames();
 
     // Drop all idents in the storage engine that are not known to the catalog. This can happen in
     // the case of a collection or index creation being rolled back.
@@ -723,8 +723,6 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     Status firstError = Status::OK();
     WriteUnitOfWork untimestampedDropWuow(opCtx);
     for (auto& nss : toDrop) {
-        auto durableCatalog = getCatalog();
-        invariant(durableCatalog);
         auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
 
         // No need to remove the indexes from the IndexCatalog because eliminating the Collection
@@ -737,11 +735,12 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
                                  ice->descriptor()->indexName(),
                                  coll->getCatalogId(),
                                  coll->uuid(),
-                                 coll->ns());
+                                 coll->ns(),
+                                 ice->accessMethod()->getSharedIdent());
         }
 
         Status result = catalog::dropCollection(
-            opCtx, coll->ns(), coll->getCatalogId(), coll->getRecordStore()->getIdent());
+            opCtx, coll->ns(), coll->getCatalogId(), coll->getSharedIdent());
         if (!result.isOK() && firstError.isOK()) {
             firstError = result;
         }
@@ -999,7 +998,7 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
 
 void StorageEngineImpl::addDropPendingIdent(const Timestamp& dropTimestamp,
                                             const NamespaceString& nss,
-                                            StringData ident) {
+                                            std::shared_ptr<Ident> ident) {
     _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident);
 }
 

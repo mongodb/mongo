@@ -36,6 +36,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_data.h"
 
 namespace mongo {
@@ -199,12 +200,12 @@ public:
  * This class must be thread-safe. In addition, for storage engines implementing the KVEngine some
  * methods must be thread safe, see DurableCatalog.
  */
-class RecordStore {
+class RecordStore : public Ident {
     RecordStore(const RecordStore&) = delete;
     RecordStore& operator=(const RecordStore&) = delete;
 
 public:
-    RecordStore(StringData ns) : _ns(ns.toString()) {}
+    RecordStore(StringData ns, StringData identName) : Ident(identName), _ns(ns.toString()) {}
 
     virtual ~RecordStore() {}
 
@@ -224,8 +225,6 @@ public:
     bool isTemp() const {
         return ns().size() == 0;
     }
-
-    virtual const std::string& getIdent() const = 0;
 
     /**
      * The dataSize is an approximation of the sum of the sizes (in bytes) of the

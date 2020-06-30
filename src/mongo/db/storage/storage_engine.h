@@ -442,12 +442,13 @@ public:
     virtual void clearDropPendingState() = 0;
 
     /**
-     * Adds 'ident' to a list of indexes/collections whose data will be dropped when the
-     * 'dropTimestamp' is sufficiently old to ensure no future data accesses.
+     * Adds 'ident' to a list of indexes/collections whose data will be dropped when:
+     * - the dropTimestamp' is sufficiently old to ensure no future data accesses
+     * - and no holders of 'ident' remain (the index/collection is no longer in active use)
      */
     virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
                                      const NamespaceString& nss,
-                                     StringData ident) = 0;
+                                     std::shared_ptr<Ident> ident) = 0;
 
     /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case

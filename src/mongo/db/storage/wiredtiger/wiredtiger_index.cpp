@@ -245,10 +245,12 @@ int WiredTigerIndex::Drop(OperationContext* opCtx, const std::string& uri) {
 
 WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  const std::string& uri,
+                                 StringData ident,
                                  const IndexDescriptor* desc,
                                  KVPrefix prefix,
                                  bool isReadOnly)
-    : SortedDataInterface(_handleVersionInfo(ctx, uri, desc, isReadOnly),
+    : SortedDataInterface(ident,
+                          _handleVersionInfo(ctx, uri, desc, isReadOnly),
                           Ordering::make(desc->keyPattern())),
       _uri(uri),
       _tableId(WiredTigerSession::genTableId()),
@@ -1373,10 +1375,11 @@ private:
 
 WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              const std::string& uri,
+                                             StringData ident,
                                              const IndexDescriptor* desc,
                                              KVPrefix prefix,
                                              bool isReadOnly)
-    : WiredTigerIndex(ctx, uri, desc, prefix, isReadOnly), _partial(desc->isPartial()) {}
+    : WiredTigerIndex(ctx, uri, ident, desc, prefix, isReadOnly), _partial(desc->isPartial()) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexUnique::newCursor(
     OperationContext* opCtx, bool forward) const {
@@ -1808,10 +1811,11 @@ void WiredTigerIndexUnique::_unindexTimestampSafe(OperationContext* opCtx,
 
 WiredTigerIndexStandard::WiredTigerIndexStandard(OperationContext* ctx,
                                                  const std::string& uri,
+                                                 StringData ident,
                                                  const IndexDescriptor* desc,
                                                  KVPrefix prefix,
                                                  bool isReadOnly)
-    : WiredTigerIndex(ctx, uri, desc, prefix, isReadOnly) {}
+    : WiredTigerIndex(ctx, uri, ident, desc, prefix, isReadOnly) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexStandard::newCursor(
     OperationContext* opCtx, bool forward) const {

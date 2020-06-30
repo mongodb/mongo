@@ -96,6 +96,10 @@ public:
         return _recordStore.get();
     }
 
+    std::shared_ptr<Ident> getSharedIdent() const final {
+        return _recordStore;
+    }
+
     const BSONObj getValidatorDoc() const final {
         return _validator.validatorDoc.getOwned();
     }
@@ -393,7 +397,7 @@ private:
     bool _committed = true;
 
     // The RecordStore may be null during a repair operation.
-    std::unique_ptr<RecordStore> _recordStore;  // owned
+    std::shared_ptr<RecordStore> _recordStore;  // shared across all Collection instances.
     const bool _needCappedLock;
     std::unique_ptr<IndexCatalog> _indexCatalog;
 

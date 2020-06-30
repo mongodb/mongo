@@ -799,9 +799,8 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
                                              OperationContext* ctx,
                                              Params params)
-    : RecordStore(params.ns),
+    : RecordStore(params.ns, params.ident),
       _uri(WiredTigerKVEngine::kTableUriPrefix + params.ident),
-      _ident(params.ident),
       _tableId(WiredTigerSession::genTableId()),
       _engineName(params.engineName),
       _isCapped(params.isCapped),
@@ -823,7 +822,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _sizeStorer(params.sizeStorer),
       _tracksSizeAdjustments(params.tracksSizeAdjustments),
       _kvEngine(kvEngine) {
-    invariant(_ident.size() > 0);
+    invariant(getIdent().size() > 0);
 
     Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
                                ctx, _uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)
@@ -855,7 +854,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         // The oplog always needs to be marked for size adjustment since it is journaled and also
         // may change during replication recovery (if truncated).
         sizeRecoveryState(getGlobalServiceContext())
-            .markCollectionAsAlwaysNeedsSizeAdjustment(_ident);
+            .markCollectionAsAlwaysNeedsSizeAdjustment(getIdent());
     }
 
     // If no SizeStorer is in use, start counting at zero. In practice, this will only ever be the
@@ -910,9 +909,9 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
                            "record store as needing size adjustment during recovery. ns: "
                            "{isTemp_temp_ns}, ident: {ident}",
                            "isTemp_temp_ns"_attr = (isTemp() ? "(temp)" : ns()),
-                           "ident"_attr = _ident);
+                           "ident"_attr = getIdent());
         sizeRecoveryState(getGlobalServiceContext())
-            .markCollectionAsAlwaysNeedsSizeAdjustment(_ident);
+            .markCollectionAsAlwaysNeedsSizeAdjustment(getIdent());
         _sizeInfo->dataSize.store(0);
         _sizeInfo->numRecords.store(0);
     }
@@ -1100,7 +1099,7 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx,
     // replication recovery. If we don't mark the collection for size adjustment then we will not
     // perform the capped deletions as expected. In that case, the collection is guaranteed to be
     // empty at the stable timestamp and thus guaranteed to be marked for size adjustment.
-    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(_ident)) {
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(getIdent())) {
         return 0;
     }
 
@@ -1884,7 +1883,8 @@ void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
                                                    long long numRecords,
                                                    long long dataSize) {
     // We're correcting the size as of now, future writes should be tracked.
-    sizeRecoveryState(getGlobalServiceContext()).markCollectionAsAlwaysNeedsSizeAdjustment(_ident);
+    sizeRecoveryState(getGlobalServiceContext())
+        .markCollectionAsAlwaysNeedsSizeAdjustment(getIdent());
 
     _sizeInfo->numRecords.store(numRecords);
     _sizeInfo->dataSize.store(dataSize);
@@ -1954,7 +1954,7 @@ void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t d
         return;
     }
 
-    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(_ident)) {
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(getIdent())) {
         return;
     }
 
@@ -1981,7 +1981,7 @@ void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t a
         return;
     }
 
-    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(_ident)) {
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(getIdent())) {
         return;
     }
 

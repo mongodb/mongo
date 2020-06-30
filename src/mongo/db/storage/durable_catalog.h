@@ -143,7 +143,7 @@ public:
                                     bool stayTemp) = 0;
 
     /**
-     * Deletes the collection catalog entry identified by 'catalogId'.
+     * Deletes the persisted collection catalog entry identified by 'catalogId'.
      *
      * Expects (invariants) that all of the index catalog entries have been removed already via
      * removeIndex.
@@ -203,7 +203,7 @@ public:
                                  StringData validationAction) = 0;
 
     /**
-     * Removes the 'indexName' index catalog entry from the collection catalog entry identified by
+     * Removes the index 'indexName' from the persisted collection catalog entry identified by
      * 'catalogId'.
      */
     virtual void removeIndex(OperationContext* opCtx, RecordId catalogId, StringData indexName) = 0;

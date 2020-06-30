@@ -815,6 +815,10 @@ SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {
     return _newInterface.get();
 }
 
+std::shared_ptr<Ident> AbstractIndexAccessMethod::getSharedIdent() const {
+    return _newInterface;
+}
+
 /**
  * Generates a new file name on each call using a static, atomic and monotonically increasing
  * number.

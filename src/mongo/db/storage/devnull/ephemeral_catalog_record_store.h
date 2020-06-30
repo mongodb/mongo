@@ -49,6 +49,7 @@ namespace mongo {
 class EphemeralForTestRecordStore : public RecordStore {
 public:
     explicit EphemeralForTestRecordStore(StringData ns,
+                                         StringData identName,
                                          std::shared_ptr<void>* dataInOut,
                                          bool isCapped = false,
                                          int64_t cappedMaxSize = -1,
@@ -56,10 +57,6 @@ public:
                                          CappedCallback* cappedCallback = nullptr);
 
     virtual const char* name() const;
-
-    const std::string& getIdent() const override {
-        return ns();
-    }
 
     virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const;
 

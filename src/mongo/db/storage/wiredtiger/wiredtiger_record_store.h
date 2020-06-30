@@ -225,10 +225,6 @@ public:
         return _uri;
     }
 
-    const std::string& getIdent() const override {
-        return _ident;
-    }
-
     uint64_t tableId() const {
         return _tableId;
     }
@@ -343,7 +339,6 @@ private:
     int64_t _cappedDeleteAsNeeded_inlock(OperationContext* opCtx, const RecordId& justInserted);
 
     const std::string _uri;
-    const std::string _ident;
     const uint64_t _tableId;  // not persisted
 
     // Canonical engine name to use for retrieving options

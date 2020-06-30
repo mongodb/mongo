@@ -505,11 +505,15 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                     return s;
                 }
             } else {
+                // There are no concurrent users of the index during startup recovery, so it is OK
+                // to pass in a nullptr for the index 'ident', promising that the index is not in
+                // use.
                 catalog::removeIndex(opCtx,
                                      indexNames[i],
                                      collection->getCatalogId(),
                                      collection->uuid(),
-                                     collection->ns());
+                                     collection->ns(),
+                                     nullptr /* ident */);
             }
         }
 

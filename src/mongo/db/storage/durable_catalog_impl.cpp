@@ -960,8 +960,6 @@ void DurableCatalogImpl::removeIndex(OperationContext* opCtx,
     if (md.findIndexOffset(indexName) < 0)
         return;  // never had the index so nothing to do.
 
-    const string ident = getIndexIdent(opCtx, catalogId, indexName);
-
     md.eraseIndex(indexName);
     putMetaData(opCtx, catalogId, md);
 }
