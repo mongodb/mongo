@@ -5863,7 +5863,7 @@ TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
     simulateSuccessfulV1Election();
 
     Timestamp stableTimestamp;
-    long long term = 2;
+    long long term = 1;
 
     getStorageInterface()->supportsDocLockingBool = true;
     getStorageInterface()->allDurableTimestamp = Timestamp(2, 1);
@@ -6623,7 +6623,7 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     ASSERT_OK(replMetadata.getStatus());
     ASSERT_EQ(replMetadata.getValue().getLastOpCommitted().opTime, optime1);
     ASSERT_EQ(replMetadata.getValue().getLastOpCommitted().wallTime, wallTime1);
-    ASSERT_EQ(replMetadata.getValue().getLastOpVisible(), OpTime());
+    ASSERT_EQ(replMetadata.getValue().getLastOpVisible(), optime1);
     ASSERT_EQ(replMetadata.getValue().getConfigVersion(), 2);
     ASSERT_EQ(replMetadata.getValue().getConfigTerm(), 0);
     ASSERT_EQ(replMetadata.getValue().getTerm(), 0);
@@ -7073,40 +7073,6 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     ASSERT_EQ(2, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 }
 
-TEST_F(ReplCoordTest, AdvanceCommittedSnapshotToMostRecentSnapshotPriorToOpTimeWhenOpTimeChanges) {
-    init("mySet");
-
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                     << "test1:1234"))),
-                       HostAndPort("test1", 1234));
-
-    auto opCtx = makeOperationContext();
-    runSingleNodeElection(opCtx.get());
-
-    OpTime time1(Timestamp(100, 1), 1);
-    OpTime time2(Timestamp(100, 2), 1);
-    OpTime time3(Timestamp(100, 3), 1);
-    OpTime time4(Timestamp(100, 4), 1);
-    OpTime time5(Timestamp(100, 5), 1);
-    OpTime time6(Timestamp(100, 6), 1);
-
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(100));
-    replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
-    replCoordSetMyLastAppliedOpTime(time5, Date_t() + Seconds(100));
-
-    // ensure current snapshot follows price is right rules (closest but not greater than)
-
-    replCoordSetMyLastDurableOpTime(time3, Date_t() + Seconds(100));
-    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshotOpTime());
-    replCoordSetMyLastDurableOpTime(time4, Date_t() + Seconds(100));
-    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshotOpTime());
-    replCoordSetMyLastDurableOpTime(time5, Date_t() + Seconds(100));
-    ASSERT_EQUALS(time5, getReplCoord()->getCurrentCommittedSnapshotOpTime());
-}
-
 TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
     init("mySet");
 
@@ -7293,6 +7259,8 @@ TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelieve
              << "protocolVersion" << 1 << "settings"
              << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000)),
         HostAndPort("test1", 1234));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
     OpTime optime(Timestamp(100, 2), 0);
     replCoordSetMyLastAppliedOpTime(optime, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(optime, Date_t() + Seconds(100));
@@ -7363,6 +7331,8 @@ TEST_F(ReplCoordTest, UpdatePositionCmdHasMetadata) {
              << "protocolVersion" << 1 << "settings"
              << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000)),
         HostAndPort("test1", 1234));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
     OpTime optime(Timestamp(100, 2), 0);
     replCoordSetMyLastAppliedOpTime(optime, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(optime, Date_t() + Seconds(100));

@@ -4931,20 +4931,64 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_recalculateStabl
         invariant(snapshotOpTime <= commitPoint.opTime);
     }
 
-    // When majority read concern is disabled, the stable opTime is set to the lastApplied, rather
-    // than the commit point.
+    //
+    // The stable timestamp must be a "consistent" timestamp with respect to the oplog. Intuitively,
+    // it must be a timestamp at which the oplog history is "set in stone" i.e. no writes will
+    // commit at earlier timestamps. More precisely, it must be a timestamp T such that future
+    // writers only commit at times greater than T and readers only read at, or earlier than, T.  We
+    // refer to this timestamp as the "no-overlap" point, since it is the timestamp that delineates
+    // these non overlapping readers and writers. The calculation of this value differs on primary
+    // and secondary nodes due to their distinct behaviors, as described below.
+    //
+
+    // On a primary node that supports document level locking, oplog writes may commit out of
+    // timestamp order, which can lead to the creation of oplog "holes". On a primary the
+    // all_durable timestamp tracks the newest timestamp T such that no future transactions will
+    // commit behind T. Since all_durable is a timestamp, however, without a term, we need to
+    // construct an optime with a proper term. If we are primary, then the all_durable should always
+    // correspond to a timestamp at or newer than the first write completed by this node as primary,
+    // since we write down a new oplog entry before allowing writes as a new primary. Thus, it can
+    // be assigned the current term of this primary.
+    OpTime allDurableOpTime = OpTime::max();
+    if (_readWriteAbility->canAcceptNonLocalWrites(lk) && _storage->supportsDocLocking(_service)) {
+        allDurableOpTime =
+            OpTime(_storage->getAllDurableTimestamp(getServiceContext()), _topCoord->getTerm());
+    }
+
+    // On a secondary, oplog entries are written in parallel, and so may be written out of timestamp
+    // order. Because of this, the stable timestamp must not fall in the middle of a batch while it
+    // is being applied. To prevent this we ensure the no-overlap point does not surpass the
+    // lastApplied, which is only advanced at the end of secondary batch application.
+    OpTime noOverlap = std::min(_topCoord->getMyLastAppliedOpTime(), allDurableOpTime);
+
+    // The stable optime must always be less than or equal to the no overlap point. When majority
+    // reads are enabled, the stable optime must also not surpass the majority commit point. When
+    // majority reads are disabled, the stable optime is not required to be majority committed.
+    boost::optional<OpTimeAndWallTime> stableOpTime;
     auto maximumStableOpTime = serverGlobalParams.enableMajorityReadConcern
         ? commitPoint
         : _topCoord->getMyLastAppliedOpTimeAndWallTime();
 
-    // Compute the current stable optime.
-    auto stableOpTime =
-        _chooseStableOpTimeFromCandidates(lk, _stableOpTimeCandidates, maximumStableOpTime);
+    // Make sure the stable optime does not surpass its maximum.
+    stableOpTime = OpTimeAndWallTime(std::min(noOverlap, maximumStableOpTime.opTime), Date_t());
+
+    // Keep EMRC=false behavior the same for now.
+    // TODO (SERVER-47844) Don't use stable optime candidates here.
+    if (!serverGlobalParams.enableMajorityReadConcern) {
+        stableOpTime =
+            _chooseStableOpTimeFromCandidates(lk, _stableOpTimeCandidates, maximumStableOpTime);
+    }
+
     if (stableOpTime) {
-        // Check that the selected stable optime does not exceed our maximum.
+        // Check that the selected stable optime does not exceed our maximum and that it does not
+        // surpass the no-overlap point.
         invariant(stableOpTime.get().opTime.getTimestamp() <=
                   maximumStableOpTime.opTime.getTimestamp());
         invariant(stableOpTime.get().opTime <= maximumStableOpTime.opTime);
+        if (serverGlobalParams.enableMajorityReadConcern) {
+            invariant(stableOpTime.get().opTime.getTimestamp() <= noOverlap.getTimestamp());
+            invariant(stableOpTime.get().opTime <= noOverlap);
+        }
     }
 
     return stableOpTime;
@@ -4957,8 +5001,43 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
         LOGV2_DEBUG(21395, 2, "Not setting stable timestamp for storage");
         return;
     }
+
+    // Don't update the stable optime if we are in initial sync. We advance the oldest timestamp
+    // continually to the lastApplied optime during initial sync oplog application, so if we learned
+    // about an earlier commit point during this period, we would risk setting the stable timestamp
+    // behind the oldest timestamp, which is prohibited in the storage engine. Note that we don't
+    // take stable checkpoints during initial sync, so the stable timestamp during this period
+    // doesn't play a functionally important role anyway.
+    auto memberState = _getMemberState_inlock();
+    if (memberState.startup2()) {
+        LOGV2_DEBUG(
+            2139501, 2, "Not updating stable timestamp", "state"_attr = memberState.toString());
+        return;
+    }
+
     // Get the current stable optime.
     auto stableOpTime = _recalculateStableOpTime(lk);
+
+    // Don't update the stable timestamp if it is earlier than the initial data timestamp.
+    // Timestamps before the initialDataTimestamp are not consistent and so are not safe to use for
+    // the stable timestamp or the committed snapshot, which is the timestamp used by majority
+    // readers. This also prevents us from setting the stable timestamp behind the oldest timestamp
+    // after leaving initial sync, since the initialDataTimestamp and oldest timestamp will be equal
+    // after initial sync oplog application has completed.
+    auto initialDataTimestamp = _service->getStorageEngine()->getInitialDataTimestamp();
+    if (stableOpTime && stableOpTime->opTime.getTimestamp() < initialDataTimestamp) {
+        LOGV2_DEBUG(2139504,
+                    2,
+                    "Not updating stable timestamp since it is less than the initialDataTimestamp",
+                    "stableTimestamp"_attr = stableOpTime->opTime.getTimestamp(),
+                    "initialDataTimestamp"_attr = initialDataTimestamp);
+        return;
+    }
+
+    if (stableOpTime && stableOpTime->opTime.getTimestamp().isNull()) {
+        LOGV2_DEBUG(2139502, 2, "Not updating stable timestamp to a null timestamp");
+        return;
+    }
 
     // If there is a valid stable optime, set it for the storage engine, and then remove any
     // old, unneeded stable optime candidates.

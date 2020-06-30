@@ -425,13 +425,6 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
         stableTimestamp = _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
     }
 
-    const auto appliedThrough = _consistencyMarkers->getAppliedThrough(opCtx);
-    invariant(!stableTimestamp || stableTimestamp->isNull() || appliedThrough.isNull() ||
-                  *stableTimestamp == appliedThrough.getTimestamp(),
-              str::stream() << "Stable timestamp " << stableTimestamp->toString()
-                            << " does not equal appliedThrough timestamp "
-                            << appliedThrough.toString());
-
     // This may take an IS lock on the oplog collection.
     _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, stableTimestamp);
 
@@ -446,6 +439,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     fassert(40290, topOfOplogSW);
     const auto topOfOplog = topOfOplogSW.getValue();
 
+    const auto appliedThrough = _consistencyMarkers->getAppliedThrough(opCtx);
     if (stableTimestamp) {
         invariant(supportsRecoveryTimestamp);
         _recoverFromStableTimestamp(opCtx, *stableTimestamp, appliedThrough, topOfOplog);
