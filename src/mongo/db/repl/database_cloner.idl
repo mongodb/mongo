@@ -28,8 +28,7 @@
 global:
     cpp_namespace: mongo::repl
     cpp_includes:
-      - "mongo/db/catalog/collection_options.h"
-      - "mongo/db/repl/database_cloner.h"
+      - "mongo/db/repl/database_cloner_common.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -39,7 +38,7 @@ types:
       description: "CollectionOptions as passed to createCollection()"
       cpp_type: "mongo::CollectionOptions"
       bson_serialization_type: object
-      deserializer: mongo::repl::DatabaseCloner::parseCollectionOptions
+      deserializer: mongo::repl::parseCollectionOptionsForDatabaseCloner
       serializer: mongo::CollectionOptions::toBSON
       
 structs:

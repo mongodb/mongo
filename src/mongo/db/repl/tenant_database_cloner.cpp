@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -33,90 +33,47 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/repl/database_cloner.h"
-#include "mongo/db/repl/database_cloner_common.h"
 #include "mongo/db/repl/database_cloner_gen.h"
+#include "mongo/db/repl/tenant_collection_cloner.h"
+#include "mongo/db/repl/tenant_database_cloner.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {
 
-DatabaseCloner::DatabaseCloner(const std::string& dbName,
-                               InitialSyncSharedData* sharedData,
-                               const HostAndPort& source,
-                               DBClientConnection* client,
-                               StorageInterface* storageInterface,
-                               ThreadPool* dbPool)
-    : BaseCloner("DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+TenantDatabaseCloner::TenantDatabaseCloner(const std::string& dbName,
+                                           InitialSyncSharedData* sharedData,
+                                           const HostAndPort& source,
+                                           DBClientConnection* client,
+                                           StorageInterface* storageInterface,
+                                           ThreadPool* dbPool)
+    : BaseCloner("TenantDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
-      _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage) {
+      _listCollectionsStage("listCollections", this, &TenantDatabaseCloner::listCollectionsStage) {
     invariant(!dbName.empty());
     _stats.dbname = dbName;
 }
 
-BaseCloner::ClonerStages DatabaseCloner::getStages() {
+BaseCloner::ClonerStages TenantDatabaseCloner::getStages() {
     return {&_listCollectionsStage};
 }
 
-void DatabaseCloner::preStage() {
+void TenantDatabaseCloner::preStage() {
     stdx::lock_guard<Latch> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
 }
 
-BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
-    BSONObj res;
-    auto collectionInfos =
-        getClient()->getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
-
-    stdx::unordered_set<std::string> seen;
-    for (auto&& info : collectionInfos) {
-        ListCollectionResult result;
-        try {
-            result = ListCollectionResult::parse(
-                IDLParserErrorContext("DatabaseCloner::listCollectionsStage"), info);
-        } catch (const DBException& e) {
-            uasserted(
-                ErrorCodes::FailedToParse,
-                e.toStatus()
-                    .withContext(str::stream() << "Collection info could not be parsed : " << info)
-                    .reason());
-        }
-        NamespaceString collectionNamespace(_dbName, result.getName());
-        if (collectionNamespace.isSystem() && !collectionNamespace.isLegalClientSystemNS()) {
-            LOGV2_DEBUG(21146,
-                        1,
-                        "Skipping 'system' collection: {namespace}",
-                        "Database cloner skipping 'system' collection",
-                        "namespace"_attr = collectionNamespace.ns());
-            continue;
-        }
-        LOGV2_DEBUG(21147,
-                    2,
-                    "Allowing cloning of collectionInfo: {info}",
-                    "Allowing cloning of collectionInfo",
-                    "info"_attr = info);
-
-        bool isDuplicate = seen.insert(result.getName().toString()).second;
-        uassert(51005,
-                str::stream() << "collection info contains duplicate collection name "
-                              << "'" << result.getName() << "': " << info,
-                isDuplicate);
-
-        // While UUID is a member of CollectionOptions, listCollections does not return the
-        // collectionUUID there as part of the options, but instead places it in the 'info' field.
-        // We need to move it back to CollectionOptions to create the collection properly.
-        result.getOptions().uuid = result.getInfo().getUuid();
-        _collections.emplace_back(collectionNamespace, result.getOptions());
-    }
+BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
+    // TODO(SERVER-48816): Implement this stage.
     return kContinueNormally;
 }
 
-bool DatabaseCloner::isMyFailPoint(const BSONObj& data) const {
+bool TenantDatabaseCloner::isMyFailPoint(const BSONObj& data) const {
     return data["database"].str() == _dbName && BaseCloner::isMyFailPoint(data);
 }
 
-void DatabaseCloner::postStage() {
+void TenantDatabaseCloner::postStage() {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.collections = _collections.size();
@@ -131,29 +88,26 @@ void DatabaseCloner::postStage() {
         auto& collectionOptions = coll.second;
         {
             stdx::lock_guard<Latch> lk(_mutex);
-            _currentCollectionCloner = std::make_unique<CollectionCloner>(sourceNss,
-                                                                          collectionOptions,
-                                                                          getSharedData(),
-                                                                          getSource(),
-                                                                          getClient(),
-                                                                          getStorageInterface(),
-                                                                          getDBPool());
+            _currentCollectionCloner =
+                std::make_unique<TenantCollectionCloner>(sourceNss,
+                                                         collectionOptions,
+                                                         getSharedData(),
+                                                         getSource(),
+                                                         getClient(),
+                                                         getStorageInterface(),
+                                                         getDBPool());
         }
         auto collStatus = _currentCollectionCloner->run();
         if (collStatus.isOK()) {
-            LOGV2_DEBUG(21148,
-                        1,
-                        "collection clone finished: {namespace}",
-                        "Collection clone finished",
-                        "namespace"_attr = sourceNss);
+            LOGV2_DEBUG(
+                4881600, 1, "Tenant collection clone finished", "namespace"_attr = sourceNss);
         } else {
-            LOGV2_ERROR(21149,
-                        "collection clone for '{namespace}' failed due to {error}",
-                        "Collection clone failed",
+            LOGV2_ERROR(4881601,
+                        "Tenant collection clone failed",
                         "namespace"_attr = sourceNss,
                         "error"_attr = collStatus.toString());
             setInitialSyncFailedStatus(
-                {ErrorCodes::InitialSyncFailure,
+                {collStatus.code(),
                  collStatus
                      .withContext(str::stream()
                                   << "Error cloning collection '" << sourceNss.toString() << "'")
@@ -163,7 +117,7 @@ void DatabaseCloner::postStage() {
             stdx::lock_guard<Latch> lk(_mutex);
             _stats.collectionStats[_stats.clonedCollections] = _currentCollectionCloner->getStats();
             _currentCollectionCloner = nullptr;
-            // Abort the database cloner if the collection clone failed.
+            // Abort the tenant database cloner if the collection clone failed.
             if (!collStatus.isOK())
                 return;
             _stats.clonedCollections++;
@@ -173,27 +127,27 @@ void DatabaseCloner::postStage() {
     _stats.end = getSharedData()->getClock()->now();
 }
 
-DatabaseCloner::Stats DatabaseCloner::getStats() const {
+TenantDatabaseCloner::Stats TenantDatabaseCloner::getStats() const {
     stdx::lock_guard<Latch> lk(_mutex);
-    DatabaseCloner::Stats stats = _stats;
+    TenantDatabaseCloner::Stats stats = _stats;
     if (_currentCollectionCloner) {
         stats.collectionStats[_stats.clonedCollections] = _currentCollectionCloner->getStats();
     }
     return stats;
 }
 
-std::string DatabaseCloner::Stats::toString() const {
+std::string TenantDatabaseCloner::Stats::toString() const {
     return toBSON().toString();
 }
 
-BSONObj DatabaseCloner::Stats::toBSON() const {
+BSONObj TenantDatabaseCloner::Stats::toBSON() const {
     BSONObjBuilder bob;
     bob.append("dbname", dbname);
     append(&bob);
     return bob.obj();
 }
 
-void DatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
+void TenantDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
     builder->appendNumber("collections", collections);
     builder->appendNumber("clonedCollections", clonedCollections);
     if (start != Date_t()) {

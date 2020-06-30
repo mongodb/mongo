@@ -689,8 +689,8 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/fail_point',
-        'initial_syncer',
         'data_replicator_external_state_initial_sync',
+        'initial_syncer',
         'repl_coordinator_interface',
         'repl_settings',
         'replica_set_messages',
@@ -698,6 +698,7 @@ env.Library(
         'replication_process',
         'reporter',
         'scatter_gather',
+        'tenant_migration_cloners',
         'topology_coordinator',
     ],
     LIBDEPS_PRIVATE=[
@@ -967,16 +968,16 @@ env.Library(
     target='initial_sync_cloners',
     source=[
         'all_database_cloner.cpp',
-        'base_cloner.cpp',
         'collection_cloner.cpp',
         'database_cloner.cpp',
-        env.Idlc('database_cloner.idl')[0]
     ],
     LIBDEPS = [
-        'task_runner',
+        'base_cloner',
+        'database_cloner_common',
         'initial_sync_shared_data',
         'member_data',
         'replication_consistency_markers_impl',
+        'task_runner',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
@@ -985,12 +986,27 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
         'replication_auth',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/index_build_entry_helpers',
         '$BUILD_DIR/mongo/util/progress_meter',
+    ]
+)
+
+env.Library(
+    target='tenant_migration_cloners',
+    source=[
+        'tenant_collection_cloner.cpp',
+        'tenant_database_cloner.cpp',
+    ],
+    LIBDEPS = [
+        'base_cloner',
+        'database_cloner_common',
+        'initial_sync_shared_data',
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
     ]
 )
 
@@ -1081,6 +1097,38 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.Library(
+    target='base_cloner',
+    source=[
+        'base_cloner.cpp',
+    ],
+    LIBDEPS=[
+        'initial_sync_shared_data',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/util/fail_point',
+    ],
+    LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
+        'replication_consistency_markers_impl',
+    ]
+)
+
+env.Library(
+    target='database_cloner_common',
+    source=[
+        'database_cloner_common.cpp',
+        env.Idlc('database_cloner.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ]
 )
 
