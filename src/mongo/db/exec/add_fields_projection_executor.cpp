@@ -223,31 +223,20 @@ std::unique_ptr<AddFieldsProjectionExecutor> AddFieldsProjectionExecutor::create
 
 void AddFieldsProjectionExecutor::parse(const BSONObj& spec) {
     for (auto elem : spec) {
-        auto fieldName = elem.fieldNameStringData();
+        // The field name might be a dotted path.
+        auto fieldPath = FieldPath(elem.fieldNameStringData());
 
         if (elem.type() == BSONType::Object) {
             // This is either an expression, or a nested specification.
-            if (parseObjectAsExpression(fieldName, elem.Obj(), _expCtx->variablesParseState)) {
+            if (parseObjectAsExpression(fieldPath, elem.Obj(), _expCtx->variablesParseState)) {
                 // It was an expression.
             } else {
-                // The field name might be a dotted path. If so, we need to keep adding children
-                // to our tree until we create a child that represents that path.
-                auto remainingPath = FieldPath(elem.fieldName());
-                auto* child = _root.get();
-                while (remainingPath.getPathLength() > 1) {
-                    child = child->addOrGetChild(remainingPath.getFieldName(0).toString());
-                    remainingPath = remainingPath.tail();
-                }
-                // It is illegal to construct an empty FieldPath, so the above loop ends one
-                // iteration too soon. Add the last path here.
-                child = child->addOrGetChild(remainingPath.fullPath());
-                parseSubObject(elem.Obj(), _expCtx->variablesParseState, child);
+                parseSubObject(elem.Obj(), _expCtx->variablesParseState, fieldPath);
             }
         } else {
             // This is a literal or regular value.
             _root->addExpressionForPath(
-                FieldPath(elem.fieldName()),
-                Expression::parseOperand(_expCtx, elem, _expCtx->variablesParseState));
+                fieldPath, Expression::parseOperand(_expCtx, elem, _expCtx->variablesParseState));
         }
     }
 }
@@ -263,7 +252,7 @@ Document AddFieldsProjectionExecutor::applyProjection(const Document& inputDoc) 
 }
 
 bool AddFieldsProjectionExecutor::parseObjectAsExpression(
-    StringData pathToObject,
+    const FieldPath& pathToObject,
     const BSONObj& objSpec,
     const VariablesParseState& variablesParseState) {
     if (objSpec.firstElementFieldName()[0] == '$') {
@@ -278,29 +267,25 @@ bool AddFieldsProjectionExecutor::parseObjectAsExpression(
 
 void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
                                                  const VariablesParseState& variablesParseState,
-                                                 InclusionNode* node) {
+                                                 const FieldPath& pathToObj) {
     for (auto&& elem : subObj) {
-        invariant(elem.fieldName()[0] != '$');
+        auto fieldName = elem.fieldNameStringData();
+        invariant(fieldName[0] != '$');
         // Dotted paths in a sub-object have already been detected and disallowed by the function
         // ProjectionSpecValidator::validate().
-        invariant(elem.fieldNameStringData().find('.') == std::string::npos);
+        invariant(fieldName.find('.') == std::string::npos);
 
+        auto currentPath = pathToObj.concat(fieldName);
         if (elem.type() == BSONType::Object) {
             // This is either an expression, or a nested specification.
-            auto fieldName = elem.fieldNameStringData().toString();
-            if (!parseObjectAsExpression(
-                    FieldPath::getFullyQualifiedPath(node->getPath(), fieldName),
-                    elem.Obj(),
-                    variablesParseState)) {
+            if (!parseObjectAsExpression(currentPath, elem.Obj(), variablesParseState)) {
                 // It was a nested subobject
-                auto* child = node->addOrGetChild(fieldName);
-                parseSubObject(elem.Obj(), variablesParseState, child);
+                parseSubObject(elem.Obj(), variablesParseState, currentPath);
             }
         } else {
             // This is a literal or regular value.
-            node->addExpressionForPath(
-                FieldPath(elem.fieldName()),
-                Expression::parseOperand(_expCtx, elem, variablesParseState));
+            _root->addExpressionForPath(
+                currentPath, Expression::parseOperand(_expCtx, elem, variablesParseState));
         }
     }
 }

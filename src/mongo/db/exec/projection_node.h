@@ -58,6 +58,9 @@ public:
      * 'path' is allowed to be dotted, and is assumed not to conflict with another path already in
      * the tree. For example, it is an error to add the path "a.b" from a tree which has already
      * added a computed field "a".
+     *
+     * Note: This function can only be called from the root of the tree. This will ensure that all
+     * the node properties are set correctly along the path from root to expression leaf.
      */
     void addProjectionForPath(const FieldPath& path);
 
@@ -74,14 +77,12 @@ public:
      * 'path' is allowed to be dotted, and is assumed not to conflict with another path already in
      * the tree. For example, it is an error to add the path "a.b" as a computed field to a tree
      * which has already projected the field "a".
+     *
+     * Note: This function can only be called from the root of the tree. Every node needs to know
+     * whether it has an expression as a descendent, so by adding nodes only from the root, this
+     * flag can be set correctly along the path from root to expression leaf.
      */
     void addExpressionForPath(const FieldPath& path, boost::intrusive_ptr<Expression> expr);
-
-    /**
-     * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted. Returns
-     * the child node if it already exists, or the newly-created child otherwise.
-     */
-    ProjectionNode* addOrGetChild(const std::string& field);
 
     /**
      * Applies all projections and expressions, if applicable, and returns the resulting document.
@@ -133,6 +134,12 @@ public:
                    MutableDocument* output) const;
 
 protected:
+    /**
+     * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted. Returns
+     * the child node if it already exists, or the newly-created child otherwise.
+     */
+    ProjectionNode* addOrGetChild(const std::string& field);
+
     // Returns a unique_ptr to a new instance of the implementing class for the given 'fieldName'.
     virtual std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const = 0;
 
@@ -194,6 +201,16 @@ private:
     void makeOptimizationsStale() {
         _maxFieldsToProject = boost::none;
     }
+
+    /**
+     * Internal helper function for addExpressionForPath().
+     */
+    void _addExpressionForPath(const FieldPath& path, boost::intrusive_ptr<Expression> expr);
+
+    /**
+     * Internal helper function for addProjectionForPath().
+     */
+    void _addProjectionForPath(const FieldPath& path);
 
     // Our projection semantics are such that all field additions need to be processed in the order
     // specified. '_orderToProcessAdditionsAndChildren' tracks that order.
