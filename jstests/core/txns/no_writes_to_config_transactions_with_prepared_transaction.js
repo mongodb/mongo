@@ -70,11 +70,24 @@ transactionEntry = config.transactions.findOne();
 assert(transactionEntry);
 
 jsTestLog("Test that dropping config.transactions fails when there is a prepared transaction" +
-          " on the session");
+          " present");
+jsTestLog("[1] collection drop in the same session");
 assert.commandFailedWithCode(assert.throws(function() {
                                               sessionConfigDB.transactions.drop();
                                           }),
-                                          40528);
+                                          [4852500, 40528]);
+jsTestLog("[2] collection drop not in a session");
+assert.commandFailedWithCode(assert.throws(function() {
+                                              config.transactions.drop();
+                                          }),
+                                          4852500);
+
+jsTestLog("Test that dropping the config db fails when there is a prepared transaction" +
+          " present");
+jsTestLog("[3] database drop in the same session");
+assert.commandFailedWithCode(sessionConfigDB.dropDatabase(), [4852500, 40528]);
+jsTestLog("[4] database drop not in a session");
+assert.commandFailedWithCode(config.dropDatabase(), 4852500);
 
 jsTestLog("Test that we can prepare a transaction on a different session");
 const session2 = db.getMongo().startSession({causalConsistency: false});
