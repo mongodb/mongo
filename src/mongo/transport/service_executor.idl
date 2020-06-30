@@ -37,59 +37,13 @@ server_parameters:
     cpp_vartype: "AtomicWord<int>"
     cpp_varname: "synchronousServiceExecutorRecursionLimit"
     default: 8
-  adaptiveServiceExecutorReservedThreads:
-    description: >-
-        The executor will always keep this many threads around.
-        If the value is -1, then it will be set to number of cores / 2.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "adaptiveServiceExecutorReservedThreads"
-    default: -1
-  adaptiveServiceExecutorRunTimeMillis:
-    description: >-
-        Each worker thread will allow ASIO to run for this many milliseconds
-        before checking whether it should exit.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "adaptiveServiceExecutorRunTimeMillis"
-    default: 5000
-  adaptiveServiceExecutorRunTimeJitterMillis:
-    description: >-
-        The period that a worker thread runs will be offset by at most this value
-        so that not all threads are scheduled at the same time.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "adaptiveServiceExecutorRunTimeJitterMillis"
-    default: 500
-  adaptiveServiceExecutorStuckThreadTimeoutMillis:
-    description: >-
-        The maximum amount of time the controller thread will sleep
-        before doing any stuck-thread detection.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "adaptiveServiceExecutorStuckThreadTimeoutMillis"
-    default: 250
-  adaptiveServiceExecutorMaxQueueLatencyMicros:
-    description: >-
-        The maximum allowed latency between when a task is scheduled
-        and a thread is started to service it.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "adaptiveServiceExecutorMaxQueueLatencyMicros"
-    default: 500
-  adaptiveServiceExecutorIdlePctThreshold:
-    description: >-
-        The percent boundary of work time over run time below which worker threads will exit.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "adaptiveServiceExecutorIdlePctThreshold"
-    default: 60
-  adaptiveServiceExecutorRecursionLimit:
+
+  fixedServiceExecutorRecursionLimit:
     description: >-
         Tasks may recurse further if their recursion depth is less than this value.
     set_at: [ startup, runtime ]
     cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "adaptiveServiceExecutorRecursionLimit"
+    cpp_varname: "fixedServiceExecutorRecursionLimit"
     default: 8
 
   reservedServiceExecutorRecursionLimit:
