@@ -25,6 +25,7 @@ error_categories:
     # desirable to maintain a connection with the client. The server will close the connection to
     # get the client to through server selection again.
     - CloseConnectionError
+    - VersionedAPIError
 
 error_codes:
     - {code: 0,name: OK}
@@ -385,6 +386,11 @@ error_codes:
 
     - {code: 320, name: TenantMigrationConflict}
     - {code: 321, name: TenantMigrationCommitted}
+    
+    - {code: 322, name: APIVersionError, categories: [VersionedAPIError]}
+    - {code: 323, name: APIStrictError, categories: [VersionedAPIError]}
+    - {code: 324, name: APIDeprecationError, categories: [VersionedAPIError]}
+   
 
     # Error codes 4000-8999 are reserved.
 
