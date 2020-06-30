@@ -1139,12 +1139,12 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesSForAdminS) {
     ASSERT(opCtx->lockState()->getLockMode(resourceIdAdminDB) == MODE_S);
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockTakesXForAdminIX) {
+TEST_F(DConcurrencyTestFixture, DBLockTakesIXForAdminIX) {
     auto opCtx = makeOperationContext();
     getClient()->swapLockState(std::make_unique<LockerImpl>());
     Lock::DBLock dbWrite(opCtx.get(), "admin", MODE_IX);
 
-    ASSERT(opCtx->lockState()->getLockMode(resourceIdAdminDB) == MODE_X);
+    ASSERT(opCtx->lockState()->getLockMode(resourceIdAdminDB) == MODE_IX);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesXForAdminX) {

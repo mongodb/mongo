@@ -202,12 +202,6 @@ Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Date
           opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, deadline, InterruptBehavior::kThrow) {
     massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
 
-    // The check for the admin db is to ensure direct writes to auth collections
-    // are serialized (see SERVER-16092).
-    if ((_id == resourceIdAdminDB) && !isSharedLockMode(_mode)) {
-        _mode = MODE_X;
-    }
-
     _opCtx->lockState()->lock(_opCtx, _id, _mode, deadline);
     _result = LOCK_OK;
 }
