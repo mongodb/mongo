@@ -48,8 +48,7 @@
     assert.eq(testNodeServerStatus.electionMetrics.averageCatchUpOps, 4);
 
     // Step up another node temporarily.
-    const tempPrimary = rst.stepUpNoAwaitReplication(rst.getSecondaries()[0]);
-    assert.eq(tempPrimary, rst.getPrimary());
+    const tempPrimary = rst.stepUp(rst.getSecondaries()[0]);
     rst.awaitReplication();
 
     // Step up the testNode and force it to catchup again.

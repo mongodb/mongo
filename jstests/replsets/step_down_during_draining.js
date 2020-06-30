@@ -92,7 +92,7 @@ load("jstests/replsets/rslib.js");
         1000);
 
     reconnect(secondary);
-    replSet.stepUpNoAwaitReplication(secondary);
+    replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
 
     // Secondary doesn't allow writes yet.
     var res = secondary.getDB("admin").runCommand({"isMaster": 1});
@@ -108,10 +108,10 @@ load("jstests/replsets/rslib.js");
 
     // Original primary steps up.
     reconnect(primary);
-    replSet.stepUpNoAwaitReplication(primary);
+    replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
 
     reconnect(secondary);
-    replSet.stepUpNoAwaitReplication(secondary);
+    replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
 
     // Disable fail point to allow replication.
     secondaries.forEach(disableFailPoint);
