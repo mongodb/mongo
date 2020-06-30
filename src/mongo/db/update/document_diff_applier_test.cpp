@@ -62,7 +62,7 @@ TEST(DiffApplierTest, DeleteSimple) {
     builder.addDelete("f2");
     builder.addDelete("f3");
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
 
     checkDiff(preImage, BSON("foo" << 2), diff);
 }
@@ -71,11 +71,13 @@ TEST(DiffApplierTest, InsertSimple) {
     const BSONObj preImage(BSON("f1" << 1 << "foo" << 2 << "f2" << 3));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
+    StringData newField = "newField";
+
     DocumentDiffBuilder builder;
     builder.addInsert("f1", storage["a"]);
-    builder.addInsert("newField", storage["b"]);
+    builder.addInsert(newField, storage["b"]);
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
     checkDiff(preImage, BSON("foo" << 2 << "f2" << 3 << "f1" << 1 << "newField" << 2), diff);
 }
 
@@ -83,11 +85,13 @@ TEST(DiffApplierTest, UpdateSimple) {
     const BSONObj preImage(BSON("f1" << 0 << "foo" << 2 << "f2" << 3));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
+    StringData newField = "newField";
+
     DocumentDiffBuilder builder;
     builder.addUpdate("f1", storage["a"]);
-    builder.addUpdate("newField", storage["b"]);
+    builder.addUpdate(newField, storage["b"]);
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
     checkDiff(preImage, BSON("f1" << 1 << "foo" << 2 << "f2" << 3 << "newField" << 2), diff);
 }
 
@@ -98,13 +102,13 @@ TEST(DiffApplierTest, SubObjDiffSimple) {
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
     DocumentDiffBuilder builder;
     {
-        DocumentDiffBuilder sub(builder.startSubObjDiff("obj"));
-        sub.addDelete("dField");
-        sub.addInsert("iField", storage["a"]);
-        sub.addUpdate("uField", storage["b"]);
+        auto subBuilderGuard = builder.startSubObjDiff("obj");
+        subBuilderGuard.builder()->addDelete("dField");
+        subBuilderGuard.builder()->addInsert("iField", storage["a"]);
+        subBuilderGuard.builder()->addUpdate("uField", storage["b"]);
     }
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
     checkDiff(
         preImage, BSON("obj" << BSON("uField" << 2 << "iField" << 1) << "otherField" << 0), diff);
 }
@@ -113,14 +117,16 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithAppend) {
     const BSONObj preImage(BSON("arr" << BSON_ARRAY(999 << 999 << 999 << 999)));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
+    StringData arr = "arr";
+
     DocumentDiffBuilder builder;
     {
-        ArrayDiffBuilder sub(builder.startSubArrDiff("arr"));
-        sub.addUpdate(1, storage["a"]);
-        sub.addUpdate(4, storage["b"]);
+        auto subBuilderGuard = builder.startSubArrDiff(arr);
+        subBuilderGuard.builder()->addUpdate(1, storage["a"]);
+        subBuilderGuard.builder()->addUpdate(4, storage["b"]);
     }
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
 
     checkDiff(preImage, BSON("arr" << BSON_ARRAY(999 << 1 << 999 << 999 << 2)), diff);
 }
@@ -129,14 +135,16 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithTruncate) {
     const BSONObj preImage(BSON("arr" << BSON_ARRAY(999 << 999 << 999 << 999)));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
+    StringData arr = "arr";
+
     DocumentDiffBuilder builder;
     {
-        ArrayDiffBuilder sub(builder.startSubArrDiff("arr"));
-        sub.addUpdate(1, storage["a"]);
-        sub.setResize(3);
+        auto subBuilderGuard = builder.startSubArrDiff(arr);
+        subBuilderGuard.builder()->addUpdate(1, storage["a"]);
+        subBuilderGuard.builder()->setResize(3);
     }
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
     checkDiff(preImage, BSON("arr" << BSON_ARRAY(999 << 1 << 999)), diff);
 }
 
@@ -144,29 +152,32 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithNullPadding) {
     const BSONObj preImage(BSON("arr" << BSON_ARRAY(0)));
 
     BSONObj storage(BSON("a" << 1));
+    StringData arr = "arr";
+
     DocumentDiffBuilder builder;
     {
-        ArrayDiffBuilder sub(builder.startSubArrDiff("arr"));
-        sub.addUpdate(3, storage["a"]);
+        auto subBuilderGuard = builder.startSubArrDiff(arr);
+        subBuilderGuard.builder()->addUpdate(3, storage["a"]);
     }
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
 
     checkDiff(preImage, BSON("arr" << BSON_ARRAY(0 << NullLabeler{} << NullLabeler{} << 1)), diff);
 }
 
 TEST(DiffApplierTest, NestedSubObjUpdateScalar) {
     BSONObj storage(BSON("a" << 1));
+    StringData subObj = "subObj";
     DocumentDiffBuilder builder;
     {
-        DocumentDiffBuilder sub(builder.startSubObjDiff("subObj"));
+        auto subBuilderGuard = builder.startSubObjDiff(subObj);
         {
-            DocumentDiffBuilder subSub(sub.startSubObjDiff("subObj"));
-            subSub.addUpdate("a", storage["a"]);
+            auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(subObj);
+            subSubBuilderGuard.builder()->addUpdate("a", storage["a"]);
         }
     }
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
 
     // Check the case where the object matches the structure we expect.
     BSONObj preImage(fromjson("{subObj: {subObj: {a: 0}}}"));
@@ -200,33 +211,38 @@ TEST(DiffApplierTest, UpdateArrayOfObjectsSubDiff) {
 
     BSONObj storage(
         BSON("uFieldNew" << 999 << "newObj" << BSON("x" << 1) << "a" << 1 << "b" << 2 << "c" << 3));
+    StringData arr = "arr";
+    StringData dFieldA = "dFieldA";
+    StringData dFieldB = "dFieldB";
+    StringData uField = "uField";
+
     DocumentDiffBuilder builder;
     {
-        builder.addDelete("dFieldA");
-        builder.addDelete("dFieldB");
-        builder.addUpdate("uField", storage["uFieldNew"]);
+        builder.addDelete(dFieldA);
+        builder.addDelete(dFieldB);
+        builder.addUpdate(uField, storage["uFieldNew"]);
 
-        ArrayDiffBuilder subArr(builder.startSubArrDiff("arr"));
+        auto subBuilderGuard = builder.startSubArrDiff(arr);
         {
             {
-                DocumentDiffBuilder subObjBuilder(subArr.startSubObjDiff(1));
-                subObjBuilder.addUpdate("a", storage["a"]);
+                auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(1);
+                subSubBuilderGuard.builder()->addUpdate("a", storage["a"]);
             }
 
             {
-                DocumentDiffBuilder subObjBuilder(subArr.startSubObjDiff(2));
-                subObjBuilder.addUpdate("b", storage["b"]);
+                auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(2);
+                subSubBuilderGuard.builder()->addUpdate("b", storage["b"]);
             }
 
             {
-                DocumentDiffBuilder subObjBuilder(subArr.startSubObjDiff(3));
-                subObjBuilder.addUpdate("c", storage["c"]);
+                auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(3);
+                subSubBuilderGuard.builder()->addUpdate("c", storage["c"]);
             }
-            subArr.addUpdate(4, storage["newObj"]);
+            subBuilderGuard.builder()->addUpdate(4, storage["newObj"]);
         }
     }
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
 
     // Case where the object matches the structure we expect.
     BSONObj preImage(
@@ -274,17 +290,18 @@ TEST(DiffApplierTest, UpdateArrayOfObjectsSubDiff) {
 // Case where an array diff rewrites several non contiguous indices which are objects.
 TEST(DiffApplierTest, UpdateArrayOfObjectsWithUpdateOperationNonContiguous) {
     BSONObj storage(BSON("dummyA" << 997 << "dummyB" << BSON("newVal" << 998) << "dummyC" << 999));
+    StringData arr = "arr";
     DocumentDiffBuilder builder;
     {
-        ArrayDiffBuilder subArr(builder.startSubArrDiff("arr"));
+        auto subBuilderGuard = builder.startSubArrDiff(arr);
         {
-            subArr.addUpdate(1, storage["dummyA"]);
-            subArr.addUpdate(2, storage["dummyB"]);
-            subArr.addUpdate(5, storage["dummyC"]);
+            subBuilderGuard.builder()->addUpdate(1, storage["dummyA"]);
+            subBuilderGuard.builder()->addUpdate(2, storage["dummyB"]);
+            subBuilderGuard.builder()->addUpdate(5, storage["dummyC"]);
         }
     }
 
-    auto diff = builder.release();
+    auto diff = builder.serialize();
 
     // Case where the object matches the structure we expect.
     BSONObj preImage(fromjson("{arr: [null, {}, {}, {}, {}, {}]}"));
@@ -342,8 +359,34 @@ TEST(DiffApplierTest, EmptyDiff) {
 }
 
 TEST(DiffApplierTest, ArrayDiffAtTop) {
-    BSONObj arrDiff = fromjson("{a: true, l: 5, '0': {d: false}}");
+    BSONObj arrDiff = fromjson("{a: true, l: 5, 'd0': false}");
     ASSERT_THROWS_CODE(applyDiff(BSONObj(), arrDiff), DBException, 4770503);
 }
+
+TEST(DiffApplierTest, DuplicateFieldNames) {
+    // Within the same update type.
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{d: {a: false, b: false, a: false}}")),
+                       DBException,
+                       4728000);
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u: {f1: 3, f1: 4}}")), DBException, 4728000);
+    ASSERT_THROWS_CODE(
+        applyDiff(BSONObj(), fromjson("{i: {a: {}, a: null}}")), DBException, 4728000);
+    ASSERT_THROWS_CODE(
+        applyDiff(BSONObj(), fromjson("{s: {a: {d: {p: false}}, a: {a: true, d: {p: false}}}}")),
+        DBException,
+        4728000);
+
+    // Across update types.
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{d: {b: false}, i: {a: {}, b: null}}")),
+                       DBException,
+                       4728000);
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u: {b: false}, i: {a: {}, b: null}}")),
+                       DBException,
+                       4728000);
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u: {a: {}}, s: {a: {d : {k: false}}}}")),
+                       DBException,
+                       4728000);
+}
+
 }  // namespace
 }  // namespace mongo::doc_diff

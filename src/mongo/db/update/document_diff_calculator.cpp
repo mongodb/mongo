@@ -50,7 +50,7 @@ bool computeArrayDiff(const BSONObj& pre,
     size_t nFieldsInPostArray = 0;
     for (; preItr.more() && postItr.more(); ++preItr, ++postItr, ++nFieldsInPostArray) {
         // Bailout if the generated diff so far is larger than the 'post' object.
-        if (postObjSize < diffBuilder->computeApproxSize()) {
+        if (postObjSize < diffBuilder->getObjSize()) {
             return false;
         }
         if (!(*preItr).binaryEqual(*postItr)) {
@@ -76,7 +76,7 @@ bool computeArrayDiff(const BSONObj& pre,
     if (preItr.more()) {
         diffBuilder->setResize(nFieldsInPostArray);
     }
-    return postObjSize > diffBuilder->computeApproxSize();
+    return postObjSize > diffBuilder->getObjSize();
 }
 
 bool computeDocDiff(const BSONObj& pre,
@@ -91,7 +91,7 @@ bool computeDocDiff(const BSONObj& pre,
         auto postVal = *postItr;
 
         // Bailout if the generated diff so far is larger than the 'post' object.
-        if (postObjSize < diffBuilder->computeApproxSize()) {
+        if (postObjSize < diffBuilder->getObjSize()) {
             return false;
         }
         if (preVal.fieldNameStringData() == postVal.fieldNameStringData()) {
@@ -134,7 +134,7 @@ bool computeDocDiff(const BSONObj& pre,
     for (auto&& deleteField : deletes) {
         diffBuilder->addDelete(deleteField);
     }
-    return postObjSize > diffBuilder->computeApproxSize();
+    return postObjSize > diffBuilder->getObjSize();
 }
 
 template <class DiffBuilder, class T>
@@ -143,19 +143,19 @@ void calculateSubDiffHelper(const BSONElement& preVal,
                             T fieldIdentifier,
                             DiffBuilder* builder) {
     if (preVal.type() == BSONType::Object) {
-        auto subDiffBuilder = builder->startSubObjDiff(fieldIdentifier);
-        const auto hasSubDiff =
-            computeDocDiff(preVal.embeddedObject(), postVal.embeddedObject(), &subDiffBuilder);
+        auto subDiffBuilderGuard = builder->startSubObjDiff(fieldIdentifier);
+        const auto hasSubDiff = computeDocDiff(
+            preVal.embeddedObject(), postVal.embeddedObject(), subDiffBuilderGuard.builder());
         if (!hasSubDiff) {
-            subDiffBuilder.abandon();
+            subDiffBuilderGuard.abandon();
             builder->addUpdate(fieldIdentifier, postVal);
         }
     } else {
-        auto subDiffBuilder = builder->startSubArrDiff(fieldIdentifier);
-        const auto hasSubDiff =
-            computeArrayDiff(preVal.embeddedObject(), postVal.embeddedObject(), &subDiffBuilder);
+        auto subDiffBuilderGuard = builder->startSubArrDiff(fieldIdentifier);
+        const auto hasSubDiff = computeArrayDiff(
+            preVal.embeddedObject(), postVal.embeddedObject(), subDiffBuilderGuard.builder());
         if (!hasSubDiff) {
-            subDiffBuilder.abandon();
+            subDiffBuilderGuard.abandon();
             builder->addUpdate(fieldIdentifier, postVal);
         }
     }
@@ -164,7 +164,12 @@ void calculateSubDiffHelper(const BSONElement& preVal,
 
 boost::optional<doc_diff::Diff> computeDiff(const BSONObj& pre, const BSONObj& post) {
     doc_diff::DocumentDiffBuilder diffBuilder;
-    bool hasDiff = computeDocDiff(pre, post, &diffBuilder);
-    return hasDiff ? boost::optional<doc_diff::Diff>(diffBuilder.release()) : boost::none;
+    if (computeDocDiff(pre, post, &diffBuilder)) {
+        auto diff = diffBuilder.serialize();
+        if (diff.objsize() < post.objsize()) {
+            return diff;
+        }
+    }
+    return {};
 }
 }  // namespace mongo::doc_diff

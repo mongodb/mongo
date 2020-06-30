@@ -128,7 +128,7 @@ TEST(DocumentDiffTest, SimpleArrayPush) {
     auto diff = doc_diff::computeDiff(fromjson("{field1: 'abcd', field2: [1, 2, 3]}"),
                                       fromjson("{field1: 'abcd', field2: [1, 2, 3, 4]}"));
     ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field2: {a: true, '3': {u: 4}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field2: {a: true, 'u3': 4}}}"));
 }
 
 TEST(DocumentDiffTest, NestedArray) {
@@ -137,15 +137,15 @@ TEST(DocumentDiffTest, NestedArray) {
     ASSERT(diff);
     // When the sub-array delta is larger than the size of the sub-array, we record it as an update
     // operation.
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field2: {a: true, '3': {u: [[4]]}}}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field2: {a: true, 'u3': [[4]]}}}"));
 
     diff = doc_diff::computeDiff(
         fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [2], 4, 5, 6], 5, 5, 5]}"),
         fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [4], 4], 5, 6]}"));
     ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff,
-                             fromjson("{s: {field2: {a: true, l: 6, '3': {s: {a: true, l: 4, "
-                                      "'2': {u: [4]}}}, '5': {u: 6}} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(
+        *diff,
+        fromjson("{s: {field2: {a: true, l: 6, 's3': {a: true, l: 4, 'u2': [4]}, 'u5': 6}}}"));
 }
 
 TEST(DocumentDiffTest, SubObjInSubArrayUpdateElements) {
@@ -157,9 +157,10 @@ TEST(DocumentDiffTest, SubObjInSubArrayUpdateElements) {
                  "5]}]}"));
 
     ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff,
-                             fromjson("{s: {field2: {a: true, '3': {s: {s: {field3: {a: true, '2': "
-                                      "{u: 4}, '3': {u: 3}, '4': {u: 5}} }} }} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(
+        *diff,
+        fromjson("{s: {field2: {a: true, 's3': {s: {field3: {a: true, 'u2': 4, 'u3': 3, "
+                 "'u4': 5}} }} }}"));
 }
 
 TEST(DocumentDiffTest, SubObjInSubArrayDeleteElements) {
@@ -169,8 +170,7 @@ TEST(DocumentDiffTest, SubObjInSubArrayDeleteElements) {
     ASSERT(diff);
     ASSERT_BSONOBJ_BINARY_EQ(
         *diff,
-        fromjson("{s: {field2: {a: true, '3': {s: {s: {field3: {a: true, l: 4, '3': "
-                 "{u: 5}} }} }} }}"));
+        fromjson("{s: {field2: {a: true, 's3': {s: {field3: {a: true, l: 4, 'u3': 5}} }} }}"));
 }
 
 TEST(DocumentDiffTest, NestedSubObjs) {
@@ -192,7 +192,7 @@ TEST(DocumentDiffTest, SubArrayInSubArrayLargeDelta) {
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {field3: [1, 2, 3, 4, 5]}]}"));
     ASSERT(diff);
     ASSERT_BSONOBJ_BINARY_EQ(
-        *diff, fromjson("{s: {field2: {a: true, '3': {u: {field3: [1, 2, 3, 4, 5]}}} }}"));
+        *diff, fromjson("{s: {field2: {a: true, 'u3': {field3: [1, 2, 3, 4, 5]}} }}"));
 }
 
 TEST(DocumentDiffTest, SubObjInSubArrayLargeDelta) {
@@ -200,20 +200,21 @@ TEST(DocumentDiffTest, SubObjInSubArrayLargeDelta) {
         doc_diff::computeDiff(fromjson("{field1: [1, 2, 3, 4, 5, 6, {a: 1, b: 2, c: 3, d: 4}, 7]}"),
                               fromjson("{field1: [1, 2, 3, 4, 5, 6, {p: 1, q: 2}, 7]}"));
     ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field1: {a: true, '6': {u: {p: 1, q: 2} }} }}"));
+    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field1: {a: true, 'u6': {p: 1, q: 2}} }}"));
 }
 
 TEST(DocumentDiffTest, SubObjInSubObjLargeDelta) {
     auto diff = doc_diff::computeDiff(
-        fromjson("{field: {p: 1, q: 2, r: {a: 1, b: 2, c: 3, 'd': 4}, s: 3}}"),
-        fromjson("{field: {p: 1, q: 2, r: {p: 1, q: 2}, s: 3}}"));
+        fromjson("{field: {p: 'someString', q: 2, r: {a: 1, b: 2, c: 3, 'd': 4}, s: 3}}"),
+        fromjson("{field: {p: 'someString', q: 2, r: {p: 1, q: 2}, s: 3}}"));
     ASSERT(diff);
     ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field: {u: {r: {p: 1, q: 2} }} }}"));
 }
 
 TEST(DocumentDiffTest, SubArrayInSubObjLargeDelta) {
-    auto diff = doc_diff::computeDiff(fromjson("{field: {p: 1, q: 2, r: [1, 3, 4, 5], s: 3}}"),
-                                      fromjson("{field: {p: 1, q: 2, r: [1, 2, 3, 4], s: 3}}"));
+    auto diff =
+        doc_diff::computeDiff(fromjson("{field: {p: 'someString', q: 2, r: [1, 3, 4, 5], s: 3}}"),
+                              fromjson("{field: {p: 'someString', q: 2, r: [1, 2, 3, 4], s: 3}}"));
     ASSERT(diff);
     ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{s: {field: {u: {r: [1, 2, 3, 4]}} }}"));
 }

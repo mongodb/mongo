@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/unittest/unittest.h"
 
@@ -50,17 +51,20 @@ BSONElement withFieldName(BSONElement elem, StringData fieldName) {
 
 TEST(DiffSerializationTest, DeleteSimple) {
     DocumentDiffBuilder builder;
-    builder.addDelete("f1"_sd);
-    builder.addDelete("f2"_sd);
-    builder.addDelete("f3"_sd);
+    StringData fieldName1 = "f1";
+    StringData fieldName2 = "f2";
+    StringData fieldName3 = "f3";
+    builder.addDelete(fieldName1);
+    builder.addDelete(fieldName2);
+    builder.addDelete(fieldName3);
 
-    auto out = builder.release();
+    auto out = builder.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{d: {f1: false, f2: false, f3: false}}"), out);
 
     DocumentDiffReader reader(out);
-    ASSERT_EQ(*reader.nextDelete(), "f1");
-    ASSERT_EQ(*reader.nextDelete(), "f2");
-    ASSERT_EQ(*reader.nextDelete(), "f3");
+    ASSERT_EQ(*reader.nextDelete(), fieldName1);
+    ASSERT_EQ(*reader.nextDelete(), fieldName2);
+    ASSERT_EQ(*reader.nextDelete(), fieldName3);
     ASSERT(reader.nextDelete() == boost::none);
 
     ASSERT(reader.nextInsert() == boost::none);
@@ -73,10 +77,10 @@ TEST(DiffSerializationTest, InsertSimple) {
                                      << "foo"));
 
     DocumentDiffBuilder builder;
-    builder.addInsert("f1"_sd, kDummyObj["a"]);
-    builder.addInsert("f2"_sd, kDummyObj["b"]);
+    builder.addInsert("f1", kDummyObj["a"]);
+    builder.addInsert("f2", kDummyObj["b"]);
 
-    auto out = builder.release();
+    auto out = builder.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{'i': {f1: 1, f2: 'foo' }}"));
 
     DocumentDiffReader reader(out);
@@ -94,10 +98,10 @@ TEST(DiffSerializationTest, UpdateSimple) {
                                      << "foo"));
 
     DocumentDiffBuilder builder;
-    builder.addUpdate("f1"_sd, kDummyObj["a"]);
-    builder.addUpdate("f2"_sd, kDummyObj["b"]);
+    builder.addUpdate("f1", kDummyObj["a"]);
+    builder.addUpdate("f2", kDummyObj["b"]);
 
-    auto out = builder.release();
+    auto out = builder.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{'u': { f1: 1, f2: 'foo'}}"));
 
     DocumentDiffReader reader(out);
@@ -115,19 +119,18 @@ TEST(DiffSerializationTest, SubDiff) {
                                      << "foo"));
 
     DocumentDiffBuilder builder;
-
     {
-        DocumentDiffBuilder sub(builder.startSubObjDiff("obj"));
-        sub.addInsert("iField", kDummyObj["a"]);
-        sub.addUpdate("uField", kDummyObj["b"]);
-        sub.addDelete("dField");
+        auto subBuilderGuard = builder.startSubObjDiff("obj");
+
+        subBuilderGuard.builder()->addInsert("iField", kDummyObj["a"]);
+        subBuilderGuard.builder()->addUpdate("uField", kDummyObj["b"]);
+        subBuilderGuard.builder()->addDelete("dField");
     }
 
-    auto out = builder.release();
+    auto out = builder.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(
         out,
-        fromjson("{s :"
-                 "{obj: {d : { dField: false }, u : { uField: 'foo' }, i : { iField: 1}}}}"));
+        fromjson("{s :{obj: {d : { dField: false }, u : { uField: 'foo' }, i : { iField: 1}}}}"));
 
     DocumentDiffReader reader(out);
     ASSERT(reader.nextUpdate() == boost::none);
@@ -156,27 +159,25 @@ TEST(DiffSerializationTest, SubArrayWithSubDiff) {
     const BSONObj kDummyObj(BSON("a" << 1 << "b"
                                      << BSON("foo"
                                              << "bar")));
-
     DocumentDiffBuilder builder;
-
     {
-        ArrayDiffBuilder sub(builder.startSubArrDiff("arr"));
-        sub.addUpdate(0, kDummyObj["b"]);
+        auto subBuilderGuard = builder.startSubArrDiff("arr");
+        subBuilderGuard.builder()->addUpdate(0, kDummyObj["b"]);
         {
-            DocumentDiffBuilder subSub(sub.startSubObjDiff(2));
-            subSub.addDelete("dField");
+            auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(2);
+            subSubBuilderGuard.builder()->addDelete("dField");
         }
 
-        sub.addUpdate(5, kDummyObj["a"]);
-        sub.setResize(6);
+        subBuilderGuard.builder()->addUpdate(5, kDummyObj["a"]);
+        subBuilderGuard.builder()->setResize(6);
     }
 
-    auto out = builder.release();
+    auto out = builder.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(out,
                              fromjson("{s: {arr: {a: true, l: 6,"
-                                      "'0': {'u': {foo: 'bar'}}, "
-                                      "'2': {s: {'d': {dField: false}}},"
-                                      "'5': {u: 1}}}}"));
+                                      "'u0': {foo: 'bar'}, "
+                                      "'s2': {'d': {dField: false}},"
+                                      "'u5': 1}}}"));
 
     DocumentDiffReader reader(out);
     ASSERT(reader.nextUpdate() == boost::none);
@@ -225,44 +226,47 @@ TEST(DiffSerializationTest, SubArrayNestedObject) {
     BSONObj storage(BSON("a" << 1 << "b" << 2 << "c" << 3));
     DocumentDiffBuilder builder;
     {
-        ArrayDiffBuilder subArr(builder.startSubArrDiff("arr"));
+        auto subArrBuilderGuard = builder.startSubArrDiff("subArray");
         {
             {
-                DocumentDiffBuilder subObjBuilder(subArr.startSubObjDiff(1));
-                subObjBuilder.addUpdate("a", storage["a"]);
+                auto subBuilderGuard = subArrBuilderGuard.builder()->startSubObjDiff(1);
+                subBuilderGuard.builder()->addUpdate(storage["a"].fieldNameStringData(),
+                                                     storage["a"]);
             }
 
             {
-                DocumentDiffBuilder subObjBuilder(subArr.startSubObjDiff(2));
-                subObjBuilder.addUpdate("b", storage["b"]);
+                auto subBuilderGuard = subArrBuilderGuard.builder()->startSubObjDiff(2);
+                subBuilderGuard.builder()->addUpdate(storage["b"].fieldNameStringData(),
+                                                     storage["b"]);
             }
 
             {
-                DocumentDiffBuilder subObjBuilder(subArr.startSubObjDiff(3));
-                subObjBuilder.addUpdate("c", storage["c"]);
+                auto subBuilderGuard = subArrBuilderGuard.builder()->startSubObjDiff(3);
+                subBuilderGuard.builder()->addUpdate(storage["c"].fieldNameStringData(),
+                                                     storage["c"]);
             }
         }
     }
 
-    const auto out = builder.release();
-    ASSERT_BSONOBJ_BINARY_EQ(out,
-                             fromjson("{s: {arr: {a: true, '1': {s: {u: {a: 1}}},"
-                                      "'2': {s: {u: {b: 2}}}, '3': {s: {u: {c: 3}}}}}}"));
+    const auto out = builder.serialize();
+    ASSERT_BSONOBJ_BINARY_EQ(
+        out,
+        fromjson(
+            "{s: {subArray: {a: true, 's1': {u: {a: 1}}, 's2': {u: {b: 2}}, 's3': {u: {c: 3}}}}}"));
 }
 
 TEST(DiffSerializationTest, SubArrayHighIndex) {
     const BSONObj kDummyObj(BSON("a" << 1 << "b"
                                      << "foo"));
-
     DocumentDiffBuilder builder;
 
     {
-        ArrayDiffBuilder sub(builder.startSubArrDiff("arr"));
-        sub.addUpdate(254, kDummyObj["b"]);
+        auto subBuilderGuard = builder.startSubArrDiff("subArray");
+        subBuilderGuard.builder()->addUpdate(254, kDummyObj["b"]);
     }
 
-    auto out = builder.release();
-    ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{s: {arr: {a: true, '254': {u: 'foo'}}}}"));
+    auto out = builder.serialize();
+    ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{s: {subArray: {a: true, 'u254': 'foo'}}}"));
 
     DocumentDiffReader reader(out);
     ASSERT(reader.nextUpdate() == boost::none);
@@ -271,7 +275,7 @@ TEST(DiffSerializationTest, SubArrayHighIndex) {
 
     {
         auto [name, subDiffVar] = *reader.nextSubDiff();
-        ASSERT_EQ(name, "arr");
+        ASSERT_EQ(name, "subArray");
 
         auto subReader = stdx::get<ArrayDiffReader>(subDiffVar);
 
@@ -294,19 +298,21 @@ TEST(DiffSerializationTest, SubDiffAbandon) {
     builder.addUpdate("uField", kDummyObj["a"]);
 
     {
-        DocumentDiffBuilder sub(builder.startSubObjDiff("obj"));
-        sub.abandon();
+
+        auto subBuilderGuard = builder.startSubObjDiff("obj");
+        subBuilderGuard.builder()->addDelete("dField3");
+        subBuilderGuard.abandon();
     }
 
     // Make sure that after we abandon something we can still use the parent builder.
     builder.addDelete("dField2");
 
     {
-        DocumentDiffBuilder sub(builder.startSubObjDiff("obj2"));
-        sub.addDelete("dField2");
+        auto subBuilderGuard = builder.startSubObjDiff("obj2");
+        subBuilderGuard.builder()->addDelete("dField2");
     }
 
-    auto out = builder.release();
+    auto out = builder.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(
         out,
         fromjson("{d : {dField1: false, dField2: false}, u: {uField: 1}, s: {obj2: {d: "
@@ -321,18 +327,19 @@ TEST(DiffSerializationTest, SubArrayDiffAbandon) {
     builder.addUpdate("uField", kDummyObj["a"]);
 
     {
-        ArrayDiffBuilder sub(builder.startSubArrDiff("arr"));
-        sub.abandon();
+        auto subBuilderGuard = builder.startSubArrDiff("subArray");
+        subBuilderGuard.builder()->addUpdate(4, kDummyObj.firstElement());
+        subBuilderGuard.abandon();
     }
 
     // Make sure that after we abandon something we can still use the parent builder.
     builder.addDelete("dField2");
 
     {
-        ArrayDiffBuilder sub(builder.startSubArrDiff("arr2"));
-        sub.setResize(5);
+        auto subBuilderGuard = builder.startSubArrDiff("arr2");
+        subBuilderGuard.builder()->setResize(5);
     }
-    auto out = builder.release();
+    auto out = builder.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(out,
                              fromjson("{d : {dField1: false, dField2: false}, u: {uField: 1},"
                                       "s: {arr2: {a: true, l: 5}}}"));
@@ -357,26 +364,108 @@ TEST(DiffSerializationTest, ValidateComputeApproxSize) {
     builder.addDelete("");
     {
         // Ensure size of the sub-array diff is included.
-        auto subDiff = builder.startSubArrDiff("subArray");
-        subDiff.setResize(5);
-        subDiff.addUpdate(2, storage["num"]);
-        subDiff.addUpdate(2, storage["str"]);
-
-        auto subSubDiff = subDiff.startSubObjDiff(22);
-        subSubDiff.addInsert("insert2", storage["emptyStr"]);
-        subSubDiff.addUpdate("update3", storage["null"]);
+        auto subBuilderGuard = builder.startSubArrDiff("subArray");
+        subBuilderGuard.builder()->setResize(5);
+        subBuilderGuard.builder()->addUpdate(2, storage["num"]);
+        subBuilderGuard.builder()->addUpdate(2, storage["str"]);
+        {
+            auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(2);
+            subSubBuilderGuard.builder()->addInsert("insert2", storage["emptyStr"]);
+            subSubBuilderGuard.builder()->addUpdate("update3", storage["null"]);
+        }
+        {
+            auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(234);
+            subSubBuilderGuard.builder()->addInsert("subObj", storage["subObj"]);
+            subSubBuilderGuard.builder()->addUpdate("update3", storage["null"]);
+        }
+        {
+            auto subSubArrayBuilderGuard = subBuilderGuard.builder()->startSubArrDiff(2456);
+            subSubArrayBuilderGuard.builder()->addUpdate(0, storage["num"]);
+            subSubArrayBuilderGuard.abandon();
+        }
+        {
+            auto subSubArrayBuilderGuard = subBuilderGuard.builder()->startSubArrDiff(2456);
+            subSubArrayBuilderGuard.builder()->setResize(10000);
+            subSubArrayBuilderGuard.builder()->addUpdate(0, storage["array"]);
+        }
+    }
+    {
+        auto subArrayBuilderGuard = builder.startSubArrDiff("subArray2");
+        subArrayBuilderGuard.builder()->addUpdate(2, storage["str"]);
     }
     {
         // Ensure size of the sub-object diff is included.
-        auto subDiff = builder.startSubObjDiff("subObj");
-        subDiff.addUpdate("setArray", storage["array"]);
+        auto subBuilderGuard = builder.startSubObjDiff("subObj");
+        subBuilderGuard.builder()->addUpdate("setArray", storage["array"]);
+    }
+    {
+        // Ensure size of the abandoned sub-object diff is non included.
+        auto subBuilderGuard = builder.startSubObjDiff("subObj1");
+        subBuilderGuard.builder()->addUpdate("setArray2", storage["array"]);
+        subBuilderGuard.abandon();
     }
     // Update with a sub-object.
-    builder.addUpdate("update4", storage["subObj"]);
+    builder.addUpdate("update2", storage["subObj"]);
 
-    auto computedSize = builder.computeApproxSize();
-    auto out = builder.release();
-    ASSERT_EQ(computedSize, out.objsize());
+    auto computedSize = builder.getObjSize();
+    auto out = builder.serialize();
+    ASSERT_EQ(computedSize, out.objsize() + kAdditionalPaddingForObjectSize);
+}
+
+TEST(DiffSerializationTest, ExecptionsWhileDiffBuildingDoesNotLeakMemory) {
+    try {
+        DocumentDiffBuilder builder;
+        auto subBuilderGuard = builder.startSubArrDiff("subArray");
+        subBuilderGuard.builder()->setResize(4);
+        auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(5);
+        throw std::exception();
+    } catch (const std::exception&) {
+    }
+}
+TEST(DiffSerializationTest, UnexpectedFieldsInObjDiff) {
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{p : 1}")), DBException, 4770503);
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u : true}")), DBException, 4770507);
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{d : []}")), DBException, 4770507);
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{i : null}")), DBException, 4770507);
+
+    // If the order of the fields is not obeyed.
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{i : {}, d: {}}")), DBException, 4770513);
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{s : {}, i: {}}")), DBException, 4770513);
+    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{s : {}, p: {}}")), DBException, 4770513);
+
+    // Empty deletes object is valid.
+    ASSERT_BSONOBJ_BINARY_EQ(applyDiff(fromjson("{a: 1}"), fromjson("{d : {}}")),
+                             fromjson("{a: 1}"));
+}
+
+TEST(DiffSerializationTest, UnexpectedFieldsInArrayDiff) {
+    ASSERT_THROWS_CODE(
+        applyDiff(fromjson("{arr: []}"), fromjson("{s: {arr: {a: true, '3u' : 1}}}")),
+        DBException,
+        4770512);
+    ASSERT_THROWS_CODE(
+        applyDiff(fromjson("{arr: []}"), fromjson("{s: {arr: {a: true, u : true}}}")),
+        DBException,
+        4770521);
+    ASSERT_THROWS_CODE(
+        applyDiff(fromjson("{arr: []}"), fromjson("{s: {arr: {a: true, '5' : {}}}}")),
+        DBException,
+        4770521);
+    ASSERT_THROWS_CODE(
+        applyDiff(fromjson("{arr: []}"), fromjson("{s: {arr: {a: false, 'u3' : 4}}}")),
+        DBException,
+        4770520);
+    ASSERT_THROWS_CODE(applyDiff(fromjson("{arr: []}"), fromjson("{s: {arr: {a: 1, 'u3' : 4}}}")),
+                       DBException,
+                       4770519);
+    ASSERT_THROWS_CODE(
+        applyDiff(fromjson("{arr: []}"), fromjson("{s: {arr: {a: true, 's3' : 4}}}")),
+        DBException,
+        4770501);
+    ASSERT_THROWS_CODE(
+        applyDiff(fromjson("{arr: []}"), fromjson("{s: {arr: {a: true, 'd3' : 4}}}")),
+        DBException,
+        4770502);
 }
 
 }  // namespace

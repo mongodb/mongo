@@ -100,16 +100,17 @@ TEST_F(PipelineExecutorTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {a: 1, b: 2}}")};
     PipelineExecutor exec(expCtx, pipeline);
 
-    mutablebson::Document doc(fromjson("{c: 1, d: 2}"));
+    mutablebson::Document doc(fromjson("{c: 1, d: 'largeStringValue'}"));
     auto result = exec.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
-    ASSERT_EQUALS(fromjson("{c: 1, d: 2, a: 1, b: 2}"), doc);
+    ASSERT_EQUALS(fromjson("{c: 1, d: 'largeStringValue', a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     if (deltaOplogEntryAllowed()) {
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {a: 1, b: 2}}}"), result.oplogEntry);
     } else {
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{c: 1, d: 2, a: 1, b: 2}"), result.oplogEntry);
+        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{c: 1, d: 'largeStringValue', a: 1, b: 2}"),
+                                 result.oplogEntry);
     }
 }
 
@@ -135,17 +136,18 @@ TEST_F(PipelineExecutorTest, ShouldSucceedWhenImmutableIdIsNotModified) {
     std::vector<BSONObj> pipeline{fromjson("{$addFields: {_id: 0, a: 1, b: 2}}")};
     PipelineExecutor exec(expCtx, pipeline);
 
-    mutablebson::Document doc(fromjson("{_id: 0, c: 1, d: 2}"));
+    mutablebson::Document doc(fromjson("{_id: 0, c: 1, d: 'largeStringValue'}"));
     addImmutablePath("_id");
     auto result = exec.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
-    ASSERT_EQUALS(fromjson("{_id: 0, c: 1, d: 2, a: 1, b: 2}"), doc);
+    ASSERT_EQUALS(fromjson("{_id: 0, c: 1, d: 'largeStringValue', a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     if (deltaOplogEntryAllowed()) {
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {a: 1, b: 2 }}}"), result.oplogEntry);
     } else {
-        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{_id: 0, c: 1, d: 2, a: 1, b: 2}"), result.oplogEntry);
+        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{_id: 0, c: 1, d: 'largeStringValue', a: 1, b: 2}"),
+                                 result.oplogEntry);
     }
 }
 
@@ -161,7 +163,14 @@ TEST_F(PipelineExecutorTest, ComplexDoc) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], e: [], c: {d: 1}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 1, b: [0, 1, 2], e: [], c: {d: 1}}"), result.oplogEntry);
+    if (deltaOplogEntryAllowed()) {
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{$v: 2, diff: {i: {c: {d: 1}}, s: {b: {a: true, u1: 1} }}}"),
+            result.oplogEntry);
+    } else {
+        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 1, b: [0, 1, 2], e: [], c: {d: 1}}"),
+                                 result.oplogEntry);
+    }
 }
 
 TEST_F(PipelineExecutorTest, CannotRemoveImmutablePath) {

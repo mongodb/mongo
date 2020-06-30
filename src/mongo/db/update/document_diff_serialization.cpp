@@ -51,13 +51,6 @@ doc_diff::DiffType identifyType(const BSONObj& diff) {
     assertDiffNonEmpty(it);
 
     if ((*it).fieldNameStringData() == kArrayHeader) {
-        uassert(470521,
-                str::stream() << "Expected " << kArrayHeader << " field to be bool but got" << *it,
-                (*it).type() == BSONType::Bool);
-
-        uassert(470522,
-                str::stream() << "Expected " << kArrayHeader << " field to be true but got" << *it,
-                (*it).Bool());
         return DiffType::kArray;
     }
     return DiffType::kDocument;
@@ -72,73 +65,90 @@ stdx::variant<DocumentDiffReader, ArrayDiffReader> getReader(const Diff& diff) {
 }
 }  // namespace
 
-DocumentDiffBuilder ArrayDiffBuilder::startSubObjDiff(size_t idx) {
-    invariant(!_childSubDiffIndex);
-    _childSubDiffIndex = idx;
-    return DocumentDiffBuilder(this);
+SubBuilderGuard<DocumentDiffBuilder> ArrayDiffBuilder::startSubObjDiff(size_t idx) {
+    auto subDiffBuilder = std::make_unique<DocumentDiffBuilder>(0);
+    DocumentDiffBuilder* subBuilderPtr = subDiffBuilder.get();
+    _modifications.push_back({std::to_string(idx), std::move(subDiffBuilder)});
+    return SubBuilderGuard<DocumentDiffBuilder>(this, subBuilderPtr);
 }
-ArrayDiffBuilder ArrayDiffBuilder::startSubArrDiff(size_t idx) {
-    invariant(!_childSubDiffIndex);
-    _childSubDiffIndex = idx;
-    return ArrayDiffBuilder(this);
+SubBuilderGuard<ArrayDiffBuilder> ArrayDiffBuilder::startSubArrDiff(size_t idx) {
+    auto subDiffBuilder = std::unique_ptr<ArrayDiffBuilder>(new ArrayDiffBuilder());
+    ArrayDiffBuilder* subBuilderPtr = subDiffBuilder.get();
+    _modifications.push_back({std::to_string(idx), std::move(subDiffBuilder)});
+    return SubBuilderGuard<ArrayDiffBuilder>(this, subBuilderPtr);
 }
 
 void ArrayDiffBuilder::addUpdate(size_t idx, BSONElement elem) {
-    _modifications.push_back({idx, elem});
+    auto fieldName = std::to_string(idx);
+    sizeTracker.addEntry(fieldName.size() + kUpdateSectionFieldName.size(), elem.valuesize());
+    _modifications.push_back({std::move(fieldName), elem});
 }
 
-void ArrayDiffBuilder::releaseTo(BSONObjBuilder* output) {
+void ArrayDiffBuilder::serializeTo(BSONObjBuilder* output) const {
     output->append(kArrayHeader, true);
     if (_newSize) {
         output->append(kResizeSectionFieldName, *_newSize);
     }
 
-    for (auto&& [idx, modification] : _modifications) {
+    for (auto&& modificationEntry : _modifications) {
+        auto&& idx = modificationEntry.first;
+        auto&& modification = modificationEntry.second;
         stdx::visit(
             visit_helper::Overloaded{
-                [idx = idx, output](const Diff& subDiff) {
-                    // TODO: SERVER-48602 Try to avoid using BSON macro here. Ideally we will just
-                    // need one BSONObjBuilder for serializing the diff, at the end.
-                    output->append(std::to_string(idx), BSON(kSubDiffSectionFieldName << subDiff));
+                [&idx, output](const std::unique_ptr<DiffBuilderBase>& subDiff) {
+                    BSONObjBuilder subObjBuilder =
+                        output->subobjStart(kSubDiffSectionFieldName + idx);
+                    subDiff->serializeTo(&subObjBuilder);
                 },
-                [idx = idx, output](BSONElement elt) {
-                    output->append(std::to_string(idx), elt.wrap(kUpdateSectionFieldName));
+                [&idx, output](BSONElement elt) {
+                    output->appendAs(elt, kUpdateSectionFieldName + idx);
                 }},
             modification);
     }
 }
 
-void DocumentDiffBuilder::releaseTo(BSONObjBuilder* output) {
-    if (!_deletes.asTempObj().isEmpty()) {
+void DocumentDiffBuilder::serializeTo(BSONObjBuilder* output) const {
+    if (!_deletes.empty()) {
         BSONObjBuilder subBob(output->subobjStart(kDeleteSectionFieldName));
-        subBob.appendElements(_deletes.done());
+        for (auto&& del : _deletes) {
+            subBob.append(del, false);
+        }
     }
 
-    if (!_updates.asTempObj().isEmpty()) {
+    if (!_updates.empty()) {
         BSONObjBuilder subBob(output->subobjStart(kUpdateSectionFieldName));
-        subBob.appendElements(_updates.done());
+        for (auto&& update : _updates) {
+            subBob.appendAs(update.second, update.first);
+        }
     }
 
-    if (!_inserts.asTempObj().isEmpty()) {
+    if (!_inserts.empty()) {
         BSONObjBuilder subBob(output->subobjStart(kInsertSectionFieldName));
-        subBob.appendElements(_inserts.done());
+        for (auto&& insert : _inserts) {
+            subBob.appendAs(insert.second, insert.first);
+        }
     }
 
-    if (!_subDiffs.asTempObj().isEmpty()) {
+    if (!_subDiffs.empty()) {
         BSONObjBuilder subBob(output->subobjStart(kSubDiffSectionFieldName));
-        subBob.appendElements(_subDiffs.done());
+        for (auto&& subDiff : _subDiffs) {
+            BSONObjBuilder subDiffBuilder(subBob.subobjStart(subDiff.first));
+            subDiff.second->serializeTo(&subDiffBuilder);
+        }
     }
 }
 
-DocumentDiffBuilder DocumentDiffBuilder::startSubObjDiff(StringData field) {
-    invariant(!_childSubDiffField);
-    _childSubDiffField = field.toString();
-    return DocumentDiffBuilder(this);
+SubBuilderGuard<DocumentDiffBuilder> DocumentDiffBuilder::startSubObjDiff(StringData field) {
+    auto subDiffBuilder = std::make_unique<DocumentDiffBuilder>(0);
+    DocumentDiffBuilder* subBuilderPtr = subDiffBuilder.get();
+    _subDiffs.push_back({field, std::move(subDiffBuilder)});
+    return SubBuilderGuard<DocumentDiffBuilder>(this, subBuilderPtr);
 }
-ArrayDiffBuilder DocumentDiffBuilder::startSubArrDiff(StringData field) {
-    invariant(!_childSubDiffField);
-    _childSubDiffField = field.toString();
-    return ArrayDiffBuilder(this);
+SubBuilderGuard<ArrayDiffBuilder> DocumentDiffBuilder::startSubArrDiff(StringData field) {
+    auto subDiffBuilder = std::unique_ptr<ArrayDiffBuilder>(new ArrayDiffBuilder());
+    ArrayDiffBuilder* subBuilderPtr = subDiffBuilder.get();
+    _subDiffs.push_back({field, std::move(subDiffBuilder)});
+    return SubBuilderGuard<ArrayDiffBuilder>(this, subBuilderPtr);
 }
 
 namespace {
@@ -186,36 +196,36 @@ boost::optional<std::pair<size_t, ArrayDiffReader::ArrayModification>> ArrayDiff
     }
 
     auto next = _it.next();
-    const size_t idx = extractArrayIndex(next.fieldNameStringData());
-    uassert(4770514,
-            str::stream() << "expected object at index " << idx << " in array diff but got "
-                          << next,
-            next.type() == BSONType::Object);
+    auto fieldName = next.fieldNameStringData();
 
-    const auto nextAsObj = next.embeddedObject();
+    static_assert(kUpdateSectionFieldName.size() == 1 && kSubDiffSectionFieldName.size() == 1,
+                  "The code below assumes that the field names used in the diff format are single "
+                  "character long");
     uassert(4770521,
-            str::stream() << "expected single-field object at index " << idx
-                          << " in array diff but got " << nextAsObj,
-            nextAsObj.nFields() == 1);
-    if (nextAsObj.firstElementFieldNameStringData() == kUpdateSectionFieldName) {
+            str::stream() << "expected field name to be at least two characters long, but found: "
+                          << fieldName,
+            fieldName.size() > 1);
+    const size_t idx = extractArrayIndex(fieldName.substr(1, fieldName.size()));
+
+    if (fieldName[0] == kUpdateSectionFieldName[0]) {
         // It's an update.
-        return {{idx, nextAsObj.firstElement()}};
-    } else if (nextAsObj.firstElementFieldNameStringData() == kSubDiffSectionFieldName) {
+        return {{idx, next}};
+    } else if (fieldName[0] == kSubDiffSectionFieldName[0]) {
         // It's a sub diff...But which type?
         uassert(4770501,
-                str::stream() << "expected sub diff at index " << idx << " but got " << nextAsObj,
-                nextAsObj.firstElement().type() == BSONType::Object);
+                str::stream() << "expected sub diff at index " << idx << " but got " << next,
+                next.type() == BSONType::Object);
 
         auto modification =
             stdx::visit(visit_helper::Overloaded{[](const auto& reader) -> ArrayModification {
                             return {reader};
                         }},
-                        getReader(nextAsObj.firstElement().embeddedObject()));
+                        getReader(next.embeddedObject()));
         return {{idx, modification}};
     } else {
         uasserted(4770502,
                   str::stream() << "Expected either 'u' (update) or 's' (sub diff) at index " << idx
-                                << " but got " << nextAsObj);
+                                << " but got " << next);
     }
 }
 

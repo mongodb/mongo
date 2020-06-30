@@ -46,40 +46,119 @@ using Diff = BSONObj;
 enum DiffType : uint8_t { kDocument, kArray };
 
 // Below are string constants used in the diff format.
-const static StringData kArrayHeader = "a"_sd;
-const static StringData kDeleteSectionFieldName = "d"_sd;
-const static StringData kInsertSectionFieldName = "i"_sd;
-const static StringData kUpdateSectionFieldName = "u"_sd;
+constexpr StringData kArrayHeader = "a"_sd;
+constexpr StringData kDeleteSectionFieldName = "d"_sd;
+constexpr StringData kInsertSectionFieldName = "i"_sd;
+constexpr StringData kUpdateSectionFieldName = "u"_sd;
 // 'l' for length.
-const static StringData kResizeSectionFieldName = "l"_sd;
-const static StringData kSubDiffSectionFieldName = "s"_sd;
+constexpr StringData kResizeSectionFieldName = "l"_sd;
+constexpr StringData kSubDiffSectionFieldName = "s"_sd;
+
+// Below are constants used for computation of Diff size. Note that the computed size is supposed to
+// be an approximate value.
+constexpr size_t kAdditionalPaddingForObjectSize = 5;
+constexpr size_t kSizeOfEmptyDocumentDiffBuilder = 5;
+// Size of empty object(5) + kArrayHeader(1) + null terminator + type byte + bool size.
+constexpr size_t kSizeOfEmptyArrayDiffBuilder = 9;
+
+/**
+ * Internal helper class for BSON size tracking to be used by the DiffBuilder classes.
+ */
+struct ApproxBSONSizeTracker {
+    ApproxBSONSizeTracker(size_t initialSize) : _size(initialSize) {}
+
+    void addEntry(size_t fieldSize, size_t valueSize, bool needToCreateWrappingObject = false) {
+        if (needToCreateWrappingObject) {
+            // Type byte(1) + FieldName(1) + Null terminator(1) + empty BSON object size (5)
+            _size += 8;
+        }
+        _size += fieldSize + valueSize + 2 /* Type byte + null terminator for field name */;
+    }
+
+    size_t getSize() const {
+        return _size;
+    }
+
+private:
+    size_t _size;
+};
+
+template <class DiffBuilder>
+class SubBuilderGuard;
+class DocumentDiffBuilder;
+class ArrayDiffBuilder;
 
 // Not meant to be used elsewhere.
 class DiffBuilderBase {
 public:
-    // A child DiffBuilder calls this on its parent when has completed and wants the diff it
-    // produced to be stored.
-    virtual void completeSubDiff(Diff) = 0;
+    DiffBuilderBase(size_t size) : sizeTracker(size){};
+    virtual ~DiffBuilderBase(){};
 
-    // When a child builder is abandoned, it calls this on its parent to indicate that the parent
-    // should release any state it was holding for the child.
+    // Serializes the diff to 'out'.
+    virtual void serializeTo(BSONObjBuilder* out) const = 0;
+    size_t getObjSize() const {
+        return sizeTracker.getSize();
+    }
+
+protected:
+    ApproxBSONSizeTracker sizeTracker;
+
+private:
+    // When the current child builder is abandoned, we needs to call this to indicate that the
+    // DiffBuilder should release any state it was holding for the current child. After calling
+    // this the builder will *not* add anything to the child builder.
     virtual void abandonChild() = 0;
+
+    // When the current child builder is finished, we needs to call this to indicate that the
+    // DiffBuilder should stop accepting further modifications to the current child. After calling
+    // this the builder will *not* add anything to the child builder.
+    virtual void finishChild() = 0;
+
+    friend class SubBuilderGuard<ArrayDiffBuilder>;
+    friend class SubBuilderGuard<DocumentDiffBuilder>;
 };
 
-class DocumentDiffBuilder;
+/**
+ * An RAII type class which provides access to a sub-diff builder. This can be used to let the
+ * parent builder know what to do with the current builder resource, i.e, either commit or destroy.
+ * Note that this class is not directly responsible for destroying the diff builders.
+ */
+template <class DiffBuilder>
+class SubBuilderGuard final {
+public:
+    SubBuilderGuard(DiffBuilderBase* parent, DiffBuilder* builder)
+        : _parent(parent), _builder(builder) {}
+    ~SubBuilderGuard() {
+        if (_parent) {
+            _parent->finishChild();
+        }
+    }
+
+    void abandon() {
+        _parent->abandonChild();
+        _parent = nullptr;
+        _builder = nullptr;
+    }
+
+    DiffBuilder* builder() {
+        return _builder;
+    }
+
+private:
+    // Both pointers are unowned.
+    DiffBuilderBase* _parent;
+    DiffBuilder* _builder;
+};
 
 /**
- * Class for building array diffs.
+ * Class for building array diffs. The diff builder does not take ownership of the BSONElement
+ * passed. It is the responsibility of the caller to ensure that data stays in scope until
+ * serializeTo() is called.
  */
 class ArrayDiffBuilder final : public DiffBuilderBase {
 public:
-    ~ArrayDiffBuilder() {
-        if (_parent) {
-            BSONObjBuilder builder;
-            releaseTo(&builder);
-            _parent->completeSubDiff(builder.obj());
-        }
-    }
+    using ArrayModification = stdx::variant<BSONElement, std::unique_ptr<DiffBuilderBase>>;
+    ~ArrayDiffBuilder() {}
 
     /**
      * Sets the new size of the array. Should only be used for array truncations.
@@ -89,6 +168,7 @@ public:
         // BSON only has signed 4 byte integers. The new size must fit into that type.
         invariant(index <= static_cast<uint32_t>(std::numeric_limits<int32_t>::max()));
         _newSize = static_cast<int32_t>(index);
+        sizeTracker.addEntry(kResizeSectionFieldName.size(), sizeof(uint32_t) /* size of value */);
     }
 
     /*
@@ -102,203 +182,119 @@ public:
      */
     void addUpdate(size_t idx, BSONElement newValue);
 
-    DocumentDiffBuilder startSubObjDiff(size_t idx);
-    ArrayDiffBuilder startSubArrDiff(size_t idx);
-
     /**
-     * Indicates that the changes added to this diff builder should be discarded. After calling
-     * this the builder will *not* add anything to its parent builder.
+     * Starts a sub-diff object and returns an unowned pointer to the sub-diff builder. The client
+     * should not try to destroy the object.
      */
-    void abandon() {
-        if (_parent) {
-            _parent->abandonChild();
-            _parent = nullptr;
-        }
-    }
+    SubBuilderGuard<DocumentDiffBuilder> startSubObjDiff(size_t idx);
+    SubBuilderGuard<ArrayDiffBuilder> startSubArrDiff(size_t idx);
 
-    void abandonChild() override {
-        invariant(_childSubDiffIndex);
-        _childSubDiffIndex = {};
-    }
-
-    // Called by child builders when they've completed.
-    void completeSubDiff(Diff childDiff) override {
-        invariant(_childSubDiffIndex);
-        _modifications.push_back({*_childSubDiffIndex, std::move(childDiff)});
-        _childSubDiffIndex = {};
-    }
-
-    size_t computeApproxSize() const {
-        // TODO SERVER-48602: We need to ensure that this function returns in O(1). Incrementally
-        // computing this size might be one option.
-        size_t size = sizeof(int) /* Size of object */ + 1 /* Type byte */ + kArrayHeader.size() +
-            1 /* null terminator */ + 1 /*type byte */ + 1 /* bool size*/;
-
-        if (_newSize) {
-            size += kResizeSectionFieldName.size() + 1 /* Null terminator */ + 1 /* Type byte */ +
-                sizeof(int) /* size of value */;
-        }
-
-        for (auto&& [idx, modification] : _modifications) {
-            stdx::visit(visit_helper::Overloaded{[idx = idx, &size](const Diff& subDiff) {
-                                                     size += sizeof(idx) +
-                                                         kSubDiffSectionFieldName.size() +
-                                                         subDiff.objsize() + 2;
-                                                 },
-                                                 [idx = idx, &size](BSONElement elt) {
-                                                     size += sizeof(idx) +
-                                                         kUpdateSectionFieldName.size() +
-                                                         elt.size() + 2;
-                                                 }},
-                        modification);
-        }
-
-        return size;
-    }
+    // Dumps the diff into the given builder.
+    void serializeTo(BSONObjBuilder* out) const;
 
 private:
     // The top-level of a diff is never an array diff. One can only construct an ArrayDiffBuilder
     // from a parent DocumentDiffBuilder.
-    explicit ArrayDiffBuilder(DiffBuilderBase* parent) : _parent(parent) {
-        invariant(_parent);
+    explicit ArrayDiffBuilder() : DiffBuilderBase(kSizeOfEmptyArrayDiffBuilder) {}
+
+    void abandonChild() override {
+        invariant(!_modifications.empty());
+        _modifications.pop_back();
     }
 
-    // Dumps the diff into the given builder.
-    void releaseTo(BSONObjBuilder* out);
+    void finishChild() override {
+        invariant(!_modifications.empty());
+        sizeTracker.addEntry(
+            _modifications.back().first.size() + kSubDiffSectionFieldName.size(),
+            stdx::get<std::unique_ptr<DiffBuilderBase>>(_modifications.back().second)
+                ->getObjSize());
+    }
 
     // Each element is either an update (BSONElement) or a sub diff.
-    std::vector<std::pair<size_t, stdx::variant<BSONElement, Diff>>> _modifications;
+    std::vector<std::pair<std::string, ArrayModification>> _modifications;
+
     boost::optional<int32_t> _newSize;
-
-    // If there is an outstanding child builder, which index it is under.
-    boost::optional<size_t> _childSubDiffIndex;
-
-    // Parent DiffBuilder, if any. When this diff builder is destroyed, it will write all of the
-    // modifications into its parent (unless it was abandoned).
-    DiffBuilderBase* _parent = nullptr;
 
     friend class DocumentDiffBuilder;
 };  // namespace doc_diff
 
 /**
- * Class for building document diffs.
+ * Class for building document diffs. The diff builder does not take ownership of either the field
+ * name or the BSONElement passed. It is the responsibility of the caller to ensure that data stays
+ * in scope until serialize() is called.
  */
 class DocumentDiffBuilder final : public DiffBuilderBase {
 public:
-    DocumentDiffBuilder() = default;
-    ~DocumentDiffBuilder() {
-        if (_parent) {
-            BSONObjBuilder builder;
-            releaseTo(&builder);
-            _parent->completeSubDiff(builder.obj());
-        }
-    }
+    DocumentDiffBuilder(size_t padding = kAdditionalPaddingForObjectSize)
+        : DiffBuilderBase(kSizeOfEmptyDocumentDiffBuilder + padding) {}
 
     /**
      * Produces an owned BSONObj representing the diff.
      */
-    Diff release() {
+    Diff serialize() const {
         BSONObjBuilder bob;
-        releaseTo(&bob);
+        serializeTo(&bob);
         return bob.obj();
     }
 
     /**
-     * Similar to release() but using an existing BSONObjBuilder.
+     * Similar to serialize() but using an existing BSONObjBuilder.
      */
-    void releaseTo(BSONObjBuilder* out);
+    void serializeTo(BSONObjBuilder* out) const;
 
     /**
      * Functions for adding pieces of the diff. These functions must be called no more than once
      * for a given field. They make no attempt to check for duplicates.
      */
     void addDelete(StringData field) {
-        _deletes.append(field, false);
+        // Add the size of 'field' + 'value'.
+        sizeTracker.addEntry(field.size(), sizeof(char), _deletes.empty());
+
+        _deletes.push_back(field);
     }
     void addUpdate(StringData field, BSONElement value) {
-        _updates.appendAs(value, field);
+        // Add the size of 'field' + 'value'.
+        sizeTracker.addEntry(field.size(), value.valuesize(), _updates.empty());
+
+        _updates.push_back({field, value});
     }
     void addInsert(StringData field, BSONElement value) {
-        _inserts.appendAs(value, field);
+        // Add the size of 'field' + 'value'.
+        sizeTracker.addEntry(field.size(), value.valuesize(), _inserts.empty());
+
+        _inserts.push_back({field, value});
     }
 
     /**
      * Methods for starting sub diffs. Must not be called more than once for a given field.  The
      * contents of the StringData passed in must live for the entire duration of the sub-builder's
-     * life.
+     * life. Returns an unowned pointer to the sub-diff builder. The client should not try to
+     * destroy the object.
      */
-    DocumentDiffBuilder startSubObjDiff(StringData field);
-    ArrayDiffBuilder startSubArrDiff(StringData field);
-
-    /**
-     * Indicates that the diff being built will never be serialized. If this is a child builder,
-     * calling this will ensure that the diff is not added to the parent's buffer on destruction.
-     */
-    void abandon() {
-        if (_parent) {
-            _parent->abandonChild();
-            _parent = nullptr;
-        }
-        _deletes.abandon();
-        _updates.abandon();
-        _inserts.abandon();
-    }
-
-    void abandonChild() override {
-        invariant(_childSubDiffField);
-        _childSubDiffField = {};
-    }
-
-    // Called by child builders when they are done.
-    void completeSubDiff(Diff childDiff) override {
-        invariant(_childSubDiffField);
-        _subDiffs.append(*_childSubDiffField, std::move(childDiff));
-        _childSubDiffField = {};
-    }
-
-    size_t computeApproxSize() {
-        // TODO SERVER-48602: We need to ensure that this function returns in O(1). Incrementally
-        // computing this size might be one option.
-        size_t size = sizeof(int) /* Size of object */ + 1 /* Type byte */;
-
-        if (!_updates.asTempObj().isEmpty()) {
-            size += 1 /* Type byte */ + kUpdateSectionFieldName.size() /* FieldName */ +
-                1 /* Null terminator */ + _updates.bb().len() + 1 /* Null terminator */;
-        }
-
-        if (!_inserts.asTempObj().isEmpty()) {
-            size += 1 /* Type byte */ + kInsertSectionFieldName.size() /* FieldName */ +
-                1 /* Null terminator */ + _inserts.bb().len() + 1 /* Null terminator */;
-        }
-
-        if (!_deletes.asTempObj().isEmpty()) {
-            size += 1 /* Type byte */ + kDeleteSectionFieldName.size() /* FieldName */ +
-                1 /* Null terminator */ + _deletes.bb().len() + 1 /* Null terminator */;
-        }
-
-        if (!_subDiffs.asTempObj().isEmpty()) {
-            size += 1 /* Type byte */ + kSubDiffSectionFieldName.size() /* FieldName */ +
-                1 /* Null terminator */ + _subDiffs.bb().len() + 1 /* Null terminator */;
-        }
-        return size;
-    }
+    SubBuilderGuard<DocumentDiffBuilder> startSubObjDiff(StringData field);
+    SubBuilderGuard<ArrayDiffBuilder> startSubArrDiff(StringData field);
 
 private:
-    DocumentDiffBuilder(DiffBuilderBase* parent) : _parent(parent) {}
+    void abandonChild() override {
+        invariant(!_subDiffs.empty());
+        _subDiffs.pop_back();
+    }
 
-    // TODO SERVER-48602: By using a BSONObjBuilder here and again in release() we make two copies
-    // of each part of the diff before serializing it. An optimized implementation should avoid
-    // this by only creating a BSONObjBuilder when it is time to serialize.
-    BSONObjBuilder _subDiffs;
-    BSONObjBuilder _deletes;
-    BSONObjBuilder _updates;
-    BSONObjBuilder _inserts;
+    void finishChild() override {
+        invariant(!_subDiffs.empty());
+
+        // Add the size of 'field' + 'value'.
+        sizeTracker.addEntry(_subDiffs.back().first.size(),
+                             _subDiffs.back().second->getObjSize(),
+                             _subDiffs.size() == 1);
+    }
+    std::vector<std::pair<StringData, BSONElement>> _updates;
+    std::vector<std::pair<StringData, BSONElement>> _inserts;
+    std::vector<StringData> _deletes;
+    std::vector<std::pair<StringData, std::unique_ptr<DiffBuilderBase>>> _subDiffs;
 
     // If there is an outstanding child diff builder, its field is stored here.
     boost::optional<std::string> _childSubDiffField;
-
-    // Only used by sub-builders.
-    DiffBuilderBase* _parent = nullptr;
 
     friend class ArrayDiffBuilder;
 };
