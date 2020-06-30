@@ -500,7 +500,8 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
     const latestOpOnOldPrimary = getLatestOp(oldPrimary);
 
     // New primary wins immediately, but needs to catch up.
-    const newPrimary = rst.stepUpNoAwaitReplication(node);
+    const newPrimary =
+        rst.stepUp(node, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
     const latestOpOnNewPrimary = getLatestOp(newPrimary);
     // Check this node is not writable.
     assert.eq(newPrimary.getDB("test").isMaster().ismaster, false);

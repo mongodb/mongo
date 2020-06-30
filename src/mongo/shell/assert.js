@@ -351,7 +351,19 @@ assert = (function() {
     assert.soonNoExcept = function(func, msg, timeout, interval) {
         var safeFunc =
             _convertExceptionToReturnStatus(func, "assert.soonNoExcept caught exception");
-        assert.soon(safeFunc, msg, timeout, interval);
+        var safeFuncwithMinimizedNoise = () => {
+            // Turns off printing the JavaScript stacktrace in doassert() to avoid generating an
+            // overwhelming amount of log messages when handling transient errors.
+            const origTraceExceptions = TestData.traceExceptions;
+            TestData.traceExceptions = false;
+
+            const res = safeFunc();
+
+            // Restore it's value to original value.
+            TestData.traceExceptions = origTraceExceptions;
+            return res;
+        };
+        assert.soon(safeFuncwithMinimizedNoise, msg, timeout, interval);
     };
 
     /*

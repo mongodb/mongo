@@ -172,9 +172,7 @@ jsTestLog("Stepping up the secondary");
 
 // Step up the secondary after initial sync is done and make sure the other two transactions are
 // properly prepared.
-replTest.stepUpNoAwaitReplication(secondary);
-replTest.waitForState(secondary, ReplSetTest.State.PRIMARY);
-const newPrimary = replTest.getPrimary();
+const newPrimary = replTest.stepUp(secondary, {awaitReplicationBeforeStepUp: false});
 testDB = newPrimary.getDB(dbName);
 testColl = testDB.getCollection(collName);
 
