@@ -212,10 +212,11 @@ public:
 
     void resetLastOpTimesFromOplog(OperationContext*, DataConsistency) final;
 
-    bool shouldChangeSyncSource(const HostAndPort&,
-                                const rpc::ReplSetMetadata&,
-                                const rpc::OplogQueryMetadata&,
-                                const OpTime&) final;
+    ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort&,
+                                                  const rpc::ReplSetMetadata&,
+                                                  const rpc::OplogQueryMetadata&,
+                                                  const OpTime&,
+                                                  const OpTime&) final;
 
     OpTime getLastCommittedOpTime() const final;
 

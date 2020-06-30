@@ -54,10 +54,11 @@ public:
     void processMetadata(const rpc::ReplSetMetadata& replMetadata,
                          rpc::OplogQueryMetadata oqMetadata) override;
 
-    bool shouldStopFetching(const HostAndPort& source,
-                            const rpc::ReplSetMetadata& replMetadata,
-                            const rpc::OplogQueryMetadata& oqMetadata,
-                            const OpTime& lastOpTimeFetched) override;
+    ChangeSyncSourceAction shouldStopFetching(const HostAndPort& source,
+                                              const rpc::ReplSetMetadata& replMetadata,
+                                              const rpc::OplogQueryMetadata& oqMetadata,
+                                              const OpTime& previousOpTimeFetched,
+                                              const OpTime& lastOpTimeFetched) override;
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* opCtx) const override;
 

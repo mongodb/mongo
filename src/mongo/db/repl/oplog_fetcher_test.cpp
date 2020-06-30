@@ -323,7 +323,9 @@ protected:
      * Tests checkSyncSource result handling.
      */
     void testSyncSourceChecking(const rpc::ReplSetMetadata& replMetadata,
-                                const rpc::OplogQueryMetadata& oqMetadata);
+                                const rpc::OplogQueryMetadata& oqMetadata,
+                                ChangeSyncSourceAction changeSyncSourceAction =
+                                    ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch);
 
     void validateLastBatch(bool skipFirstDoc, OplogFetcher::Documents docs, OpTime lastFetched);
 
@@ -478,14 +480,15 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(const Messag
 }
 
 void OplogFetcherTest::testSyncSourceChecking(const rpc::ReplSetMetadata& replMetadata,
-                                              const rpc::OplogQueryMetadata& oqMetadata) {
+                                              const rpc::OplogQueryMetadata& oqMetadata,
+                                              ChangeSyncSourceAction changeSyncSourceAction) {
     auto firstEntry = makeNoopOplogEntry(lastFetched);
     auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
     auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.getTerm()});
 
     auto metadataObj = makeOplogBatchMetadata(replMetadata, oqMetadata);
 
-    dataReplicatorExternalState->shouldStopFetchingResult = true;
+    dataReplicatorExternalState->shouldStopFetchingResult = changeSyncSourceAction;
 
     auto shutdownState =
         processSingleBatch(makeFirstBatch(0, {firstEntry, secondEntry, thirdEntry}, metadataObj),
@@ -1832,6 +1835,10 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithBothMetadatasStopsTheOplogFetc
     ASSERT_EQUALS(source, dataReplicatorExternalState->lastSyncSourceChecked);
     ASSERT_EQUALS(oqMetadata.getLastOpApplied(), dataReplicatorExternalState->syncSourceLastOpTime);
     ASSERT_TRUE(dataReplicatorExternalState->syncSourceHasSyncSource);
+
+    // We should have enqueued the last batch if the 'shouldStopFetching' check returns
+    // kStopSyncingAndEnqueueLastBatch.
+    ASSERT_FALSE(lastEnqueuedDocuments.empty());
 }
 
 TEST_F(OplogFetcherTest,
@@ -1845,6 +1852,19 @@ TEST_F(OplogFetcherTest,
     ASSERT_EQUALS(oplogQueryMetadata.getLastOpApplied(),
                   dataReplicatorExternalState->syncSourceLastOpTime);
     ASSERT_FALSE(dataReplicatorExternalState->syncSourceHasSyncSource);
+
+    // We should have enqueued the last batch if the 'shouldStopFetching' check returns
+    // kStopSyncingAndEnqueueLastBatch.
+    ASSERT_FALSE(lastEnqueuedDocuments.empty());
+}
+
+TEST_F(OplogFetcherTest, FailedSyncSourceCheckReturnsStopSyncingAndDropBatch) {
+    testSyncSourceChecking(
+        replSetMetadata, oqMetadata, ChangeSyncSourceAction::kStopSyncingAndDropLastBatch);
+
+    // If the 'shouldStopFetching' check returns kStopSyncingAndDropLastBatch, we should not enqueue
+    // any documents.
+    ASSERT_TRUE(lastEnqueuedDocuments.empty());
 }
 
 TEST_F(OplogFetcherTest, ValidateDocumentsReturnsNoSuchKeyIfTimestampIsNotFoundInAnyDocument) {

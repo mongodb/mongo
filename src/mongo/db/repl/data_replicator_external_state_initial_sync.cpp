@@ -40,16 +40,18 @@ DataReplicatorExternalStateInitialSync::DataReplicatorExternalStateInitialSync(
     : DataReplicatorExternalStateImpl(replicationCoordinator, replicationCoordinatorExternalState) {
 }
 
-bool DataReplicatorExternalStateInitialSync::shouldStopFetching(const HostAndPort&,
-                                                                const rpc::ReplSetMetadata&,
-                                                                const rpc::OplogQueryMetadata&,
-                                                                const OpTime& lastOpTimeFetched) {
+ChangeSyncSourceAction DataReplicatorExternalStateInitialSync::shouldStopFetching(
+    const HostAndPort&,
+    const rpc::ReplSetMetadata&,
+    const rpc::OplogQueryMetadata&,
+    const OpTime& previousOpTimeFetched,
+    const OpTime& lastOpTimeFetched) {
 
     // Since initial sync does not allow for sync source changes, it should not check if there are
     // better sync sources. If there is a problem on the sync source, it will manifest itself in the
     // cloning phase as well, and cause a failure there.
 
-    return false;
+    return ChangeSyncSourceAction::kContinueSyncing;
 }
 
 }  // namespace repl

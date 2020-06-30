@@ -56,11 +56,13 @@ void SyncSourceSelectorMock::setChooseNewSyncSourceHook_forTest(
     _chooseNewSyncSourceHook = hook;
 }
 
-bool SyncSourceSelectorMock::shouldChangeSyncSource(const HostAndPort&,
-                                                    const rpc::ReplSetMetadata&,
-                                                    const rpc::OplogQueryMetadata& oqMetadata,
-                                                    const OpTime& lastOpTimeFetched) {
-    return false;
+ChangeSyncSourceAction SyncSourceSelectorMock::shouldChangeSyncSource(
+    const HostAndPort&,
+    const rpc::ReplSetMetadata&,
+    const rpc::OplogQueryMetadata& oqMetadata,
+    const OpTime& previousOpTimeFetched,
+    const OpTime& lastOpTimeFetched) {
+    return ChangeSyncSourceAction::kContinueSyncing;
 }
 
 void SyncSourceSelectorMock::setChooseNewSyncSourceResult_forTest(const HostAndPort& syncSource) {

@@ -89,10 +89,12 @@ void DataReplicatorExternalStateMock::processMetadata(const rpc::ReplSetMetadata
     metadataWasProcessed = true;
 }
 
-bool DataReplicatorExternalStateMock::shouldStopFetching(const HostAndPort& source,
-                                                         const rpc::ReplSetMetadata& replMetadata,
-                                                         const rpc::OplogQueryMetadata& oqMetadata,
-                                                         const OpTime& lastOpTimeFetched) {
+ChangeSyncSourceAction DataReplicatorExternalStateMock::shouldStopFetching(
+    const HostAndPort& source,
+    const rpc::ReplSetMetadata& replMetadata,
+    const rpc::OplogQueryMetadata& oqMetadata,
+    const OpTime& previousOpTimeFetched,
+    const OpTime& lastOpTimeFetched) {
     lastSyncSourceChecked = source;
     syncSourceLastOpTime = oqMetadata.getLastOpApplied();
     syncSourceHasSyncSource = oqMetadata.getSyncSourceIndex() != -1;

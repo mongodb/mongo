@@ -283,10 +283,11 @@ public:
     virtual void resetLastOpTimesFromOplog(OperationContext* opCtx,
                                            DataConsistency consistency) override;
 
-    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const rpc::ReplSetMetadata& replMetadata,
-                                        const rpc::OplogQueryMetadata& oqMetadata,
-                                        const OpTime& lastOpTimeFetched) override;
+    virtual ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                          const rpc::ReplSetMetadata& replMetadata,
+                                                          const rpc::OplogQueryMetadata& oqMetadata,
+                                                          const OpTime& previousOpTimeFetched,
+                                                          const OpTime& lastOpTimeFetched) override;
 
     virtual OpTime getLastCommittedOpTime() const override;
     virtual OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const override;

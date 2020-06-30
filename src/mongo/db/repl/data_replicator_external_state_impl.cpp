@@ -91,13 +91,16 @@ void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata
     }
 }
 
-bool DataReplicatorExternalStateImpl::shouldStopFetching(const HostAndPort& source,
-                                                         const rpc::ReplSetMetadata& replMetadata,
-                                                         const rpc::OplogQueryMetadata& oqMetadata,
-                                                         const OpTime& lastOpTimeFetched) {
+ChangeSyncSourceAction DataReplicatorExternalStateImpl::shouldStopFetching(
+    const HostAndPort& source,
+    const rpc::ReplSetMetadata& replMetadata,
+    const rpc::OplogQueryMetadata& oqMetadata,
+    const OpTime& previousOpTimeFetched,
+    const OpTime& lastOpTimeFetched) {
     // Re-evaluate quality of sync target.
-    if (_replicationCoordinator->shouldChangeSyncSource(
-            source, replMetadata, oqMetadata, lastOpTimeFetched)) {
+    auto changeSyncSourceAction = _replicationCoordinator->shouldChangeSyncSource(
+        source, replMetadata, oqMetadata, previousOpTimeFetched, lastOpTimeFetched);
+    if (changeSyncSourceAction != ChangeSyncSourceAction::kContinueSyncing) {
         LOGV2(21150,
               "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
               "sync source. Current source: {syncSource}, OpTime {lastAppliedOpTime}, "
@@ -107,10 +110,8 @@ bool DataReplicatorExternalStateImpl::shouldStopFetching(const HostAndPort& sour
               "syncSource"_attr = source,
               "lastAppliedOpTime"_attr = oqMetadata.getLastOpApplied(),
               "syncSourceIndex"_attr = oqMetadata.getSyncSourceIndex());
-
-        return true;
     }
-    return false;
+    return changeSyncSourceAction;
 }
 
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOplogBuffer(

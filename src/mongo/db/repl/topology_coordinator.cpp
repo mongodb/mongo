@@ -3016,7 +3016,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
               "Choosing new sync source. Our current sync source is not primary and does "
               "not have a sync source, so we require that it is ahead of us",
               "syncSource"_attr = currentSource,
-              "lastFetchedOpTime"_attr = lastOpTimeFetched,
+              "lastOpTimeFetched"_attr = lastOpTimeFetched,
               "syncSourceLatestOplogOpTime"_attr = currentSourceOpTime,
               "isPrimary"_attr = replMetadata.getIsPrimary());
         return true;
@@ -3069,7 +3069,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
 
 bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort& currentSource,
                                                               const MemberState& memberState,
-                                                              const OpTime& lastOpTimeFetched,
+                                                              const OpTime& previousOpTimeFetched,
                                                               Date_t now,
                                                               const ReadPreference readPreference) {
     // If we find an eligible sync source that is significantly closer than our current sync source,
@@ -3146,8 +3146,11 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
             continue;
         }
 
-        if (_isEligibleSyncSource(
-                candidateIndex, now, lastOpTimeFetched, readPreference, true /* firstAttempt */)) {
+        if (_isEligibleSyncSource(candidateIndex,
+                                  now,
+                                  previousOpTimeFetched,
+                                  readPreference,
+                                  true /* firstAttempt */)) {
             LOGV2(4744901,
                   "Choosing new sync source because we have found another potential sync "
                   "source that is significantly closer than our current sync source",

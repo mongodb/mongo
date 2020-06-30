@@ -4803,20 +4803,30 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opC
     _reportUpstream_inlock(std::move(lock));
 }
 
-bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
-                                                        const rpc::ReplSetMetadata& replMetadata,
-                                                        const rpc::OplogQueryMetadata& oqMetadata,
-                                                        const OpTime& lastOpTimeFetched) {
+ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(
+    const HostAndPort& currentSource,
+    const rpc::ReplSetMetadata& replMetadata,
+    const rpc::OplogQueryMetadata& oqMetadata,
+    const OpTime& previousOpTimeFetched,
+    const OpTime& lastOpTimeFetched) {
     stdx::lock_guard<Latch> lock(_mutex);
     const auto now = _replExecutor->now();
+
     if (_topCoord->shouldChangeSyncSource(
             currentSource, replMetadata, oqMetadata, lastOpTimeFetched, now)) {
-        return true;
+        return ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch;
     }
 
     const auto readPreference = _getSyncSourceReadPreference(lock);
-    return _topCoord->shouldChangeSyncSourceDueToPingTime(
-        currentSource, _getMemberState_inlock(), lastOpTimeFetched, now, readPreference);
+    if (_topCoord->shouldChangeSyncSourceDueToPingTime(
+            currentSource, _getMemberState_inlock(), previousOpTimeFetched, now, readPreference)) {
+        // We should drop the last batch if we find a significantly closer node. This is to
+        // avoid advancing our 'lastFetched', which makes it more likely that we will be able to
+        // choose the closer node as our sync source.
+        return ChangeSyncSourceAction::kStopSyncingAndDropLastBatch;
+    }
+
+    return ChangeSyncSourceAction::kContinueSyncing;
 }
 
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock lk) {

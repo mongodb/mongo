@@ -247,10 +247,11 @@ public:
 
     bool lastOpTimesWereReset() const;
 
-    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const rpc::ReplSetMetadata& replMetadata,
-                                        const rpc::OplogQueryMetadata& oqMetadata,
-                                        const OpTime& lastOpTimeFetched);
+    virtual ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                          const rpc::ReplSetMetadata& replMetadata,
+                                                          const rpc::OplogQueryMetadata& oqMetadata,
+                                                          const OpTime& previousOpTimeFetched,
+                                                          const OpTime& lastOpTimeFetched);
 
     virtual OpTime getLastCommittedOpTime() const;
 

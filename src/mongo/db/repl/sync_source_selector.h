@@ -48,6 +48,12 @@ namespace repl {
 class OpTime;
 struct SyncSourceResolverResponse;
 
+enum class ChangeSyncSourceAction {
+    kContinueSyncing,
+    kStopSyncingAndDropLastBatch,
+    kStopSyncingAndEnqueueLastBatch
+};
+
 /**
  * Manage list of viable and blocked sync sources that we can replicate from.
  */
@@ -84,10 +90,11 @@ public:
      *
      * "now" is used to skip over currently blacklisted sync sources.
      */
-    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const rpc::ReplSetMetadata& replMetadata,
-                                        const rpc::OplogQueryMetadata& oqMetadata,
-                                        const OpTime& lastOpTimeFetched) = 0;
+    virtual ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                          const rpc::ReplSetMetadata& replMetadata,
+                                                          const rpc::OplogQueryMetadata& oqMetadata,
+                                                          const OpTime& previousOpTimeFetched,
+                                                          const OpTime& lastOpTimeFetched) = 0;
 };
 
 }  // namespace repl

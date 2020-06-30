@@ -277,7 +277,7 @@ public:
      */
     bool shouldChangeSyncSourceDueToPingTime(const HostAndPort& currentSource,
                                              const MemberState& memberState,
-                                             const OpTime& lastOpTimeFetched,
+                                             const OpTime& previousOpTimeFetched,
                                              Date_t now,
                                              const ReadPreference readPreference);
 

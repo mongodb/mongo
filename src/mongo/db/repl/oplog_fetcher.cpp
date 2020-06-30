@@ -680,14 +680,16 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     }
 
     // This lastFetched value is the last OpTime from the previous batch.
-    auto lastFetched = _getLastOpTimeFetched();
+    auto previousOpTimeFetched = _getLastOpTimeFetched();
 
     auto validateResult = OplogFetcher::validateDocuments(
-        documents, _firstBatch, lastFetched.getTimestamp(), _startingPoint);
+        documents, _firstBatch, previousOpTimeFetched.getTimestamp(), _startingPoint);
     if (!validateResult.isOK()) {
         return validateResult.getStatus();
     }
     auto info = validateResult.getValue();
+    // If the batch is empty, set 'lastDocOpTime' to the lastFetched from the previous batch.
+    auto lastDocOpTime = info.lastDocument.isNull() ? previousOpTimeFetched : info.lastDocument;
 
     // Process replset metadata.  It is important that this happen after we've validated the
     // first batch, so we don't progress our knowledge of the commit point from a
@@ -704,6 +706,24 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         return metadataResult.getStatus();
     }
     auto replSetMetadata = metadataResult.getValue();
+
+    // Determine if we should stop syncing from our current sync source.
+    auto changeSyncSourceAction = _dataReplicatorExternalState->shouldStopFetching(
+        _source, replSetMetadata, oqMetadata, previousOpTimeFetched, lastDocOpTime);
+    str::stream errMsg;
+    errMsg << "sync source " << _source.toString();
+    errMsg << " (config version: " << replSetMetadata.getConfigVersion();
+    errMsg << "; last applied optime: " << oqMetadata.getLastOpApplied().toString();
+    errMsg << "; sync source index: " << oqMetadata.getSyncSourceIndex();
+    errMsg << "; has primary index: " << oqMetadata.hasPrimaryIndex();
+    errMsg << ") is no longer valid";
+    errMsg << " previous batch last fetched optime: " << previousOpTimeFetched.toString();
+    errMsg << " current batch last fetched optime: " << lastDocOpTime.toString();
+
+    if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndDropLastBatch) {
+        return Status(ErrorCodes::InvalidSyncSource, errMsg);
+    }
+
     _dataReplicatorExternalState->processMetadata(replSetMetadata, oqMetadata);
 
     // Increment stats. We read all of the docs in the query.
@@ -717,6 +737,10 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         return status;
     }
 
+    if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch) {
+        return Status(ErrorCodes::InvalidSyncSource, errMsg);
+    }
+
     if (MONGO_unlikely(hangOplogFetcherBeforeAdvancingLastFetched.shouldFail())) {
         hangOplogFetcherBeforeAdvancingLastFetched.pauseWhileSet();
     }
@@ -725,14 +749,9 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     // of this fetcher.
     _startingPoint = StartingPoint::kSkipFirstDoc;
 
-    // We have now processed the batch and should move forward our view of _lastFetched.
-    if (documents.size() > 0) {
-        auto lastDocOpTimeRes = OpTime::parseFromOplogEntry(documents.back());
-        if (!lastDocOpTimeRes.isOK()) {
-            return lastDocOpTimeRes.getStatus();
-        }
-
-        auto lastDocOpTime = lastDocOpTimeRes.getValue();
+    // We have now processed the batch. We should only move forward our view of _lastFetched if the
+    // batch was not empty.
+    if (lastDocOpTime != previousOpTimeFetched) {
         LOGV2_DEBUG(21273,
                     3,
                     "Oplog fetcher setting last fetched optime ahead after batch: {lastDocOpTime}",
@@ -741,22 +760,6 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
 
         stdx::lock_guard<Latch> lock(_mutex);
         _lastFetched = lastDocOpTime;
-    }
-
-    // Get the last fetched optime from the most recent batch.
-    lastFetched = _getLastOpTimeFetched();
-
-    if (_dataReplicatorExternalState->shouldStopFetching(
-            _source, replSetMetadata, oqMetadata, lastFetched)) {
-        str::stream errMsg;
-        errMsg << "sync source " << _source.toString();
-        errMsg << " (config version: " << replSetMetadata.getConfigVersion();
-        errMsg << "; last applied optime: " << oqMetadata.getLastOpApplied().toString();
-        errMsg << "; sync source index: " << oqMetadata.getSyncSourceIndex();
-        errMsg << "; has primary index: " << oqMetadata.hasPrimaryIndex();
-        errMsg << ") is no longer valid";
-        errMsg << "last fetched optime: " << lastFetched.toString();
-        return Status(ErrorCodes::InvalidSyncSource, errMsg);
     }
 
     _firstBatch = false;

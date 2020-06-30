@@ -218,10 +218,11 @@ public:
 
     void resetLastOpTimesFromOplog(OperationContext*, DataConsistency) override;
 
-    bool shouldChangeSyncSource(const HostAndPort&,
-                                const rpc::ReplSetMetadata&,
-                                const rpc::OplogQueryMetadata&,
-                                const repl::OpTime&) override;
+    repl::ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort&,
+                                                        const rpc::ReplSetMetadata&,
+                                                        const rpc::OplogQueryMetadata&,
+                                                        const repl::OpTime&,
+                                                        const repl::OpTime&) override;
 
     repl::OpTime getLastCommittedOpTime() const override;
 

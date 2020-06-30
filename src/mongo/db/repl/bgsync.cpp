@@ -110,10 +110,11 @@ public:
         ReplicationCoordinator* replicationCoordinator,
         ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
         BackgroundSync* bgsync);
-    bool shouldStopFetching(const HostAndPort& source,
-                            const rpc::ReplSetMetadata& replMetadata,
-                            const rpc::OplogQueryMetadata& oqMetadata,
-                            const OpTime& lastOpTimeFetched) override;
+    ChangeSyncSourceAction shouldStopFetching(const HostAndPort& source,
+                                              const rpc::ReplSetMetadata& replMetadata,
+                                              const rpc::OplogQueryMetadata& oqMetadata,
+                                              const OpTime& previousOpTimeFetched,
+                                              const OpTime& lastOpTimeFetched) override;
 
 private:
     BackgroundSync* _bgsync;
@@ -126,17 +127,18 @@ DataReplicatorExternalStateBackgroundSync::DataReplicatorExternalStateBackground
     : DataReplicatorExternalStateImpl(replicationCoordinator, replicationCoordinatorExternalState),
       _bgsync(bgsync) {}
 
-bool DataReplicatorExternalStateBackgroundSync::shouldStopFetching(
+ChangeSyncSourceAction DataReplicatorExternalStateBackgroundSync::shouldStopFetching(
     const HostAndPort& source,
     const rpc::ReplSetMetadata& replMetadata,
     const rpc::OplogQueryMetadata& oqMetadata,
+    const OpTime& previousOpTimeFetched,
     const OpTime& lastOpTimeFetched) {
     if (_bgsync->shouldStopFetching()) {
-        return true;
+        return ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch;
     }
 
     return DataReplicatorExternalStateImpl::shouldStopFetching(
-        source, replMetadata, oqMetadata, lastOpTimeFetched);
+        source, replMetadata, oqMetadata, previousOpTimeFetched, lastOpTimeFetched);
 }
 
 size_t getSize(const BSONObj& o) {
