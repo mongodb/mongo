@@ -16,3 +16,10 @@ signal:src/mongo/unittest/death_test.cpp
 # TODO: https://jira.mongodb.org/browse/SERVER-48599
 race:src/third_party/wiredtiger/*
 
+# These functions call malloc() down the line while inside a signal handler.
+# Since we've never had problems with any of the allocators we use, and since
+# the process is going to exit in actual practice (unlike in some of our tests),
+# we are taking the calculated risk to allow AS-unsafe calls in our signal
+# handlers.
+signal:abruptQuitAction
+signal:abruptQuitWithAddrSignal
