@@ -50,6 +50,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
@@ -931,6 +932,9 @@ void execCommandDatabase(OperationContext* opCtx,
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+
+        auto apiParams = initializeAPIParameters(request.body);
+
         sessionOptions = initializeOperationSessionInfo(
             opCtx,
             request.body,

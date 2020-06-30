@@ -46,6 +46,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
@@ -345,6 +346,8 @@ void runCommand(OperationContext* opCtx,
 
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
+
+    auto apiParams = initializeAPIParameters(request.body);
 
     auto osi = initializeOperationSessionInfo(opCtx,
                                               request.body,

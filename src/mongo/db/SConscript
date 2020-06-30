@@ -1398,7 +1398,9 @@ env.Library(
 env.Library(
     target='shared_request_handling',
     source=[
+        'initialize_api_parameters.cpp',
         'transaction_validation.cpp',
+        env.Idlc('initialize_api_parameters.idl')[0],
     ],
     LIBDEPS=[
         'error_labels',
