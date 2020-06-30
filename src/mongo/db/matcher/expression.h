@@ -33,6 +33,7 @@
 #include <functional>
 #include <memory>
 
+#include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -203,6 +204,51 @@ public:
     using ConstIterator = MatchExpressionIterator<true>;
 
     /**
+     * Tracks the information needed to generate a document validation error for a
+     * MatchExpression node.
+     */
+    struct ErrorAnnotation {
+        /**
+         * Enumerated type describing what action to take when generating errors for document
+         * validation failures.
+         */
+        enum class Mode {
+            // Do not generate an error for this MatchExpression or any of its children.
+            kIgnore,
+            // Do not generate an error for this MatchExpression, but iterate over any children
+            // as they may provide useful information. This is particularly useful for translated
+            // jsonSchema keywords.
+            kIgnoreButDescend,
+            // Generate an error message.
+            kGenerateError,
+        };
+
+        /**
+         * Constructs an annotation for a MatchExpression which does not contribute to error output.
+         */
+        ErrorAnnotation(Mode mode) : operatorName(""), annotation(BSONObj()), mode(mode) {
+            invariant(mode != Mode::kGenerateError);
+        }
+
+        /**
+         * Constructs a complete annotation for a MatchExpression which contributes to error output.
+         */
+        ErrorAnnotation(std::string operatorName, BSONObj annotation)
+            : operatorName(std::move(operatorName)),
+              annotation(annotation.getOwned()),
+              mode(Mode::kGenerateError) {}
+
+        std::unique_ptr<ErrorAnnotation> clone() const {
+            return std::make_unique<ErrorAnnotation>(*this);
+        }
+
+        const std::string operatorName;
+        // Tracks the original expression as specified by the user.
+        const BSONObj annotation;
+        const Mode mode;
+    };
+
+    /**
      * Make simplifying changes to the structure of a MatchExpression tree without altering its
      * semantics. This function may return:
      *   - a pointer to the original, unmodified MatchExpression,
@@ -243,7 +289,7 @@ public:
         return tree;
     }
 
-    MatchExpression(MatchType type);
+    MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation = nullptr);
     virtual ~MatchExpression() {}
 
     //
@@ -411,6 +457,11 @@ public:
     virtual void acceptVisitor(MatchExpressionMutableVisitor* visitor) = 0;
     virtual void acceptVisitor(MatchExpressionConstVisitor* visitor) const = 0;
 
+    // Returns nullptr if this MatchExpression node has no annotation.
+    ErrorAnnotation* getErrorAnnotation() const {
+        return _errorAnnotation.get();
+    }
+
     //
     // Debug information
     //
@@ -448,6 +499,8 @@ protected:
     virtual void _doAddDependencies(DepsTracker* deps) const {}
 
     void _debugAddSpace(StringBuilder& debug, int indentationLevel) const;
+
+    clonable_ptr<ErrorAnnotation> _errorAnnotation;
 
 private:
     /**

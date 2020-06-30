@@ -50,17 +50,22 @@ class CollatorInterface;
 
 class LeafMatchExpression : public PathMatchExpression {
 public:
-    LeafMatchExpression(MatchType matchType, StringData path)
+    LeafMatchExpression(MatchType matchType,
+                        StringData path,
+                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : LeafMatchExpression(matchType,
                               path,
                               ElementPath::LeafArrayBehavior::kTraverse,
-                              ElementPath::NonLeafArrayBehavior::kTraverse) {}
+                              ElementPath::NonLeafArrayBehavior::kTraverse,
+                              std::move(annotation)) {}
 
     LeafMatchExpression(MatchType matchType,
                         StringData path,
                         ElementPath::LeafArrayBehavior leafArrBehavior,
-                        ElementPath::NonLeafArrayBehavior nonLeafArrBehavior)
-        : PathMatchExpression(matchType, path, leafArrBehavior, nonLeafArrBehavior) {}
+                        ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
+                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : PathMatchExpression(
+              matchType, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)) {}
 
     virtual ~LeafMatchExpression() = default;
 
@@ -102,7 +107,8 @@ public:
                                   StringData path,
                                   const BSONElement& rhs,
                                   ElementPath::LeafArrayBehavior,
-                                  ElementPath::NonLeafArrayBehavior);
+                                  ElementPath::NonLeafArrayBehavior,
+                                  clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual ~ComparisonMatchExpressionBase() = default;
 
@@ -173,7 +179,10 @@ public:
         }
     }
 
-    ComparisonMatchExpression(MatchType type, StringData path, const BSONElement& rhs);
+    ComparisonMatchExpression(MatchType type,
+                              StringData path,
+                              const BSONElement& rhs,
+                              clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual ~ComparisonMatchExpression() = default;
 
@@ -184,8 +193,10 @@ class EqualityMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$eq"_sd;
 
-    EqualityMatchExpression(StringData path, const BSONElement& rhs)
-        : ComparisonMatchExpression(EQ, path, rhs) {}
+    EqualityMatchExpression(StringData path,
+                            const BSONElement& rhs,
+                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(EQ, path, rhs, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -193,7 +204,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            std::make_unique<EqualityMatchExpression>(path(), _rhs);
+            std::make_unique<EqualityMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -214,8 +225,10 @@ class LTEMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$lte"_sd;
 
-    LTEMatchExpression(StringData path, const BSONElement& rhs)
-        : ComparisonMatchExpression(LTE, path, rhs) {}
+    LTEMatchExpression(StringData path,
+                       const BSONElement& rhs,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(LTE, path, rhs, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -223,7 +236,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            std::make_unique<LTEMatchExpression>(path(), _rhs);
+            std::make_unique<LTEMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -244,8 +257,10 @@ class LTMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$lt"_sd;
 
-    LTMatchExpression(StringData path, const BSONElement& rhs)
-        : ComparisonMatchExpression(LT, path, rhs) {}
+    LTMatchExpression(StringData path,
+                      const BSONElement& rhs,
+                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(LT, path, rhs, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -253,7 +268,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            std::make_unique<LTMatchExpression>(path(), _rhs);
+            std::make_unique<LTMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -274,8 +289,10 @@ class GTMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$gt"_sd;
 
-    GTMatchExpression(StringData path, const BSONElement& rhs)
-        : ComparisonMatchExpression(GT, path, rhs) {}
+    GTMatchExpression(StringData path,
+                      const BSONElement& rhs,
+                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(GT, path, rhs, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -283,7 +300,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            std::make_unique<GTMatchExpression>(path(), _rhs);
+            std::make_unique<GTMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -304,8 +321,10 @@ class GTEMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$gte"_sd;
 
-    GTEMatchExpression(StringData path, const BSONElement& rhs)
-        : ComparisonMatchExpression(GTE, path, rhs) {}
+    GTEMatchExpression(StringData path,
+                       const BSONElement& rhs,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(GTE, path, rhs, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -313,7 +332,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            std::make_unique<GTEMatchExpression>(path(), _rhs);
+            std::make_unique<GTEMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -474,7 +493,7 @@ private:
  */
 class InMatchExpression : public LeafMatchExpression {
 public:
-    explicit InMatchExpression(StringData path);
+    explicit InMatchExpression(StringData path, clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const;
 

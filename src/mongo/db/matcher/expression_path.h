@@ -45,8 +45,9 @@ public:
     PathMatchExpression(MatchType matchType,
                         StringData path,
                         ElementPath::LeafArrayBehavior leafArrBehavior,
-                        ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior)
-        : MatchExpression(matchType), _path(path) {
+                        ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior,
+                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : MatchExpression(matchType, std::move(annotation)), _path(path) {
         _elementPath.init(_path);
         _elementPath.setLeafArrayBehavior(leafArrBehavior);
         _elementPath.setNonLeafArrayBehavior(nonLeafArrayBehavior);

@@ -32,6 +32,8 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/doc_validation_error.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/match_expression_walker.h"
 
@@ -51,7 +53,41 @@ enum class InvertError { kNormal, kInverted };
 /**
  * A struct which tracks context during error generation.
  */
-struct ValidationErrorContext {};
+struct ValidationErrorContext {
+    ValidationErrorContext(const MatchableDocument* doc) : doc(doc) {}
+
+    /**
+     * Returns the complete document validation error as a BSONObj once error generation has
+     * finished.
+     */
+    BSONObj done() {
+        // When error generation is finished, there must be exactly one BSONObjBuilder which
+        // contains the complete error.
+        return objBuilder.obj();
+    }
+
+    BSONObjBuilder& getCurrentObjBuilder() {
+        return objBuilder;
+    }
+
+    /**
+     * Sets 'inversion' to the opposite of its current value.
+     */
+    void flipInversion() {
+        inversion =
+            inversion == InvertError::kNormal ? InvertError::kInverted : InvertError::kNormal;
+    }
+
+    // BSONObjBuilder which is used to construct the generated error.
+    BSONObjBuilder objBuilder;
+    // Document which failed to match against the collection's validator.
+    const MatchableDocument* doc;
+    // Tracks whether the generated error should be described normally or in an inverted context.
+    InvertError inversion = InvertError::kNormal;
+};
+
+using ErrorAnnotation = MatchExpression::ErrorAnnotation;
+using Mode = ErrorAnnotation::Mode;
 
 /**
  * Visitor which is primarily responsible for error generation.
@@ -68,16 +104,26 @@ public:
     void visit(const BitsAnySetMatchExpression* expr) final {}
     void visit(const ElemMatchObjectMatchExpression* expr) final {}
     void visit(const ElemMatchValueMatchExpression* expr) final {}
-    void visit(const EqualityMatchExpression* expr) final {}
+    void visit(const EqualityMatchExpression* expr) final {
+        generateComparisonError(expr);
+    }
     void visit(const ExistsMatchExpression* expr) final {}
     void visit(const ExprMatchExpression* expr) final {}
-    void visit(const GTEMatchExpression* expr) final {}
-    void visit(const GTMatchExpression* expr) final {}
+    void visit(const GTEMatchExpression* expr) final {
+        generateComparisonError(expr);
+    }
+    void visit(const GTMatchExpression* expr) final {
+        generateComparisonError(expr);
+    }
     void visit(const GeoMatchExpression* expr) final {}
     void visit(const GeoNearMatchExpression* expr) final {
         MONGO_UNREACHABLE;
     }
-    void visit(const InMatchExpression* expr) final {}
+    void visit(const InMatchExpression* expr) final {
+        static constexpr auto kNormalReason = "no matching value found in array";
+        static constexpr auto kInvertedReason = "matching value found in array";
+        generateLeafError(expr, kNormalReason, kInvertedReason);
+    }
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
@@ -98,11 +144,17 @@ public:
     void visit(const InternalSchemaTypeExpression* expr) final {}
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
     void visit(const InternalSchemaXorMatchExpression* expr) final {}
-    void visit(const LTEMatchExpression* expr) final {}
-    void visit(const LTMatchExpression* expr) final {}
+    void visit(const LTEMatchExpression* expr) final {
+        generateComparisonError(expr);
+    }
+    void visit(const LTMatchExpression* expr) final {
+        generateComparisonError(expr);
+    }
     void visit(const ModMatchExpression* expr) final {}
     void visit(const NorMatchExpression* expr) final {}
-    void visit(const NotMatchExpression* expr) final {}
+    void visit(const NotMatchExpression* expr) final {
+        _context->flipInversion();
+    }
     void visit(const OrMatchExpression* expr) final {}
     void visit(const RegexMatchExpression* expr) final {}
     void visit(const SizeMatchExpression* expr) final {}
@@ -122,6 +174,75 @@ public:
     }
 
 private:
+    // Set of utilities responsible for appending various fields to build a descriptive error.
+    void appendOperatorName(const ErrorAnnotation& annotation, BSONObjBuilder* bob) {
+        bob->append("operatorName", annotation.operatorName);
+    }
+    void appendSpecifiedAs(const ErrorAnnotation& annotation, BSONObjBuilder* bob) {
+        bob->append("specifiedAs", annotation.annotation);
+    }
+
+    /**
+     * Given a pointer to a LeafMatchExpression 'expr', appends details to the current
+     * BSONObjBuilder tracked by '_context' describing why the document failed to match against
+     * 'expr'. In particular:
+     * - Appends "reason: field was missing" if expr's path is missing from the document.
+     * - Appends the specified 'reason' along with 'consideredValue' if the 'path' in the
+     * document resolves to a single value.
+     * - Appends the specified 'reason' along with 'consideredValues' if the 'path' in the
+     * document resolves to an array of values that is implicitly traversed by 'expr'.
+     */
+    void appendLeafErrorDetails(const LeafMatchExpression* expr, const std::string& reason) {
+        BSONObjBuilder* bob = &(_context->getCurrentObjBuilder());
+        ElementPath path(expr->path());
+        MatchableDocument::IteratorHolder cursor(_context->doc, &path);
+        BSONArrayBuilder bab;
+        while (cursor->more()) {
+            auto elem = cursor->next().element();
+            if (elem.eoo()) {
+                break;
+            } else {
+                bab.append(elem);
+            }
+        }
+        auto size = bab.arrSize();
+        if (size == 0) {
+            bob->append("reason", "field was missing");
+        } else {
+            bob->append("reason", reason);
+            auto arr = bab.arr();
+            if (size == 1) {
+                bob->appendAs(arr[0], "consideredValue");
+            } else {
+                bob->append("consideredValues", arr);
+            }
+        }
+    }
+
+    void generateLeafError(const LeafMatchExpression* expr,
+                           const std::string& normalReason,
+                           const std::string& invertedReason) {
+        if (auto annotationPtr = expr->getErrorAnnotation()) {
+            const auto& annotation = *annotationPtr;
+            BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+            if (annotation.mode == Mode::kGenerateError) {
+                appendOperatorName(annotation, &bob);
+                appendSpecifiedAs(annotation, &bob);
+                if (_context->inversion == InvertError::kNormal) {
+                    appendLeafErrorDetails(expr, normalReason);
+                } else {
+                    appendLeafErrorDetails(expr, invertedReason);
+                }
+            }
+        }
+    }
+
+    void generateComparisonError(const ComparisonMatchExpression* expr) {
+        static constexpr auto normalReason = "comparison failed";
+        static constexpr auto invertedReason = "comparison succeeded";
+        generateLeafError(expr, normalReason, invertedReason);
+    }
+
     ValidationErrorContext* _context;
 };
 
@@ -246,7 +367,9 @@ public:
     void visit(const LTMatchExpression* expr) final {}
     void visit(const ModMatchExpression* expr) final {}
     void visit(const NorMatchExpression* expr) final {}
-    void visit(const NotMatchExpression* expr) final {}
+    void visit(const NotMatchExpression* expr) final {
+        _context->flipInversion();
+    }
     void visit(const OrMatchExpression* expr) final {}
     void visit(const RegexMatchExpression* expr) final {}
     void visit(const SizeMatchExpression* expr) final {}
@@ -287,13 +410,13 @@ const BSONObj& DocumentValidationFailureInfo::getDetails() const {
 }
 BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) {
     BSONMatchableDocument matchableDoc(doc);
-    ValidationErrorContext context;
+    ValidationErrorContext context(&matchableDoc);
     ValidationErrorPreVisitor preVisitor{&context};
     ValidationErrorInVisitor inVisitor{&context};
     ValidationErrorPostVisitor postVisitor{&context};
     MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
     tree_walker::walk<true, MatchExpression>(&validatorExpr, &walker);
-    return BSONObj();
+    return context.done();
 }
 
 }  // namespace mongo::doc_validation_error

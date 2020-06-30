@@ -97,7 +97,8 @@ bool matchExpressionLessThan(const MatchExpression* lhs, const MatchExpression* 
 
 }  // namespace
 
-MatchExpression::MatchExpression(MatchType type) : _matchType(type) {}
+MatchExpression::MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation)
+    : _errorAnnotation(std::move(annotation)), _matchType(type) {}
 
 // static
 void MatchExpression::sortTree(MatchExpression* tree) {

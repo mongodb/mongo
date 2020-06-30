@@ -215,11 +215,13 @@ public:
 
 class NotMatchExpression final : public MatchExpression {
 public:
-    explicit NotMatchExpression(MatchExpression* e) : MatchExpression(NOT), _exp(e) {}
+    explicit NotMatchExpression(MatchExpression* e,
+                                clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : MatchExpression(NOT, std::move(annotation)), _exp(e) {}
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<NotMatchExpression> self =
-            std::make_unique<NotMatchExpression>(_exp->shallowClone().release());
+            std::make_unique<NotMatchExpression>(_exp->shallowClone().release(), _errorAnnotation);
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
