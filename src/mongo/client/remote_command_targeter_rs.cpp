@@ -84,10 +84,18 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCt
     // Enforce a 20-second ceiling on the time spent looking for a host. This conforms with the
     // behavior used throughout mongos prior to version 3.4, but is not fundamentally desirable.
     // See comment in remote_command_targeter.h for details.
-    return _rsMonitor
-        ->getHostOrRefresh(readPref,
-                           std::min<Milliseconds>(opCtx->getRemainingMaxTimeMillis(), Seconds(20)))
-        .getNoThrow(opCtx);
+    bool maxTimeMsLesser = (opCtx->getRemainingMaxTimeMillis() < Milliseconds(Seconds(20)));
+    auto swHostAndPort =
+        _rsMonitor
+            ->getHostOrRefresh(
+                readPref, std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(Seconds(20))))
+            .getNoThrow(opCtx);
+
+    if (maxTimeMsLesser && swHostAndPort.getStatus() == ErrorCodes::FailedToSatisfyReadPreference) {
+        return Status(ErrorCodes::MaxTimeMSExpired, "operation timed out");
+    }
+
+    return swHostAndPort;
 }
 
 void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host, const Status& status) {
