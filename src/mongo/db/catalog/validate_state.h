@@ -73,7 +73,7 @@ public:
     }
 
     bool shouldEnforceFastCount() const {
-        return _mode == ValidateMode::kForegroundFullEnforceFastCount;
+        return _mode == ValidateMode::kForegroundFullEnforceFastCount && !_nss.isOplog();
     }
 
     bool isFullValidation() const {
