@@ -53,6 +53,7 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
+MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 
 namespace {
 void onDbVersionMismatch(OperationContext* opCtx,
@@ -92,6 +93,11 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 stdx::lock_guard<Client> lk(*tc.get());
                 tc->setSystemOperationKillable(lk);
             }
+
+            if (MONGO_unlikely(hangInRecoverRefreshThread.shouldFail())) {
+                hangInRecoverRefreshThread.pauseWhileSet();
+            }
+
             auto opCtx = tc->makeOperationContext();
 
             ON_BLOCK_EXIT([&] {
