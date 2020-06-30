@@ -51,6 +51,9 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(hangInCloneStage);
+MONGO_FAIL_POINT_DEFINE(hangInCleanStaleDataStage);
+
 using namespace shardmetadatautil;
 
 MovePrimarySourceManager::MovePrimarySourceManager(OperationContext* opCtx,
@@ -101,6 +104,11 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     }
 
     _state = kCloning;
+
+    if (MONGO_unlikely(hangInCloneStage.shouldFail())) {
+        LOGV2(4908700, "Hit hangInCloneStage");
+        hangInCloneStage.pauseWhileSet(opCtx);
+    }
 
     auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto fromShardObj = uassertStatusOK(shardRegistry->getShard(opCtx, _fromShard));
@@ -203,6 +211,7 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
     LOGV2(22043, "movePrimary successfully entered critical section");
 
     scopedGuard.dismiss();
+
     return Status::OK();
 }
 
@@ -337,6 +346,11 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
 Status MovePrimarySourceManager::cleanStaleData(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kNeedCleanStaleData);
+
+    if (MONGO_unlikely(hangInCleanStaleDataStage.shouldFail())) {
+        LOGV2(4908701, "Hit hangInCleanStaleDataStage");
+        hangInCleanStaleDataStage.pauseWhileSet(opCtx);
+    }
 
     // Only drop the cloned (unsharded) collections.
     DBDirectClient client(opCtx);
