@@ -82,7 +82,7 @@ assert.soon(
     1000);
 
 reconnect(secondary);
-replSet.stepUpNoAwaitReplication(secondary);
+replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
 
 // Secondary doesn't allow writes yet.
 var res = secondary.getDB("admin").runCommand({"isMaster": 1});
@@ -133,7 +133,7 @@ assert(!secondary.adminCommand('ismaster').ismaster);
 // Now ensure that the node can successfully become primary again.
 replSet.restart(0);
 replSet.restart(2);
-replSet.stepUpNoAwaitReplication(secondary);
+replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
 
 assert.soon(function() {
     return secondary.adminCommand('ismaster').ismaster;

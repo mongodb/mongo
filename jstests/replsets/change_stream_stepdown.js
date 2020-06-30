@@ -18,11 +18,8 @@ replTest.initiateWithHighElectionTimeout();
 
 function stepUp(replTest, conn) {
     assert.commandWorked(conn.adminCommand({replSetFreeze: 0}));
-    // Steps up the node in conn but this function does not wait for the new primary to be able to
-    // accept writes.
-    replTest.stepUpNoAwaitReplication(conn);
-    // Waits for the new primary to accept new writes.
-    return replTest.getPrimary();
+    // Steps up the node in conn and awaits for the stepped up node to become writable primary.
+    return replTest.stepUp(conn, {awaitReplicationBeforeStepUp: false});
 }
 
 const dbName = name;
@@ -30,9 +27,7 @@ const collName = "change_stream_stepdown";
 const changeStreamComment = collName + "_comment";
 
 const primary = replTest.getPrimary();
-const secondary = replTest.getSecondary();
 const primaryDb = primary.getDB(dbName);
-const secondaryDb = secondary.getDB(dbName);
 const primaryColl = primaryDb[collName];
 
 // Open a change stream.
@@ -96,9 +91,10 @@ jsTestLog("Testing that changestream waiting on old primary sees docs inserted o
 
 replTest.awaitReplication();  // Ensure secondary is up to date and can win an election.
 
-function shellFn(secondaryHost, dbName, collName, changeStreamComment, stepUpFn) {
+function shellFn(dbName, collName, changeStreamComment, stepUpFn) {
     // Wait for the getMore to be in progress.
-    assert.soon(() => db.getSiblingDB("admin")
+    const primary = db.getMongo();
+    assert.soon(() => primary.getDB("admin")
                           .aggregate([
                               {'$currentOp': {}},
                               {
@@ -110,19 +106,18 @@ function shellFn(secondaryHost, dbName, collName, changeStreamComment, stepUpFn)
                           ])
                           .itcount() == 1);
 
-    const replTest = new ReplSetTest(secondaryHost);
-    const secondary = new Mongo(secondaryHost);
-    const secondaryDb = secondary.getDB(dbName);
+    const replTest = new ReplSetTest(primary.host);
+
     // Step down the old primary and wait for new primary.
-    jsTestLog(`Stepping up ${secondaryHost} and waiting for new primary`);
-    stepUpFn(replTest, secondary);
+    const newPrimary = stepUpFn(replTest, replTest.getSecondary());
+    const newPrimaryDB = newPrimary.getDB(dbName);
+    assert.neq(newPrimary, primary, "Primary didn't change.");
 
     jsTestLog("Inserting document on new primary");
-    assert.commandWorked(secondaryDb[collName].insert({_id: 4}), {writeConcern: {w: "majority"}});
+    assert.commandWorked(newPrimaryDB[collName].insert({_id: 4}), {writeConcern: {w: "majority"}});
 }
 let waitForShell = startParallelShell(
-    funWithArgs(shellFn, secondary.host, dbName, collName, changeStreamComment, stepUp),
-    primary.port);
+    funWithArgs(shellFn, dbName, collName, changeStreamComment, stepUp), primary.port);
 
 res = assert.commandWorked(primaryDb.runCommand({
     getMore: cursorId,
