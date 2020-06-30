@@ -170,6 +170,14 @@ TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExpression) {
                        executor->applyTransformation(Document{fromjson("{a: 1, b: 2}")}));
 }
 
+TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExpressionWithCommonParent) {
+    auto proj = parseWithDefaultPolicies(
+        fromjson("{'a.b.c': 1, 'b.c.d': 1, 'a.p.c' : {$add: ['$a.b.e', '$a.p']}, 'a.b.e': 1}"));
+    auto executor = createProjectionExecutor(proj);
+    ASSERT_DOCUMENT_EQ(Document{fromjson("{a: {b: {e: 4}, p: {c: 6}}}")},
+                       executor->applyTransformation(Document{fromjson("{a: {b: {e: 4}, p: 2}}")}));
+}
+
 TEST_F(ProjectionExecutorTestWithFallBackToDefault, CanProjectExclusionWithIdPath) {
     auto projWithoutId = parseWithDefaultPolicies(fromjson("{a: 0, _id: 0}"));
     auto executor = createProjectionExecutor(projWithoutId);

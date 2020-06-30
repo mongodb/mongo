@@ -40,17 +40,30 @@ ProjectionNode::ProjectionNode(ProjectionPolicies policies, std::string pathToNo
     : _policies(policies), _pathToNode(std::move(pathToNode)) {}
 
 void ProjectionNode::addProjectionForPath(const FieldPath& path) {
+    // Enforce that this method can only be called on the root node.
+    invariant(_pathToNode.empty());
+    _addProjectionForPath(path);
+}
+
+void ProjectionNode::_addProjectionForPath(const FieldPath& path) {
     makeOptimizationsStale();
     if (path.getPathLength() == 1) {
         _projectedFields.insert(path.fullPath());
         return;
     }
     // FieldPath can't be empty, so it is safe to obtain the first path component here.
-    addOrGetChild(path.getFieldName(0).toString())->addProjectionForPath(path.tail());
+    addOrGetChild(path.getFieldName(0).toString())->_addProjectionForPath(path.tail());
 }
 
 void ProjectionNode::addExpressionForPath(const FieldPath& path,
                                           boost::intrusive_ptr<Expression> expr) {
+    // Enforce that this method can only be called on the root node.
+    invariant(_pathToNode.empty());
+    _addExpressionForPath(path, std::move(expr));
+}
+
+void ProjectionNode::_addExpressionForPath(const FieldPath& path,
+                                           boost::intrusive_ptr<Expression> expr) {
     makeOptimizationsStale();
     // If the computed fields policy is 'kBanComputedFields', we should never reach here.
     invariant(_policies.computedFieldsPolicy == ComputedFieldsPolicy::kAllowComputedFields);
@@ -66,7 +79,7 @@ void ProjectionNode::addExpressionForPath(const FieldPath& path,
         return;
     }
     // FieldPath can't be empty, so it is safe to obtain the first path component here.
-    addOrGetChild(path.getFieldName(0).toString())->addExpressionForPath(path.tail(), expr);
+    addOrGetChild(path.getFieldName(0).toString())->_addExpressionForPath(path.tail(), expr);
 }
 
 boost::intrusive_ptr<Expression> ProjectionNode::getExpressionForPath(const FieldPath& path) const {

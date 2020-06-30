@@ -130,17 +130,17 @@ private:
      * Throws an error if it was determined to be an expression specification, but failed to parse
      * as a valid expression.
      */
-    bool parseObjectAsExpression(StringData pathToObject,
+    bool parseObjectAsExpression(const FieldPath& pathToObject,
                                  const BSONObj& objSpec,
                                  const VariablesParseState& variablesParseState);
 
     /**
-     * Traverses 'subObj' and parses each field. Adds any computed fields at this level
-     * to 'node'.
+     * Traverses 'subObj' and parses each field. Creates nodes along the 'pathToObj' when an
+     * expression/terminal path is found.
      */
     void parseSubObject(const BSONObj& subObj,
                         const VariablesParseState& variablesParseState,
-                        InclusionNode* node);
+                        const FieldPath& pathToObj);
 
     // The InclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<InclusionNode> _root;
