@@ -212,6 +212,8 @@ public:
 
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
+    Timestamp getInitialDataTimestamp() override;
+
     void setOldestTimestampFromStable() override;
 
     /**

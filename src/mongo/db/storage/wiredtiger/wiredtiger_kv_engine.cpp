@@ -1951,6 +1951,10 @@ void WiredTigerKVEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp)
     _initialDataTimestamp.store(initialDataTimestamp.asULL());
 }
 
+Timestamp WiredTigerKVEngine::getInitialDataTimestamp() {
+    return Timestamp(_initialDataTimestamp.load());
+}
+
 bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
     if (!_keepDataHistory) {
         return false;
