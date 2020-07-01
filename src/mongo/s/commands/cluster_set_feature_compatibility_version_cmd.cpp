@@ -72,11 +72,12 @@ public:
     std::string help() const override {
         using FCVP = FeatureCompatibilityVersionParser;
         return str::stream()
-            << "Set the API version used by this cluster. If set to '" << FCVP::kVersion44
-            << "', then " << FCVP::kVersion46 << " features are disabled. If set to '"
-            << FCVP::kVersion46 << "', then " << FCVP::kVersion46
+            << "Set the featureCompatibilityVersion used by this cluster. If set to '"
+            << FCVP::kVersion44 << "', then " << FCVP::kVersion451
+            << " features are disabled. If set to '" << FCVP::kVersion451 << "', then "
+            << FCVP::kVersion451
             << " features are enabled, and all nodes in the cluster must be binary version "
-            << FCVP::kVersion46 << ". See "
+            << FCVP::kVersion451 << ". See "
             << feature_compatibility_version_documentation::kCompatibilityLink << ".";
     }
 

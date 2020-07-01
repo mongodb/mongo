@@ -166,19 +166,19 @@ struct ServerGlobalParams {
          * (4.4, Unset): Only 4.4 features are available, and new and existing storage
          *               engine entries use the 4.4 format
          *
-         * kUpgradingTo46
-         * (4.4, 4.6): Only 4.4 features are available, but new storage engine entries
-         *             use the 4.6 format, and existing entries may have either the
-         *             4.4 or 4.6 format
+         * kUpgradingFrom44To451
+         * (4.4, 4.5.1): Only 4.4 features are available, but new storage engine entries
+         *             use the 4.5.1 format, and existing entries may have either the
+         *             4.4 or 4.5.1 format
          *
-         * kFullyUpgradedTo46
-         * (4.6, Unset): 4.6 features are available, and new and existing storage
-         *               engine entries use the 4.6 format
+         * kVersion451
+         * (4.5.1, Unset): 4.5.1 features are available, and new and existing storage
+         *               engine entries use the 4.5.1 format
          *
-         * kDowngradingTo44
+         * kDowngradingFrom451To44
          * (4.4, 4.4): Only 4.4 features are available and new storage engine
          *             entries use the 4.4 format, but existing entries may have
-         *             either the 4.4 or 4.6 format
+         *             either the 4.4 or 4.5.1 format
          *
          * kUnsetDefault44Behavior
          * (Unset, Unset): This is the case on startup before the fCV document is
@@ -193,12 +193,12 @@ struct ServerGlobalParams {
             // lower than some maximum, respectively.
             kUnsetDefault44Behavior = 0,
             kFullyDowngradedTo44 = 1,
-            kDowngradingTo44 = 2,
-            kUpgradingTo46 = 3,
-            kFullyUpgradedTo46 = 4,
+            kDowngradingFrom451To44 = 2,
+            kUpgradingFrom44To451 = 3,
+            kVersion451 = 4,
         };
 
-        static constexpr Version kLatest = Version::kFullyUpgradedTo46;
+        static constexpr Version kLatest = Version::kVersion451;
         static constexpr Version kLastContinuous = Version::kFullyDowngradedTo44;
         static constexpr Version kLastLTS = Version::kFullyDowngradedTo44;
 

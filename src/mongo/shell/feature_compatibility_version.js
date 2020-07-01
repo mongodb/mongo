@@ -10,7 +10,7 @@
  * multiple times.
  */
 
-var latestFCV = "4.6";
+var latestFCV = "4.5.1";
 var lastStableFCV = "4.4";
 
 /**

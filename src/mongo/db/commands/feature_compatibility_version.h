@@ -52,23 +52,23 @@ public:
     static Lock::ResourceMutex fcvLock;
 
     /**
-     * Records intent to perform a 4.4 -> 4.6 upgrade by updating the on-disk feature
-     * compatibility version document to have 'version'=4.4, 'targetVersion'=4.6.
+     * Records intent to perform a 4.4 -> 4.5.1 upgrade by updating the on-disk feature
+     * compatibility version document to have 'version'=4.4, 'targetVersion'=4.5.1.
      * Should be called before schemas are modified.
      */
     static void setTargetUpgrade(OperationContext* opCtx);
 
     /**
-     * Records intent to perform a 4.6 -> 4.4 downgrade by updating the on-disk feature
+     * Records intent to perform a 4.5.1 -> 4.4 downgrade by updating the on-disk feature
      * compatibility version document to have 'version'=4.4, 'targetVersion'=4.4.
      * Should be called before schemas are modified.
      */
     static void setTargetDowngrade(OperationContext* opCtx);
 
     /**
-     * Records the completion of a 4.4 <-> 4.6 upgrade or downgrade by updating the on-disk feature
-     * compatibility version document to have 'version'=version and unsetting the 'targetVersion'
-     * field. Should be called after schemas are modified.
+     * Records the completion of a 4.4 <-> 4.5.1 upgrade or downgrade by updating the on-disk
+     * feature compatibility version document to have 'version'=version and unsetting the
+     * 'targetVersion' field. Should be called after schemas are modified.
      */
     static void unsetTargetUpgradeOrDowngrade(OperationContext* opCtx, StringData version);
 

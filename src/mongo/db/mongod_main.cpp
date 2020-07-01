@@ -1084,7 +1084,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     // TODO SERVER-49138: Remove this FCV check once we branch for 4.8.
     if (serverGlobalParams.featureCompatibility.isVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46)) {
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion451)) {
         if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
             replCoord && replCoord->enterQuiesceModeIfSecondary(shutdownTimeout)) {
             ServiceContext::UniqueOperationContext uniqueOpCtx;

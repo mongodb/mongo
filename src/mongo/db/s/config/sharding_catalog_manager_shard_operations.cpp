@@ -653,9 +653,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         BSONObj setFCVCmd;
         switch (serverGlobalParams.featureCompatibility.getVersion()) {
             case ServerGlobalParams::FeatureCompatibility::kLatest:
-            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo46:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To451:
                 setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                                 << FeatureCompatibilityVersionParser::kVersion46
+                                 << FeatureCompatibilityVersionParser::kVersion451
                                  << WriteConcernOptions::kWriteConcernField
                                  << opCtx->getWriteConcern().toBSON());
                 break;

@@ -159,8 +159,7 @@ public:
              Component component) const override {
         const auto& fcv = serverGlobalParams.featureCompatibility;
         if (fcv.isVersionInitialized() &&
-            fcv.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
+            fcv.getVersion() == ServerGlobalParams::FeatureCompatibility::Version::kVersion451) {
             return ActualFormat::out(service, opCtx, permitRefresh, out, time, component);
         }
         return false;

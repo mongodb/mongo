@@ -3198,7 +3198,7 @@ bool ReplicationCoordinatorImpl::_supportsAutomaticReconfig() const {
     }
 
     if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46) {
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion451) {
         return false;
     }
 

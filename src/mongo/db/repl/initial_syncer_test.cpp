@@ -1905,7 +1905,7 @@ TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsUpgradeTargetVersion) {
     auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
                             << FeatureCompatibilityVersionParser::kVersion44 << "targetVersion"
-                            << FeatureCompatibilityVersionParser::kVersion46)};
+                            << FeatureCompatibilityVersionParser::kVersion451)};
     runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
 }
 

@@ -39,9 +39,9 @@
 namespace mongo {
 
 constexpr StringData FeatureCompatibilityVersionParser::kVersion44;
-constexpr StringData FeatureCompatibilityVersionParser::kVersion46;
-constexpr StringData FeatureCompatibilityVersionParser::kVersionDowngradingTo44;
-constexpr StringData FeatureCompatibilityVersionParser::kVersionUpgradingTo46;
+constexpr StringData FeatureCompatibilityVersionParser::kVersion451;
+constexpr StringData FeatureCompatibilityVersionParser::kVersionDowngradingFrom451To44;
+constexpr StringData FeatureCompatibilityVersionParser::kVersionUpgradingFrom44To451;
 constexpr StringData FeatureCompatibilityVersionParser::kVersionUnset;
 
 constexpr StringData FeatureCompatibilityVersionParser::kParameterName;
@@ -72,11 +72,11 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
                                   << ".");
             }
 
-            if (elem.String() != kVersion46 && elem.String() != kVersion44) {
+            if (elem.String() != kVersion451 && elem.String() != kVersion44) {
                 return Status(ErrorCodes::BadValue,
                               str::stream()
                                   << "Invalid value for " << fieldName << ", found "
-                                  << elem.String() << ", expected '" << kVersion46 << "' or '"
+                                  << elem.String() << ", expected '" << kVersion451 << "' or '"
                                   << kVersion44 << "'. Contents of " << kParameterName
                                   << " document in "
                                   << NamespaceString::kServerConfigurationNamespace.toString()
@@ -103,15 +103,15 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
     }
 
     if (versionString == kVersion44) {
-        if (targetVersionString == kVersion46) {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo46;
+        if (targetVersionString == kVersion451) {
+            version = ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To451;
         } else if (targetVersionString == kVersion44) {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo44;
+            version = ServerGlobalParams::FeatureCompatibility::Version::kDowngradingFrom451To44;
         } else {
             version = ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44;
         }
-    } else if (versionString == kVersion46) {
-        if (targetVersionString == kVersion46 || targetVersionString == kVersion44) {
+    } else if (versionString == kVersion451) {
+        if (targetVersionString == kVersion451 || targetVersionString == kVersion44) {
             return Status(ErrorCodes::BadValue,
                           str::stream()
                               << "Invalid state for " << kParameterName << " document in "
@@ -120,7 +120,7 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
                               << feature_compatibility_version_documentation::kCompatibilityLink
                               << ".");
         } else {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46;
+            version = ServerGlobalParams::FeatureCompatibility::Version::kVersion451;
         }
     } else {
         return Status(ErrorCodes::BadValue,

@@ -77,7 +77,7 @@ namespace {
 
 const std::string mustDowngradeErrorMsg = str::stream()
     << "UPGRADE PROBLEM: The data files need to be fully upgraded to version 4.4 before attempting "
-       "an upgrade to 4.6; see "
+       "an upgrade to 4.5.1; see "
     << feature_compatibility_version_documentation::kUpgradeLink << " for more details.";
 
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
@@ -584,22 +584,22 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                     // On startup, if the version is in an upgrading or downgrading state, print a
                     // warning.
                     if (version ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo46) {
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To451) {
                         LOGV2_WARNING_OPTIONS(
                             21011,
                             {logv2::LogTag::kStartupWarnings},
                             "A featureCompatibilityVersion upgrade did not complete. The current "
                             "featureCompatibilityVersion is "
                             "{currentfeatureCompatibilityVersion}. To fix this, use the "
-                            "setFeatureCompatibilityVersion command to resume upgrade to 4.6.",
+                            "setFeatureCompatibilityVersion command to resume upgrade to 4.5.1.",
                             "A featureCompatibilityVersion upgrade did not complete. To fix this, "
                             "use the "
-                            "setFeatureCompatibilityVersion command to resume upgrade to 4.6",
+                            "setFeatureCompatibilityVersion command to resume upgrade to 4.5.1",
                             "currentfeatureCompatibilityVersion"_attr =
                                 FeatureCompatibilityVersionParser::toString(version));
                     } else if (version ==
                                ServerGlobalParams::FeatureCompatibility::Version::
-                                   kDowngradingTo44) {
+                                   kDowngradingFrom451To44) {
                         LOGV2_WARNING_OPTIONS(
                             21014,
                             {logv2::LogTag::kStartupWarnings},
