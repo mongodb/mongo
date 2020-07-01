@@ -125,6 +125,8 @@ selector:
   # Enable the following two tests once SERVER-49986 and SERVER-49988 are backported to 4.0.
   - jstests/sharding/database_and_shard_versioning_all_commands.js
   - jstests/sharding/ismaster.js
+  # Requires behavior that does not and will never exist in 3.6.
+  - jstests/sharding/safe_secondary_reads_causal_consistency.js
 executor:
   config:
     shell_options:

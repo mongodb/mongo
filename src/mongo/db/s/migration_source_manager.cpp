@@ -117,6 +117,7 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
 MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
 MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
+MONGO_FAIL_POINT_DEFINE(hangBeforePostMigrationCommitRefresh);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
 
 MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime& csr) {
@@ -469,6 +470,11 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                                   << redact(migrationCommitStatus)
                                   << ". Updating the optime with a write before refreshing the "
                                   << "metadata also failed"));
+    }
+
+    if (MONGO_FAIL_POINT(hangBeforePostMigrationCommitRefresh)) {
+        log() << "hangBeforePostMigrationCommitRefresh fail point enabled";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforePostMigrationCommitRefresh);
     }
 
     // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
