@@ -79,7 +79,8 @@ public:
         return _sessions.size();
     }
 
-    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override {
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request) noexcept override {
         MONGO_UNREACHABLE;
     }
 
@@ -191,7 +192,8 @@ public:
         return 0;
     }
 
-    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override {
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request) noexcept override {
         MONGO_UNREACHABLE;
     }
 

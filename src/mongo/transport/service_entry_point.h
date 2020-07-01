@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -82,7 +83,8 @@ public:
     /**
      * Processes a request and fills out a DbResponse.
      */
-    virtual DbResponse handleRequest(OperationContext* opCtx, const Message& request) = 0;
+    virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                             const Message& request) noexcept = 0;
 
 protected:
     ServiceEntryPoint() = default;

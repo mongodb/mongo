@@ -143,7 +143,7 @@ DbResponse loopbackBuildResponse(OperationContext* const opCtx,
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
-    return opCtx->getServiceContext()->getServiceEntryPoint()->handleRequest(opCtx, toSend);
+    return opCtx->getServiceContext()->getServiceEntryPoint()->handleRequest(opCtx, toSend).get();
 }
 }  // namespace
 

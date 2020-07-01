@@ -177,6 +177,7 @@ Status updateConfigDocumentInTxn(OperationContext* opCtx,
             ->getServiceEntryPoint()
             ->handleRequest(opCtx,
                             OpMsgRequest::fromDBAndBody(nss.db().toString(), cmdObj).serialize())
+            .get()
             .response);
 
     return getStatusFromCommandResult(replyOpMsg.body);
@@ -221,6 +222,7 @@ Status commitTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber) 
                                               OpMsgRequest::fromDBAndBody(
                                                   NamespaceString::kAdminDb.toString(), cmdObj)
                                                   .serialize())
+                              .get()
                               .response);
 
     return getStatusFromCommandResult(replyOpMsg.body);

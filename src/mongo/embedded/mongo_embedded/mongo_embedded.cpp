@@ -426,7 +426,7 @@ void client_wire_protocol_rpc(mongo_embedded_v1_client* const client,
 
     Message msg(std::move(sb));
 
-    client->response = sep->handleRequest(opCtx.get(), msg);
+    client->response = sep->handleRequest(opCtx.get(), msg).get();
 
     // Note that we skip OP_MSG's optional checksum for embedded.
     MsgData::View outMessage(client->response.response.buf());

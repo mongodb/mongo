@@ -42,7 +42,8 @@ class ServiceEntryPointEmbedded final : public ServiceEntryPoint {
 
 public:
     ServiceEntryPointEmbedded() = default;
-    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override;
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request) noexcept override;
 
     void startSession(transport::SessionHandle session) override;
     void endAllSessions(transport::Session::TagMask tags) override;

@@ -110,7 +110,8 @@ public:
                              BSONObjBuilder* metadataBob) const override {}
 };
 
-DbResponse ServiceEntryPointEmbedded::handleRequest(OperationContext* opCtx, const Message& m) {
+Future<DbResponse> ServiceEntryPointEmbedded::handleRequest(OperationContext* opCtx,
+                                                            const Message& m) noexcept {
     // Only one thread will pump at a time and concurrent calls to this will skip the pumping and go
     // directly to handleRequest. This means that the jobs in the periodic runner can't provide any
     // guarantees of the state (that they have run).

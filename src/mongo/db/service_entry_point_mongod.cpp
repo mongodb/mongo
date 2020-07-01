@@ -269,7 +269,8 @@ public:
     }
 };
 
-DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const Message& m) {
+Future<DbResponse> ServiceEntryPointMongod::handleRequest(OperationContext* opCtx,
+                                                          const Message& m) noexcept {
     return ServiceEntryPointCommon::handleRequest(opCtx, m, Hooks{});
 }
 

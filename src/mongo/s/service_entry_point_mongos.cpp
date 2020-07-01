@@ -60,7 +60,8 @@ BSONObj buildErrReply(const DBException& ex) {
 }  // namespace
 
 
-DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const Message& message) {
+Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
+                                                          const Message& message) noexcept try {
     const int32_t msgId = message.header().getId();
     const NetworkOp op = message.operation();
 
@@ -94,7 +95,7 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
         CurOp::get(opCtx)->completeAndLogOperation(
             opCtx, logv2::LogComponent::kCommand, dbResponse.response.size());
 
-        return dbResponse;
+        return Future<DbResponse>::makeReady(std::move(dbResponse));
     }
 
     NamespaceString nss;
@@ -179,7 +180,10 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
     CurOp::get(opCtx)->completeAndLogOperation(
         opCtx, logv2::LogComponent::kCommand, dbResponse.response.size());
 
-    return dbResponse;
+    return Future<DbResponse>::makeReady(std::move(dbResponse));
+} catch (const DBException& e) {
+    LOGV2(4879803, "Failed to handle request", "error"_attr = redact(e));
+    return e.toStatus();
 }
 
 }  // namespace mongo

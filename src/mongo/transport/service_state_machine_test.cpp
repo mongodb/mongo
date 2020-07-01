@@ -72,7 +72,8 @@ public:
 
     void startSession(transport::SessionHandle session) override {}
 
-    DbResponse handleRequest(OperationContext* opCtx, const Message& request) override {
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request) noexcept override try {
         LOGV2(22994, "In handleRequest");
         _ranHandler = true;
         ASSERT_TRUE(haveClient());
@@ -98,7 +99,10 @@ public:
         }
         dbResponse.response = res;
 
-        return dbResponse;
+        return Future<DbResponse>::makeReady(std::move(dbResponse));
+    } catch (const DBException& e) {
+        LOGV2_ERROR(4879805, "Failed to handle request", "error"_attr = redact(e));
+        return e.toStatus();
     }
 
     void endAllSessions(transport::Session::TagMask tags) override {}

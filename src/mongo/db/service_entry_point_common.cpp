@@ -1645,9 +1645,9 @@ BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* comman
     return bob.obj();
 }
 
-DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
-                                                  const Message& m,
-                                                  const Hooks& behaviors) {
+Future<DbResponse> ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
+                                                          const Message& m,
+                                                          const Hooks& behaviors) noexcept try {
     // before we lock...
     NetworkOp op = m.operation();
     bool isCommand = false;
@@ -1790,7 +1790,10 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     }
 
     recordCurOpMetrics(opCtx);
-    return dbresponse;
+    return Future<DbResponse>::makeReady(std::move(dbresponse));
+} catch (const DBException& e) {
+    LOGV2_ERROR(4879802, "Failed to handle request", "error"_attr = redact(e));
+    return e.toStatus();
 }
 
 ServiceEntryPointCommon::Hooks::~Hooks() = default;

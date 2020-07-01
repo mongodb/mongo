@@ -109,7 +109,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     mongo::Message msg(std::move(sb));
 
     try {
-        serviceContext->getServiceEntryPoint()->handleRequest(opCtx.get(), msg);
+        serviceContext->getServiceEntryPoint()->handleRequest(opCtx.get(), msg).get();
     } catch (const mongo::AssertionException&) {
         // We need to catch exceptions caused by invalid inputs
     }
