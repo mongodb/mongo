@@ -1567,6 +1567,7 @@ env.Library(
         'vector_clock.cpp',
         env.Idlc('keys_collection_manager.idl')[0],
         env.Idlc('logical_clock.idl')[0],
+        env.Idlc('vector_clock_document.idl')[0],
     ],
     LIBDEPS=[
         'auth/authprivilege',
