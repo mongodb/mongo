@@ -664,19 +664,16 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
     if (id == WT_TXN_ABORTED)
         return (false);
 
+    /* Transactions see their own changes. */
+    if (id == txn->id)
+        return (true);
+
     /* Read-uncommitted transactions see all other changes. */
     if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
         return (true);
 
-    /*
-     * If we don't have a transactional snapshot, only make stable updates visible.
-     */
-    if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
-        return (__txn_visible_all_id(session, id));
-
-    /* Transactions see their own changes. */
-    if (id == txn->id)
-        return (true);
+    /* Otherwise, we should be called with a snapshot. */
+    WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) || session->dhandle->checkpoint != NULL);
 
     /*
      * WT_ISO_SNAPSHOT, WT_ISO_READ_COMMITTED: the ID is visible if it is not the result of a

@@ -1051,6 +1051,12 @@ err:
     WT_TRET(__wt_txn_activity_drain(session));
 
     /*
+     * There should be no active transactions running now. Therefore, it's safe for operations to
+     * proceed without doing snapshot visibility checks.
+     */
+    session->txn->isolation = WT_ISO_READ_UNCOMMITTED;
+
+    /*
      * Clear any pending async operations and shut down the async worker threads and system before
      * closing LSM.
      */
