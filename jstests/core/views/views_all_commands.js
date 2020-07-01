@@ -65,15 +65,15 @@
 (function() {
 "use strict";
 
+load('jstests/sharding/libs/last_lts_mongod_commands.js');
+
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
 const isUnrelated = "is unrelated";
-const wasRemovedInBinaryVersion44 =
-    "must define test coverage for the multiversion passthrough suite";
 
 let viewsCommandTests = {
     _addShard: {skip: isAnInternalCommand},
-    _cloneCatalogData: {skip: wasRemovedInBinaryVersion44},
+    _cloneCatalogData: {skip: isAnInternalCommand},
     _cloneCollectionOptionsFromPrimaryShard: {skip: isAnInternalCommand},
     _configsvrAddShard: {skip: isAnInternalCommand},
     _configsvrAddShardToZone: {skip: isAnInternalCommand},
@@ -110,7 +110,7 @@ let viewsCommandTests = {
     _killOperations: {skip: isUnrelated},
     _mergeAuthzCollections: {skip: isAnInternalCommand},
     _migrateClone: {skip: isAnInternalCommand},
-    _movePrimary: {skip: wasRemovedInBinaryVersion44},
+    _movePrimary: {skip: isAnInternalCommand},
     _recvChunkAbort: {skip: isAnInternalCommand},
     _recvChunkCommit: {skip: isAnInternalCommand},
     _recvChunkStart: {skip: isAnInternalCommand},
@@ -163,7 +163,6 @@ let viewsCommandTests = {
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
     clearLog: {skip: isUnrelated},
-    cloneCollection: {skip: wasRemovedInBinaryVersion44},
     cloneCollectionAsCapped: {
         command: {cloneCollectionAsCapped: "view", toCollection: "testcapped", size: 10240},
         expectFailure: true,
@@ -449,7 +448,6 @@ let viewsCommandTests = {
             skipSharded: true,
         }
     ],
-    repairCursor: {skip: wasRemovedInBinaryVersion44},
     repairDatabase: {skip: isUnrelated},
     replSetAbortPrimaryCatchUp: {skip: isUnrelated},
     replSetFreeze: {skip: isUnrelated},
@@ -560,7 +558,6 @@ let viewsCommandTests = {
     testVersion2: {skip: isAnInternalCommand},
     testVersions1And2: {skip: isAnInternalCommand},
     top: {skip: "tested in views/views_stats.js"},
-    touch: {skip: wasRemovedInBinaryVersion44},
     unsetSharding: {skip: isAnInternalCommand},
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
     updateRole: {
@@ -589,6 +586,10 @@ let viewsCommandTests = {
     whatsmyuri: {skip: isUnrelated},
     whatsmysni: {skip: isUnrelated}
 };
+
+commandsRemovedFromMongodSinceLastLTS.forEach(function(cmd) {
+    viewsCommandTests[cmd] = {skip: "must define test coverage for 4.4 backwards compatibility"};
+});
 
 /**
  * Helper function for failing commands or writes that checks the result 'res' of either.
