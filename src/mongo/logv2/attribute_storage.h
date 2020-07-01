@@ -678,8 +678,6 @@ private:
 // Wrapper around internal pointer of AttributeStorage so it does not need any template parameters
 class TypeErasedAttributeStorage {
 public:
-    using const_iterator = const detail::NamedAttribute*;
-
     TypeErasedAttributeStorage() : _size(0) {}
 
     template <typename... Args>
@@ -695,13 +693,6 @@ public:
 
     std::size_t size() const {
         return _size;
-    }
-
-    const_iterator begin() const {
-        return _data;
-    }
-    const_iterator end() const {
-        return _data + _size;
     }
 
     // Applies a function to every stored named attribute in order they are captured
