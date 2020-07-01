@@ -153,6 +153,23 @@ let runTest = function(mongodOptions) {
     assert.eq(healthyIndexUri, getUriForIndex(healthyColl, indexName));
 
     MongoRunner.stopMongod(mongod);
+
+    /**
+     * Test 5. Corrupt the WiredTigerHS file in an unrecoverable way. Run repair and verify that
+     * MongoDB was rebuilt properly and starts up normally.
+     */
+    // TODO SERVER-49287: Enable this test case
+    let skip = true;
+    if (skip) {
+        return;
+    }
+
+    let corruptedWiredTigerHSFile = dbpath + "WiredTigerHS.wt";
+    jsTestLog("corrupting WT History Store file: " + corruptedWiredTigerHSFile);
+    corruptFile(corruptedWiredTigerHSFile);
+
+    assertRepairFails(dbpath, mongod.port);
+    assertErrorOnStartupAfterIncompleteRepair(dbpath, mongod.port);
 };
 
 runTest({});

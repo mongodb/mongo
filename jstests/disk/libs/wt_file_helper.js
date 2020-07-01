@@ -73,6 +73,15 @@ let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
 };
 
 /**
+ * Asserts that running MongoDB with --repair on the provided dbpath fails.
+ */
+let assertRepairFails = function(dbpath, port) {
+    jsTestLog("The node should complete repairing the node but fails.");
+
+    assert.neq(0, runMongoProgram("mongod", "--repair", "--port", port, "--dbpath", dbpath));
+};
+
+/**
  * Assert that starting MongoDB with --replSet on an existing data path exits with a specific
  * error.
  */

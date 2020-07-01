@@ -143,4 +143,29 @@ assert.eq(testColl.find({}).itcount(), 0);
 assert.eq(testColl.count(), 0);
 
 MongoRunner.stopMongod(mongod);
+resetDbpath(dbpath);
+
+/**
+ * Test 6. Delete WT history store. Verify MongoDB starts up normally.
+ */
+
+let wiredTigerHSFile = dbpath + "WiredTigerHS.wt";
+mongod = startMongodOnExistingPath(dbpath);
+testColl = mongod.getDB(baseName)[collName];
+
+assert.commandWorked(testColl.insert(doc));
+MongoRunner.stopMongod(mongod);
+
+jsTestLog("deleting WT history store file: " + wiredTigerHSFile);
+removeFile(wiredTigerHSFile);
+
+assertRepairSucceeds(dbpath, mongod.port);
+
+mongod = startMongodOnExistingPath(dbpath);
+testColl = mongod.getDB(baseName)[collName];
+
+assert.eq(testColl.find(doc).itcount(), 1);
+assert.eq(testColl.count(), 1);
+
+MongoRunner.stopMongod(mongod);
 })();
