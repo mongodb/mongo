@@ -708,9 +708,10 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription c
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
 
-    // If the shard key fields remain unchanged by this update or if this document is an orphan and
-    // so does not belong to this shard, we can skip the rest of the checks.
-    if ((newShardKey.woCompare(oldShardKey) == 0) || !collDesc->keyBelongsToMe(oldShardKey)) {
+    // If the shard key fields remain unchanged by this update we can skip the rest of the checks.
+    // Using BSONObj::binaryEqual() still allows a missing shard key field to be filled in with an
+    // explicit null value.
+    if (newShardKey.binaryEqual(oldShardKey)) {
         return false;
     }
 
@@ -747,6 +748,12 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionDescription c
             "Must run update to shard key field in a multi-statement transaction or with "
             "retryWrites: true.",
             opCtx()->getTxnNumber() || !opCtx()->writesAreReplicated());
+
+    // If the shard key of an orphan document is allowed to change, and the document is allowed to
+    // become owned by the shard, the global uniqueness assumption for _id values would be violated.
+    uassert(468110,
+            "Changing the shard key of an orphan document is not allowed",
+            collDesc->keyBelongsToMe(oldShardKey));
 
     if (!collDesc->keyBelongsToMe(newShardKey)) {
         if (MONGO_unlikely(hangBeforeThrowWouldChangeOwningShard.shouldFail())) {
