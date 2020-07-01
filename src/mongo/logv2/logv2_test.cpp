@@ -1319,6 +1319,13 @@ TEST_F(LogV2ContainerTest, StringMapUint32) {
     });
 }
 
+TEST_F(LogV2Test, AttrNameCollision) {
+    ASSERT_THROWS_CODE(
+        LOGV2(4793300, "Collision {k1}", "Collision", "k1"_attr = "v1", "k1"_attr = "v2"),
+        AssertionException,
+        4793301);
+}
+
 TEST_F(LogV2Test, Unicode) {
     auto lines = makeLineCapture(JSONFormatter());
 
