@@ -219,7 +219,7 @@ You can disable monitoring at any time by running db.disableFreeMonitoring()."""
                 'version': bson.int64.Int64(1),
                 'haltMetricsUploading': False,
                 'permanentlyDelete': False,
-                'id': '',
+                'id': decoded_doc['id'],
                 'reportingInterval': bson.int64.Int64(1),
                 'message': 'Thanks for all the metrics',
             })
