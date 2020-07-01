@@ -433,9 +433,12 @@ _Code spelunking starting points:_
 
 # Repair
 
-Data corruption has a variety of causes, but can usually be attributed to misconfigured or unreliable I/O subsystems that do not make data durable when called upon, often in the event of power outages.
+Data corruption has a variety of causes, but can usually be attributed to misconfigured or
+unreliable I/O subsystems that do not make data durable when called upon, often in the event of
+power outages.
 
-MongoDB provides a command-line `--repair` utility that attempts to recover as much data as possible from an installation that fails to start up due to data corruption.
+MongoDB provides a command-line `--repair` utility that attempts to recover as much data as possible
+from an installation that fails to start up due to data corruption.
 
 - [Types of Corruption](#types-of-corruption)
 - [Repair Procedure](#repair-procedure)
@@ -449,8 +452,11 @@ MongoDB repair attempts to address the following forms of corruption:
 * Missing WiredTiger data files
   * Includes all collections, `_mdb_catalog`, and `sizeStorer`
 * Indexes
-  * Prior to 4.4, all indexes were always rebuilt on all collections, even if not missing or corrupt.
-  * Starting in 4.4, indexes are only rebuilt on collections that are salvaged or fail validation with inconsistencies. See [repairCollections](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L115).
+  * Prior to 4.4, all indexes were always rebuilt on all collections, even if not missing or
+    corrupt.
+  * Starting in 4.4, indexes are only rebuilt on collections that are salvaged or fail validation
+    with inconsistencies. See
+    [repairCollections](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L115).
 * Unsalvageable collection data files
 * Corrupt metadata
     * `WiredTiger.wt`, `WiredTiger.turtle`, and WT journal files
@@ -462,25 +468,64 @@ MongoDB repair attempts to address the following forms of corruption:
 
 ## Repair Procedure
 
-1. Initialize the WiredTigerKVEngine. If a call to `wiredtiger_open` returns the `WT_TRY_SALVAGE` error code, this indicates there is some form of corruption in the WiredTiger metadata. Attempt to [salvage the metadata](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1046-L1071) by using the WiredTiger `salvage=true` configuration option.
-2. Initialize the StorageEngine and [salvage the `_mdb_catalog` table, if needed](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L95).
+1. Initialize the WiredTigerKVEngine. If a call to `wiredtiger_open` returns the `WT_TRY_SALVAGE`
+   error code, this indicates there is some form of corruption in the WiredTiger metadata. Attempt
+   to [salvage the
+   metadata](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1046-L1071)
+   by using the WiredTiger `salvage=true` configuration option.
+2. Initialize the StorageEngine and [salvage the `_mdb_catalog` table, if
+   needed](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L95).
 3. Recover orphaned collections.
     * If an [ident](#glossary) is known to WiredTiger but is not present in the `_mdb_catalog`,
-    [create a new collection](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L145-L189)
-    with the prefix `local.orphan.<ident-name>` that references this ident.
-    * If an ident is present in the `_mdb_catalog` but not known to WiredTiger, [attempt to recover the ident](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L197-L229). This [procedure for orphan recovery](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605) is a less reliable and more invasive. It involves moving the corrupt data file to a temporary file, creates a new table with the same name, replaces the original data file over the new one, and [salvages](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605) the table in attempt to reconstruct the table.
-4. [Verify collection data files](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1195-L1226), and salvage if necessary.
-    *  If call to WiredTiger [verify()](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a0334da4c85fe8af4197c9a7de27467d3) fails, call [salvage()](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#ab3399430e474f7005bd5ea20e6ec7a8e), which recovers as much data from a WT data file as possible.
+      [create a new
+      collection](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L145-L189)
+      with the prefix `local.orphan.<ident-name>` that references this ident.
+    * If an ident is present in the `_mdb_catalog` but not known to WiredTiger, [attempt to recover
+      the
+      ident](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L197-L229).
+      This [procedure for orphan
+      recovery](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605)
+      is a less reliable and more invasive. It involves moving the corrupt data file to a temporary
+      file, creates a new table with the same name, replaces the original data file over the new
+      one, and
+      [salvages](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1525-L1605)
+      the table in attempt to reconstruct the table.
+4. [Verify collection data
+   files](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1195-L1226),
+   and salvage if necessary.
+    *  If call to WiredTiger
+       [verify()](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#a0334da4c85fe8af4197c9a7de27467d3)
+       fails, call
+       [salvage()](https://source.wiredtiger.com/develop/struct_w_t___s_e_s_s_i_o_n.html#ab3399430e474f7005bd5ea20e6ec7a8e),
+       which recovers as much data from a WT data file as possible.
     * If a salvage is unsuccessful, rename the data file with a `.corrupt` suffix.
-    * If a data file is missing or a salvage was unsuccessful, [drop the original table from the metadata, and create a new, empty table](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1262-L1274) under the original name. This allows MongoDB to continue to start up despite present corruption.
-    * After any salvage operation, [all indexes are rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L134-L149) for that collection.
+    * If a data file is missing or a salvage was unsuccessful, [drop the original table from the
+      metadata, and create a new, empty
+      table](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1262-L1274)
+      under the original name. This allows MongoDB to continue to start up despite present
+      corruption.
+    * After any salvage operation, [all indexes are
+      rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L134-L149)
+      for that collection.
 5. Validate collection and index consistency.
-    * [Collection validation](#collection-validation) checks for consistency between the collection and indexes. If any inconsistencies are found, [all indexes are rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L167-L184).
-6. [Invalidate the replica set configuration](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L460-L485) if data has been or could have been modified. This [prevents a repaired node from joining](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L486-L494) and threatening the consisency of its replica set.
+    * [Collection validation](#collection-validation) checks for consistency between the collection
+      and indexes. If any inconsistencies are found, [all indexes are
+      rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L167-L184).
+6. [Invalidate the replica set
+   configuration](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L460-L485)
+   if data has been or could have been modified. This [prevents a repaired node from
+   joining](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L486-L494)
+   and threatening the consisency of its replica set.
 
 Additionally:
-* When repair starts, it creates a temporary file, `_repair_incomplete` that is only removed when repair completes. The server [will not start up normally](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_init.cpp#L82-L86) as long as this file is present.
-* Repair [will restore a missing](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L434) `featureCompatibilityVersion` document in the `admin.system.version` to the lower FCV version available.
+* When repair starts, it creates a temporary file, `_repair_incomplete` that is only removed when
+  repair completes. The server [will not start up
+  normally](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_init.cpp#L82-L86)
+  as long as this file is present.
+* Repair [will restore a
+  missing](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L434)
+  `featureCompatibilityVersion` document in the `admin.system.version` to the lower FCV version
+  available.
 
 # Startup Recovery
 There are three components to startup recovery. The first step, of course, is starting
