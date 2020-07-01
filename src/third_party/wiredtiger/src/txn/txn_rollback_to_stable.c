@@ -212,7 +212,7 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
      * the given timestamp, the key is removed from data store.
      */
     ret = __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, key, WT_TS_MAX, NULL);
-    for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
+    for (; ret == 0; ret = __wt_hs_cursor_prev(session, hs_cursor)) {
         WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
 
         /* Stop before crossing over to the next btree */
@@ -231,8 +231,7 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
          * If the stop time pair on the tombstone in the history store is already globally visible
          * we can skip it.
          */
-        if (__wt_txn_visible_all(
-              session, cbt->upd_value->tw.stop_txn, cbt->upd_value->tw.durable_stop_ts)) {
+        if (__wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
             WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone_rts);
             continue;
         }
@@ -1010,7 +1009,7 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
 
     /* Walk the history store for the given btree. */
     hs_cursor->set_key(hs_cursor, btree_id, &key, WT_TS_NONE, 0);
-    ret = hs_cursor->search_near(hs_cursor, &exact);
+    ret = __wt_hs_cursor_search_near(session, hs_cursor, &exact);
 
     /*
      * The search should always end up pointing to the start of the required btree or end of the
@@ -1018,9 +1017,9 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
      */
     WT_ASSERT(session, (ret != 0 || exact != 0));
     if (ret == 0 && exact < 0)
-        ret = hs_cursor->next(hs_cursor);
+        ret = __wt_hs_cursor_next(session, hs_cursor);
 
-    for (; ret == 0; ret = hs_cursor->next(hs_cursor)) {
+    for (; ret == 0; ret = __wt_hs_cursor_next(session, hs_cursor)) {
         WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
 
         /* Stop crossing into the next btree boundary. */
@@ -1031,8 +1030,7 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
          * If the stop time pair on the tombstone in the history store is already globally visible
          * we can skip it.
          */
-        if (__wt_txn_visible_all(
-              session, cbt->upd_value->tw.stop_txn, cbt->upd_value->tw.durable_stop_ts)) {
+        if (__wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
             WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone_rts);
             continue;
         }
