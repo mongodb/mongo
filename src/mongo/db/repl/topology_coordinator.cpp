@@ -50,6 +50,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
@@ -78,6 +79,13 @@ MONGO_FAIL_POINT_DEFINE(voteYesInDryRunButNoInRealElection);
 MONGO_FAIL_POINT_DEFINE(disableMaxSyncSourceLagSecs);
 
 constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
+
+// Tracks the number of times we decide to change sync sources in order to sync from a significantly
+// closer node.
+Counter64 numSyncSourceChangesDueToSignificantlyCloserNode;
+ServerStatusMetricField<Counter64> displayNumSyncSourceChangesDueToSignificantlyCloserNode(
+    "repl.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode",
+    &numSyncSourceChangesDueToSignificantlyCloserNode);
 
 using namespace fmt::literals;
 
@@ -3131,6 +3139,7 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
                   "changeSyncSourceThreshold"_attr = changeSyncSourceThreshold,
                   "candidateNode"_attr = candidateNode,
                   "candidatePingTime"_attr = candidateSyncSourcePingTime);
+            numSyncSourceChangesDueToSignificantlyCloserNode.increment();
             return true;
         }
     }
