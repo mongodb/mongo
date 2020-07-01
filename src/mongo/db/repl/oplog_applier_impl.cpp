@@ -274,6 +274,21 @@ void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
 
 void stableSortByNamespace(std::vector<const OplogEntry*>* oplogEntryPointers) {
     auto nssComparator = [](const OplogEntry* l, const OplogEntry* r) {
+        // Specially sort collections that are $cmd first, before everything else.  This will
+        // move commands with the special $cmd collection name to the beginning, rather than sorting
+        // them potentially in the middle of the sorted vector of insert/update/delete ops.
+        // This special sort behavior is required because DDL operations need to run before
+        // create/update/delete operations in a multi-doc transaction.
+        if (l->getNss().isCommand()) {
+            if (r->getNss().isCommand())
+                // l == r; now compare the namespace
+                return l->getNss() < r->getNss();
+            // l < r
+            return true;
+        }
+        if (r->getNss().isCommand())
+            // l > r
+            return false;
         return l->getNss() < r->getNss();
     };
     std::stable_sort(oplogEntryPointers->begin(), oplogEntryPointers->end(), nssComparator);
@@ -1026,6 +1041,8 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
     opCtx->recoveryUnit()->setPrepareConflictBehavior(
         PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
+    // Group the operations by namespace in order to get larger groups for bulk inserts, but do not
+    // mix up the current order of oplog entries within the same namespace (thus *stable* sort).
     stableSortByNamespace(ops);
 
     const auto oplogApplicationMode = getOptions().mode;

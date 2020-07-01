@@ -15,7 +15,9 @@ load("jstests/libs/fixture_helpers.js");  // for isMongos
 function runCollectionCreateTest(command, explicitCreate) {
     const session = db.getMongo().startSession();
     const collName = "create_new_collection";
-    const secondCollName = collName + "_second";
+    // Note: using strange collection name here to test sorting of operations by namespace,
+    // SERVER-48628
+    const secondCollName = "\n" + collName + "_second";
 
     let sessionDB = session.getDatabase("test");
     let sessionColl = sessionDB[collName];
