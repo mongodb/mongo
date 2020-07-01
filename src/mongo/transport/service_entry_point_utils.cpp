@@ -51,6 +51,8 @@
 #define __has_feature(x) 0
 #endif
 
+using namespace fmt::literals;
+
 namespace mongo {
 
 namespace {
@@ -113,7 +115,6 @@ Status launchServiceWorkerThread(std::function<void()> task) noexcept {
         pthread_attr_destroy(&attrs);
 
         if (failed) {
-            using namespace fmt::literals;
             uassert(
                 4850900, "pthread_create failed: {}"_format(errnoWithDescription(failed)), failed);
             throw std::system_error(
@@ -124,9 +125,9 @@ Status launchServiceWorkerThread(std::function<void()> task) noexcept {
 #endif
 
     } catch (const std::exception& e) {
-        LOGV2_ERROR(22948, "pthread_create failed: {errno}", "pthread_create failed");
+        LOGV2_ERROR(22948, "Thread creation failed", "error"_attr = e.what());
         return {ErrorCodes::InternalError,
-                str::stream() << "Failed to create service entry worker thread: " << e.what()};
+                format(FMT_STRING("Failed to create service entry worker thread: {}"), e.what())};
     }
 
     return Status::OK();
