@@ -119,6 +119,7 @@ MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
 MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
+MONGO_FAIL_POINT_DEFINE(hangBeforePostMigrationCommitRefresh);
 
 MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* csr,
                                                     CollectionShardingRuntime::CSRLock& csrLock) {
@@ -490,6 +491,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                                    << ". Updating the optime with a write before refreshing the "
                                    << "metadata also failed"));
     }
+
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforePostMigrationCommitRefresh);
 
     // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
     // section. It is okay if the refresh fails because that will cause the metadata to be cleared
