@@ -62,9 +62,38 @@ e.g. data changes in tables are versioned, dropping/creating tables is not versi
 How are updates to the catalog done in-memory and on disk?
 
 ## Two-Phase Collection and Index Drop
-First phase removes access to the collection/index in the in-memory catalog, second phase drops the WT table.
-Explain this is necessary because WT versions document writes but not table drops.
-Necessary to support ongoing queries, repl ops like rollback, and our own startup recovery.
+
+Collections and indexes are dropped in two phases to ensure both that reads at points-in-time
+earlier than the drop are still possible and startup recovery and rollback via a stable timestamp
+can find the correct and expected data. The first phase removes the catalog entry associated with
+the collection or index: this delete is versioned by the storage engine, so earlier PIT accesses
+continue to see the catalog data. The second phase drops the collection or index data: this is not
+versioned and there is no PIT access that can see it afterwards. WiredTiger versions document
+writes, but not table drops: once a table is gone, the data is gone.
+
+The first phase of drop clears the associated catalog entry, both in-memory and on-disk, and then
+registers the collection or index's ident (identifier) with the reaper. The reaper maintains a list
+of {ident, drop timestamp} pairs and drops the collection or index's data when the drop timestamp
+becomes sufficiently persisted, old and inaccessible to readers. Currently that means that the drop
+timestamp must be both older than the timestamp of the last checkpoint and the oldest_timestamp.
+Requiring the drop timestamp to reach the checkpointed time ensures that startup recovery and
+rollback via recovery to a stable timestamp, which both recover to the last checkpoint, will never
+be missing collection or index data that should still exist at the checkpoint time that is less than
+the drop timestamp. Requiring the drop timestamp to pass (become older) than the oldest_timestamp
+ensures that all reads, which are supported back to the oldest_timestamp, successfully find the
+collection or index data.
+
+_Code spelunking starting points:_
+
+* [_The KVDropPendingIdentReaper
+  class_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/kv/kv_drop_pending_ident_reaper.h)
+  * Handles the second phase of collection/index drop. Runs when notified.
+* [_The TimestampMonitor and TimestampListener
+  classes_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.h#L178-L313)
+  * The TimestampMonitor starts a periodic job to notify the reaper of the latest timestamp that is
+    okay to reap.
+* [_Code that signals the reaper with a
+  timestamp_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L932-L949)
 
 # Storage Transactions
 Clarify transaction refers to storage engine transactions, not repl or sharding, throughout this document.
