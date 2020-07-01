@@ -1249,6 +1249,8 @@ public:
     int SSL_write(SSLConnectionInterface* conn, const void* buf, int num) final;
     int SSL_shutdown(SSLConnectionInterface* conn) final;
 
+    SSLInformationToLog getSSLInformationToLog() const final;
+
 private:
     bool _weakValidation;
     bool _allowInvalidCertificates;
@@ -1722,6 +1724,11 @@ int SSLManagerApple::SSL_shutdown(SSLConnectionInterface* conn) {
     }
     uassertOSStatusOK(status, ErrorCodes::SocketException);
     return 1;
+}
+
+SSLInformationToLog SSLManagerApple::getSSLInformationToLog() const {
+    SSLInformationToLog info;
+    return info;
 }
 
 }  // namespace

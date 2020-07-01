@@ -177,6 +177,26 @@ struct TLSVersionCounts {
     static TLSVersionCounts& get(ServiceContext* serviceContext);
 };
 
+struct CertInformationToLog {
+    SSLX509Name subject;
+    SSLX509Name issuer;
+    std::vector<char> thumbprint;
+    Date_t validityNotBefore;
+    Date_t validityNotAfter;
+};
+
+struct CRLInformationToLog {
+    std::vector<char> thumbprint;
+    Date_t validityNotBefore;
+    Date_t validityNotAfter;
+};
+
+struct SSLInformationToLog {
+    CertInformationToLog server;
+    boost::optional<CertInformationToLog> cluster;
+    boost::optional<CRLInformationToLog> crl;
+};
+
 class SSLManagerInterface : public Decorable<SSLManagerInterface> {
 public:
     static std::unique_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
@@ -275,6 +295,12 @@ public:
      * SSL_CTX obect.
      */
     virtual Status stapleOCSPResponse(SSLContextType context) = 0;
+
+    /**
+     * Get information about the certificates and CRL that will be used for outgoing and incoming
+     * SSL connecctions.
+     */
+    virtual SSLInformationToLog getSSLInformationToLog() const = 0;
 };
 
 // Access SSL functions through this instance.

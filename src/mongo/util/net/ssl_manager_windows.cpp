@@ -296,6 +296,8 @@ public:
 
     int SSL_shutdown(SSLConnectionInterface* conn) final;
 
+    SSLInformationToLog getSSLInformationToLog() const final;
+
 private:
     Status _loadCertificates(const SSLParams& params);
 
@@ -2043,6 +2045,11 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     } else {
         return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(peerSubjectName));
     }
+}
+
+SSLInformationToLog SSLManagerWindows::getSSLInformationToLog() const {
+    SSLInformationToLog info;
+    return info;
 }
 
 }  // namespace

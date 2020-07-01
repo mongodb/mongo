@@ -1044,6 +1044,8 @@ public:
 
     Future<void> ocspClientVerification(SSL* ssl, const ExecutorPtr& reactor);
 
+    SSLInformationToLog getSSLInformationToLog() const final;
+
 private:
     const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
                                      mongodbRolesOID.shortDescription.c_str(),
@@ -2747,6 +2749,11 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
     }
     _flushNetworkBIO(conn);
     throwSocketError(errToThrow, conn->socket->remoteString());
+}
+
+SSLInformationToLog SSLManagerOpenSSL::getSSLInformationToLog() const {
+    SSLInformationToLog info;
+    return info;
 }
 
 }  // namespace mongo
