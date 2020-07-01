@@ -1019,3 +1019,4 @@ If the mongod server is primary, it will [try to step down](https://github.com/m
 * [Shutdown logic](https://github.com/mongodb/mongo/blob/30f5448e95114d344e6acffa92856536885e35dd/src/mongo/s/mongos_main.cpp#L336-L354) for mongos.
 
 ### Quiesce mode on shutdown
+mongos enters quiesce mode prior to shutdown, to allow short-running operations to finish. During this time, new and existing operations are allowed to run, but `isMaster` requests return a `ShutdownInProgress` error, to indicate that clients should start routing operations to other nodes. Entering quiesce mode is considered a significant topology change in the streaming `isMaster` protocol, so mongos tracks a `TopologyVersion`, which it increments on entering quiesce mode, prompting it to respond to all waiting isMaster requests.
