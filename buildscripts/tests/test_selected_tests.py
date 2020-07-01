@@ -54,7 +54,7 @@ class TestAcceptance(unittest.TestCase):
         selected_tests_service_mock.get_test_mappings.return_value = []
         selected_tests_variant_expansions = {
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
+            "build_id": "my_build_id", "project": "mongodb-mongo-master", "version_id": "my_version"
         }
         repos = [mock_changed_git_files([])]
 
@@ -77,7 +77,7 @@ class TestAcceptance(unittest.TestCase):
         ]
         selected_tests_variant_expansions = {
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
+            "build_id": "my_build_id", "project": "mongodb-mongo-master", "version_id": "my_version"
         }
         repos = [mock_changed_git_files(["src/file1.cpp"])]
 
@@ -113,7 +113,7 @@ class TestAcceptance(unittest.TestCase):
         ]
         selected_tests_variant_expansions = {
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
+            "build_id": "my_build_id", "project": "mongodb-mongo-master", "version_id": "my_version"
         }
         repos = [mock_changed_git_files(["src/file1.cpp"])]
 
@@ -583,7 +583,7 @@ class TestGetTaskConfigs(unittest.TestCase):
         self.assertEqual(task_configs["task_config_key"], "task_config_value_2")
 
 
-class RemoveRepoPathPrefix(unittest.TestCase):
+class TestRemoveRepoPathPrefix(unittest.TestCase):
     def test_file_is_in_enterprise_modules(self):
         filepath = under_test._remove_repo_path_prefix(
             "src/mongo/db/modules/enterprise/src/file1.cpp")
@@ -594,3 +594,45 @@ class RemoveRepoPathPrefix(unittest.TestCase):
         filepath = under_test._remove_repo_path_prefix("other_directory/src/file1.cpp")
 
         self.assertEqual(filepath, "other_directory/src/file1.cpp")
+
+
+class TestRemoveTaskConfigsAlreadyInBuild(unittest.TestCase):
+    def test_tasks_are_already_in_build(self):
+        task_configs = {
+            "aggregation": {"build_variant": "linux-64-debug"},
+            "jsCore": {"build_variant": "linux-64-debug"}
+        }
+        evg_api = MagicMock()
+        aggregation_task = MagicMock(display_name="aggregation")
+        evg_api.version_by_id.return_value.build_by_variant.return_value.get_tasks.return_value = [
+            aggregation_task
+        ]
+        build_variant_config = MagicMock()
+        version_id = "version_id"
+        under_test.remove_task_configs_already_in_build(task_configs, evg_api, build_variant_config,
+                                                        version_id)
+
+        self.assertNotIn("aggregation", task_configs)
+        self.assertIn("jsCore", task_configs)
+
+    def test_no_build_exists(self):
+        task_configs = {"aggregation": {"build_variant": "linux-64-debug"}}
+        evg_api = MagicMock()
+        evg_api.version_by_id.return_value.build_by_variant.side_effect = KeyError
+        build_variant_config = MagicMock()
+        version_id = "version_id"
+        under_test.remove_task_configs_already_in_build(task_configs, evg_api, build_variant_config,
+                                                        version_id)
+
+        self.assertIn("aggregation", task_configs)
+
+    def test_no_tasks_already_in_build(self):
+        task_configs = {"aggregation": {"build_variant": "linux-64-debug"}}
+        evg_api = MagicMock()
+        evg_api.version_by_id.return_value.build_by_variant.return_value.get_tasks.return_value = []
+        build_variant_config = MagicMock()
+        version_id = "version_id"
+        under_test.remove_task_configs_already_in_build(task_configs, evg_api, build_variant_config,
+                                                        version_id)
+
+        self.assertIn("aggregation", task_configs)

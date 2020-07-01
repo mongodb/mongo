@@ -187,7 +187,7 @@ def _exclude_task(task: Task) -> bool:
 
 
 def _find_selected_tasks(selected_tests_service: SelectedTestsService, changed_files: Set[str]) -> \
-Set[str]:
+        Set[str]:
     """
     Request tasks from selected-tests and filter out tasks that don't exist or should be excluded.
 
@@ -389,6 +389,35 @@ def _get_task_configs(evg_conf: EvergreenProjectConfig,
     return task_configs
 
 
+def remove_task_configs_already_in_build(task_configs: Dict[str, Dict], evg_api: EvergreenApi,
+                                         build_variant_config: Variant, version_id: str) -> None:
+    """
+    Remove the task_configs that exist for tasks that have been pulled into the build manually.
+
+    :param task_configs: The task configurations for the tasks to be generated.
+    :param evg_api: Evergreen API object.
+    :param build_variant_config: Config of build variant to collect task info from.
+    :param version_id: The version_id of the version running selected tests.
+    """
+    version = evg_api.version_by_id(version_id)
+
+    try:
+        build = version.build_by_variant(build_variant_config.name)
+    except KeyError:
+        LOGGER.debug("No build exists on this build variant for this version yet",
+                     variant=build_variant_config.name)
+        build = None
+
+    if build:
+        tasks_already_in_build = build.get_tasks()
+        for task in tasks_already_in_build:
+            if task.display_name in task_configs:
+                LOGGER.info(
+                    "Will not generate task that has already been pulled into the build manually",
+                    variant=build_variant_config.name, task_already_in_build=task.display_name)
+                del task_configs[task.display_name]
+
+
 def run(evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
         selected_tests_service: SelectedTestsService,
         selected_tests_variant_expansions: Dict[str, str], repos: List[Repo]) -> Dict[str, str]:
@@ -417,6 +446,9 @@ def run(evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
         task_configs = _get_task_configs(evg_conf, selected_tests_service,
                                          selected_tests_variant_expansions, build_variant_config,
                                          changed_files)
+
+        remove_task_configs_already_in_build(task_configs, evg_api, build_variant_config,
+                                             selected_tests_variant_expansions["version_id"])
 
         for task_config in task_configs.values():
             config_options = SelectedTestsConfigOptions.from_file(
