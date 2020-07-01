@@ -256,7 +256,8 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 
     auto const grid = Grid::get(operationContext());
     grid->init(makeShardingCatalogClient(std::move(distLockManagerPtr)),
-               std::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext())),
+               std::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext()),
+                                              catalogCacheExecutor()),
                makeShardRegistry(configConnStr),
                makeClusterCursorManager(),
                makeBalancerConfiguration(),

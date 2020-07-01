@@ -346,8 +346,8 @@ public:
         _clusterId = OID::gen();
         ShardingState::get(getServiceContext())->setInitialized(_myShardName, _clusterId);
 
-        std::unique_ptr<CatalogCacheLoaderMock> mockLoader =
-            std::make_unique<CatalogCacheLoaderMock>();
+        _catalogCacheExecutor = CatalogCache::makeDefaultThreadPool();
+        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>(catalogCacheExecutor());
         _mockCatalogCacheLoader = mockLoader.get();
         CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
 

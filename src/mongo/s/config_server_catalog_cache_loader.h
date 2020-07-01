@@ -36,8 +36,8 @@ namespace mongo {
 
 class ConfigServerCatalogCacheLoader final : public CatalogCacheLoader {
 public:
-    ConfigServerCatalogCacheLoader();
-    ~ConfigServerCatalogCacheLoader();
+    ConfigServerCatalogCacheLoader(std::shared_ptr<ThreadPool> executor);
+    ~ConfigServerCatalogCacheLoader() = default;
 
     /**
      * These functions should never be called. They trigger invariants if called.
@@ -50,24 +50,13 @@ public:
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
     void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
 
-    std::shared_ptr<Notification<void>> getChunksSince(
-        const NamespaceString& nss,
-        ChunkVersion version,
-        GetChunksSinceCallbackFn callbackFn) override;
-
-    void getDatabase(
-        StringData dbName,
-        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+    SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
+                                                          ChunkVersion version) override;
+    SemiFuture<DatabaseType> getDatabase(StringData dbName) override;
 
 private:
     // Thread pool to be used to perform metadata load
-    ThreadPool _threadPool;
-
-    // Protects the class state below
-    Mutex _mutex = MONGO_MAKE_LATCH("ConfigServerCatalogCacheLoader::_mutex");
-
-    // True if shutDown was called.
-    bool _inShutdown{false};
+    std::shared_ptr<ThreadPool> _executor;
 };
 
 }  // namespace mongo

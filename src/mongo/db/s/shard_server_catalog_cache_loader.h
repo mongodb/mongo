@@ -50,7 +50,8 @@ class ShardServerCatalogCacheLoader : public CatalogCacheLoader {
     ShardServerCatalogCacheLoader& operator=(const ShardServerCatalogCacheLoader&) = delete;
 
 public:
-    ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configServerLoader);
+    ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configServerLoader,
+                                  std::shared_ptr<ThreadPool> executor);
     ~ShardServerCatalogCacheLoader();
 
     /**
@@ -77,14 +78,10 @@ public:
      */
     void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
 
-    std::shared_ptr<Notification<void>> getChunksSince(
-        const NamespaceString& nss,
-        ChunkVersion version,
-        GetChunksSinceCallbackFn callbackFn) override;
+    SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
+                                                          ChunkVersion version) override;
 
-    void getDatabase(
-        StringData dbName,
-        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+    SemiFuture<DatabaseType> getDatabase(StringData dbName) override;
 
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
 
@@ -337,61 +334,51 @@ private:
     /**
      * Forces the primary to refresh its metadata for 'nss' and waits until this node's metadata
      * has caught up to the primary's.
-     * Then retrieves chunk metadata from this node's persisted metadata store and passes it to
-     * 'callbackFn'.
+     *
+     * Returns chunk metadata from this node's persisted metadata store.
      */
-    void _runSecondaryGetChunksSince(
+    StatusWith<CollectionAndChangedChunks> _runSecondaryGetChunksSince(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const ChunkVersion& catalogCacheSinceVersion,
-        std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
-        std::shared_ptr<Notification<void>> notify);
+        const ChunkVersion& catalogCacheSinceVersion);
 
     /**
      * Refreshes chunk metadata from the config server's metadata store, and schedules maintenance
      * of the shard's persisted metadata store with the latest updates retrieved from the config
      * server.
      *
-     * Then calls 'callbackFn' with metadata retrieved locally from the shard persisted metadata
-     * store and any in-memory tasks with terms matching 'currentTerm' enqueued to update that
-     * store, GTE to 'catalogCacheSinceVersion'.
+     * Returns the metadata retrieved locally from the shard persisted metadata
+     * store and any in-memory enqueued tasks to update that store that match the given term,
+     * grather then or equal to the given chunk version.
      *
      * Only run on the shard primary.
      */
-    void _schedulePrimaryGetChunksSince(
+    StatusWith<CollectionAndChangedChunks> _schedulePrimaryGetChunksSince(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
-        long long currentTerm,
-        std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
-        std::shared_ptr<Notification<void>> notify);
+        long long termScheduled);
 
     /**
      * Forces the primary to refresh its metadata for 'dbName' and waits until this node's metadata
      * has caught up to the primary's.
-     * Then retrieves the db version from this node's persisted metadata store and passes it to
-     * 'callbackFn'.
+     * Returns the database version from this node's persisted metadata store.
      */
-    void _runSecondaryGetDatabase(
-        OperationContext* opCtx,
-        StringData dbName,
-        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
+    StatusWith<DatabaseType> _runSecondaryGetDatabase(OperationContext* opCtx, StringData dbName);
 
     /**
      * Refreshes db version from the config server's metadata store, and schedules maintenance
      * of the shard's persisted metadata store with the latest updates retrieved from the config
      * server.
      *
-     * Then calls 'callbackFn' with metadata retrieved locally from the shard persisted metadata
-     * to update that store.
+     * Returns the metadata retrieved locally from the shard persisted metadata to update that
+     * store.
      *
      * Only run on the shard primary.
      */
-    void _schedulePrimaryGetDatabase(
-        OperationContext* opCtx,
-        StringData dbName,
-        long long termScheduled,
-        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
+    StatusWith<DatabaseType> _schedulePrimaryGetDatabase(OperationContext* opCtx,
+                                                         StringData dbName,
+                                                         long long termScheduled);
 
     /**
      * Loads chunk metadata from the shard persisted metadata store and any in-memory tasks with
@@ -478,7 +465,7 @@ private:
     std::unique_ptr<CatalogCacheLoader> _configServerLoader;
 
     // Thread pool used to run blocking tasks which perform disk reads and writes
-    ThreadPool _threadPool;
+    std::shared_ptr<ThreadPool> _executor;
 
     // Registry of notifications for changes happening to the shard's on-disk routing information
     NamespaceMetadataChangeNotifications _namespaceNotifications;

@@ -40,35 +40,8 @@ namespace mongo {
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
-namespace {
-
-/**
- * Constructs the options for the loader thread pool.
- */
-ThreadPool::Options makeDefaultThreadPoolOptions() {
-    ThreadPool::Options options;
-    options.poolName = "CatalogCacheLoaderMock";
-    options.minThreads = 0;
-    options.maxThreads = 1;
-
-    // Ensure all threads have a client.
-    options.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-
-    return options;
-}
-
-}  // namespace
-
-CatalogCacheLoaderMock::CatalogCacheLoaderMock() : _threadPool(makeDefaultThreadPoolOptions()) {
-    _threadPool.startup();
-}
-
-CatalogCacheLoaderMock::~CatalogCacheLoaderMock() {
-    _threadPool.shutdown();
-    _threadPool.join();
-}
+CatalogCacheLoaderMock::CatalogCacheLoaderMock(std::shared_ptr<ThreadPool> executor)
+    : _executor(executor) {}
 
 void CatalogCacheLoaderMock::initializeReplicaSetRole(bool isPrimary) {
     MONGO_UNREACHABLE;
@@ -97,68 +70,41 @@ void CatalogCacheLoaderMock::waitForDatabaseFlush(OperationContext* opCtx, Strin
     MONGO_UNREACHABLE;
 }
 
-std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
-    const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) {
-    auto notify = std::make_shared<Notification<void>>();
+SemiFuture<CollectionAndChangedChunks> CatalogCacheLoaderMock::getChunksSince(
+    const NamespaceString& nss, ChunkVersion version) {
 
-    _threadPool.schedule([ this, notify, callbackFn ](auto status) noexcept {
-        invariant(status);
+    return ExecutorFuture<void>(_executor)
+        .then([this] {
+            uassertStatusOK(_swCollectionReturnValue);
+            uassertStatusOK(_swChunksReturnValue);
 
-        auto opCtx = Client::getCurrent()->makeOperationContext();
+            // We swap the chunks out of _swChunksReturnValue to ensure if this task is
+            // scheduled multiple times that we don't inform the ChunkManager about a chunk it
+            // has already updated.
+            std::vector<ChunkType> chunks;
+            _swChunksReturnValue.getValue().swap(chunks);
 
-        auto swCollAndChunks = [&]() -> StatusWith<CollectionAndChangedChunks> {
-            try {
-                uassertStatusOK(_swCollectionReturnValue);
-                uassertStatusOK(_swChunksReturnValue);
-
-                // We swap the chunks out of _swChunksReturnValue to ensure if this task is
-                // scheduled multiple times that we don't inform the ChunkManager about a chunk it
-                // has already updated.
-                std::vector<ChunkType> chunks;
-                _swChunksReturnValue.getValue().swap(chunks);
-
-                return CollectionAndChangedChunks(
-                    _swCollectionReturnValue.getValue().getUUID(),
-                    _swCollectionReturnValue.getValue().getEpoch(),
-                    _swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
-                    _swCollectionReturnValue.getValue().getDefaultCollation(),
-                    _swCollectionReturnValue.getValue().getUnique(),
-                    std::move(chunks));
-            } catch (const DBException& ex) {
-                return ex.toStatus();
-            }
-        }();
-
-        callbackFn(opCtx.get(), std::move(swCollAndChunks));
-        notify->set();
-    });
-
-    return notify;
+            return CollectionAndChangedChunks(
+                _swCollectionReturnValue.getValue().getUUID(),
+                _swCollectionReturnValue.getValue().getEpoch(),
+                _swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
+                _swCollectionReturnValue.getValue().getDefaultCollation(),
+                _swCollectionReturnValue.getValue().getUnique(),
+                std::move(chunks));
+        })
+        .semi();
 }
 
-void CatalogCacheLoaderMock::getDatabase(
-    StringData dbName,
-    std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    _threadPool.schedule([ this, callbackFn ](auto status) noexcept {
-        invariant(status);
-
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-
-        auto swDatabase = [&]() -> StatusWith<DatabaseType> {
-            try {
-                uassertStatusOK(_swDatabaseReturnValue);
-
-                return DatabaseType(_swDatabaseReturnValue.getValue().getName(),
-                                    _swDatabaseReturnValue.getValue().getPrimary(),
-                                    _swDatabaseReturnValue.getValue().getSharded(),
-                                    _swDatabaseReturnValue.getValue().getVersion());
-            } catch (const DBException& ex) {
-                return ex.toStatus();
-            }
-        }();
-
-        callbackFn(opCtx.get(), std::move(swDatabase));
-    });
+SemiFuture<DatabaseType> CatalogCacheLoaderMock::getDatabase(StringData dbName) {
+    return ExecutorFuture<void>(_executor)
+        .then([this] {
+            uassertStatusOK(_swDatabaseReturnValue);
+            return DatabaseType(_swDatabaseReturnValue.getValue().getName(),
+                                _swDatabaseReturnValue.getValue().getPrimary(),
+                                _swDatabaseReturnValue.getValue().getSharded(),
+                                _swDatabaseReturnValue.getValue().getVersion());
+        })
+        .semi();
 }
 
 void CatalogCacheLoaderMock::setCollectionRefreshReturnValue(

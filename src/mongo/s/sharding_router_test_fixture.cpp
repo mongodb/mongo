@@ -167,18 +167,21 @@ ShardingTestFixture::ShardingTestFixture()
     auto shardRegistry(std::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
     executorPool->startup();
 
-    CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+    _catalogCacheExecutor = CatalogCache::makeDefaultThreadPool();
+    CatalogCacheLoader::set(
+        service, std::make_unique<ConfigServerCatalogCacheLoader>(catalogCacheExecutor()));
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
     auto const grid = Grid::get(operationContext());
-    grid->init(makeShardingCatalogClient(std::move(uniqueDistLockManager)),
-               std::make_unique<CatalogCache>(CatalogCacheLoader::get(service)),
-               std::move(shardRegistry),
-               std::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
-               std::make_unique<BalancerConfiguration>(),
-               std::move(executorPool),
-               _mockNetwork);
+    grid->init(
+        makeShardingCatalogClient(std::move(uniqueDistLockManager)),
+        std::make_unique<CatalogCache>(CatalogCacheLoader::get(service), catalogCacheExecutor()),
+        std::move(shardRegistry),
+        std::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
+        std::make_unique<BalancerConfiguration>(),
+        std::move(executorPool),
+        _mockNetwork);
 
     if (grid->catalogClient()) {
         grid->catalogClient()->startup();

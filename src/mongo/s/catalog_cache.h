@@ -40,6 +40,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version_gen.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/string_map.h"
 
@@ -128,7 +129,7 @@ class CatalogCache {
     CatalogCache& operator=(const CatalogCache&) = delete;
 
 public:
-    CatalogCache(CatalogCacheLoader& cacheLoader);
+    CatalogCache(CatalogCacheLoader& cacheLoader, std::shared_ptr<ThreadPool> executor);
     ~CatalogCache();
 
     /**
@@ -302,6 +303,13 @@ public:
      */
     void checkAndRecordOperationBlockedByRefresh(OperationContext* opCtx, mongo::LogicalOp opType);
 
+    /**
+     * Returns a ThreadPool with default options to be used for CatalogCache.
+     *
+     * The returned ThreadPool is already started up.
+     */
+    static std::shared_ptr<ThreadPool> makeDefaultThreadPool();
+
 private:
     // Make the cache entries friends so they can access the private classes below
     friend class CachedDatabaseInfo;
@@ -353,7 +361,7 @@ private:
      * database entry must be in the 'needsRefresh' state.
      */
     void _scheduleDatabaseRefresh(WithLock,
-                                  const std::string& dbName,
+                                  StringData dbName,
                                   std::shared_ptr<DatabaseInfoEntry> dbEntry);
 
     /**
@@ -361,6 +369,7 @@ private:
      * namespace must be in the 'needRefresh' state.
      */
     void _scheduleCollectionRefresh(WithLock,
+                                    ServiceContext* service,
                                     std::shared_ptr<CollectionRoutingInfoEntry> collEntry,
                                     NamespaceString const& nss,
                                     int refreshAttempt);
@@ -486,6 +495,8 @@ private:
         void report(BSONObjBuilder* builder) const;
 
     } _stats;
+
+    std::shared_ptr<ThreadPool> _executor;
 
     using DatabaseInfoMap = StringMap<std::shared_ptr<DatabaseInfoEntry>>;
     using CollectionInfoMap = StringMap<std::shared_ptr<CollectionRoutingInfoEntry>>;

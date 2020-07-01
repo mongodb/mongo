@@ -135,7 +135,19 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
 
 }  // namespace
 
-CatalogCache::CatalogCache(CatalogCacheLoader& cacheLoader) : _cacheLoader(cacheLoader) {}
+std::shared_ptr<ThreadPool> CatalogCache::makeDefaultThreadPool() {
+    ThreadPool::Options options;
+    options.poolName = "CatalogCache";
+    options.minThreads = 0;
+    options.maxThreads = 6;
+
+    auto executor = std::make_shared<ThreadPool>(std::move(options));
+    executor->startup();
+    return executor;
+}
+
+CatalogCache::CatalogCache(CatalogCacheLoader& cacheLoader, std::shared_ptr<ThreadPool> executor)
+    : _cacheLoader(cacheLoader), _executor(executor){};
 
 CatalogCache::~CatalogCache() = default;
 
@@ -159,7 +171,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
                 if (!refreshNotification) {
                     refreshNotification = (dbEntry->refreshCompletionNotification =
                                                std::make_shared<Notification<Status>>());
-                    _scheduleDatabaseRefresh(ul, dbName.toString(), dbEntry);
+                    _scheduleDatabaseRefresh(ul, dbName, dbEntry);
                 }
 
                 // Wait on the notification outside of the mutex.
@@ -236,7 +248,7 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
             if (!refreshNotification) {
                 refreshNotification = (collEntry->refreshCompletionNotification =
                                            std::make_shared<Notification<Status>>());
-                _scheduleCollectionRefresh(ul, collEntry, nss, 1);
+                _scheduleCollectionRefresh(ul, opCtx->getServiceContext(), collEntry, nss, 1);
                 refreshActionTaken = RefreshAction::kPerformedRefresh;
             }
 
@@ -584,76 +596,10 @@ void CatalogCache::checkAndRecordOperationBlockedByRefresh(OperationContext* opC
 }
 
 void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
-                                            const std::string& dbName,
+                                            StringData dbName,
                                             std::shared_ptr<DatabaseInfoEntry> dbEntry) {
-    const auto onRefreshCompleted = [this, t = Timer(), dbName, dbEntry](
-                                        const StatusWith<DatabaseType>& swDbt) {
-        // TODO (SERVER-34164): Track and increment stats for database refreshes.
-        if (!swDbt.isOK()) {
-            LOGV2_OPTIONS(24100,
-                          {logv2::LogComponent::kShardingCatalogRefresh},
-                          "Error refreshing cached database entry for {db}. Took {duration} and "
-                          "failed due to {error}",
-                          "Error refreshing cached database entry",
-                          "db"_attr = dbName,
-                          "duration"_attr = Milliseconds(t.millis()),
-                          "error"_attr = redact(swDbt.getStatus()));
-            return;
-        }
 
-        const auto dbVersionAfterRefresh = swDbt.getValue().getVersion();
-        const int logLevel =
-            (!dbEntry->dbt ||
-             (dbEntry->dbt &&
-              !databaseVersion::equal(dbVersionAfterRefresh, dbEntry->dbt->getVersion())))
-            ? 0
-            : 1;
-        LOGV2_FOR_CATALOG_REFRESH(
-            24101,
-            logLevel,
-            "Refreshed cached database entry for {db} to version {newDbVersion} from version "
-            "{oldDbVersion}. Took {duration}",
-            "Refreshed cached database entry",
-            "db"_attr = dbName,
-            "newDbVersion"_attr = dbVersionAfterRefresh.toBSON(),
-            "oldDbVersion"_attr = (dbEntry->dbt ? dbEntry->dbt->getVersion().toBSON() : BSONObj()),
-            "duration"_attr = Milliseconds(t.millis()));
-    };
-
-    // Invoked if getDatabase resulted in error or threw and exception
-    const auto onRefreshFailed =
-        [ this, dbName, dbEntry, onRefreshCompleted ](WithLock, const Status& status) noexcept {
-        onRefreshCompleted(status);
-
-        // Clear the notification so the next 'getDatabase' kicks off a new refresh attempt.
-        dbEntry->refreshCompletionNotification->set(status);
-        dbEntry->refreshCompletionNotification = nullptr;
-
-        if (status == ErrorCodes::NamespaceNotFound) {
-            // The refresh found that the database was dropped, so remove its entry from the cache.
-            _databases.erase(dbName);
-            _collectionsByDb.erase(dbName);
-            return;
-        }
-    };
-
-    const auto refreshCallback = [ this, dbName, dbEntry, onRefreshFailed, onRefreshCompleted ](
-        OperationContext * opCtx, StatusWith<DatabaseType> swDbt) noexcept {
-        stdx::lock_guard<Latch> lg(_mutex);
-
-        if (!swDbt.isOK()) {
-            onRefreshFailed(lg, swDbt.getStatus());
-            return;
-        }
-
-        onRefreshCompleted(swDbt);
-
-        dbEntry->needsRefresh = false;
-        dbEntry->refreshCompletionNotification->set(Status::OK());
-        dbEntry->refreshCompletionNotification = nullptr;
-
-        dbEntry->dbt = std::move(swDbt.getValue());
-    };
+    // TODO (SERVER-34164): Track and increment stats for database refreshes
 
     LOGV2_FOR_CATALOG_REFRESH(24102,
                               1,
@@ -664,16 +610,65 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
                               "currentDbInfo"_attr =
                                   (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj()));
 
-    try {
-        _cacheLoader.getDatabase(dbName, refreshCallback);
-    } catch (const DBException& ex) {
-        const auto status = ex.toStatus();
+    Timer t{};
 
-        onRefreshFailed(lk, status);
-    }
+    _cacheLoader.getDatabase(dbName)
+        .thenRunOn(_executor)
+        .then([=](const DatabaseType& dbt) noexcept {
+            const auto dbVersionAfterRefresh = dbt.getVersion();
+            const auto dbVersionHasChanged =
+                (!dbEntry->dbt ||
+                 (dbEntry->dbt &&
+                  !databaseVersion::equal(dbVersionAfterRefresh, dbEntry->dbt->getVersion())));
+
+            stdx::lock_guard<Latch> lg(_mutex);
+
+            LOGV2_FOR_CATALOG_REFRESH(
+                24101,
+                dbVersionHasChanged ? 0 : 1,
+                "Refreshed cached database entry for {db} to version {newDbVersion}"
+                "from version {oldDbVersion}. Took {duration}",
+                "Refreshed cached database entry",
+                "db"_attr = dbName,
+                "newDbVersion"_attr = dbVersionAfterRefresh,
+                "oldDbVersion"_attr =
+                    (dbEntry->dbt ? dbEntry->dbt->getVersion().toBSON() : BSONObj()),
+                "duration"_attr = Milliseconds(t.millis()));
+
+            dbEntry->needsRefresh = false;
+            dbEntry->refreshCompletionNotification->set(Status::OK());
+            dbEntry->refreshCompletionNotification = nullptr;
+
+            dbEntry->dbt = std::move(dbt);
+        })
+        .onError([=](Status errStatus) noexcept {
+            stdx::lock_guard<Latch> lg(_mutex);
+
+            LOGV2_OPTIONS(24100,
+                          {logv2::LogComponent::kShardingCatalogRefresh},
+                          "Error refreshing cached database entry for {db}. Took {duration} and "
+                          "failed due to {error}",
+                          "Error refreshing cached database entry",
+                          "db"_attr = dbName,
+                          "duration"_attr = Milliseconds(t.millis()),
+                          "error"_attr = redact(errStatus));
+
+            // Clear the notification so the next 'getDatabase' kicks off a new refresh attempt.
+            dbEntry->refreshCompletionNotification->set(errStatus);
+            dbEntry->refreshCompletionNotification = nullptr;
+
+            if (errStatus == ErrorCodes::NamespaceNotFound) {
+                // The refresh found that the database was dropped, so remove its entry
+                // from the cache.
+                _databases.erase(dbName);
+                _collectionsByDb.erase(dbName);
+            }
+        })
+        .getAsync([](auto) {});
 }
 
 void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
+                                              ServiceContext* service,
                                               std::shared_ptr<CollectionRoutingInfoEntry> collEntry,
                                               NamespaceString const& nss,
                                               int refreshAttempt) {
@@ -744,15 +739,16 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     };
 
     // Invoked if getChunksSince resulted in error or threw an exception
-    const auto onRefreshFailed = [ this, collEntry, nss, refreshAttempt, onRefreshCompleted ](
-        WithLock lk, const Status& status) noexcept {
+    const auto onRefreshFailed =
+        [ this, service, collEntry, nss, refreshAttempt,
+          onRefreshCompleted ](WithLock lk, const Status& status) noexcept {
         onRefreshCompleted(status, nullptr);
 
         // It is possible that the metadata is being changed concurrently, so retry the
         // refresh again
         if (status == ErrorCodes::ConflictingOperationInProgress &&
             refreshAttempt < kMaxInconsistentRoutingInfoRefreshAttempts) {
-            _scheduleCollectionRefresh(lk, collEntry, nss, refreshAttempt + 1);
+            _scheduleCollectionRefresh(lk, service, collEntry, nss, refreshAttempt + 1);
         } else {
             // Leave needsRefresh to true so that any subsequent get attempts will kick off
             // another round of refresh
@@ -762,13 +758,16 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     };
 
     const auto refreshCallback =
-        [ this, collEntry, nss, existingRoutingInfo, onRefreshFailed, onRefreshCompleted ](
-            OperationContext * opCtx,
+        [ this, service, collEntry, nss, existingRoutingInfo, onRefreshFailed, onRefreshCompleted ](
             StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
+
+        ThreadClient tc("CatalogCache::collectionRefresh", service);
+        auto opCtx = tc->makeOperationContext();
+
         std::shared_ptr<RoutingTableHistory> newRoutingInfo;
         try {
             newRoutingInfo = refreshCollectionRoutingInfo(
-                opCtx, nss, std::move(existingRoutingInfo), std::move(swCollAndChunks));
+                opCtx.get(), nss, std::move(existingRoutingInfo), std::move(swCollAndChunks));
 
             onRefreshCompleted(Status::OK(), newRoutingInfo.get());
         } catch (const DBException& ex) {
@@ -784,7 +783,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         collEntry->refreshCompletionNotification->set(Status::OK());
         collEntry->refreshCompletionNotification = nullptr;
 
-        setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
+        setOperationShouldBlockBehindCatalogCacheRefresh(opCtx.get(), false);
 
         if (existingRoutingInfo && newRoutingInfo &&
             existingRoutingInfo->getSequenceNumber() == newRoutingInfo->getSequenceNumber()) {
@@ -805,18 +804,9 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         "namespace"_attr = nss,
         "currentCollectionVersion"_attr = startingCollectionVersion);
 
-    try {
-        _cacheLoader.getChunksSince(nss, startingCollectionVersion, refreshCallback);
-    } catch (const DBException& ex) {
-        const auto status = ex.toStatus();
-
-        // ConflictingOperationInProgress errors trigger retry of the catalog cache reload logic. If
-        // we failed to schedule the asynchronous reload, there is no point in doing another
-        // attempt.
-        invariant(status != ErrorCodes::ConflictingOperationInProgress);
-
-        onRefreshFailed(lk, status);
-    }
+    _cacheLoader.getChunksSince(nss, startingCollectionVersion)
+        .thenRunOn(_executor)
+        .getAsync(refreshCallback);
 
     // The routing info for this collection shouldn't change, as other threads may try to use the
     // CatalogCache while we are waiting for the refresh to complete.

@@ -49,23 +49,6 @@ using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunk
 namespace {
 
 /**
- * Constructs the default options for the thread pool used by the cache loader.
- */
-ThreadPool::Options makeDefaultThreadPoolOptions() {
-    ThreadPool::Options options;
-    options.poolName = "ConfigServerCatalogCacheLoader";
-    options.minThreads = 0;
-    options.maxThreads = 6;
-
-    // Ensure all threads have a client
-    options.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-
-    return options;
-}
-
-/**
  * Structure repsenting the generated query and sort order for a chunk diffing operation.
  */
 struct QueryAndSort {
@@ -136,14 +119,8 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
 
 }  // namespace
 
-ConfigServerCatalogCacheLoader::ConfigServerCatalogCacheLoader()
-    : _threadPool(makeDefaultThreadPoolOptions()) {
-    _threadPool.startup();
-}
-
-ConfigServerCatalogCacheLoader::~ConfigServerCatalogCacheLoader() {
-    shutDown();
-}
+ConfigServerCatalogCacheLoader::ConfigServerCatalogCacheLoader(std::shared_ptr<ThreadPool> executor)
+    : _executor(executor) {}
 
 void ConfigServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
     MONGO_UNREACHABLE;
@@ -157,19 +134,7 @@ void ConfigServerCatalogCacheLoader::onStepUp() {
     MONGO_UNREACHABLE;
 }
 
-void ConfigServerCatalogCacheLoader::shutDown() {
-    {
-        stdx::lock_guard<Latch> lg(_mutex);
-        if (_inShutdown) {
-            return;
-        }
-
-        _inShutdown = true;
-    }
-
-    _threadPool.shutdown();
-    _threadPool.join();
-}
+void ConfigServerCatalogCacheLoader::shutDown() {}
 
 void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
     MONGO_UNREACHABLE;
@@ -185,53 +150,34 @@ void ConfigServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCt
     MONGO_UNREACHABLE;
 }
 
-std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSince(
-    const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) {
-    auto notify = std::make_shared<Notification<void>>();
+SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunksSince(
+    const NamespaceString& nss, ChunkVersion version) {
 
-    _threadPool.schedule([ nss, version, notify, callbackFn ](auto status) noexcept {
-        invariant(status);
+    return ExecutorFuture<void>(_executor)
+        .then([=]() {
+            ThreadClient tc("ConfigServerCatalogCacheLoader::getChunksSince",
+                            getGlobalServiceContext());
+            auto opCtx = tc->makeOperationContext();
 
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-
-        auto swCollAndChunks = [&]() -> StatusWith<CollectionAndChangedChunks> {
-            try {
-                return getChangedChunks(opCtx.get(), nss, version);
-            } catch (const DBException& ex) {
-                return ex.toStatus();
-            }
-        }();
-
-        callbackFn(opCtx.get(), std::move(swCollAndChunks));
-        notify->set();
-    });
-
-    return notify;
+            return getChangedChunks(opCtx.get(), nss, version);
+        })
+        .semi();
 }
 
-void ConfigServerCatalogCacheLoader::getDatabase(
-    StringData dbName,
-    std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    _threadPool.schedule([ name = dbName.toString(), callbackFn ](auto status) noexcept {
-        invariant(status);
-
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-
-        auto swDbt = [&]() -> StatusWith<DatabaseType> {
-            try {
-                return uassertStatusOK(
-                           Grid::get(opCtx.get())
-                               ->catalogClient()
-                               ->getDatabase(
-                                   opCtx.get(), name, repl::ReadConcernLevel::kMajorityReadConcern))
-                    .value;
-            } catch (const DBException& ex) {
-                return ex.toStatus();
-            }
-        }();
-
-        callbackFn(opCtx.get(), std::move(swDbt));
-    });
+SemiFuture<DatabaseType> ConfigServerCatalogCacheLoader::getDatabase(StringData dbName) {
+    return ExecutorFuture<void>(_executor)
+        .then([name = dbName.toString()] {
+            ThreadClient tc("ConfigServerCatalogCacheLoader::getDatabase",
+                            getGlobalServiceContext());
+            auto opCtx = tc->makeOperationContext();
+            return uassertStatusOK(Grid::get(opCtx.get())
+                                       ->catalogClient()
+                                       ->getDatabase(opCtx.get(),
+                                                     name,
+                                                     repl::ReadConcernLevel::kMajorityReadConcern))
+                .value;
+        })
+        .semi();
 }
 
 }  // namespace mongo

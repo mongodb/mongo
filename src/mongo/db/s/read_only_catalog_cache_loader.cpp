@@ -52,15 +52,13 @@ void ReadOnlyCatalogCacheLoader::shutDown() {
     _configServerLoader.shutDown();
 }
 
-std::shared_ptr<Notification<void>> ReadOnlyCatalogCacheLoader::getChunksSince(
-    const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) {
-    return _configServerLoader.getChunksSince(nss, version, callbackFn);
+SemiFuture<CollectionAndChangedChunks> ReadOnlyCatalogCacheLoader::getChunksSince(
+    const NamespaceString& nss, ChunkVersion version) {
+    return _configServerLoader.getChunksSince(nss, version);
 }
 
-void ReadOnlyCatalogCacheLoader::getDatabase(
-    StringData dbName,
-    std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    return _configServerLoader.getDatabase(dbName, callbackFn);
+SemiFuture<DatabaseType> ReadOnlyCatalogCacheLoader::getDatabase(StringData dbName) {
+    return _configServerLoader.getDatabase(dbName);
 }
 
 }  // namespace mongo

@@ -70,9 +70,12 @@ protected:
         // When sharding initialization is triggered, initialize sharding state as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
-        CatalogCacheLoader::set(getServiceContext(),
-                                std::make_unique<ShardServerCatalogCacheLoader>(
-                                    std::make_unique<ConfigServerCatalogCacheLoader>()));
+        _catalogCacheExecutor = CatalogCache::makeDefaultThreadPool();
+        CatalogCacheLoader::set(
+            getServiceContext(),
+            std::make_unique<ShardServerCatalogCacheLoader>(
+                std::make_unique<ConfigServerCatalogCacheLoader>(catalogCacheExecutor()),
+                catalogCacheExecutor()));
 
         ShardingInitializationMongoD::get(getServiceContext())
             ->setGlobalInitMethodForTest([&](OperationContext* opCtx,

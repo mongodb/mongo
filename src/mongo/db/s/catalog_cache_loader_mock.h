@@ -43,8 +43,8 @@ class CatalogCacheLoaderMock final : public CatalogCacheLoader {
     CatalogCacheLoaderMock& operator=(const CatalogCacheLoaderMock&) = delete;
 
 public:
-    CatalogCacheLoaderMock();
-    ~CatalogCacheLoaderMock();
+    CatalogCacheLoaderMock(std::shared_ptr<ThreadPool> executor);
+    ~CatalogCacheLoaderMock() = default;
 
     /**
      * These functions should never be called. They trigger invariants if called.
@@ -57,14 +57,10 @@ public:
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
     void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
 
-    std::shared_ptr<Notification<void>> getChunksSince(
-        const NamespaceString& nss,
-        ChunkVersion version,
-        GetChunksSinceCallbackFn callbackFn) override;
+    SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
+                                                          ChunkVersion version) override;
 
-    void getDatabase(
-        StringData dbName,
-        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+    SemiFuture<DatabaseType> getDatabase(StringData dbName) override;
 
     /**
      * Sets the mocked collection entry result that getChunksSince will use to construct its return
@@ -96,7 +92,7 @@ private:
         Status(ErrorCodes::InternalError, "config loader mock chunks response is uninitialized")};
 
     // Thread pool on which to mock load chunk metadata.
-    ThreadPool _threadPool;
+    std::shared_ptr<ThreadPool> _executor;
 };
 
 }  // namespace mongo
