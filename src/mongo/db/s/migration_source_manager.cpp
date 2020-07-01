@@ -133,6 +133,7 @@ MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
 MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
+MONGO_FAIL_POINT_DEFINE(hangBeforePostMigrationCommitRefresh);
 
 MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* csr,
                                                     CollectionShardingRuntime::CSRLock& csrLock) {
@@ -492,6 +493,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     if (!migrationCommitStatus.isOK()) {
         migrationutil::ensureChunkVersionIsGreaterThan(_opCtx, _args.getRange(), _chunkVersion);
     }
+
+    hangBeforePostMigrationCommitRefresh.pauseWhileSet();
 
     migrationutil::refreshFilteringMetadataUntilSuccess(_opCtx, getNss());
 

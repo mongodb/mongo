@@ -123,7 +123,7 @@ public:
                 // consistency guarantee.
                 auto const css = CollectionShardingState::get(opCtx, ns());
                 auto criticalSectionSignal =
-                    css->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead);
+                    css->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
                 if (criticalSectionSignal) {
                     oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
                 }
