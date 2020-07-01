@@ -43,6 +43,9 @@
 namespace mongo {
 namespace biggie {
 
+// TODO SERVER-38987: Change the name to EphemeralForTest.
+extern const std::string kBiggieEngineName;
+
 /**
  * A RecordStore that stores all data in-memory.
  */

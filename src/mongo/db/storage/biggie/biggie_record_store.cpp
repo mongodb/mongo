@@ -71,6 +71,9 @@ RecordId extractRecordId(const std::string& keyStr) {
 }
 }  // namespace
 
+
+const std::string kBiggieEngineName = "biggie";
+
 RecordStore::RecordStore(StringData ns,
                          StringData ident,
                          bool isCapped,

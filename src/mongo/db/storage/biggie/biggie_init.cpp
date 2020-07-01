@@ -32,9 +32,15 @@
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
+#include "mongo/db/storage/biggie/biggie_record_store.h"
+#include "mongo/db/storage/biggie/biggie_server_status.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
+
+#if __has_feature(address_sanitizer)
+#include <sanitizer/lsan_interface.h>
+#endif
 
 namespace mongo {
 namespace biggie {
@@ -44,14 +50,30 @@ class BiggieStorageEngineFactory : public StorageEngine::Factory {
 public:
     virtual std::unique_ptr<StorageEngine> create(const StorageGlobalParams& params,
                                                   const StorageEngineLockFile* lockFile) const {
+        auto kv = std::make_unique<KVEngine>();
+        // We must only add the server parameters to the global registry once during unit testing.
+        static int setupCountForUnitTests = 0;
+        if (setupCountForUnitTests == 0) {
+            ++setupCountForUnitTests;
+
+            // Intentionally leaked.
+            MONGO_COMPILER_VARIABLE_UNUSED auto leakedSection =
+                new BiggieServerStatusSection(kv.get());
+
+            // This allows unit tests to run this code without encountering memory leaks
+#if __has_feature(address_sanitizer)
+            __lsan_ignore_object(leakedSection);
+#endif
+        }
+
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
-        return std::make_unique<StorageEngineImpl>(std::make_unique<KVEngine>(), options);
+        return std::make_unique<StorageEngineImpl>(std::move(kv), options);
     }
 
     virtual StringData getCanonicalName() const {
-        return "biggie";
+        return kBiggieEngineName;
     }
 
     virtual Status validateMetadata(const StorageEngineMetadata& metadata,
