@@ -36,7 +36,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"

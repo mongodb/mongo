@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -49,7 +50,11 @@ public:
         : ServiceContextMongoDTest("ephemeralForTest", repair),
           _storageEngine(getServiceContext()->getStorageEngine()) {}
 
-    StorageEngineTest() : StorageEngineTest(RepairAction::kNoRepair) {}
+    StorageEngineTest() : StorageEngineTest(RepairAction::kNoRepair) {
+        auto serviceCtx = getServiceContext();
+        repl::ReplicationCoordinator::set(
+            serviceCtx, std::make_unique<repl::ReplicationCoordinatorMock>(serviceCtx));
+    }
 
     StatusWith<DurableCatalog::Entry> createCollection(OperationContext* opCtx,
                                                        NamespaceString ns) {

@@ -37,12 +37,12 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -138,6 +138,46 @@ std::string escapeDbName(StringData dbname) {
 
 bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
     return accessMethod == IndexNames::BTREE || accessMethod == IndexNames::GEO_2DSPHERE;
+}
+
+/**
+ * Returns true if writes to the catalog entry for the input namespace require being timestamped.
+ */
+bool requiresTimestampForCatalogWrite(OperationContext* opCtx, const NamespaceString& nss) {
+    if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr.") || nss.isDropPendingNamespace()) {
+        return false;
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->isReplEnabled()) {
+        return false;
+    }
+
+    if (replCoord->canAcceptWritesFor(opCtx, nss)) {
+        return false;
+    }
+
+    // If there is a timestamp already assigned, there's no need to explicitly assign a timestamp.
+    if (opCtx->recoveryUnit()->isTimestamped()) {
+        return false;
+    }
+
+    // Nodes in `startup` do not need to timestamp writes.
+    // Nodes in the oplog application phase of initial sync (`startup2`) must not timestamp writes
+    // before the `initialDataTimestamp`.
+    const auto memberState = replCoord->getMemberState();
+    if (memberState.startup() || memberState.startup2()) {
+        return false;
+    }
+
+    // When rollback completes, index builds may be restarted, which requires untimestamped catalog
+    // writes. Additionally, it's illegal to timestamp a write later than the timestamp associated
+    // with the node exiting the rollback state.
+    if (memberState.rollback()) {
+        return false;
+    }
+
+    return true;
 }
 
 }  // namespace
@@ -634,8 +674,7 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
         obj = b.obj();
     }
 
-    if (IndexTimestampHelper::requiresGhostCommitTimestampForCatalogWrite(opCtx, nss) &&
-        !nss.isDropPendingNamespace()) {
+    if (requiresTimestampForCatalogWrite(opCtx, nss)) {
         opCtx->recoveryUnit()->setMustBeTimestamped();
     }
 
@@ -681,9 +720,7 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
         it->second.nss = fromName;
     });
 
-    NamespaceString fromNss(fromName);
-    if (IndexTimestampHelper::requiresGhostCommitTimestampForCatalogWrite(opCtx, fromNss) &&
-        !fromNss.isDropPendingNamespace()) {
+    if (requiresTimestampForCatalogWrite(opCtx, fromName)) {
         opCtx->recoveryUnit()->setMustBeTimestamped();
     }
 

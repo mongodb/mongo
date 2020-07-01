@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
@@ -47,6 +48,10 @@ public:
     BiggieKVHarnessHelper() {
         invariant(hasGlobalServiceContext());
         _engine = std::make_unique<KVEngine>();
+        repl::ReplicationCoordinator::set(
+            getGlobalServiceContext(),
+            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
+                getGlobalServiceContext(), repl::ReplSettings())));
     }
 
     virtual KVEngine* getEngine() override {

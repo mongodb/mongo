@@ -39,7 +39,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog/multi_index_block_gen.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/client.h"
@@ -102,22 +101,6 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
                 _indexes[i].block->fail(opCtx, collection);
                 _indexes[i].block->finalizeTemporaryTables(
                     opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-            }
-
-            // Nodes building an index on behalf of a user (e.g: `createIndexes`, `applyOps`) may
-            // fail, removing the existence of the index from the catalog. This update must be
-            // timestamped (unless the build is on an unreplicated collection). A failure from
-            // `createIndexes` should not have a commit timestamp and instead write a noop entry. A
-            // foreground `applyOps` index build may have a commit timestamp already set.
-            if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-                // We must choose a timestamp to write with, as we don't have one handy in the
-                // recovery unit already.
-
-                // Simply get a timestamp to write with here; we can't write to the oplog.
-                repl::UnreplicatedWritesBlock uwb(opCtx);
-                if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
-                    LOGV2(20382, "Did not timestamp index abort write");
-                }
             }
 
             onCleanUp();

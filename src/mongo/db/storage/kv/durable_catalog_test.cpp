@@ -39,6 +39,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -62,6 +63,10 @@ public:
         : _nss("unittests.durable_catalog"),
           _storageEngine(std::make_unique<DevNullKVEngine>(), StorageEngineOptions()) {
         _storageEngine.finishInit();
+        repl::ReplicationCoordinator::set(
+            getGlobalServiceContext(),
+            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
+                getGlobalServiceContext(), repl::ReplSettings())));
     }
 
     ~DurableCatalogTest() {

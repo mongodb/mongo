@@ -67,5 +67,7 @@ env.CppUnitTest(
    ],
    LIBDEPS_PRIVATE=[
        '$BUILD_DIR/mongo/db/auth/authmocks',
+       '$BUILD_DIR/mongo/db/repl/replmocks',
+       '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
    ],
 )

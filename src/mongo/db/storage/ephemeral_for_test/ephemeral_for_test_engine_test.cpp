@@ -32,14 +32,22 @@
 #include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 namespace mongo {
 namespace {
 
-class EphemeralForTestKVHarnessHelper : public KVHarnessHelper {
+class EphemeralForTestKVHarnessHelper : public KVHarnessHelper,
+                                        public ScopedGlobalServiceContextForTest {
 public:
-    EphemeralForTestKVHarnessHelper() : _engine(new EphemeralForTestEngine()) {}
+    EphemeralForTestKVHarnessHelper() : _engine(new EphemeralForTestEngine()) {
+        repl::ReplicationCoordinator::set(
+            getGlobalServiceContext(),
+            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
+                getGlobalServiceContext(), repl::ReplSettings())));
+    }
 
     virtual KVEngine* restartEngine() {
         // Intentionally not restarting since the in-memory storage engine
