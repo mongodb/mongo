@@ -53,7 +53,7 @@ using std::vector;
 using unittest::assertGet;
 
 MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
-    ReplicaSetMonitor::disableRefreshRetries_forTest();
+    ScanningReplicaSetMonitor::disableRefreshRetries_forTest();
     return Status::OK();
 }
 

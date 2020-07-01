@@ -53,6 +53,15 @@ class ScanningReplicaSetMonitor : public ReplicaSetMonitor {
 public:
     class Refresher;
 
+    /**
+     * Defaults to false, meaning that if multiple hosts meet a criteria we pick one at random.
+     * This is required by the replica set driver spec. Set this to true in tests that need host
+     * selection to be deterministic.
+     *
+     * NOTE: Used by unit-tests only.
+     */
+    static bool useDeterministicHostSelection;
+
     static constexpr auto kExpeditedRefreshPeriod = Milliseconds(500);
     static constexpr auto kCheckTimeout = Seconds(5);
 
@@ -131,6 +140,10 @@ public:
      * continuing.
      */
     void runScanForMockReplicaSet();
+
+    static void disableRefreshRetries_forTest();
+
+    static bool areRefreshRetriesDisabledForTest();
 
 private:
     Future<std::vector<HostAndPort>> _getHostsOrRefresh(const ReadPreferenceSetting& readPref,

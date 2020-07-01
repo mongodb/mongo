@@ -45,6 +45,7 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
+#include "mongo/client/scanning_replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -63,7 +64,7 @@ using std::unique_ptr;
 using std::vector;
 
 MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
-    ReplicaSetMonitor::disableRefreshRetries_forTest();
+    ScanningReplicaSetMonitor::disableRefreshRetries_forTest();
     return Status::OK();
 }
 
@@ -558,7 +559,7 @@ protected:
         DBClientRSTest::setUp();
 
         // Tests for pinning behavior require this.
-        ReplicaSetMonitor::useDeterministicHostSelection = true;
+        ScanningReplicaSetMonitor::useDeterministicHostSelection = true;
 
         // This shuts down the background RSMWatcher thread and prevents it from running. These
         // tests depend on controlling when the RSMs are updated.
@@ -660,7 +661,7 @@ protected:
     }
 
     void tearDown() {
-        ReplicaSetMonitor::useDeterministicHostSelection = false;
+        ScanningReplicaSetMonitor::useDeterministicHostSelection = false;
 
         ConnectionString::setConnectionHook(_originalConnectionHook);
         ReplicaSetMonitor::cleanup();

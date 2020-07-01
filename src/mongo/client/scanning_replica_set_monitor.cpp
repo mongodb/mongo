@@ -167,6 +167,9 @@ int32_t pingTimeMillis(const Node& node) {
 const Seconds kDefaultRefreshPeriod(30);
 }  // namespace
 
+// Defaults to random selection as required by the spec
+bool ScanningReplicaSetMonitor::useDeterministicHostSelection = false;
+
 ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const SetStatePtr& initialState)
     : _state(initialState) {}
 
@@ -492,6 +495,18 @@ void ScanningReplicaSetMonitor::runScanForMockReplicaSet() {
     // This function should only be called from tests using MockReplicaSet and they should use the
     // synchronous path to complete before returning.
     invariant(_state->currentScan == nullptr);
+}
+
+namespace {
+AtomicWord<bool> refreshRetriesDisabledForTest{false};
+}  // namespace
+
+void ScanningReplicaSetMonitor::disableRefreshRetries_forTest() {
+    refreshRetriesDisabledForTest.store(true);
+}
+
+bool ScanningReplicaSetMonitor::areRefreshRetriesDisabledForTest() {
+    return refreshRetriesDisabledForTest.load();
 }
 
 void ScanningReplicaSetMonitor::_ensureScanInProgress(const SetStatePtr& state) {

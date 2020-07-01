@@ -394,8 +394,6 @@ env.Library(
     ],
 )
 
-# Cannot be combined with the above unit test due to an explicit call to
-# ReplicaSetMonitor::disableRefreshRetries_forTest.
 env.CppUnitTest(
     target='client_rs_test',
     source=[

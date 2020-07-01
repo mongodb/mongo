@@ -63,9 +63,6 @@ using std::vector;
 // Failpoint for changing the default refresh period
 MONGO_FAIL_POINT_DEFINE(modifyReplicaSetMonitorDefaultRefreshPeriod);
 
-// Defaults to random selection as required by the spec
-bool ReplicaSetMonitor::useDeterministicHostSelection = false;
-
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const string& name,
                                                                 const set<HostAndPort>& servers) {
     return ReplicaSetMonitorManager::get()->getOrCreateMonitor(
@@ -98,17 +95,5 @@ void ReplicaSetMonitor::shutdown() {
 
 void ReplicaSetMonitor::cleanup() {
     ReplicaSetMonitorManager::get()->removeAllMonitors();
-}
-
-namespace {
-AtomicWord<bool> refreshRetriesDisabledForTest{false};
-}  // namespace
-
-void ReplicaSetMonitor::disableRefreshRetries_forTest() {
-    refreshRetriesDisabledForTest.store(true);
-}
-
-bool ReplicaSetMonitor::areRefreshRetriesDisabledForTest() {
-    return refreshRetriesDisabledForTest.load();
 }
 }  // namespace mongo
