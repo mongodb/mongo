@@ -124,7 +124,7 @@ public:
                 // consistency guarantee.
                 auto const csr = CollectionShardingRuntime::get(opCtx, ns());
                 auto criticalSectionSignal =
-                    csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kRead);
+                    csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
                 if (criticalSectionSignal) {
                     oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
                 }

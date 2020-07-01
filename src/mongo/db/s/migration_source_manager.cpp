@@ -111,6 +111,7 @@ MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
 MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
+MONGO_FAIL_POINT_DEFINE(hangBeforePostMigrationCommitRefresh);
 
 MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* csr,
                                                     CollectionShardingRuntime::CSRLock& csrLock) {
@@ -461,6 +462,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         onShardVersionMismatchNoExcept(_opCtx, getNss(), boost::none).ignore();
         return migrationCommitStatus;
     }
+
+    hangBeforePostMigrationCommitRefresh.pauseWhileSet();
 
     try {
         LOGV2_DEBUG_OPTIONS(4817404,
