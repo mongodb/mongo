@@ -35,7 +35,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/killcursors_request.h"
+#include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/query/killcursors_response.h"
 
 namespace mongo {
@@ -43,14 +43,12 @@ namespace mongo {
 Status KillCursorsCmdBase::checkAuthForCommand(Client* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) const {
-    const auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);
-    if (!statusWithRequest.isOK()) {
-        return statusWithRequest.getStatus();
-    }
-    const auto killCursorsRequest = statusWithRequest.getValue();
 
-    const auto& nss = killCursorsRequest.nss;
-    for (CursorId id : killCursorsRequest.cursorIds) {
+    const auto killCursorsRequest =
+        KillCursorsRequest::parse(IDLParserErrorContext("killCursors"), cmdObj);
+
+    const auto& nss = killCursorsRequest.getNamespace();
+    for (CursorId id : killCursorsRequest.getCursorIds()) {
         const auto status = _checkAuth(client, nss, id);
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::CursorNotFound) {
@@ -70,17 +68,16 @@ bool KillCursorsCmdBase::runImpl(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj,
                                  BSONObjBuilder& result) {
-    auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);
-    uassertStatusOK(statusWithRequest.getStatus());
-    auto killCursorsRequest = std::move(statusWithRequest.getValue());
+    auto killCursorsRequest =
+        KillCursorsRequest::parse(IDLParserErrorContext("killCursors"), cmdObj);
 
     std::vector<CursorId> cursorsKilled;
     std::vector<CursorId> cursorsNotFound;
     std::vector<CursorId> cursorsAlive;
     std::vector<CursorId> cursorsUnknown;
 
-    for (CursorId id : killCursorsRequest.cursorIds) {
-        Status status = _killCursor(opCtx, killCursorsRequest.nss, id);
+    for (CursorId id : killCursorsRequest.getCursorIds()) {
+        Status status = _killCursor(opCtx, killCursorsRequest.getNamespace(), id);
         if (status.isOK()) {
             cursorsKilled.push_back(id);
         } else if (status.code() == ErrorCodes::CursorNotFound) {
@@ -90,7 +87,7 @@ bool KillCursorsCmdBase::runImpl(OperationContext* opCtx,
         }
 
         audit::logKillCursorsAuthzCheck(
-            opCtx->getClient(), killCursorsRequest.nss, id, status.code());
+            opCtx->getClient(), killCursorsRequest.getNamespace(), id, status.code());
     }
 
     KillCursorsResponse killCursorsResponse(

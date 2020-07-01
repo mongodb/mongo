@@ -95,6 +95,19 @@ TEST(KillCursorsResponseTest, parseFromBSONArrayContainsInvalidElement) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
+TEST(KillCursorsResponseTest, parseFromBSONEmptyArrays) {
+    // Verifies that a kill cursors response with empty cursor ID arrays is accepted.
+    StatusWith<KillCursorsResponse> result = KillCursorsResponse::parseFromBSON(
+        BSON("cursorsKilled" << BSONArray() << "cursorsNotFound" << BSONArray() << "cursorsAlive"
+                             << BSONArray() << "cursorsUnknown" << BSONArray() << "ok" << 1.0));
+    ASSERT_OK(result.getStatus());
+    KillCursorsResponse response = result.getValue();
+    ASSERT_EQ(response.cursorsKilled.size(), 0U);
+    ASSERT_EQ(response.cursorsNotFound.size(), 0U);
+    ASSERT_EQ(response.cursorsAlive.size(), 0U);
+    ASSERT_EQ(response.cursorsUnknown.size(), 0U);
+}
+
 TEST(KillCursorsResponseTest, toBSON) {
     std::vector<CursorId> killed = {CursorId(123)};
     std::vector<CursorId> notFound = {CursorId(456), CursorId(6)};
@@ -110,6 +123,20 @@ TEST(KillCursorsResponseTest, toBSON) {
     ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
 }
 
-}  // namespace
+TEST(KillCursorsResponseTest, toBSONWithZeroKilledNotFoundAliveUnknownCursors) {
+    std::vector<CursorId> killed;
+    std::vector<CursorId> notFound;
+    std::vector<CursorId> alive;
+    std::vector<CursorId> unknown;
+    // Verifies that a kill cursors response with empty cursor ID arrays can be created and is
+    // correctly serialized to a BSON object.
+    KillCursorsResponse response(killed, notFound, alive, unknown);
+    BSONObj responseObj = response.toBSON();
+    BSONObj expectedResponse =
+        BSON("cursorsKilled" << BSONArray() << "cursorsNotFound" << BSONArray() << "cursorsAlive"
+                             << BSONArray() << "cursorsUnknown" << BSONArray() << "ok" << 1.0);
+    ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
+}
 
+}  // namespace
 }  // namespace mongo

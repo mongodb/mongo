@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/killcursors_request.h"
+#include "mongo/db/query/kill_cursors_gen.h"
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/unittest/unittest.h"
@@ -38,100 +38,79 @@ namespace mongo {
 
 namespace {
 
-TEST(KillCursorsRequestTest, parseFromBSONSuccess) {
-    StatusWith<KillCursorsRequest> result =
-        KillCursorsRequest::parseFromBSON("db",
-                                          BSON("killCursors"
-                                               << "coll"
-                                               << "cursors"
-                                               << BSON_ARRAY(CursorId(123) << CursorId(456))));
-    ASSERT_OK(result.getStatus());
-    KillCursorsRequest request = result.getValue();
-    ASSERT_EQ(request.nss.ns(), "db.coll");
-    ASSERT_EQ(request.cursorIds.size(), 2U);
-    ASSERT_EQ(request.cursorIds[0], CursorId(123));
-    ASSERT_EQ(request.cursorIds[1], CursorId(456));
+const IDLParserErrorContext ctxt("killCursors");
+
+TEST(KillCursorsRequestTest, parseSuccess) {
+    auto bsonObj = BSON("killCursors"
+                        << "coll"
+                        << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456)) << "$db"
+                        << "db");
+    KillCursorsRequest request = KillCursorsRequest::parse(ctxt, bsonObj);
+    ASSERT_EQ(request.getNamespace().ns(), "db.coll");
+    ASSERT_EQ(request.getCursorIds().size(), 2U);
+    ASSERT_EQ(request.getCursorIds()[0], CursorId(123));
+    ASSERT_EQ(request.getCursorIds()[1], CursorId(456));
 }
 
-TEST(KillCursorsRequestTest, parseFromBSONFirstFieldNotKillCursors) {
-    StatusWith<KillCursorsRequest> result =
-        KillCursorsRequest::parseFromBSON("db",
-                                          BSON("foobar"
-                                               << "coll"
-                                               << "cursors"
-                                               << BSON_ARRAY(CursorId(123) << CursorId(456))));
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+TEST(KillCursorsRequestTest, parseCursorsFieldEmptyArray) {
+    auto bsonObj = BSON("killCursors"
+                        << "coll"
+                        << "cursors" << BSONArray() << "$db"
+                        << "db");
+    KillCursorsRequest request = KillCursorsRequest::parse(ctxt, bsonObj);
+    ASSERT_EQ(request.getCursorIds().size(), 0U);
 }
 
-TEST(KillCursorsRequestTest, parseFromBSONFirstFieldNotString) {
-    StatusWith<KillCursorsRequest> result = KillCursorsRequest::parseFromBSON(
-        "db", BSON("killCursors" << 99 << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456))));
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+TEST(KillCursorsRequestTest, parseFirstFieldNotString) {
+    auto bsonObj =
+        BSON("killCursors" << 99 << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456)) << "$db"
+                           << "db");
+    ASSERT_THROWS_CODE(
+        KillCursorsRequest::parse(ctxt, bsonObj), AssertionException, ErrorCodes::BadValue);
 }
 
-TEST(KillCursorsRequestTest, parseFromBSONInvalidNamespace) {
-    StatusWith<KillCursorsRequest> result =
-        KillCursorsRequest::parseFromBSON("",
-                                          BSON("killCursors"
-                                               << "coll"
-                                               << "cursors"
-                                               << BSON_ARRAY(CursorId(123) << CursorId(456))));
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidNamespace);
+TEST(KillCursorsRequestTest, parseInvalidNamespace) {
+    auto bsonObj = BSON("killCursors"
+                        << "coll"
+                        << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456)));
+    ASSERT_THROWS_CODE(KillCursorsRequest::parse(ctxt, bsonObj), AssertionException, 40414);
 }
 
-TEST(KillCursorsRequestTest, parseFromBSONCursorFieldMissing) {
-    StatusWith<KillCursorsRequest> result = KillCursorsRequest::parseFromBSON("db",
-                                                                              BSON("killCursors"
-                                                                                   << "coll"));
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+TEST(KillCursorsRequestTest, parseCursorsFieldMissing) {
+    auto bsonObj = BSON("killCursors"
+                        << "coll"
+                        << "$db"
+                        << "db");
+    ASSERT_THROWS_CODE(KillCursorsRequest::parse(ctxt, bsonObj), AssertionException, 40414);
 }
 
-TEST(KillCursorsRequestTest, parseFromBSONCursorFieldNotArray) {
-    StatusWith<KillCursorsRequest> result =
-        KillCursorsRequest::parseFromBSON("db",
-                                          BSON("killCursors"
-                                               << "coll"
-                                               << "cursors" << CursorId(123)));
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+TEST(KillCursorsRequestTest, parseCursorFieldNotArray) {
+    auto bsonObj = BSON("killCursors"
+                        << "coll"
+                        << "cursors" << CursorId(123) << "$db"
+                        << "db");
+    ASSERT_THROWS_CODE(KillCursorsRequest::parse(ctxt, bsonObj), AssertionException, 10065);
 }
 
-TEST(KillCursorsRequestTest, parseFromBSONCursorFieldEmptyArray) {
-    StatusWith<KillCursorsRequest> result =
-        KillCursorsRequest::parseFromBSON("db",
-                                          BSON("killCursors"
-                                               << "coll"
-                                               << "cursors" << BSONArrayBuilder().arr()));
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
-}
-
-
-TEST(KillCursorsRequestTest, parseFromBSONCursorFieldContainsEltOfWrongType) {
-    StatusWith<KillCursorsRequest> result = KillCursorsRequest::parseFromBSON(
-        "db",
-        BSON("killCursors"
-             << "coll"
-             << "cursors" << BSON_ARRAY(CursorId(123) << "foo" << CursorId(456))));
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+TEST(KillCursorsRequestTest, parseCursorFieldArrayWithNonCursorIdValue) {
+    auto bsonObj = BSON("killCursors"
+                        << "coll"
+                        << "cursors" << BSON_ARRAY(CursorId(123) << "String value") << "$db"
+                        << "db");
+    ASSERT_THROWS_CODE(
+        KillCursorsRequest::parse(ctxt, bsonObj), AssertionException, ErrorCodes::TypeMismatch);
 }
 
 TEST(KillCursorsRequestTest, toBSON) {
     const NamespaceString nss("db.coll");
-    std::vector<CursorId> cursorIds = {CursorId(123), CursorId(456)};
+    std::vector<CursorId> cursorIds = {CursorId(123)};
     KillCursorsRequest request(nss, cursorIds);
-    BSONObj requestObj = request.toBSON();
+    BSONObj requestObj = request.toBSON(BSONObj{});
     BSONObj expectedObj = BSON("killCursors"
                                << "coll"
-                               << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456)));
+                               << "cursors" << BSON_ARRAY(CursorId(123)));
     ASSERT_BSONOBJ_EQ(requestObj, expectedObj);
 }
 
 }  // namespace
-
 }  // namespace mongo

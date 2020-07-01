@@ -38,7 +38,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/killcursors_request.h"
+#include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
@@ -264,7 +264,8 @@ void killRemoteCursor(OperationContext* opCtx,
                       executor::TaskExecutor* executor,
                       RemoteCursor&& cursor,
                       const NamespaceString& nss) {
-    BSONObj cmdObj = KillCursorsRequest(nss, {cursor.getCursorResponse().getCursorId()}).toBSON();
+    BSONObj cmdObj =
+        KillCursorsRequest(nss, {cursor.getCursorResponse().getCursorId()}).toBSON(BSONObj{});
     executor::RemoteCommandRequest request(
         cursor.getHostAndPort(), nss.db().toString(), cmdObj, opCtx);
 

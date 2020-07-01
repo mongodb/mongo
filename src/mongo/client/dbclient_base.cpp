@@ -51,7 +51,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/killcursors_request.h"
+#include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -906,7 +906,7 @@ void DBClientBase::update(const string& ns,
 
 void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
     runFireAndForgetCommand(
-        OpMsgRequest::fromDBAndBody(ns.db(), KillCursorsRequest(ns, {cursorId}).toBSON()));
+        OpMsgRequest::fromDBAndBody(ns.db(), KillCursorsRequest(ns, {cursorId}).toBSON(BSONObj{})));
 }
 
 namespace {

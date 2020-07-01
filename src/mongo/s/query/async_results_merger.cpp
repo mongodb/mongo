@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/killcursors_request.h"
+#include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -819,7 +819,8 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
 
     for (const auto& remote : _remotes) {
         if (remote.status.isOK() && remote.cursorId && !remote.exhausted()) {
-            BSONObj cmdObj = KillCursorsRequest(_params.getNss(), {remote.cursorId}).toBSON();
+            BSONObj cmdObj =
+                KillCursorsRequest(_params.getNss(), {remote.cursorId}).toBSON(BSONObj{});
 
             executor::RemoteCommandRequest request(
                 remote.getTargetHost(), _params.getNss().db().toString(), cmdObj, opCtx);
