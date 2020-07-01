@@ -1063,7 +1063,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
         LOGV2_FATAL(4671205,
                     "This version of MongoDB is too recent to start up on the existing data files. "
                     "Try MongoDB 4.2 or earlier.");
-        fassertFailedNoTrace(46712006);
+        fassertFailedNoTrace(4671206);
     }
 
     // MongoDB 4.4 doing clean shutdown in FCV 4.2 will use compatibility version 3.3.

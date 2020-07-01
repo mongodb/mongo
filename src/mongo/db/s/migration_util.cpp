@@ -919,7 +919,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                                 "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
                         } else {
                             LOGV2(
-                                46712004,
+                                4671204,
                                 "Even after forced refresh, the filtering metadata has a UUID that "
                                 "does not match the collection UUID in the migration coordinator "
                                 "document. Deleting the range deletion tasks on the donor and "

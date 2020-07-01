@@ -26,6 +26,7 @@ except ImportError:
 
 ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]
 MINIMUM_CODE = 10000
+MAXIMUM_CODE = 9999999  # JIRA Ticket + XX
 
 # pylint: disable=invalid-name
 codes = []  # type: ignore
@@ -126,8 +127,9 @@ def read_error_codes():
     errors = []
     dups = defaultdict(list)
     skips = []
+    malformed = []  # type: ignore
 
-    # define callback
+    # define validation callbacks
     def check_dups(assert_loc):
         """Check for duplicates."""
         codes.append(assert_loc)
@@ -144,7 +146,18 @@ def read_error_codes():
             dups[code].append(assert_loc)
             errors.append(assert_loc)
 
-    parse_source_files(check_dups)
+    def validate_code(assert_loc):
+        """Check for malformed codes."""
+        code = int(assert_loc.code)
+        if code > MAXIMUM_CODE:
+            malformed.append(assert_loc)
+            errors.append(assert_loc)
+
+    def callback(assert_loc):
+        validate_code(assert_loc)
+        check_dups(assert_loc)
+
+    parse_source_files(callback)
 
     if "0" in seen:
         code = "0"
@@ -164,6 +177,11 @@ def read_error_codes():
         for loc in locations:
             line, col = get_line_and_column_for_position(loc)
             print("  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines))
+
+    for loc in malformed:
+        line, col = get_line_and_column_for_position(loc)
+        print("MALFORMED ID: %s" % loc.code)
+        print("  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines))
 
     return (codes, errors)
 

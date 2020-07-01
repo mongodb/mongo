@@ -151,7 +151,7 @@ public:
              const mongo::BSONObj& cmdObj,
              mongo::BSONObjBuilder& result) override {
         if (_sampler.tick()) {
-            LOGV2_WARNING(47187007,
+            LOGV2_WARNING(4718707,
                           "The shardConnPoolStats command is deprecated. Use instead the "
                           "connPoolStats command.");
         }

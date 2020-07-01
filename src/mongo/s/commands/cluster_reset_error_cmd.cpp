@@ -71,7 +71,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         if (_sampler.tick()) {
-            LOGV2_WARNING(47187006, "The resetError command is deprecated.");
+            LOGV2_WARNING(4718706, "The resetError command is deprecated.");
         }
 
         LastError::get(cc()).reset();

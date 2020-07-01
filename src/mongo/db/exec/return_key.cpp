@@ -48,7 +48,7 @@ PlanStage::StageState ReturnKeyStage::doWork(WorkingSetID* out) {
         Status indexKeyStatus = _extractIndexKey(member);
 
         if (!indexKeyStatus.isOK()) {
-            LOGV2_WARNING(4615602,
+            LOGV2_WARNING(4615614,
                           "Couldn't execute {stage}, status = {indexKeyStatus}",
                           "stage"_attr = kStageName,
                           "indexKeyStatus"_attr = redact(indexKeyStatus));

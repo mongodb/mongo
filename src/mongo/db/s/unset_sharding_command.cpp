@@ -79,7 +79,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         if (_sampler.tick()) {
-            LOGV2_WARNING(47187008, "The unsetSharding command is deprecated.");
+            LOGV2_WARNING(4718708, "The unsetSharding command is deprecated.");
         }
 
         ShardedConnectionInfo::reset(opCtx->getClient());
