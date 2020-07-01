@@ -65,6 +65,8 @@ using std::set;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringBulkLoadPhase);
+
 namespace {
 
 // Reserved RecordId against which multikey metadata keys are indexed.
@@ -638,7 +640,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     KeyString::Value previousKey;
 
-    while (it->more()) {
+    for (int64_t i = 0; it->more(); i++) {
         opCtx->checkForInterrupt();
 
         WriteUnitOfWork wunit(opCtx);
@@ -681,6 +683,17 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                                               _descriptor->collation());
             }
         }
+
+        hangIndexBuildDuringBulkLoadPhase.executeIf(
+            [i](const BSONObj& data) {
+                LOGV2(4924400,
+                      "Hanging index build during bulk load phase due to "
+                      "'hangIndexBuildDuringBulkLoadPhase' failpoint",
+                      "iteration"_attr = i);
+
+                hangIndexBuildDuringBulkLoadPhase.pauseWhileSet();
+            },
+            [i](const BSONObj& data) { return i == data["iteration"].numberLong(); });
 
         Status status = builder->addKey(data.first);
 

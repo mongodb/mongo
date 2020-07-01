@@ -1,5 +1,9 @@
 // Helper functions for testing index builds.
 
+load("jstests/libs/fail_point_util.js");
+load("jstests/libs/parallel_shell_helpers.js");
+load("jstests/libs/uuid_util.js");
+
 var IndexBuildTest = class {
     /**
      * Starts an index build in a separate mongo shell process with given options.
@@ -207,7 +211,9 @@ var IndexBuildTest = class {
             .commandWorked(conn.adminCommand({getParameter: 1, enableIndexBuildCommitQuorum: 1}))
             .enableIndexBuildCommitQuorum;
     }
+};
 
+const ResumableIndexBuildTest = class {
     /**
      * Returns whether resumable index builds are supported.
      */
@@ -215,5 +221,93 @@ var IndexBuildTest = class {
         return assert
             .commandWorked(conn.adminCommand({getParameter: 1, enableResumableIndexBuilds: 1}))
             .enableResumableIndexBuilds;
+    }
+
+    /**
+     * Restarts the given node, ensuring that the the index build with name indexName has its state
+     * written to disk upon shutdown and is completed upon startup.
+     */
+    static restart(rst, conn, coll, indexName, failPointName) {
+        clearRawMongoProgramOutput();
+
+        const buildUUID = extractUUIDFromObject(
+            IndexBuildTest
+                .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
+                .buildUUID);
+
+        const disableFailPoint = function(failPointName, buildUUID) {
+            // Wait for the log message that the index build has failed due to the node being shut
+            // down.
+            checkLog.containsJson(db.getMongo(), 20449, {
+                buildUUID: function(uuid) {
+                    return uuid["uuid"]["$uuid"] === buildUUID;
+                },
+                error: function(error) {
+                    return error.code === ErrorCodes.InterruptedDueToReplStateChange;
+                }
+            });
+
+            // Once the index build has failed, disable the failpoint so that shutdown can proceed.
+            assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
+        };
+        const awaitDisableFailPoint =
+            startParallelShell(funWithArgs(disableFailPoint, failPointName, buildUUID), conn.port);
+
+        rst.stop(conn);
+        awaitDisableFailPoint();
+
+        // Ensure that the resumable index build state was written to disk upon clean shutdown.
+        assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput()));
+
+        rst.start(conn, {noCleanData: true});
+
+        // Ensure that the index build was completed upon the node starting back up.
+        checkLog.containsJson(conn, 20663, {
+            buildUUID: function(uuid) {
+                return uuid["uuid"]["$uuid"] === buildUUID;
+            },
+            namespace: coll.getFullName()
+        });
+        IndexBuildTest.assertIndexes(coll, 2, ["_id_", indexName]);
+    }
+
+    /**
+     * Runs the resumable index build test specified by the provided failpoint information and
+     * index spec on the provided replica set and namespace. Document(s) specified by
+     * insertIntoSideWritesTable will be inserted after the bulk load phase so that they are
+     * inserted into the side writes table and processed during the drain writes phase.
+     */
+    static run(
+        rst, dbName, collName, indexSpec, failPointName, failPointData, insertIntoSideWritesTable) {
+        const primary = rst.getPrimary();
+        const coll = primary.getDB(dbName).getCollection(collName);
+        const indexName = "resumable_index_build";
+
+        const fp = configureFailPoint(primary, failPointName, failPointData);
+
+        const createIndex = function(collName, indexSpec, indexName) {
+            assert.commandFailedWithCode(
+                db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
+                ErrorCodes.InterruptedDueToReplStateChange);
+        };
+        const awaitCreateIndex = startParallelShell(
+            funWithArgs(createIndex, coll.getName(), indexSpec, indexName), primary.port);
+
+        if (insertIntoSideWritesTable) {
+            const sideWritesFp =
+                configureFailPoint(primary, "hangAfterIndexBuildDumpsInsertsFromBulk");
+            sideWritesFp.wait();
+
+            assert.commandWorked(coll.insert(insertIntoSideWritesTable));
+
+            sideWritesFp.off();
+        }
+
+        fp.wait();
+
+        ResumableIndexBuildTest.restart(rst, primary, coll, indexName, failPointName);
+
+        awaitCreateIndex();
+        assert.commandWorked(coll.dropIndex(indexName));
     }
 };

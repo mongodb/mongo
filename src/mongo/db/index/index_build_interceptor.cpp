@@ -53,6 +53,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYield);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhase);
 
 bool IndexBuildInterceptor::typeCanFastpathMultikeyUpdates(IndexType indexType) {
     // Ensure no new indexes are added without considering whether they use the multikeyPaths
@@ -185,6 +186,19 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             if (batchSize > 0 && batchSizeBytes + objSize > kBatchMaxBytes) {
                 break;
             }
+
+            hangIndexBuildDuringDrainWritesPhase.executeIf(
+                [&](const BSONObj& data) {
+                    LOGV2(4924401,
+                          "Hanging index build during drain writes phase due to "
+                          "'hangIndexBuildDuringDrainWritesPhase' failpoint",
+                          "iteration"_attr = _numApplied + batchSize);
+
+                    hangIndexBuildDuringDrainWritesPhase.pauseWhileSet();
+                },
+                [&](const BSONObj& data) {
+                    return _numApplied + batchSize == data["iteration"].numberLong();
+                });
 
             batchSize += 1;
             batchSizeBytes += objSize;

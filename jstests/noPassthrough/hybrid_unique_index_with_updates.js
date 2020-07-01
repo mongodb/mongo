@@ -20,18 +20,17 @@ let testDB = conn.getDB('test');
 // Enables a failpoint, runs 'hitFailpointFunc' to hit the failpoint, then runs
 // 'duringFailpointFunc' while the failpoint is active.
 let doDuringFailpoint = function(
-    failPointName, logMessage, structuredLogMessage, hitFailpointFunc, duringFailpointFunc, i) {
+    failPointName, structuredLogRegEx, hitFailpointFunc, duringFailpointFunc, stopKey) {
     clearRawMongoProgramOutput();
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn", data: {"i": i}}));
+    assert.commandWorked(testDB.adminCommand({
+        configureFailPoint: failPointName,
+        mode: "alwaysOn",
+        data: {fieldsToMatch: {i: stopKey}}
+    }));
 
     hitFailpointFunc();
 
-    if (isJsonLogNoConn()) {
-        assert.soon(() => rawMongoProgramOutput().search(structuredLogMessage));
-    } else {
-        assert.soon(() => rawMongoProgramOutput().indexOf(logMessage) >= 0);
-    }
+    assert.soon(() => structuredLogRegEx.test(rawMongoProgramOutput()));
 
     duringFailpointFunc();
 
@@ -123,27 +122,26 @@ let runTest = function(config) {
             break;
         // Hang before scanning the first document.
         case 0:
-            doDuringFailpoint("hangBeforeIndexBuildOf",
-                              "Hanging before index build of i=" + stopKey,
-                              new RegExp("\"id\":20386.*\"where\":\"before\",\"i\":" + stopKey),
-                              buildIndex,
-                              doOperation,
-                              stopKey);
+            doDuringFailpoint(
+                "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
+                new RegExp("\"id\":20386.*\"where\":\"before\",\"doc\":.*\"i\":" + stopKey),
+                buildIndex,
+                doOperation,
+                stopKey);
             break;
         // Hang after scanning the first document.
         case 1:
-            doDuringFailpoint("hangAfterIndexBuildOf",
-                              "Hanging after index build of i=" + stopKey,
-                              new RegExp("\"id\":20386.*\"where\":\"after\",\"i\":" + stopKey),
-                              buildIndex,
-                              doOperation,
-                              stopKey);
+            doDuringFailpoint(
+                "hangIndexBuildDuringCollectionScanPhaseAfterInsertion",
+                new RegExp("\"id\":20386.*\"where\":\"after\",\"doc\":.*\"i\":" + stopKey),
+                buildIndex,
+                doOperation,
+                stopKey);
             break;
         // Hang before the first drain and after dumping the keys from the external sorter into
         // the index.
         case 2:
             doDuringFailpoint("hangAfterIndexBuildDumpsInsertsFromBulk",
-                              "Hanging after dumping inserts from bulk builder",
                               new RegExp("\"id\":20665"),
                               buildIndex,
                               doOperation);
@@ -151,7 +149,6 @@ let runTest = function(config) {
         // Hang before the second drain.
         case 3:
             doDuringFailpoint("hangAfterIndexBuildFirstDrain",
-                              "Hanging after index build first drain",
                               new RegExp("\"id\":20666"),
                               buildIndex,
                               doOperation);
@@ -159,7 +156,6 @@ let runTest = function(config) {
         // Hang before the final drain and commit.
         case 4:
             doDuringFailpoint("hangAfterIndexBuildSecondDrain",
-                              "Hanging after index build second drain",
                               new RegExp("\"id\":20667"),
                               buildIndex,
                               doOperation);

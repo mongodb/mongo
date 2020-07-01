@@ -36,6 +36,7 @@
 #include <ostream>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -66,8 +67,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
-MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseBeforeInsertion);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
 MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
 
 MultiIndexBlock::~MultiIndexBlock() {
@@ -310,14 +311,20 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& doc) {
     fp->executeIf(
         [&](const BSONObj& data) {
-            int i = doc.getIntField("i");
-            LOGV2(
-                20386, "Hanging {where} index build of i={i}", "where"_attr = where, "i"_attr = i);
+            LOGV2(20386,
+                  "Hanging index build during collection scan phase insertion",
+                  "where"_attr = where,
+                  "doc"_attr = doc);
+
             fp->pauseWhileSet();
         },
-        [&](const BSONObj& data) {
-            int i = doc.getIntField("i");
-            return data["i"].numberInt() == i;
+        [&doc](const BSONObj& data) {
+            auto fieldsToMatch = data.getObjectField("fieldsToMatch");
+            return std::all_of(
+                fieldsToMatch.begin(), fieldsToMatch.end(), [&doc](const auto& elem) {
+                    return SimpleBSONElementComparator::kInstance.evaluate(elem ==
+                                                                           doc[elem.fieldName()]);
+                });
         });
 }
 
@@ -407,7 +414,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
             progress->setTotalWhileRunning(collection->numRecords(opCtx));
 
-            failPointHangDuringBuild(&hangBeforeIndexBuildOf, "before", objToIndex);
+            failPointHangDuringBuild(
+                &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion, "before", objToIndex);
 
             // The external sorter is not part of the storage engine and therefore does not need a
             // WriteUnitOfWork to write keys.
@@ -416,7 +424,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
                 return ret;
             }
 
-            failPointHangDuringBuild(&hangAfterIndexBuildOf, "after", objToIndex);
+            failPointHangDuringBuild(
+                &hangIndexBuildDuringCollectionScanPhaseAfterInsertion, "after", objToIndex);
 
             // Go to the next document.
             progress->hit();

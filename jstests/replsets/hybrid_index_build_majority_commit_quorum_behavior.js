@@ -7,7 +7,6 @@
 "use strict";
 load("jstests/replsets/rslib.js");
 load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/libs/parallel_shell_helpers.js");  // funWithArgs
 
 var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
