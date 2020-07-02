@@ -150,8 +150,7 @@ error_codes:
     - {code: 118,name: NamespaceNotSharded}
     - {code: 119,name: InvalidSyncSource}
     - {code: 120,name: OplogStartMissing}
-    # Error code 121 is only for the document validator on collections.
-    - {code: 121,name: DocumentValidationFailure,extra: doc_validation_error::DocumentValidationFailureInfo}
+    - {code: 121,name: DocumentValidationFailure} # Only for the document validator on collections.
     - {code: 122,name: OBSOLETE_ReadAfterOptimeTimeout}
     - {code: 123,name: NotAReplicaSet}
     - {code: 124,name: IncompatibleElectionProtocol}

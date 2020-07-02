@@ -29,29 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/error_extra_info.h"
 #include "mongo/db/matcher/expression.h"
 
 namespace mongo::doc_validation_error {
-/**
- * Represents information about a document validation error.
- */
-class DocumentValidationFailureInfo final : public ErrorExtraInfo {
-public:
-    static constexpr auto code = ErrorCodes::DocumentValidationFailure;
-    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
-    explicit DocumentValidationFailureInfo(const BSONObj& err) : _details(err.getOwned()) {}
-    const BSONObj& getDetails() const;
-    void serialize(BSONObjBuilder* bob) const override;
-
-private:
-    BSONObj _details;
-};
-
 /**
  * Given a pointer to a MatchExpression corresponding to a collection's validator expression and a
  * reference to a BSONObj corresponding to the document that failed to match against the validator
  * expression, returns a BSONObj that describes why 'doc' failed to match against 'validatorExpr'.
  */
 BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc);
+
 }  // namespace mongo::doc_validation_error

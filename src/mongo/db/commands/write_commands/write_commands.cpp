@@ -40,7 +40,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete_request_gen.h"
@@ -153,10 +152,6 @@ void serializeReply(OperationContext* opCtx,
                 BSONObjBuilder errInfo(error.subobjStart("errInfo"));
                 staleInfo->serialize(&errInfo);
             }
-        } else if (auto docValidationError =
-                       status.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()) {
-            error.append("code", static_cast<int>(ErrorCodes::DocumentValidationFailure));
-            error.append("errInfo", docValidationError->getDetails());
         } else {
             error.append("code", int(status.code()));
             if (auto const extraInfo = status.extraInfo()) {

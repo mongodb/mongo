@@ -53,7 +53,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer.h"
@@ -398,9 +397,7 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
         return Status::OK();
     }
 
-    return {doc_validation_error::DocumentValidationFailureInfo(
-                doc_validation_error::generateError(*validatorMatchExpr, document)),
-            "Document failed validation"};
+    return {ErrorCodes::DocumentValidationFailure, "Document failed validation"};
 }
 
 Collection::Validator CollectionImpl::parseValidator(
