@@ -38,7 +38,8 @@ def timestamp_str(t):
 # Test that the history store sweep cleans the obsolete history store entries and gives expected results.
 class test_hs07(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=50MB,log=(enabled)'
+    conn_config = ('cache_size=50MB,eviction_updates_trigger=95,'
+                   'eviction_updates_target=80,log=(enabled)')
     session_config = 'isolation=snapshot'
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
