@@ -56,6 +56,9 @@ public:
 
     virtual void rollback() {
         _visibilityManager->dealtWithRecord(_rid);
+        if (!_rs)
+            return;
+
         stdx::lock_guard<Latch> lk(_rs->_cappedCallbackMutex);
         if (_rs->_cappedCallback)
             _rs->_cappedCallback->notifyCappedWaitersIfNeeded();
@@ -71,6 +74,17 @@ void VisibilityManager::dealtWithRecord(RecordId rid) {
     stdx::lock_guard<Latch> lock(_stateLock);
     _uncommittedRecords.erase(rid);
     _opsBecameVisibleCV.notify_all();
+}
+
+void VisibilityManager::reserveRecord(RecoveryUnit* recoveryUnit, RecordId rid) {
+    stdx::lock_guard<Latch> lock(_stateLock);
+
+    // Just register one change even if reserveRecord is called multiple times
+    auto it = _uncommittedRecords.find(rid);
+    if (it == _uncommittedRecords.end()) {
+        _uncommittedRecords.insert(it, rid);
+        recoveryUnit->registerChange(std::make_unique<VisibilityManagerChange>(this, nullptr, rid));
+    }
 }
 
 void VisibilityManager::addUncommittedRecord(OperationContext* opCtx,

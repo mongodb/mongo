@@ -157,6 +157,10 @@ public:
      */
     bool trySwapMaster(StringStore& newMaster, uint64_t version);
 
+    VisibilityManager* visibilityManager() {
+        return _visibilityManager.get();
+    }
+
 private:
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest = 0;

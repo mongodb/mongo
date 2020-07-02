@@ -55,6 +55,8 @@ public:
 
     virtual void setOrderedCommit(bool orderedCommit) override;
 
+    Status setTimestamp(Timestamp timestamp) override;
+
     // Biggie specific function declarations below.
     StringStore* getHead() {
         forkIfNeeded();

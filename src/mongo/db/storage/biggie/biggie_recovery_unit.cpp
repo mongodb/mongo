@@ -35,6 +35,7 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/db/storage/oplog_hack.h"
 
 namespace mongo {
 namespace biggie {
@@ -118,6 +119,14 @@ bool RecoveryUnit::forkIfNeeded() {
     return true;
 }
 
+Status RecoveryUnit::setTimestamp(Timestamp timestamp) {
+    auto key = oploghack::keyForOptime(timestamp);
+    if (!key.isOK())
+        return key.getStatus();
+
+    _KVEngine->visibilityManager()->reserveRecord(this, key.getValue());
+    return Status::OK();
+}
 void RecoveryUnit::setOrderedCommit(bool orderedCommit) {}
 
 void RecoveryUnit::_abort() {

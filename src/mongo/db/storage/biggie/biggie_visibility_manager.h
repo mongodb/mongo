@@ -52,6 +52,12 @@ public:
     void dealtWithRecord(RecordId rid);
 
     /**
+     * Reserves a RecordId to be tracked before it is added. Used to ensure we don't skip over oplog
+     * holes when inserting out-of-order
+     */
+    void reserveRecord(RecoveryUnit* recoveryUnit, RecordId rid);
+
+    /**
      * Adds a RecordId to be tracked while its Record is uncommitted. Upon commit or rollback of
      * the record, the appropriate actions are taken to change the visibility of the oplog.
      */

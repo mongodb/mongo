@@ -337,6 +337,16 @@ boost::optional<RecordId> RecordStore::oplogStartHack(OperationContext* opCtx,
     return rid;
 }
 
+Status RecordStore::oplogDiskLocRegister(OperationContext* opCtx,
+                                         const Timestamp& opTime,
+                                         bool orderedCommit) {
+    if (!orderedCommit) {
+        return opCtx->recoveryUnit()->setTimestamp(opTime);
+    }
+
+    return Status::OK();
+}
+
 void RecordStore::_initHighestIdIfNeeded(OperationContext* opCtx) {
     // In the normal case, this will already be initialized, so use a weak load. Since this value
     // will only change from 0 to a positive integer, the only risk is reading an outdated value, 0,
@@ -420,7 +430,11 @@ void RecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* wo
 RecordStore::Cursor::Cursor(OperationContext* opCtx,
                             const RecordStore& rs,
                             VisibilityManager* visibilityManager)
-    : opCtx(opCtx), _rs(rs), _visibilityManager(visibilityManager) {}
+    : opCtx(opCtx), _rs(rs), _visibilityManager(visibilityManager) {
+    if (_rs._isOplog) {
+        _oplogVisibility = _visibilityManager->getAllCommittedRecord();
+    }
+}
 
 boost::optional<Record> RecordStore::Cursor::next() {
     _savedPosition = boost::none;
@@ -438,8 +452,10 @@ boost::optional<Record> RecordStore::Cursor::next() {
         nextRecord.id = RecordId(extractRecordId(it->first));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
 
-        if (_rs._isOplog && nextRecord.id > _visibilityManager->getAllCommittedRecord())
+        if (_rs._isOplog && nextRecord.id > _oplogVisibility) {
             return boost::none;
+        }
+
         return nextRecord;
     }
     return boost::none;
@@ -455,8 +471,9 @@ boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
     if (it == workingCopy->end() || !inPrefix(it->first))
         return boost::none;
 
-    if (_rs._isOplog && id > _visibilityManager->getAllCommittedRecord())
+    if (_rs._isOplog && id > _oplogVisibility) {
         return boost::none;
+    }
 
     _needFirstSeek = false;
     _savedPosition = it->first;
@@ -470,6 +487,13 @@ void RecordStore::Cursor::saveUnpositioned() {}
 bool RecordStore::Cursor::restore() {
     if (!_savedPosition)
         return true;
+
+    // Get oplog visibility before forking working tree to guarantee that nothing gets committed
+    // after we've forked that would update oplog visibility
+    if (_rs._isOplog) {
+        _oplogVisibility = _visibilityManager->getAllCommittedRecord();
+    }
+
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     it = workingCopy->lower_bound(_savedPosition.value());
     _lastMoveWasRestore = it == workingCopy->end() || it->first != _savedPosition.value();
