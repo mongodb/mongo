@@ -4,6 +4,8 @@
  * Checks that {full:true} cannot be run with {background:true}.
  * Checks that {background:true} runs.
  * Checks that {background:true} can run concurrently with CRUD ops on the same collection.
+ *
+ * @tags: [requires_fsync]
  */
 
 (function() {
