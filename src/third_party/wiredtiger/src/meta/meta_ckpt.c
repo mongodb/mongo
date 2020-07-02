@@ -408,8 +408,7 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
          * - Our entry's id string matches the current global information. We just want to add our
          *   information to the existing list.
          * - Our entry's id string does not match the current one. It is outdated. Free old
-         * resources
-         *   and then set up our entry.
+         * resources and then set up our entry.
          */
 
         /* Check if the global entry is valid at our index.  */

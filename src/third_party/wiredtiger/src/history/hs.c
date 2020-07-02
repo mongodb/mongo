@@ -222,10 +222,6 @@ __wt_hs_cursor_open(WT_SESSION_IMPL *session)
       session, ret = __wt_open_cursor(session, WT_HS_URI, NULL, open_cursor_cfg, &cursor));
     WT_RET(ret);
 
-    /*
-     * Set the flag to stop creating snapshots for history store cursors
-     */
-    F_SET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN);
     /* History store cursors should always ignore tombstones. */
     F_SET(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
 
@@ -1526,7 +1522,7 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
   const WT_ITEM *key, wt_timestamp_t ts, uint64_t *counter, const WT_ITEM *srch_key)
 {
     WT_CURSOR *insert_cursor;
-    WT_CURSOR_BTREE *hs_cbt, *insert_cbt;
+    WT_CURSOR_BTREE *hs_cbt;
     WT_DECL_RET;
     WT_HS_TIME_POINT start_time_point, stop_time_point;
     WT_ITEM hs_key;
@@ -1540,7 +1536,6 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
 
     insert_cursor = NULL;
     hs_cbt = (WT_CURSOR_BTREE *)hs_cursor;
-    insert_cbt = NULL;
     WT_CLEAR(hs_key);
     tombstone = NULL;
 
@@ -1626,8 +1621,6 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
             WT_WITHOUT_DHANDLE(session,
               ret = __wt_open_cursor(session, WT_HS_URI, NULL, open_cursor_cfg, &insert_cursor));
             WT_ERR(ret);
-            insert_cbt = (WT_CURSOR_BTREE *)insert_cursor;
-            F_SET(insert_cbt, WT_CBT_NO_TXN);
         }
 
         /*

@@ -37,7 +37,7 @@ def timestamp_str(t):
 # test to ensure history store eviction is working for prepared transactions.
 class test_prepare_hs01(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=50MB'
+    conn_config = 'cache_size=50MB,eviction_updates_trigger=95,eviction_updates_target=80'
 
     def check(self, uri, ds, nrows, nsessions, nkeys, read_ts, expected_value, not_expected_value):
         cursor = self.session.open_cursor(uri)
