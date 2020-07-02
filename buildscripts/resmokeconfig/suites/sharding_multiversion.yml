@@ -12,8 +12,6 @@ selector:
   exclude_files:
   # TODO SERVER-46040: Enable when SERVER-46040 is backported
   - jstests/sharding/drop_indexes_with_stale_config_error.js
-  # TODO SERVER-31368: Enable when SERVER-31368 is backported to v4.4.
-  - jstests/sharding/log_remote_op_wait.js
 executor:
   config:
     shell_options:
