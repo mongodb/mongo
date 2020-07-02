@@ -32,6 +32,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/config_server_test_fixture.h"
@@ -41,9 +42,83 @@ namespace {
 
 using SplitChunkTest = ConfigServerTestFixture;
 
+/**
+ * A fixture which sets the incrementChunkMajorVersionOnChunkSplits server parameter to true.
+ */
+class SplitChunkWithMajorVersionIncrementTest : public ConfigServerTestFixture {
+public:
+    void setUp() override {
+        ConfigServerTestFixture::setUp();
+        // Ignore the return status.
+        std::ignore = ServerParameterSet::getGlobal()
+                          ->getMap()
+                          .find("incrementChunkMajorVersionOnChunkSplits")
+                          ->second->setFromString("true");
+    }
+
+    void tearDown() override {
+        // Ignore the return status.
+        std::ignore = ServerParameterSet::getGlobal()
+                          ->getMap()
+                          .find("incrementChunkMajorVersionOnChunkSplits")
+                          ->second->setFromString("false");
+        ConfigServerTestFixture::tearDown();
+    }
+};
+
 const NamespaceString kNamespace("TestDB.TestColl");
 
 TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
+    ChunkType chunk;
+    chunk.setNS("TestDB.TestColl");
+
+    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+
+    auto chunkSplitPoint = BSON("a" << 5);
+    std::vector<BSONObj> splitPoints{chunkSplitPoint};
+
+    setupChunks({chunk});
+
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->commitChunkSplit(operationContext(),
+                                     kNamespace,
+                                     origVersion.epoch(),
+                                     ChunkRange(chunkMin, chunkMax),
+                                     splitPoints,
+                                     "shard0000"));
+
+    // First chunkDoc should have range [chunkMin, chunkSplitPoint]
+    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin);
+    ASSERT_OK(chunkDocStatus.getStatus());
+
+    auto chunkDoc = chunkDocStatus.getValue();
+    ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
+
+    // Check for increment on first chunkDoc's minor version
+    ASSERT_EQ(origVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(origVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
+
+    // Second chunkDoc should have range [chunkSplitPoint, chunkMax]
+    auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
+    ASSERT_OK(otherChunkDocStatus.getStatus());
+
+    auto otherChunkDoc = otherChunkDocStatus.getValue();
+    ASSERT_BSONOBJ_EQ(chunkMax, otherChunkDoc.getMax());
+
+    // Check for increment on second chunkDoc's minor version
+    ASSERT_EQ(origVersion.majorVersion(), otherChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(origVersion.minorVersion() + 2, otherChunkDoc.getVersion().minorVersion());
+}
+
+
+TEST_F(SplitChunkWithMajorVersionIncrementTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ChunkType chunk;
     chunk.setNS("TestDB.TestColl");
 
@@ -93,6 +168,68 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 }
 
 TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
+    ChunkType chunk;
+    chunk.setNS("TestDB.TestColl");
+
+    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+
+    auto chunkSplitPoint = BSON("a" << 5);
+    auto chunkSplitPoint2 = BSON("a" << 7);
+    std::vector<BSONObj> splitPoints{chunkSplitPoint, chunkSplitPoint2};
+
+    setupChunks({chunk});
+
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->commitChunkSplit(operationContext(),
+                                     kNamespace,
+                                     origVersion.epoch(),
+                                     ChunkRange(chunkMin, chunkMax),
+                                     splitPoints,
+                                     "shard0000"));
+
+    // First chunkDoc should have range [chunkMin, chunkSplitPoint]
+    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin);
+    ASSERT_OK(chunkDocStatus.getStatus());
+
+    auto chunkDoc = chunkDocStatus.getValue();
+    ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
+
+    // Check for increment on first chunkDoc's minor version
+    ASSERT_EQ(origVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(origVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
+
+    // Second chunkDoc should have range [chunkSplitPoint, chunkSplitPoint2]
+    auto midChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
+    ASSERT_OK(midChunkDocStatus.getStatus());
+
+    auto midChunkDoc = midChunkDocStatus.getValue();
+    ASSERT_BSONOBJ_EQ(chunkSplitPoint2, midChunkDoc.getMax());
+
+    // Check for increment on second chunkDoc's minor version
+    ASSERT_EQ(origVersion.majorVersion(), midChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(origVersion.minorVersion() + 2, midChunkDoc.getVersion().minorVersion());
+
+    // Third chunkDoc should have range [chunkSplitPoint2, chunkMax]
+    auto lastChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint2);
+    ASSERT_OK(lastChunkDocStatus.getStatus());
+
+    auto lastChunkDoc = lastChunkDocStatus.getValue();
+    ASSERT_BSONOBJ_EQ(chunkMax, lastChunkDoc.getMax());
+
+    // Check for increment on third chunkDoc's minor version
+    ASSERT_EQ(origVersion.majorVersion(), lastChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(origVersion.minorVersion() + 3, lastChunkDoc.getVersion().minorVersion());
+}
+
+
+TEST_F(SplitChunkWithMajorVersionIncrementTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ChunkType chunk;
     chunk.setNS("TestDB.TestColl");
 
@@ -197,6 +334,66 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     auto chunkDoc = chunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
 
+    // Check for increment based on the competing chunk version
+    ASSERT_EQ(competingVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(competingVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
+
+    // Second chunkDoc should have range [chunkSplitPoint, chunkMax]
+    auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
+    ASSERT_OK(otherChunkDocStatus.getStatus());
+
+    auto otherChunkDoc = otherChunkDocStatus.getValue();
+    ASSERT_BSONOBJ_EQ(chunkMax, otherChunkDoc.getMax());
+
+    // Check for increment based on the competing chunk version
+    ASSERT_EQ(competingVersion.majorVersion(), otherChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(competingVersion.minorVersion() + 2, otherChunkDoc.getVersion().minorVersion());
+}
+
+TEST_F(SplitChunkWithMajorVersionIncrementTest, NewSplitShouldClaimHighestVersion) {
+    ChunkType chunk, chunk2;
+    chunk.setNS("TestDB.TestColl");
+    chunk2.setNS("TestDB.TestColl");
+    auto collEpoch = OID::gen();
+
+    // set up first chunk
+    auto origVersion = ChunkVersion(1, 2, collEpoch);
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+
+    std::vector<BSONObj> splitPoints;
+    auto chunkSplitPoint = BSON("a" << 5);
+    splitPoints.push_back(chunkSplitPoint);
+
+    // set up second chunk (chunk2)
+    auto competingVersion = ChunkVersion(2, 1, collEpoch);
+    chunk2.setVersion(competingVersion);
+    chunk2.setShard(ShardId("shard0000"));
+    chunk2.setMin(BSON("a" << 10));
+    chunk2.setMax(BSON("a" << 20));
+
+    setupChunks({chunk, chunk2});
+
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->commitChunkSplit(operationContext(),
+                                     kNamespace,
+                                     collEpoch,
+                                     ChunkRange(chunkMin, chunkMax),
+                                     splitPoints,
+                                     "shard0000"));
+
+    // First chunkDoc should have range [chunkMin, chunkSplitPoint]
+    auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin);
+    ASSERT_OK(chunkDocStatus.getStatus());
+
+    auto chunkDoc = chunkDocStatus.getValue();
+    ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
+
     // Check for major version increment based on the competing chunk version.
     ASSERT_EQ(competingVersion.majorVersion() + 1, chunkDoc.getVersion().majorVersion());
     // The minor version gets reset to 0 when the major version is incremented, and chunk splits
@@ -219,7 +416,8 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     ASSERT_EQ(2u, otherChunkDoc.getVersion().minorVersion());
 }
 
-TEST_F(SplitChunkTest, SplitsOnShardWithLowerShardVersionDoesNotIncreaseCollectionVersion) {
+TEST_F(SplitChunkWithMajorVersionIncrementTest,
+       SplitsOnShardWithLowerShardVersionDoesNotIncreaseCollectionVersion) {
     ChunkType chunk, chunk2;
     chunk.setNS(kNamespace.toString());
     chunk2.setNS(kNamespace.toString());
@@ -271,7 +469,8 @@ TEST_F(SplitChunkTest, SplitsOnShardWithLowerShardVersionDoesNotIncreaseCollecti
     ASSERT_EQ(competingVersion.minorVersion() + 2u, otherChunkDoc.getVersion().minorVersion());
 }
 
-TEST_F(SplitChunkTest, SplitsOnShardWithHighestShardVersionIncreasesCollectionVersion) {
+TEST_F(SplitChunkWithMajorVersionIncrementTest,
+       SplitsOnShardWithHighestShardVersionIncreasesCollectionVersion) {
     ChunkType chunk, chunk2;
     chunk.setNS(kNamespace.toString());
     chunk2.setNS(kNamespace.toString());

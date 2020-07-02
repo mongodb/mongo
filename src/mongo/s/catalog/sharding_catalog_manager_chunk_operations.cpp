@@ -43,6 +43,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -55,6 +56,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+MONGO_EXPORT_SERVER_PARAMETER(incrementChunkMajorVersionOnChunkSplits, bool, false);
+
 namespace {
 
 MONGO_FP_DECLARE(migrationCommitVersionError);
@@ -318,7 +322,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     ChunkVersion currentMaxVersion = collVersion;
     // Increment the major version only if the shard that owns the chunk being split has version ==
     // collection version. See SERVER-41480 for details.
-    if (shardVersion == collVersion) {
+    if (incrementChunkMajorVersionOnChunkSplits.load() && shardVersion == collVersion) {
         currentMaxVersion.incMajor();
     }
 
