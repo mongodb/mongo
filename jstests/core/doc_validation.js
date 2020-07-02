@@ -11,21 +11,26 @@
 (function() {
 "use strict";
 
-function assertFailsValidation(res) {
-    if (res instanceof WriteResult) {
-        assert.writeErrorWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
-    } else {
-        assert.commandFailedWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
-    }
-}
+const collName = "doc_validation";
+const coll = db[collName];
 
 const array = [];
 for (let i = 0; i < 2048; i++) {
     array.push({arbitrary: i});
 }
 
-const collName = "doc_validation";
-const coll = db[collName];
+function assertFailsValidation(res) {
+    // Assert that validation fails with a 'DocumentValidationFailure' error.
+    assert.commandFailedWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
+    // Verify that the 'errInfo' field is propagated as part of the document validation failure
+    // for WriteErrors.
+    // We don't currently support detailed error info for 'OP_INSERT' and 'OP_UPDATE'.
+    if (coll.getMongo().writeMode() === "commands") {
+        const error = res instanceof WriteResult ? res.getWriteError() : res;
+        assert(error.hasOwnProperty("errInfo"), tojson(error));
+        assert.eq(typeof error["errInfo"], "object", tojson(error));
+    }
+}
 
 /**
  * Runs a series of document validation tests using the validator 'validator', which should

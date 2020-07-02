@@ -29,14 +29,16 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/match_expression_walker.h"
 
 namespace mongo::doc_validation_error {
-
 namespace {
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DocumentValidationFailureInfo);
+
 /**
  * Enumerated type which describes whether an error should be described normally or in an
  * inverted sense when in a negated context. More precisely, when a MatchExpression fails to match a
@@ -201,7 +203,6 @@ private:
 class ValidationErrorPostVisitor final : public MatchExpressionConstVisitor {
 public:
     ValidationErrorPostVisitor(ValidationErrorContext* context) : _context(context) {}
-
     void visit(const AlwaysFalseMatchExpression* expr) final {}
     void visit(const AlwaysTrueMatchExpression* expr) final {}
     void visit(const AndMatchExpression* expr) final {}
@@ -270,6 +271,20 @@ private:
 
 }  // namespace
 
+std::shared_ptr<const ErrorExtraInfo> DocumentValidationFailureInfo::parse(const BSONObj& obj) {
+    auto errInfo = obj["errInfo"];
+    uassert(4878100,
+            "DocumentValidationFailureInfo must have a field 'errInfo' of type object",
+            errInfo.type() == BSONType::Object);
+    return std::make_shared<DocumentValidationFailureInfo>(errInfo.embeddedObject());
+}
+
+void DocumentValidationFailureInfo::serialize(BSONObjBuilder* bob) const {
+    bob->append("errInfo", _details);
+}
+const BSONObj& DocumentValidationFailureInfo::getDetails() const {
+    return _details;
+}
 BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) {
     BSONMatchableDocument matchableDoc(doc);
     ValidationErrorContext context;
