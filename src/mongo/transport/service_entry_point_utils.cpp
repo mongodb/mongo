@@ -113,7 +113,7 @@ Status launchServiceWorkerThread(std::function<void()> task) noexcept {
         int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());
 
         pthread_attr_destroy(&attrs);
-        uassert(4850900, "pthread_create failed: {}"_format(errnoWithDescription(failed)), failed);
+        uassert(4850900, "pthread_create failed: {}"_format(errnoWithDescription(failed)), !failed);
 
         ctx.release();
 #endif
