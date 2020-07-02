@@ -110,6 +110,11 @@ server_parameters:
     validator:
       callback: "validateOpensslCipherConfig"
 
+  opensslCipherSuiteConfig:
+    description: "Cipher configuration string for OpenSSL based connections that use TLS 1.3 or newer ONLY"
+    set_at: startup
+    cpp_varname: "sslGlobalParams.sslCipherSuiteConfig"
+
   disableNonTLSConnectionLogging:
     deprecated_name: "disableNonSSLConnectionLogging"
     description: "Suppress logging of warnings when non-SSL connections are accepted in preferSSL mode"

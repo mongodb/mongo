@@ -51,6 +51,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
@@ -84,6 +85,15 @@
 #include <openssl/x509v3.h>
 #ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
 #include <openssl/ec.h>
+#endif
+
+#if OPENSSL_VERSION_NUMBER < 0x1010100FL
+int SSL_CTX_set_ciphersuites(SSL_CTX*, const char*) {
+    uasserted(
+        4877400,
+        "Setting OpenSSL cipher suites is not allowed for OpenSSL versions older than 1.1.1.");
+    return 0;
+}
 #endif
 
 namespace mongo {
@@ -1881,6 +1891,18 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
                       str::stream() << "Can not set supported cipher suites with config string \""
                                     << params.sslCipherConfig
                                     << "\": " << getSSLErrorMessage(ERR_get_error()));
+    }
+
+    if (!params.sslCipherSuiteConfig.empty()) {
+        // OpenSSL versions older than version 1.1.1 are not allowed to configure their cipher
+        // suites using the sslCipherSuiteConfig flag.
+        if (0 == ::SSL_CTX_set_ciphersuites(context, params.sslCipherSuiteConfig.c_str())) {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream()
+                              << "Can not set supported cipher suites with config string \""
+                              << params.sslCipherSuiteConfig
+                              << "\": " << getSSLErrorMessage(ERR_get_error()));
+        }
     }
 
     // We use the address of the context as the session id context.
