@@ -11,6 +11,11 @@ function runTest(conn) {
         const isMasterDuration = new Date() - now;
         assert.gte(isMasterDuration, 100);
     }
+
+    // Do a find to make sure that the shell has finished running isMaster while establishing its
+    // initial connection.
+    assert.eq(0, conn.getDB("test").c.find().itcount());
+
     // Use a skip of 1, since the parallel shell runs isMaster when it starts.
     const isMasterFailpoint = configureFailPoint(conn, "waitInIsMaster", {}, {skip: 1});
     const awaitIsMaster = startParallelShell(runIsMasterCommand, conn.port);
