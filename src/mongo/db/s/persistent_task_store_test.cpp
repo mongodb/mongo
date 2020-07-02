@@ -220,6 +220,48 @@ TEST_F(PersistentTaskStoreTest, TestUpdateOnlyUpdatesOneMatchingDocument) {
     ASSERT_EQ(store.count(opCtx, QUERY("key" << keyToMatch << "min" << expectedUpdatedMin)), 1);
 }
 
+TEST_F(PersistentTaskStoreTest, TestUpdateWithUpsert) {
+    auto opCtx = operationContext();
+
+    PersistentTaskStore<TestTask> store(kNss);
+
+    std::string keyToMatch = "foo";
+    auto query = QUERY("key" << keyToMatch);
+
+    TestTask task(keyToMatch, 0, 0);
+    BSONObj taskBson = task.toBSON();
+
+    // Test that the document is not created (upsert == false by default)
+    store.update(opCtx, query, taskBson);
+
+    ASSERT_EQ(store.count(opCtx, query), 0);
+
+    // Test that the document is not created with upsert == false
+    store.update(opCtx, query, taskBson, WriteConcerns::kMajorityWriteConcern, false);
+
+    ASSERT_EQ(store.count(opCtx, query), 0);
+
+    // Test that the document is created with upsert == true
+    store.update(opCtx, query, taskBson, WriteConcerns::kMajorityWriteConcern, true);
+
+    ASSERT_EQ(store.count(opCtx, query), 1);
+
+    // Verify that the task document is actually correct
+    store.forEach(opCtx, query, [&](const TestTask& t) { ASSERT_EQ(t.toBSON(), task.toBSON()); });
+
+    // Verify that updates happen as normal with upsert == true and upsert == false
+    store.update(
+        opCtx, query, BSON("$inc" << BSON("min" << 1)), WriteConcerns::kMajorityWriteConcern, true);
+    store.forEach(opCtx, query, [&](const TestTask& t) { ASSERT_EQ(t.min, 1); });
+
+    store.update(opCtx,
+                 query,
+                 BSON("$inc" << BSON("min" << 1)),
+                 WriteConcerns::kMajorityWriteConcern,
+                 false);
+    store.forEach(opCtx, query, [&](const TestTask& t) { ASSERT_EQ(t.min, 2); });
+}
+
 TEST_F(PersistentTaskStoreTest, TestWritesPersistAcrossInstances) {
     auto opCtx = operationContext();
 

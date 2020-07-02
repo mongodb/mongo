@@ -81,7 +81,8 @@ public:
     void update(OperationContext* opCtx,
                 Query query,
                 const BSONObj& update,
-                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern,
+                bool upsert = false) {
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = dbClient.runCommand([&] {
@@ -89,7 +90,7 @@ public:
             write_ops::UpdateModification updateModification(update);
             write_ops::UpdateOpEntry updateEntry(query.obj, updateModification);
             updateEntry.setMulti(false);
-            updateEntry.setUpsert(false);
+            updateEntry.setUpsert(upsert);
             updateOp.setUpdates({updateEntry});
 
             return updateOp.serialize({});
