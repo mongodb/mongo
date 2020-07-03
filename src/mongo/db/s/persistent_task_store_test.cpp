@@ -247,19 +247,28 @@ TEST_F(PersistentTaskStoreTest, TestUpdateWithUpsert) {
     ASSERT_EQ(store.count(opCtx, query), 1);
 
     // Verify that the task document is actually correct
-    store.forEach(opCtx, query, [&](const TestTask& t) { ASSERT_EQ(t.toBSON(), task.toBSON()); });
+    store.forEach(opCtx, query, [&](const TestTask& t) {
+        ASSERT_EQ(t.toBSON().toString(), task.toBSON().toString());
+        return true;
+    });
 
     // Verify that updates happen as normal with upsert == true and upsert == false
     store.update(
         opCtx, query, BSON("$inc" << BSON("min" << 1)), WriteConcerns::kMajorityWriteConcern, true);
-    store.forEach(opCtx, query, [&](const TestTask& t) { ASSERT_EQ(t.min, 1); });
+    store.forEach(opCtx, query, [&](const TestTask& t) {
+        ASSERT_EQ(t.min, 1);
+        return true;
+    });
 
     store.update(opCtx,
                  query,
                  BSON("$inc" << BSON("min" << 1)),
                  WriteConcerns::kMajorityWriteConcern,
                  false);
-    store.forEach(opCtx, query, [&](const TestTask& t) { ASSERT_EQ(t.min, 2); });
+    store.forEach(opCtx, query, [&](const TestTask& t) {
+        ASSERT_EQ(t.min, 2);
+        return true;
+    });
 }
 
 TEST_F(PersistentTaskStoreTest, TestWritesPersistAcrossInstances) {
