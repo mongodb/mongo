@@ -19,7 +19,11 @@ const collName = "coll";
 // Start a sharded cluster with latest binaries.
 const st = new ShardingTest({
     shards: 1,
-    rs: {nodes: 2, binVersion: "latest"},
+    rs: {
+        nodes: 2,
+        binVersion: "latest",
+        setParameter: {logComponentVerbosity: '{command: {verbosity: 2}}'}
+    },
     other: {mongosOptions: {binVersion: "latest"}}
 });
 
@@ -136,6 +140,11 @@ const changeStreamsVariants = [
     }
 ];
 
+function dumpLatestOpLogEntries(node, limit) {
+    const oplog = node.getDB("local").getCollection("oplog.rs");
+    return oplog.find().sort({"ts": -1}).limit(limit).toArray();
+}
+
 /**
  * For each test case and change stream variation, generates the oplog entries to be tested and
  * creates an augmented test-case containing a resume token which marks the start of the test, and a
@@ -156,19 +165,26 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
     let testStartTime = createSentinelEntry(testNum);
     const outputChangeStreams = [];
     for (let testCase of testCases) {
+        jsTestLog(
+            `Opening a change stream for '${testCase.testName}' at startTime: ${testStartTime}`);
+
         // Capture the 'resumeToken' when the sentinel entry is found. We use the token to resume
         // the stream rather than the 'testStartTime' because resuming from a token adds more stages
         // to the $changeStream pipeline, which increases our coverage.
         let resumeToken;
         const csCursor = changeStreamsVariants[0].watch({startAtOperationTime: testStartTime});
-        assert.soon(() => {
-            if (!csCursor.hasNext()) {
-                return false;
-            }
-            const nextEvent = csCursor.next();
-            resumeToken = nextEvent._id;
-            return (nextEvent.documentKey._id == "sentinel_entry_" + testNum);
-        });
+        assert.soon(
+            () => {
+                if (!csCursor.hasNext()) {
+                    return false;
+                }
+                const nextEvent = csCursor.next();
+                resumeToken = nextEvent._id;
+                return (nextEvent.documentKey._id == "sentinel_entry_" + testNum);
+            },
+            () => {
+                return tojson(dumpLatestOpLogEntries(st.rs0.getPrimary(), 100));
+            });
 
         for (let changeStreamVariant of changeStreamsVariants) {
             // Start a change stream on the sentinel entry for each test case.
