@@ -35,6 +35,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/util/exit_code.h"
 
 #ifndef _WIN32
 #include <cstdio>
@@ -45,6 +46,10 @@
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
+#endif
+
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#include <sanitizer/common_interface_defs.h>
 #endif
 
 #include <sstream>
@@ -80,6 +85,15 @@ void logAndThrowWithErrnoAt(const StringData expr,
     throw DeathTestSyscallException(
         "{} failed: {} @{}:{}"_format(expr, errnoWithDescription(err), file, line));
 }
+
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+// Our callback handler exits with the default TSAN exit code so we can check in the death test
+// framework Without this, the use could override the exit code and get a false positive that the
+// test passes in TSAN builds.
+void sanitizerDieCallback() {
+    _exit(EXIT_THREAD_SANITIZER);
+}
+#endif
 
 void DeathTestBase::_doTest() {
 #if defined(_WIN32)
@@ -150,7 +164,14 @@ void DeathTestBase::_doTest() {
             }
         }
         if (WIFSIGNALED(stat) || (WIFEXITED(stat) && WEXITSTATUS(stat) != 0)) {
-            // Exited with a signal or non-zero code. Validate the expected message.
+// Exited with a signal or non-zero code. Validate the expected message.
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+            if (WEXITSTATUS(stat) == EXIT_THREAD_SANITIZER) {
+                FAIL(
+                    "Death test exited with Thread Sanitizer exit code, search test output for "
+                    "'ThreadSanitizer' for more information");
+            }
+#endif
             if (_isRegex()) {
                 ASSERT_STRING_SEARCH_REGEX(os.str(), _doGetPattern())
                     << " @" << _getFile() << ":" << _getLine();
@@ -179,6 +200,10 @@ void DeathTestBase::_doTest() {
     const struct rlimit kNoCoreDump { 0U, 0U };
     if (setrlimit(RLIMIT_CORE, &kNoCoreDump) == -1)
         logAndThrowWithErrno("setrlimit(RLIMIT_CORE, &kNoCoreDump)");
+
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+    __sanitizer_set_death_callback(sanitizerDieCallback);
+#endif
 
     try {
         auto test = _doMakeTest();

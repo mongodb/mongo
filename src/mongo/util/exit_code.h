@@ -56,7 +56,8 @@ enum ExitCode : int {
     EXIT_WATCHDOG = 61,  // Internal Watchdog has terminated mongod
     EXIT_NEED_DOWNGRADE =
         62,  // The current binary version is not appropriate to run on the existing datafiles.
-    EXIT_UNCAUGHT = 100,  // top level exception that wasn't caught
+    EXIT_THREAD_SANITIZER = 66,  // Default Exit code for Thread Sanitizer failures
+    EXIT_UNCAUGHT = 100,         // top level exception that wasn't caught
     EXIT_TEST = 101
 };
 
