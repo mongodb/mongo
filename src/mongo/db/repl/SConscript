@@ -1295,6 +1295,7 @@ env.CppUnitTest(
         'task_runner_test.cpp',
         'task_runner_test_fixture.cpp',
         'vote_requester_test.cpp',
+        'wait_for_majority_service_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1370,6 +1371,7 @@ env.CppUnitTest(
         'sync_source_selector_mock',
         'task_executor_mock',
         'task_runner',
+        'wait_for_majority_service',
     ],
 )
 
@@ -1489,5 +1491,16 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authservercommon',
         '$BUILD_DIR/mongo/db/commands/authentication_commands',
+    ],
+)
+
+env.Library(
+    target='wait_for_majority_service',
+    source=[
+        'wait_for_majority_service.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/rw_concern_d',
     ],
 )

@@ -143,7 +143,6 @@ env.Library(
         'transaction_coordinator_util.cpp',
         'transaction_coordinator_worker_curop_repository_mongod.cpp',
         'transaction_coordinator.cpp',
-        'wait_for_majority_service.cpp',
         env.Idlc('transaction_coordinator_document.idl')[0],
         env.Idlc('transaction_coordinators_stats.idl')[0],
     ],
@@ -152,6 +151,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/vector_clock_mutable',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
@@ -404,7 +404,6 @@ env.CppUnitTest(
         'start_chunk_clone_request_test.cpp',
         'type_shard_identity_test.cpp',
         'vector_clock_shard_server_test.cpp',
-        'wait_for_majority_service_test.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/wait_for_majority_service.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/unittest.h"

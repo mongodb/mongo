@@ -33,8 +33,8 @@
 
 #include "mongo/db/s/transaction_coordinator.h"
 
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
-#include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"

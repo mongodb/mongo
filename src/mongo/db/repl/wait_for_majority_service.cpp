@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/wait_for_majority_service.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 
 #include <utility>
 
