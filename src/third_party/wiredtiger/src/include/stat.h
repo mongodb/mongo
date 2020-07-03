@@ -393,6 +393,7 @@ struct __wt_connection_stats {
     int64_t cache_eviction_force;
     int64_t cache_eviction_force_fail;
     int64_t cache_eviction_force_fail_time;
+    int64_t cache_eviction_force_rollback;
     int64_t cache_eviction_hazard;
     int64_t cache_hazard_checks;
     int64_t cache_hazard_walks;
