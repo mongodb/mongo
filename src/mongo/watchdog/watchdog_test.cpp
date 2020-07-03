@@ -394,7 +394,7 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
 }
 
 // Positive: Make sure watchdog monitor terminates the process if a check is unresponsive
-DEATH_TEST(WatchdogMonitorTest, Death, "") {
+DEATH_TEST_F(WatchdogMonitorTest, Death, "") {
     auto sleepyCheck = std::make_unique<SleepyCheck>();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
@@ -405,7 +405,8 @@ DEATH_TEST(WatchdogMonitorTest, Death, "") {
 
     monitor.start();
 
-    sleepmillis(1000);
+    // In TSAN builds, we need to wait enough time for death to be triggered
+    sleepsecs(100);
 }
 
 // Positive: Make sure the monitor can be paused and resumed, and it does not trigger death
