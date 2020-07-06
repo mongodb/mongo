@@ -81,11 +81,15 @@ env.Library(
     source=[
         "feature_compatibility_version_parser.cpp",
         "feature_compatibility_version_command_parser.cpp",
+        env.Idlc('feature_compatibility_version_document.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/command_generic_argument',
         '$BUILD_DIR/mongo/db/namespace_string',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

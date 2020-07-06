@@ -200,7 +200,8 @@ public:
                 return true;
             }
 
-            FeatureCompatibilityVersion::setTargetUpgrade(opCtx);
+            FeatureCompatibilityVersion::setTargetUpgradeFrom(
+                opCtx, ServerGlobalParams::FeatureCompatibility::kLastLTS);
 
             {
                 // Take the global lock in S mode to create a barrier for operations taking the
@@ -237,7 +238,8 @@ public:
             }
 
             hangWhileUpgrading.pauseWhileSet(opCtx);
-            FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
+            FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(
+                opCtx, FeatureCompatibilityVersionParser::parseVersion(requestedVersion));
         } else if (requestedVersion == FeatureCompatibilityVersionParser::kVersion44) {
             uassert(ErrorCodes::IllegalOperation,
                     "cannot initiate setting featureCompatibilityVersion to 4.4 while a previous "
@@ -279,7 +281,8 @@ public:
                 "nodes");
             LOGV2(4637905, "The current replica set config has been propagated to all nodes.");
 
-            FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
+            FeatureCompatibilityVersion::setTargetDowngrade(
+                opCtx, FeatureCompatibilityVersionParser::parseVersion(requestedVersion));
 
             {
                 // Take the global lock in S mode to create a barrier for operations taking the
@@ -317,7 +320,8 @@ public:
             }
 
             hangWhileDowngrading.pauseWhileSet(opCtx);
-            FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
+            FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(
+                opCtx, FeatureCompatibilityVersionParser::parseVersion(requestedVersion));
         }
 
         return true;

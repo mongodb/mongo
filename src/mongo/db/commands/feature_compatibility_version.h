@@ -52,25 +52,29 @@ public:
     static Lock::ResourceMutex fcvLock;
 
     /**
-     * Records intent to perform a 4.4 -> 4.5.1 upgrade by updating the on-disk feature
-     * compatibility version document to have 'version'=4.4, 'targetVersion'=4.5.1.
-     * Should be called before schemas are modified.
+     * Records intent to perform a currentVersion -> kLatest upgrade by updating the on-disk
+     * feature compatibility version document to have 'version'=currentVersion,
+     * 'targetVersion'=kLatest. Should be called before schemas are modified.
      */
-    static void setTargetUpgrade(OperationContext* opCtx);
+    static void setTargetUpgradeFrom(OperationContext* opCtx,
+                                     ServerGlobalParams::FeatureCompatibility::Version fromVersion);
 
     /**
-     * Records intent to perform a 4.5.1 -> 4.4 downgrade by updating the on-disk feature
-     * compatibility version document to have 'version'=4.4, 'targetVersion'=4.4.
-     * Should be called before schemas are modified.
+     * Records intent to perform a downgrade from the latest version by updating the on-disk feature
+     * compatibility version document to have 'version'=version, 'targetVersion'=version and
+     * 'previousVersion'=kLatest. Should be called before schemas are modified.
      */
-    static void setTargetDowngrade(OperationContext* opCtx);
+    static void setTargetDowngrade(OperationContext* opCtx,
+                                   ServerGlobalParams::FeatureCompatibility::Version version);
 
     /**
-     * Records the completion of a 4.4 <-> 4.5.1 upgrade or downgrade by updating the on-disk
+     * Records the completion of a upgrade or downgrade by updating the on-disk
      * feature compatibility version document to have 'version'=version and unsetting the
-     * 'targetVersion' field. Should be called after schemas are modified.
+     * 'targetVersion' field and the 'previousVersion' field. Should be called after schemas are
+     * modified.
      */
-    static void unsetTargetUpgradeOrDowngrade(OperationContext* opCtx, StringData version);
+    static void unsetTargetUpgradeOrDowngrade(
+        OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version version);
 
     /**
      * If there are no non-local databases, store the featureCompatibilityVersion document. If we
@@ -105,17 +109,6 @@ public:
     static void onReplicationRollback(OperationContext* opCtx);
 
 private:
-    /**
-     * Validate version. Uasserts if invalid.
-     */
-    static void _validateVersion(StringData version);
-
-    /**
-     * Build update command.
-     */
-    typedef std::function<void(BSONObjBuilder)> UpdateBuilder;
-    static void _runUpdateCommand(OperationContext* opCtx, UpdateBuilder callback);
-
     /**
      * Set the FCV to newVersion, making sure to close any outgoing connections with incompatible
      * servers and closing open transactions if necessary. Increments the server TopologyVersion.

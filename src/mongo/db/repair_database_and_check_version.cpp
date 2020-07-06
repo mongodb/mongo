@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_document_gen.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -115,22 +116,19 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
                           fcvColl,
                           BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
                           featureCompatibilityVersion)) {
-        LOGV2(21000,
+        LOGV2(4926905,
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
-              "document with version "
-              "{FeatureCompatibilityVersionParser_kVersion44}.",
-              "Re-creating featureCompatibilityVersion document that was deleted",
-              "version"_attr = FeatureCompatibilityVersionParser::kVersion44);
+              "document with last LTS version.",
+              "version"_attr = FeatureCompatibilityVersionParser::kLastLTS);
 
-        BSONObj fcvObj = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName
-                                    << FeatureCompatibilityVersionParser::kVersionField
-                                    << FeatureCompatibilityVersionParser::kVersion44);
+        FeatureCompatibilityVersionDocument fcvDoc;
+        fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
 
         writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
             OpDebug* const nullOpDebug = nullptr;
-            uassertStatusOK(
-                fcvColl->insertDocument(opCtx, InsertStatement(fcvObj), nullOpDebug, false));
+            uassertStatusOK(fcvColl->insertDocument(
+                opCtx, InsertStatement(fcvDoc.toBSON()), nullOpDebug, false));
             wunit.commit();
         });
     }

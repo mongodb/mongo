@@ -47,8 +47,17 @@ public:
     static constexpr StringData kVersionUnset = "Unset"_sd;
 
     static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
-    static constexpr StringData kVersionField = "version"_sd;
-    static constexpr StringData kTargetVersionField = "targetVersion"_sd;
+
+    static constexpr StringData kLastLTS = kVersion44;
+    static constexpr StringData kLastContinuous = kVersion44;
+    static constexpr StringData kLatest = kVersion451;
+
+    static ServerGlobalParams::FeatureCompatibility::Version parseVersion(StringData versionString);
+
+    static StringData serializeVersion(ServerGlobalParams::FeatureCompatibility::Version version);
+
+    static Status validatePreviousVersionField(
+        ServerGlobalParams::FeatureCompatibility::Version version);
 
     /**
      * Parses the featureCompatibilityVersion document from the server configuration collection

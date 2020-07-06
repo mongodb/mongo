@@ -36,6 +36,7 @@
 #include <ostream>
 
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version_document_gen.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/json.h"
@@ -676,9 +677,9 @@ void assertFCVRequest(RemoteCommandRequest request) {
 }
 
 void InitialSyncerTest::processSuccessfulFCVFetcherResponseLastStable() {
-    auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
-                            << FeatureCompatibilityVersionParser::kVersion44)};
-    processSuccessfulFCVFetcherResponse(docs);
+    FeatureCompatibilityVersionDocument fcvDoc;
+    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    processSuccessfulFCVFetcherResponse({fcvDoc.toBSON()});
 }
 
 void InitialSyncerTest::processSuccessfulFCVFetcherResponse(std::vector<BSONObj> docs) {
@@ -1895,8 +1896,9 @@ TEST_F(InitialSyncerTest,
 
 TEST_F(InitialSyncerTest,
        InitialSyncerReturnsTooManyMatchingDocumentsWhenFCVFetcherReturnsMultipleDocuments) {
-    auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
-                            << FeatureCompatibilityVersionParser::kVersion44),
+    FeatureCompatibilityVersionDocument fcvDoc;
+    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    auto docs = {fcvDoc.toBSON(),
                  BSON("_id"
                       << "other")};
     runInitialSyncWithBadFCVResponse(docs, ErrorCodes::TooManyMatchingDocuments);
@@ -1904,24 +1906,25 @@ TEST_F(InitialSyncerTest,
 
 TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsUpgradeTargetVersion) {
-    auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
-                            << FeatureCompatibilityVersionParser::kVersion44 << "targetVersion"
-                            << FeatureCompatibilityVersionParser::kVersion451)};
-    runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
+    FeatureCompatibilityVersionDocument fcvDoc;
+    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    runInitialSyncWithBadFCVResponse({fcvDoc.toBSON()}, ErrorCodes::IncompatibleServerVersion);
 }
 
 TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsDowngradeTargetVersion) {
-    auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
-                            << FeatureCompatibilityVersionParser::kVersion44 << "targetVersion"
-                            << FeatureCompatibilityVersionParser::kVersion44)};
-    runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
+    FeatureCompatibilityVersionDocument fcvDoc;
+    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    fcvDoc.setPreviousVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    runInitialSyncWithBadFCVResponse({fcvDoc.toBSON()}, ErrorCodes::IncompatibleServerVersion);
 }
 
-TEST_F(InitialSyncerTest, InitialSyncerReturnsBadValueWhenFCVFetcherReturnsNoVersion) {
+TEST_F(InitialSyncerTest, InitialSyncerReturnsParseErrorWhenFCVFetcherReturnsNoVersion) {
     auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "targetVersion"
                             << FeatureCompatibilityVersionParser::kVersion44)};
-    runInitialSyncWithBadFCVResponse(docs, ErrorCodes::BadValue);
+    runInitialSyncWithBadFCVResponse(docs, ((ErrorCodes::Error)40414));
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) {
@@ -1951,9 +1954,9 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
         // Oplog entry associated with the beginApplyingTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
-        auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
-                                << FeatureCompatibilityVersionParser::kVersion44)};
-        processSuccessfulFCVFetcherResponse(docs);
+        FeatureCompatibilityVersionDocument fcvDoc;
+        fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+        processSuccessfulFCVFetcherResponse({fcvDoc.toBSON()});
     }
 
     // We shut it down so we do not have to finish initial sync. If the fCV fetcher got an error,

@@ -16,14 +16,24 @@ var lastStableFCV = "4.4";
 /**
  * Checks the featureCompatibilityVersion document and server parameter. The
  * featureCompatibilityVersion document is of the form {_id: "featureCompatibilityVersion", version:
- * <required>, targetVersion: <optional>}. The getParameter result is of the form
- * {featureCompatibilityVersion: {version: <required>, targetVersion: <optional>}, ok: 1}.
+ * <required>, targetVersion: <optional>, previousVersion: <optional>}. The getParameter result is
+ * of the form {featureCompatibilityVersion: {version: <required>, targetVersion: <optional>,
+ * previousVersion: <optional>}, ok: 1}.
  */
 function checkFCV(adminDB, version, targetVersion) {
     let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
     assert.commandWorked(res);
     assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
     assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
+    // When both version and targetVersion are equal to lastStableFCV, downgrade is in progress.
+    // This tests that previousVersion is always equal to latestFCV in downgrading states or
+    // undefined otherwise.
+    const isDowngrading = (version === lastStableFCV && targetVersion === lastStableFCV);
+    if (isDowngrading) {
+        assert.eq(res.featureCompatibilityVersion.previousVersion, latestFCV, tojson(res));
+    } else {
+        assert.eq(res.featureCompatibilityVersion.previousVersion, undefined, tojson(res));
+    }
 
     // This query specifies an explicit readConcern because some FCV tests pass a connection that
     // has manually run isMaster with internalClient, and mongod expects internalClients (ie. other
@@ -34,6 +44,11 @@ function checkFCV(adminDB, version, targetVersion) {
                   .next();
     assert.eq(doc.version, version, tojson(doc));
     assert.eq(doc.targetVersion, targetVersion, tojson(doc));
+    if (isDowngrading) {
+        assert.eq(doc.previousVersion, latestFCV, tojson(doc));
+    } else {
+        assert.eq(doc.previousVersion, undefined, tojson(doc));
+    }
 }
 
 /**

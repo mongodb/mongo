@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/feature_compatibility_version_document_gen.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
@@ -66,34 +67,70 @@ Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVe
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingRunningTransactionsOnFCVDowngrade);
 
-void FeatureCompatibilityVersion::setTargetUpgrade(OperationContext* opCtx) {
-    // Sets both 'version' and 'targetVersion' fields.
-    _runUpdateCommand(opCtx, [](auto updateMods) {
-        updateMods.append(FeatureCompatibilityVersionParser::kVersionField,
-                          FeatureCompatibilityVersionParser::kVersion44);
-        updateMods.append(FeatureCompatibilityVersionParser::kTargetVersionField,
-                          FeatureCompatibilityVersionParser::kVersion451);
-    });
+/**
+ * Build update command for featureCompatibilityVersion document updates.
+ */
+void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersionDocument& fcvDoc) {
+    DBDirectClient client(opCtx);
+    NamespaceString nss(NamespaceString::kServerConfigurationNamespace);
+
+    BSONObjBuilder updateCmd;
+    updateCmd.append("update", nss.coll());
+    {
+        BSONArrayBuilder updates(updateCmd.subarrayStart("updates"));
+        {
+            BSONObjBuilder updateSpec(updates.subobjStart());
+            {
+                BSONObjBuilder queryFilter(updateSpec.subobjStart("q"));
+                queryFilter.append("_id", FeatureCompatibilityVersionParser::kParameterName);
+            }
+            {
+                BSONObjBuilder updateMods(updateSpec.subobjStart("u"));
+                fcvDoc.serialize(&updateMods);
+            }
+            updateSpec.appendBool("upsert", true);
+        }
+    }
+    auto timeout = opCtx->getWriteConcern().usedDefault ? WriteConcernOptions::kNoTimeout
+                                                        : opCtx->getWriteConcern().wTimeout;
+    auto newWC = WriteConcernOptions(
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout);
+    updateCmd.append(WriteConcernOptions::kWriteConcernField, newWC.toBSON());
+
+    // Update the featureCompatibilityVersion document stored in the server configuration
+    // collection.
+    BSONObj updateResult;
+    client.runCommand(nss.db().toString(), updateCmd.obj(), updateResult);
+    uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
 }
 
-void FeatureCompatibilityVersion::setTargetDowngrade(OperationContext* opCtx) {
+
+void FeatureCompatibilityVersion::setTargetUpgradeFrom(
+    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version fromVersion) {
     // Sets both 'version' and 'targetVersion' fields.
-    _runUpdateCommand(opCtx, [](auto updateMods) {
-        updateMods.append(FeatureCompatibilityVersionParser::kVersionField,
-                          FeatureCompatibilityVersionParser::kVersion44);
-        updateMods.append(FeatureCompatibilityVersionParser::kTargetVersionField,
-                          FeatureCompatibilityVersionParser::kVersion44);
-    });
+    FeatureCompatibilityVersionDocument fcvDoc;
+    fcvDoc.setVersion(fromVersion);
+    fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    runUpdateCommand(opCtx, fcvDoc);
 }
 
-void FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(OperationContext* opCtx,
-                                                                StringData version) {
-    _validateVersion(version);
+void FeatureCompatibilityVersion::setTargetDowngrade(
+    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version version) {
+    // Sets 'version', 'targetVersion' and 'previousVersion' fields.
+    FeatureCompatibilityVersionDocument fcvDoc;
+    fcvDoc.setVersion(version);
+    fcvDoc.setTargetVersion(version);
+    fcvDoc.setPreviousVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    runUpdateCommand(opCtx, fcvDoc);
+}
 
-    // Updates 'version' field, while also unsetting the 'targetVersion' field.
-    _runUpdateCommand(opCtx, [version](auto updateMods) {
-        updateMods.append(FeatureCompatibilityVersionParser::kVersionField, version);
-    });
+void FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(
+    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version version) {
+    // Updates 'version' field, while also unsetting the 'targetVersion' field and the
+    // 'previousVersion' field.
+    FeatureCompatibilityVersionDocument fcvDoc;
+    fcvDoc.setVersion(version);
+    runUpdateCommand(opCtx, fcvDoc);
 }
 
 void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
@@ -117,17 +154,19 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
     }
 
+    FeatureCompatibilityVersionDocument fcvDoc;
+    if (storeUpgradeVersion) {
+        fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    } else {
+        fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    }
+
     // We then insert the featureCompatibilityVersion document into the server configuration
     // collection. The server parameter will be updated on commit by the op observer.
     uassertStatusOK(storageInterface->insertDocument(
         opCtx,
         nss,
-        repl::TimestampedBSONObj{
-            BSON("_id" << FeatureCompatibilityVersionParser::kParameterName
-                       << FeatureCompatibilityVersionParser::kVersionField
-                       << (storeUpgradeVersion ? FeatureCompatibilityVersionParser::kVersion451
-                                               : FeatureCompatibilityVersionParser::kVersion44)),
-            Timestamp()},
+        repl::TimestampedBSONObj{fcvDoc.toBSON(), Timestamp()},
         repl::OpTime::kUninitializedTerm));  // No timestamp or term because this write is not
                                              // replicated.
 }
@@ -257,51 +296,6 @@ void FeatureCompatibilityVersion::onReplicationRollback(OperationContext* opCtx)
     }
 }
 
-void FeatureCompatibilityVersion::_validateVersion(StringData version) {
-    uassert(40284,
-            str::stream() << "featureCompatibilityVersion must be '"
-                          << FeatureCompatibilityVersionParser::kVersion451 << "' or '"
-                          << FeatureCompatibilityVersionParser::kVersion44 << "'. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink << ".",
-            version == FeatureCompatibilityVersionParser::kVersion451 ||
-                version == FeatureCompatibilityVersionParser::kVersion44);
-}
-
-void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
-                                                    UpdateBuilder builder) {
-    DBDirectClient client(opCtx);
-    NamespaceString nss(NamespaceString::kServerConfigurationNamespace);
-
-    BSONObjBuilder updateCmd;
-    updateCmd.append("update", nss.coll());
-    {
-        BSONArrayBuilder updates(updateCmd.subarrayStart("updates"));
-        {
-            BSONObjBuilder updateSpec(updates.subobjStart());
-            {
-                BSONObjBuilder queryFilter(updateSpec.subobjStart("q"));
-                queryFilter.append("_id", FeatureCompatibilityVersionParser::kParameterName);
-            }
-            {
-                BSONObjBuilder updateMods(updateSpec.subobjStart("u"));
-                builder(std::move(updateMods));
-            }
-            updateSpec.appendBool("upsert", true);
-        }
-    }
-    auto timeout = opCtx->getWriteConcern().usedDefault ? WriteConcernOptions::kNoTimeout
-                                                        : opCtx->getWriteConcern().wTimeout;
-    auto newWC = WriteConcernOptions(
-        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout);
-    updateCmd.append(WriteConcernOptions::kWriteConcernField, newWC.toBSON());
-
-    // Update the featureCompatibilityVersion document stored in the server configuration
-    // collection.
-    BSONObj updateResult;
-    client.runCommand(nss.db().toString(), updateCmd.obj(), updateResult);
-    uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
-}
-
 /**
  * Read-only server parameter for featureCompatibilityVersion.
  */
@@ -318,38 +312,28 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
             str::stream() << name << " is not yet known.",
             serverGlobalParams.featureCompatibility.isVersionInitialized());
 
+    FeatureCompatibilityVersionDocument fcvDoc;
     BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
-    switch (serverGlobalParams.featureCompatibility.getVersion()) {
+    auto version = serverGlobalParams.featureCompatibility.getVersion();
+    switch (version) {
         case ServerGlobalParams::FeatureCompatibility::kLatest:
-            featureCompatibilityVersionBuilder.append(
-                FeatureCompatibilityVersionParser::kVersionField,
-                FeatureCompatibilityVersionParser::kVersion451);
-            return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To451:
-            featureCompatibilityVersionBuilder.append(
-                FeatureCompatibilityVersionParser::kVersionField,
-                FeatureCompatibilityVersionParser::kVersion44);
-            featureCompatibilityVersionBuilder.append(
-                FeatureCompatibilityVersionParser::kTargetVersionField,
-                FeatureCompatibilityVersionParser::kVersion451);
-            return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingFrom451To44:
-            featureCompatibilityVersionBuilder.append(
-                FeatureCompatibilityVersionParser::kVersionField,
-                FeatureCompatibilityVersionParser::kVersion44);
-            featureCompatibilityVersionBuilder.append(
-                FeatureCompatibilityVersionParser::kTargetVersionField,
-                FeatureCompatibilityVersionParser::kVersion44);
-            return;
         case ServerGlobalParams::FeatureCompatibility::kLastLTS:
-            featureCompatibilityVersionBuilder.append(
-                FeatureCompatibilityVersionParser::kVersionField,
-                FeatureCompatibilityVersionParser::kVersion44);
-            return;
+            fcvDoc.setVersion(version);
+            break;
+        case ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastLTSToLatest:
+            fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+            fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+            break;
+        case ServerGlobalParams::FeatureCompatibility::kDowngradingFromLatestToLastLTS:
+            fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+            fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+            fcvDoc.setPreviousVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+            break;
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;
     }
+    featureCompatibilityVersionBuilder.appendElements(fcvDoc.toBSON().removeField("_id"));
 }
 
 Status FeatureCompatibilityVersionParameter::setFromString(const std::string&) {

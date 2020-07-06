@@ -204,6 +204,16 @@ struct ServerGlobalParams {
         static constexpr Version kLastContinuous = Version::kFullyDowngradedTo44;
         static constexpr Version kLastLTS = Version::kFullyDowngradedTo44;
 
+        // These constants should only be used for generic FCV references. Generic references are
+        // FCV references that are expected to exist across LTS binary versions.
+        // NOTE: DO NOT USE THEM FOR REGULAR FCV CHECKS.
+        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom44To451;
+        static constexpr Version kUpgradingFromLastContinuousToLatest =
+            Version::kUpgradingFrom44To451;
+        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom451To44;
+        static constexpr Version kDowngradingFromLatestToLastContinuous =
+            Version::kDowngradingFrom451To44;
+
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.

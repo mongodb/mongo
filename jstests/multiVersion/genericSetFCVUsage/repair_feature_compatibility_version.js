@@ -66,9 +66,10 @@ assert.neq(null,
            connection,
            "mongod was unable to start up with version=" + latest + " and existing data files");
 adminDB = connection.getDB("admin");
-assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-          lastStableFCV);
-assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).targetVersion, null);
+const fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
+assert.eq(fcvDoc.version, lastStableFCV);
+assert.eq(fcvDoc.targetVersion, undefined);
+assert.eq(fcvDoc.previousVersion, undefined);
 MongoRunner.stopMongod(connection);
 
 // If the featureCompatibilityVersion document is present, --repair should just return success.
