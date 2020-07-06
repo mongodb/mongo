@@ -14,9 +14,8 @@ let st = new ShardingTest({
 
 const dbName = "testdb";
 
-function validateCollections() {
-    assert.eq(3, db.unshardedFoo.count());
-    assert.eq(3, db.shardedBar.count());
+function verifyDocuments(db, count) {
+    assert.eq(count, db.unshardedFoo.count());
 }
 
 function createCollections() {
@@ -72,7 +71,7 @@ function testMovePrimary(failpoint, fromShard, toShard, coll, shouldFail) {
         assert.commandFailedWithCode(coll.update({a: 1}, {$set: {a: 10}}),
                                      ErrorCodes.MovePrimaryInProgress);
     } else {
-        assert.commandWorked(coll.update({a: 11}, {$set: {a: 11}}));
+        assert.commandWorked(coll.update({a: 10}, {$set: {a: 11}}));
     }
 
     jsTestLog("Before remove");
@@ -90,14 +89,37 @@ function testMovePrimary(failpoint, fromShard, toShard, coll, shouldFail) {
 createCollections();
 let fromShard = st.getPrimaryShard(dbName);
 let toShard = st.getOther(fromShard);
-
 testMovePrimary('hangInCloneStage', fromShard, toShard, fromShard.getDB(dbName).shardedBar, false);
+
+fromShard = st.getPrimaryShard(dbName);
+toShard = st.getOther(fromShard);
+testMovePrimary('hangInCloneStage', fromShard, toShard, fromShard.getDB(dbName).unshardedFoo, true);
+verifyDocuments(toShard.getDB(dbName), 3);
+verifyDocuments(fromShard.getDB(dbName), 0);
+
+createCollections();
+fromShard = st.getPrimaryShard(dbName);
+toShard = st.getOther(fromShard);
+testMovePrimary('hangInCloneStage', fromShard, toShard, st.s.getDB(dbName).shardedBar, false);
+
+fromShard = st.getPrimaryShard(dbName);
+toShard = st.getOther(fromShard);
+testMovePrimary('hangInCloneStage', fromShard, toShard, st.s.getDB(dbName).unshardedFoo, true);
+verifyDocuments(toShard.getDB(dbName), 3);
+verifyDocuments(fromShard.getDB(dbName), 0);
 
 createCollections();
 fromShard = st.getPrimaryShard(dbName);
 toShard = st.getOther(fromShard);
 testMovePrimary(
-    'hangInCleanStaleDataStage', fromShard, toShard, fromShard.getDB(dbName).shardedBar, false);
+    'hangInCleanStaleDataStage', fromShard, toShard, st.s.getDB(dbName).shardedBar, false);
+
+fromShard = st.getPrimaryShard(dbName);
+toShard = st.getOther(fromShard);
+testMovePrimary(
+    'hangInCleanStaleDataStage', fromShard, toShard, st.s.getDB(dbName).unshardedFoo, false);
+verifyDocuments(toShard.getDB(dbName), 3);
+verifyDocuments(fromShard.getDB(dbName), 0);
 
 st.stop();
 })();
