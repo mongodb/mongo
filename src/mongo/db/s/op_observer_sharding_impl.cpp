@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/op_observer_sharding_impl.h"
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
@@ -75,6 +80,24 @@ bool isMigratingWithCSRLock(CollectionShardingRuntime* csr,
     return msm && msm->getCloner()->isDocumentInMigratingChunk(docToDelete);
 }
 
+void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
+    Lock::DBLock dblock(opCtx, nss.db(), MODE_IS);
+    auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
+    if (!dss) {
+        return;
+    }
+
+    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+    auto mpsm = dss->getMovePrimarySourceManager(dssLock);
+
+    if (mpsm) {
+        LOGV2(4908600, "assertMovePrimaryInProgress", "movePrimaryNss"_attr = nss.toString());
+
+        uasserted(ErrorCodes::MovePrimaryInProgress,
+                  "movePrimary is in progress for namespace " + nss.toString());
+    }
+}
+
 }  // namespace
 
 bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
@@ -104,8 +127,10 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
     csr->checkShardVersionOrThrow(opCtx);
 
     auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded())
+    if (!metadata || !metadata->isSharded()) {
+        assertMovePrimaryInProgress(opCtx, nss);
         return;
+    }
 
     if (inMultiDocumentTransaction) {
         assertIntersectingChunkHasNotMoved(opCtx, *metadata, insertedDoc);
@@ -130,8 +155,10 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     csr->checkShardVersionOrThrow(opCtx);
 
     auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded())
+    if (!metadata || !metadata->isSharded()) {
+        assertMovePrimaryInProgress(opCtx, nss);
         return;
+    }
 
     if (inMultiDocumentTransaction) {
         assertIntersectingChunkHasNotMoved(opCtx, *metadata, postImageDoc);
@@ -155,8 +182,10 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
     csr->checkShardVersionOrThrow(opCtx);
 
     auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded())
+    if (!metadata || !metadata->isSharded()) {
+        assertMovePrimaryInProgress(opCtx, nss);
         return;
+    }
 
     if (inMultiDocumentTransaction) {
         assertIntersectingChunkHasNotMoved(opCtx, *metadata, documentKey);
