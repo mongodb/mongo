@@ -35,6 +35,7 @@
 
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
 
 namespace mongo {
@@ -80,7 +81,7 @@ void releaseValue(TypeTags tag, Value val) noexcept {
             delete getKeyStringView(val);
             break;
         case TypeTags::pcreRegex:
-            delete getPrceRegexView(val);
+            delete getPcreRegexView(val);
             break;
         default:
             break;
@@ -146,6 +147,13 @@ std::ostream& operator<<(std::ostream& os, const TypeTags tag) {
         case TypeTags::bsonObjectId:
             os << "bsonObjectId";
             break;
+        case TypeTags::ksValue:
+            os << "KeyString";
+        case TypeTags::pcreRegex:
+            os << "pcreRegex";
+        case TypeTags::timeZoneDB:
+            os << "timeZoneDB";
+            break;
         default:
             os << "unknown tag";
             break;
@@ -166,6 +174,9 @@ void printValue(std::ostream& os, TypeTags tag, Value val) {
             break;
         case value::TypeTags::NumberDecimal:
             os << bitcastTo<Decimal128>(val).toString();
+            break;
+        case value::TypeTags::Date:
+            os << bitcastTo<int64_t>(val);
             break;
         case value::TypeTags::Boolean:
             os << ((val) ? "true" : "false");
@@ -294,9 +305,15 @@ void printValue(std::ostream& os, TypeTags tag, Value val) {
             break;
         }
         case value::TypeTags::pcreRegex: {
-            auto regex = getPrceRegexView(val);
+            auto regex = getPcreRegexView(val);
             // TODO: Also include the regex flags.
             os << "/" << regex->pattern() << "/";
+            break;
+        }
+        case value::TypeTags::timeZoneDB: {
+            auto tzdb = getTimeZoneDBView(val);
+            auto timeZones = tzdb->getTimeZoneStrings();
+            os << "TimeZoneDatabase(" + timeZones.front() + "..." + timeZones.back() + ")";
             break;
         }
         default:

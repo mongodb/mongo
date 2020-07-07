@@ -351,5 +351,35 @@ private:
     ErrorCodes::Error _code;
     std::string _message;
 };
+
+/**
+ * This is a numeric conversion expression. It supports both narrowing and widening conversion under
+ * no loss of precision. If a given conversion loses precision the expression results in Nothing.
+ * ENumericConvert can be instantiated for the following source to target tags,
+ *
+ *  NumberInt32 -> NumberInt64, NumberInt32 -> NumberDouble, NumberInt32 -> NumberDecimal
+ *  NumberInt64 -> NumberInt32, NumberInt64 -> NumberDouble, NumberInt64 -> NumberDecimal
+ *  NumberDouble -> NumberInt32, NumberDouble -> NumberInt64, NumberDouble -> NumberDecimal
+ *  NumberDecimal -> NumberInt32, NumberDecimal -> NumberInt64, NumberDecimal -> NumberDouble
+ */
+class ENumericConvert final : public EExpression {
+public:
+    ENumericConvert(std::unique_ptr<EExpression> source, value::TypeTags target) : _target(target) {
+        _nodes.emplace_back(std::move(source));
+        validateNodes();
+        invariant(
+            target == value::TypeTags::NumberInt32 || target == value::TypeTags::NumberInt64 ||
+            target == value::TypeTags::NumberDouble || target == value::TypeTags::NumberDecimal);
+    }
+
+    std::unique_ptr<EExpression> clone() const override;
+
+    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+
+    std::vector<DebugPrinter::Block> debugPrint() const override;
+
+private:
+    value::TypeTags _target;
+};
 }  // namespace sbe
 }  // namespace mongo

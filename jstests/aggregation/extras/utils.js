@@ -273,6 +273,14 @@ function assertErrorCode(coll, pipe, code, errmsg, options = {}) {
 }
 
 /**
+ * Assert that an aggregation fails with a list of specific codes.
+ */
+function assertErrorCodes(coll, pipe, codes) {
+    const response = assert.commandFailedWithCode(
+        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}), codes);
+}
+
+/**
  * Assert that an aggregation fails with a specific code and the error message contains the given
  * string.
  */

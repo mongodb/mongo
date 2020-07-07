@@ -123,6 +123,8 @@ struct ProjectionTraversalVisitorContext {
                                                nullptr)};
     }
 
+    OperationContext* opCtx;
+
     projection_ast::ProjectType projectType;
     sbe::value::SlotIdGenerator* const slotIdGenerator;
     sbe::value::FrameIdGenerator* const frameIdGenerator;
@@ -215,7 +217,8 @@ public:
         // 'evals' stack. If the expression is translated into a sub-tree, stack it with the
         // existing 'fieldPathExpressionsTraverseStage' sub-tree.
         auto [outputSlot, expr, stage] =
-            generateExpression(node->expressionRaw(),
+            generateExpression(_context->opCtx,
+                               node->expressionRaw(),
                                std::move(_context->topLevel().fieldPathExpressionsTraverseStage),
                                _context->slotIdGenerator,
                                _context->frameIdGenerator,
@@ -365,13 +368,14 @@ private:
 }  // namespace
 
 std::pair<sbe::value::SlotId, PlanStageType> generateProjection(
+    OperationContext* opCtx,
     const projection_ast::Projection* projection,
     PlanStageType stage,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId inputVar) {
     ProjectionTraversalVisitorContext context{
-        projection->type(), slotIdGenerator, frameIdGenerator, std::move(stage), inputVar};
+        opCtx, projection->type(), slotIdGenerator, frameIdGenerator, std::move(stage), inputVar};
     context.relevantSlots.push_back(inputVar);
     ProjectionTraversalPreVisitor preVisitor{&context};
     ProjectionTraversalPostVisitor postVisitor{&context};

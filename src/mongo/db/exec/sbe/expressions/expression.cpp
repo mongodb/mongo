@@ -345,6 +345,9 @@ struct BuiltinFn {
  * The map of recognized builtin functions.
  */
 static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
+    {"dateParts", BuiltinFn{[](size_t n) { return n == 9; }, vm::Builtin::dateParts, false}},
+    {"datePartsWeekYear",
+     BuiltinFn{[](size_t n) { return n == 9; }, vm::Builtin::datePartsWeekYear, false}},
     {"split", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::split, false}},
     {"regexMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexMatch, false}},
     {"dropFields", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::dropFields, false}},
@@ -605,6 +608,53 @@ std::vector<DebugPrinter::Block> EFail::debugPrint() const {
 
     ret.emplace_back("`)");
 
+    return ret;
+}
+
+std::unique_ptr<EExpression> ENumericConvert::clone() const {
+    return std::make_unique<ENumericConvert>(_nodes[0]->clone(), _target);
+}
+
+std::unique_ptr<vm::CodeFragment> ENumericConvert::compile(CompileCtx& ctx) const {
+    auto code = std::make_unique<vm::CodeFragment>();
+
+    auto operand = _nodes[0]->compile(ctx);
+    code->append(std::move(operand));
+    code->appendNumericConvert(_target);
+
+    return code;
+}
+
+std::vector<DebugPrinter::Block> ENumericConvert::debugPrint() const {
+    std::vector<DebugPrinter::Block> ret;
+
+    DebugPrinter::addKeyword(ret, "convert");
+
+    ret.emplace_back("(");
+
+    DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
+
+    ret.emplace_back(DebugPrinter::Block("`,"));
+
+    switch (_target) {
+        case value::TypeTags::NumberInt32:
+            ret.emplace_back("int32");
+            break;
+        case value::TypeTags::NumberInt64:
+            ret.emplace_back("int64");
+            break;
+        case value::TypeTags::NumberDouble:
+            ret.emplace_back("double");
+            break;
+        case value::TypeTags::NumberDecimal:
+            ret.emplace_back("decimal");
+            break;
+        default:
+            MONGO_UNREACHABLE;
+            break;
+    }
+
+    ret.emplace_back("`)");
     return ret;
 }
 

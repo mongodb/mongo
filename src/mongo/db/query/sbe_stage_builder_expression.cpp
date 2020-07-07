@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/sbe_stage_builder_expression.h"
+#include "mongo/db/query/util/make_data_structure.h"
 
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
@@ -89,12 +91,14 @@ struct ExpressionVisitorContext {
                              sbe::value::SlotIdGenerator* slotIdGenerator,
                              sbe::value::FrameIdGenerator* frameIdGenerator,
                              sbe::value::SlotId rootSlot,
-                             sbe::value::SlotVector* relevantSlots)
+                             sbe::value::SlotVector* relevantSlots,
+                             const TimeZoneDatabase* timeZoneDB)
         : traverseStage(std::move(inputStage)),
           slotIdGenerator(slotIdGenerator),
           frameIdGenerator(frameIdGenerator),
           rootSlot(rootSlot),
-          relevantSlots(relevantSlots) {}
+          relevantSlots(relevantSlots),
+          timeZoneDB(timeZoneDB) {}
 
     void ensureArity(size_t arity) {
         invariant(exprs.size() >= arity);
@@ -179,6 +183,9 @@ struct ExpressionVisitorContext {
     // See the comment above the generateExpression() declaration for an explanation of the
     // 'relevantSlots' list.
     sbe::value::SlotVector* relevantSlots;
+
+    // Unowned timezone database needed to evaluate date/time expressions.
+    const TimeZoneDatabase* timeZoneDB;
 };
 
 /**
@@ -312,6 +319,19 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverse(
                                                nullptr,
                                                1)};
     }
+}
+
+/**
+ * Generates an EExpression that checks if the input expression is null or missing.
+ */
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
+                                                        const sbe::value::SlotId slotId) {
+    sbe::EVariable var{frameId, slotId};
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::logicOr,
+        sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
+                                    sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(var.clone()))),
+        sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(var.clone())));
 }
 
 class ExpressionPreVisitor final : public ExpressionVisitor {
@@ -690,12 +710,7 @@ public:
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
 
-        auto checkNullOrEmpty = sbe::makeE<sbe::EPrimBinary>(
-            sbe::EPrimBinary::logicOr,
-            sbe::makeE<sbe::EPrimUnary>(
-                sbe::EPrimUnary::logicNot,
-                sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(inputRef.clone()))),
-            sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(inputRef.clone())));
+        auto checkNullOrEmpty = generateNullOrMissing(frameId, 0);
 
         auto absExpr = sbe::makeE<sbe::EIf>(
             std::move(checkNullOrEmpty),
@@ -823,7 +838,300 @@ public:
         unsupportedExpression("$dateFromString");
     }
     void visit(ExpressionDateFromParts* expr) final {
-        unsupportedExpression("$dateFromString");
+        // This expression can carry null children depending on the set of fields provided,
+        // to compute a date from parts so we only need to pop if a child exists.
+        auto children = expr->getChildren();
+        invariant(children.size() == 11);
+
+        auto eTimezone = children[10] ? _context->popExpr() : nullptr;
+        auto eIsoDayOfWeek = children[9] ? _context->popExpr() : nullptr;
+        auto eIsoWeek = children[8] ? _context->popExpr() : nullptr;
+        auto eIsoWeekYear = children[7] ? _context->popExpr() : nullptr;
+        auto eMillisecond = children[6] ? _context->popExpr() : nullptr;
+        auto eSecond = children[5] ? _context->popExpr() : nullptr;
+        auto eMinute = children[4] ? _context->popExpr() : nullptr;
+        auto eHour = children[3] ? _context->popExpr() : nullptr;
+        auto eDay = children[2] ? _context->popExpr() : nullptr;
+        auto eMonth = children[1] ? _context->popExpr() : nullptr;
+        auto eYear = children[0] ? _context->popExpr() : nullptr;
+
+        // Save a flag to determine if we are in the case of an iso
+        // week year. Note that the agg expression parser ensures that one of date or
+        // isoWeekYear inputs are provided so we don't need to enforce that at this depth.
+        auto isIsoWeekYear = eIsoWeekYear ? true : false;
+
+        auto frameId = _context->frameIdGenerator->generate();
+        sbe::EVariable yearRef(frameId, 0);
+        sbe::EVariable monthRef(frameId, 1);
+        sbe::EVariable dayRef(frameId, 2);
+        sbe::EVariable hourRef(frameId, 3);
+        sbe::EVariable minRef(frameId, 4);
+        sbe::EVariable secRef(frameId, 5);
+        sbe::EVariable millisecRef(frameId, 6);
+        sbe::EVariable timeZoneRef(frameId, 7);
+
+        // Build a chain of nested bounds checks for each date part that is provided in the
+        // expression. We elide the checks in the case that default values are used. These bound
+        // checks are then used by folding over pairs of ite tests and else branches to implement
+        // short-circuiting in the case that checks fail. To emulate the control flow of MQL for
+        // this expression we interleave type conversion checks with time component bound checks.
+        const auto minInt16 = std::numeric_limits<int16_t>::lowest();
+        const auto maxInt16 = std::numeric_limits<int16_t>::max();
+
+        // Constructs an expression that does a bound check of var over a closed interval [lower,
+        // upper].
+        auto boundedCheck =
+            [](sbe::EExpression& var, int16_t lower, int16_t upper, const std::string& varName) {
+                str::stream errMsg;
+                if (varName == "year" || varName == "isoWeekYear") {
+                    errMsg << "'" << varName << "'"
+                           << " must evaluate to an integer in the range " << lower << " to "
+                           << upper;
+                } else {
+                    errMsg << "'" << varName << "'"
+                           << " must evaluate to a value in the range [" << lower << ", " << upper
+                           << "]";
+                }
+                return std::make_pair(
+                    sbe::makeE<sbe::EPrimBinary>(
+                        sbe::EPrimBinary::logicAnd,
+                        sbe::makeE<sbe::EPrimBinary>(
+                            sbe::EPrimBinary::greaterEq,
+                            var.clone(),
+                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, lower)),
+                        sbe::makeE<sbe::EPrimBinary>(
+                            sbe::EPrimBinary::lessEq,
+                            var.clone(),
+                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, upper))),
+                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{4848972}, errMsg));
+            };
+
+        // Here we want to validate each field that is provided as input to the agg expression. To
+        // do this we implement the following checks:
+        //
+        // 1) Check if the value in a given slot null or missing. If so bind null to l1.0, and
+        // continue to the next binding. Otherwise, do check 2 below.
+        //
+        // 2) Check if the value in a given slot is an integral int64. This test is done by
+        // computing a lossless conversion of the value in s1 to an int64. The exposed
+        // conversion function by the vm returns a value if there is no loss of precsision,
+        // otherwise it returns Nothing. In both the valid or Nothing case, we can store the result
+        // of the conversion in l2.0 of the inner let binding and test for existence. If the
+        // existence check fails we know the conversion is lossy and we can fail the query.
+        // Otherwise, the inner let evaluates to the converted value which is then bound to the
+        // outer let.
+        //
+        // Each invocation of fieldConversionBinding will produce a nested let of the form.
+        //
+        // let [l1.0 = s1] in
+        //   if (isNull(l1.0) || !exists(l1.0), null,
+        //     let [l2.0 = convert(l1.0, int)] in
+        //       if (exists(l2.0), l2.0, fail("... must evaluate to an integer")]), ...]
+        //  in ...
+        auto fieldConversionBinding = [](std::unique_ptr<sbe::EExpression> expr,
+                                         sbe::value::FrameIdGenerator* frameIdGenerator,
+                                         const std::string& varName) {
+            auto outerFrameId = frameIdGenerator->generate();
+            auto innerFrameId = frameIdGenerator->generate();
+            sbe::EVariable outerSlotRef(outerFrameId, 0);
+            sbe::EVariable convertedFieldRef(innerFrameId, 0);
+            return sbe::makeE<sbe::ELocalBind>(
+                outerFrameId,
+                sbe::makeEs(expr->clone()),
+                sbe::makeE<sbe::EIf>(
+                    sbe::makeE<sbe::EPrimBinary>(
+                        sbe::EPrimBinary::logicOr,
+                        sbe::makeE<sbe::EPrimUnary>(
+                            sbe::EPrimUnary::logicNot,
+                            sbe::makeE<sbe::EFunction>("exists",
+                                                       sbe::makeEs(outerSlotRef.clone()))),
+                        sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(outerSlotRef.clone()))),
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+                    sbe::makeE<sbe::ELocalBind>(
+                        innerFrameId,
+                        sbe::makeEs(sbe::makeE<sbe::ENumericConvert>(
+                            outerSlotRef.clone(), sbe::value::TypeTags::NumberInt64)),
+                        sbe::makeE<sbe::EIf>(
+                            sbe::makeE<sbe::EFunction>("exists",
+                                                       sbe::makeEs(convertedFieldRef.clone())),
+                            convertedFieldRef.clone(),
+                            sbe::makeE<sbe::EFail>(ErrorCodes::Error{4848979},
+                                                   str::stream()
+                                                       << "'" << varName << "'"
+                                                       << " must evaluate to an integer")))));
+        };
+
+        // Build two vectors on the fly to elide bound and conversion for defaulted values.
+        std::vector<std::pair<std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::EExpression>>>
+            boundChecks;  // checks for lower and upper bounds of date fields.
+
+        // Operands is for the outer let bindings.
+        std::vector<std::unique_ptr<sbe::EExpression>> operands;
+        if (isIsoWeekYear) {
+            if (!eIsoWeekYear) {
+                eIsoWeekYear = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1970);
+                operands.push_back(std::move(eIsoWeekYear));
+            } else {
+                boundChecks.push_back(boundedCheck(yearRef, 1, 9999, "isoWeekYear"));
+                operands.push_back(fieldConversionBinding(
+                    std::move(eIsoWeekYear), _context->frameIdGenerator, "isoWeekYear"));
+            }
+            if (!eIsoWeek) {
+                eIsoWeek = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+                operands.push_back(std::move(eIsoWeek));
+            } else {
+                boundChecks.push_back(boundedCheck(monthRef, minInt16, maxInt16, "isoWeek"));
+                operands.push_back(fieldConversionBinding(
+                    std::move(eIsoWeek), _context->frameIdGenerator, "isoWeek"));
+            }
+            if (!eIsoDayOfWeek) {
+                eIsoDayOfWeek = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+                operands.push_back(std::move(eIsoDayOfWeek));
+            } else {
+                boundChecks.push_back(boundedCheck(dayRef, minInt16, maxInt16, "isoDayOfWeek"));
+                operands.push_back(fieldConversionBinding(
+                    std::move(eIsoDayOfWeek), _context->frameIdGenerator, "isoDayOfWeek"));
+            }
+        } else {
+            // The regular year/month/day case.
+            if (!eYear) {
+                eYear = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1970);
+                operands.push_back(std::move(eYear));
+            } else {
+                boundChecks.push_back(boundedCheck(yearRef, 1, 9999, "year"));
+                operands.push_back(
+                    fieldConversionBinding(std::move(eYear), _context->frameIdGenerator, "year"));
+            }
+            if (!eMonth) {
+                eMonth = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+                operands.push_back(std::move(eMonth));
+            } else {
+                boundChecks.push_back(boundedCheck(monthRef, minInt16, maxInt16, "month"));
+                operands.push_back(
+                    fieldConversionBinding(std::move(eMonth), _context->frameIdGenerator, "month"));
+            }
+            if (!eDay) {
+                eDay = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+                operands.push_back(std::move(eDay));
+            } else {
+                boundChecks.push_back(boundedCheck(dayRef, minInt16, maxInt16, "day"));
+                operands.push_back(
+                    fieldConversionBinding(std::move(eDay), _context->frameIdGenerator, "day"));
+            }
+        }
+        if (!eHour) {
+            eHour = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0);
+            operands.push_back(std::move(eHour));
+        } else {
+            boundChecks.push_back(boundedCheck(hourRef, minInt16, maxInt16, "hour"));
+            operands.push_back(
+                fieldConversionBinding(std::move(eHour), _context->frameIdGenerator, "hour"));
+        }
+        if (!eMinute) {
+            eMinute = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0);
+            operands.push_back(std::move(eMinute));
+        } else {
+            boundChecks.push_back(boundedCheck(minRef, minInt16, maxInt16, "minute"));
+            operands.push_back(
+                fieldConversionBinding(std::move(eMinute), _context->frameIdGenerator, "minute"));
+        }
+        if (!eSecond) {
+            eSecond = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0);
+            operands.push_back(std::move(eSecond));
+        } else {
+            // MQL doesn't place bound restrictions on the second field, because seconds carry over
+            // to minutes and can be large ints such as 71,841,012 or even unix epochs.
+            operands.push_back(
+                fieldConversionBinding(std::move(eSecond), _context->frameIdGenerator, "second"));
+        }
+        if (!eMillisecond) {
+            eMillisecond = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0);
+            operands.push_back(std::move(eMillisecond));
+        } else {
+            // MQL doesn't enforce bound restrictions on millisecond fields because milliseconds
+            // carry over to seconds.
+            operands.push_back(fieldConversionBinding(
+                std::move(eMillisecond), _context->frameIdGenerator, "millisecond"));
+        }
+        if (!eTimezone) {
+            eTimezone = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::StringSmall, 0);
+            operands.push_back(std::move(eTimezone));
+        } else {
+            // Validate that eTimezone is a string.
+            auto tzFrameId = _context->frameIdGenerator->generate();
+            sbe::EVariable timezoneRef(tzFrameId, 0);
+            operands.push_back(sbe::makeE<sbe::ELocalBind>(
+                tzFrameId,
+                sbe::makeEs(std::move(eTimezone)),
+                sbe::makeE<sbe::EIf>(
+                    sbe::makeE<sbe::EFunction>("isString", sbe::makeEs(timeZoneRef.clone())),
+                    timezoneRef.clone(),
+                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{4848980},
+                                           str::stream()
+                                               << "'timezone' must evaluate to a string"))));
+        }
+
+        // Make a disjunction of null checks for each date part by over this vector. These checks
+        // are necessary after the initial conversion computation because we need have the outer let
+        // binding evaluate to null if any field is null.
+        auto nullExprs =
+            make_vector<std::unique_ptr<sbe::EExpression>>(generateNullOrMissing(frameId, 7),
+                                                           generateNullOrMissing(frameId, 6),
+                                                           generateNullOrMissing(frameId, 5),
+                                                           generateNullOrMissing(frameId, 4),
+                                                           generateNullOrMissing(frameId, 3),
+                                                           generateNullOrMissing(frameId, 2),
+                                                           generateNullOrMissing(frameId, 1),
+                                                           generateNullOrMissing(frameId, 0));
+
+        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        auto checkPartsForNull =
+            std::accumulate(std::move_iterator<iter_t>(nullExprs.begin() + 1),
+                            std::move_iterator<iter_t>(nullExprs.end()),
+                            std::move(nullExprs.front()),
+                            [](auto&& acc, auto&& b) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(b));
+                            });
+
+        // The builtins need to access the timeZoneDB in order to compute dates from parts. Here
+        // we pass a pointer to the global timeZoneDB. This should not be freed as it's a singleton
+        // and and it's lifetime is tied to the lifetime of the service context.
+        auto unownedTzDB = sbe::value::bitcastFrom(_context->timeZoneDB);
+
+        auto computeDate = sbe::makeE<sbe::EFunction>(
+            isIsoWeekYear ? "datePartsWeekYear" : "dateParts",
+            sbe::makeEs(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::timeZoneDB, unownedTzDB),
+                        yearRef.clone(),
+                        monthRef.clone(),
+                        dayRef.clone(),
+                        hourRef.clone(),
+                        minRef.clone(),
+                        secRef.clone(),
+                        millisecRef.clone(),
+                        timeZoneRef.clone()));
+
+        using iterPair_t = std::vector<std::pair<std::unique_ptr<sbe::EExpression>,
+                                                 std::unique_ptr<sbe::EExpression>>>::iterator;
+        auto computeBoundChecks =
+            std::accumulate(std::move_iterator<iterPair_t>(boundChecks.begin()),
+                            std::move_iterator<iterPair_t>(boundChecks.end()),
+                            std::move(computeDate),
+                            [](auto&& acc, auto&& b) {
+                                return sbe::makeE<sbe::EIf>(
+                                    std::move(b.first), std::move(acc), std::move(b.second));
+                            });
+
+        // This final ite expression allows short-circuting of the null field case. If the nullish,
+        // checks pass, then we check the bounds of each field and invoke the builtins if all checks
+        // pass.
+        auto computeDateOrNull =
+            sbe::makeE<sbe::EIf>(std::move(checkPartsForNull),
+                                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+                                 std::move(computeBoundChecks));
+
+        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
+            frameId, std::move(operands), std::move(computeDateOrNull)));
     }
     void visit(ExpressionDateToParts* expr) final {
         unsupportedExpression("$dateFromString");
@@ -1333,7 +1641,8 @@ private:
 }  // namespace
 
 std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::PlanStage>>
-generateExpression(Expression* expr,
+generateExpression(OperationContext* opCtx,
+                   Expression* expr,
                    std::unique_ptr<sbe::PlanStage> stage,
                    sbe::value::SlotIdGenerator* slotIdGenerator,
                    sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -1342,8 +1651,11 @@ generateExpression(Expression* expr,
     auto tempRelevantSlots = sbe::makeSV(rootSlot);
     relevantSlots = relevantSlots ? relevantSlots : &tempRelevantSlots;
 
+    auto timeZoneDB = getTimeZoneDatabase(opCtx);
+
     ExpressionVisitorContext context(
-        std::move(stage), slotIdGenerator, frameIdGenerator, rootSlot, relevantSlots);
+        std::move(stage), slotIdGenerator, frameIdGenerator, rootSlot, relevantSlots, timeZoneDB);
+
     ExpressionPreVisitor preVisitor{&context};
     ExpressionInVisitor inVisitor{&context};
     ExpressionPostVisitor postVisitor{&context};

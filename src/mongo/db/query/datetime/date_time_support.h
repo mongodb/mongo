@@ -438,6 +438,8 @@ public:
 
     std::vector<std::string> getTimeZoneStrings() const;
 
+    std::string toString() const;
+
 private:
     /**
      * Populates '_timeZones' with parsed time zone rules for each timezone specified by

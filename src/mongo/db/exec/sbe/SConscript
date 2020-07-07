@@ -86,6 +86,7 @@ env.CppUnitTest(
     source=[
         'sbe_test.cpp',
         'sbe_key_string_test.cpp',
+        'sbe_numeric_convert_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',

@@ -5,8 +5,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
 const coll = db.dateFromParts;
 
-/* --------------------------------------------------------------------------------------- */
-/* Basic Sanity Checks */
+// Basic Sanity Checks
 coll.drop();
 
 assert.commandWorked(coll.insert([
@@ -108,8 +107,6 @@ pipeline = {
     $project: {date: {'$dateFromParts': {year: 2012, "timezone": 5}}}
 };
 assertErrorCode(coll, pipeline, 40517);
-
-/* --------------------------------------------------------------------------------------- */
 
 coll.drop();
 
@@ -392,8 +389,7 @@ pipelines.forEach(function(pipeline) {
               tojson(pipeline));
 });
 
-/* --------------------------------------------------------------------------------------- */
-/* Testing whether it throws the right assert for missing values */
+// Testing whether $dateFromParts throws the right assert for missing values
 
 coll.drop();
 
@@ -421,8 +417,7 @@ pipelines.forEach(function(pipeline) {
 pipeline = [{'$project': {date: {'$dateFromParts': {year: 2017, timezone: "$timezone"}}}}];
 assert.eq([{_id: 0, date: null}], coll.aggregate(pipeline).toArray());
 
-/* --------------------------------------------------------------------------------------- */
-/* Testing whether it throws the right assert for uncoersable values */
+// Testing whether it throws the right assert for uncoersable values
 
 coll.drop();
 
@@ -444,14 +439,13 @@ pipelines = [
 ];
 
 pipelines.forEach(function(pipeline) {
-    assertErrorCode(coll, pipeline, 40515, tojson(pipeline));
+    assertErrorCodes(coll, pipeline, [40515, 4848979]);
 });
 
 pipeline = [{'$project': {date: {'$dateFromParts': {year: 2017, timezone: "$falseValue"}}}}];
-assertErrorCode(coll, pipeline, 40517);
+assertErrorCodes(coll, pipeline, [40517, 4848979, 4848980]);
 
-/* --------------------------------------------------------------------------------------- */
-/* Testing whether it throws the right assert for uncoersable values */
+// Testing whether it throws the right assert for uncoersable values
 
 coll.drop();
 
@@ -467,11 +461,10 @@ pipelines = [
 ];
 
 pipelines.forEach(function(pipeline) {
-    assertErrorCode(coll, pipeline, 40523, tojson(pipeline));
+    assertErrorCodes(coll, pipeline, [40523, 4848972]);
 });
 
-/* --------------------------------------------------------------------------------------- */
-/* Testing "out of range" under and overflows */
+// Testing "out of range" under and overflows
 
 coll.drop();
 
@@ -491,7 +484,7 @@ assert.commandWorked(coll.insert([{
     millisSinceEpoch: NumberLong("1502095918551"),
 }]));
 
-tests = [
+let tests = [
     {expected: "0001-01-01T00:00:00.000Z", parts: {year: "$one"}},
     {expected: "9999-01-01T00:00:00.000Z", parts: {year: "$tenThousandMinusOne"}},
     {expected: "2016-11-01T00:00:00.000Z", parts: {year: 2017, month: "$minusOne"}},
@@ -539,11 +532,9 @@ tests.forEach(function(test) {
         tojson(test));
 });
 
-/* --------------------------------------------------------------------------------------- */
-/*
- * Testing double and Decimal128 millisecond values that aren't representable as a 64-bit
- * integer or overflow when converting to a 64-bit microsecond value.
- */
+// Testing double and Decimal128 millisecond values that aren't representable as a 64-bit
+// integer or overflow when converting to a 64-bit microsecond value.
+
 coll.drop();
 
 assert.commandWorked(coll.insert([{
@@ -561,6 +552,8 @@ assertErrCodeAndErrMsgContains(
     ErrorCodes.DurationOverflow,
     "Overflow casting from a lower-precision duration to a higher-precision duration");
 
+// This doesn't throw unless I +1 to $veryBigDecimal128A
+//
 pipeline =
     [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDecimal128A"}}}}];
 assertErrCodeAndErrMsgContains(
@@ -570,15 +563,16 @@ assertErrCodeAndErrMsgContains(
     "Overflow casting from a lower-precision duration to a higher-precision duration");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDoubleB"}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
+assertErrCodeAndErrMsgContains(
+    coll, pipeline, [40515, 4848979], "'millisecond' must evaluate to an integer");
 
 pipeline =
     [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDecimal128B"}}}}];
-assertErrCodeAndErrMsgContains(coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
+assertErrCodeAndErrMsgContains(
+    coll, pipeline, [40515, 4848979], "'millisecond' must evaluate to an integer");
 
-/* --------------------------------------------------------------------------------------- */
-/* Testing that year values are only allowed in the range [0, 9999] and that month, day, hour,
- * and minute values are only allowed in the range [-32,768, 32,767]. */
+// Testing that year values are only allowed in the range [0, 9999] and that month, day, hour,
+// and minute values are only allowed in the range [-32,768, 32,767].
 coll.drop();
 
 assert.commandWorked(coll.insert(
@@ -586,77 +580,113 @@ assert.commandWorked(coll.insert(
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: "$bigYear"}}}}];
 assertErrCodeAndErrMsgContains(
-    coll, pipeline, 40523, "'year' must evaluate to an integer in the range 1 to 9999");
+    coll, pipeline, [40523, 4848972], "'year' must evaluate to an integer in the range 1 to 9999");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: "$smallYear"}}}}];
 assertErrCodeAndErrMsgContains(
-    coll, pipeline, 40523, "'year' must evaluate to an integer in the range 1 to 9999");
+    coll, pipeline, [40523, 4848972], "'year' must evaluate to an integer in the range 1 to 9999");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, month: "$prettyBigInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'month' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'month' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, month: "$prettyBigNegativeInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'month' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'month' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, month: 1, day: "$prettyBigInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'day' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'day' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline =
     [{$project: {date: {"$dateFromParts": {year: 1970, month: 1, day: "$prettyBigNegativeInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'day' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'day' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, hour: "$prettyBigInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'hour' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'hour' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, hour: "$prettyBigNegativeInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'hour' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'hour' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, hour: 0, minute: "$prettyBigInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'minute' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'minute' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline = [
     {$project: {date: {"$dateFromParts": {year: 1970, hour: 0, minute: "$prettyBigNegativeInt"}}}}
 ];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'minute' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'minute' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$bigYear"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 1 to 9999");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31095, 4848972],
+                               "'isoWeekYear' must evaluate to an integer in the range 1 to 9999");
+
+pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$bigYear"}}}}];
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31095, 4848972],
+                               "'isoWeekYear' must evaluate to an integer in the range 1 to 9999");
 
 pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$smallYear"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 1 to 9999");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31095, 4848972],
+                               "'isoWeekYear' must evaluate to an integer in the range 1 to 9999");
 
 pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoWeek: "$prettyBigInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'isoWeek' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'isoWeek' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline =
     [{$project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoWeek: "$prettyBigNegativeInt"}}}}];
-assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'isoWeek' must evaluate to a value in the range [-32768, 32767]");
+assertErrCodeAndErrMsgContains(coll,
+                               pipeline,
+                               [31034, 4848972],
+                               "'isoWeek' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline =
     [{$project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoDayOfWeek: "$prettyBigInt"}}}}];
+assertErrorCodes(coll, pipeline, [31034, 4848972]);
 assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
+    coll,
+    pipeline,
+    [31034, 4848972],
+    "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
 
 pipeline = [{
     $project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoDayOfWeek: "$prettyBigNegativeInt"}}}
 }];
 assertErrCodeAndErrMsgContains(
-    coll, pipeline, 31034, "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
+    coll,
+    pipeline,
+    [31034, 4848972],
+    "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
 
-/* --------------------------------------------------------------------------------------- */
-/* Testing wrong arguments */
+// Testing wrong arguments
 
 coll.drop();
 
@@ -697,9 +727,7 @@ pipelines.forEach(function(item) {
     assertErrorCode(coll, item.pipeline, item.code, tojson(pipeline));
 });
 
-/* --------------------------------------------------------------------------------------- */
-/* Testing wrong value (types) */
-
+// Testing wrong value (types)
 coll.drop();
 
 assert.commandWorked(coll.insert([
@@ -718,10 +746,8 @@ pipelines = [
 ];
 
 pipelines.forEach(function(item) {
-    assertErrorCode(coll, item.pipeline, item.code, tojson(pipeline));
+    assertErrorCodes(coll, [item.pipeline], [item.code, 4848979]);
 });
-
-/* --------------------------------------------------------------------------------------- */
 
 coll.drop();
 
@@ -801,8 +827,6 @@ assert.eq(
         ])
         .toArray());
 
-/* --------------------------------------------------------------------------------------- */
-
 coll.drop();
 
 assert.commandWorked(coll.insert([
@@ -818,7 +842,7 @@ assert.commandWorked(coll.insert([
     },
 ]));
 
-var tests = [
+tests = [
     {expected: ISODate("2017-06-19T19:01:51.551Z"), tz: "-04:00"},
     {expected: ISODate("2017-06-19T12:01:51.551Z"), tz: "+03"},
     {expected: ISODate("2017-06-19T18:21:51.551Z"), tz: "-0320"},
@@ -851,8 +875,6 @@ tests.forEach(function(test) {
         tojson(test));
 });
 
-/* --------------------------------------------------------------------------------------- */
-
 coll.drop();
 
 assert.commandWorked(coll.insert([
@@ -868,7 +890,7 @@ assert.commandWorked(coll.insert([
     },
 ]));
 
-var tests = [
+tests = [
     {expected: ISODate("2017-06-19T19:01:51.551Z"), tz: "-04:00"},
     {expected: ISODate("2017-06-19T12:01:51.551Z"), tz: "+03"},
     {expected: ISODate("2017-06-19T18:21:51.551Z"), tz: "-0320"},
@@ -900,6 +922,4 @@ tests.forEach(function(test) {
             .toArray(),
         tojson(test));
 });
-
-/* --------------------------------------------------------------------------------------- */
 })();

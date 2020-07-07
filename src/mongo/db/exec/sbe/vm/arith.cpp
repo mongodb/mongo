@@ -346,6 +346,26 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericMod(value::Type
     return {false, value::TypeTags::Nothing, 0};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericNumConvert(
+    value::TypeTags lhsTag, value::Value lhsValue, value::TypeTags targetTag) {
+    if (value::isNumber(lhsTag)) {
+        switch (lhsTag) {
+            case value::TypeTags::NumberInt32:
+                return numericConvLossless<int32_t>(value::bitcastTo<int32_t>(lhsValue), targetTag);
+            case value::TypeTags::NumberInt64:
+                return numericConvLossless<int64_t>(value::bitcastTo<int64_t>(lhsValue), targetTag);
+            case value::TypeTags::NumberDouble:
+                return numericConvLossless<double>(value::bitcastTo<double>(lhsValue), targetTag);
+            case value::TypeTags::NumberDecimal:
+                return numericConvLossless<Decimal128>(value::bitcastTo<Decimal128>(lhsValue),
+                                                       targetTag);
+            default:
+                MONGO_UNREACHABLE
+        }
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAbs(value::TypeTags operandTag,
                                                                      value::Value operandValue) {
     switch (operandTag) {

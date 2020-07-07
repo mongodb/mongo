@@ -44,6 +44,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/represent_as.h"
 
 namespace pcrecpp {
 class RE;
@@ -56,6 +57,9 @@ namespace mongo {
 namespace KeyString {
 class Value;
 }
+
+class TimeZoneDatabase;
+
 namespace sbe {
 using FrameId = int64_t;
 using SpoolId = int64_t;
@@ -71,7 +75,7 @@ enum class TypeTags : uint8_t {
     // The value does not exist, aka Nothing in the Maybe monad.
     Nothing = 0,
 
-    // Numberical data types.
+    // Numerical data types.
     NumberInt32,
     NumberInt64,
     NumberDouble,
@@ -104,6 +108,9 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a compiled PCRE regular expression object.
     pcreRegex,
+
+    // Pointer to a timezone database object.
+    timeZoneDB,
 };
 
 std::ostream& operator<<(std::ostream& os, const TypeTags tag);
@@ -559,8 +566,12 @@ inline KeyString::Value* getKeyStringView(Value val) noexcept {
     return reinterpret_cast<KeyString::Value*>(val);
 }
 
-inline pcrecpp::RE* getPrceRegexView(Value val) noexcept {
+inline pcrecpp::RE* getPcreRegexView(Value val) noexcept {
     return reinterpret_cast<pcrecpp::RE*>(val);
+}
+
+inline TimeZoneDatabase* getTimeZoneDBView(Value val) noexcept {
+    return reinterpret_cast<TimeZoneDatabase*>(val);
 }
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
@@ -620,7 +631,7 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
         case TypeTags::ksValue:
             return makeCopyKeyString(*getKeyStringView(val));
         case TypeTags::pcreRegex:
-            return makeCopyPcreRegex(*getPrceRegexView(val));
+            return makeCopyPcreRegex(*getPcreRegexView(val));
         default:
             break;
     }
@@ -659,6 +670,44 @@ inline T numericCast(TypeTags tag, Value val) noexcept {
             MONGO_UNREACHABLE;
         default:
             MONGO_UNREACHABLE;
+    }
+}
+
+/**
+ * Performs a lossless numeric conversion from a value to a destination type denoted by the target
+ * TypeTag. In the case that a conversion is lossy, we return Nothing.
+ */
+template <typename T>
+inline std::tuple<bool, value::TypeTags, value::Value> numericConvLossless(
+    T value, value::TypeTags targetTag) {
+    switch (targetTag) {
+        case value::TypeTags::NumberInt32: {
+            if (auto result = representAs<int32_t>(value); result) {
+                return {false, value::TypeTags::NumberInt32, value::bitcastFrom(*result)};
+            }
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        case value::TypeTags::NumberInt64: {
+            if (auto result = representAs<int64_t>(value); result) {
+                return {false, value::TypeTags::NumberInt64, value::bitcastFrom(*result)};
+            }
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        case value::TypeTags::NumberDouble: {
+            if (auto result = representAs<double>(value); result) {
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom(*result)};
+            }
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        case value::TypeTags::NumberDecimal: {
+            if (auto result = representAs<Decimal128>(value); result) {
+                auto [tag, val] = value::makeCopyDecimal(*result);
+                return {true, tag, val};
+            }
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        default:
+            MONGO_UNREACHABLE
     }
 }
 

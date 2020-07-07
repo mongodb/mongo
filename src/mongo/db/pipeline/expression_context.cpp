@@ -100,9 +100,7 @@ ExpressionContext::ExpressionContext(
       uuid(std::move(collUUID)),
       opCtx(opCtx),
       mongoProcessInterface(mongoProcessInterface),
-      timeZoneDatabase(opCtx && opCtx->getServiceContext()
-                           ? TimeZoneDatabase::get(opCtx->getServiceContext())
-                           : nullptr),
+      timeZoneDatabase(getTimeZoneDatabase(opCtx)),
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),

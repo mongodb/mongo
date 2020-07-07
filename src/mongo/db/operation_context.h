@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -607,6 +608,12 @@ private:
     // Whether this operation is an exhaust command.
     bool _exhaust = false;
 };
+
+// Gets a TimeZoneDatabase pointer from the ServiceContext.
+inline const TimeZoneDatabase* getTimeZoneDatabase(OperationContext* opCtx) {
+    return opCtx && opCtx->getServiceContext() ? TimeZoneDatabase::get(opCtx->getServiceContext())
+                                               : nullptr;
+}
 
 namespace repl {
 /**

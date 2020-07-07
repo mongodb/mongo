@@ -111,6 +111,7 @@ struct Instruction {
         idiv,
         mod,
         negate,
+        numConvert,
 
         logicNot,
 
@@ -162,6 +163,8 @@ static_assert(sizeof(Instruction) == sizeof(uint8_t));
 enum class Builtin : uint8_t {
     split,
     regexMatch,
+    dateParts,
+    datePartsWeekYear,
     dropFields,
     newObj,
     ksToString,       // KeyString to string
@@ -245,6 +248,7 @@ public:
     void appendFail() {
         appendSimpleInstruction(Instruction::fail);
     }
+    void appendNumericConvert(value::TypeTags targetTag);
 
 private:
     void appendSimpleInstruction(Instruction::Tags tag);
@@ -316,6 +320,9 @@ private:
                                                                value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericNot(value::TypeTags tag,
                                                                value::Value value);
+    std::tuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
+                                                                      value::Value lhsValue,
+                                                                      value::TypeTags rhsTag);
     template <typename Op>
     std::pair<value::TypeTags, value::Value> genericCompare(value::TypeTags lhsTag,
                                                             value::Value lhsValue,
@@ -371,6 +378,8 @@ private:
                                                             value::Value fieldValue);
 
     std::tuple<bool, value::TypeTags, value::Value> builtinSplit(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinDate(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexMatch(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDropFields(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewObj(uint8_t arity);

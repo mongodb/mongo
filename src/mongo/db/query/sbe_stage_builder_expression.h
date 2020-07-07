@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/id_generators.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression.h"
 
 namespace mongo::stage_builder {
@@ -49,7 +50,8 @@ namespace mongo::stage_builder {
  * relevant slots to thie list.
  */
 std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::PlanStage>>
-generateExpression(Expression* expr,
+generateExpression(OperationContext* opCtx,
+                   Expression* expr,
                    std::unique_ptr<sbe::PlanStage> stage,
                    sbe::value::SlotIdGenerator* slotIdGenerator,
                    sbe::value::FrameIdGenerator* frameIdGenerator,

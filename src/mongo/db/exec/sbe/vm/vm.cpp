@@ -35,6 +35,7 @@
 
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/summation.h"
@@ -64,6 +65,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // idiv
     -1,  // mod
     0,   // negate
+    0,   // numConvert
 
     0,  // logicNot
 
@@ -201,6 +203,17 @@ void CodeFragment::appendLocalVal(FrameId frameId, int stackOffset) {
 
 void CodeFragment::appendAdd() {
     appendSimpleInstruction(Instruction::add);
+}
+
+void CodeFragment::appendNumericConvert(value::TypeTags targetTag) {
+    Instruction i;
+    i.tag = Instruction::numConvert;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(targetTag));
+
+    offset += value::writeToMemory(offset, i);
+    offset += value::writeToMemory(offset, targetTag);
 }
 
 void CodeFragment::appendSub() {
@@ -776,7 +789,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(uint
     auto stringView = value::getStringView(typeTagInputStr, valueInputStr);
     pcrecpp::StringPiece pcreStringView{stringView.data(), static_cast<int>(stringView.size())};
 
-    auto pcreRegex = value::getPrceRegexView(valuePcreRegex);
+    auto pcreRegex = value::getPcreRegexView(valuePcreRegex);
     auto regexMatchResult = pcreRegex->PartialMatch(pcreStringView);
 
     return {false, value::TypeTags::Boolean, regexMatchResult};
@@ -872,9 +885,135 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
     return {false, value::TypeTags::Nothing, 0};
 }
 
+/**
+ * A helper for the bultinDate method. The formal parameters yearOrWeekYear and monthOrWeek carry
+ * values depending on wether the date is a year-month-day or ISOWeekYear.
+ */
+using DateFn = std::function<Date_t(
+    TimeZone, long long, long long, long long, long long, long long, long long, long long)>;
+std::tuple<bool, value::TypeTags, value::Value> builtinDateHelper(
+    DateFn computeDateFn,
+    std::tuple<bool, value::TypeTags, value::Value> tzdb,
+    std::tuple<bool, value::TypeTags, value::Value> yearOrWeekYear,
+    std::tuple<bool, value::TypeTags, value::Value> monthOrWeek,
+    std::tuple<bool, value::TypeTags, value::Value> day,
+    std::tuple<bool, value::TypeTags, value::Value> hour,
+    std::tuple<bool, value::TypeTags, value::Value> minute,
+    std::tuple<bool, value::TypeTags, value::Value> second,
+    std::tuple<bool, value::TypeTags, value::Value> millisecond,
+    std::tuple<bool, value::TypeTags, value::Value> timezone) {
+
+    auto [ownedTzdb, typeTagTzdb, valueTzdb] = tzdb;
+    auto [ownedYearOrWeekYear, typeTagYearOrWeekYear, valueYearOrWeekYear] = yearOrWeekYear;
+    auto [ownedMonthOrWeek, typeTagMonthOrWeek, valueMonthOrWeek] = monthOrWeek;
+    auto [ownedDay, typeTagDay, valueDay] = day;
+    auto [ownedHr, typeTagHr, valueHr] = hour;
+    auto [ownedMin, typeTagMin, valueMin] = minute;
+    auto [ownedSec, typeTagSec, valueSec] = second;
+    auto [ownedMillis, typeTagMillis, valueMillis] = millisecond;
+    auto [ownedTz, typeTagTz, valueTz] = timezone;
+
+    if (typeTagTzdb != value::TypeTags::timeZoneDB || !value::isNumber(typeTagYearOrWeekYear) ||
+        !value::isNumber(typeTagMonthOrWeek) || !value::isNumber(typeTagDay) ||
+        !value::isNumber(typeTagHr) || !value::isNumber(typeTagMin) ||
+        !value::isNumber(typeTagSec) || !value::isNumber(typeTagMillis) ||
+        !value::isString(typeTagTz)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto timeZoneDB = value::getTimeZoneDBView(valueTzdb);
+    invariant(timeZoneDB);
+
+    auto tzString = value::getStringView(typeTagTz, valueTz);
+    const auto tz = tzString == ""
+        ? timeZoneDB->utcZone()
+        : timeZoneDB->getTimeZone(StringData{tzString.data(), tzString.size()});
+
+    auto date =
+        computeDateFn(tz,
+                      value::numericCast<int64_t>(typeTagYearOrWeekYear, valueYearOrWeekYear),
+                      value::numericCast<int64_t>(typeTagMonthOrWeek, valueMonthOrWeek),
+                      value::numericCast<int64_t>(typeTagDay, valueDay),
+                      value::numericCast<int64_t>(typeTagHr, valueHr),
+                      value::numericCast<int64_t>(typeTagMin, valueMin),
+                      value::numericCast<int64_t>(typeTagSec, valueSec),
+                      value::numericCast<int64_t>(typeTagMillis, valueMillis));
+    return {false, value::TypeTags::Date, date.asInt64()};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDate(uint8_t arity) {
+    auto timeZoneDBTuple = getFromStack(0);
+    auto yearTuple = getFromStack(1);
+    auto monthTuple = getFromStack(2);
+    auto dayTuple = getFromStack(3);
+    auto hourTuple = getFromStack(4);
+    auto minuteTuple = getFromStack(5);
+    auto secondTuple = getFromStack(6);
+    auto millisTuple = getFromStack(7);
+    auto timezoneTuple = getFromStack(8);
+
+    return builtinDateHelper(
+        [](TimeZone tz,
+           long long year,
+           long long month,
+           long long day,
+           long long hour,
+           long long min,
+           long long sec,
+           long long millis) -> Date_t {
+            return tz.createFromDateParts(year, month, day, hour, min, sec, millis);
+        },
+        timeZoneDBTuple,
+        yearTuple,
+        monthTuple,
+        dayTuple,
+        hourTuple,
+        minuteTuple,
+        secondTuple,
+        millisTuple,
+        timezoneTuple);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateWeekYear(uint8_t arity) {
+    auto timeZoneDBTuple = getFromStack(0);
+    auto yearTuple = getFromStack(1);
+    auto weekTuple = getFromStack(2);
+    auto dayTuple = getFromStack(3);
+    auto hourTuple = getFromStack(4);
+    auto minuteTuple = getFromStack(5);
+    auto secondTuple = getFromStack(6);
+    auto millisTuple = getFromStack(7);
+    auto timezoneTuple = getFromStack(8);
+
+    return builtinDateHelper(
+        [](TimeZone tz,
+           long long year,
+           long long month,
+           long long day,
+           long long hour,
+           long long min,
+           long long sec,
+           long long millis) -> Date_t {
+            return tz.createFromIso8601DateParts(year, month, day, hour, min, sec, millis);
+        },
+        timeZoneDBTuple,
+        yearTuple,
+        weekTuple,
+        dayTuple,
+        hourTuple,
+        minuteTuple,
+        secondTuple,
+        millisTuple,
+        timezoneTuple);
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
+        case Builtin::dateParts:
+            return builtinDate(arity);
+        case Builtin::datePartsWeekYear:
+            return builtinDateWeekYear(arity);
         case Builtin::split:
             return builtinSplit(arity);
         case Builtin::regexMatch:
@@ -1089,6 +1228,22 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(CodeFragment* c
 
                     if (owned) {
                         value::releaseValue(resultTag, resultVal);
+                    }
+
+                    break;
+                }
+                case Instruction::numConvert: {
+                    auto tag = value::readFromMemory<value::TypeTags>(pcPointer);
+                    pcPointer += sizeof(tag);
+
+                    auto [owned, lhsTag, lhsVal] = getFromStack(0);
+
+                    auto [rhsOwned, rhsTag, rhsVal] = genericNumConvert(lhsTag, lhsVal, tag);
+
+                    topStack(rhsOwned, rhsTag, rhsVal);
+
+                    if (owned) {
+                        value::releaseValue(lhsTag, lhsVal);
                     }
 
                     break;
