@@ -37,7 +37,8 @@
     ENUMIFY(arrayMarker)       \
     ENUMIFY(atan2)             \
     ENUMIFY(id)                \
-    ENUMIFY(project)
+    ENUMIFY(project)           \
+    ENUMIFY(inhibitOptimization)
 
 MAKE_PRINTABLE_ENUM(KeyFieldname, KEYFIELDNAMES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_fieldname, KeyFieldname, KEYFIELDNAMES);

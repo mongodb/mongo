@@ -32,9 +32,12 @@
 #include <iostream>
 #include <string>
 
+#include "mongo/bson/json.h"
+#include "mongo/db/cst/bson_lexer.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/db/cst/pipeline_parser_gen.hpp"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 
@@ -59,6 +62,63 @@ TEST(CstTest, BuildsAndPrints) {
         ASSERT_EQ("{\nproject :\n\t{\n\ta :\n\t\t<KeyValue trueKey>\n"s +
                       "\tid :\n\t\t<KeyValue falseKey>\n\t}\n}",
                   cst.toString());
+    }
+}
+
+TEST(CstGrammarTest, EmptyPipeline) {
+    CNode output;
+    auto input = fromjson("{pipeline: []}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_TRUE(stdx::get_if<CNode::Children>(&output.payload));
+    ASSERT_EQ(0, stdx::get_if<CNode::Children>(&output.payload)->size());
+}
+
+TEST(CstGrammarTest, InvalidPipelineSpec) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(1, parseTree.parse());
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$unknownStage: {}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(1, parseTree.parse());
+    }
+    {
+        ASSERT_THROWS_CODE(
+            [] {
+                CNode output;
+                auto input = fromjson("{pipeline: 'not an array'}");
+                BSONLexer lexer(input["pipeline"].Array());
+            }(),
+            AssertionException,
+            13111);
+    }
+}
+
+TEST(CstGrammarTest, ParsesInternalInhibitOptimization) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$_internalInhibitOptimization: {}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::Children>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::inhibitOptimization == stdx::get<KeyFieldname>(stages[0].first));
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$_internalInhibitOptimization: 'invalid'}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(1, parseTree.parse());
     }
 }
 

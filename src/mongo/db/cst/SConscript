@@ -7,9 +7,12 @@ env = env.Clone()
 env.Library(
     target='cst',
     source=[
+        'bson_lexer.cpp',
         'c_node.cpp',
+        'pipeline_parser_gen.cpp',
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
     ]
 )
 

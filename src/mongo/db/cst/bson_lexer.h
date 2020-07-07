@@ -29,38 +29,46 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include <sstream>
 #include <string>
-#include <utility>
 #include <vector>
 
-#include "mongo/db/cst/key_fieldname.h"
-#include "mongo/db/cst/key_value.h"
-#include "mongo/stdx/variant.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/cst/pipeline_parser_gen.hpp"
 
 namespace mongo {
 
-using UserFieldname = std::string;
-using UserDouble = double;
-using UserString = std::string;
+class BSONLexer {
+public:
+    explicit BSONLexer(std::vector<BSONElement> input);
 
-struct CNode {
-    static auto noopLeaf() {
-        return CNode{Children{}};
-    }
-
-    auto toString() const {
-        return toStringHelper(0);
+    /**
+     * Retrieves the next token in the stream.
+     */
+    PipelineParserGen::symbol_type getNext() {
+        return _tokens[_position++];
     }
 
 private:
-    std::string toStringHelper(int numTabs) const;
+    // Tokenizes the given BSONElement, traversing its children if necessary. If the field name
+    // should not be considered, set 'includeFieldName' to false.
+    void tokenize(BSONElement elem, bool includeFieldName);
 
-public:
-    using Fieldname = stdx::variant<KeyFieldname, UserFieldname>;
-    using Children = std::vector<std::pair<Fieldname, CNode>>;
-    stdx::variant<Children, KeyValue, UserDouble, UserString> payload;
+    PipelineParserGen::location_type getNextLoc() {
+        auto loc = PipelineParserGen::location_type{nullptr, _position, _position};
+        _position++;
+        return loc;
+    }
+
+    // Track the position of the input, both during construction of the list of tokens as well as
+    // during parse.
+    int _position = 0;
+
+    std::vector<PipelineParserGen::symbol_type> _tokens;
 };
+
+// This is the entry point for retrieving the next token from the lexer, invoked from Bison's
+// yyparse().
+PipelineParserGen::symbol_type yylex(mongo::BSONLexer& lexer);
 
 }  // namespace mongo
