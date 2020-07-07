@@ -295,7 +295,7 @@ private:
         InsertDeleteOptions options;
     };
 
-    enum class Phase { kCollectionScan, kBulkLoad, kDrainWrites };
+    enum class Phase { kInitialized, kCollectionScan, kBulkLoad, kDrainWrites };
 
     void _abortWithoutCleanup(OperationContext* opCtx, bool shutdown);
 
@@ -329,6 +329,6 @@ private:
     boost::optional<RecordId> _lastRecordIdInserted;
 
     // The current phase of the index build.
-    Phase _phase = Phase::kCollectionScan;
+    Phase _phase = Phase::kInitialized;
 };
 }  // namespace mongo

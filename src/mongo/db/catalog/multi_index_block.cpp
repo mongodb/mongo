@@ -389,6 +389,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     opCtx->recoveryUnit()->setReadOnce(readOnce);
 
     try {
+        invariant(_phase == Phase::kInitialized, _phaseToString(_phase));
+        _phase = Phase::kCollectionScan;
+
         BSONObj objToIndex;
         RecordId loc;
         PlanExecutor::ExecState state;
@@ -420,6 +423,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
             n++;
         }
     } catch (...) {
+        _phase = Phase::kInitialized;
         return exceptionToStatus();
     }
 
@@ -502,7 +506,12 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
-    invariant(_phase == Phase::kCollectionScan, _phaseToString(_phase));
+    // Initial sync adds documents to the sorter using insert() instead of delegating to
+    // insertDocumentsInCollection() to scan and insert the contents of the collection.
+    // Therefore, it is possible for the phase of this MultiIndexBlock to be kInitialized
+    // rather than kCollection when this function is called.
+    invariant(_phase == Phase::kCollectionScan || _phase == Phase::kInitialized,
+              _phaseToString(_phase));
     _phase = Phase::kBulkLoad;
 
     for (size_t i = 0; i < _indexes.size(); i++) {
@@ -823,6 +832,8 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
 
 std::string MultiIndexBlock::_phaseToString(Phase phase) const {
     switch (phase) {
+        case Phase::kInitialized:
+            return "initialized";
         case Phase::kCollectionScan:
             return "collection scan";
         case Phase::kBulkLoad:
