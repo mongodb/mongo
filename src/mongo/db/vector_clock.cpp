@@ -426,10 +426,10 @@ void VectorClock::resetVectorClock_forTest() {
     _isEnabled = true;
 }
 
-void VectorClock::advanceClusterTime_forTest(LogicalTime newClusterTime) {
-    LogicalTimeArray newTime;
-    newTime[Component::ClusterTime] = newClusterTime;
-    _advanceTime(std::move(newTime));
+void VectorClock::advanceTime_forTest(Component component, LogicalTime newTime) {
+    LogicalTimeArray newTimeArray;
+    newTimeArray[component] = newTime;
+    _advanceTime(std::move(newTimeArray));
 }
 
 }  // namespace mongo

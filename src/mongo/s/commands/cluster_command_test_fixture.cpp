@@ -55,7 +55,8 @@ void ClusterCommandTestFixture::setUp() {
     // Set up a logical clock with an initial time.
     auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
     LogicalClock::set(getServiceContext(), std::move(logicalClock));
-    VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
+    VectorClock::get(getServiceContext())
+        ->advanceTime_forTest(VectorClock::Component::ClusterTime, kInMemoryLogicalTime);
 
     auto keysCollectionClient = std::make_unique<KeysCollectionClientSharded>(
         Grid::get(operationContext())->catalogClient());

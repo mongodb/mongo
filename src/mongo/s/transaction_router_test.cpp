@@ -126,7 +126,8 @@ protected:
         // Set up a logical clock with an initial time.
         auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
-        VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
+        VectorClock::get(getServiceContext())
+            ->advanceTime_forTest(VectorClock::Component::ClusterTime, kInMemoryLogicalTime);
 
         // Set up a tick source for transaction metrics.
         auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
@@ -1428,7 +1429,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
     // Advance the latest time in the logical clock so the retry attempt will pick a later time.
     LogicalTime laterTime(Timestamp(1000, 1));
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
-    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTime);
+    VectorClock::get(operationContext())
+        ->advanceTime_forTest(VectorClock::Component::ClusterTime, laterTime);
 
     // Simulate a snapshot error.
 
@@ -1477,7 +1479,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
-    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeSameStmt);
+    VectorClock::get(operationContext())
+        ->advanceTime_forTest(VectorClock::Component::ClusterTime, laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1501,7 +1504,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeNewStmt(Timestamp(1000, 1));
     ASSERT_GT(laterTimeNewStmt, laterTimeSameStmt);
-    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeNewStmt);
+    VectorClock::get(operationContext())
+        ->advanceTime_forTest(VectorClock::Component::ClusterTime, laterTimeNewStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1749,7 +1753,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTime(Timestamp(1000, 1));
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
-    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTime);
+    VectorClock::get(operationContext())
+        ->advanceTime_forTest(VectorClock::Component::ClusterTime, laterTime);
 
     ASSERT(txnRouter.canContinueOnStaleShardOrDbError("find", kDummyStatus));
     txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus);
@@ -2315,7 +2320,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     LogicalTime laterTimeSameStmt(Timestamp(100, 1));
     ASSERT_GT(laterTimeSameStmt, kInMemoryLogicalTime);
-    VectorClock::get(operationContext())->advanceClusterTime_forTest(laterTimeSameStmt);
+    VectorClock::get(operationContext())
+        ->advanceTime_forTest(VectorClock::Component::ClusterTime, laterTimeSameStmt);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 

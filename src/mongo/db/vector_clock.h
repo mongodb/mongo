@@ -134,7 +134,7 @@ public:
     bool isEnabled() const;
 
     void resetVectorClock_forTest();
-    void advanceClusterTime_forTest(LogicalTime newClusterTime);
+    void advanceTime_forTest(Component component, LogicalTime newTime);
 
 protected:
     VectorClock();
