@@ -113,38 +113,10 @@ void VectorClock::_advanceTime(LogicalTimeArray&& newTime) {
     }
 }
 
-class VectorClock::GossipFormat {
+class VectorClock::PlainComponentFormat : public VectorClock::ComponentFormat {
 public:
-    class Plain;
-    class Signed;
-    template <class ActualFormat>
-    class OnlyGossipOutOnNewFCV;
-
-    static const ComponentArray<std::unique_ptr<GossipFormat>> _formatters;
-
-    GossipFormat(std::string fieldName) : _fieldName(fieldName) {}
-    virtual ~GossipFormat() = default;
-
-    // Returns true if the time was output, false otherwise.
-    virtual bool out(ServiceContext* service,
-                     OperationContext* opCtx,
-                     bool permitRefresh,
-                     BSONObjBuilder* out,
-                     LogicalTime time,
-                     Component component) const = 0;
-    virtual LogicalTime in(ServiceContext* service,
-                           OperationContext* opCtx,
-                           const BSONObj& in,
-                           bool couldBeUnauthenticated,
-                           Component component) const = 0;
-
-    const std::string _fieldName;
-};
-
-class VectorClock::GossipFormat::Plain : public VectorClock::GossipFormat {
-public:
-    using GossipFormat::GossipFormat;
-    virtual ~Plain() = default;
+    using ComponentFormat::ComponentFormat;
+    virtual ~PlainComponentFormat() = default;
 
     bool out(ServiceContext* service,
              OperationContext* opCtx,
@@ -174,10 +146,10 @@ public:
 };
 
 template <class ActualFormat>
-class VectorClock::GossipFormat::OnlyGossipOutOnNewFCV : public ActualFormat {
+class VectorClock::OnlyOutOnNewFCVComponentFormat : public ActualFormat {
 public:
     using ActualFormat::ActualFormat;
-    virtual ~OnlyGossipOutOnNewFCV() = default;
+    virtual ~OnlyOutOnNewFCVComponentFormat() = default;
 
     bool out(ServiceContext* service,
              OperationContext* opCtx,
@@ -203,10 +175,10 @@ public:
     }
 };
 
-class VectorClock::GossipFormat::Signed : public VectorClock::GossipFormat {
+class VectorClock::SignedComponentFormat : public VectorClock::ComponentFormat {
 public:
-    using GossipFormat::GossipFormat;
-    virtual ~Signed() = default;
+    using ComponentFormat::ComponentFormat;
+    virtual ~SignedComponentFormat() = default;
 
     bool out(ServiceContext* service,
              OperationContext* opCtx,
@@ -339,14 +311,14 @@ private:
     static constexpr char kSignatureKeyIdFieldName[] = "keyId";
 };
 
-const VectorClock::ComponentArray<std::unique_ptr<VectorClock::GossipFormat>>
-    VectorClock::GossipFormat::_formatters{
-        std::make_unique<VectorClock::GossipFormat::Signed>(VectorClock::kClusterTimeFieldName),
+const VectorClock::ComponentArray<std::unique_ptr<VectorClock::ComponentFormat>>
+    VectorClock::_gossipFormatters{
+        std::make_unique<VectorClock::SignedComponentFormat>(VectorClock::kClusterTimeFieldName),
         std::make_unique<
-            VectorClock::GossipFormat::OnlyGossipOutOnNewFCV<VectorClock::GossipFormat::Plain>>(
+            VectorClock::OnlyOutOnNewFCVComponentFormat<VectorClock::PlainComponentFormat>>(
             VectorClock::kConfigTimeFieldName),
         std::make_unique<
-            VectorClock::GossipFormat::OnlyGossipOutOnNewFCV<VectorClock::GossipFormat::Plain>>(
+            VectorClock::OnlyOutOnNewFCVComponentFormat<VectorClock::PlainComponentFormat>>(
             VectorClock::kTopologyTimeFieldName)};
 
 bool VectorClock::gossipOut(OperationContext* opCtx,
@@ -389,7 +361,7 @@ bool VectorClock::_gossipOutComponent(OperationContext* opCtx,
                                       BSONObjBuilder* out,
                                       const LogicalTimeArray& time,
                                       Component component) const {
-    bool wasOutput = GossipFormat::_formatters[component]->out(
+    bool wasOutput = _gossipFormatters[component]->out(
         _service, opCtx, _permitRefreshDuringGossipOut(), out, time[component], component);
     return (component == Component::ClusterTime) ? wasOutput : false;
 }
@@ -399,12 +371,12 @@ void VectorClock::_gossipInComponent(OperationContext* opCtx,
                                      bool couldBeUnauthenticated,
                                      LogicalTimeArray* newTime,
                                      Component component) {
-    (*newTime)[component] = GossipFormat::_formatters[component]->in(
-        _service, opCtx, in, couldBeUnauthenticated, component);
+    (*newTime)[component] =
+        _gossipFormatters[component]->in(_service, opCtx, in, couldBeUnauthenticated, component);
 }
 
 std::string VectorClock::_componentName(Component component) {
-    return GossipFormat::_formatters[component]->_fieldName;
+    return _gossipFormatters[component]->_fieldName;
 }
 
 bool VectorClock::isEnabled() const {
