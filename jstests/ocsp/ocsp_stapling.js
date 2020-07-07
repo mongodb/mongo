@@ -21,6 +21,7 @@ function test(serverCert, caCert, responderCertPair) {
         sslCAFile: caCert,
         sslAllowInvalidHostnames: "",
         setParameter: {
+            "ocspStaplingRefreshPeriodSecs": 500,
             "ocspEnabled": "true",
         },
     };
