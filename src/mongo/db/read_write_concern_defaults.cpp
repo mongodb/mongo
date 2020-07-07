@@ -237,12 +237,13 @@ ReadWriteConcernDefaults::~ReadWriteConcernDefaults() = default;
 ReadWriteConcernDefaults::Cache::Cache(ServiceContext* service,
                                        ThreadPoolInterface& threadPool,
                                        FetchDefaultsFn fetchDefaultsFn)
-    : ReadThroughCache(
-          _mutex,
-          service,
-          threadPool,
-          [this](OperationContext* opCtx, Type) { return LookupResult(lookup(opCtx)); },
-          1 /* cacheSize */),
+    : ReadThroughCache(_mutex,
+                       service,
+                       threadPool,
+                       [this](OperationContext* opCtx, Type, const ValueHandle& unusedCachedValue) {
+                           return LookupResult(lookup(opCtx));
+                       },
+                       1 /* cacheSize */),
       _fetchDefaultsFn(std::move(fetchDefaultsFn)) {}
 
 boost::optional<RWConcernDefault> ReadWriteConcernDefaults::Cache::lookup(OperationContext* opCtx) {

@@ -404,10 +404,11 @@ public:
     }
 
     /**
-     * If 'key' is in the store, returns its latest 'timeInStore', which can either be from the time
-     * of insertion or from the latest call to 'advanceTimeInStore'. Otherwise, returns Time().
+     * If 'key' is in the store, returns its currently cached value and its latest 'timeInStore',
+     * which can either be from the time of insertion or from the latest call to
+     * 'advanceTimeInStore'. Otherwise, returns a nullptr ValueHandle and Time().
      */
-    Time getTimeInStore(const Key& key) {
+    std::pair<ValueHandle, Time> getCachedValueAndTime(const Key& key) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
@@ -417,10 +418,12 @@ public:
             storedValue = it->second.lock();
         }
 
-        if (storedValue)
-            return storedValue->timeInStore;
+        if (storedValue) {
+            auto timeInStore = storedValue->timeInStore;
+            return {ValueHandle(std::move(storedValue)), timeInStore};
+        }
 
-        return Time();
+        return {ValueHandle(nullptr), Time()};
     }
 
     /**

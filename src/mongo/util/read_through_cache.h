@@ -97,6 +97,17 @@ protected:
     Mutex _cancelTokenMutex = MONGO_MAKE_LATCH("ReadThroughCacheBase::_cancelTokenMutex");
 };
 
+template <typename Result, typename Key, typename Value, typename Time>
+struct ReadThroughCacheLookupFnImpl {
+    using fn = unique_function<Result(
+        OperationContext*, const Key&, const Value& cachedValue, const Time& timeInStore)>;
+};
+
+template <typename Result, typename Key, typename Value>
+struct ReadThroughCacheLookupFnImpl<Result, Key, Value, CacheNotCausallyConsistent> {
+    using fn = unique_function<Result(OperationContext*, const Key&, const Value& cachedValue)>;
+};
+
 /**
  * Implements an (optionally) causally consistent read-through cache from Key to Value, built on top
  * of InvalidatingLRUCache.
@@ -206,7 +217,9 @@ public:
         // contains the time that the store returned for the 'value'.
         Time t;
     };
-    using LookupFn = unique_function<LookupResult(OperationContext*, const Key&)>;
+
+    using LookupFn =
+        typename ReadThroughCacheLookupFnImpl<LookupResult, Key, ValueHandle, Time>::fn;
 
     // Exposed publicly so it can be unit-tested indepedently of the usages in this class. Must not
     // be used independently.
@@ -247,8 +260,11 @@ public:
             return it->second->addWaiter(ul);
 
         // Schedule an asynchronous lookup for the key
+        auto [cachedValue, timeInStore] = _cache.getCachedValueAndTime(key);
         auto [it, emplaced] = _inProgressLookups.emplace(
-            key, std::make_unique<InProgressLookup>(*this, key, _cache.getTimeInStore(key)));
+            key,
+            std::make_unique<InProgressLookup>(
+                *this, key, ValueHandle(std::move(cachedValue)), timeInStore));
         invariant(emplaced);
         auto& inProgressLookup = *it->second;
         auto sharedFutureToReturn = inProgressLookup.addWaiter(ul);
@@ -498,8 +514,11 @@ private:
 template <typename Key, typename Value, typename Time>
 class ReadThroughCache<Key, Value, Time>::InProgressLookup {
 public:
-    InProgressLookup(ReadThroughCache& cache, Key key, Time minTimeInStore)
-        : _cache(cache), _key(std::move(key)), _minTimeInStore(std::move(minTimeInStore)) {}
+    InProgressLookup(ReadThroughCache& cache, Key key, ValueHandle cachedValue, Time minTimeInStore)
+        : _cache(cache),
+          _key(std::move(key)),
+          _cachedValue(std::move(cachedValue)),
+          _minTimeInStore(std::move(minTimeInStore)) {}
 
     Future<LookupResult> asyncLookupRound() {
         auto [promise, future] = makePromiseFuture<LookupResult>();
@@ -510,7 +529,11 @@ public:
             OperationContext * opCtx, const Status& status) mutable noexcept {
             promise.setWith([&] {
                 uassertStatusOK(status);
-                return _cache._lookupFn(opCtx, _key);
+                if constexpr (std::is_same_v<Time, CacheNotCausallyConsistent>) {
+                    return _cache._lookupFn(opCtx, _key, _cachedValue);
+                } else {
+                    return _cache._lookupFn(opCtx, _key, _cachedValue, _minTimeInStore);
+                }
             });
         }));
 
@@ -580,6 +603,7 @@ private:
     bool _valid{false};
     boost::optional<CancelToken> _cancelToken;
 
+    ValueHandle _cachedValue;
     Time _minTimeInStore;
 
     using TimeAndPromiseMap = std::map<Time, std::unique_ptr<SharedPromise<ValueHandle>>>;

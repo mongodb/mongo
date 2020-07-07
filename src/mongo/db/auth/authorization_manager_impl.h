@@ -158,7 +158,9 @@ private:
         // Even though the dist cache permits for lookup to return boost::none for non-existent
         // values, the contract of the authorization manager is that it should throw an exception if
         // the value can not be loaded, so if it returns, the value will always be set.
-        LookupResult _lookup(OperationContext* opCtx, int unusedKey);
+        LookupResult _lookup(OperationContext* opCtx,
+                             int unusedKey,
+                             const ValueHandle& unusedCachedValue);
 
         Mutex _mutex =
             MONGO_MAKE_LATCH("AuthorizationManagerImpl::AuthSchemaVersionDistCache::_mutex");
@@ -181,7 +183,9 @@ private:
         // Even though the dist cache permits for lookup to return boost::none for non-existent
         // values, the contract of the authorization manager is that it should throw an exception if
         // the value can not be loaded, so if it returns, the value will always be set.
-        LookupResult _lookup(OperationContext* opCtx, const UserRequest& user);
+        LookupResult _lookup(OperationContext* opCtx,
+                             const UserRequest& user,
+                             const UserHandle& unusedCachedUser);
 
         Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::UserDistCacheImpl::_mutex");
 

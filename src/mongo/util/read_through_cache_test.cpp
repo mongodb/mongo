@@ -60,9 +60,10 @@ public:
                            service,
                            threadPool,
                            [this, lookupFn = std::move(lookupFn)](OperationContext* opCtx,
-                                                                  const std::string& key) {
+                                                                  const std::string& key,
+                                                                  const ValueHandle& cachedValue) {
                                ++countLookups;
-                               return lookupFn(opCtx, key);
+                               return lookupFn(opCtx, key, cachedValue);
                            },
                            size) {}
 
@@ -82,9 +83,11 @@ public:
                            service,
                            threadPool,
                            [this, lookupFn = std::move(lookupFn)](OperationContext* opCtx,
-                                                                  const std::string& key) {
+                                                                  const std::string& key,
+                                                                  const ValueHandle& cachedValue,
+                                                                  Timestamp timeInStore) {
                                ++countLookups;
-                               return lookupFn(opCtx, key);
+                               return lookupFn(opCtx, key, cachedValue, timeInStore);
                            },
                            size) {}
 
@@ -149,7 +152,8 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateAndRefetch) {
     fnTest(CacheWithThreadPool<Cache>(
         getServiceContext(),
         1,
-        [&, nextValue = 0](OperationContext*, const std::string& key) mutable {
+        [&, nextValue = 0](
+            OperationContext*, const std::string& key, const Cache::ValueHandle&) mutable {
             ASSERT_EQ("TestKey", key);
             return Cache::LookupResult(CachedValue(100 * ++nextValue));
         }));
@@ -157,7 +161,10 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateAndRefetch) {
     fnTest(CacheWithThreadPool<CausallyConsistentCache>(
         getServiceContext(),
         1,
-        [&, nextValue = 0](OperationContext*, const std::string& key) mutable {
+        [&, nextValue = 0](OperationContext*,
+                           const std::string& key,
+                           const CausallyConsistentCache::ValueHandle&,
+                           const Timestamp& timeInStore) mutable {
             ASSERT_EQ("TestKey", key);
             ++nextValue;
             return CausallyConsistentCache::LookupResult(CachedValue(100 * nextValue),
@@ -174,14 +181,16 @@ TEST_F(ReadThroughCacheTest, FailedLookup) {
     fnTest(CacheWithThreadPool<Cache>(
         getServiceContext(),
         1,
-        [&](OperationContext*, const std::string& key) -> Cache::LookupResult {
-            uasserted(ErrorCodes::InternalError, "Test error");
-        }));
+        [&](OperationContext*, const std::string& key, const Cache::ValueHandle&)
+            -> Cache::LookupResult { uasserted(ErrorCodes::InternalError, "Test error"); }));
 
     fnTest(CacheWithThreadPool<CausallyConsistentCache>(
         getServiceContext(),
         1,
-        [&](OperationContext*, const std::string& key) -> CausallyConsistentCache::LookupResult {
+        [&](OperationContext*,
+            const std::string& key,
+            const CausallyConsistentCache::ValueHandle&,
+            const Timestamp& timeInStore) -> CausallyConsistentCache::LookupResult {
             uasserted(ErrorCodes::InternalError, "Test error");
         }));
 }
@@ -209,7 +218,8 @@ TEST_F(ReadThroughCacheTest, InvalidateCacheSizeZeroReissuesLookup) {
     fnTest(CacheWithThreadPool<Cache>(
         getServiceContext(),
         0,
-        [&, nextValue = 0](OperationContext*, const std::string& key) mutable {
+        [&, nextValue = 0](
+            OperationContext*, const std::string& key, const Cache::ValueHandle&) mutable {
             ASSERT_EQ("TestKey", key);
             return Cache::LookupResult(CachedValue(1000 * ++nextValue));
         }));
@@ -217,7 +227,10 @@ TEST_F(ReadThroughCacheTest, InvalidateCacheSizeZeroReissuesLookup) {
     fnTest(CacheWithThreadPool<CausallyConsistentCache>(
         getServiceContext(),
         0,
-        [&, nextValue = 0](OperationContext*, const std::string& key) mutable {
+        [&, nextValue = 0](OperationContext*,
+                           const std::string& key,
+                           const CausallyConsistentCache::ValueHandle&,
+                           const Timestamp& timeInStore) mutable {
             ASSERT_EQ("TestKey", key);
             ++nextValue;
             return CausallyConsistentCache::LookupResult(CachedValue(1000 * nextValue),
@@ -229,13 +242,20 @@ TEST_F(ReadThroughCacheTest, KeyDoesNotExist) {
     auto fnTest = [&](auto cache) { ASSERT(!cache.acquire(_opCtx, "TestKey")); };
 
     fnTest(CacheWithThreadPool<Cache>(
-        getServiceContext(), 1, [&](OperationContext*, const std::string& key) {
+        getServiceContext(),
+        1,
+        [&](OperationContext*, const std::string& key, const Cache::ValueHandle&) {
             ASSERT_EQ("TestKey", key);
             return Cache::LookupResult(boost::none);
         }));
 
     fnTest(CacheWithThreadPool<CausallyConsistentCache>(
-        getServiceContext(), 1, [&](OperationContext*, const std::string& key) {
+        getServiceContext(),
+        1,
+        [&](OperationContext*,
+            const std::string& key,
+            const CausallyConsistentCache::ValueHandle&,
+            const Timestamp& timeInStore) {
             ASSERT_EQ("TestKey", key);
             return CausallyConsistentCache::LookupResult(boost::none, Timestamp(10));
         }));
@@ -244,7 +264,12 @@ TEST_F(ReadThroughCacheTest, KeyDoesNotExist) {
 TEST_F(ReadThroughCacheTest, CausalConsistency) {
     boost::optional<CausallyConsistentCache::LookupResult> nextToReturn;
     CacheWithThreadPool<CausallyConsistentCache> cache(
-        getServiceContext(), 1, [&](OperationContext*, const std::string& key) {
+        getServiceContext(),
+        1,
+        [&](OperationContext*,
+            const std::string& key,
+            const CausallyConsistentCache::ValueHandle&,
+            const Timestamp& timeInStore) {
             ASSERT_EQ("TestKey", key);
             return CausallyConsistentCache::LookupResult(std::move(*nextToReturn));
         });
@@ -273,9 +298,12 @@ TEST_F(ReadThroughCacheAsyncTest, SuccessfulInProgressLookupForNotCausallyConsis
     ThreadPool threadPool{ThreadPool::Options()};
     threadPool.startup();
 
-    Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string& key) {
-        return Cache::LookupResult(CachedValue(500));
-    });
+    Cache cache(getServiceContext(),
+                threadPool,
+                1,
+                [&](OperationContext*, const std::string& key, const Cache::ValueHandle&) {
+                    return Cache::LookupResult(CachedValue(500));
+                });
 
     // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
     // are completed before the cache resources are released.
@@ -284,7 +312,8 @@ TEST_F(ReadThroughCacheAsyncTest, SuccessfulInProgressLookupForNotCausallyConsis
         threadPool.join();
     });
 
-    Cache::InProgressLookup inProgress(cache, "TestKey", CacheNotCausallyConsistent());
+    Cache::InProgressLookup inProgress(
+        cache, "TestKey", Cache::ValueHandle(), CacheNotCausallyConsistent());
     auto future = inProgress.addWaiter(WithLock::withoutLock());
     ASSERT(!future.isReady());
 
@@ -308,9 +337,8 @@ TEST_F(ReadThroughCacheAsyncTest, FailedInProgressLookupForNotCausallyConsistent
     Cache cache(getServiceContext(),
                 threadPool,
                 1,
-                [&](OperationContext*, const std::string& key) -> Cache::LookupResult {
-                    uasserted(ErrorCodes::InternalError, "Test error");
-                });
+                [&](OperationContext*, const std::string& key, const Cache::ValueHandle&)
+                    -> Cache::LookupResult { uasserted(ErrorCodes::InternalError, "Test error"); });
 
     // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
     // are completed before the cache resources are released.
@@ -319,7 +347,8 @@ TEST_F(ReadThroughCacheAsyncTest, FailedInProgressLookupForNotCausallyConsistent
         threadPool.join();
     });
 
-    Cache::InProgressLookup inProgress(cache, "TestKey", CacheNotCausallyConsistent());
+    Cache::InProgressLookup inProgress(
+        cache, "TestKey", Cache::ValueHandle(), CacheNotCausallyConsistent());
     auto future = inProgress.addWaiter(WithLock::withoutLock());
     ASSERT(!future.isReady());
 
@@ -340,11 +369,14 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireObservesOperationContextDeadline) {
 
     Barrier lookupStartedBarrier(2);
     Barrier completeLookupBarrier(2);
-    Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string& key) {
-        lookupStartedBarrier.countDownAndWait();
-        completeLookupBarrier.countDownAndWait();
-        return Cache::LookupResult(CachedValue(5));
-    });
+    Cache cache(getServiceContext(),
+                threadPool,
+                1,
+                [&](OperationContext*, const std::string& key, const Cache::ValueHandle&) {
+                    lookupStartedBarrier.countDownAndWait();
+                    completeLookupBarrier.countDownAndWait();
+                    return Cache::LookupResult(CachedValue(5));
+                });
 
     // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
     // are completed before the cache resources are released.
@@ -397,12 +429,15 @@ TEST_F(ReadThroughCacheAsyncTest, InvalidateReissuesLookup) {
     Barrier lookupStartedBarriers[] = {Barrier{2}, Barrier{2}, Barrier{2}};
     Barrier completeLookupBarriers[] = {Barrier{2}, Barrier{2}, Barrier{2}};
 
-    Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string& key) {
-        int idx = countLookups.fetchAndAdd(1);
-        lookupStartedBarriers[idx].countDownAndWait();
-        completeLookupBarriers[idx].countDownAndWait();
-        return Cache::LookupResult(CachedValue(idx));
-    });
+    Cache cache(getServiceContext(),
+                threadPool,
+                1,
+                [&](OperationContext*, const std::string& key, const Cache::ValueHandle&) {
+                    int idx = countLookups.fetchAndAdd(1);
+                    lookupStartedBarriers[idx].countDownAndWait();
+                    completeLookupBarriers[idx].countDownAndWait();
+                    return Cache::LookupResult(CachedValue(idx));
+                });
 
     // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
     // are completed before the cache resources are released.
@@ -447,10 +482,13 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireWithAShutdownThreadPool) {
     threadPool.shutdown();
     threadPool.join();
 
-    Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
-        FAIL("Should not be called");
-        return Cache::LookupResult(boost::none);  // Will never be reached
-    });
+    Cache cache(getServiceContext(),
+                threadPool,
+                1,
+                [&](OperationContext*, const std::string&, const Cache::ValueHandle&) {
+                    FAIL("Should not be called");
+                    return Cache::LookupResult(boost::none);  // Will never be reached
+                });
 
     auto future = cache.acquireAsync("TestKey");
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
@@ -481,10 +519,13 @@ private:
 TEST_F(ReadThroughCacheAsyncTest, AdvanceTimeDuringLookupOfUnCachedKey) {
     MockThreadPool threadPool;
     boost::optional<CausallyConsistentCache::LookupResult> nextToReturn;
-    CausallyConsistentCache cache(
-        getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
-            return std::move(*nextToReturn);
-        });
+    CausallyConsistentCache cache(getServiceContext(),
+                                  threadPool,
+                                  1,
+                                  [&](OperationContext*,
+                                      const std::string&,
+                                      const CausallyConsistentCache::ValueHandle&,
+                                      const Timestamp&) { return std::move(*nextToReturn); });
 
     auto futureAtTS100 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
     ASSERT(!futureAtTS100.isReady());
@@ -508,10 +549,13 @@ TEST_F(ReadThroughCacheAsyncTest, AdvanceTimeDuringLookupOfUnCachedKey) {
 TEST_F(ReadThroughCacheAsyncTest, KeyDeletedAfterAdvanceTimeInStore) {
     MockThreadPool threadPool;
     boost::optional<CausallyConsistentCache::LookupResult> nextToReturn;
-    CausallyConsistentCache cache(
-        getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
-            return std::move(*nextToReturn);
-        });
+    CausallyConsistentCache cache(getServiceContext(),
+                                  threadPool,
+                                  1,
+                                  [&](OperationContext*,
+                                      const std::string&,
+                                      const CausallyConsistentCache::ValueHandle&,
+                                      const Timestamp&) { return std::move(*nextToReturn); });
 
     auto futureAtTS100 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
     nextToReturn.emplace(CachedValue(100), Timestamp(100));
@@ -537,10 +581,13 @@ TEST_F(ReadThroughCacheAsyncTest, KeyDeletedAfterAdvanceTimeInStore) {
 TEST_F(ReadThroughCacheAsyncTest, AcquireAsyncAndAdvanceTimeInterleave) {
     MockThreadPool threadPool;
     boost::optional<CausallyConsistentCache::LookupResult> nextToReturn;
-    CausallyConsistentCache cache(
-        getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
-            return std::move(*nextToReturn);
-        });
+    CausallyConsistentCache cache(getServiceContext(),
+                                  threadPool,
+                                  1,
+                                  [&](OperationContext*,
+                                      const std::string&,
+                                      const CausallyConsistentCache::ValueHandle&,
+                                      const Timestamp&) { return std::move(*nextToReturn); });
 
     auto futureAtTS100 = cache.acquireAsync("TestKey");
     nextToReturn.emplace(CachedValue(100), Timestamp(100));
@@ -573,9 +620,12 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireAsyncAndAdvanceTimeInterleave) {
 
 TEST_F(ReadThroughCacheAsyncTest, InvalidateCalledBeforeLookupTaskExecutes) {
     MockThreadPool threadPool;
-    Cache cache(getServiceContext(), threadPool, 1, [&](OperationContext*, const std::string&) {
-        return Cache::LookupResult(CachedValue(123));
-    });
+    Cache cache(getServiceContext(),
+                threadPool,
+                1,
+                [&](OperationContext*, const std::string&, const Cache::ValueHandle&) {
+                    return Cache::LookupResult(CachedValue(123));
+                });
 
     auto future = cache.acquireAsync("TestKey");
     cache.invalidateAll();
@@ -605,21 +655,24 @@ TEST_F(ReadThroughCacheAsyncTest, CacheSizeZero) {
     fnTest(Cache(getServiceContext(),
                  threadPool,
                  0,
-                 [&, nextValue = 0](OperationContext*, const std::string& key) mutable {
+                 [&, nextValue = 0](
+                     OperationContext*, const std::string& key, const Cache::ValueHandle&) mutable {
                      ASSERT_EQ("TestKey", key);
                      return Cache::LookupResult(CachedValue(100 * ++nextValue));
                  }));
 
-    fnTest(CausallyConsistentCache(
-        getServiceContext(),
-        threadPool,
-        0,
-        [&, nextValue = 0](OperationContext*, const std::string& key) mutable {
-            ASSERT_EQ("TestKey", key);
-            ++nextValue;
-            return CausallyConsistentCache::LookupResult(CachedValue(100 * nextValue),
-                                                         Timestamp(nextValue));
-        }));
+    fnTest(CausallyConsistentCache(getServiceContext(),
+                                   threadPool,
+                                   0,
+                                   [&, nextValue = 0](OperationContext*,
+                                                      const std::string& key,
+                                                      const CausallyConsistentCache::ValueHandle&,
+                                                      const Timestamp&) mutable {
+                                       ASSERT_EQ("TestKey", key);
+                                       ++nextValue;
+                                       return CausallyConsistentCache::LookupResult(
+                                           CachedValue(100 * nextValue), Timestamp(nextValue));
+                                   }));
 }
 
 }  // namespace

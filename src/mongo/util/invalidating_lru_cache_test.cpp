@@ -269,14 +269,18 @@ TEST(InvalidatingLRUCacheTest, CausalConsistencyPreservedForEvictedCheckedOutKey
     // list
     cache.insertOrAssign(2, TestValue("Key 2 - Value @ TS 20"), Timestamp(20));
 
-    ASSERT_EQ(Timestamp(10), cache.getTimeInStore(1));
+    auto [cachedValueAtTS10, timeInStoreAtTS10] = cache.getCachedValueAndTime(1);
+    ASSERT_EQ(Timestamp(10), timeInStoreAtTS10);
+    ASSERT_EQ("Key 1 - Value @ TS 10", cachedValueAtTS10->value);
     ASSERT_EQ("Key 1 - Value @ TS 10", key1ValueAtTS10->value);
     ASSERT_EQ("Key 1 - Value @ TS 10", cache.get(1, CacheCausalConsistency::kLatestCached)->value);
     ASSERT_EQ("Key 1 - Value @ TS 10", cache.get(1, CacheCausalConsistency::kLatestKnown)->value);
 
     cache.advanceTimeInStore(1, Timestamp(11));
-    ASSERT_EQ(Timestamp(11), cache.getTimeInStore(1));
+    auto [cachedValueAtTS11, timeInStoreAtTS11] = cache.getCachedValueAndTime(1);
+    ASSERT_EQ(Timestamp(11), timeInStoreAtTS11);
     ASSERT(!key1ValueAtTS10.isValid());
+    ASSERT_EQ("Key 1 - Value @ TS 10", cachedValueAtTS11->value);
     ASSERT_EQ("Key 1 - Value @ TS 10", key1ValueAtTS10->value);
     ASSERT_EQ("Key 1 - Value @ TS 10", cache.get(1, CacheCausalConsistency::kLatestCached)->value);
     ASSERT(!cache.get(1, CacheCausalConsistency::kLatestKnown));
@@ -427,14 +431,18 @@ TEST(InvalidatingLRUCacheTest, CacheSizeZeroCausalConsistency) {
 
     cache.advanceTimeInStore(100, Timestamp(30));
     cache.insertOrAssign(100, TestValue("Value @ TS 30"), Timestamp(30));
-    ASSERT_EQ(Timestamp(), cache.getTimeInStore(100));
+    auto [cachedValueAtTS30, timeInStoreAtTS30] = cache.getCachedValueAndTime(100);
+    ASSERT_EQ(Timestamp(), timeInStoreAtTS30);
+    ASSERT(!cachedValueAtTS30);
 
     auto valueAtTS30 = cache.insertOrAssignAndGet(100, TestValue("Value @ TS 30"), Timestamp(30));
     ASSERT_EQ("Value @ TS 30", cache.get(100, CacheCausalConsistency::kLatestCached)->value);
     ASSERT_EQ("Value @ TS 30", cache.get(100, CacheCausalConsistency::kLatestKnown)->value);
 
     cache.advanceTimeInStore(100, Timestamp(35));
-    ASSERT_EQ(Timestamp(35), cache.getTimeInStore(100));
+    auto [cachedValueAtTS35, timeInStoreAtTS35] = cache.getCachedValueAndTime(100);
+    ASSERT_EQ(Timestamp(35), timeInStoreAtTS35);
+    ASSERT_EQ("Value @ TS 30", cachedValueAtTS35->value);
     ASSERT_EQ("Value @ TS 30", cache.get(100, CacheCausalConsistency::kLatestCached)->value);
     ASSERT(!cache.get(100, CacheCausalConsistency::kLatestKnown));
 

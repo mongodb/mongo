@@ -964,7 +964,9 @@ public:
     }
 
 private:
-    static LookupResult _lookup(OperationContext* opCtx, const OCSPCacheKey& key) {
+    static LookupResult _lookup(OperationContext* opCtx,
+                                const OCSPCacheKey& key,
+                                const ValueHandle& unusedCachedValue) {
         // If there is a CRL file, we expect the CRL file to cover the certificate status
         // information, and therefore we don't need to make a roundtrip.
         if (!getSSLGlobalParams().sslCRLFile.empty()) {
