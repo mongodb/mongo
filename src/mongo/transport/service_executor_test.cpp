@@ -37,6 +37,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -131,18 +132,16 @@ protected:
 };
 
 void scheduleBasicTask(ServiceExecutor* exec, bool expectSuccess) {
-    stdx::condition_variable cond;
-    auto mutex = MONGO_MAKE_LATCH();
-    auto task = [&cond, &mutex] {
-        stdx::unique_lock<Latch> lk(mutex);
-        cond.notify_all();
-    };
+    // The barrier is only used when "expectSuccess" is set to true. The ownership of the barrier
+    // must be shared between the scheduler and the executor threads to prevent read-after-delete
+    // race conditions.
+    auto barrier = std::make_shared<unittest::Barrier>(2);
+    auto task = [barrier] { barrier->countDownAndWait(); };
 
-    stdx::unique_lock<Latch> lk(mutex);
     auto status = exec->schedule(std::move(task), ServiceExecutor::kEmptyFlags);
     if (expectSuccess) {
         ASSERT_OK(status);
-        cond.wait(lk);
+        barrier->countDownAndWait();
     } else {
         ASSERT_NOT_OK(status);
     }
