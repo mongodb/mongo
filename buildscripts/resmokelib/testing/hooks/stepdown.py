@@ -473,7 +473,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         for rs_fixture in self._rs_fixtures:
             self._step_down(rs_fixture)
 
-    # pylint: disable=R0912,R0915
+    # pylint: disable=R0912,R0914,R0915
     def _step_down(self, rs_fixture):
         try:
             primary = rs_fixture.get_primary(timeout_secs=self._stepdown_interval_secs)
