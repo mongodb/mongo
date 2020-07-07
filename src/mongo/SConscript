@@ -577,6 +577,7 @@ env.Library(
         'db/repl/serveronly_repl',
         'db/repl/storage_interface_impl',
         'db/repl/topology_coordinator',
+        'db/repl/wait_for_majority_service',
         'db/s/sessions_collection_config_server',
         'db/s/sharding_runtime_d',
         'db/serverinit',
