@@ -31,6 +31,8 @@
 
 #include "mongo/executor/remote_command_response.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/util/str.h"

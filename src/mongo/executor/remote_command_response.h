@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <fmt/format.h>
 #include <iosfwd>
 #include <memory>
 #include <string>
