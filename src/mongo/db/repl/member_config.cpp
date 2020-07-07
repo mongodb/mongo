@@ -70,14 +70,6 @@ MemberConfig::MemberConfig(const BSONObj& mcfg) {
         host = HostAndPort(host.host(), host.port());
     }
 
-    if (getNewlyAdded()) {
-        uassert(
-            ErrorCodes::InvalidReplicaSetConfig,
-            str::stream() << kNewlyAddedFieldName
-                          << " field cannot be specified if enableAutomaticReconfig is turned off",
-            enableAutomaticReconfig);
-    }
-
     _splitHorizon = SplitHorizon(host, getHorizons());
 
     if (isArbiter()) {
@@ -206,7 +198,6 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
 
     if (!omitNewlyAddedField && getNewlyAdded()) {
         // We should never have _newlyAdded if automatic reconfigs aren't enabled.
-        invariant(enableAutomaticReconfig);
         invariant(getNewlyAdded().get());
         configBuilder.append(kNewlyAddedFieldName, getNewlyAdded().get());
     }

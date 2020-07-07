@@ -3184,10 +3184,6 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
 }
 
 bool ReplicationCoordinatorImpl::_supportsAutomaticReconfig() const {
-    if (!enableAutomaticReconfig) {
-        return false;
-    }
-
     if (serverGlobalParams.featureCompatibility.getVersion() !=
         ServerGlobalParams::FeatureCompatibility::Version::kVersion451) {
         return false;
