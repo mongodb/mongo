@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/summation.h"
 
 MONGO_FAIL_POINT_DEFINE(failOnPoisonedFieldLookup);
 
@@ -60,6 +61,8 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // sub
     -1,  // mul
     -1,  // div
+    -1,  // idiv
+    -1,  // mod
     0,   // negate
 
     0,  // logicNot
@@ -210,6 +213,14 @@ void CodeFragment::appendMul() {
 
 void CodeFragment::appendDiv() {
     appendSimpleInstruction(Instruction::div);
+}
+
+void CodeFragment::appendIDiv() {
+    appendSimpleInstruction(Instruction::idiv);
+}
+
+void CodeFragment::appendMod() {
+    appendSimpleInstruction(Instruction::mod);
 }
 
 void CodeFragment::appendNegate() {
@@ -771,6 +782,96 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(uint
     return {false, value::TypeTags::Boolean, regexMatchResult};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(uint8_t arity) {
+    invariant(arity > 0);
+
+    value::TypeTags resultTag = value::TypeTags::NumberInt32;
+    bool haveDate = false;
+
+    // Sweep across all tags and pick the result type.
+    for (size_t idx = 0; idx < arity; ++idx) {
+        auto [own, tag, val] = getFromStack(idx);
+        if (tag == value::TypeTags::Date) {
+            if (haveDate) {
+                uassert(4848404, "only one date allowed in an $add expression", !haveDate);
+            }
+            // Date is a simple 64 bit integer.
+            haveDate = true;
+            tag = value::TypeTags::NumberInt64;
+        }
+        if (value::isNumber(tag)) {
+            resultTag = value::getWidestNumericalType(resultTag, tag);
+        } else if (tag == value::TypeTags::Nothing || tag == value::TypeTags::Null) {
+            // What to do about null and nothing?
+            return {false, value::TypeTags::Nothing, 0};
+        } else {
+            // What to do about non-numeric types like arrays and objects?
+            return {false, value::TypeTags::Nothing, 0};
+        }
+    }
+
+    if (resultTag == value::TypeTags::NumberDecimal) {
+        Decimal128 sum;
+        for (size_t idx = 0; idx < arity; ++idx) {
+            auto [own, tag, val] = getFromStack(idx);
+            if (tag == value::TypeTags::Date) {
+                sum.add(Decimal128(value::bitcastTo<int64_t>(val)));
+            } else {
+                sum.add(value::numericCast<Decimal128>(tag, val));
+            }
+        }
+        if (haveDate) {
+            return {false, value::TypeTags::Date, value::bitcastFrom(sum.toLong())};
+        } else {
+            auto [tag, val] = value::makeCopyDecimal(sum);
+            return {true, tag, val};
+        }
+    } else {
+        DoubleDoubleSummation sum;
+        for (size_t idx = 0; idx < arity; ++idx) {
+            auto [own, tag, val] = getFromStack(idx);
+            if (tag == value::TypeTags::NumberInt32) {
+                sum.addInt(value::numericCast<int32_t>(tag, val));
+            } else if (tag == value::TypeTags::NumberInt64 || tag == value::TypeTags::Date) {
+                sum.addLong(value::numericCast<int64_t>(tag, val));
+            } else if (tag == value::TypeTags::NumberDouble) {
+                sum.addDouble(value::numericCast<double>(tag, val));
+            } else if (tag == value::TypeTags::Date) {
+                sum.addLong(value::bitcastTo<int64_t>(val));
+            }
+        }
+        if (haveDate) {
+            uassert(ErrorCodes::Overflow, "date overflow in $add", sum.fitsLong());
+            return {false, value::TypeTags::Date, value::bitcastFrom(sum.getLong())};
+        } else {
+            switch (resultTag) {
+                case value::TypeTags::NumberInt32: {
+                    auto result = sum.getLong();
+                    if (sum.fitsLong() && result >= std::numeric_limits<int32_t>::min() &&
+                        result <= std::numeric_limits<int32_t>::max()) {
+                        return {false, value::TypeTags::NumberInt32, value::bitcastFrom(result)};
+                    }
+                    // Fall through to the larger type.
+                }
+                case value::TypeTags::NumberInt64: {
+                    if (sum.fitsLong()) {
+                        return {
+                            false, value::TypeTags::NumberInt64, value::bitcastFrom(sum.getLong())};
+                    }
+                    // Fall through to the larger type.
+                }
+                case value::TypeTags::NumberDouble: {
+                    return {
+                        false, value::TypeTags::NumberDouble, value::bitcastFrom(sum.getDouble())};
+                }
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -792,6 +893,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinAddToArray(arity);
         case Builtin::addToSet:
             return builtinAddToSet(arity);
+        case Builtin::doubleDoubleSum:
+            return builtinDoubleDoubleSum(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -931,6 +1034,40 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(CodeFragment* c
                     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
 
                     auto [owned, tag, val] = genericDiv(lhsTag, lhsVal, rhsTag, rhsVal);
+
+                    topStack(owned, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
+                case Instruction::idiv: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+                    auto [owned, tag, val] = genericIDiv(lhsTag, lhsVal, rhsTag, rhsVal);
+
+                    topStack(owned, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
+                case Instruction::mod: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+                    auto [owned, tag, val] = genericMod(lhsTag, lhsVal, rhsTag, rhsVal);
 
                     topStack(owned, tag, val);
 

@@ -108,6 +108,8 @@ struct Instruction {
         sub,
         mul,
         div,
+        idiv,
+        mod,
         negate,
 
         logicNot,
@@ -162,11 +164,12 @@ enum class Builtin : uint8_t {
     regexMatch,
     dropFields,
     newObj,
-    ksToString,  // KeyString to string
-    newKs,       // new KeyString
-    abs,         // absolute value
-    addToArray,  // agg function to append to an array
-    addToSet,    // agg function to append to a set
+    ksToString,       // KeyString to string
+    newKs,            // new KeyString
+    abs,              // absolute value
+    addToArray,       // agg function to append to an array
+    addToSet,         // agg function to append to a set
+    doubleDoubleSum,  // special double summation
 };
 
 class CodeFragment {
@@ -195,6 +198,8 @@ public:
     void appendSub();
     void appendMul();
     void appendDiv();
+    void appendIDiv();
+    void appendMod();
     void appendNegate();
     void appendNot();
     void appendLess() {
@@ -299,6 +304,14 @@ private:
                                                                value::Value lhsValue,
                                                                value::TypeTags rhsTag,
                                                                value::Value rhsValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericIDiv(value::TypeTags lhsTag,
+                                                                value::Value lhsValue,
+                                                                value::TypeTags rhsTag,
+                                                                value::Value rhsValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericMod(value::TypeTags lhsTag,
+                                                               value::Value lhsValue,
+                                                               value::TypeTags rhsTag,
+                                                               value::Value rhsValue);
     std::tuple<bool, value::TypeTags, value::Value> genericAbs(value::TypeTags operandTag,
                                                                value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericNot(value::TypeTags tag,
@@ -366,6 +379,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinAbs(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToArray(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToSet(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 
