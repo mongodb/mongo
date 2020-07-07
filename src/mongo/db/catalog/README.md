@@ -1,5 +1,25 @@
 # Execution Internals
-_intro to execution goes here_
+The storage execution layer provides an interface for higher level MongoDB components, including
+query, replication and sharding, to all storage engines compatible with MongoDB. It maintains a
+catalog, in-memory and on-disk, of collections and indexes. It also implements an additional (to
+whatever a storage engine implements) concurrency control layer to safely modify the catalog while
+sustaining correct and consistent collection and index data formatting.
+
+Execution faciliates reads and writes to the storage engine with various persistence guarantees,
+builds indexes, supports replication rollback, manages oplog visibility, repairs data corruption
+and inconsistencies, and much more.
+
+The main code highlights are: the storage integration layer found in the [**storage/**][] directory;
+the lock manager and lock helpers found in the [**concurrency/**][] directory; the catalog found in
+the [**catalog/**][] directory; the index build code found in many directories; the various types of
+index implementations found in the [**index/**][] directory; and the sorter found in the
+[**sorter/**][] directory.
+
+[**storage/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/storage
+[**concurrency/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/concurrency
+[**catalog/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/catalog
+[**index/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/index
+[**sorter/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/sorter
 
 # The Catalog
 
