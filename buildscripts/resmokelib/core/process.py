@@ -120,7 +120,6 @@ class Process(object):
                 close_fds=close_fds, env=self.env, creationflags=creation_flags, cwd=self._cwd)
             self.pid = self._process.pid
 
-            # TODO: check path exists
             if _config.UNDO_RECORDER_PATH is not None and ("mongod" in self.args[0]
                                                            or "mongos" in self.args[0]):
                 recorder_args = [
