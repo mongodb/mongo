@@ -37,7 +37,6 @@
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/projection_parser.h"
 
 namespace mongo {
 
@@ -62,7 +61,9 @@ BSONObj buildExclusionProjectionSpecification(const std::vector<BSONElement>& un
 }  // namespace
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::create(
-    BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx, StringData specifiedName) {
+    projection_ast::Projection projection,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    StringData specifiedName) {
     const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
         expCtx,
@@ -72,8 +73,6 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
             // here so we can add the name that was actually specified by the user, be it $project
             // or an alias.
             try {
-                auto policies = ProjectionPolicies::aggregateProjectionPolicies();
-                auto projection = projection_ast::parse(expCtx, projectSpec, policies);
                 // We won't optimize the executor on creation, and will do it as part of the
                 // pipeline optimization process when requested via the 'optimize()' method on
                 // 'DocumentSourceSingleDocumentTransformation', so we won't pass the
@@ -87,7 +86,10 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
                     projection_executor::kDefaultBuilderParams};
                 builderParams.reset(projection_executor::kOptimizeExecutor);
                 return projection_executor::buildProjectionExecutor(
-                    expCtx, &projection, policies, builderParams);
+                    expCtx,
+                    &projection,
+                    ProjectionPolicies::aggregateProjectionPolicies(),
+                    builderParams);
             } catch (DBException& ex) {
                 ex.addContext("Invalid " + specifiedName.toString());
                 throw;

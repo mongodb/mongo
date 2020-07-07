@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,37 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/projection_policies.h"
+#include "mongo/platform/basic.h"
 
-namespace mongo {
-namespace projection_ast {
+#include <memory>
 
-/**
- * Turns a BSON-representation of a projection into a walkable tree.
- *
- * 'query' and 'queryObj' refer to the associated filter provided in a find() command.
- */
-Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
-                 const BSONObj& obj,
-                 const MatchExpression* query,
-                 const BSONObj& queryObj,
-                 ProjectionPolicies policies);
+#include "mongo/db/pipeline/pipeline.h"
+
+namespace mongo::cst_pipeline_translation {
 
 /**
- * Overload of parse() to be used when not parsing a projection from a find() command.
+ * Walk a pipeline array CNode and produce a Pipeline.
  */
-Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
-                 const BSONObj& obj,
-                 ProjectionPolicies policies);
+std::unique_ptr<Pipeline, PipelineDeleter> translatePipeline(
+    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-/**
- * Adds a node to the projection AST rooted at 'root' to the path specified by 'path'.
- */
-void addNodeAtPath(ProjectionPathASTNode* root,
-                   const FieldPath& path,
-                   std::unique_ptr<ASTNode> newChild);
-
-}  // namespace projection_ast
-}  // namespace mongo
+}  // namespace mongo::cst_pipeline_translation

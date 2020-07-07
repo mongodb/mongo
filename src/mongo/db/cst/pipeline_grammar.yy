@@ -118,8 +118,7 @@
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
-%type <CNode> stageList
-%type <std::pair<KeyFieldname, CNode>> stage
+%nterm <CNode> stageList stage
 
 //
 // Grammar rules
@@ -135,14 +134,14 @@ stageList[result]:
     %empty { }
     | START_OBJECT stage END_OBJECT stageList[stagesArg] { 
         $result = std::move($stagesArg);
-        auto& children = stdx::get<CNode::Children>($result.payload);
+        auto& children = stdx::get<CNode::ArrayChildren>($result.payload);
         children.emplace_back(std::move($stage));
     }
 ;
 
 stage:
     STAGE_INHIBIT_OPTIMIZATION START_OBJECT END_OBJECT { 
-        $stage = std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()};
+        $stage = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
     }
 ;
 

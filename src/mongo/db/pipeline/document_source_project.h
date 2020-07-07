@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/query/projection_parser.h"
 
 namespace mongo {
 
@@ -45,12 +46,28 @@ public:
     static constexpr StringData kAliasNameUnset = "$unset"_sd;
 
     /**
+     * Method to create a $project stage from a Projection AST.
+     */
+    static boost::intrusive_ptr<DocumentSource> create(
+        projection_ast::Projection projection,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        StringData specifiedName);
+
+    /**
      * Convenience method to create a $project stage from 'projectSpec'.
      */
     static boost::intrusive_ptr<DocumentSource> create(
         BSONObj projectSpec,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        StringData specifiedName);
+        StringData specifiedName) try {
+        return create(projection_ast::parse(
+                          expCtx, projectSpec, ProjectionPolicies::aggregateProjectionPolicies()),
+                      expCtx,
+                      specifiedName);
+    } catch (DBException& ex) {
+        ex.addContext("Invalid " + specifiedName.toString());
+        throw;
+    }
 
     /**
      * Parses a $project stage from the user-supplied BSON.

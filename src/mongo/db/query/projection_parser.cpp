@@ -186,12 +186,6 @@ void addNodeAtPathHelper(ProjectionPathASTNode* root,
     addNodeAtPathHelper(childPathNode, path, componentIndex + 1, std::move(newChild));
 }
 
-void addNodeAtPath(ProjectionPathASTNode* root,
-                   const FieldPath& path,
-                   std::unique_ptr<ASTNode> newChild) {
-    addNodeAtPathHelper(root, path, 0, std::move(newChild));
-}
-
 bool hasPositionalOperator(StringData path) {
     return path.endsWith(".$");
 }
@@ -641,5 +635,12 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                  ProjectionPolicies policies) {
     return parse(std::move(expCtx), obj, nullptr, BSONObj(), std::move(policies));
 }
+
+void addNodeAtPath(ProjectionPathASTNode* root,
+                   const FieldPath& path,
+                   std::unique_ptr<ASTNode> newChild) {
+    addNodeAtPathHelper(root, path, 0, std::move(newChild));
+}
+
 }  // namespace projection_ast
 }  // namespace mongo

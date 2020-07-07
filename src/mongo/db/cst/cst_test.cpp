@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <iostream>
 #include <string>
 
 #include "mongo/bson/json.h"
@@ -38,30 +37,29 @@
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/cst/pipeline_parser_gen.hpp"
-#include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
-using namespace std::string_literals;
 
 TEST(CstTest, BuildsAndPrints) {
     {
-        const auto cst = CNode{CNode::Children{
+        const auto cst = CNode{CNode::ObjectChildren{
             {KeyFieldname::atan2,
-             CNode{CNode::Children{{KeyFieldname::arrayMarker, CNode{UserDouble{3.0}}},
-                                   {KeyFieldname::arrayMarker, CNode{UserDouble{2.0}}}}}}}};
-        ASSERT_EQ("{\natan2 :\n\t[\n\t\t<UserDouble 3.000000>\n\t\t<UserDouble 2.000000>\n\t]\n}"s,
-                  cst.toString());
+             CNode{CNode::ArrayChildren{CNode{UserDouble{3.0}}, CNode{UserDouble{2.0}}}}}}};
+        ASSERT_BSONOBJ_EQ(
+            fromjson("{atan2: [\"<UserDouble 3.000000>\", \"<UserDouble 2.000000>\"]}"),
+            cst.toBson());
     }
     {
-        const auto cst = CNode{CNode::Children{
+        const auto cst = CNode{CNode::ObjectChildren{
             {KeyFieldname::project,
-             CNode{CNode::Children{{UserFieldname{"a"}, CNode{KeyValue::trueKey}},
-                                   {KeyFieldname::id, CNode{KeyValue::falseKey}}}}}}};
-        ASSERT_EQ("{\nproject :\n\t{\n\ta :\n\t\t<KeyValue trueKey>\n"s +
-                      "\tid :\n\t\t<KeyValue falseKey>\n\t}\n}",
-                  cst.toString());
+             CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}},
+                                         {KeyFieldname::id, CNode{KeyValue::falseKey}}}}}}};
+        ASSERT_BSONOBJ_EQ(
+            fromjson("{project : {a: \"<KeyValue trueKey>\", id: \"<KeyValue falseKey>\"}}"),
+            cst.toBson());
     }
 }
 
@@ -71,8 +69,8 @@ TEST(CstGrammarTest, EmptyPipeline) {
     BSONLexer lexer(input["pipeline"].Array());
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    ASSERT_TRUE(stdx::get_if<CNode::Children>(&output.payload));
-    ASSERT_EQ(0, stdx::get_if<CNode::Children>(&output.payload)->size());
+    ASSERT_TRUE(stdx::get_if<CNode::ArrayChildren>(&output.payload));
+    ASSERT_EQ(0, stdx::get_if<CNode::ArrayChildren>(&output.payload)->size());
 }
 
 TEST(CstGrammarTest, InvalidPipelineSpec) {
@@ -109,9 +107,9 @@ TEST(CstGrammarTest, ParsesInternalInhibitOptimization) {
         BSONLexer lexer(input["pipeline"].Array());
         auto parseTree = PipelineParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::Children>(output.payload);
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
-        ASSERT(KeyFieldname::inhibitOptimization == stdx::get<KeyFieldname>(stages[0].first));
+        ASSERT(KeyFieldname::inhibitOptimization == stages[0].firstKeyFieldname());
     }
     {
         CNode output;

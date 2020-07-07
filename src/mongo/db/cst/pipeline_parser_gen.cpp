@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.5.4.
+// A Bison parser, made by GNU Bison 3.6.3.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
@@ -30,15 +30,16 @@
 // This special exception was added by the Free Software Foundation in
 // version 2.2 of Bison.
 
-// Undocumented macros, especially those whose name start with YY_,
-// are private implementation details.  Do not rely on them.
+// DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+// especially those whose name start with YY_ or yy_.  They are
+// private implementation details that can be changed or removed.
 
 
 #include "pipeline_parser_gen.hpp"
 
 
 // Unqualified %code blocks.
-#line 77 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 77 "pipeline_grammar.yy"
 
 #include "mongo/db/cst/bson_lexer.h"
 
@@ -49,7 +50,7 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
 }
 }  // namespace mongo
 
-#line 57 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+#line 58 "pipeline_parser_gen.cpp"
 
 
 #ifndef YY_
@@ -63,6 +64,7 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
 #define YY_(msgid) msgid
 #endif
 #endif
+
 
 // Whether we are compiled with exception support.
 #ifndef YY_EXCEPTIONS
@@ -114,10 +116,10 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
             yy_reduce_print_(Rule); \
     } while (false)
 
-#define YY_STACK_PRINT()      \
-    do {                      \
-        if (yydebug_)         \
-            yystack_print_(); \
+#define YY_STACK_PRINT()       \
+    do {                       \
+        if (yydebug_)          \
+            yy_stack_print_(); \
     } while (false)
 
 #else  // !YYDEBUG
@@ -139,10 +141,9 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
 #define YYERROR goto yyerrorlab
 #define YYRECOVERING() (!!yyerrstatus_)
 
-#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 52 "pipeline_grammar.yy"
 namespace mongo {
-#line 149 "src/mongo/db/cst/pipeline_parser_gen.cpp"
-
+#line 151 "pipeline_parser_gen.cpp"
 
 /// Build a parser object.
 PipelineParserGen::PipelineParserGen(BSONLexer& driver_yyarg, CNode* cst_yyarg)
@@ -161,7 +162,7 @@ PipelineParserGen::~PipelineParserGen() {}
 PipelineParserGen::syntax_error::~syntax_error() YY_NOEXCEPT YY_NOTHROW {}
 
 /*---------------.
-| Symbol types.  |
+| symbol kinds.  |
 `---------------*/
 
 
@@ -181,19 +182,20 @@ void PipelineParserGen::by_state::move(by_state& that) {
 
 PipelineParserGen::by_state::by_state(state_type s) YY_NOEXCEPT : state(s) {}
 
-PipelineParserGen::symbol_number_type PipelineParserGen::by_state::type_get() const YY_NOEXCEPT {
+PipelineParserGen::symbol_kind_type PipelineParserGen::by_state::kind() const YY_NOEXCEPT {
     if (state == empty_state)
-        return empty_symbol;
+        return symbol_kind::S_YYEMPTY;
     else
-        return yystos_[+state];
+        return YY_CAST(symbol_kind_type, yystos_[+state]);
 }
 
 PipelineParserGen::stack_symbol_type::stack_symbol_type() {}
 
 PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) that)
     : super_type(YY_MOVE(that.state), YY_MOVE(that.location)) {
-    switch (that.type_get()) {
-        case 17:  // stageList
+    switch (that.kind()) {
+        case 16:  // stageList
+        case 17:  // stage
             value.YY_MOVE_OR_COPY<CNode>(YY_MOVE(that.value));
             break;
 
@@ -213,10 +215,6 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_ty
             value.YY_MOVE_OR_COPY<long long>(YY_MOVE(that.value));
             break;
 
-        case 18:  // stage
-            value.YY_MOVE_OR_COPY<std::pair<KeyFieldname, CNode>>(YY_MOVE(that.value));
-            break;
-
         case 10:  // STRING
             value.YY_MOVE_OR_COPY<std::string>(YY_MOVE(that.value));
             break;
@@ -233,8 +231,9 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_ty
 
 PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(symbol_type) that)
     : super_type(s, YY_MOVE(that.location)) {
-    switch (that.type_get()) {
-        case 17:  // stageList
+    switch (that.kind()) {
+        case 16:  // stageList
+        case 17:  // stage
             value.move<CNode>(YY_MOVE(that.value));
             break;
 
@@ -254,10 +253,6 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_RE
             value.move<long long>(YY_MOVE(that.value));
             break;
 
-        case 18:  // stage
-            value.move<std::pair<KeyFieldname, CNode>>(YY_MOVE(that.value));
-            break;
-
         case 10:  // STRING
             value.move<std::string>(YY_MOVE(that.value));
             break;
@@ -267,15 +262,16 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_RE
     }
 
     // that is emptied.
-    that.type = empty_symbol;
+    that.kind_ = symbol_kind::S_YYEMPTY;
 }
 
 #if YY_CPLUSPLUS < 201103L
 PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::operator=(
     const stack_symbol_type& that) {
     state = that.state;
-    switch (that.type_get()) {
-        case 17:  // stageList
+    switch (that.kind()) {
+        case 16:  // stageList
+        case 17:  // stage
             value.copy<CNode>(that.value);
             break;
 
@@ -295,10 +291,6 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
             value.copy<long long>(that.value);
             break;
 
-        case 18:  // stage
-            value.copy<std::pair<KeyFieldname, CNode>>(that.value);
-            break;
-
         case 10:  // STRING
             value.copy<std::string>(that.value);
             break;
@@ -314,8 +306,9 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
 PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::operator=(
     stack_symbol_type& that) {
     state = that.state;
-    switch (that.type_get()) {
-        case 17:  // stageList
+    switch (that.kind()) {
+        case 16:  // stageList
+        case 17:  // stage
             value.move<CNode>(that.value);
             break;
 
@@ -333,10 +326,6 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
 
         case 12:  // NUMBER_LONG
             value.move<long long>(that.value);
-            break;
-
-        case 18:  // stage
-            value.move<std::pair<KeyFieldname, CNode>>(that.value);
             break;
 
         case 10:  // STRING
@@ -365,18 +354,15 @@ template <typename Base>
 void PipelineParserGen::yy_print_(std::ostream& yyo, const basic_symbol<Base>& yysym) const {
     std::ostream& yyoutput = yyo;
     YYUSE(yyoutput);
-    symbol_number_type yytype = yysym.type_get();
-#if defined __GNUC__ && !defined __clang__ && !defined __ICC && \
-    __GNUC__ * 100 + __GNUC_MINOR__ <= 408
-    // Avoid a (spurious) G++ 4.8 warning about "array subscript is
-    // below array bounds".
     if (yysym.empty())
-        std::abort();
-#endif
-    yyo << (yytype < yyntokens_ ? "token" : "nterm") << ' ' << yytname_[yytype] << " ("
-        << yysym.location << ": ";
-    YYUSE(yytype);
-    yyo << ')';
+        yyo << "empty symbol";
+    else {
+        symbol_kind_type yykind = yysym.kind();
+        yyo << (yykind < YYNTOKENS ? "token" : "nterm") << ' ' << yysym.name() << " ("
+            << yysym.location << ": ";
+        YYUSE(yykind);
+        yyo << ')';
+    }
 }
 #endif
 
@@ -419,11 +405,11 @@ void PipelineParserGen::set_debug_level(debug_level_type l) {
 #endif  // YYDEBUG
 
 PipelineParserGen::state_type PipelineParserGen::yy_lr_goto_state_(state_type yystate, int yysym) {
-    int yyr = yypgoto_[yysym - yyntokens_] + yystate;
+    int yyr = yypgoto_[yysym - YYNTOKENS] + yystate;
     if (0 <= yyr && yyr <= yylast_ && yycheck_[yyr] == yystate)
         return yytable_[yyr];
     else
-        return yydefgoto_[yysym - yyntokens_];
+        return yydefgoto_[yysym - YYNTOKENS];
 }
 
 bool PipelineParserGen::yy_pact_value_is_default_(int yyvalue) {
@@ -475,6 +461,7 @@ int PipelineParserGen::parse() {
     `-----------------------------------------------*/
     yynewstate:
         YYCDEBUG << "Entering state " << int(yystack_[0].state) << '\n';
+        YY_STACK_PRINT();
 
         // Accept?
         if (yystack_[0].state == yyfinal_)
@@ -494,7 +481,7 @@ int PipelineParserGen::parse() {
 
         // Read a lookahead token.
         if (yyla.empty()) {
-            YYCDEBUG << "Reading a token: ";
+            YYCDEBUG << "Reading a token\n";
 #if YY_EXCEPTIONS
             try
 #endif  // YY_EXCEPTIONS
@@ -512,10 +499,19 @@ int PipelineParserGen::parse() {
         }
         YY_SYMBOL_PRINT("Next token is", yyla);
 
+        if (yyla.kind() == symbol_kind::S_YYerror) {
+            // The scanner already issued an error message, process directly
+            // to error recovery.  But do not keep the error token as
+            // lookahead, it is too special and may lead us to an endless
+            // loop in error recovery. */
+            yyla.kind_ = symbol_kind::S_YYUNDEF;
+            goto yyerrlab1;
+        }
+
         /* If the proper action on seeing token YYLA.TYPE is to reduce or
            to detect an error, take that action.  */
-        yyn += yyla.type_get();
-        if (yyn < 0 || yylast_ < yyn || yycheck_[yyn] != yyla.type_get()) {
+        yyn += yyla.kind();
+        if (yyn < 0 || yylast_ < yyn || yycheck_[yyn] != yyla.kind()) {
             goto yydefault;
         }
 
@@ -559,7 +555,8 @@ int PipelineParserGen::parse() {
                correct type. The default '$$ = $1' action is NOT applied
                when using variants.  */
             switch (yyr1_[yyn]) {
-                case 17:  // stageList
+                case 16:  // stageList
+                case 17:  // stage
                     yylhs.value.emplace<CNode>();
                     break;
 
@@ -577,10 +574,6 @@ int PipelineParserGen::parse() {
 
                 case 12:  // NUMBER_LONG
                     yylhs.value.emplace<long long>();
-                    break;
-
-                case 18:  // stage
-                    yylhs.value.emplace<std::pair<KeyFieldname, CNode>>();
                     break;
 
                 case 10:  // STRING
@@ -607,43 +600,42 @@ int PipelineParserGen::parse() {
             {
                 switch (yyn) {
                     case 2:
-#line 130 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 129 "pipeline_grammar.yy"
                     {
                         *cst = std::move(yystack_[1].value.as<CNode>());
                     }
-#line 678 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+#line 673 "pipeline_parser_gen.cpp"
                     break;
 
                     case 3:
-#line 135 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 134 "pipeline_grammar.yy"
                     {
                     }
-#line 684 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+#line 679 "pipeline_parser_gen.cpp"
                     break;
 
                     case 4:
-#line 136 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 135 "pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = std::move(yystack_[0].value.as<CNode>());
                         auto& children =
-                            stdx::get<CNode::Children>(yylhs.value.as<CNode>().payload);
-                        children.emplace_back(
-                            std::move(yystack_[2].value.as<std::pair<KeyFieldname, CNode>>()));
+                            stdx::get<CNode::ArrayChildren>(yylhs.value.as<CNode>().payload);
+                        children.emplace_back(std::move(yystack_[2].value.as<CNode>()));
                     }
-#line 694 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+#line 689 "pipeline_parser_gen.cpp"
                     break;
 
                     case 5:
-#line 144 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 143 "pipeline_grammar.yy"
                     {
-                        yylhs.value.as<std::pair<KeyFieldname, CNode>>() =
-                            std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()};
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
                     }
-#line 702 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+#line 697 "pipeline_parser_gen.cpp"
                     break;
 
 
-#line 706 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+#line 701 "pipeline_parser_gen.cpp"
 
                     default:
                         break;
@@ -659,7 +651,6 @@ int PipelineParserGen::parse() {
             YY_SYMBOL_PRINT("-> $$ =", yylhs);
             yypop_(yylen);
             yylen = 0;
-            YY_STACK_PRINT();
 
             // Shift the result of the reduction.
             yypush_(YY_NULLPTR, YY_MOVE(yylhs));
@@ -674,7 +665,8 @@ int PipelineParserGen::parse() {
         // If not already recovering from an error, report this error.
         if (!yyerrstatus_) {
             ++yynerrs_;
-            error(yyla.location, yysyntax_error_(yystack_[0].state, yyla));
+            std::string msg = YY_("syntax error");
+            error(yyla.location, YY_MOVE(msg));
         }
 
 
@@ -684,7 +676,7 @@ int PipelineParserGen::parse() {
                error, discard it.  */
 
             // Return failure if at end of input.
-            if (yyla.type_get() == yyeof_)
+            if (yyla.kind() == symbol_kind::S_YYEOF)
                 YYABORT;
             else if (!yyla.empty()) {
                 yy_destroy_("Error: discarding", yyla);
@@ -709,6 +701,7 @@ int PipelineParserGen::parse() {
            this YYERROR.  */
         yypop_(yylen);
         yylen = 0;
+        YY_STACK_PRINT();
         goto yyerrlab1;
 
 
@@ -717,28 +710,29 @@ int PipelineParserGen::parse() {
     `-------------------------------------------------------------*/
     yyerrlab1:
         yyerrstatus_ = 3;  // Each real token shifted decrements this.
+        // Pop stack until we find a state that shifts the error token.
+        for (;;) {
+            yyn = yypact_[+yystack_[0].state];
+            if (!yy_pact_value_is_default_(yyn)) {
+                yyn += symbol_kind::S_YYerror;
+                if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == symbol_kind::S_YYerror) {
+                    yyn = yytable_[yyn];
+                    if (0 < yyn)
+                        break;
+                }
+            }
+
+            // Pop the current state because it cannot handle the error token.
+            if (yystack_.size() == 1)
+                YYABORT;
+
+            yyerror_range[1].location = yystack_[0].location;
+            yy_destroy_("Error: popping", yystack_[0]);
+            yypop_();
+            YY_STACK_PRINT();
+        }
         {
             stack_symbol_type error_token;
-            for (;;) {
-                yyn = yypact_[+yystack_[0].state];
-                if (!yy_pact_value_is_default_(yyn)) {
-                    yyn += yy_error_token_;
-                    if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == yy_error_token_) {
-                        yyn = yytable_[yyn];
-                        if (0 < yyn)
-                            break;
-                    }
-                }
-
-                // Pop the current state because it cannot handle the error token.
-                if (yystack_.size() == 1)
-                    YYABORT;
-
-                yyerror_range[1].location = yystack_[0].location;
-                yy_destroy_("Error: popping", yystack_[0]);
-                yypop_();
-                YY_STACK_PRINT();
-            }
 
             yyerror_range[2].location = yyla.location;
             YYLLOC_DEFAULT(error_token.location, yyerror_range, 2);
@@ -776,6 +770,7 @@ int PipelineParserGen::parse() {
         /* Do not reclaim the symbols of the rule whose action triggered
            this YYABORT or YYACCEPT.  */
         yypop_(yylen);
+        YY_STACK_PRINT();
         while (1 < yystack_.size()) {
             yy_destroy_("Cleanup: popping", yystack_[0]);
             yypop_();
@@ -804,10 +799,11 @@ void PipelineParserGen::error(const syntax_error& yyexc) {
     error(yyexc.location, yyexc.what());
 }
 
-// Generate an error message.
-std::string PipelineParserGen::yysyntax_error_(state_type, const symbol_type&) const {
-    return YY_("syntax error");
+#if YYDEBUG || 0
+const char* PipelineParserGen::symbol_name(symbol_kind_type yysymbol) {
+    return yytname_[yysymbol];
 }
+#endif  // #if YYDEBUG || 0
 
 
 const signed char PipelineParserGen::yypact_ninf_ = -8;
@@ -818,27 +814,27 @@ const signed char PipelineParserGen::yypact_[] = {-7, -2, 2, -6, -4, -8, 3, 1, -
 
 const signed char PipelineParserGen::yydefact_[] = {0, 3, 0, 0, 0, 1, 0, 0, 2, 0, 3, 5, 4};
 
-const signed char PipelineParserGen::yypgoto_[] = {-8, -8, -3, -8};
+const signed char PipelineParserGen::yypgoto_[] = {-8, -3, -8, -8};
 
-const signed char PipelineParserGen::yydefgoto_[] = {-1, 2, 4, 7};
+const signed char PipelineParserGen::yydefgoto_[] = {-1, 4, 7, 2};
 
 const signed char PipelineParserGen::yytable_[] = {1, 3, 5, 6, 8, 10, 9, 12, 11};
 
 const signed char PipelineParserGen::yycheck_[] = {7, 3, 0, 9, 8, 4, 3, 10, 4};
 
-const signed char PipelineParserGen::yystos_[] = {0, 7, 16, 3, 17, 0, 9, 18, 8, 3, 4, 4, 17};
+const signed char PipelineParserGen::yystos_[] = {0, 7, 18, 3, 16, 0, 9, 17, 8, 3, 4, 4, 16};
 
-const signed char PipelineParserGen::yyr1_[] = {0, 15, 16, 17, 17, 18};
+const signed char PipelineParserGen::yyr1_[] = {0, 15, 18, 16, 16, 17};
 
 const signed char PipelineParserGen::yyr2_[] = {0, 2, 3, 0, 4, 3};
 
 
 #if YYDEBUG
 // YYTNAME[SYMBOL-NUM] -- String name of the symbol SYMBOL-NUM.
-// First, the terminals, then, starting at \a yyntokens_, nonterminals.
+// First, the terminals, then, starting at \a YYNTOKENS, nonterminals.
 const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "error",
-                                                   "$undefined",
+                                                   "\"invalid token\"",
                                                    "START_OBJECT",
                                                    "END_OBJECT",
                                                    "START_ORDERED_OBJECT",
@@ -852,24 +848,24 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "NUMBER_DOUBLE",
                                                    "BOOL",
                                                    "$accept",
-                                                   "pipeline",
                                                    "stageList",
                                                    "stage",
+                                                   "pipeline",
                                                    YY_NULLPTR};
+#endif
 
 
-const unsigned char PipelineParserGen::yyrline_[] = {0, 130, 130, 135, 136, 144};
+#if YYDEBUG
+const unsigned char PipelineParserGen::yyrline_[] = {0, 129, 129, 134, 135, 143};
 
-// Print the state stack on the debug stream.
-void PipelineParserGen::yystack_print_() {
+void PipelineParserGen::yy_stack_print_() const {
     *yycdebug_ << "Stack now";
     for (stack_type::const_iterator i = yystack_.begin(), i_end = yystack_.end(); i != i_end; ++i)
         *yycdebug_ << ' ' << int(i->state);
     *yycdebug_ << '\n';
 }
 
-// Report on the debug stream that the rule \a yyrule is going to be reduced.
-void PipelineParserGen::yy_reduce_print_(int yyrule) {
+void PipelineParserGen::yy_reduce_print_(int yyrule) const {
     int yylno = yyrline_[yyrule];
     int yynrhs = yyr2_[yyrule];
     // Print the symbols being reduced, and their result.
@@ -881,8 +877,8 @@ void PipelineParserGen::yy_reduce_print_(int yyrule) {
 #endif  // YYDEBUG
 
 
-#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 52 "pipeline_grammar.yy"
 }  // namespace mongo
-#line 1000 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+#line 1003 "pipeline_parser_gen.cpp"
 
-#line 149 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 148 "pipeline_grammar.yy"
