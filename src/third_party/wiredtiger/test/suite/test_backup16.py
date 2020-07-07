@@ -42,11 +42,20 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
     logmax='100K'
     mult=1
     nops=10
+
+    # Define the table name and its on-disk file name together.
+    file1='test1.wt'
     uri1='table:test1'
+    file2='test2.wt'
     uri2='table:test2'
+    file3='test3.wt'
     uri3='table:test3'
+    file4='test4.wt'
     uri4='table:test4'
+    file5='test5.wt'
     uri5='table:test5'
+    file6='test6.wt'
+    uri6='table:test6'
 
     pfx = 'test_backup'
     # Set the key and value big enough that we modify a few blocks.
@@ -75,6 +84,8 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
         num_files = 0
 
         # Verify the files included in the incremental backup are the ones we expect.
+        # Note that all files will be returned. We're only interested in the ones that
+        # return file information.
         while True:
             ret = bkup_cur.next()
             if ret != 0:
@@ -89,6 +100,7 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
 
             while True:
                 ret = incr_cur.next()
+                # Stop if there is nothing to copy or we're done.
                 if ret != 0:
                     break
 
@@ -97,9 +109,9 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
                 num_files += 1
 
                 # Ensure that the file we changed has content to copy and the file we didn't
-                # change doesn't have any content to copy.
-                # Note:
-                # Pretty sure this is the file size and not the number of bytes to copy.
+                # change doesn't have any content to copy. The second value is the number of
+                # bytes to copy for a range return or the file size on a file copy. Either way
+                # it should not be zero.
                 incr_list = incr_cur.get_keys()
                 self.assertNotEqual(incr_list[1], 0)
 
@@ -113,9 +125,11 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_backup16(self):
 
+        # Create four tables before the first backup. Add data to two of them.
         self.session.create(self.uri1, 'key_format=S,value_format=S')
         self.session.create(self.uri2, 'key_format=S,value_format=S')
         self.session.create(self.uri3, 'key_format=S,value_format=S')
+        self.session.create(self.uri6, 'key_format=S,value_format=S')
         self.add_data(self.uri1)
         self.add_data(self.uri2)
 
@@ -126,6 +140,19 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
         cursor.close()
 
         # Create new tables, add more data and checkpoint.
+        # Add data to an earlier table and one of the new tables. This now gives us:
+        # 1. An existing table with checkpointed new data and changes to record.
+        # 2. An existing table with old data and no new changes.
+        # 3. An existing table with no data at all but gets new data.
+        # 4. An new table with no data and that will never have new data.
+        # 5. A new table with checkpointed new data.
+        # 6. An existing table with no data and that will never have new data.
+        #
+        # Note that cases 4 and 6 are different. In the case of table 6, since it existed on
+        # disk at the time of the initial full backup it will never appear in the list of files
+        # with any data to copy. In the case of table 4 we will be told to copy the whole file
+        # every time in order to have the new file appear in the backup.
+        #
         self.session.create(self.uri4, "key_format=S,value_format=S")
         self.session.create(self.uri5, "key_format=S,value_format=S")
         self.add_data(self.uri1)
@@ -133,21 +160,25 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.checkpoint()
 
         # Validate these three files are included in the incremental.
-        files_to_backup = ['test1.wt', 'test4.wt', 'test5.wt']
+        # Both new tables should appear in the incremental and the old table with
+        # new data.
+        files_to_backup = [self.file1, self.file4, self.file5]
         self.verify_incr_backup(files_to_backup)
 
-        # Add more data and checkpoint.
+        # Add more data and checkpoint. Earlier old tables without new data should not
+        # appear in the list. The table with no data at all continues to appear in the
+        # list.
         self.add_data(self.uri3)
         self.add_data(self.uri5)
         self.session.checkpoint()
 
         # Validate these three files are included in the incremental.
-        files_to_backup = ['test3.wt', 'test4.wt', 'test5.wt']
+        files_to_backup = [self.file3, self.file4, self.file5]
         self.verify_incr_backup(files_to_backup)
 
         # Perform one more incremental without changing anything. We should only
-        # see one file.
-        files_to_backup = ['test4.wt']
+        # see one file, the file that does not have any checkpoint information.
+        files_to_backup = [self.file4]
         self.verify_incr_backup(files_to_backup)
 
 if __name__ == '__main__':
