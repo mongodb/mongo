@@ -72,12 +72,13 @@ server_parameters:
     cpp_varname: "tlsOCSPCacheSize"
     validator:
       gt: 0
-  ocspValidationRefreshPeriodSecs:
+  ocspStaplingRefreshPeriodSecs:
     description: "Interval at which the OCSP response will be refreshed"
     set_at: startup
     cpp_vartype: int
+    deprecated_name: ocspValidationRefreshPeriodSecs
     default: -1
-    cpp_varname: "kOCSPValidationRefreshPeriodSecs"
+    cpp_varname: "kOCSPStaplingRefreshPeriodSecs"
     validator:
       gte: 1
   tlsOCSPVerifyTimeoutSecs:

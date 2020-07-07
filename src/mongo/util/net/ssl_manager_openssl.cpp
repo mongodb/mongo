@@ -1801,8 +1801,8 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
             Milliseconds duration;
             if (swDurationInitial.isOK()) {
                 // if the validation refresh period was set manually, use it
-                if (kOCSPValidationRefreshPeriodSecs != -1) {
-                    duration = Seconds(kOCSPValidationRefreshPeriodSecs);
+                if (kOCSPStaplingRefreshPeriodSecs != -1) {
+                    duration = Seconds(kOCSPStaplingRefreshPeriodSecs);
                 } else {
                     duration = swDurationInitial.getValue();
                 }
@@ -1822,9 +1822,9 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
                                 return;
                             } else {
                                 // if the validation refresh period was set manually, use it
-                                if (kOCSPValidationRefreshPeriodSecs != -1) {
+                                if (kOCSPStaplingRefreshPeriodSecs != -1) {
                                     this->_ocspStaplingAnchor.setPeriod(
-                                        Seconds(kOCSPValidationRefreshPeriodSecs));
+                                        Seconds(kOCSPStaplingRefreshPeriodSecs));
                                 } else {
                                     this->_ocspStaplingAnchor.setPeriod(swDuration.getValue());
                                 }
