@@ -95,6 +95,9 @@ struct CollectionUpdateArgs {
 
     StoreDocOption storeDocOption = StoreDocOption::None;
     bool preImageRecordingEnabledForCollection = false;
+
+    // Set if an OpTime was reserved for the update ahead of time.
+    boost::optional<OplogSlot> oplogSlot = boost::none;
 };
 
 /**
