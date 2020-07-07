@@ -80,13 +80,9 @@ function deleteIndexKeysByUpdateDocs(testDB, collName, keys) {
     }
 }
 
-function createIndex(testColl, background, unique) {
+function createIndex(testColl, unique) {
     let numIndexesBefore = testColl.getIndexes().length;
-    if (background)
-        assert.commandWorked(
-            testColl.createIndex({k: 1}, {background: background, unique: unique}));
-    else
-        assert.commandWorked(testColl.createIndex({k: 1}, {unique: unique}));
+    assert.commandWorked(testColl.createIndex({k: 1}, {unique: unique}));
     assert.eq(numIndexesBefore + 1, testColl.getIndexes().length);
 }
 
@@ -100,7 +96,7 @@ function dropIndex(testColl) {
 /**
  * This test makes sure we can insert, read, update and delete big index keys.
  */
-function testAllInteractionsWithBigIndexKeys(testDB, collName, backgroundIndexBuild) {
+function testAllInteractionsWithBigIndexKeys(testDB, collName) {
     [true, false].forEach(function(uniqueIndex) {
         [true, false].forEach(function(createIndexFirst) {
             for (let i = 0; i < bigKeyGroups.length; i++) {
@@ -112,11 +108,11 @@ function testAllInteractionsWithBigIndexKeys(testDB, collName, backgroundIndexBu
 
                 // Test that we can insert big index keys.
                 if (createIndexFirst) {
-                    createIndex(testColl, backgroundIndexBuild, uniqueIndex);
+                    createIndex(testColl, uniqueIndex);
                     insertIndexKeysByInsertDocs(testColl, keys);
                 } else {
                     insertIndexKeysByInsertDocs(testColl, keys);
-                    createIndex(testColl, backgroundIndexBuild, uniqueIndex);
+                    createIndex(testColl, uniqueIndex);
                 }
 
                 // Test that we can read big index keys by querying with keys.

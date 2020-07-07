@@ -13,5 +13,5 @@ load("jstests/libs/index_bigkeys.js");
 
 const collName = "index_bigkeys_foreground_test";
 
-testAllInteractionsWithBigIndexKeys(db, collName, false);
+testAllInteractionsWithBigIndexKeys(db, collName);
 }());
