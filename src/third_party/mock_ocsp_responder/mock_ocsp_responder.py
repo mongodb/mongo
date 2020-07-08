@@ -599,6 +599,8 @@ def _handle_get(u_path):
     An OCSP GET request contains the DER-in-base64 encoded OCSP request in the
     HTTP request URL.
     """
+    if "Host" not in request.headers:
+        raise ValueError ("Required 'Host' header not present")
     der = base64.b64decode(u_path)
     ocsp_request = responder.parse_ocsp_request(der)
     return responder.build_http_response(ocsp_request)
@@ -610,5 +612,7 @@ def _handle_post():
     An OCSP POST request contains the DER encoded OCSP request in the HTTP
     request body.
     """
+    if "Host" not in request.headers:
+        raise ValueError ("Required 'Host' header not present")
     ocsp_request = responder.parse_ocsp_request(request.data)
     return responder.build_http_response(ocsp_request)
