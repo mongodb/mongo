@@ -58,7 +58,6 @@ var RenameAcrossDatabasesTest = function(options) {
         for (let i = 1; i < nodes.length; ++i) {
             replTest.add(nodes[i]);
         }
-        replTest.waitForAllNewlyAddedRemovals();
 
         const conns = replTest.nodes;
         const hosts = replTest.nodeList();

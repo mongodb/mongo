@@ -179,9 +179,7 @@ public:
 
     repl::ReplSetConfig getConfig() const override;
 
-    void processReplSetGetConfig(BSONObjBuilder*,
-                                 bool commitmentStatus = false,
-                                 bool includeNewlyAdded = false) override;
+    void processReplSetGetConfig(BSONObjBuilder*, bool commitmentStatus = false) override;
 
     void processReplSetMetadata(const rpc::ReplSetMetadata&) override;
 

@@ -18,7 +18,11 @@ load("jstests/libs/parallel_shell_helpers.js");  // for funWithArgs()
 
 // Start a single node replica set.
 // Disable Chaining so that initial sync nodes always sync from primary.
-const rst = new ReplSetTest({nodes: 1, settings: {chainingAllowed: false}});
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {setParameter: {enableAutomaticReconfig: true}},
+    settings: {chainingAllowed: false}
+});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
@@ -56,6 +60,8 @@ function checkFCV({version, targetVersion}) {
 }
 
 function addNewVotingNode({parallel: parallel = false, startupParams: startupParams = {}}) {
+    startupParams['enableAutomaticReconfig'] = true;
+
     const conn = rst.add({rsConfig: {priority: 0, votes: 1}, setParameter: startupParams});
 
     jsTestLog("Adding a new voting node {" + conn.host + "} to the replica set");

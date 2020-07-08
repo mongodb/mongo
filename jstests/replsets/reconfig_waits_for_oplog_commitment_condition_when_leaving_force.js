@@ -51,7 +51,7 @@ assert.commandWorked(primary.adminCommand({replSetReconfig: twoNodeConfig, force
 
 // Wait until the config has propagated to the secondary and the primary has learned of it, so that
 // the config replication check is satisfied.
-rst.waitForConfigReplication(primary);
+waitForConfigReplication(primary);
 
 // Reconfig should succeed even if we have not committed the last committed op in the current
 // config because the current config is from a force reconfig.

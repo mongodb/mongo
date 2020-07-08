@@ -41,7 +41,7 @@ C1.members = C1.members.slice(0, 3);  // Remove the last node.
 // Increase the C1 version by a high number to ensure the following config
 // C2 will win the propagation by having a higher term.
 C1.version = C1.version + 1000;
-rst.waitForConfigReplication(node0);
+waitForConfigReplication(node0);
 rst.awaitReplication();
 
 jsTestLog("Disconnecting the primary from other nodes");
@@ -78,7 +78,7 @@ node0.reconnect([node1, node2, node3]);
 // step down from being primary. The reconfig command issued to this node, C1, will fail.
 rst.waitForState(node0, ReplSetTest.State.SECONDARY);
 rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, [node0, node1, node3]);
-rst.waitForConfigReplication(node1);
+waitForConfigReplication(node1);
 assert.eq(C2, rst.getReplSetConfigFromNode());
 
 // The new config is now {node0, node1, node2, node3}.

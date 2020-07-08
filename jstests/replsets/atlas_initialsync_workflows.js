@@ -96,9 +96,6 @@ function testAddWithInitialSync(secondariesDown) {
 }
 
 function testReplaceWithInitialSync(secondariesDown) {
-    // Wait for existing reconfigs to complete.
-    rst.waitForAllNewlyAddedRemovals();
-
     const nodeToBeReplaced = rst.getSecondaries()[2];
     secondariesDown = secondariesDown || 0;
     const useForce = secondariesDown > 1;

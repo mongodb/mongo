@@ -276,7 +276,7 @@ server_parameters:
         test_only: true
         cpp_vartype: bool
         cpp_varname: enableAutomaticReconfig
-        default: true
+        default: false
 
     oplogApplicationEnforcesSteadyStateConstraints:
         description: >-

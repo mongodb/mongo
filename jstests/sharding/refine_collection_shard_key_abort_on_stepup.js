@@ -38,7 +38,7 @@ cfg.settings.electionTimeoutMillis = csrs.kDefaultTimeoutMS;
 cfg.settings.catchUpTimeoutMillis = 0;
 cfg.settings.chainingAllowed = false;
 reconfig(csrs, cfg, true);
-csrs.waitForConfigReplication(csrs.getPrimary());
+waitForConfigReplication(csrs.getPrimary());
 csrs.awaitReplication();
 
 const kDbName = jsTestName();

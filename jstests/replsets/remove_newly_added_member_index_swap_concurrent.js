@@ -18,13 +18,22 @@ const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest({name: testName, nodes: 1, settings: {chainingAllowed: false}});
+const rst = new ReplSetTest({
+    name: testName,
+    nodes: 1,
+    nodeOptions: {setParameter: {enableAutomaticReconfig: true}},
+    settings: {chainingAllowed: false}
+});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
 const primaryColl = primaryDb.getCollection(collName);
+
+// TODO (SERVER-46808): Move this into ReplSetTest.initiate
+waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 0);
+waitForConfigReplication(primary, rst.nodes);
 
 assert.commandWorked(primaryColl.insert({"starting": "doc"}));
 
@@ -33,6 +42,7 @@ const newNodeOne = rst.add({
     setParameter: {
         'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
         'numInitialSyncAttempts': 1,
+        'enableAutomaticReconfig': true,
     }
 });
 
@@ -41,6 +51,7 @@ const newNodeTwo = rst.add({
     setParameter: {
         'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
         'numInitialSyncAttempts': 1,
+        'enableAutomaticReconfig': true,
     }
 });
 
@@ -90,7 +101,7 @@ config.members[1] = config.members[2];
 config.members[2] = tempMemberOne;
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
-rst.waitForConfigReplication(primary);
+waitForConfigReplication(primary);
 
 jsTestLog("Making sure the config now has the ids and indexes flipped");
 configOnDisk = primary.getDB("local").system.replset.findOne();

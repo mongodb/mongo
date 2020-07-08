@@ -9,7 +9,8 @@
 load("jstests/replsets/rslib.js");
 load('jstests/libs/fail_point_util.js');
 
-const rst = new ReplSetTest({name: jsTestName(), nodes: 1});
+const rst = new ReplSetTest(
+    {name: jsTestName(), nodes: 1, nodeOptions: {setParameter: {enableAutomaticReconfig: true}}});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
@@ -19,6 +20,10 @@ const dbName = "testdb";
 const collName = "testcoll";
 const primaryDb = primary.getDB(dbName);
 const primaryColl = primaryDb.getCollection(collName);
+
+// TODO (SERVER-46808): Move this into ReplSetTest.initiate
+waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 0);
+assert.eq(false, isMemberNewlyAdded(primary, 0));
 
 assert.commandWorked(primaryColl.insert({"starting": "doc"}));
 
@@ -41,6 +46,7 @@ const addNode = (id, {newlyAdded, force, shouldSucceed, failureCode} = {}) => {
                 tojson({mode: 'alwaysOn', data: {"hostAndPort": primary.host}}),
             'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
             'numInitialSyncAttempts': 1,
+            'enableAutomaticReconfig': true
         }
     });
 
@@ -70,7 +76,7 @@ const addNode = (id, {newlyAdded, force, shouldSucceed, failureCode} = {}) => {
     jsTestLog("Running reconfig with valid config " + tojsononeline(config));
     assert(!failureCode);
     assert.commandWorked(primary.adminCommand({replSetReconfig: config, force: force}));
-    rst.waitForConfigReplication(primary, rst.nodes);
+    waitForConfigReplication(primary, rst.nodes);
 
     assert.commandWorked(newNode.adminCommand({
         waitForFailPoint: "initialSyncHangBeforeFinish",

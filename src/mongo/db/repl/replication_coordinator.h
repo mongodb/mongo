@@ -634,12 +634,8 @@ public:
      *
      * If commitmentStatus is true, adds a boolean 'commitmentStatus' field to 'result' indicating
      * whether the current config is committed.
-     *
-     * If includeNewlyAdded is true, does not omit 'newlyAdded' fields from the config.
      */
-    virtual void processReplSetGetConfig(BSONObjBuilder* result,
-                                         bool commitmentStatus = false,
-                                         bool includeNewlyAdded = false) = 0;
+    virtual void processReplSetGetConfig(BSONObjBuilder* result, bool commitmentStatus = false) = 0;
 
     /**
      * Processes the ReplSetMetadata returned from a command run against another

@@ -1146,7 +1146,7 @@ var ReplSetTest = function(opts) {
     };
 
     function replSetCommandWithRetry(master, cmd) {
-        print("Running command with retry: " + tojson(cmd));
+        printjson(cmd);
         const cmdName = Object.keys(cmd)[0];
         const errorMsg = `${cmdName} during initiate failed`;
         assert.retry(() => {
@@ -1155,98 +1155,12 @@ var ReplSetTest = function(opts) {
                 [
                     ErrorCodes.NodeNotFound,
                     ErrorCodes.NewReplicaSetConfigurationIncompatible,
-                    ErrorCodes.InterruptedDueToReplStateChange,
-                    ErrorCodes.ConfigurationInProgress,
-                    ErrorCodes.CurrentConfigNotCommittedYet
+                    ErrorCodes.InterruptedDueToReplStateChange
                 ],
                 errorMsg);
             return result.ok;
         }, errorMsg, 3, 5 * 1000);
     }
-
-    /**
-     * Wait until the config on the primary becomes committed. Callers specify the primary in case
-     * this must be called when two nodes are expected to be concurrently primary.
-     */
-    this.waitForConfigReplication = function(primary, nodes) {
-        const nodeHosts = nodes ? tojson(nodes.map((n) => n.host)) : "all nodes";
-        print("waitForConfigReplication: Waiting for the config on " + primary.host +
-              " to replicate to " + nodeHosts);
-
-        let configVersion = -2;
-        let configTerm = -2;
-        assert.soon(function() {
-            const res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-            const primaryMember = res.members.find((m) => m.self);
-            configVersion = primaryMember.configVersion;
-            configTerm = primaryMember.configTerm;
-            function hasSameConfig(member) {
-                return member.configVersion === primaryMember.configVersion &&
-                    member.configTerm === primaryMember.configTerm;
-            }
-            let members = res.members;
-            if (nodes) {
-                members = res.members.filter((m) => nodes.some((node) => m.name === node.host));
-            }
-            return members.every((m) => hasSameConfig(m));
-        });
-
-        print("waitForConfigReplication: config on " + primary.host +
-              " replicated successfully to " + nodeHosts + " with version " + configVersion +
-              " and term " + configTerm);
-    };
-
-    /**
-     * Waits for all 'newlyAdded' fields to be removed, for that config to be committed, and for
-     * the in-memory and on-disk configs to match.
-     */
-    this.waitForAllNewlyAddedRemovals = function(timeout) {
-        timeout = timeout || self.kDefaultTimeoutMS;
-        print("waitForAllNewlyAddedRemovals: starting for set " + self.name);
-        const primary = self.getPrimary();
-
-        // Shadow 'db' so that we can call the function on the primary without a separate shell when
-        // x509 auth is not needed.
-        let db = primary.getDB('admin');
-        runFnWithAuthOnPrimary(function() {
-            assert.soon(function() {
-                const getConfigRes = assert.commandWorked(db.adminCommand({
-                    replSetGetConfig: 1,
-                    commitmentStatus: true,
-                    $_internalIncludeNewlyAdded: true
-                }));
-                const config = getConfigRes.config;
-                for (let i = 0; i < config.members.length; i++) {
-                    const memberConfig = config.members[i];
-                    if (memberConfig.hasOwnProperty("newlyAdded")) {
-                        assert(memberConfig["newlyAdded"] === true, config);
-                        print("waitForAllNewlyAddedRemovals: Retrying because memberIndex " + i +
-                              " is still 'newlyAdded'");
-                        return false;
-                    }
-                }
-                if (!getConfigRes.hasOwnProperty("commitmentStatus")) {
-                    print(
-                        "waitForAllNewlyAddedRemovals: Skipping wait due to no commitmentStatus." +
-                        " Assuming this is an older version.");
-                    return true;
-                }
-
-                if (!getConfigRes.commitmentStatus) {
-                    print("waitForAllNewlyAddedRemovals: " +
-                          "Retrying because primary's config isn't committed. " +
-                          "Version: " + config.version + ", Term: " + config.term);
-                    return false;
-                }
-
-                return true;
-            });
-        }, "waitForAllNewlyAddedRemovals");
-
-        self.waitForConfigReplication(primary);
-
-        print("waitForAllNewlyAddedRemovals: finished for set " + this.name);
-    };
 
     /**
      * Runs replSetInitiate on the first node of the replica set.
@@ -1257,8 +1171,7 @@ var ReplSetTest = function(opts) {
      */
     this.initiateWithAnyNodeAsPrimary = function(cfg, initCmd, {
         doNotWaitForStableRecoveryTimestamp: doNotWaitForStableRecoveryTimestamp = false,
-        doNotWaitForReplication: doNotWaitForReplication = false,
-        doNotWaitForNewlyAddedRemovals: doNotWaitForNewlyAddedRemovals = false
+        doNotWaitForReplication: doNotWaitForReplication = false
     } = {}) {
         let startTime = new Date();  // Measure the execution time of this function.
         var master = this.nodes[0].getDB("admin");
@@ -1444,30 +1357,11 @@ var ReplSetTest = function(opts) {
             print("Reconfiguring replica set to add in other nodes");
             for (let i = 2; i <= originalMembers.length; i++) {
                 print("ReplSetTest adding in node " + i);
-                assert.soon(function() {
-                    const statusRes =
-                        assert.commandWorked(master.adminCommand({replSetGetStatus: 1}));
-                    const primaryMember = statusRes.members.find((m) => m.self);
-                    config.version = primaryMember.configVersion + 1;
-
-                    config.members = originalMembers.slice(0, i);
-                    cmd = {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS};
-                    print("Running reconfig command: " + tojsononeline(cmd));
-                    const reconfigRes = master.adminCommand(cmd);
-                    const retryableReconfigCodes = [
-                        ErrorCodes.NodeNotFound,
-                        ErrorCodes.NewReplicaSetConfigurationIncompatible,
-                        ErrorCodes.InterruptedDueToReplStateChange,
-                        ErrorCodes.ConfigurationInProgress,
-                        ErrorCodes.CurrentConfigNotCommittedYet
-                    ];
-                    if (retryableReconfigCodes.includes(reconfigRes.code)) {
-                        print("Retrying reconfig due to " + tojsononeline(reconfigRes));
-                        return false;
-                    }
-                    assert.commandWorked(reconfigRes);
-                    return true;
-                }, "reconfig for fixture set up failed", ReplSetTest.kDefaultTimeoutMS, 1000);
+                config.members = originalMembers.slice(0, i);
+                // Set a maxTimeMS so reconfig fails if it times out.
+                replSetCommandWithRetry(
+                    master, {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS});
+                config.version++;
             }
         }
 
@@ -1481,13 +1375,6 @@ var ReplSetTest = function(opts) {
         // detect initial sync completion more quickly.
         this.awaitSecondaryNodes(
             self.kDefaultTimeoutMS, null /* slaves */, 25 /* retryIntervalMS */);
-
-        // If test commands are not enabled, we cannot wait for 'newlyAdded' removals. Tests that
-        // disable test commands must ensure 'newlyAdded' removals mid-test are acceptable.
-        if (!doNotWaitForNewlyAddedRemovals && jsTest.options().enableTestCommands) {
-            self.waitForAllNewlyAddedRemovals();
-        }
-
         print("ReplSetTest initiate reconfig and awaitSecondaryNodes took " +
               (new Date() - reconfigStart) + "ms for " + this.nodes.length + " nodes in set '" +
               this.name + "'");
@@ -1746,41 +1633,6 @@ var ReplSetTest = function(opts) {
         return masterOpTime;
     };
 
-    // TODO(SERVER-14017): Remove this extra sub-shell in favor of a cleaner authentication
-    // solution.
-    function runFnWithAuthOnPrimary(fn, fnName) {
-        const primary = self.getPrimary();
-        const primaryId = "n" + self.getNodeId(primary);
-        const primaryOptions = self.nodeOptions[primaryId] || {};
-        const options =
-            (primaryOptions === {} || !self.startOptions) ? primaryOptions : self.startOptions;
-        const authMode = options.clusterAuthMode;
-        if (authMode === "x509") {
-            print(fnName + ": authenticating on separate shell with x509 for " + self.name);
-            const caFile = options.sslCAFile ? options.sslCAFile : options.tlsCAFile;
-            const keyFile =
-                options.sslPEMKeyFile ? options.sslPEMKeyFile : options.tlsCertificateKeyFile;
-            const subShellArgs = [
-                'mongo',
-                '--ssl',
-                '--sslCAFile=' + caFile,
-                '--sslPEMKeyFile=' + keyFile,
-                '--sslAllowInvalidHostnames',
-                '--authenticationDatabase=$external',
-                '--authenticationMechanism=MONGODB-X509',
-                primary.host,
-                '--eval',
-                `(${fn.toString()})();`
-            ];
-
-            const retVal = _runMongoProgram(...subShellArgs);
-            assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
-        } else {
-            print(fnName + ": authenticating with authMode '" + authMode + "' for " + self.name);
-            asCluster(primary, fn, primaryOptions.keyFile);
-        }
-    }
-
     /**
      * This function performs some writes and then waits for all nodes in this replica set to
      * establish a stable recovery timestamp. The writes are necessary to prompt storage engines to
@@ -1802,8 +1654,7 @@ var ReplSetTest = function(opts) {
         // propagate to all members and trigger a stable checkpoint on all persisted storage engines
         // nodes.
         function advanceCommitPoint(master) {
-            // Shadow 'db' so that we can call the function on the primary without a separate shell
-            // when x509 auth is not needed.
+            // Shadow 'db' so that we can call 'advanceCommitPoint' directly on the primary node.
             let db = master.getDB('admin');
             const appendOplogNoteFn = function() {
                 assert.commandWorked(db.adminCommand({
@@ -1813,7 +1664,35 @@ var ReplSetTest = function(opts) {
                 }));
             };
 
-            runFnWithAuthOnPrimary(appendOplogNoteFn, "AwaitLastStableRecoveryTimestamp");
+            // TODO(SERVER-14017): Remove this extra sub-shell in favor of a cleaner authentication
+            // solution.
+            const masterId = "n" + rst.getNodeId(master);
+            const masterOptions = rst.nodeOptions[masterId] || {};
+            if (masterOptions.clusterAuthMode === "x509") {
+                print("AwaitLastStableRecoveryTimestamp: authenticating on separate shell " +
+                      "with x509 for " + id);
+                const subShellArgs = [
+                    'mongo',
+                    '--ssl',
+                    '--sslCAFile=' + masterOptions.sslCAFile,
+                    '--sslPEMKeyFile=' + masterOptions.sslPEMKeyFile,
+                    '--sslAllowInvalidHostnames',
+                    '--authenticationDatabase=$external',
+                    '--authenticationMechanism=MONGODB-X509',
+                    master.host,
+                    '--eval',
+                    `(${appendOplogNoteFn.toString()})();`
+                ];
+
+                const retVal = _runMongoProgram(...subShellArgs);
+                assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+            } else {
+                if (masterOptions.clusterAuthMode) {
+                    print("AwaitLastStableRecoveryTimestamp: authenticating with " +
+                          masterOptions.clusterAuthMode + " for " + id);
+                }
+                asCluster(master, appendOplogNoteFn, masterOptions.keyFile);
+            }
         }
 
         print("AwaitLastStableRecoveryTimestamp: Beginning for " + id);

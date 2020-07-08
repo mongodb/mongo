@@ -195,9 +195,7 @@ public:
 
     virtual ReplSetConfig getConfig() const;
 
-    virtual void processReplSetGetConfig(BSONObjBuilder* result,
-                                         bool commitmentStatus = false,
-                                         bool includeNewlyAdded = false);
+    virtual void processReplSetGetConfig(BSONObjBuilder* result, bool commitmentStatus = false);
 
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
 

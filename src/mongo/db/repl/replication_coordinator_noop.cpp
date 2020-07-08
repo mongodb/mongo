@@ -299,8 +299,7 @@ ReplSetConfig ReplicationCoordinatorNoOp::getConfig() const {
 }
 
 void ReplicationCoordinatorNoOp::processReplSetGetConfig(BSONObjBuilder* result,
-                                                         bool commitmentStatus,
-                                                         bool includeNewlyAdded) {
+                                                         bool commitmentStatus) {
     MONGO_UNREACHABLE;
 }
 

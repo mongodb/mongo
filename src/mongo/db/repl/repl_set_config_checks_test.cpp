@@ -233,6 +233,10 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewlyAddedFieldNotAllowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
     ReplSetConfig firstNewlyAdded;
     ReplSetConfig lastNewlyAdded;
     OID newReplSetId = OID::gen();
@@ -1072,12 +1076,22 @@ TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionOfArbitersDisall
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_SingleNodeAdditionOfNewlyAddedAllowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2);
     BSONArray newMembers = BSON_ARRAY(m1 << m2 << m3_NewlyAdded);  // add 1 'newlyAdded' node.
     ASSERT_OK(validateMemberReconfig(oldMembers, newMembers, m1));
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionOfNewlyAddedAllowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2);
     BSONArray newMembers =
         BSON_ARRAY(m1 << m2 << m3_NewlyAdded << m4_NewlyAdded);  // add 2 'newlyAdded' nodes.
@@ -1085,12 +1099,22 @@ TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionOfNewlyAddedAllo
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeRemovalOfNewlyAddedAllowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2_NewlyAdded << m3_NewlyAdded);
     BSONArray newMembers = BSON_ARRAY(m1);  // Remove 2 'newlyAdded' nodes.
     ASSERT_OK(validateMemberReconfig(oldMembers, newMembers, m1));
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_SimultaneousAddAndRemoveOfNewlyAddedAllowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2_NewlyAdded);
     BSONArray newMembers =
         BSON_ARRAY(m1 << m3_NewlyAdded);  // Remove 'newlyAdded' 2, add 'newlyAdded' 3.
@@ -1098,12 +1122,22 @@ TEST_F(ServiceContextTest, ValidateForReconfig_SimultaneousAddAndRemoveOfNewlyAd
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_SingleAutoReconfigAllowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2_NewlyAdded);
     BSONArray newMembers = BSON_ARRAY(m1 << m2);  // Remove 'newlyAdded' 2, add voting node 2.
     ASSERT_OK(validateMemberReconfig(oldMembers, newMembers, m1));
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_MultiAutoReconfigDisallowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2_NewlyAdded << m3_NewlyAdded);
     BSONArray newMembers =
         BSON_ARRAY(m1 << m2 << m3);  // Remove 'newlyAdded' 2 & 3, add voting node 2 & 3.
@@ -1113,6 +1147,11 @@ TEST_F(ServiceContextTest, ValidateForReconfig_MultiAutoReconfigDisallowed) {
 
 TEST_F(ServiceContextTest,
        ValidateForReconfig_SimultaneousAutoReconfigAndAdditionOfVoterNodeDisallowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2_NewlyAdded);
     BSONArray newMembers =
         BSON_ARRAY(m1 << m2 << m3);  // Remove 'newlyAdded' 2, add voting node 2 & 3.
@@ -1122,6 +1161,11 @@ TEST_F(ServiceContextTest,
 
 TEST_F(ServiceContextTest,
        ValidateForReconfig_SimultaneousAutoReconfigAndRemovalOfVoterNodeDisallowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2_NewlyAdded << m3);
     BSONArray newMembers =
         BSON_ARRAY(m1 << m2);  // Remove 'newlyAdded' 2 and voter node 3, add voting node 2.
@@ -1131,6 +1175,11 @@ TEST_F(ServiceContextTest,
 
 TEST_F(ServiceContextTest,
        ValidateForReconfig_SimultaneousAutoReconfigAndAdditionOfNewlyAddedAllowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2_NewlyAdded);
     BSONArray newMembers = BSON_ARRAY(
         m1 << m2 << m3_NewlyAdded);  // Remove 'newlyAdded' 2, add voting node 2 & 'newlyAdded' 3.
@@ -1139,6 +1188,11 @@ TEST_F(ServiceContextTest,
 
 TEST_F(ServiceContextTest,
        ValidateForReconfig_SimultaneousAutoReconfigAndRemovalOfNewlyAddedAllowed) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     BSONArray oldMembers = BSON_ARRAY(m1 << m2_NewlyAdded << m3_NewlyAdded);
     BSONArray newMembers = BSON_ARRAY(m1 << m2);  // Remove 'newlyAdded' 2 & 3, add voting node 2.
     ASSERT_OK(validateMemberReconfig(oldMembers, newMembers, m1));

@@ -37,7 +37,7 @@ replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.kDefaultTimeoutMS);
 jsTestLog('node 2 is now primary');
 
 replSet.awaitReplication();
-replSet.waitForConfigReplication(nodes[2]);
+waitForConfigReplication(nodes[2]);
 
 // Stop replication and disconnect node 2 so that it cannot do a priority takeover.
 stopServerReplication(nodes[2]);
@@ -71,7 +71,7 @@ nodes[2].reconnect(nodes[0]);
 nodes[2].reconnect(nodes[1]);
 
 // Wait until nodes have learned the latest config.
-replSet.waitForConfigReplication(nodes[1], [nodes[1], nodes[2]]);
+waitForConfigReplication(nodes[1], [nodes[1], nodes[2]]);
 
 // Step up a lagged node.
 assert.commandWorked(nodes[1].adminCommand({replSetStepUp: 1}));

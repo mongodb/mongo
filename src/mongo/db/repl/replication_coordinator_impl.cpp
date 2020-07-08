@@ -3061,14 +3061,9 @@ WriteConcernOptions ReplicationCoordinatorImpl::_getConfigReplicationWriteConcer
 }
 
 void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result,
-                                                         bool commitmentStatus,
-                                                         bool includeNewlyAdded) {
+                                                         bool commitmentStatus) {
     stdx::lock_guard<Latch> lock(_mutex);
-    if (includeNewlyAdded) {
-        result->append("config", _rsConfig.toBSON());
-    } else {
-        result->append("config", _rsConfig.toBSONWithoutNewlyAdded());
-    }
+    result->append("config", _rsConfig.toBSONWithoutNewlyAdded());
 
     if (commitmentStatus) {
         uassert(ErrorCodes::NotMaster,

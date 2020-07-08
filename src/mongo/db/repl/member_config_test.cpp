@@ -235,6 +235,11 @@ void setNewlyAdded_ForTest(MemberConfig* mc, boost::optional<bool> newlyAdded) {
 
 namespace {
 TEST(MemberConfig, ParseAndSetNewlyAddedField) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetTagConfig tagConfig;
     {
         MemberConfig mc(BSON("_id" << 0 << "host"
@@ -256,6 +261,11 @@ TEST(MemberConfig, ParseAndSetNewlyAddedField) {
 }
 
 TEST(MemberConfig, NewlyAddedSetToFalseShouldThrow) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetTagConfig tagConfig;
     ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
                                           << "h"
@@ -265,6 +275,11 @@ TEST(MemberConfig, NewlyAddedSetToFalseShouldThrow) {
 }
 
 TEST(MemberConfig, VotingNodeWithNewlyAddedFieldShouldStillHaveVoteAfterToBSON) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetTagConfig tagConfig;
 
     // Create a member with 'newlyAdded: true'.
@@ -291,6 +306,11 @@ TEST(MemberConfig, VotingNodeWithNewlyAddedFieldShouldStillHaveVoteAfterToBSON) 
 }
 
 TEST(MemberConfig, NonVotingNodesWithNewlyAddedFieldShouldStillHaveZeroVotesAfterToBSON) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetTagConfig tagConfig;
 
     MemberConfig mc(BSON("_id" << 0 << "host"
@@ -354,6 +374,11 @@ TEST(MemberConfig, VotingNodesShouldStillHaveVoteAfterToBSON) {
 }
 
 TEST(MemberConfig, NodeWithNewlyAddedFieldShouldStillHavePriorityAfterToBSON) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetTagConfig tagConfig;
 
     // Create a member with 'newlyAdded: true' and 'priority: 3'.
@@ -378,6 +403,11 @@ TEST(MemberConfig, NodeWithNewlyAddedFieldShouldStillHavePriorityAfterToBSON) {
 }
 
 TEST(MemberConfig, PriorityZeroNodeWithNewlyAddedFieldShouldStillHaveZeroPriorityAfterToBSON) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetTagConfig tagConfig;
 
     // Create a member with 'newlyAdded: true' and 'priority: 0'.
@@ -454,6 +484,11 @@ TEST(MemberConfig, NodeShouldStillHavePriorityAfterToBSON) {
 }
 
 TEST(MemberConfig, CanOmitNewlyAddedFieldInBSONViaToBSONWithoutNewlyAdded) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetTagConfig tagConfig;
 
     // Create a member with 'newlyAdded: true' and 'priority: 0'.
@@ -479,6 +514,11 @@ TEST(MemberConfig, CanOmitNewlyAddedFieldInBSONViaToBSONWithoutNewlyAdded) {
 }
 
 TEST(MemberConfig, ArbiterCannotHaveNewlyAddedFieldSet) {
+    // Set the flag to add the 'newlyAdded' field to MemberConfigs.
+    enableAutomaticReconfig = true;
+    // Set the flag back to false after this test exits.
+    ON_BLOCK_EXIT([] { enableAutomaticReconfig = false; });
+
     ReplSetTagConfig tagConfig;
 
     // Verify that an exception is thrown when we try to create an arbiter with 'newlyAdded' field.

@@ -15,8 +15,6 @@ selector:
   - jstests/replsets/interrupted_batch_insert.js
   - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
   - jstests/replsets/transactions_committed_with_tickets_exhausted.js
-  # This test disables test commands which is incompatible with this suite.
-  - jstests/replsets/test_only_repl_commands.js
 
 executor:
   config:

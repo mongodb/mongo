@@ -378,8 +378,7 @@ void ReplicationCoordinatorMock::setGetConfigReturnValue(ReplSetConfig returnVal
 }
 
 void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result,
-                                                         bool commitmentStatus,
-                                                         bool includeNewlyAdded) {
+                                                         bool commitmentStatus) {
     // TODO
 }
 
