@@ -230,12 +230,6 @@ Status validatePreImageRecording(OperationContext* opCtx, const NamespaceString&
                 "recordPreImages collection option is not supported on shards or config servers"};
     }
 
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isReplEnabled()) {
-        return {ErrorCodes::InvalidOptions,
-                "recordPreImages collection option depends on being in a replica set"};
-    }
-
     return Status::OK();
 }
 
