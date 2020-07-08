@@ -193,21 +193,30 @@ void ProgramRegistry::registerReaderThread(ProcessId pid, stdx::thread reader) {
     _outputReaderThreads.emplace(pid, std::move(reader));
 }
 
-bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* const exit_code) {
+void ProgramRegistry::updatePidExitCode(ProcessId pid, int exitCode) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-    // unregistered pids are dead
-    if (!this->isPidRegistered(pid)) {
-        if (exit_code) {
-            const auto code = _pidToExitCode.find(pid);
-            if (code != _pidToExitCode.end()) {
-                *exit_code = code->second;
-            } else {
-                // If you hit this invariant, you're waiting on a PID that was
-                // never a child of this process.
-                MONGO_UNREACHABLE;
+    _pidToExitCode[pid] = exitCode;
+}
+
+bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* const exit_code) {
+    {
+        // Be careful not to hold the lock while waiting for the pid to finish
+        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+
+        // unregistered pids are dead
+        if (!this->isPidRegistered(pid)) {
+            if (exit_code) {
+                const auto code = _pidToExitCode.find(pid);
+                if (code != _pidToExitCode.end()) {
+                    *exit_code = code->second;
+                } else {
+                    // If you hit this invariant, you're waiting on a PID that was
+                    // never a child of this process.
+                    MONGO_UNREACHABLE;
+                }
             }
+            return true;
         }
-        return true;
     }
 #ifdef _WIN32
     HANDLE h = getHandleForPid(pid);
@@ -236,7 +245,7 @@ bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* con
         eraseHandleForPid(pid);
         if (exit_code)
             *exit_code = tmp;
-        _pidToExitCode[pid] = tmp;
+        updatePidExitCode(pid, tmp);
 
         unregisterProgram(pid);
         return true;
@@ -261,7 +270,7 @@ bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* con
         } else {
             MONGO_UNREACHABLE;
         }
-        _pidToExitCode[pid] = code;
+        updatePidExitCode(pid, code);
         if (exit_code) {
             *exit_code = code;
         }

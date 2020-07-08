@@ -110,6 +110,9 @@ public:
     void getRegisteredPids(std::vector<ProcessId>& pids);
 
 private:
+    void updatePidExitCode(const ProcessId pid, int exitCode);
+
+private:
     stdx::unordered_set<ProcessId> _registeredPids;
     stdx::unordered_map<int, ProcessId> _portToPidMap;
     stdx::unordered_map<ProcessId, int> _pidToExitCode;
