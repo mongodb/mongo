@@ -482,15 +482,16 @@ Status DBClientReplicaSet::_runAuthLoop(Authenticate authCb) {
     }
 }
 
-Status DBClientReplicaSet::authenticateInternalUser() {
+Status DBClientReplicaSet::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
     if (!auth::isInternalAuthSet()) {
         return {ErrorCodes::AuthenticationFailed,
                 "No authentication parameters set for internal user"};
     }
 
     _internalAuthRequested = true;
-    return _runAuthLoop(
-        [&](DBClientConnection* conn) { uassertStatusOK(conn->authenticateInternalUser()); });
+    return _runAuthLoop([stepDownBehavior](DBClientConnection* conn) {
+        uassertStatusOK(conn->authenticateInternalUser(stepDownBehavior));
+    });
 }
 
 void DBClientReplicaSet::_auth(const BSONObj& params) {

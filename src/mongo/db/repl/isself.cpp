@@ -230,7 +230,8 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
             return false;
         }
 
-        if (auth::isInternalAuthSet() && !conn.authenticateInternalUser().isOK()) {
+        if (auth::isInternalAuthSet() &&
+            !conn.authenticateInternalUser(auth::StepDownBehavior::kKeepConnectionOpen).isOK()) {
             return false;
         }
         BSONObj out;

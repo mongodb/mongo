@@ -75,7 +75,7 @@ public:
      */
     bool connect();
 
-    Status authenticateInternalUser() override;
+    Status authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) override;
 
     /**
      * Logs out the connection for the given database.

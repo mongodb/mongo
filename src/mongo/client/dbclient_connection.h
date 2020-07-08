@@ -300,7 +300,8 @@ public:
         return _isMongos;
     }
 
-    Status authenticateInternalUser() override;
+    Status authenticateInternalUser(
+        auth::StepDownBehavior stepDownBehavior = auth::StepDownBehavior::kKillConnection) override;
 
     bool authenticatedDuringConnect() const override {
         return _authenticatedDuringConnect;
@@ -338,6 +339,9 @@ protected:
     void _checkConnection();
 
     bool _internalAuthOnReconnect = false;
+
+    auth::StepDownBehavior _internalAuthStepDownBehavior = auth::StepDownBehavior::kKillConnection;
+
     std::map<std::string, BSONObj> authCache;
 
     static AtomicWord<int> _numConnections;

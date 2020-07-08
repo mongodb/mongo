@@ -174,7 +174,10 @@ Future<void> AsyncDBClient::authenticateInternal(boost::optional<std::string> me
     }
 #endif
 
-    return auth::authenticateInternalClient(clientName, mechanismHint, _makeAuthRunCommandHook());
+    return auth::authenticateInternalClient(clientName,
+                                            mechanismHint,
+                                            auth::StepDownBehavior::kKillConnection,
+                                            _makeAuthRunCommandHook());
 }
 
 Future<bool> AsyncDBClient::completeSpeculativeAuth(std::shared_ptr<SaslClientSession> session,

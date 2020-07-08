@@ -304,7 +304,8 @@ public:
      * Authenticates to another cluster member using appropriate authentication data.
      * @return true if the authentication was successful
      */
-    virtual Status authenticateInternalUser();
+    virtual Status authenticateInternalUser(
+        auth::StepDownBehavior stepDownBehavior = auth::StepDownBehavior::kKillConnection);
 
     /**
      * Authenticate a user.
