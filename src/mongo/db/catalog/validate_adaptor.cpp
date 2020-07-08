@@ -58,6 +58,8 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(crashOnMultikeyValidateFailure);
 
+// Set limit for size of corrupted records that will be reported.
+const long long kMaxErrorSizeBytes = 1 * 1024 * 1024;
 const long long kInterruptIntervalNumRecords = 4096;
 const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 
@@ -74,15 +76,15 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         return exceptionToStatus();
     }
 
-    if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
-        LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
-    }
-
     const Status status = validateBSON(recordBson.objdata(), recordBson.objsize());
     if (status.isOK()) {
         *dataSize = recordBson.objsize();
     } else {
         return status;
+    }
+
+    if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+        LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
     }
 
     const IndexCatalog* indexCatalog = _validateState->getCollection()->getIndexCatalog();
@@ -298,6 +300,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     long long dataSizeTotal = 0;
     long long interruptIntervalNumBytes = 0;
     long long nInvalid = 0;
+    long long numCorruptRecordsSizeBytes = 0;
 
     results->valid = true;
     RecordId prevRecordId;
@@ -316,6 +319,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         _progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage, totalRecords));
     }
 
+    bool corruptRecordsSizeLimitWarning = false;
     const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
         _validateState->getTraverseRecordStoreCursor();
     for (auto record =
@@ -363,6 +367,15 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             if (results->valid) {
                 results->errors.push_back("Detected one or more invalid documents. See logs.");
                 results->valid = false;
+            }
+
+            numCorruptRecordsSizeBytes += sizeof(record->id);
+            if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
+                results->corruptRecords.push_back(record->id);
+            } else if (!corruptRecordsSizeLimitWarning) {
+                results->errors.push_back(
+                    "Not all corrupted records are listed due to size limitations.");
+                corruptRecordsSizeLimitWarning = true;
             }
             nInvalid++;
         }

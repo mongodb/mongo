@@ -152,6 +152,11 @@ void printValidateResults(const ValidateResults& results) {
         ss << "\t" << obj << "\n";
     }
 
+    ss << "Corrupt document record Ids:\n";
+    for (const RecordId id : results.corruptRecords) {
+        ss << "\t" << id << "\n";
+    }
+
     LOGV2(51812, "{results_string}", "results_string"_attr = ss.str());
 }
 

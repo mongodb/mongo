@@ -96,13 +96,6 @@ protected:
             _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
         });
 
-        // This function will force a checkpoint, so background validation can then read from that
-        // checkpoint and see all the new data.
-        // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
-        // stable_timestamp.
-        _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
-                                                                 /*stableCheckpoint*/ false);
-
         auto mode = [&] {
             if (_background)
                 return CollectionValidation::ValidateMode::kBackground;
@@ -1203,13 +1196,6 @@ public:
         releaseDb();
 
         {
-            // This function will force a checkpoint, so background validation can then read from
-            // that checkpoint and see all the new data.
-            // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
-            // stable_timestamp.
-            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
-                                                                     /*stableCheckpoint*/ false);
-
             ValidateResults results;
             BSONObjBuilder output;
 
@@ -1328,13 +1314,6 @@ public:
         }
 
         {
-            // This function will force a checkpoint, so background validation can then read from
-            // that checkpoint and see all the new data.
-            // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
-            // stable_timestamp.
-            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
-                                                                     /*stableCheckpoint*/ false);
-
             ValidateResults results;
             BSONObjBuilder output;
 
@@ -1426,13 +1405,6 @@ public:
         }
 
         {
-            // This function will force a checkpoint, so background validation can then read from
-            // that checkpoint and see all the new data.
-            // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
-            // stable_timestamp.
-            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
-                                                                     /*stableCheckpoint*/ false);
-
             ValidateResults results;
             BSONObjBuilder output;
 
@@ -1599,13 +1571,6 @@ public:
         }
 
         {
-            // This function will force a checkpoint, so background validation can then read from
-            // that checkpoint and see all the new data.
-            // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
-            // stable_timestamp.
-            _opCtx.recoveryUnit()->waitUntilUnjournaledWritesDurable(&_opCtx,
-                                                                     /*stableCheckpoint*/ false);
-
             // Now we have two missing index entries with the keys { : 1 } since the KeyStrings
             // aren't hydrated with their field names.
             ensureValidateFailed();
@@ -1776,6 +1741,74 @@ public:
     }
 };
 
+template <bool full, bool background>
+class ValidateInvalidBSONResults : public ValidateBase {
+public:
+    ValidateInvalidBSONResults() : ValidateBase(full, background) {}
+
+    void run() {
+        // Cannot run validate with {background:true} if either
+        //  - the RecordStore cursor does not retrieve documents in RecordId order
+        //  - or the storage engine does not support checkpoints.
+        if (_background && (!_isInRecordIdOrder || !_engineSupportsCheckpoints)) {
+            return;
+        }
+
+        // Create a new collection.
+        lockDb(MODE_X);
+        Collection* coll;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+            wunit.commit();
+        }
+
+        // Encode an invalid BSON Object with an invalid type, x90 and insert record
+        const char* buffer = "\x0c\x00\x00\x00\x90\x41\x00\x10\x00\x00\x00\x00";
+        BSONObj obj(buffer);
+        lockDb(MODE_X);
+        RecordStore* rs = coll->getRecordStore();
+        RecordId rid;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            auto swRecordId = rs->insertRecord(&_opCtx, obj.objdata(), obj.objsize(), Timestamp());
+            ASSERT_OK(swRecordId);
+            rid = swRecordId.getValue();
+            wunit.commit();
+        }
+        releaseDb();
+
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.corruptRecords.size());
+            ASSERT_EQ(rid, results.corruptRecords[0]);
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
 class ValidateTests : public OldStyleSuiteSpecification {
 public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
@@ -1823,6 +1856,9 @@ public:
 
         add<ValidateDuplicateKeysUniqueIndex<false, false>>();
         add<ValidateDuplicateKeysUniqueIndex<false, true>>();
+
+        add<ValidateInvalidBSONResults<false, false>>();
+        add<ValidateInvalidBSONResults<false, true>>();
     }
 };
 
