@@ -8339,7 +8339,7 @@ buildvariants:
   - rhel62-large
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off --link-model=dynamic
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
     test_flags: --excludeWithAnyTags=requires_http_client
@@ -8355,6 +8355,7 @@ buildvariants:
   - name: .change_streams !.secondary_reads
   - name: .misc_js
   - name: disk_wiredtiger
+  - name: free_monitoring
   - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_txns_large_txns_format
