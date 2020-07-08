@@ -140,7 +140,8 @@ void persistMigrationCoordinatorLocally(OperationContext* opCtx,
  * concern.
  */
 void persistRangeDeletionTaskLocally(OperationContext* opCtx,
-                                     const RangeDeletionTask& deletionTask);
+                                     const RangeDeletionTask& deletionTask,
+                                     const WriteConcernOptions& writeConcern);
 
 /**
  * Updates the migration coordinator document to set the decision field to "committed" and waits for
