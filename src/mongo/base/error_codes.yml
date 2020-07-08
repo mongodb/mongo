@@ -111,11 +111,11 @@ error_codes:
     - {code: 81,name: NoMatchParseContext}
     - {code: 82,name: NoProgressMade}
     - {code: 83,name: RemoteResultsUnavailable}
-    - {code: 84,name: DuplicateKeyValue}
+    - {code: 84,name: OBSOLETE_DuplicateKeyValue}
     - {code: 85,name: IndexOptionsConflict}
     - {code: 86,name: IndexKeySpecsConflict}
     - {code: 87,name: CannotSplit}
-    - {code: 88,name: SplitFailed_OBSOLETE}
+    - {code: 88,name: OBSOLETE_SplitFailed}
     - {code: 89,name: NetworkTimeout,categories: [NetworkError,RetriableError,NetworkTimeoutError]}
     - {code: 90,name: CallbackCanceled,categories: [CancelationError]}
     - {code: 91,name: ShutdownInProgress,
@@ -416,6 +416,6 @@ error_codes:
     - {code: 13435,name: NotMasterNoSlaveOk,categories: [NotMasterError,RetriableError]}
     - {code: 13436,name: NotMasterOrSecondary,categories: [NotMasterError,RetriableError]}
     - {code: 14031,name: OutOfDiskSpace}
-    - {code: 17280,name: OSBELETE_KeyTooLong}
+    - {code: 17280,name: OBSOLETE_KeyTooLong}
     - {code: 46841,name: ClientMarkedKilled,categories: [Interruption,CancelationError]}
 

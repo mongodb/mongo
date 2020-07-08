@@ -101,26 +101,6 @@ AbstractIndexAccessMethod::AbstractIndexAccessMethod(IndexCatalogEntry* btreeSta
     verify(IndexDescriptor::isIndexVersionSupported(_descriptor->version()));
 }
 
-bool AbstractIndexAccessMethod::isFatalError(OperationContext* opCtx,
-                                             Status status,
-                                             KeyString::Value key) {
-    // If the status is Status::OK() return false immediately.
-    if (status.isOK()) {
-        return false;
-    }
-
-    // A document might be indexed multiple times during a background index build if it moves ahead
-    // of the cursor (e.g. via an update). We test this scenario and swallow the error accordingly.
-    if (status == ErrorCodes::DuplicateKeyValue && !_indexCatalogEntry->isReady(opCtx)) {
-        LOGV2_DEBUG(20681,
-                    3,
-                    "KeyString {key} already in index during background indexing (ok)",
-                    "key"_attr = key);
-        return false;
-    }
-    return true;
-}
-
 // Find the keys for obj, put them in the tree pointing to loc.
 Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
                                          const Collection* coll,
@@ -178,9 +158,8 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                     result->dupsInserted.push_back(key);
                 }
             }
-            if (isFatalError(opCtx, status, keyString)) {
+            if (!status.isOK())
                 return status;
-            }
         }
     }
 
@@ -429,9 +408,8 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     for (const auto keySet : {&ticket.added, &ticket.newMultikeyMetadataKeys}) {
         for (const auto& keyString : *keySet) {
             Status status = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
-            if (isFatalError(opCtx, status, keyString)) {
+            if (!status.isOK())
                 return status;
-            }
         }
     }
 

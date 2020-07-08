@@ -578,14 +578,6 @@ private:
     class BulkBuilderImpl;
 
     /**
-     * Determine whether the given Status represents an exception that should cause the indexing
-     * process to abort. The 'key' argument is passed in to allow the offending entry to be logged
-     * in the event that a non-fatal 'ErrorCodes::DuplicateKeyValue' is encountered during a
-     * background index build.
-     */
-    bool isFatalError(OperationContext* opCtx, Status status, KeyString::Value key);
-
-    /**
      * Removes a single key from the index.
      *
      * Used by remove() only.
