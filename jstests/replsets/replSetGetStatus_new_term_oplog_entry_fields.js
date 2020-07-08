@@ -21,7 +21,7 @@ stopServerReplication(rst.nodes);
 const newPrimary = rst.getSecondary();
 assert.soonNoExcept(function() {
     assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
-    rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, rst.nodes, rst.getNodeId(newPrimary));
+    rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, rst.nodes, newPrimary);
     return newPrimary.adminCommand('replSetGetStatus').myState === ReplSetTest.State.PRIMARY;
 }, 'failed to step up node ' + newPrimary.host, rst.kDefaultTimeoutMS);
 

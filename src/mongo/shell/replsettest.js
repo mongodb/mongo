@@ -931,23 +931,25 @@ var ReplSetTest = function(opts) {
 
     /**
      * Blocks until all nodes agree on who the primary is.
-     * If 'expectedPrimaryNodeId' is provided, ensure that every node is seeing this node as the
+     * If 'expectedPrimaryNode' is provided, ensure that every node is seeing this node as the
      * primary. Otherwise, ensure that all the nodes in the set agree with the first node on the
      * identity of the primary.
      */
-    this.awaitNodesAgreeOnPrimary = function(timeout, nodes, expectedPrimaryNodeId) {
+    this.awaitNodesAgreeOnPrimary = function(timeout, nodes, expectedPrimaryNode) {
         timeout = timeout || self.kDefaultTimeoutMS;
         nodes = nodes || self.nodes;
-        expectedPrimaryNodeId = expectedPrimaryNodeId || -1;
-        if (expectedPrimaryNodeId === -1) {
+        // indexOf will return the index of the expected node. If expectedPrimaryNode is undefined,
+        // indexOf will return -1.
+        const expectedPrimaryNodeIdx = self.nodes.indexOf(expectedPrimaryNode);
+        if (expectedPrimaryNodeIdx === -1) {
             print("AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on any primary.");
         } else {
             print("AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on " +
-                  nodes[expectedPrimaryNodeId].name + " as primary.");
+                  expectedPrimaryNode.name + " as primary.");
         }
 
         assert.soonNoExcept(function() {
-            var primary = expectedPrimaryNodeId;
+            var primary = expectedPrimaryNodeIdx;
 
             for (var i = 0; i < nodes.length; i++) {
                 var replSetGetStatus =
@@ -974,7 +976,10 @@ var ReplSetTest = function(opts) {
                 }
 
                 if (primary < 0) {
-                    // If we haven't seen a primary yet, set it to this.
+                    print("AwaitNodesAgreeOnPrimary: " + nodes[i].name + " thinks the " +
+                          " primary is " + self.nodes[nodesPrimary].name +
+                          ". Other nodes are expected to agree on the same primary.");
+                    // If the nodes haven't seen a primary yet, set primary to nodes[i]'s primary.
                     primary = nodesPrimary;
                 } else if (primary !== nodesPrimary) {
                     print("AwaitNodesAgreeOnPrimary: Retrying because " + nodes[i].name +
