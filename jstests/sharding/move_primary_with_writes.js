@@ -29,6 +29,7 @@ function createCollections() {
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
 
     assert.commandWorked(db.createCollection('unshardedFoo'));
+    assert.commandWorked(db.createView('viewOnFoo', 'unshardedFoo', [{$match: {}}]));
     assert.commandWorked(db.createCollection('shardedBar'));
 
     for (let i = 0; i < 3; i++) {
@@ -46,11 +47,30 @@ function createCollections() {
 
 function buildCommands(collName) {
     const commands = [
-        {insert: collName, documents: [{a: 10}]},
-        {update: collName, updates: [{q: {a: 1}, u: {$set: {a: 11}}}]},
-        {findAndModify: collName, query: {a: 2}, update: {$set: {a: 11}}},
-        {delete: collName, deletes: [{q: {a: 0}, limit: 1}]}
+        {command: {insert: collName, documents: [{a: 10}]}, alwaysFail: false},
+        {
+            command: {update: collName, updates: [{q: {a: 1}, u: {$set: {a: 11}}}]},
+            alwaysFail: false
+        },
+        {
+            command: {findAndModify: collName, query: {_id: 2}, update: {$set: {a: 11}}},
+            alwaysFail: false
+        },
+        {command: {delete: collName, deletes: [{q: {_id: 0}, limit: 1}]}, alwaysFail: false},
+        {command: {create: "testCollection"}, alwaysFail: true},
+        {
+            command: {collMod: "viewOnFoo", viewOn: "unshardedFoo", pipeline: [{$match: {_id: 1}}]},
+            alwaysFail: true
+        },
     ];
+    return commands;
+}
+
+function buildDDLCommands() {
+    const commands = [{
+        command: {renameCollection: "testdb.unshardedFoo", to: "testdb.testCollection"},
+        alwaysFail: true
+    }];
     return commands;
 }
 
@@ -75,13 +95,46 @@ function testMovePrimary(failpoint, fromShard, toShard, db, shouldFail, sharded)
         collName = "unshardedFoo";
     }
 
-    buildCommands(collName).forEach(command => {
+    buildCommands(collName).forEach(commandObj => {
         if (shouldFail) {
-            jsTestLog("running command: " + tojson(command) + ",\nshoudFail: " + shouldFail);
-            assert.commandFailedWithCode(db.runCommand(command), ErrorCodes.MovePrimaryInProgress);
-        } else {
-            jsTestLog("running command: " + tojson(command) + ",\nshoudFail: " + shouldFail);
-            assert.commandWorked(db.runCommand(command));
+            jsTestLog("running command: " + tojson(commandObj.command) +
+                      ",\nshoudFail: " + shouldFail);
+            assert.commandFailedWithCode(db.runCommand(commandObj.command),
+                                         ErrorCodes.MovePrimaryInProgress);
+        } else if (!commandObj.alwaysFail) {
+            jsTestLog("running command: " + tojson(commandObj.command) +
+                      ",\nshoudFail: " + shouldFail);
+            assert.commandWorked(db.runCommand(commandObj.command));
+        }
+    });
+
+    assert.commandWorked(fromShard.adminCommand({configureFailPoint: failpoint, mode: 'off'}));
+
+    awaitShell();
+}
+
+function testMovePrimaryDDL(failpoint, fromShard, toShard, db, shouldFail) {
+    let codeToRunInParallelShell = '{ db.getSiblingDB("admin").runCommand({movePrimary: "' +
+        dbName + '", to: "' + toShard.name + '"}); }';
+
+    assert.commandWorked(fromShard.adminCommand({configureFailPoint: failpoint, mode: 'alwaysOn'}));
+
+    let awaitShell = startParallelShell(codeToRunInParallelShell, st.s.port);
+
+    jsTestLog("Waiting for failpoint " + failpoint);
+    waitForFailpoint("Hit " + failpoint, 1);
+    clearRawMongoProgramOutput();
+
+    buildDDLCommands().forEach(commandObj => {
+        if (shouldFail) {
+            jsTestLog("running command: " + tojson(commandObj.command) +
+                      ",\nshoudFail: " + shouldFail);
+            assert.commandFailedWithCode(db.runCommand(commandObj.command),
+                                         ErrorCodes.MovePrimaryInProgress);
+        } else if (!commandObj.alwaysFail) {
+            jsTestLog("running command: " + tojson(commandObj.command) +
+                      ",\nshoudFail: " + shouldFail);
+            assert.commandWorked(db.runCommand(commandObj.command));
         }
     });
 
@@ -94,21 +147,22 @@ createCollections();
 let fromShard = st.getPrimaryShard(dbName);
 let toShard = st.getOther(fromShard);
 
-testMovePrimary('hangInCloneStage', fromShard, toShard, fromShard.getDB(dbName), true, false);
-verifyDocuments(toShard.getDB(dbName), 3);
-verifyDocuments(fromShard.getDB(dbName), 0);
-
-createCollections();
-fromShard = st.getPrimaryShard(dbName);
-toShard = st.getOther(fromShard);
-testMovePrimary('hangInCloneStage', fromShard, toShard, fromShard.getDB(dbName), false, true);
-
-createCollections();
-fromShard = st.getPrimaryShard(dbName);
-toShard = st.getOther(fromShard);
 testMovePrimary('hangInCloneStage', fromShard, toShard, st.s.getDB(dbName), true, false);
 verifyDocuments(toShard.getDB(dbName), 3);
 verifyDocuments(fromShard.getDB(dbName), 0);
+
+createCollections();
+fromShard = st.getPrimaryShard(dbName);
+toShard = st.getOther(fromShard);
+
+testMovePrimary('hangInCloneStage', fromShard, toShard, st.s.getDB(dbName), false, true);
+verifyDocuments(toShard.getDB(dbName), 3);
+verifyDocuments(fromShard.getDB(dbName), 0);
+
+createCollections();
+fromShard = st.getPrimaryShard(dbName);
+toShard = st.getOther(fromShard);
+testMovePrimaryDDL('hangInCloneStage', fromShard, toShard, st.s.getDB("admin"), true);
 
 createCollections();
 fromShard = st.getPrimaryShard(dbName);
