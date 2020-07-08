@@ -135,6 +135,8 @@ public:
     void abort(repl::OpTime opTime);
     void rollBackCommitOrAbort();
 
+    void appendInfoForServerStatus(BSONObjBuilder* builder) const;
+
 private:
     void _waitForOpTimeToMajorityCommit(repl::OpTime opTime, std::function<void()> callbackFn);
 

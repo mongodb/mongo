@@ -236,4 +236,15 @@ void MigratingTenantAccessBlocker::_waitForOpTimeToMajorityCommit(
         }));
 }
 
+void MigratingTenantAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* builder) const {
+    builder->append("access", _access);
+    if (_blockTimestamp) {
+        builder->append("blockTimestamp", _blockTimestamp.get());
+    }
+
+    if (_commitOrAbortOpTime) {
+        builder->append("commitOrAbortOpTime", _commitOrAbortOpTime->toBSON());
+    }
+}
+
 }  // namespace mongo

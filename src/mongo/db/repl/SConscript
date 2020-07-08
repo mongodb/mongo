@@ -1167,6 +1167,8 @@ env.Library(
     target='migrating_tenant_access_blocker',
     source=[
         'migrating_tenant_access_blocker.cpp',
+        'migrating_tenant_access_blocker_by_prefix.cpp',
+        'migrating_tenant_access_blocker_server_status_section.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
