@@ -157,7 +157,7 @@ namespace {
 // with a meaningful value will trigger failures as of SERVER-32630.
 void setUpFCV() {
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
+        ServerGlobalParams::FeatureCompatibility::kLatest);
 }
 void tearDownFCV() {
     serverGlobalParams.featureCompatibility.reset();

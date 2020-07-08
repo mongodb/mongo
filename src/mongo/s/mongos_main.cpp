@@ -904,7 +904,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
                                      ("EndStartupOptionStorage"))
 (InitializerContext* context) {
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
+        ServerGlobalParams::FeatureCompatibility::kLatest);
     return Status::OK();
 }
 

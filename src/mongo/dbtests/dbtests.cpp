@@ -180,7 +180,7 @@ int dbtestsMain(int argc, char** argv) {
 
     mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo46);
+        ServerGlobalParams::FeatureCompatibility::kLatest);
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     setGlobalServiceContext(ServiceContext::make());

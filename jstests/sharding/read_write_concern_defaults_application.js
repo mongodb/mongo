@@ -654,7 +654,7 @@ let testCases = {
     whatsmyuri: {skip: "internal command"},
 };
 
-commandsRemovedFromMongodIn46.forEach(function(cmd) {
+commandsRemovedFromMongodSinceLastLTS.forEach(function(cmd) {
     testCases[cmd] = {skip: "must define test coverage for 4.4 backwards compatibility"};
 });
 

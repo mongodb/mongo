@@ -380,7 +380,7 @@ let testCases = {
     whatsmyuri: {skip: "does not return user data"}
 };
 
-commandsRemovedFromMongosIn46.forEach(function(cmd) {
+commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
     testCases[cmd] = {skip: "must define test coverage for 4.4 backwards compatibility"};
 });
 

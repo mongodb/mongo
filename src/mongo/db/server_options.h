@@ -198,6 +198,10 @@ struct ServerGlobalParams {
             kFullyUpgradedTo46 = 4,
         };
 
+        static constexpr Version kLatest = Version::kFullyUpgradedTo46;
+        static constexpr Version kLastContinuous = Version::kFullyDowngradedTo44;
+        static constexpr Version kLastLTS = Version::kFullyDowngradedTo44;
+
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
