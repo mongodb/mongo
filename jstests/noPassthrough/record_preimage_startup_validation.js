@@ -8,15 +8,6 @@
 'use strict';
 
 /**
- * Test that a standalone cannot record pre-images.
- */
-
-let conn = MongoRunner.runMongod({});
-assert.commandFailedWithCode(conn.getDB("test").runCommand({create: "test", recordPreImages: true}),
-                             ErrorCodes.InvalidOptions);
-MongoRunner.stopMongod(conn);
-
-/**
  * Find the collection information on database 'nodeDB' for collection 'collName'.
  */
 const findCollectionInfo = function(nodeDB, collName) {
