@@ -12156,6 +12156,7 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
     - name: compile_all_run_unittests_TG
+    - name: jsCore
 
 - name: enterprise-ubuntu-no-latch-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (without Diagnostic Latches)"
