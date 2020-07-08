@@ -475,7 +475,7 @@ void DBClientBase::_auth(const BSONObj& params) {
         .get();
 }
 
-Status DBClientBase::authenticateInternalUser() {
+Status DBClientBase::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
     ScopedMetadataWriterRemover remover{this};
     if (!auth::isInternalAuthSet()) {
         if (!serverGlobalParams.quiet.load()) {
@@ -493,9 +493,9 @@ Status DBClientBase::authenticateInternalUser() {
     }
 #endif
 
-    auto status =
-        auth::authenticateInternalClient(clientName, boost::none, _makeAuthRunCommandHook())
-            .getNoThrow();
+    auto status = auth::authenticateInternalClient(
+                      clientName, boost::none, stepDownBehavior, _makeAuthRunCommandHook())
+                      .getNoThrow();
     if (status.isOK()) {
         return status;
     }

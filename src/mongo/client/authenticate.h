@@ -74,6 +74,11 @@ constexpr auto kSpeculativeAuthenticate = "speculativeAuthenticate"_sd;
 constexpr auto kAuthenticateCommand = "authenticate"_sd;
 
 /**
+ * On replication step down, should the current connection be killed or left open.
+ */
+enum class StepDownBehavior { kKillConnection, kKeepConnectionOpen };
+
+/**
  * Authenticate a user.
  *
  * Pass the default hostname for this client in through "hostname." If SSL is enabled and
@@ -113,11 +118,15 @@ Future<void> authenticateClient(const BSONObj& params,
  * (e.g. SCRAM-SHA-256). If it is boost::none, then an isMaster will be called to negotiate
  * a SASL mechanism with the server.
  *
+ * The "stepDownBehavior" parameter controls whether replication will kill the connection on
+ * stepdown.
+ *
  * Because this may retry during cluster keyfile rollover, this may call the RunCommandHook more
  * than once, but will only call the AuthCompletionHandler once.
  */
 Future<void> authenticateInternalClient(const std::string& clientSubjectName,
                                         boost::optional<std::string> mechanismHint,
+                                        StepDownBehavior stepDownBehavior,
                                         RunCommandHook runCommand);
 
 /**
@@ -162,7 +171,8 @@ BSONObj buildAuthParams(StringData dbname,
  */
 Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                                            const UserName& username,
-                                           boost::optional<std::string> mechanismHint);
+                                           boost::optional<std::string> mechanismHint,
+                                           StepDownBehavior stepDownBehavior);
 
 /**
  * Return the field name for the database containing credential information.

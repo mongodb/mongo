@@ -257,12 +257,13 @@ void DBClientConnection::_auth(const BSONObj& params) {
     DBClientBase::_auth(params);
 }
 
-Status DBClientConnection::authenticateInternalUser() {
+Status DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
     if (autoReconnect) {
         _internalAuthOnReconnect = true;
+        _internalAuthStepDownBehavior = stepDownBehavior;
     }
 
-    return DBClientBase::authenticateInternalUser();
+    return DBClientBase::authenticateInternalUser(stepDownBehavior);
 }
 
 bool DBClientConnection::connect(const HostAndPort& server,
@@ -586,7 +587,7 @@ void DBClientConnection::_checkConnection() {
                 "Reconnected",
                 "connString"_attr = toString());
     if (_internalAuthOnReconnect) {
-        uassertStatusOK(authenticateInternalUser());
+        uassertStatusOK(authenticateInternalUser(_internalAuthStepDownBehavior));
     } else {
         for (const auto& kv : authCache) {
             try {

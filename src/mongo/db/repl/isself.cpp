@@ -236,7 +236,8 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
         }
 
         if (auth::isInternalAuthSet()) {
-            auto authInternalUserResult = conn.authenticateInternalUser();
+            auto authInternalUserResult =
+                conn.authenticateInternalUser(auth::StepDownBehavior::kKeepConnectionOpen);
             if (!authInternalUserResult.isOK()) {
                 LOGV2(4834701,
                       "isSelf could not authenticate internal user",
