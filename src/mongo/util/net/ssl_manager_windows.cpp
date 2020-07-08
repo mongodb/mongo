@@ -1398,7 +1398,7 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
                 "All supported TLS protocols have been disabled."};
     }
 
-    if (!params.sslCipherConfig.empty()) {
+    if (params.sslCipherConfig != kSSLCipherConfigDefault) {
         LOGV2_WARNING(
             23272,
             "sslCipherConfig parameter is not supported with Windows SChannel and is ignored.");
