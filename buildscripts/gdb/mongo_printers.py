@@ -104,14 +104,20 @@ class BSONObjPrinter(object):
         """Initialize BSONObjPrinter."""
         self.val = val
         self.ptr = self.val['_objdata'].cast(gdb.lookup_type('void').pointer())
+        self.is_valid = False
+
         # Handle the endianness of the BSON object size, which is represented as a 32-bit integer
         # in little-endian format.
         inferior = gdb.selected_inferior()
         if self.ptr.is_optimized_out:
             # If the value has been optimized out, we cannot decode it.
             self.size = -1
+            self.raw_memory = None
         else:
             self.size = struct.unpack('<I', inferior.read_memory(self.ptr, 4))[0]
+            self.raw_memory = bytes(memoryview(inferior.read_memory(self.ptr, self.size)))
+            if bson:
+                self.is_valid = bson.is_valid(self.raw_memory)
 
     @staticmethod
     def display_hint():
@@ -120,14 +126,13 @@ class BSONObjPrinter(object):
 
     def children(self):
         """Children."""
-        # Do not decode a BSONObj with an invalid size.
-        if not bson or self.size < 5 or self.size > 17 * 1024 * 1024:
+        # Do not decode a BSONObj with an invalid size, or that is considered
+        # invalid by pymongo.
+        if not bson or not self.is_valid or self.size < 5 or self.size > 17 * 1024 * 1024:
             return
 
-        inferior = gdb.selected_inferior()
-        buf = bson.BSON(bytes(inferior.read_memory(self.ptr, self.size)))
         options = CodecOptions(document_class=collections.OrderedDict)
-        bsondoc = buf.decode(codec_options=options)
+        bsondoc = bson.decode(self.raw_memory, codec_options=options)
 
         for key, val in list(bsondoc.items()):
             yield 'key', key
@@ -137,7 +142,7 @@ class BSONObjPrinter(object):
         """Return BSONObj for printing."""
         # The value has been optimized out.
         if self.size == -1:
-            return "BSONObj @ %s" % (self.ptr)
+            return "BSONObj @ %s - optimized out" % (self.ptr)
 
         ownership = "owned" if self.val['_ownedBuffer']['_buffer']['_holder']['px'] else "unowned"
 
@@ -148,7 +153,20 @@ class BSONObjPrinter(object):
 
         if size == 5:
             return "%s empty BSONObj @ %s" % (ownership, self.ptr)
-        return "%s BSONObj %s bytes @ %s" % (ownership, size, self.ptr)
+
+        suffix = ""
+        if not self.is_valid:
+            # Wondering why this is unprintable? See PYTHON-1824. The Python
+            # driver's BSON implementation does not support all possible BSON
+            # datetimes. (specifically any BSON datetime where the year is >
+            # datetime.MAXYEAR (usually 9999)).
+            # Attempting to print any BSONObj that contains an out of range
+            # datetime at any level of the document will cause an exception.
+            # There exists no workaround for this in the driver; not even the
+            # TypeDecoder API works for this because the BSON implementation
+            # errors out early when the date is out of range.
+            suffix = " - unprintable or invalid"
+        return "%s BSONObj %s bytes @ %s%s" % (ownership, size, self.ptr, suffix)
 
 
 class UUIDPrinter(object):
