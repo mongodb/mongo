@@ -87,6 +87,7 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock.h"
@@ -1941,6 +1942,10 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
 
 ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplication(
     OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+    // It is illegal to wait for replication with a session checked out because it can lead to
+    // deadlocks.
+    invariant(OperationContextSession::get(opCtx) == nullptr);
+
     Timer timer;
     WriteConcernOptions fixedWriteConcern = populateUnsetWriteConcernOptionsSyncMode(writeConcern);
 

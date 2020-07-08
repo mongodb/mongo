@@ -93,8 +93,9 @@ var $config = extendWorkload($config, function($config, $super) {
         // limited number of retries with exponential backoff.
         const bounds = this.calculateChunkBoundsForShardKey(collName, chunk);
         const waitForDelete = Random.rand() < 0.5;
+        const secondaryThrottle = Random.rand() < 0.5;
         try {
-            ChunkHelper.moveChunk(db, collName, bounds, toShard, waitForDelete);
+            ChunkHelper.moveChunk(db, collName, bounds, toShard, waitForDelete, secondaryThrottle);
         } catch (e) {
             // Failed moveChunks are thrown by the moveChunk helper with the response included as a
             // JSON string in the error's message.

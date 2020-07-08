@@ -579,10 +579,11 @@ void persistMigrationCoordinatorLocally(OperationContext* opCtx,
 }
 
 void persistRangeDeletionTaskLocally(OperationContext* opCtx,
-                                     const RangeDeletionTask& deletionTask) {
+                                     const RangeDeletionTask& deletionTask,
+                                     const WriteConcernOptions& writeConcern) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     try {
-        store.add(opCtx, deletionTask);
+        store.add(opCtx, deletionTask, writeConcern);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // Convert a DuplicateKey error to an anonymous error.
         uasserted(31375,
