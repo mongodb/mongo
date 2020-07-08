@@ -57,6 +57,29 @@ function buildCommands(collName) {
             alwaysFail: false
         },
         {command: {delete: collName, deletes: [{q: {_id: 0}, limit: 1}]}, alwaysFail: false},
+        {
+            command: {
+                aggregate: collName,
+                cursor: {},
+                pipeline: [
+                    {$match: {_id: 0}},
+                    {
+                        $merge: {
+                            into: "testMergeColl",
+                            on: "_id",
+                            whenMatched: "replace",
+                            whenNotMatched: "insert"
+                        }
+                    }
+                ]
+            },
+            alwaysFail: true
+        },
+        {
+            command:
+                {aggregate: collName, cursor: {}, pipeline: [{$match: {}}, {$out: "testOutColl"}]},
+            alwaysFail: true
+        },
         {command: {create: "testCollection"}, alwaysFail: true},
         {
             command: {collMod: "viewOnFoo", viewOn: "unshardedFoo", pipeline: [{$match: {_id: 1}}]},
