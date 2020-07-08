@@ -55,7 +55,12 @@ namespace mongo {
 class BSONLexer;
 }
 
-#line 59 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#ifdef _MSC_VER
+// warning C4065: switch statement contains 'default' but no 'case' labels.
+#pragma warning(disable : 4065)
+#endif
+
+#line 64 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -186,7 +191,7 @@ class BSONLexer;
 
 #line 52 "src/mongo/db/cst/pipeline_grammar.yy"
 namespace mongo {
-#line 194 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 199 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -1298,7 +1303,7 @@ inline int PipelineParserGen::by_type::type_get() const YY_NOEXCEPT {
 
 #line 52 "src/mongo/db/cst/pipeline_grammar.yy"
 }  // namespace mongo
-#line 1564 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 1569 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
 #endif  // !YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED

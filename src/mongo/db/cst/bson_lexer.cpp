@@ -75,12 +75,10 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
             } else {
                 _tokens.emplace_back(
                     PipelineParserGen::make_STRING(elem.fieldName(), getNextLoc()));
-                return KeywordToken{.type = PipelineParserGen::token::STRING,
-                                    .traverseChild = true,
-                                    .orderedArguments = false};
+                return KeywordToken{PipelineParserGen::token::STRING, true, false};
             }
         }
-        return KeywordToken{.type = boost::none, .traverseChild = true, .orderedArguments = false};
+        return KeywordToken{boost::none, true, false};
     }();
 
     switch (elem.type()) {

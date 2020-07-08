@@ -38,7 +38,7 @@
 
 
 // Unqualified %code blocks.
-#line 72 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 77 "src/mongo/db/cst/pipeline_grammar.yy"
 
 #include "mongo/db/cst/bson_lexer.h"
 
@@ -607,7 +607,7 @@ int PipelineParserGen::parse() {
             {
                 switch (yyn) {
                     case 2:
-#line 125 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 130 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         *cst = std::move(yystack_[1].value.as<CNode>());
                     }
@@ -615,14 +615,14 @@ int PipelineParserGen::parse() {
                     break;
 
                     case 3:
-#line 130 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 135 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                     }
 #line 684 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 4:
-#line 131 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 136 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = std::move(yystack_[0].value.as<CNode>());
                         auto& children =
@@ -634,7 +634,7 @@ int PipelineParserGen::parse() {
                     break;
 
                     case 5:
-#line 139 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 144 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<KeyFieldname, CNode>>() =
                             std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()};
@@ -858,7 +858,7 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    YY_NULLPTR};
 
 
-const unsigned char PipelineParserGen::yyrline_[] = {0, 125, 125, 130, 131, 139};
+const unsigned char PipelineParserGen::yyrline_[] = {0, 130, 130, 135, 136, 144};
 
 // Print the state stack on the debug stream.
 void PipelineParserGen::yystack_print_() {
@@ -885,4 +885,4 @@ void PipelineParserGen::yy_reduce_print_(int yyrule) {
 }  // namespace mongo
 #line 1000 "src/mongo/db/cst/pipeline_parser_gen.cpp"
 
-#line 144 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 149 "src/mongo/db/cst/pipeline_grammar.yy"
