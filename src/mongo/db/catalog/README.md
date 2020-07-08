@@ -628,6 +628,41 @@ explain how datafiles persist a machine’s identity which must be manipulated f
 
 # Checkpoints
 
+Checkpoints provide recovery points that enable the database to load a consistent snapshot of the
+data quickly during startup or after a failure. Checkpoints provide basic operation durability in
+favor of fast recovery in the event of a crash.
+
+Write-ahead logging, aka [journaling](#journaling), is used in addition to checkpointing to provide
+commit-level durability for all operations since the last checkpoint. On startup, all journaled
+writes are re-applied to the data from the last checkpoint. Without journaling, all writes between
+checkpoints would be lost.
+
+Storage engines need to
+[support checkpoints](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine.h#L267)
+for MongoDB to take advantage of this, otherwise MongoDB will act as an ephemeral data store. The
+frequency of these checkpoints is determined by the
+['storage.syncPeriodSecs' or 'syncdelay'](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/mongod_options_storage.idl#L86-L93)
+options.
+
+The WiredTiger storage engine
+[supports checkpoints](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L443-L647)
+, which are a read-only, static view of one or more data sources. When WiredTiger takes a
+checkpoint, it writes all of the data in a snapshot to the disk in a consistent way across all of
+the data files.
+
+To avoid taking unnecessary checkpoints on an idle server, WiredTiger will only take checkpoints for
+the following scenarios:
+* When the [stable timestamp](../repl/README.md#replication-timestamp-glossary) is greater than or 
+  equal to the [initial data timestamp](../repl/README.md#replication-timestamp-glossary), we take a
+  stable checkpoint, which is a durable view of the data at a particular timestamp. This is for
+  steady-state replication.
+* The [initial data timestamp](../repl/README.md#replication-timestamp-glossary) is not set, so we
+  must take a full checkpoint. This is when there is no consistent view of the data, such as during
+  initial sync.
+
+Not only does checkpointing provide us with durability for the database, but it also enables us to
+take [backups of the data](#file-system-backups).
+
 # Journaling
 
 MongoDB provides write durability via a persisted change log for replicated writes and persistence
