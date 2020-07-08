@@ -128,8 +128,10 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterResponseReturnsCurrentMongosTopologyVer
 
     bool isMasterReturned = false;
     stdx::thread getIsMasterThread([&] {
-        const auto response =
-            getTopoCoord().awaitIsMasterResponse(opCtx.get(), currentTopologyVersion, deadline);
+        Client::setCurrent(getServiceContext()->makeClient("getIsMasterThread"));
+        auto threadOpCtx = cc().makeOperationContext();
+        const auto response = getTopoCoord().awaitIsMasterResponse(
+            threadOpCtx.get(), currentTopologyVersion, deadline);
         isMasterReturned = true;
         auto topologyVersion = response->getTopologyVersion();
         // Assert that on timeout, the returned IsMasterResponse contains the same TopologyVersion.
@@ -278,12 +280,14 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
     auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn);
     ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
     stdx::thread getIsMasterThread([&] {
+        Client::setCurrent(getServiceContext()->makeClient("getIsMasterThread"));
+        auto threadOpCtx = cc().makeOperationContext();
         auto maxAwaitTime = Milliseconds(5000);
         auto deadline = now() + maxAwaitTime;
-        ASSERT_THROWS_CODE(
-            getTopoCoord().awaitIsMasterResponse(opCtx.get(), currentTopologyVersion, deadline),
-            AssertionException,
-            ErrorCodes::ShutdownInProgress);
+        ASSERT_THROWS_CODE(getTopoCoord().awaitIsMasterResponse(
+                               threadOpCtx.get(), currentTopologyVersion, deadline),
+                           AssertionException,
+                           ErrorCodes::ShutdownInProgress);
     });
 
     // Ensure that awaitIsMasterResponse() is called before entering quiesce mode.
