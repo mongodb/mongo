@@ -55,37 +55,43 @@ TEST_F(ChunkMapTest, TestAddChunk) {
     const OID epoch = OID::gen();
     ChunkVersion version{1, 0, epoch};
 
-    auto chunk =
+    auto chunk = std::make_shared<ChunkInfo>(
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
                   version,
-                  kThisShard};
+                  kThisShard});
 
-    ChunkMap chunkMap{};
-    chunkMap.addChunk(chunk);
+    ChunkMap chunkMap{epoch};
+    auto newChunkMap = chunkMap.createMerged({chunk});
 
-    ASSERT_EQ(chunkMap.size(), 1);
+    ASSERT_EQ(newChunkMap.size(), 1);
 }
 
 TEST_F(ChunkMapTest, TestEnumerateAllChunks) {
-    ChunkMap chunkMap{};
-
     const OID epoch = OID::gen();
+    ChunkMap chunkMap{epoch};
     ChunkVersion version{1, 0, epoch};
 
-    chunkMap.addChunk(ChunkType{
-        kNss, ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)}, version, kThisShard});
+    auto newChunkMap = chunkMap.createMerged(
+        {std::make_shared<ChunkInfo>(
+             ChunkType{kNss,
+                       ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
+                       version,
+                       kThisShard}),
 
-    chunkMap.addChunk(
-        ChunkType{kNss, ChunkRange{BSON("a" << 0), BSON("a" << 100)}, version, kThisShard});
+         std::make_shared<ChunkInfo>(
+             ChunkType{kNss, ChunkRange{BSON("a" << 0), BSON("a" << 100)}, version, kThisShard}),
 
-    chunkMap.addChunk(ChunkType{
-        kNss, ChunkRange{BSON("a" << 100), getShardKeyPattern().globalMax()}, version, kThisShard});
+         std::make_shared<ChunkInfo>(ChunkType{
+             kNss,
+             ChunkRange{BSON("a" << 100), getShardKeyPattern().globalMax()},
+             version,
+             kThisShard})});
 
     int count = 0;
     auto lastMax = getShardKeyPattern().globalMin();
 
-    chunkMap.forEach([&](const auto& chunkInfo) {
+    newChunkMap.forEach([&](const auto& chunkInfo) {
         ASSERT(SimpleBSONObjComparator::kInstance.evaluate(chunkInfo->getMax() > lastMax));
         lastMax = chunkInfo->getMax();
         count++;
@@ -93,25 +99,31 @@ TEST_F(ChunkMapTest, TestEnumerateAllChunks) {
         return true;
     });
 
-    ASSERT_EQ(count, chunkMap.size());
+    ASSERT_EQ(count, newChunkMap.size());
 }
 
 TEST_F(ChunkMapTest, TestIntersectingChunk) {
-    ChunkMap chunkMap{};
-
     const OID epoch = OID::gen();
+    ChunkMap chunkMap{epoch};
     ChunkVersion version{1, 0, epoch};
 
-    chunkMap.addChunk(ChunkType{
-        kNss, ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)}, version, kThisShard});
+    auto newChunkMap = chunkMap.createMerged(
+        {std::make_shared<ChunkInfo>(
+             ChunkType{kNss,
+                       ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
+                       version,
+                       kThisShard}),
 
-    chunkMap.addChunk(
-        ChunkType{kNss, ChunkRange{BSON("a" << 0), BSON("a" << 100)}, version, kThisShard});
+         std::make_shared<ChunkInfo>(
+             ChunkType{kNss, ChunkRange{BSON("a" << 0), BSON("a" << 100)}, version, kThisShard}),
 
-    chunkMap.addChunk(ChunkType{
-        kNss, ChunkRange{BSON("a" << 100), getShardKeyPattern().globalMax()}, version, kThisShard});
+         std::make_shared<ChunkInfo>(ChunkType{
+             kNss,
+             ChunkRange{BSON("a" << 100), getShardKeyPattern().globalMax()},
+             version,
+             kThisShard})});
 
-    auto intersectingChunk = chunkMap.findIntersectingChunk(BSON("a" << 50));
+    auto intersectingChunk = newChunkMap.findIntersectingChunk(BSON("a" << 50));
 
     ASSERT(intersectingChunk);
     ASSERT(
@@ -121,25 +133,31 @@ TEST_F(ChunkMapTest, TestIntersectingChunk) {
 }
 
 TEST_F(ChunkMapTest, TestEnumerateOverlappingChunks) {
-    ChunkMap chunkMap{};
-
     const OID epoch = OID::gen();
+    ChunkMap chunkMap{epoch};
     ChunkVersion version{1, 0, epoch};
 
-    chunkMap.addChunk(ChunkType{
-        kNss, ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)}, version, kThisShard});
+    auto newChunkMap = chunkMap.createMerged(
+        {std::make_shared<ChunkInfo>(
+             ChunkType{kNss,
+                       ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
+                       version,
+                       kThisShard}),
 
-    chunkMap.addChunk(
-        ChunkType{kNss, ChunkRange{BSON("a" << 0), BSON("a" << 100)}, version, kThisShard});
+         std::make_shared<ChunkInfo>(
+             ChunkType{kNss, ChunkRange{BSON("a" << 0), BSON("a" << 100)}, version, kThisShard}),
 
-    chunkMap.addChunk(ChunkType{
-        kNss, ChunkRange{BSON("a" << 100), getShardKeyPattern().globalMax()}, version, kThisShard});
+         std::make_shared<ChunkInfo>(ChunkType{
+             kNss,
+             ChunkRange{BSON("a" << 100), getShardKeyPattern().globalMax()},
+             version,
+             kThisShard})});
 
     auto min = BSON("a" << -50);
     auto max = BSON("a" << 150);
 
     int count = 0;
-    chunkMap.forEachOverlappingChunk(min, max, true, [&](const auto& chunk) {
+    newChunkMap.forEachOverlappingChunk(min, max, true, [&](const auto& chunk) {
         count++;
         return true;
     });

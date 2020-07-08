@@ -68,14 +68,20 @@ using ShardVersionMap = std::map<ShardId, ShardVersionTargetingInfo>;
 // provides a simpler, high-level interface for domain specific operations without exposing the
 // underlying implementation.
 class ChunkMap {
-    // Ordered map from the max for each chunk to an entry describing the chunk
-    using ChunkInfoMap = std::map<std::string, std::shared_ptr<ChunkInfo>>;
+    // Vector of chunks ordered by max key.
+    using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
 
 public:
-    ChunkMap() {}
+    explicit ChunkMap(OID epoch, size_t initialCapacity = 0) : _collectionVersion(0, 0, epoch) {
+        _chunkMap.reserve(initialCapacity);
+    }
 
     size_t size() const {
         return _chunkMap.size();
+    }
+
+    ChunkVersion getVersion() const {
+        return _collectionVersion;
     }
 
     template <typename Callable>
@@ -83,7 +89,7 @@ public:
         auto it = shardKey.isEmpty() ? _chunkMap.begin() : _findIntersectingChunk(shardKey);
 
         for (; it != _chunkMap.end(); ++it) {
-            if (!handler(it->second))
+            if (!handler(*it))
                 break;
         }
     }
@@ -96,21 +102,29 @@ public:
         const auto bounds = _overlappingBounds(min, max, isMaxInclusive);
 
         for (auto it = bounds.first; it != bounds.second; ++it) {
-            if (!handler(it->second))
+            if (!handler(*it))
                 break;
         }
     }
 
-    ShardVersionMap constructShardVersionMap(const OID& epoch) const;
-    void addChunk(const ChunkType& chunk);
+    ShardVersionMap constructShardVersionMap() const;
     std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const;
 
+    void appendChunk(const std::shared_ptr<ChunkInfo>& chunk);
+    ChunkMap createMerged(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks);
+
+    BSONObj toBSON() const;
+
 private:
-    ChunkInfoMap::const_iterator _findIntersectingChunk(const BSONObj& shardKey) const;
-    std::pair<ChunkInfoMap::const_iterator, ChunkInfoMap::const_iterator> _overlappingBounds(
+    ChunkVector::const_iterator _findIntersectingChunk(const BSONObj& shardKey,
+                                                       bool isMaxInclusive = true) const;
+    std::pair<ChunkVector::const_iterator, ChunkVector::const_iterator> _overlappingBounds(
         const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
 
-    ChunkInfoMap _chunkMap;
+    ChunkVector _chunkMap;
+
+    // Max version across all chunks
+    ChunkVersion _collectionVersion;
 };
 
 /**
@@ -187,7 +201,7 @@ public:
     void setAllShardsRefreshed();
 
     ChunkVersion getVersion() const {
-        return _collectionVersion;
+        return _chunkMap.getVersion();
     }
 
     /**
@@ -256,8 +270,7 @@ private:
                         KeyPattern shardKeyPattern,
                         std::unique_ptr<CollatorInterface> defaultCollator,
                         bool unique,
-                        ChunkMap chunkMap,
-                        ChunkVersion collectionVersion);
+                        ChunkMap chunkMap);
 
     ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
 
@@ -283,9 +296,6 @@ private:
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).
     ChunkMap _chunkMap;
-
-    // Max version across all chunks
-    const ChunkVersion _collectionVersion;
 
     // The representation of shard versions and staleness indicators for this namespace. If a
     // shard does not exist, it will not have an entry in the map.

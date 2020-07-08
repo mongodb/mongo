@@ -254,13 +254,12 @@ std::string ShardKeyPattern::toString() const {
 }
 
 std::string ShardKeyPattern::toKeyString(const BSONObj& shardKey) {
-    BSONObjBuilder strippedKeyValue;
-    for (const auto& elem : shardKey) {
-        strippedKeyValue.appendAs(elem, ""_sd);
-    }
+    KeyString::Builder ks(KeyString::Version::V1, Ordering::allAscending());
 
-    KeyString::Builder ks(
-        KeyString::Version::V1, strippedKeyValue.done(), Ordering::allAscending());
+    BSONObjIterator it(shardKey);
+    while (auto elem = it.next()) {
+        ks.appendBSONElement(elem);
+    }
 
     return {ks.getBuffer(), ks.getSize()};
 }

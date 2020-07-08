@@ -173,6 +173,10 @@ boost::optional<ChunkRange> ChunkRange::overlapWith(ChunkRange const& other) con
                       le(_maxKey, other._maxKey) ? _maxKey : other._maxKey);
 }
 
+bool ChunkRange::overlaps(const ChunkRange& other) const {
+    return _minKey.woCompare(other._maxKey) < 0 && _maxKey.woCompare(other._minKey) > 0;
+}
+
 ChunkRange ChunkRange::unionWith(ChunkRange const& other) const {
     auto le = [](auto const& a, auto const& b) { return a.woCompare(b) <= 0; };
     return ChunkRange(le(_minKey, other._minKey) ? _minKey : other._minKey,
