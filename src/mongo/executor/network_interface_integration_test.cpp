@@ -163,6 +163,10 @@ public:
         startNet(std::make_unique<WaitForIsMasterHook>(this));
     }
 
+    void tearDown() override {
+        // Nothing
+    }
+
     RemoteCommandRequest makeTestCommand(
         Milliseconds timeout,
         BSONObj cmd,
@@ -291,6 +295,19 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceTest::_mutex");
     stdx::condition_variable _isMasterCond;
     boost::optional<IsMasterData> _isMasterResult;
+};
+
+class NetworkInterfaceInternalClientTest : public NetworkInterfaceTest {
+public:
+    void setUp() override {
+        WireSpec::instance().isInternalClient = true;
+        NetworkInterfaceTest::setUp();
+    }
+
+    void tearDown() override {
+        NetworkInterfaceTest::tearDown();
+        WireSpec::instance().isInternalClient = false;
+    }
 };
 
 TEST_F(NetworkInterfaceTest, CancelMissingOperation) {
@@ -642,7 +659,7 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
     assertNumOps(0u, 0u, 0u, 5u);
 }
 
-TEST_F(NetworkInterfaceTest, StartCommandOnAny) {
+TEST_F(NetworkInterfaceInternalClientTest, StartCommandOnAny) {
     // The echo command below uses hedging so after a response is returned, we will issue
     // a _killOperations command to kill the pending operation. As a result, the number of
     // successful commands can sometimes be 2 (echo and _killOperations) instead 1 when the
@@ -667,8 +684,8 @@ TEST_F(NetworkInterfaceTest, StartCommandOnAny) {
     auto deferred = runCommandOnAny(makeCallbackHandle(), std::move(request));
     auto res = deferred.get();
 
-    auto cmdObj = res.data.getObjectField("echo");
     uassertStatusOK(res.status);
+    auto cmdObj = res.data.getObjectField("echo");
     ASSERT_EQ(1, cmdObj.getIntField("echo"));
     ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
     ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
@@ -709,9 +726,8 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
     ASSERT_FALSE(swResult.isOK());
 }
 
-TEST_F(NetworkInterfaceTest, IsMasterRequestContainsOutgoingWireVersionInternalClientInfo) {
-    WireSpec::instance().isInternalClient = true;
-
+TEST_F(NetworkInterfaceInternalClientTest,
+       IsMasterRequestContainsOutgoingWireVersionInternalClientInfo) {
     auto deferred = runCommand(makeCallbackHandle(), makeTestCommand(kNoTimeout, makeEchoCmdObj()));
     auto isMasterHandshake = waitForIsMaster();
 
