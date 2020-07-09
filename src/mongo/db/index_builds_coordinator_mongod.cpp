@@ -128,19 +128,25 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         // Only operations originating from user connections need to wait while there are more than
         // 'maxNumActiveUserIndexBuilds' index builds currently running.
         if (opCtx->getClient()->isFromUserConnection()) {
-            // Need to follow the locking order here by getting the global lock first followed by
-            // the mutex. The global lock acquires the RSTL lock which we use to assert that we're
-            // the primary node when running user operations.
-            ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                opCtx->lockState());
-            Lock::GlobalLock globalLk(opCtx, MODE_IX);
+            {
+                // The global lock acquires the RSTL lock which we use to assert that we're the
+                // primary node when running user operations. Additionally, releasing this lock
+                // allows the node to step down after we have checked the replication state. If this
+                // node steps down after this check, similar assertions will cause the index build
+                // to fail later on when locks are reacquired. Therefore, this assertion is not
+                // required for correctness, but only intended to rate limit index builds started on
+                // primaries.
+                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                    opCtx->lockState());
+                Lock::GlobalLock globalLk(opCtx, MODE_IX);
+
+                auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+                uassert(ErrorCodes::NotMaster,
+                        "Not primary while waiting to start an index build",
+                        replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
+            }
 
             stdx::unique_lock<Latch> lk(_mutex);
-
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            uassert(ErrorCodes::NotMaster,
-                    "Not primary while waiting to start an index build",
-                    replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
             opCtx->waitForConditionOrInterrupt(_indexBuildFinished, lk, [&] {
                 const int maxActiveBuilds = maxNumActiveUserIndexBuilds.load();
                 if (_numActiveIndexBuilds < maxActiveBuilds) {
