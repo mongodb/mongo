@@ -45,6 +45,13 @@ function createCollections() {
     assert.commandWorked(db.adminCommand({shardCollection: dbName + '.shardedBar', key: {_id: 1}}));
 }
 
+function mapFunc() {
+    emit(this.a, 1);
+}
+function reduceFunc(key, values) {
+    return Array.sum(values);
+}
+
 function buildCommands(collName) {
     const commands = [
         {command: {insert: collName, documents: [{a: 10}]}, alwaysFail: false},
@@ -78,6 +85,15 @@ function buildCommands(collName) {
         {
             command:
                 {aggregate: collName, cursor: {}, pipeline: [{$match: {}}, {$out: "testOutColl"}]},
+            alwaysFail: true
+        },
+        {
+            command: {
+                mapReduce: collName,
+                map: mapFunc,
+                reduce: reduceFunc,
+                out: {merge: "testOutMR", db: dbName}
+            },
             alwaysFail: true
         },
         {command: {create: "testCollection"}, alwaysFail: true},
