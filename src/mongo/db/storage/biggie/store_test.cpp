@@ -56,7 +56,7 @@ public:
     }
 
     int getRootCount() const {
-        return thisStore._root.use_count();
+        return thisStore._root->refCount();
     }
 
     bool hasPreviousVersion() const {
@@ -81,9 +81,9 @@ public:
     /**
      * Returns all nodes in "store" with level order traversal.
      */
-    std::vector<std::shared_ptr<node_type>> allNodes(StringStore& store) const {
-        std::deque<std::shared_ptr<node_type>> level(1, store._root);
-        std::vector<std::shared_ptr<node_type>> result(1, store._root);
+    std::vector<boost::intrusive_ptr<node_type>> allNodes(StringStore& store) const {
+        std::deque<boost::intrusive_ptr<node_type>> level(1, store._root);
+        std::vector<boost::intrusive_ptr<node_type>> result(1, store._root);
         while (!level.empty()) {
             auto node = level.front().get();
             for (int i = 0; i < 256; ++i) {

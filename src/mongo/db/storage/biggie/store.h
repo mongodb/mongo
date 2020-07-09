@@ -30,6 +30,7 @@
 #pragma once
 
 #include <array>
+#include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 #include <cstring>
 #include <exception>
@@ -38,10 +39,12 @@
 #include <string.h>
 #include <vector>
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace biggie {
+
 
 class merge_conflict_exception : std::exception {
     virtual const char* what() const noexcept {
@@ -147,9 +150,9 @@ public:
         }
 
     private:
-        radix_iterator(const std::shared_ptr<Head>& root) : _root(root), _current(nullptr) {}
+        radix_iterator(const boost::intrusive_ptr<Head>& root) : _root(root), _current(nullptr) {}
 
-        radix_iterator(const std::shared_ptr<Head>& root, Node* current)
+        radix_iterator(const boost::intrusive_ptr<Head>& root, Node* current)
             : _root(root), _current(current) {}
 
         /**
@@ -231,10 +234,10 @@ public:
 
         void updateTreeView(bool stopIfMultipleCursors = false) {
             while (_root && _root->_nextVersion) {
-                if (stopIfMultipleCursors && _root.use_count() > 1)
+                if (stopIfMultipleCursors && _root->refCount() > 1)
                     return;
 
-                bool clearPreviousFlag = _root.use_count() == 1;
+                bool clearPreviousFlag = _root->refCount() == 1;
                 _root = _root->_nextVersion;
                 if (clearPreviousFlag)
                     _root->_hasPreviousVersion = false;
@@ -242,7 +245,7 @@ public:
         }
 
         // "_root" is a pointer to the root of the tree over which this is iterating.
-        std::shared_ptr<Head> _root;
+        boost::intrusive_ptr<Head> _root;
 
         // "_current" is the node that the iterator is currently on. _current->_data will never be
         // boost::none (unless it is within the process of tree traversal), and _current will be
@@ -367,10 +370,10 @@ public:
         }
 
     private:
-        reverse_radix_iterator(const std::shared_ptr<Head>& root)
+        reverse_radix_iterator(const boost::intrusive_ptr<Head>& root)
             : _root(root), _current(nullptr) {}
 
-        reverse_radix_iterator(const std::shared_ptr<Head>& root, Node* current)
+        reverse_radix_iterator(const boost::intrusive_ptr<Head>& root, Node* current)
             : _root(root), _current(current) {}
 
         void _findNextReverse() {
@@ -434,10 +437,10 @@ public:
 
         void updateTreeView(bool stopIfMultipleCursors = false) {
             while (_root && _root->_nextVersion) {
-                if (stopIfMultipleCursors && _root.use_count() > 1)
+                if (stopIfMultipleCursors && _root->refCount() > 1)
                     return;
 
-                bool clearPreviousFlag = _root.use_count() == 1;
+                bool clearPreviousFlag = _root->refCount() == 1;
                 _root = _root->_nextVersion;
                 if (clearPreviousFlag)
                     _root->_hasPreviousVersion = false;
@@ -445,7 +448,7 @@ public:
         }
 
         // "_root" is a pointer to the root of the tree over which this is iterating.
-        std::shared_ptr<Head> _root;
+        boost::intrusive_ptr<Head> _root;
 
         // "_current" is a the node that the iterator is currently on. _current->_data will never be
         // boost::none, and _current will be become a nullptr once there are no more nodes left to
@@ -457,9 +460,9 @@ public:
     using const_reverse_iterator = reverse_radix_iterator<const_pointer, const value_type&>;
 
     // Constructors
-    RadixStore() : _root(std::make_shared<Head>()) {}
-    RadixStore(const RadixStore& other) : _root(std::make_shared<Head>(*(other._root))) {}
-    RadixStore(const Head& other) : _root(std::make_shared<Head>(other)) {}
+    RadixStore() : _root(make_intrusive_node<Head>()) {}
+    RadixStore(const RadixStore& other) : _root(make_intrusive_node<Head>(*(other._root))) {}
+    RadixStore(const Head& other) : _root(make_intrusive_node<Head>(other)) {}
 
     friend void swap(RadixStore& first, RadixStore& second) {
         std::swap(first._root, second._root);
@@ -518,7 +521,7 @@ public:
 
     // Modifiers
     void clear() noexcept {
-        _root = std::make_shared<Head>();
+        _root = make_intrusive_node<Head>();
     }
 
     std::pair<const_iterator, bool> insert(value_type&& value) {
@@ -550,7 +553,7 @@ public:
 
         Node* prev = _root.get();
         int rootUseCount = _root->_hasPreviousVersion ? 2 : 1;
-        bool isUniquelyOwned = _root.use_count() == rootUseCount;
+        bool isUniquelyOwned = _root->refCount() == rootUseCount;
         context.push_back(std::make_pair(prev, isUniquelyOwned));
 
         Node* node = nullptr;
@@ -570,7 +573,7 @@ public:
                 return false;
             }
 
-            isUniquelyOwned = isUniquelyOwned && prev->_children[c].use_count() == 1;
+            isUniquelyOwned = isUniquelyOwned && prev->_children[c]->refCount() == 1;
             context.push_back(std::make_pair(node, isUniquelyOwned));
             depth = node->_depth + node->_trieKey.size();
             prev = node;
@@ -598,8 +601,8 @@ public:
 
         if (!isUniquelyOwned) {
             invariant(!_root->_nextVersion);
-            invariant(_root.use_count() > rootUseCount);
-            _root->_nextVersion = std::make_shared<Head>(*_root);
+            invariant(_root->refCount() > rootUseCount);
+            _root->_nextVersion = make_intrusive_node<Head>(*_root);
             _root = _root->_nextVersion;
             _root->_hasPreviousVersion = true;
             parent = _root.get();
@@ -615,7 +618,7 @@ public:
 
             uint8_t childFirstChar = child->_trieKey.front();
             if (!isUniquelyOwned) {
-                parent->_children[childFirstChar] = std::make_shared<Node>(*child);
+                parent->_children[childFirstChar] = make_intrusive_node<Node>(*child);
                 child = parent->_children[childFirstChar].get();
             }
 
@@ -806,6 +809,7 @@ private:
                 _data.emplace(other._data->first, other._data->second);
             _children = other._children;
             _numChildren = other._numChildren;
+            // _refCount is initialized to 0 and not copied from other.
         }
 
         Node(Node&& other) {
@@ -814,6 +818,7 @@ private:
             _data = std::move(other._data);
             _children = std::move(other._children);
             _numChildren = std::move(other._numChildren);
+            // _refCount is initialized to 0 and not copied from other.
         }
 
         virtual ~Node() = default;
@@ -826,14 +831,35 @@ private:
             return _numChildren;
         }
 
+        int refCount() const {
+            return _refCount.load();
+        }
+
+        friend void intrusive_ptr_add_ref(Node* ptr) {
+            ptr->_refCount.fetchAndAdd(1);
+        }
+
+        friend void intrusive_ptr_release(Node* ptr) {
+            if (ptr->_refCount.fetchAndSubtract(1) == 1) {
+                delete ptr;
+            }
+        }
+
     protected:
         unsigned int _depth = 0;
         std::vector<uint8_t> _trieKey;
         boost::optional<value_type> _data;
-        std::array<std::shared_ptr<Node>, 256> _children;
+        std::array<boost::intrusive_ptr<Node>, 256> _children;
         // TODO SERVER-36709: Updating to uint8_t after using adaptive nodes.
         uint16_t _numChildren = 0;
+        AtomicWord<uint32_t> _refCount{0};
     };
+
+    template <typename Node, typename... Args>
+    boost::intrusive_ptr<Node> make_intrusive_node(Args&&... args) {
+        auto ptr = new Node(std::forward<Args>(args)...);
+        return boost::intrusive_ptr<Node>(ptr, true);
+    }
 
     /**
      * Head is the root node of every RadixStore, it contains extra information used by cursors to
@@ -863,7 +889,7 @@ private:
     protected:
         // Forms a singly linked list of versions that is needed to reposition cursors after
         // modifications have been made.
-        std::shared_ptr<Head> _nextVersion;
+        boost::intrusive_ptr<Head> _nextVersion;
 
         // While we have cursors that haven't been repositioned to the latest tree, this will be
         // true to help us understand when to copy on modifications due to the extra shared pointer
@@ -964,16 +990,16 @@ private:
     void _makeRootUnique() {
         int rootUseCount = _root->_hasPreviousVersion ? 2 : 1;
 
-        if (_root.use_count() == rootUseCount)
+        if (_root->refCount() == rootUseCount)
             return;
 
-        invariant(_root.use_count() > rootUseCount);
+        invariant(_root->refCount() > rootUseCount);
         // Copy the node on a modifying operation when the root isn't unique.
 
         // There should not be any _nextVersion set in the _root otherwise our tree would have
         // multiple HEADs.
         invariant(!_root->_nextVersion);
-        _root->_nextVersion = std::make_shared<Head>(*_root);
+        _root->_nextVersion = make_intrusive_node<Head>(*_root);
         _root = _root->_nextVersion;
         _root->_hasPreviousVersion = true;
     }
@@ -999,11 +1025,11 @@ private:
         _makeRootUnique();
 
         Node* prev = _root.get();
-        std::shared_ptr<Node> node = prev->_children[childFirstChar];
+        boost::intrusive_ptr<Node> node = prev->_children[childFirstChar];
         while (node != nullptr) {
-            if (node.use_count() - 1 > 1) {
+            if (node->refCount() - 1 > 1) {
                 // Copy node on a modifying operation when it isn't owned uniquely.
-                node = std::make_shared<Node>(*node);
+                node = make_intrusive_node<Node>(*node);
                 prev->_children[childFirstChar] = node;
             }
 
@@ -1113,7 +1139,7 @@ private:
      */
     Node* _addChild(Node* node, std::vector<uint8_t> key, boost::optional<value_type> value) {
 
-        std::shared_ptr<Node> newNode = std::make_shared<Node>(key);
+        boost::intrusive_ptr<Node> newNode = make_intrusive_node<Node>(key);
         newNode->_depth = node->_depth + node->_trieKey.size();
         if (value) {
             newNode->_data.emplace(value->first, value->second);
@@ -1171,7 +1197,7 @@ private:
     /**
      * Compresses a child node into its parent if necessary. This is required when an erase results
      * in a node with no value and only one child.
-     * Returns true if compression occured and false otherwise.
+     * Returns true if compression occurred and false otherwise.
      */
     bool _compressOnlyChild(Node* node) {
         // Don't compress if this node has an actual value associated with it or is the root
@@ -1181,7 +1207,7 @@ private:
         }
 
         // Determine if this node has only one child.
-        std::shared_ptr<Node> onlyChild = nullptr;
+        boost::intrusive_ptr<Node> onlyChild = nullptr;
 
         for (size_t i = 0; i < node->_children.size(); ++i) {
             if (node->_children[i] != nullptr) {
@@ -1238,8 +1264,8 @@ private:
         for (size_t idx = 1; idx < context.size(); idx++) {
             node = context[idx];
 
-            if (prev->_children[node->_trieKey.front()].use_count() > 1) {
-                std::shared_ptr<Node> nodeCopy = std::make_shared<Node>(*node);
+            if (prev->_children[node->_trieKey.front()]->refCount() > 1) {
+                boost::intrusive_ptr<Node> nodeCopy = make_intrusive_node<Node>(*node);
                 prev->_children[nodeCopy->_trieKey.front()] = nodeCopy;
                 context[idx] = nodeCopy.get();
                 prev = nodeCopy.get();
@@ -1260,9 +1286,9 @@ private:
         // Merges all differences between this and other, using base to determine whether operations
         // are allowed or should throw a merge conflict.
         RadixStore base, other, node;
-        node._root = std::make_shared<Head>(*current);
-        base._root = std::make_shared<Head>(*baseNode);
-        other._root = std::make_shared<Head>(*otherNode);
+        node._root = make_intrusive_node<Head>(*current);
+        base._root = make_intrusive_node<Head>(*baseNode);
+        other._root = make_intrusive_node<Head>(*otherNode);
 
         // Merges insertions and updates from the master tree into the working tree, if possible.
         for (const value_type otherVal : other) {
@@ -1272,7 +1298,7 @@ private:
             if (thisIter != node.end() && baseIter != base.end()) {
                 // All three trees have a record of the node with the same key.
                 if (thisIter->second == baseIter->second && baseIter->second != otherVal.second) {
-                    // No changes occured in the working tree, so the value in the master tree can
+                    // No changes occurred in the working tree, so the value in the master tree can
                     // be merged in cleanly.
                     this->update(RadixStore::value_type(otherVal));
                 } else if (thisIter->second != baseIter->second &&
@@ -1310,7 +1336,7 @@ private:
             if (otherIter == other.end()) {
                 if (thisIter != node.end() && thisIter->second == baseVal.second) {
                     // Nothing changed between the working tree and merge base, so it is safe to
-                    // perform the deletion that occured in the master tree.
+                    // perform the deletion that occurred in the master tree.
                     this->erase(baseVal.first);
                 } else if (thisIter != node.end() && thisIter->second != baseVal.second) {
                     // The working tree made a change to the node while the master tree removed the
@@ -1328,8 +1354,8 @@ private:
     void _mergeTwoBranches(const Node* current, const Node* otherNode) {
 
         RadixStore other, node;
-        node._root = std::make_shared<Head>(*current);
-        other._root = std::make_shared<Head>(*otherNode);
+        node._root = make_intrusive_node<Head>(*current);
+        other._root = make_intrusive_node<Head>(*otherNode);
 
         for (const value_type otherVal : other) {
             RadixStore::const_iterator thisIter = node.find(otherVal.first);
@@ -1538,7 +1564,7 @@ private:
         return node;
     }
 
-    std::shared_ptr<Head> _root = nullptr;
+    boost::intrusive_ptr<Head> _root = nullptr;
 };
 
 using StringStore = RadixStore<std::string, std::string>;
