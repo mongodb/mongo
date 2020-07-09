@@ -1042,6 +1042,7 @@ env.CppUnitTest('replication_coordinator_impl_reconfig_test',
 env.Library(
     target='repl_coordinator_interface',
     source=[
+        'always_allow_non_local_writes.cpp',
         'repl_client_info.cpp',
         'replication_coordinator.cpp',
         'replication_coordinator_noop.cpp',
