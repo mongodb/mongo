@@ -47,8 +47,10 @@ TEST(DiagnosticInfo, BasicSingleThread) {
     serviceContext->setFastClockSource(std::move(clockSource));
     setGlobalServiceContext(std::move(serviceContext));
 
+    ThreadClient tc("DiagnosticInfoTest", getGlobalServiceContext());
+
     // take the initial diagnostic info
-    DiagnosticInfo capture1 = DiagnosticInfo::capture("capture1"_sd);
+    DiagnosticInfo capture1 = DiagnosticInfo::capture(tc.get(), "capture1"_sd);
     ASSERT_EQ(capture1.getCaptureName(), "capture1");
 
     // mock time advancing and check that the current time is greater than capture1's timestamp
@@ -56,7 +58,7 @@ TEST(DiagnosticInfo, BasicSingleThread) {
     ASSERT_LT(capture1.getTimestamp(), clockSourcePointer->now());
 
     // take a second diagnostic capture and compare its fields to the first
-    DiagnosticInfo capture2 = DiagnosticInfo::capture("capture2"_sd);
+    DiagnosticInfo capture2 = DiagnosticInfo::capture(tc.get(), "capture2"_sd);
     ASSERT_LT(capture1.getTimestamp(), capture2.getTimestamp());
     ASSERT_EQ(capture2.getCaptureName(), "capture2");
     ASSERT_NE(capture2, capture1);

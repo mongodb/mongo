@@ -187,9 +187,7 @@ MONGO_INITIALIZER_GENERAL(DiagnosticInfo, (/* NO PREREQS */), ("FinalizeDiagnost
     class DiagnosticListener : public latch_detail::DiagnosticListener {
         void onContendedLock(const Identity& id) override {
             if (auto client = Client::getCurrent()) {
-                auto& handle = getDiagnosticInfoHandle(client);
-                stdx::lock_guard<stdx::mutex> lk(handle.mutex);
-                handle.list.emplace_front(DiagnosticInfo::capture(id.name()));
+                DiagnosticInfo::capture(client, id.name());
 
                 if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
                     (id.name() == kBlockedOpMutexName)) {
@@ -229,9 +227,7 @@ MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
 
         void addInfo(const StringData& name) {
             if (auto client = Client::getCurrent()) {
-                auto& handle = getDiagnosticInfoHandle(client);
-                stdx::lock_guard<stdx::mutex> lk(handle.mutex);
-                handle.list.emplace_front(DiagnosticInfo::capture(name));
+                DiagnosticInfo::capture(client, name);
 
                 if (currentOpSpawnsThreadWaitingForLatch.shouldFail() &&
                     (name == kBlockedOpInterruptibleName)) {
@@ -278,13 +274,23 @@ std::string DiagnosticInfo::toString() const {
         _captureName.toString(), _timestamp.toString(), _backtrace.data.size());
 }
 
-DiagnosticInfo DiagnosticInfo::capture(const StringData& captureName, Options options) {
+const DiagnosticInfo& DiagnosticInfo::capture(Client* client,
+                                              const StringData& captureName,
+                                              Options options) noexcept {
+    auto currentTime = client->getServiceContext()->getFastClockSource()->now();
+
     // Since we don't have a fast enough backtrace implementation at the moment, the Backtrace is
     // always empty. If SERVER-44091 happens, this should branch on options.shouldTakeBacktrace
     auto backtrace = Backtrace{};
-    auto currentTime = getGlobalServiceContext()->getFastClockSource()->now();
 
-    return DiagnosticInfo(currentTime, captureName, std::move(backtrace));
+    auto info = DiagnosticInfo(currentTime, captureName, std::move(backtrace));
+
+    auto& handle = getDiagnosticInfoHandle(client);
+
+    stdx::lock_guard<stdx::mutex> lk(handle.mutex);
+    handle.list.emplace_front(std::move(info));
+
+    return handle.list.front();
 }
 
 DiagnosticInfo::BlockedOpGuard::~BlockedOpGuard() {

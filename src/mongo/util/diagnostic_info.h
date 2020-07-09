@@ -85,7 +85,9 @@ public:
     /**
      * Captures the diagnostic information based on the caller's context.
      */
-    static DiagnosticInfo capture(const StringData& captureName, Options options = Options{});
+    static const DiagnosticInfo& capture(Client* client,
+                                         const StringData& captureName,
+                                         Options options = Options{}) noexcept;
 
     /**
      * This function checks the FailPoint currentOpSpawnsThreadWaitingForLatch and potentially
