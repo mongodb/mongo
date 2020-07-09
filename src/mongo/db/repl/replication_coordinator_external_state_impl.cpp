@@ -58,6 +58,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repair_database.h"
+#include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/isself.h"
@@ -424,6 +425,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                            "initiate oplog entry",
                            NamespaceString::kRsOplogNamespace.toString(),
                            [this, &opCtx, &config] {
+                               // Permit writing to the oplog before we step up to primary.
+                               AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
                                Lock::GlobalWrite globalWrite(opCtx);
 
                                WriteUnitOfWork wuow(opCtx);
