@@ -253,6 +253,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
      * both must be initialized.
      */
     upd_select->upd = NULL;
+    upd_select->upd_saved = false;
     select_tw = &upd_select->tw;
     WT_TIME_WINDOW_INIT(select_tw);
 
@@ -385,6 +386,10 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             WT_RET_PANIC(session, EINVAL, "reconciliation error, update not visible");
         return (__wt_set_return(session, EBUSY));
     }
+
+    /* If an update was selected, record that we're making progress. */
+    if (upd != NULL)
+        r->update_used = true;
 
     /*
      * The start timestamp is determined by the commit timestamp when the key is first inserted (or
@@ -526,7 +531,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
           upd_select->upd != NULL && upd_select->upd->type == WT_UPDATE_TOMBSTONE ? NULL :
                                                                                     upd_select->upd,
           supd_restore, upd_memsize));
-        upd_saved = true;
+        upd_saved = upd_select->upd_saved = true;
     }
 
     /*

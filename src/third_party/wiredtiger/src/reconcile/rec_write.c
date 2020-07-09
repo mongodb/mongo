@@ -193,6 +193,19 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     if (F_ISSET(r, WT_REC_EVICT) && !WT_IS_HS(btree))
         __wt_cache_update_hs_score(session, r->updates_seen, r->updates_unstable);
 
+    /*
+     * If eviction didn't use any updates and didn't split or delete the page, it didn't make
+     * progress. Give up rather than silently succeeding in doing no work: this way threads know to
+     * back off forced eviction rather than spinning.
+     *
+     * Do not return an error if we are syncing the file with eviction disabled or as part of a
+     * checkpoint.
+     */
+    if (ret == 0 && !(btree->evict_disabled > 0 || !F_ISSET(btree->dhandle, WT_DHANDLE_OPEN)) &&
+      F_ISSET(r, WT_REC_EVICT) && !WT_PAGE_IS_INTERNAL(r->page) && r->multi_next == 1 &&
+      F_ISSET(r, WT_REC_CALL_URGENT) && !r->update_used && r->cache_write_restore)
+        ret = __wt_set_return(session, EBUSY);
+
     /* Wrap up the page reconciliation. */
     if (ret == 0 && (ret = __rec_write_wrapup(session, r, page)) == 0)
         __rec_write_page_status(session, r);
@@ -546,6 +559,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
 
     /* Track if updates were used and/or uncommitted. */
     r->updates_seen = r->updates_unstable = 0;
+    r->update_used = false;
 
     /* Track if the page can be marked clean. */
     r->leave_dirty = false;
@@ -1000,7 +1014,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key,
 
     /*
      * For a column-store, the promoted key is the recno and we already have a copy. For a
-     * row-store, it's the first key on the page, a variable- length byte string, get a copy.
+     * row-store, it's the first key on the page, a variable-length byte string, get a copy.
      *
      * This function is called from the split code at each split boundary, but that means we're not
      * called before the first boundary, and we will eventually have to get the first key explicitly
