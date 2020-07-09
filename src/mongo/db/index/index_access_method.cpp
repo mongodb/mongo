@@ -595,8 +595,8 @@ int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                                              BulkBuilder* bulk,
                                              bool dupsAllowed,
-                                             KeyHandlerFn&& onDuplicateKey,
-                                             set<RecordId>* dupRecords) {
+                                             KeyHandlerFn&& onDuplicateKeyInserted,
+                                             RecordIdHandlerFn&& onDuplicateRecord) {
     Timer timer;
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
@@ -617,13 +617,11 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     while (it->more()) {
         opCtx->checkForInterrupt();
 
-        WriteUnitOfWork wunit(opCtx);
-
         // Get the next datum and add it to the builder.
         BulkBuilder::Sorter::Data data = it->next();
 
-        // Assert that keys are retrieved from the sorter in non-decreasing order, but only in
-        // debug builds since this check can be expensive.
+        // Assert that keys are retrieved from the sorter in non-decreasing order, but only in debug
+        // builds since this check can be expensive.
         int cmpData;
         if (kDebugBuild || _descriptor->unique()) {
             cmpData = data.first.compareWithoutRecordId(previousKey);
@@ -638,27 +636,18 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         }
 
         // Before attempting to insert, perform a duplicate key check.
-        bool isDup = false;
-        if (_descriptor->unique()) {
-            isDup = cmpData == 0;
-            if (isDup && !dupsAllowed) {
-                if (dupRecords) {
-                    RecordId recordId = KeyString::decodeRecordIdAtEnd(data.first.getBuffer(),
-                                                                       data.first.getSize());
-                    dupRecords->insert(recordId);
-                    continue;
-                }
-                auto dupKey =
-                    KeyString::toBson(data.first, getSortedDataInterface()->getOrdering());
-                return buildDupKeyErrorStatus(dupKey.getOwned(),
-                                              _descriptor->parentNS(),
-                                              _descriptor->indexName(),
-                                              _descriptor->keyPattern(),
-                                              _descriptor->collation());
+        bool isDup = (_descriptor->unique()) ? (cmpData == 0) : false;
+        if (isDup && !dupsAllowed) {
+            Status status = _handleDuplicateKey(opCtx, data.first, std::move(onDuplicateRecord));
+            if (!status.isOK()) {
+                return status;
             }
+            continue;
         }
 
+        WriteUnitOfWork wunit(opCtx);
         Status status = builder->addKey(data.first);
+        wunit.commit();
 
         if (!status.isOK()) {
             // Duplicates are checked before inserting.
@@ -669,14 +658,13 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         previousKey = data.first;
 
         if (isDup) {
-            status = onDuplicateKey(data.first);
+            status = onDuplicateKeyInserted(data.first);
             if (!status.isOK())
                 return status;
         }
 
         // If we're here either it's a dup and we're cool with it or the addKey went just fine.
         pm.hit();
-        wunit.commit();
     }
 
     pm.finished();
@@ -798,6 +786,21 @@ std::string nextFileName() {
     return "extsort-index." + std::to_string(indexAccessMethodFileCounter.fetchAndAdd(1));
 }
 
+Status AbstractIndexAccessMethod::_handleDuplicateKey(OperationContext* opCtx,
+                                                      const KeyString::Value& dataKey,
+                                                      RecordIdHandlerFn&& onDuplicateRecord) {
+    RecordId recordId = KeyString::decodeRecordIdAtEnd(dataKey.getBuffer(), dataKey.getSize());
+    if (onDuplicateRecord) {
+        return onDuplicateRecord(recordId);
+    }
+
+    BSONObj dupKey = KeyString::toBson(dataKey, getSortedDataInterface()->getOrdering());
+    return buildDupKeyErrorStatus(dupKey.getOwned(),
+                                  _indexCatalogEntry->ns(),
+                                  _descriptor->indexName(),
+                                  _descriptor->keyPattern(),
+                                  _descriptor->collation());
+}
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"

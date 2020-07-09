@@ -1,16 +1,10 @@
 var baseDir = 'jstests_disk_directoryper';
 var baseName = 'directoryperdb';
 var dbpath = MongoRunner.dataPath + baseDir + '/';
-var storageEngine = db.serverStatus().storageEngine.name;
+var storageEngine = "wiredTiger";
 
-// The pattern which matches the names of database files
-var dbFileMatcher;
-if (storageEngine == 'wiredTiger') {
-    // Matches wiredTiger collection-*.wt and index-*.wt files
-    dbFileMatcher = /(collection|index)-.+\.wt$/;
-} else {
-    assert(false, 'This test must be run against wiredTiger');
-}
+// Matches wiredTiger collection-*.wt and index-*.wt files
+var dbFileMatcher = /(collection|index)-.+\.wt$/;
 
 // Set up helper functions.
 assertDocumentCount = function(db, count) {
@@ -24,22 +18,19 @@ assertDocumentCount = function(db, count) {
  * Returns the current connection which gets restarted with wiredtiger.
  */
 checkDBFilesInDBDirectory = function(conn, dbToCheck) {
-    if (storageEngine == 'wiredTiger') {
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', restart: true});
-    }
+    MongoRunner.stopMongod(conn);
+    conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', restart: true});
 
     var dir = dbpath + dbToCheck;
-    if (storageEngine == 'wiredTiger') {
-        // The KV catalog escapes non alpha-numeric characters with its UTF-8 byte sequence in
-        // decimal when creating the directory on disk.
-        if (dbToCheck == '&') {
-            dir = dbpath + '.38';
-        } else if (dbToCheck == '処') {
-            dir = dbpath + '.229.135.166';
-        } else if (dbToCheck == Array(22).join('処')) {
-            dir = dbpath + Array(22).join('.229.135.166');
-        }
+
+    // The KV catalog escapes non alpha-numeric characters with its UTF-8 byte sequence in
+    // decimal when creating the directory on disk.
+    if (dbToCheck == '&') {
+        dir = dbpath + '.38';
+    } else if (dbToCheck == '処') {
+        dir = dbpath + '.229.135.166';
+    } else if (dbToCheck == Array(22).join('処')) {
+        dir = dbpath + Array(22).join('.229.135.166');
     }
 
     files = listFiles(dir);
@@ -59,10 +50,8 @@ checkDBFilesInDBDirectory = function(conn, dbToCheck) {
  * Returns the restarted connection with wiredtiger.
  */
 checkDBDirectoryNonexistent = function(conn, dbToCheck) {
-    if (storageEngine == 'wiredTiger') {
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', restart: true});
-    }
+    MongoRunner.stopMongod(conn);
+    conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', restart: true});
 
     var files = listFiles(dbpath);
     // Check that there are no files in the toplevel dbpath.
@@ -75,20 +64,18 @@ checkDBDirectoryNonexistent = function(conn, dbToCheck) {
     }
 
     // Check db directories to ensure db files in them have been destroyed.
-    if (storageEngine == 'wiredTiger') {
-        var dir = dbpath + dbToCheck;
-        // The KV catalog escapes non alpha-numeric characters with its UTF-8 byte sequence in
-        // decimal when creating the directory on disk.
-        if (dbToCheck == '&') {
-            dir = dbpath + '.38';
-        } else if (dbToCheck == '処') {
-            dir = dbpath + '.229.135.166';
-        } else if (dbToCheck == Array(22).join('処')) {
-            dir = dbpath + Array(22).join('.229.135.166');
-        }
-        var files = listFiles(dir);
-        assert.eq(files.length, 0, 'Files left behind in database directory');
+    var dir = dbpath + dbToCheck;
+    // The KV catalog escapes non alpha-numeric characters with its UTF-8 byte sequence in
+    // decimal when creating the directory on disk.
+    if (dbToCheck == '&') {
+        dir = dbpath + '.38';
+    } else if (dbToCheck == '処') {
+        dir = dbpath + '.229.135.166';
+    } else if (dbToCheck == Array(22).join('処')) {
+        dir = dbpath + Array(22).join('.229.135.166');
     }
+    var files = listFiles(dir);
+    assert.eq(files.length, 0, 'Files left behind in database directory');
     return conn;
 };
 
@@ -119,10 +106,8 @@ assert.writeError(db[ 'journal' ].insert( {} ));
 
 // Using WiredTiger, it should be impossible to create a database named 'WiredTiger' with
 // directoryperdb, as that file is created by the WiredTiger storageEngine.
-if (storageEngine == 'wiredTiger') {
-    var dbW = m.getDB('WiredTiger');
-    assert.writeError(dbW[baseName].insert({}));
-}
+var dbW = m.getDB('WiredTiger');
+assert.writeError(dbW[baseName].insert({}));
 
 // Create a database named 'a' repeated 63 times.
 var dbNameAA = Array(64).join('a');

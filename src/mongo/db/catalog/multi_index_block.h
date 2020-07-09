@@ -162,16 +162,14 @@ public:
      *
      * Do not call if you called insertAllDocumentsInCollection();
      *
-     * If 'dupRecords' is passed as non-NULL and duplicates are not allowed for the index, violators
-     * of uniqueness constraints will be added to the set. Records added to this set are not
-     * indexed, so callers MUST either fail this index build or delete the documents from the
-     * collection.
+     * If 'onDuplicateRecord' is passed as non-NULL and duplicates are not allowed for the index,
+     * violators of uniqueness constraints will be handled by 'onDuplicateRecord'.
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
     Status dumpInsertsFromBulk(OperationContext* opCtx);
-    Status dumpInsertsFromBulk(OperationContext* opCtx, std::set<RecordId>* const dupRecords);
-
+    Status dumpInsertsFromBulk(OperationContext* opCtx,
+                               IndexAccessMethod::RecordIdHandlerFn&& onDuplicateRecord);
     /**
      * For background indexes using an IndexBuildInterceptor to capture inserts during a build,
      * drain these writes into the index. If intent locks are held on the collection, more writes

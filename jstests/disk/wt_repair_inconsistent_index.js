@@ -12,11 +12,6 @@ const baseName = "wt_repair_inconsistent_index";
 const collName = "test";
 const dbpath = MongoRunner.dataPath + baseName + "/";
 
-const forceCheckpoint = () => {
-    assert.commandWorked(db.fsyncLock());
-    assert.commandWorked(db.fsyncUnlock());
-};
-
 /**
  * Run the test by supplying additional paramters to MongoRunner.runMongod with 'mongodOptions'.
  */

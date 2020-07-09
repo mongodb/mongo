@@ -600,19 +600,19 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx) {
     return dumpInsertsFromBulk(opCtx, nullptr);
 }
 
-Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
-                                            std::set<RecordId>* dupRecords) {
+Status MultiIndexBlock::dumpInsertsFromBulk(
+    OperationContext* opCtx, IndexAccessMethod::RecordIdHandlerFn&& onDuplicateRecord) {
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].bulk == nullptr)
             continue;
 
-        // When dupRecords is passed, 'dupsAllowed' should be passed to reflect whether or not the
-        // index is unique.
-        bool dupsAllowed = (dupRecords) ? !_indexes[i].block->getEntry()->descriptor()->unique()
-                                        : _indexes[i].options.dupsAllowed;
-
+        // When onDuplicateRecord is passed, 'dupsAllowed' should be passed to reflect whether or
+        // not the index is unique.
+        bool dupsAllowed = (onDuplicateRecord)
+            ? !_indexes[i].block->getEntry()->descriptor()->unique()
+            : _indexes[i].options.dupsAllowed;
         IndexCatalogEntry* entry = _indexes[i].block->getEntry();
         LOGV2_DEBUG(
             20392,
@@ -627,15 +627,25 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
                 opCtx,
                 _indexes[i].bulk.get(),
                 dupsAllowed,
-                [=](const KeyString::Value& duplicateKey) {
+                [=](const KeyString::Value& duplicateKey) -> Status {
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.
-                    return dupsAllowed && !dupRecords && !_ignoreUnique &&
-                            entry->indexBuildInterceptor()
-                        ? entry->indexBuildInterceptor()->recordDuplicateKey(opCtx, duplicateKey)
-                        : Status::OK();
+                    return writeConflictRetry(
+                        opCtx, "recordingDuplicateKey", entry->ns().ns(), [&] {
+                            if (dupsAllowed && !onDuplicateRecord && !_ignoreUnique &&
+                                entry->indexBuildInterceptor()) {
+                                WriteUnitOfWork wuow(opCtx);
+                                Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
+                                    opCtx, duplicateKey);
+                                if (!status.isOK()) {
+                                    return status;
+                                }
+                                wuow.commit();
+                            }
+                            return Status::OK();
+                        });
                 },
-                dupRecords);
+                std::move(onDuplicateRecord));
 
             if (!status.isOK()) {
                 return status;
