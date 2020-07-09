@@ -309,6 +309,14 @@ function checkReplDbhashBackgroundThread(hosts) {
                 hasTransientError = true;
             }
 
+            // In debug builds, read-only operations can receive write conflicts when the storage
+            // engine cache is full. Since dbHash holds open a read snapshot for an extended period
+            // of time and pulls all collection data into cache, the storage engine may abort the
+            // operation if it needs to free up space. Try again after space has been freed.
+            if (e.code === ErrorCodes.WriteConflict && buildInfo().debug) {
+                hasTransientError = true;
+            }
+
             return hasTransientError;
         };
 
