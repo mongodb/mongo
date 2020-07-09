@@ -54,7 +54,17 @@ var fsm = (function() {
             };
 
             const getReplSetName = (conn) => {
-                const res = assert.commandWorked(conn.getDB('admin').runCommand({isMaster: 1}));
+                let res;
+                assert.soonNoExcept(
+                    () => {
+                        res = conn.getDB('admin').runCommand({isMaster: 1});
+                        return true;
+                    },
+                    "Failed to establish a connection to the replica set",
+                    undefined,  // default timeout is 10 mins
+                    2 * 1000);  // retry on a 2 second interval
+
+                assert.commandWorked(res);
                 assert.eq('string',
                           typeof res.setName,
                           () => `not connected to a replica set: ${tojson(res)}`);
