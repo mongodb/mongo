@@ -28,6 +28,12 @@ function isShardAware(shard, coll) {
     return res.metadata.collVersion != undefined;
 }
 
+// Disable checking for index consistency to ensure that the config server doesn't trigger a
+// StaleShardVersion exception on shard0 and cause it to refresh its sharding metadata.
+const nodeOptions = {
+    setParameter: {enableShardedIndexConsistencyCheck: false}
+};
+
 const testName = "change_streams_primary_shard_unaware";
 const st = new ShardingTest({
     shards: 2,
@@ -37,12 +43,8 @@ const st = new ShardingTest({
         // Use a higher frequency for periodic noops to speed up the test.
         setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
     },
+    other: {configOptions: nodeOptions}
 });
-
-// Disable checking for index consistency to ensure that the config server doesn't trigger a
-// StaleShardVersion exception on shard0 and cause it to refresh its sharding metadata.
-st._configServers.forEach(
-    config => config.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
 
 const mongosDB = st.s0.getDB(testName);
 
