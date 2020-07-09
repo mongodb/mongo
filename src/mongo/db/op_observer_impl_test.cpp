@@ -34,6 +34,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -238,6 +239,20 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
 
     // Ensure that the rename optime returned is the same as the last optime in the ReplClientInfo.
     ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), renameOpTime);
+}
+
+TEST_F(OpObserverTest, MustBePrimaryToWriteOplogEntries) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx.get())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    Lock::GlobalWrite globalWrite(opCtx.get());
+    WriteUnitOfWork wunit(opCtx.get());
+
+    // No-op writes should be prohibited.
+    ASSERT_THROWS(opObserver.onOpMessage(opCtx.get(), {}), AssertionException);
 }
 
 }  // namespace
