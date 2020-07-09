@@ -39,17 +39,15 @@ function restartPrimaryShard(rs, localColl, foreignColl) {
                            true);
 }
 
-const testName = "lookup_stale_mongod";
-const st = new ShardingTest({
-    shards: 2,
-    mongos: 2,
-    rs: {nodes: 1},
-});
-
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on shard0 and cause it to refresh its sharding metadata.
-st._configServers.forEach(
-    config => config.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
+const nodeOptions = {
+    setParameter: {enableShardedIndexConsistencyCheck: false}
+};
+
+const testName = "lookup_stale_mongod";
+const st =
+    new ShardingTest({shards: 2, mongos: 2, rs: {nodes: 1}, other: {configOptions: nodeOptions}});
 
 // Set the parameter allowing sharded $lookup on all nodes.
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(st.s0).concat([st.s1.host]),

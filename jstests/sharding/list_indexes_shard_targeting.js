@@ -12,15 +12,16 @@ load("jstests/libs/fail_point_util.js");
 // This test makes shards have inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
-const st = new ShardingTest({shards: 3});
+// Disable checking for index consistency to ensure that the config server doesn't trigger a
+// StaleShardVersion exception on shards and cause them to refresh their sharding metadata.
+const nodeOptions = {
+    setParameter: {enableShardedIndexConsistencyCheck: false}
+};
+
+const st = new ShardingTest({shards: 3, other: {configOptions: nodeOptions}});
 const dbName = "test";
 const collName = "user";
 const ns = dbName + "." + collName;
-
-// Disable checking for index consistency to ensure that the config server doesn't trigger a
-// StaleShardVersion exception on shards and cause them to refresh their sharding metadata.
-st._configServers.forEach(
-    config => config.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);

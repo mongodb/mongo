@@ -16,7 +16,13 @@
 load('jstests/libs/parallel_shell_helpers.js');
 load('jstests/libs/fail_point_util.js');
 
-const st = new ShardingTest({shards: 2, mongos: 2});
+// Disable checking for index consistency to ensure that the config server doesn't trigger a
+// StaleShardVersion exception on the shards and cause them to refresh theirsharding metadata.
+const nodeOptions = {
+    setParameter: {enableShardedIndexConsistencyCheck: false}
+};
+
+const st = new ShardingTest({shards: 2, mongos: 2, other: {configOptions: nodeOptions}});
 
 // Used to get the shard destination ids for the moveChunks commands
 const shard0Name = st.shard0.shardName;
