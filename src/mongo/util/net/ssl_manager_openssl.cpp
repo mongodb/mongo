@@ -1015,6 +1015,16 @@ ServiceContext::ConstructorActionRegisterer OCSPCacheRegisterer("CreateOCSPCache
 
 using OCSPCacheVal = OCSPCache::ValueHandle;
 
+struct OCSPStaplingContext {
+    OCSPStaplingContext(UniqueOCSPResponse response, Date_t nextUpdate)
+        : sharedResponseForServer(std::move(response)), sharedResponseNextUpdate(nextUpdate) {}
+
+    OCSPStaplingContext() = default;
+
+    std::shared_ptr<OCSP_RESPONSE> sharedResponseForServer;
+    Date_t sharedResponseNextUpdate;
+};
+
 class SSLManagerOpenSSL : public SSLManagerInterface {
 public:
     explicit SSLManagerOpenSSL(const SSLParams& params, bool isServer);
@@ -1061,6 +1071,18 @@ public:
 
     SSLInformationToLog getSSLInformationToLog() const final;
 
+    Mutex* getSharedResponseMutex() {
+        return &_sharedResponseMutex;
+    }
+
+    const std::shared_ptr<OCSPStaplingContext> getOcspStaplingContext(WithLock) {
+        return _ocspStaplingContext;
+    }
+
+    void setOcspStaplingContext(WithLock, std::shared_ptr<OCSPStaplingContext> newContext) {
+        _ocspStaplingContext = newContext;
+    }
+
 private:
     const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
                                      mongodbRolesOID.shortDescription.c_str(),
@@ -1073,6 +1095,9 @@ private:
     bool _allowInvalidHostnames;
     bool _suppressNoCertificateWarning;
     SSLConfiguration _sslConfiguration;
+
+    Mutex _sharedResponseMutex = MONGO_MAKE_LATCH("OCSPStaplingJobRunner::_sharedResponseMutex");
+    std::shared_ptr<OCSPStaplingContext> _ocspStaplingContext;
 
     Mutex _staplingMutex = MONGO_MAKE_LATCH("OCSPStaplingJobRunner::_mutex");
     PeriodicRunner::JobAnchor _ocspStaplingAnchor;
@@ -1207,7 +1232,6 @@ private:
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
-extern SSLManagerInterface* theSSLManager;
 extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
@@ -1463,26 +1487,13 @@ int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
     return status;
 }
 
-struct OCSPStaplingContext {
-    OCSPStaplingContext(UniqueOCSPResponse response, Date_t nextUpdate)
-        : sharedResponseForServer(std::move(response)), sharedResponseNextUpdate(nextUpdate) {}
-
-    OCSPStaplingContext() = default;
-
-    std::shared_ptr<OCSP_RESPONSE> sharedResponseForServer;
-    Date_t sharedResponseNextUpdate;
-};
-
-mongo::Mutex sharedResponseMutex;
-std::shared_ptr<OCSPStaplingContext> ocspStaplingContext;
-
 int ocspServerCallback(SSL* ssl, void* arg) {
     {
         std::shared_ptr<OCSPStaplingContext> context;
-
         {
-            stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
-            context = ocspStaplingContext;
+            stdx::lock_guard<mongo::Mutex> guard(
+                *(static_cast<SSLManagerOpenSSL*>(arg)->getSharedResponseMutex()));
+            context = static_cast<SSLManagerOpenSSL*>(arg)->getOcspStaplingContext(guard);
         }
 
         if (!context || !context->sharedResponseForServer) {
@@ -1775,16 +1786,27 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
         return dispatchRequests(
                    context, std::move(intermediateCerts), ocspContext, OCSPPurpose::kStaple)
             .onCompletion([](StatusWith<OCSPFetchResponse> swResponse) -> Milliseconds {
+                std::shared_ptr<SSLManagerInterface> sslManager =
+                    theSSLManagerCoordinator->getSSLManager();
+                std::shared_ptr<SSLManagerOpenSSL> theSSLManagerCast =
+                    std::static_pointer_cast<SSLManagerOpenSSL>(sslManager);
+
+                Mutex* sharedResponseMutex = theSSLManagerCast->getSharedResponseMutex();
+
+                stdx::lock_guard<mongo::Mutex> guard(*sharedResponseMutex);
+
+                std::shared_ptr<OCSPStaplingContext> ocspStaplingContext =
+                    theSSLManagerCast->getOcspStaplingContext(guard);
+
                 if (!swResponse.isOK()) {
                     LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
-
-                    stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
 
                     if (ocspStaplingContext && ocspStaplingContext->sharedResponseForServer &&
                         ocspStaplingContext->sharedResponseNextUpdate <
                             (Date_t::now() + kOCSPUnknownStatusRefreshRate)) {
 
-                        ocspStaplingContext = std::make_shared<OCSPStaplingContext>();
+                        theSSLManagerCast->setOcspStaplingContext(
+                            guard, std::make_shared<OCSPStaplingContext>());
 
                         LOGV2_WARNING(
                             4633601,
@@ -1794,12 +1816,11 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
                     return kOCSPUnknownStatusRefreshRate;
                 }
 
-                stdx::lock_guard<mongo::Mutex> guard(sharedResponseMutex);
-
-                ocspStaplingContext = std::make_shared<OCSPStaplingContext>(
-                    std::move(swResponse.getValue().response),
-                    swResponse.getValue().nextStapleRefresh());
-
+                theSSLManagerCast->setOcspStaplingContext(
+                    guard,
+                    std::make_shared<OCSPStaplingContext>(
+                        std::move(swResponse.getValue().response),
+                        swResponse.getValue().nextStapleRefresh()));
                 return swResponse.getValue().fetchNewResponseDuration();
             });
     };
@@ -1852,7 +1873,7 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
         });
 
     SSL_CTX_set_tlsext_status_cb(context, ocspServerCallback);
-    SSL_CTX_set_tlsext_status_arg(context, nullptr);
+    SSL_CTX_set_tlsext_status_arg(context, static_cast<void*>(this));
 
     return Status::OK();
 }
