@@ -45,8 +45,8 @@ void MigratingTenantAccessBlockerByPrefix::add(StringData dbPrefix,
                                                std::shared_ptr<MigratingTenantAccessBlocker> mtab) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    auto blockerIterator = _migratingTenantAccessBlockers.find(dbPrefix);
-    invariant(blockerIterator != _migratingTenantAccessBlockers.end());
+    auto it = _migratingTenantAccessBlockers.find(dbPrefix);
+    invariant(it == _migratingTenantAccessBlockers.end());
 
     _migratingTenantAccessBlockers.emplace(dbPrefix, mtab);
 }
@@ -80,14 +80,14 @@ MigratingTenantAccessBlockerByPrefix::getMigratingTenantBlocker(StringData dbNam
             return dbName.startsWith(dbPrefix);
         };
 
-    auto blockerMatchedIterator = std::find_if(_migratingTenantAccessBlockers.begin(),
-                                               _migratingTenantAccessBlockers.end(),
-                                               doesDBNameStartWithPrefix);
+    auto it = std::find_if(_migratingTenantAccessBlockers.begin(),
+                           _migratingTenantAccessBlockers.end(),
+                           doesDBNameStartWithPrefix);
 
-    if (blockerMatchedIterator == _migratingTenantAccessBlockers.end()) {
+    if (it == _migratingTenantAccessBlockers.end()) {
         return nullptr;
     } else {
-        return blockerMatchedIterator->second;
+        return it->second;
     }
 }
 

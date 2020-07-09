@@ -34,10 +34,57 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
+#include "mongo/db/repl/migrating_tenant_access_blocker_by_prefix.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
 namespace migrating_tenant_donor_util {
+
+namespace {
+
+const char kThreadNamePrefix[] = "TenantMigrationWorker-";
+const char kPoolName[] = "TenantMigrationWorkerThreadPool";
+const char kNetName[] = "TenantMigrationWorkerNetwork";
+
+/**
+ * Updates the MigratingTenantAccessBlocker when the tenant migration transitions to the blocking
+ * state.
+ */
+void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocument& donorDoc) {
+    invariant(donorDoc.getState() == TenantMigrationDonorStateEnum::kBlocking);
+    invariant(donorDoc.getBlockTimestamp());
+
+    auto& mtabByPrefix = MigratingTenantAccessBlockerByPrefix::get(opCtx->getServiceContext());
+    auto mtab = mtabByPrefix.getMigratingTenantBlocker(donorDoc.getDatabasePrefix());
+
+    if (!opCtx->writesAreReplicated()) {
+        // A primary must create the MigratingTenantAccessBlocker and call startBlockingWrites on it
+        // before reserving the OpTime for the "start blocking" write, so only secondaries create
+        // the MigratingTenantAccessBlocker and call startBlockingWrites on it in the op observer.
+        invariant(!mtab);
+
+        mtab = std::make_shared<MigratingTenantAccessBlocker>(
+            opCtx->getServiceContext(),
+            migrating_tenant_donor_util::getTenantMigrationExecutor(opCtx->getServiceContext())
+                .get());
+        mtabByPrefix.add(donorDoc.getDatabasePrefix(), mtab);
+        mtab->startBlockingWrites();
+    }
+
+    invariant(mtab);
+
+    // Both primaries and secondaries call startBlockingReadsAfter in the op observer, since
+    // startBlockingReadsAfter just needs to be called before the "start blocking" write's oplog
+    // hole is filled.
+    mtab->startBlockingReadsAfter(donorDoc.getBlockTimestamp().get());
+}
+
+}  // namespace
+
 void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& originalDoc) {
     // Send recipientSyncData.
 
@@ -95,6 +142,39 @@ void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& origi
             return Status::OK();
         }));
 }
+
+std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContext* serviceContext) {
+    ThreadPool::Options tpOptions;
+    tpOptions.threadNamePrefix = kThreadNamePrefix;
+    tpOptions.poolName = kPoolName;
+    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
+    tpOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+
+    return std::make_unique<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(tpOptions),
+        executor::makeNetworkInterface(kNetName, nullptr, nullptr));
+}
+
+void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& doc) {
+    auto donorDoc = TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorDoc"), doc);
+
+    switch (donorDoc.getState()) {
+        case TenantMigrationDonorStateEnum::kDataSync:
+            break;
+        case TenantMigrationDonorStateEnum::kBlocking:
+            onTransitionToBlocking(opCtx, donorDoc);
+            break;
+        case TenantMigrationDonorStateEnum::kCommitted:
+            break;
+        case TenantMigrationDonorStateEnum::kAborted:
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 }  // namespace migrating_tenant_donor_util
 
 }  // namespace mongo

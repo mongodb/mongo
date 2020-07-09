@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 
@@ -41,6 +42,17 @@ namespace migrating_tenant_donor_util {
  * reads.
  */
 void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& donorDoc);
+
+/**
+ * Creates a task executor to be used for tenant migration.
+ */
+std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContext* serviceContext);
+
+/**
+ * Updates the MigratingTenantAccessBlocker for the tenant migration represented by the given
+ * config.migrationDonors document.
+ */
+void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& doc);
 
 }  // namespace migrating_tenant_donor_util
 

@@ -1165,28 +1165,34 @@ env.Library(
 )
 
 env.Library(
-    target='migrating_tenant_access_blocker',
+    target='migrating_tenant',
     source=[
         'migrating_tenant_access_blocker.cpp',
         'migrating_tenant_access_blocker_by_prefix.cpp',
         'migrating_tenant_access_blocker_server_status_section.cpp',
+        'migrating_tenant_donor_util.cpp',
+        env.Idlc('migrate_tenant_state_machine.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        'local_oplog_info',
         'optime',
-        'repl_coordinator_impl'
+        'repl_coordinator_interface',
     ],
 )
 
 env.Library(
     target="serveronly_repl",
     source=[
-        'migrating_tenant_donor_util.cpp',
         'noop_writer.cpp',
         "replication_coordinator_external_state_impl.cpp",
         "sync_source_feedback.cpp",
-        env.Idlc('migrate_tenant_state_machine.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1214,7 +1220,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         'bgsync',
         'drop_pending_collection_reaper',
-        'migrating_tenant_access_blocker',
+        'migrating_tenant',
         'oplog_application',
         'oplog_buffer_collection',
         'oplog_interface_remote',
