@@ -68,6 +68,8 @@
 namespace mongo {
 
 using logv2::LogComponent;
+const std::set<std::string> kNoApiVersions = {};
+const std::set<std::string> kApiVersions1 = {"1"};
 
 namespace {
 

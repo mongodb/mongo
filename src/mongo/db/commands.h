@@ -58,6 +58,8 @@ namespace mongo {
 extern FailPoint failCommand;
 extern FailPoint waitInCommandMarkKillOnClientDisconnect;
 extern const OperationContext::Decoration<boost::optional<BSONArray>> errorLabelsOverride;
+extern const std::set<std::string> kNoApiVersions;
+extern const std::set<std::string> kApiVersions1;
 
 class Command;
 class CommandInvocation;
@@ -352,6 +354,16 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
+
+    // List of API versions that include this command.
+    virtual const std::set<std::string>& apiVersions() const {
+        return kNoApiVersions;
+    };
+
+    // API versions in which this command is deprecated.
+    virtual const std::set<std::string>& deprecatedApiVersions() const {
+        return kNoApiVersions;
+    };
 
     /**
      * Like adminOnly, but even stricter: we must either be authenticated for admin db,
