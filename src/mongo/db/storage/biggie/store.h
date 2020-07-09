@@ -818,18 +818,6 @@ private:
 
         virtual ~Node() = default;
 
-        friend void swap(Node& first, Node& second) {
-            std::swap(first.trieKey, second.trieKey);
-            std::swap(first.depth, second.depth);
-            std::swap(first.data, second.data);
-            std::swap(first.children, second.children);
-        }
-
-        Node& operator=(const Node other) {
-            swap(*this, other);
-            return *this;
-        }
-
         bool isLeaf() const {
             return !_numChildren;
         }
@@ -866,16 +854,7 @@ private:
                 _nextVersion->_hasPreviousVersion = false;
         }
 
-        friend void swap(Head& first, Head& second) {
-            Node::swap(first, second);
-        }
-
         Head(Head&& other) : Node(std::move(other)) {}
-
-        Head& operator=(const Head other) {
-            swap(*this, other);
-            return *this;
-        }
 
         bool hasPreviousVersion() const {
             return _hasPreviousVersion;
