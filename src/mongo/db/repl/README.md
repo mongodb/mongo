@@ -242,10 +242,10 @@ endless loop doing the following:
 8. Persist the node's "applied through" optime (the optime of the last oplog entry in this oplog
    applier batch) to disk. This will update the `minValid` document now that the batch has been
    applied in its entirety.
-9. Update oplog visibility by notifying the storage engine of the new oplog entries. Since entries
-   in an oplog applier batch are applied in parallel, it is only safe to make these entries visible
-   once all the entries in this batch are applied, otherwise an oplog hole could be made visible.
-   <!-- TODO SERVER-47296: Link to Oplog Visibility Section in Execution Arch Guide -->
+9. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
+   engine of the new oplog entries. Since entries in an oplog applier batch are applied in
+   parallel, it is only safe to make these entries visible once all the entries in this batch are
+   applied, otherwise an oplog hole could be made visible.
 10. Finalize the batch by advancing the global timestamp (and the node's last applied optime) to the
    last optime in the batch.
 
