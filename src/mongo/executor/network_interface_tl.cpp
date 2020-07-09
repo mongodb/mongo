@@ -797,16 +797,16 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
             .onError([this, anchor = shared_from_this()](Status error) {
                 // The RCRq failed, wrap the error into a RCRsp with the host and duration
                 return RemoteCommandOnAnyResponse(host, std::move(error), stopwatch.elapsed());
-            })
-            .tapAll([ this, anchor = shared_from_this() ](const auto& swr) noexcept {
-                invariant(swr.isOK());
-                returnConnection(swr.getValue().status);
             });
 
     std::move(anyFuture)                                    //
         .thenRunOn(makeGuaranteedExecutor(baton, reactor))  // Switch to the baton/reactor.
         .getAsync([ this, anchor = shared_from_this() ](auto swr) noexcept {
-            auto response = uassertStatusOK(std::move(swr));
+            auto response = uassertStatusOK(swr);
+            auto status = response.status;
+
+            returnConnection(status);
+
             auto commandStatus = getStatusFromCommandResult(response.data);
             // Ignore maxTimeMS expiration errors for hedged reads without triggering the finish
             // line.
