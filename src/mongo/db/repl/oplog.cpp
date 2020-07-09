@@ -214,7 +214,7 @@ void _logOpsInner(OperationContext* opCtx,
                   OpTime finalOpTime,
                   Date_t wallTime) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
-    if (nss.size() && replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
+    if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
         str::stream ss;
         ss << "logOp() but can't accept write to collection " << nss;
