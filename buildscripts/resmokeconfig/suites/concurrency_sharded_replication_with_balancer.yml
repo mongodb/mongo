@@ -110,6 +110,9 @@ selector:
   # SERVER-44160 Modify cleanupOrphaned to wait for overlapping ranges to finish
   - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
 
+  # Inserts directly into system.views using applyOps, which is not available on mongos.
+  - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+
   exclude_with_any_tags:
   - assumes_balancer_off
   - requires_replication

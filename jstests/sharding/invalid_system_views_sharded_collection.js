@@ -28,8 +28,15 @@ function runTest(st, badViewDefinition) {
     const unshardedColl = db.getCollection("unshardedColl");
     assert.commandWorked(unshardedColl.insert({b: "boo"}));
 
-    assert.commandWorked(db.system.views.insert(badViewDefinition),
-                         "failed to insert " + tojson(badViewDefinition));
+    // applyOps is not available on mongos, so we use it to insert into the system.views collection
+    // directly on each shard.
+    [st.shard0, st.shard1].forEach(shard => {
+        assert.commandWorked(shard.getDB(db.getName()).createCollection("system.views"));
+        assert.commandWorked(
+            shard.adminCommand(
+                {applyOps: [{op: "i", ns: db.getName() + ".system.views", o: badViewDefinition}]}),
+            "failed to insert " + tojson(badViewDefinition));
+    });
 
     // Test that a command involving views properly fails with a views-specific error code.
     assert.commandFailedWithCode(
@@ -104,7 +111,7 @@ function runTest(st, badViewDefinition) {
     assert.commandWorked(db.runCommand({drop: unshardedColl.getName()}), makeErrorMessage("drop"));
 
     // Drop the offending view so that the validate hook succeeds.
-    db.system.views.remove(badViewDefinition);
+    assert(db.system.views.drop());
 }
 
 const st = new ShardingTest({name: "views_sharded", shards: 2, other: {enableBalancer: false}});

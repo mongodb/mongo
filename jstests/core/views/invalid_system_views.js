@@ -3,6 +3,8 @@
  * collections.
  *
  * @tags: [
+ *   # applyOps is not available on mongos.
+ *   assumes_against_mongod_not_mongos,
  *   assumes_superuser_permissions,
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
@@ -25,8 +27,11 @@ function runTest(badViewDefinition) {
     assert.commandWorked(viewsDB.runCommand({create: "collection2"}));
     assert.commandWorked(viewsDB.runCommand({create: "collection3"}));
     assert.commandWorked(viewsDB.collection.createIndex({x: 1}));
-    assert.commandWorked(viewsDB.system.views.insert(badViewDefinition),
-                         "failed to insert " + tojson(badViewDefinition));
+    assert.commandWorked(viewsDB.createCollection("system.views"));
+    assert.commandWorked(
+        viewsDB.adminCommand(
+            {applyOps: [{op: "i", ns: viewsDB.getName() + ".system.views", o: badViewDefinition}]}),
+        "failed to insert " + tojson(badViewDefinition));
 
     // Test that a command involving views properly fails with a views-specific error code.
     assert.commandFailedWithCode(
@@ -118,7 +123,8 @@ function runTest(badViewDefinition) {
     assert.commandWorked(viewsDB.runCommand({drop: "collection2"}), makeErrorMessage("drop"));
 
     // Drop the offending view so that the validate hook succeeds.
-    assert.commandWorked(viewsDB.system.views.remove(badViewDefinition));
+    assert.commandWorked(viewsDB.adminCommand(
+        {applyOps: [{op: "d", ns: viewsDB.getName() + ".system.views", o: badViewDefinition}]}));
 }
 
 runTest({_id: "invalid_system_views.badViewStringPipeline", viewOn: "collection", pipeline: "bad"});

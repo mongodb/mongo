@@ -87,7 +87,8 @@ assert.commandWorked(b2.coll.insert([{_id: 1, y: 1}, {_id: 2, y: 2}]));
 assert.commandWorked(b2.createView("y", "coll", [{$match: {y: 2}}]));
 let b3 = b1.getSiblingDB("test3");
 assert.commandWorked(b3.createView("z", "coll", []));
-assert.commandWorked(b3.system.views.remove({}));
+assert.commandWorked(b3.adminCommand(
+    {applyOps: [{op: "d", ns: b3.getName() + ".system.views", o: {_id: b3.getName() + ".z"}}]}));
 assert.commandWorked(b3.z.insert([{z: 1}, {z: 2}, {z: 3}]));
 assert.commandWorked(b3.z.remove({z: 1}));
 

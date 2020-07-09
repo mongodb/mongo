@@ -92,6 +92,9 @@ selector:
   - jstests/concurrency/fsm_workloads/yield_and_hashed.js
   - jstests/concurrency/fsm_workloads/yield_and_sorted.js
 
+  # Inserts directly into system.views using applyOps, which is not available on mongos.
+  - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - assumes_balancer_on

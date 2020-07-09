@@ -1,6 +1,16 @@
-// When loading the view catalog, the server should not crash because it encountered a view with an
-// invalid name. This test is specifically for the case of a view with a dbname that contains an
-// embedded null character (SERVER-36859).
+
+/**
+ * When loading the view catalog, the server should not crash because it encountered a view with an
+ * invalid name. This test is specifically for the case of a view with a dbname that contains an
+ * embedded null character (SERVER-36859).
+ *
+ * @tags: [
+ *   # applyOps is not available on mongos.
+ *   assumes_against_mongod_not_mongos,
+ *   # applyOps is not retryable.
+ *   requires_non_retryable_commands,
+ * ]
+ */
 (function() {
 "use strict";
 
@@ -15,13 +25,11 @@ const viewDef = {
     pipeline: []
 };
 
-try {
-    assert.commandWorked(db.system.views.insert(viewDef));
-} finally {
-    // Don't let the bogus view stick around, or else it will cause an error in validation.
-    var result = db.system.views.deleteOne({_id: viewName});
-}
-// If this test otherwise succeeded, assert cleaning up succeeded.
-// Skip this assertion if the test otherwise failed, to avoid masking the original error.
-assert.eq(1, result.deletedCount);
+db.system.views.drop();
+assert.commandWorked(db.createCollection("system.views"));
+assert.commandWorked(db.adminCommand({applyOps: [{op: "i", ns: "test.system.views", o: viewDef}]}));
+
+// Don't let the bogus view stick around, or else it will cause an error in validation.
+assert.commandWorked(
+    db.adminCommand({applyOps: [{op: "d", ns: "test.system.views", o: {_id: viewName}}]}));
 }());

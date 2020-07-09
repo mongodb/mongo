@@ -1,7 +1,13 @@
-// SERVER-25942 Test that views are not validated in the case that only collections are queried.
-// @tags: [
-//   assumes_superuser_permissions,
-// ]
+/**
+ * SERVER-25942 Test that views are not validated in the case that only collections are queried.
+ *
+ * @tags: [
+ *   assumes_against_mongod_not_mongos,
+ *   assumes_superuser_permissions,
+ *   # applyOps is not retryable.
+ *   requires_non_retryable_commands,
+ * ]
+ */
 (function() {
 'use strict';
 let mydb = db.getSiblingDB('list_collections_no_views');
@@ -105,8 +111,13 @@ assert.eq(viewOnlyExpected,
                   return 0;
               }));
 
-let views = mydb.getCollection('system.views');
-views.insertOne({invalid: NumberLong(1000)});
+assert.commandWorked(db.adminCommand({
+    applyOps: [{
+        op: "i",
+        ns: mydb.getName() + ".system.views",
+        o: {_id: "invalid_view_def", invalid: NumberLong(1000)}
+    }]
+}));
 
 let collOnlyInvalidView = mydb.runCommand(collOnlyCommand);
 assert.eq(collOnlyExpected,

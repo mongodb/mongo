@@ -1,8 +1,14 @@
-// Test the creation of views with various options.
-// @tags: [
-//   assumes_superuser_permissions,
-// ]
-
+/**
+ * Test the creation of views with various options.
+ *
+ * @tags: [
+ *   # applyOps is not available on mongos.
+ *   assumes_against_mongod_not_mongos,
+ *   assumes_superuser_permissions,
+ *   # applyOps is not retryable.
+ *   requires_non_retryable_commands,
+ * ]
+ */
 (function() {
 "use strict";
 
@@ -100,14 +106,21 @@ assert.commandFailedWithCode(viewsDB.runCommand({
 
 // These test that, when an existing view in system.views is invalid because of a $out in the
 // pipeline, the database errors on creation of a new view.
-assert.commandWorked(viewsDB.system.views.insert({
-    _id: `${viewsDBName}.invalidView`,
-    viewOn: "collection",
-    pipeline: [{$project: {_id: false}}, {$out: "notExistingCollection"}]
+assert.commandWorked(viewsDB.adminCommand({
+    applyOps: [{
+        op: "i",
+        ns: viewsDBName + ".system.views",
+        o: {
+            _id: viewsDBName + ".invalidView",
+            viewOn: "collection",
+            pipeline: [{$project: {_id: false}}, {$out: "notExistingCollection"}]
+        }
+    }]
 }));
 assert.commandFailedWithCode(
     viewsDB.runCommand({create: "viewWithBadViewCatalog", viewOn: "collection", pipeline: []}),
     ErrorCodes.OptionNotSupportedOnView);
-assert.commandWorked(
-    viewsDB.system.views.remove({_id: `${viewsDBName}.invalidView`}, {justOne: true}));
+assert.commandWorked(viewsDB.adminCommand({
+    applyOps: [{op: "d", ns: viewsDBName + ".system.views", o: {_id: viewsDBName + ".invalidView"}}]
+}));
 }());

@@ -256,7 +256,6 @@ public:
         }();
 
         {
-            // TODO SERVER-43633 change to AutoGetCollection
             // Avoid using AutoGetCollection() as it returns the InvalidViewDefinition error code
             // if an invalid view is in the 'system.views' collection.
             AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);

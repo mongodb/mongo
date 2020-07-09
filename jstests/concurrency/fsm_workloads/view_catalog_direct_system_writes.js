@@ -14,17 +14,30 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.create = function create(db, collName) {
         this.counter++;
         let pipeline = [{$match: {_id: this.counter}}];
-        assertAlways.commandWorked(db.system.views.insert({
-            _id: db.getName() + "." + this.threadViewName,
-            viewOn: this.threadCollName,
-            pipeline: pipeline
+        assertAlways.commandWorkedOrFailedWithCode(db.createCollection("system.views"),
+                                                   ErrorCodes.NamespaceExists);
+        assertAlways.commandWorked(db.adminCommand({
+            applyOps: [{
+                op: "i",
+                ns: db.getName() + ".system.views",
+                o: {
+                    _id: db.getName() + "." + this.threadViewName,
+                    viewOn: this.threadCollName,
+                    pipeline: pipeline
+                }
+            }]
         }));
         this.confirmViewDefinition(db, this.threadViewName, collName, pipeline, this.counter);
     };
 
     $config.states.drop = function drop(db, collName) {
-        assertAlways.commandWorked(
-            db.system.views.deleteOne({_id: db.getName() + "." + this.threadViewName}));
+        assertAlways.commandWorked(db.adminCommand({
+            applyOps: [{
+                op: "d",
+                ns: db.getName() + ".system.views",
+                o: {_id: db.getName() + "." + this.threadViewName}
+            }]
+        }));
 
         let res = db.runCommand({listCollections: 1, filter: {name: this.threadViewName}});
         assertAlways.commandWorked(res);

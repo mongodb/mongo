@@ -883,7 +883,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     }
 
     // Check that the target namespace is in the correct form, "database.collection".
-    auto targetStatus = userAllowedWriteNS(targetNss);
+    auto targetStatus = userAllowedCreateNS(targetNss);
     if (!targetStatus.isOK()) {
         return Status(targetStatus.code(),
                       str::stream() << "error with target namespace: " << targetStatus.reason());
