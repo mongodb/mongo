@@ -545,6 +545,9 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
     invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
+
+    // Note that this temporary collection name is used by MongoMirror and thus must not be changed
+    // without consultation.
     auto tmpNameResult =
         targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.renameCollection");
     if (!tmpNameResult.isOK()) {

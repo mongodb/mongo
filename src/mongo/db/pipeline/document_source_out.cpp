@@ -108,6 +108,8 @@ void DocumentSourceOut::initialize() {
     const auto& outputNs = getOutputNs();
     // We will write all results into a temporary collection, then rename the temporary collection
     // to be the target collection once we are done.
+    // Note that this temporary collection name is used by MongoMirror and thus should not be
+    // changed without consultation.
     _tempNs = NamespaceString(str::stream() << outputNs.db() << ".tmp.agg_out." << UUID::gen());
 
     // Save the original collection options and index specs so we can check they didn't change
