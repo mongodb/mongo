@@ -699,7 +699,9 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(const Snapshotted<BSONObj>& o
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
 
     // If the shard key fields remain unchanged by this update we can skip the rest of the checks.
-    if (newShardKey.woCompare(oldShardKey) == 0) {
+    // Using BSONObj::binaryEqual() still allows a missing shard key field to be filled in with an
+    // explicit null value.
+    if (newShardKey.binaryEqual(oldShardKey)) {
         return false;
     }
 
@@ -743,10 +745,9 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(const Snapshotted<BSONObj>& o
     const auto collFilter = css->getOwnershipFilter(
         opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
 
-    // If this document does not belong anymore to this shard
-    if (!collFilter.keyBelongsToMe(oldShardKey)) {
-        return false;
-    }
+    // If the shard key of an orphan document is allowed to change, and the document is allowed to
+    // become owned by the shard, the global uniqueness assumption for _id values would be violated.
+    invariant(collFilter.keyBelongsToMe(oldShardKey));
 
     if (!collFilter.keyBelongsToMe(newShardKey)) {
         if (MONGO_unlikely(hangBeforeThrowWouldChangeOwningShard.shouldFail())) {
