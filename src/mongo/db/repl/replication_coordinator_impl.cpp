@@ -686,6 +686,19 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         OpTime minValid = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx.get());
         consistency =
             (lastOpTime >= minValid) ? DataConsistency::Consistent : DataConsistency::Inconsistent;
+
+        // It is not safe to take stable checkpoints until we reach minValid, so we set our
+        // initialDataTimestamp to prevent this. It is expected that this is only necessary when
+        // enableMajorityReadConcern:false.
+        if (lastOpTime < minValid) {
+            LOGV2_DEBUG(4916700,
+                        2,
+                        "Setting initialDataTimestamp to minValid since our last optime is less "
+                        "than minValid",
+                        "lastOpTime"_attr = lastOpTime,
+                        "minValid"_attr = minValid);
+            _storage->setInitialDataTimestamp(getServiceContext(), minValid.getTimestamp());
+        }
     }
 
     // Update the global timestamp before setting the last applied opTime forward so the last
@@ -4982,23 +4995,14 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_recalculateStabl
     // Make sure the stable optime does not surpass its maximum.
     stableOpTime = OpTimeAndWallTime(std::min(noOverlap, maximumStableOpTime.opTime), Date_t());
 
-    // Keep EMRC=false behavior the same for now.
-    // TODO (SERVER-47844) Don't use stable optime candidates here.
-    if (!serverGlobalParams.enableMajorityReadConcern) {
-        stableOpTime =
-            _chooseStableOpTimeFromCandidates(lk, _stableOpTimeCandidates, maximumStableOpTime);
-    }
-
     if (stableOpTime) {
         // Check that the selected stable optime does not exceed our maximum and that it does not
         // surpass the no-overlap point.
         invariant(stableOpTime.get().opTime.getTimestamp() <=
                   maximumStableOpTime.opTime.getTimestamp());
         invariant(stableOpTime.get().opTime <= maximumStableOpTime.opTime);
-        if (serverGlobalParams.enableMajorityReadConcern) {
-            invariant(stableOpTime.get().opTime.getTimestamp() <= noOverlap.getTimestamp());
-            invariant(stableOpTime.get().opTime <= noOverlap);
-        }
+        invariant(stableOpTime.get().opTime.getTimestamp() <= noOverlap.getTimestamp());
+        invariant(stableOpTime.get().opTime <= noOverlap);
     }
 
     return stableOpTime;
