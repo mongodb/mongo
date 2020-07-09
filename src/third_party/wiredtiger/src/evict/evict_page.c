@@ -635,6 +635,13 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      */
     cache = conn->cache;
 
+    /*
+     * Urgent eviction and forced eviction want two different behaviors for inefficient update
+     * restore evictions, pass this flag so that reconciliation knows which to use.
+     */
+    if (FLD_ISSET(evict_flags, WT_EVICT_CALL_URGENT))
+        LF_SET(WT_REC_CALL_URGENT);
+
     if (closing)
         LF_SET(WT_REC_VISIBILITY_ERR);
     else if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) || WT_IS_HS(S2BT(session)))

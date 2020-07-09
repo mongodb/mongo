@@ -43,6 +43,14 @@ struct __wt_reconcile {
     u_int updates_unstable; /* Count of updates not visible_all. */
 
     /*
+     * When we do not find any update to be written for the whole page, we would like to mark
+     * eviction failed in the case of update-restore. There is no progress made by eviction in such
+     * a case, the page size stays the same and considering it a success could force the page
+     * through eviction repeatedly.
+     */
+    bool update_used;
+
+    /*
      * When we can't mark the page clean after reconciliation (for example, checkpoint or eviction
      * found some uncommitted updates), there's a leave-dirty flag.
      */
@@ -268,6 +276,8 @@ typedef struct {
     WT_UPDATE *upd; /* Update to write (or NULL) */
 
     WT_TIME_WINDOW tw;
+
+    bool upd_saved; /* An element on the row's update chain was saved */
 } WT_UPDATE_SELECT;
 
 /*

@@ -517,6 +517,16 @@ __wt_modify_vector_peek(WT_MODIFY_VECTOR *modifies, WT_UPDATE **updp)
 }
 
 /*
+ * __wt_modify_vector_clear --
+ *     Clear a modify vector.
+ */
+void
+__wt_modify_vector_clear(WT_MODIFY_VECTOR *modifies)
+{
+    modifies->size = 0;
+}
+
+/*
  * __wt_modify_vector_free --
  *     Free any resources associated with a modify vector. If we exceeded the allowed stack space on
  *     the vector and had to fallback to dynamic allocations, we'll be doing a free here.

@@ -13,6 +13,13 @@
     (WT_CROSSING_MIN_BND(r, next_len) || WT_CROSSING_SPLIT_BND(r, next_len))
 
 /*
+ * WT_REC_SPLIT_MIN_ITEMS_USE_MEM
+ *     The minimum number of page items (entries on the disk image or saved updates) associated with
+ *     a page required to consider in-memory updates in the split calculation.
+ */
+#define WT_REC_SPLIT_MIN_ITEMS_USE_MEM 10
+
+/*
  * __rec_cell_addr_stats --
  *     Track statistics for time values associated with an address.
  */
@@ -212,7 +219,7 @@ __wt_rec_need_split(WT_RECONCILE *r, size_t len)
      * dominating the calculation and causing excessive splitting. Therefore, we'll limit the impact
      * to a tenth of the cache usage occupied by those updates.
      */
-    if (r->page->type == WT_PAGE_ROW_LEAF && page_items > 10)
+    if (r->page->type == WT_PAGE_ROW_LEAF && page_items > WT_REC_SPLIT_MIN_ITEMS_USE_MEM)
         len += r->supd_memsize / 10;
 
     /* Check for the disk image crossing a boundary. */

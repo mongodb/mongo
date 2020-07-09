@@ -568,8 +568,27 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
     for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
         WT_RET(__wt_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
-        if ((upd = upd_select.upd) == NULL)
+        if ((upd = upd_select.upd) == NULL) {
+            /*
+             * In cases where a page has grown so large we are trying to force evict it (there is
+             * content, but none of the content can be evicted), we set up fake split points, to
+             * allow the page to use update restore eviction and be split into multiple reasonably
+             * sized pages. Check if we are in this situation. The call to split with zero
+             * additional size is odd, but split takes into account saved updates in a special way
+             * for this case already.
+             */
+            if (!upd_select.upd_saved || !__wt_rec_need_split(r, 0))
+                continue;
+
+            WT_RET(__wt_buf_set(session, r->cur, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
+            WT_RET(__wt_rec_split_crossing_bnd(session, r, 0, false));
+
+            /*
+             * Turn off prefix and suffix compression until a full key is written into the new page.
+             */
+            r->key_pfx_compress = r->key_sfx_compress = false;
             continue;
+        }
 
         WT_TIME_WINDOW_COPY(&tw, &upd_select.tw);
 

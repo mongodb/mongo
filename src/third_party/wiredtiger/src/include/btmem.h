@@ -26,14 +26,15 @@
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_REC_CHECKPOINT 0x01u
-#define WT_REC_CLEAN_AFTER_REC 0x02u
-#define WT_REC_EVICT 0x04u
-#define WT_REC_HS 0x08u
-#define WT_REC_IN_MEMORY 0x10u
-#define WT_REC_SCRUB 0x20u
-#define WT_REC_VISIBILITY_ERR 0x40u
-#define WT_REC_VISIBLE_ALL 0x80u
+#define WT_REC_CALL_URGENT 0x001u
+#define WT_REC_CHECKPOINT 0x002u
+#define WT_REC_CLEAN_AFTER_REC 0x004u
+#define WT_REC_EVICT 0x008u
+#define WT_REC_HS 0x010u
+#define WT_REC_IN_MEMORY 0x020u
+#define WT_REC_SCRUB 0x040u
+#define WT_REC_VISIBILITY_ERR 0x080u
+#define WT_REC_VISIBLE_ALL 0x100u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /*
@@ -1074,11 +1075,12 @@ struct __wt_update {
     volatile uint8_t prepare_state; /* prepare state */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_UPDATE_HS 0x01u                       /* Update has been written to history store. */
-#define WT_UPDATE_MASKED_BY_NON_TS_UPDATE 0x02u  /* Update masked by updates without timestamp. */
-#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x04u /* Prepared update restored from data store. */
-#define WT_UPDATE_RESTORED_FROM_DS 0x08u         /* Update restored from data store. */
-#define WT_UPDATE_RESTORED_FROM_HS 0x10u         /* Update restored from history store. */
+#define WT_UPDATE_CLEARED_HS 0x01u               /* Update that cleared the history store. */
+#define WT_UPDATE_HS 0x02u                       /* Update has been written to history store. */
+#define WT_UPDATE_OBSOLETE 0x04u                 /* Update that is obsolete. */
+#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x08u /* Prepared update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_DS 0x10u         /* Update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_HS 0x20u         /* Update restored from history store. */
                                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint8_t flags;
 
