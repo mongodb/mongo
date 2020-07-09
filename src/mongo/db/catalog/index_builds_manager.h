@@ -200,6 +200,14 @@ private:
     // Map of index builders by build UUID. Allows access to the builders so that actions can be
     // taken on and information passed to and from index builds.
     std::map<UUID, std::unique_ptr<MultiIndexBlock>> _builders;
+
+    /**
+     * Deletes records containing duplicate keys and inserts them into a local lost and found
+     * collection titled "local.system.lost_and_found.<original collection UUID>".
+     */
+    StatusWith<long long> _moveDocsToLostAndFound(OperationContext* opCtx,
+                                                  NamespaceString ns,
+                                                  std::set<RecordId>* dupRecords);
 };
 
 }  // namespace mongo

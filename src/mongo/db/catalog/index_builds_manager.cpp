@@ -37,8 +37,11 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -210,11 +213,23 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     }
 
     progressMeter.finished();
+    std::set<RecordId> dups;
 
-    Status status = builder->dumpInsertsFromBulk(opCtx);
+    Status status =
+        builder->dumpInsertsFromBulk(opCtx, (repair == RepairData::kYes) ? &dups : nullptr);
     if (!status.isOK()) {
         return status;
     }
+
+    // Delete duplicate documents and insert them into local lost and found.
+    // TODO SERVER-49507: Reduce memory consumption when there are a large number of duplicate
+    // records.
+    auto dupRecordsDeleted = _moveDocsToLostAndFound(opCtx, ns, &dups);
+    if (!dupRecordsDeleted.isOK()) {
+        return dupRecordsDeleted.getStatus();
+    }
+    numRecords -= dupRecordsDeleted.getValue();
+
     return std::make_pair(numRecords, dataSize);
 }
 
@@ -349,6 +364,93 @@ StatusWith<MultiIndexBlock*> IndexBuildsManager::_getBuilder(const UUID& buildUU
         return {ErrorCodes::NoSuchKey, str::stream() << "No index build with UUID: " << buildUUID};
     }
     return builderIt->second.get();
+}
+
+StatusWith<long long> IndexBuildsManager::_moveDocsToLostAndFound(OperationContext* opCtx,
+                                                                  NamespaceString nss,
+                                                                  std::set<RecordId>* dupRecords) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+
+    long long recordsDeleted = 0;
+    if (dupRecords->empty()) {
+        return recordsDeleted;
+    }
+
+    auto originalCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto collUUID = originalCollection->uuid();
+
+    const NamespaceString lostAndFoundNss =
+        NamespaceString(NamespaceString::kLocalDb, "system.lost_and_found." + collUUID.toString());
+    Collection* localCollection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, lostAndFoundNss);
+
+    // Create the collection if it doesn't exist.
+    if (!localCollection) {
+        Status status =
+            writeConflictRetry(opCtx, "createLostAndFoundCollection", lostAndFoundNss.ns(), [&]() {
+                WriteUnitOfWork wuow(opCtx);
+                AutoGetOrCreateDb autoDb(opCtx, NamespaceString::kLocalDb, MODE_X);
+                Database* db = autoDb.getDb();
+
+                // Ensure the database exists.
+                invariant(db);
+
+                // Since we are potentially deleting documents with duplicate _id values, we need to
+                // be able to insert into the lost and found collection without generating any
+                // duplicate key errors on the _id value.
+                CollectionOptions collOptions;
+                collOptions.setNoIdIndex();
+                localCollection = db->createCollection(opCtx, lostAndFoundNss, collOptions);
+
+                // Ensure the collection exists.
+                invariant(localCollection);
+                wuow.commit();
+                return Status::OK();
+            });
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    for (auto&& recordId : *dupRecords) {
+
+        Status status =
+            writeConflictRetry(opCtx, "writeDupDocToLostAndFoundCollection", nss.ns(), [&]() {
+                WriteUnitOfWork wuow(opCtx);
+
+                Snapshotted<BSONObj> doc;
+                // If the record doesn’t exist, continue with other documents.
+                if (!originalCollection->findDoc(opCtx, recordId, &doc)) {
+                    return Status::OK();
+                }
+
+                // Write document to lost_and_found collection and delete from original collection.
+                Status status =
+                    localCollection->insertDocument(opCtx, InsertStatement(doc.value()), nullptr);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                originalCollection->deleteDocument(opCtx, kUninitializedStmtId, recordId, nullptr);
+                wuow.commit();
+
+                recordsDeleted++;
+                return Status::OK();
+            });
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    StorageRepairObserver::get(opCtx->getServiceContext())
+        ->invalidatingModification(str::stream()
+                                   << "Moved " << recordsDeleted
+                                   << " docs to lost and found: " << localCollection->ns());
+
+    LOGV2(3956200,
+          "Moved documents to lost and found.",
+          "numDocuments"_attr = recordsDeleted,
+          "lostAndFoundNss"_attr = lostAndFoundNss);
+    return recordsDeleted;
 }
 
 }  // namespace mongo

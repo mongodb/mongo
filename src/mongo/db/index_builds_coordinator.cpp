@@ -2512,6 +2512,14 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
             uassertStatusOK(_indexBuildsManager.startBuildingIndexForRecovery(
                 opCtx, collection->ns(), buildUUID, repair));
 
+        // Since we are holding an exclusive collection lock to stop new writes, do not yield locks
+        // while draining.
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+            opCtx,
+            replState->buildUUID,
+            RecoveryUnit::ReadSource::kUnset,
+            IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
         uassertStatusOK(
             _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
 
