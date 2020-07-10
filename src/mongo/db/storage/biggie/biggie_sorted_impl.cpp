@@ -1001,7 +1001,7 @@ void CursorUnique::restoreForward() {
             // We reached the end of the index data, so we need to go to the next item in the
             // radix tree to be positioned on a valid item
             ++_forwardIt;
-            if (_forwardIt != _workingCopy->end()) {
+            if (checkCursorValid()) {
                 _indexData = UniqueIndexData(_forwardIt->second);
                 _indexDataIt = _indexData.begin();
                 _indexDataEnd = _indexData.end();
@@ -1026,7 +1026,7 @@ void CursorUnique::restoreReverse() {
         _indexDataEnd = _indexData.end();
         if (_indexDataIt == _indexDataEnd) {
             ++_reverseIt;
-            if (_reverseIt != _workingCopy->rend()) {
+            if (checkCursorValid()) {
                 _indexData = UniqueIndexData(_reverseIt->second);
                 _reversePos = 0;
                 initReverseDataIterators();
