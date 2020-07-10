@@ -134,6 +134,7 @@ struct Instruction {
         fillEmpty,
 
         getField,
+        getElement,
 
         aggSum,
         aggMin,
@@ -237,6 +238,7 @@ public:
         appendSimpleInstruction(Instruction::fillEmpty);
     }
     void appendGetField();
+    void appendGetElement();
     void appendSum();
     void appendMin();
     void appendMax();
@@ -331,6 +333,9 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
                                                                       value::Value lhsValue,
                                                                       value::TypeTags rhsTag);
+    std::pair<value::TypeTags, value::Value> genericNumConvertToPreciseInt64(value::TypeTags lhsTag,
+                                                                             value::Value lhsValue);
+
     template <typename Op>
     std::pair<value::TypeTags, value::Value> genericCompare(value::TypeTags lhsTag,
                                                             value::Value lhsValue,
@@ -359,6 +364,11 @@ private:
                                                              value::Value objValue,
                                                              value::TypeTags fieldTag,
                                                              value::Value fieldValue);
+
+    std::tuple<bool, value::TypeTags, value::Value> getElement(value::TypeTags objTag,
+                                                               value::Value objValue,
+                                                               value::TypeTags fieldTag,
+                                                               value::Value fieldValue);
 
     std::tuple<bool, value::TypeTags, value::Value> aggSum(value::TypeTags accTag,
                                                            value::Value accValue,

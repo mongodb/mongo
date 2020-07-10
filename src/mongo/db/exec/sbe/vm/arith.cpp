@@ -366,6 +366,27 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericNumConvert(
     return {false, value::TypeTags::Nothing, 0};
 }
 
+static const double kDoubleLargestConsecutiveInteger =
+    pow(std::numeric_limits<double>::radix, std::numeric_limits<double>::digits);
+
+std::pair<value::TypeTags, value::Value> ByteCode::genericNumConvertToPreciseInt64(
+    value::TypeTags lhsTag, value::Value lhsValue) {
+    // If lhs is a double, we need to perform an extra check to ensure that lhs is within the range
+    // where double can represent consecutive integers precisely. This check isn't necessary for
+    // Decimal128, because Decimal128 can precisely represent every possible numeric value that can
+    // fit in an int64_t.
+    if (lhsTag == value::TypeTags::NumberDouble) {
+        auto d = value::bitcastTo<double>(lhsValue);
+        if (d > kDoubleLargestConsecutiveInteger || d < -kDoubleLargestConsecutiveInteger) {
+            return {value::TypeTags::Nothing, 0};
+        }
+    }
+
+    auto [owned, tag, val] = genericNumConvert(lhsTag, lhsValue, value::TypeTags::NumberInt64);
+    invariant(!owned);
+    return {tag, val};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAbs(value::TypeTags operandTag,
                                                                      value::Value operandValue) {
     switch (operandTag) {

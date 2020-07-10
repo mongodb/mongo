@@ -273,6 +273,10 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
         }
     }
 }
+void convertToBsonObj(BSONArrayBuilder& builder, value::Array* arr) {
+    return convertToBsonObj(
+        builder, value::ArrayEnumerator{value::TypeTags::Array, value::bitcastFrom(arr)});
+}
 void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj) {
     for (size_t idx = 0; idx < obj->size(); ++idx) {
         auto [tag, val] = obj->getAt(idx);

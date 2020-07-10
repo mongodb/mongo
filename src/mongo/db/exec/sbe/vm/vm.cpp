@@ -80,6 +80,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // fillEmpty
 
     -1,  // getField
+    -1,  // getElement
 
     -1,  // sum
     -1,  // min
@@ -259,6 +260,10 @@ void CodeFragment::appendGetField() {
     appendSimpleInstruction(Instruction::getField);
 }
 
+void CodeFragment::appendGetElement() {
+    appendSimpleInstruction(Instruction::getElement);
+}
+
 void CodeFragment::appendSum() {
     appendSimpleInstruction(Instruction::aggSum);
 }
@@ -409,6 +414,59 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTa
         }
     }
     return {false, value::TypeTags::Nothing, 0};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::TypeTags arrTag,
+                                                                     value::Value arrValue,
+                                                                     value::TypeTags idxTag,
+                                                                     value::Value idxValue) {
+    if (arrTag != value::TypeTags::Array && arrTag != value::TypeTags::bsonArray) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    // Bail out if the `idx` parameter isn't a number, or if it can't be converted to a 64-bit
+    // integer, or if it's outside of the range where the `lhsTag` type can represent consecutive
+    // integers precisely.
+    auto [numTag, numVal] = genericNumConvertToPreciseInt64(idxTag, idxValue);
+    if (numTag != value::TypeTags::NumberInt64) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    int64_t numInt64 = value::bitcastTo<int64_t>(numVal);
+    // Cast the `idx` parameter to size_t. Bail out if its negative or if it's too big for size_t.
+    if (numInt64 < 0 ||
+        (sizeof(size_t) < sizeof(int64_t) &&
+         numInt64 > static_cast<int64_t>(std::numeric_limits<size_t>::max()))) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    size_t idx = static_cast<size_t>(numInt64);
+
+    if (arrTag == value::TypeTags::Array) {
+        // If `arr` is an SBE array, use Array::getAt() to retrieve the element at index `idx`.
+        auto [tag, val] = value::getArrayView(arrValue)->getAt(idx);
+        return {false, tag, val};
+    } else if (arrTag == value::TypeTags::bsonArray) {
+        // If `arr` is a BSON array, loop over the elements until we reach the idx-th element.
+        auto be = value::bitcastTo<const char*>(arrValue);
+        auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+        // Skip document length.
+        be += 4;
+        // The field names of an array are always be 0 thru N-1 in order. Therefore we don't need to
+        // inspect the field names (aside from determining their length so we can skip over them).
+        for (size_t currentIdx = 0; *be != 0; ++currentIdx) {
+            size_t fieldNameLength = strlen(be + 1);
+            if (currentIdx == idx) {
+                auto [tag, val] = bson::convertFrom(true, be, end, fieldNameLength);
+                return {false, tag, val};
+            }
+            be = bson::advance(be, fieldNameLength);
+        }
+        // If the array didn't have an element at index `idx`, return Nothing.
+        return {false, value::TypeTags::Nothing, 0};
+    } else {
+        // Earlier in this function we bailed out if the `arrTag` wasn't Array or bsonArray, so it
+        // should be impossible to reach this point.
+        MONGO_UNREACHABLE
+    }
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags accTag,
@@ -1418,6 +1476,23 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(CodeFragment* c
                     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
 
                     auto [owned, tag, val] = getField(lhsTag, lhsVal, rhsTag, rhsVal);
+
+                    topStack(owned, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
+                case Instruction::getElement: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+                    auto [owned, tag, val] = getElement(lhsTag, lhsVal, rhsTag, rhsVal);
 
                     topStack(owned, tag, val);
 

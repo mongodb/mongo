@@ -45,6 +45,7 @@ inline auto fieldNameView(const char* be) noexcept {
     return std::string_view{be + 1};
 }
 
+void convertToBsonObj(BSONArrayBuilder& builder, value::Array* arr);
 void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj);
 }  // namespace bson
 }  // namespace sbe

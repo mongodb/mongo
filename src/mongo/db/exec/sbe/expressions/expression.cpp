@@ -382,6 +382,8 @@ struct InstrFn {
 static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
     {"getField",
      InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendGetField, false}},
+    {"getElement",
+     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendGetElement, false}},
     {"fillEmpty",
      InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendFillEmpty, false}},
     {"exists", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendExists, false}},
