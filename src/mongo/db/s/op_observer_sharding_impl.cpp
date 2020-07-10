@@ -81,6 +81,10 @@ bool isMigratingWithCSRLock(CollectionShardingRuntime* csr,
 }
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
+    if (!nss.isNormalCollection()) {
+        return;
+    }
+
     Lock::DBLock dblock(opCtx, nss.db(), MODE_IS);
     auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
     if (!dss) {
