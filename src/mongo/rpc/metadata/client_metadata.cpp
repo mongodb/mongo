@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 
@@ -57,6 +58,7 @@ constexpr auto kOperatingSystem = "os"_sd;
 
 constexpr auto kArchitecture = "architecture"_sd;
 constexpr auto kName = "name"_sd;
+constexpr auto kPid = "pid"_sd;
 constexpr auto kType = "type"_sd;
 constexpr auto kVersion = "version"_sd;
 
@@ -333,37 +335,27 @@ void ClientMetadata::serialize(StringData driverName,
 
     ProcessInfo processInfo;
 
+    std::string appName;
+    if (kDebugBuild) {
+        appName = processInfo.getProcessName();
+        if (appName.length() > kMaxApplicationNameByteLength) {
+            static constexpr auto kEllipsis = "..."_sd;
+            appName.replace(appName.begin() + kMaxApplicationNameByteLength - kEllipsis.size(),
+                            appName.end(),
+                            kEllipsis.begin(),
+                            kEllipsis.end());
+        }
+    }
+
     serializePrivate(driverName,
                      driverVersion,
                      processInfo.getOsType(),
                      processInfo.getOsName(),
                      processInfo.getArch(),
                      processInfo.getOsVersion(),
-                     builder);
-}
-
-void ClientMetadata::serializePrivate(StringData driverName,
-                                      StringData driverVersion,
-                                      StringData osType,
-                                      StringData osName,
-                                      StringData osArchitecture,
-                                      StringData osVersion,
-                                      BSONObjBuilder* builder) {
-    BSONObjBuilder metaObjBuilder(builder->subobjStart(kMetadataDocumentName));
-
-    {
-        BSONObjBuilder subObjBuilder(metaObjBuilder.subobjStart(kDriver));
-        subObjBuilder.append(kName, driverName);
-        subObjBuilder.append(kVersion, driverVersion);
-    }
-
-    {
-        BSONObjBuilder subObjBuilder(metaObjBuilder.subobjStart(kOperatingSystem));
-        subObjBuilder.append(kType, osType);
-        subObjBuilder.append(kName, osName);
-        subObjBuilder.append(kArchitecture, osArchitecture);
-        subObjBuilder.append(kVersion, osVersion);
-    }
+                     appName,
+                     builder)
+        .ignore();
 }
 
 Status ClientMetadata::serialize(StringData driverName,
@@ -405,6 +397,9 @@ Status ClientMetadata::serializePrivate(StringData driverName,
         if (!appName.empty()) {
             BSONObjBuilder subObjBuilder(metaObjBuilder.subobjStart(kApplication));
             subObjBuilder.append(kName, appName);
+            if (kDebugBuild) {
+                subObjBuilder.append(kPid, ProcessId::getCurrent().toString());
+            }
         }
 
         {

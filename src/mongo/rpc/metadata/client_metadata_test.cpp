@@ -38,8 +38,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -48,6 +50,7 @@ constexpr auto kMetadataDoc = "client"_sd;
 constexpr auto kApplication = "application"_sd;
 constexpr auto kDriver = "driver"_sd;
 constexpr auto kName = "name"_sd;
+constexpr auto kPid = "pid"_sd;
 constexpr auto kType = "type"_sd;
 constexpr auto kVersion = "version"_sd;
 constexpr auto kOperatingSystem = "os"_sd;
@@ -74,7 +77,7 @@ constexpr auto kUnknown = "unkown"_sd;
 
 
 TEST(ClientMetadatTest, TestLoopbackTest) {
-    // Serialize without application name
+    // serializePrivate with appName
     {
         BSONObjBuilder builder;
         ASSERT_OK(ClientMetadata::serializePrivate("a", "b", "c", "d", "e", "f", "g", &builder));
@@ -84,23 +87,39 @@ TEST(ClientMetadatTest, TestLoopbackTest) {
         ASSERT_OK(swParseStatus.getStatus());
         ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
 
+        auto pid = ProcessId::getCurrent().toString();
+
+        using BOB = BSONObjBuilder;
         BSONObj outDoc =
-            BSON(kMetadataDoc << BSON(kApplication
-                                      << BSON(kName << "g") << kDriver
-                                      << BSON(kName << "a" << kVersion << "b") << kOperatingSystem
-                                      << BSON(kType << "c" << kName << "d" << kArchitecture << "e"
-                                                    << kVersion << "f")));
+            BOB{}
+                .append(kMetadataDoc,
+                        BOB{}
+                            .append(kApplication,
+                                    BOB{}
+                                        .append(kName, "g")
+                                        .appendElements(kDebugBuild ? BOB{}.append(kPid, pid).obj()
+                                                                    : BOB{}.obj())
+                                        .obj())
+                            .append(kDriver, BOB{}.append(kName, "a").append(kVersion, "b").obj())
+                            .append(kOperatingSystem,
+                                    BOB{}
+                                        .append(kType, "c")
+                                        .append(kName, "d")
+                                        .append(kArchitecture, "e")
+                                        .append(kVersion, "f")
+                                        .obj())
+                            .obj())
+                .obj();
         ASSERT_BSONOBJ_EQ(obj, outDoc);
     }
 
-    // Serialize without application name
+    // serializePrivate without appName
     {
         BSONObjBuilder builder;
-        ClientMetadata::serializePrivate("a", "b", "c", "d", "e", "f", &builder);
+        ASSERT_OK(ClientMetadata::serializePrivate(
+            "a", "b", "c", "d", "e", "f", std::string{}, &builder));
 
         auto obj = builder.obj();
-        auto swParseStatus = ClientMetadata::parse(obj[kMetadataDoc]);
-        ASSERT_OK(swParseStatus.getStatus());
 
         BSONObj outDoc =
             BSON(kMetadataDoc << BSON(kDriver
@@ -295,12 +314,27 @@ TEST(ClientMetadatTest, TestMongoSAppend) {
     constexpr auto kClient = "client"_sd;
     constexpr auto kHost = "host"_sd;
 
+    auto pid = ProcessId::getCurrent().toString();
+
+    using BOB = BSONObjBuilder;
     BSONObj outDoc =
-        BSON(kApplication << BSON(kName << "g") << kDriver << BSON(kName << "a" << kVersion << "b")
-                          << kOperatingSystem
-                          << BSON(kType << "c" << kName << "d" << kArchitecture << "e" << kVersion
-                                        << "f")
-                          << kMongos << BSON(kHost << "h" << kClient << "i" << kVersion << "j"));
+        BOB{}
+            .append(kApplication,
+                    BOB{}
+                        .append(kName, "g")
+                        .appendElements(kDebugBuild ? BOB{}.append(kPid, pid).obj() : BOB{}.obj())
+                        .obj())
+            .append(kDriver, BOB{}.append(kName, "a").append(kVersion, "b").obj())
+            .append(kOperatingSystem,
+                    BOB{}
+                        .append(kType, "c")
+                        .append(kName, "d")
+                        .append(kArchitecture, "e")
+                        .append(kVersion, "f")
+                        .obj())
+            .append(kMongos,
+                    BOB{}.append(kHost, "h").append(kClient, "i").append(kVersion, "j").obj())
+            .obj();
     ASSERT_BSONOBJ_EQ(doc, outDoc);
 }
 

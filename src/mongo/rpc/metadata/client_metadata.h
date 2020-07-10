@@ -199,19 +199,6 @@ public:
     /**
      * Create a new client metadata document.
      *
-     * Exposed for Unit Test purposes
-     */
-    static void serializePrivate(StringData driverName,
-                                 StringData driverVersion,
-                                 StringData osType,
-                                 StringData osName,
-                                 StringData osArchitecture,
-                                 StringData osVersion,
-                                 BSONObjBuilder* builder);
-
-    /**
-     * Create a new client metadata document.
-     *
      * driverName - name of the driver
      * driverVersion - a string for the driver version
      * osType - name of host operating system of client, i.e. uname -s

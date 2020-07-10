@@ -43,6 +43,13 @@
 
 namespace mongo {
 
+namespace {
+MONGO_INITIALIZER(initApplicationInfo)(InitializerContext* context) {
+    ProcessInfo().appInfo().init(context->args());
+    return Status::OK();
+}
+}  // namespace
+
 class PidFileWiper {
 public:
     ~PidFileWiper() {

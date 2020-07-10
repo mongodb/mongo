@@ -37,6 +37,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/static_immortal.h"
 
 namespace mongo {
 
@@ -170,7 +171,7 @@ public:
      *
      * NOTE requires blockCheckSupported() == true
      */
-    inline static const void* alignToStartOfPage(const void* ptr) {
+    static const void* alignToStartOfPage(const void* ptr) {
         return reinterpret_cast<const void*>(reinterpret_cast<unsigned long long>(ptr) &
                                              ~(getPageSize() - 1));
     }
@@ -184,6 +185,10 @@ public:
      * NOTE: requires blockCheckSupported() == true
      */
     static bool pagesInMemory(const void* start, size_t numPages, std::vector<char>* out);
+
+    static const std::string& getProcessName() {
+        return appInfo().getProcessName();
+    }
 
 private:
     /**
@@ -227,13 +232,37 @@ private:
         void collectSystemInfo();
     };
 
+    class ApplicationInfo {
+    public:
+        void init(const std::vector<std::string>& argv) {
+            invariant(!_isInitialized);
+            _isInitialized = true;
+            if (!argv.empty()) {
+                _processName = argv[0];
+            }
+        }
+        const std::string& getProcessName() const {
+            return _processName;
+        }
+
+    private:
+        bool _isInitialized = false;
+        std::string _processName;
+    };
+
     ProcessId _pid;
 
     static bool checkNumaEnabled();
 
-    inline static const SystemInfo& sysInfo() {
+    static const SystemInfo& sysInfo() {
         static ProcessInfo::SystemInfo systemInfo;
         return systemInfo;
+    }
+
+public:
+    static ApplicationInfo& appInfo() {
+        static StaticImmortal<ApplicationInfo> applicationInfo{};
+        return applicationInfo.value();
     }
 
 private:
