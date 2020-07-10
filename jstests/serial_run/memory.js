@@ -38,7 +38,8 @@ function assertMemoryError(func) {
     try {
         func();
     } catch (e) {
-        if (e.message.includes('"errmsg" : "Out of memory"')) {
+        if (e.message.includes('"errmsg" : "Out of memory"') ||
+            e.message.includes('"errmsg" : "JavaScript execution interrupted"')) {
             return;
         }
         throw e;
