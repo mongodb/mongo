@@ -978,6 +978,7 @@ buildvariants:
     use_scons_cache: true
     compile_flags: >-
       --ssl
+      --separate-debug
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
@@ -1013,6 +1014,7 @@ buildvariants:
     <<: *compile-expansions
     compile_flags: >-
       --ssl
+      --separate-debug
       MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
