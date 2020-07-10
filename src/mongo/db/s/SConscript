@@ -67,6 +67,7 @@ env.Library(
         'periodic_sharded_index_consistency_checker.cpp',
         'range_deletion_util.cpp',
         'read_only_catalog_cache_loader.cpp',
+        'resharding_util.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
         'session_catalog_migration_destination.cpp',
         'session_catalog_migration_source.cpp',
@@ -277,6 +278,7 @@ env.Library(
         'config/configsvr_refine_collection_shard_key_command.cpp',
         'config/configsvr_remove_shard_command.cpp',
         'config/configsvr_remove_shard_from_zone_command.cpp',
+        'config/configsvr_reshard_collection_cmd.cpp',
         'config/configsvr_shard_collection_command.cpp',
         'config/configsvr_split_chunk_command.cpp',
         'config/configsvr_update_zone_key_range_command.cpp',
@@ -493,6 +495,7 @@ env.CppUnitTest(
         'balancer/type_migration_test.cpp',
         'config_server_op_observer_test.cpp',
         'vector_clock_config_server_test.cpp',
+        'resharding_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

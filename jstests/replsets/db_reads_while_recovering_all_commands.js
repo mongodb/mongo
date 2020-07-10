@@ -46,6 +46,7 @@ const allCommands = {
     _configsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _configsvrRemoveShard: {skip: isPrimaryOnly},
     _configsvrRemoveShardFromZone: {skip: isPrimaryOnly},
+    _configsvrReshardCollection: {skip: isPrimaryOnly},
     _configsvrShardCollection: {skip: isPrimaryOnly},
     _configsvrUpdateZoneKeyRange: {skip: isPrimaryOnly},
     _flushDatabaseCacheUpdates: {skip: isPrimaryOnly},

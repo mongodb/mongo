@@ -33,7 +33,6 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
@@ -51,41 +50,25 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
-            const auto routingInfo = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                             nss));
+            ConfigsvrReshardCollection configsvrReshardCollection(nss, request().getKey());
+            configsvrReshardCollection.setDbName(request().getDbName());
+            configsvrReshardCollection.setUnique(request().getUnique());
+            configsvrReshardCollection.setCollation(request().getCollation());
+            configsvrReshardCollection.set_presetReshardedChunks(
+                request().get_presetReshardedChunks());
+            configsvrReshardCollection.setZones(request().getZones());
+            configsvrReshardCollection.setNumInitialChunks(request().getNumInitialChunks());
 
-            uassert(ErrorCodes::BadValue,
-                    "The unique field must be false",
-                    !request().getUnique().get_value_or(false));
-
-            bool presetReshardedChunksSpecified = bool(request().get_presetReshardedChunks());
-            uassert(ErrorCodes::BadValue,
-                    "Test commands must be enabled when a value is provided for field: "
-                    "_presetReshardedChunks",
-                    !presetReshardedChunksSpecified || getTestCommandsEnabled());
-
-            uassert(ErrorCodes::BadValue,
-                    "Must specify only one of _presetReshardedChunks or numInitialChunks",
-                    !(presetReshardedChunksSpecified && bool(request().getNumInitialChunks())));
-            // TODO: Use this in SERVER-48677
-            MONGO_COMPILER_VARIABLE_UNUSED int numInitialChunks;
-            if (!presetReshardedChunksSpecified) {
-                numInitialChunks =
-                    request().getNumInitialChunks().get_value_or(routingInfo.cm()->numChunks());
-            }
-
-            if (request().getCollation()) {
-                auto& collation = request().getCollation().get();
-                auto collator =
-                    uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                        ->makeFromBSON(collation));
-                uassert(ErrorCodes::BadValue,
-                        str::stream()
-                            << "The collation for reshardCollection must be {locale: 'simple'}, "
-                            << "but found: " << collation,
-                        !collator);
-            }
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                "admin",
+                CommandHelpers::appendMajorityWriteConcern(configsvrReshardCollection.toBSON({}),
+                                                           opCtx->getWriteConcern()),
+                Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(cmdResponse.commandStatus);
+            uassertStatusOK(cmdResponse.writeConcernStatus);
         }
 
     private:
