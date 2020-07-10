@@ -2,6 +2,7 @@
  * Starts a replica set with arbiter, build an index
  * restart secondary once it starts building index,
  * index build restarts after secondary restarts
+ * @tags: [requires_persistence]
  */
 
 var replTest = new ReplSetTest({
