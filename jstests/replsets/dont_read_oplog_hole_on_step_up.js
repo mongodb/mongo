@@ -41,6 +41,10 @@ assert.commandWorked(secondary.adminCommand({
 }));
 rst.reInitiate();
 
+// Wait for all 'newlyAdded' field removals to prevent auto reconfigs from interfering with the
+// replSetStepUp command below.
+rst.waitForAllNewlyAddedRemovals();
+
 // Make sure when the original primary syncs, it's only from the secondary; this avoids spurious log
 // messages.
 assert.commandWorked(oldPrimary.adminCommand({
