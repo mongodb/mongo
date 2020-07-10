@@ -70,9 +70,9 @@ class test_gc02(test_gc_base):
         # Checkpoint to ensure that the history store is checkpointed and not cleaned.
         self.session.checkpoint()
         c = self.session.open_cursor('statistics:')
-        self.assertEqual(c[stat.conn.hs_gc_pages_evict][2], 0)
-        self.assertEqual(c[stat.conn.hs_gc_pages_removed][2], 0)
-        self.assertGreater(c[stat.conn.hs_gc_pages_visited][2], 0)
+        self.assertEqual(c[stat.conn.cc_pages_evict][2], 0)
+        self.assertEqual(c[stat.conn.cc_pages_removed][2], 0)
+        self.assertGreater(c[stat.conn.cc_pages_visited][2], 0)
         c.close()
 
         # Pin oldest and stable to timestamp 100.

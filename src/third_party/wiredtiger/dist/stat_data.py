@@ -56,6 +56,10 @@ class CapacityStat(Stat):
     prefix = 'capacity'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, CapacityStat.prefix, desc, flags)
+class CheckpointCleanupStat(Stat):
+    prefix = 'checkpoint-cleanup'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, CheckpointCleanupStat.prefix, desc, flags)
 class CompressStat(Stat):
     prefix = 'compression'
     def __init__(self, name, desc, flags=''):
@@ -72,10 +76,6 @@ class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
-class HistoryStat(Stat):
-    prefix = 'history'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, HistoryStat.prefix, desc, flags)
 class JoinStat(Stat):
     prefix = ''  # prefix is inserted dynamically
     def __init__(self, name, desc, flags=''):
@@ -412,11 +412,12 @@ connection_stats = [
     DhandleStat('dh_sweeps', 'connection sweeps'),
 
     ##########################################
-    # History statistics
+    # Checkpoint cleanup statistics
     ##########################################
-    HistoryStat('hs_gc_pages_evict', 'history pages added for eviction during garbage collection'),
-    HistoryStat('hs_gc_pages_removed', 'history pages removed for garbage collection'),
-    HistoryStat('hs_gc_pages_visited', 'history pages visited for garbage collection'),
+    CheckpointCleanupStat('cc_pages_evict', 'pages added for eviction'),
+    CheckpointCleanupStat('cc_pages_removed', 'pages removed'),
+    CheckpointCleanupStat('cc_pages_visited', 'pages visited'),
+    CheckpointCleanupStat('cc_pages_walk_skipped', 'pages skipped during tree walk'),
 
     ##########################################
     # Locking statistics
@@ -857,11 +858,12 @@ dsrc_stats = [
     CursorStat('cursor_update_bytes_changed', 'update value size change', 'size'),
 
     ##########################################
-    # History statistics
+    # Checkpoint cleanup statistics
     ##########################################
-    HistoryStat('hs_gc_pages_evict', 'history pages added for eviction during garbage collection'),
-    HistoryStat('hs_gc_pages_removed', 'history pages removed for garbage collection'),
-    HistoryStat('hs_gc_pages_visited', 'history pages visited for garbage collection'),
+    CheckpointCleanupStat('cc_pages_evict', 'pages added for eviction'),
+    CheckpointCleanupStat('cc_pages_removed', 'pages removed'),
+    CheckpointCleanupStat('cc_pages_visited', 'pages visited'),
+    CheckpointCleanupStat('cc_pages_walk_skipped', 'pages skipped during tree walk'),
 
     ##########################################
     # LSM statistics

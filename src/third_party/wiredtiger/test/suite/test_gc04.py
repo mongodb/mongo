@@ -65,42 +65,42 @@ class test_gc04(test_gc_base):
 
         # Checkpoint to ensure that the history store is populated.
         self.session.checkpoint()
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_evict), 0)
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_removed), 0)
-        self.assertGreater(self.get_stat(stat.conn.hs_gc_pages_visited), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_evict), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_removed), 0)
+        self.assertGreater(self.get_stat(stat.conn.cc_pages_visited), 0)
 
         self.large_updates(uri, bigvalue, ds, nrows, 30)
 
         # Checkpoint to ensure that the history store is populated.
         self.session.checkpoint()
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_evict), 0)
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_removed), 0)
-        self.assertGreater(self.get_stat(stat.conn.hs_gc_pages_visited), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_evict), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_removed), 0)
+        self.assertGreater(self.get_stat(stat.conn.cc_pages_visited), 0)
 
         self.large_updates(uri, bigvalue2, ds, nrows, 40)
 
         # Checkpoint to ensure that the history store is populated.
         self.session.checkpoint()
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_evict), 0)
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_removed), 0)
-        self.assertGreater(self.get_stat(stat.conn.hs_gc_pages_visited), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_evict), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_removed), 0)
+        self.assertGreater(self.get_stat(stat.conn.cc_pages_visited), 0)
 
         self.large_updates(uri, bigvalue, ds, nrows, 50)
         self.large_updates(uri, bigvalue2, ds, nrows, 60)
 
         # Checkpoint to ensure that the history store is populated.
         self.session.checkpoint()
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_evict), 0)
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_removed), 0)
-        self.assertGreater(self.get_stat(stat.conn.hs_gc_pages_visited), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_evict), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_removed), 0)
+        self.assertGreater(self.get_stat(stat.conn.cc_pages_visited), 0)
 
         self.large_updates(uri, bigvalue, ds, nrows, 70)
 
         # Checkpoint to ensure that the history store is populated.
         self.session.checkpoint()
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_evict), 0)
-        self.assertEqual(self.get_stat(stat.conn.hs_gc_pages_removed), 0)
-        self.assertGreater(self.get_stat(stat.conn.hs_gc_pages_visited), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_evict), 0)
+        self.assertEqual(self.get_stat(stat.conn.cc_pages_removed), 0)
+        self.assertGreater(self.get_stat(stat.conn.cc_pages_visited), 0)
 
 if __name__ == '__main__':
     wttest.run()

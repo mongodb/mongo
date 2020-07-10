@@ -143,7 +143,7 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     NULL, 0},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"checkpoint\","
-    "\"checkpoint_gc\",\"checkpoint_progress\",\"compact\","
+    "\"checkpoint_cleanup\",\"checkpoint_progress\",\"compact\","
     "\"compact_progress\",\"error_returns\",\"evict\",\"evict_stuck\""
     ",\"evictserver\",\"fileops\",\"handleops\",\"log\","
     "\"history_store\",\"history_store_activity\",\"lsm\","
@@ -591,7 +591,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
   {"use_environment_priv", "boolean", NULL, NULL, NULL, 0},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"checkpoint\","
-    "\"checkpoint_gc\",\"checkpoint_progress\",\"compact\","
+    "\"checkpoint_cleanup\",\"checkpoint_progress\",\"compact\","
     "\"compact_progress\",\"error_returns\",\"evict\",\"evict_stuck\""
     ",\"evictserver\",\"fileops\",\"handleops\",\"log\","
     "\"history_store\",\"history_store_activity\",\"lsm\","
@@ -667,7 +667,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
   {"use_environment_priv", "boolean", NULL, NULL, NULL, 0},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"checkpoint\","
-    "\"checkpoint_gc\",\"checkpoint_progress\",\"compact\","
+    "\"checkpoint_cleanup\",\"checkpoint_progress\",\"compact\","
     "\"compact_progress\",\"error_returns\",\"evict\",\"evict_stuck\""
     ",\"evictserver\",\"fileops\",\"handleops\",\"log\","
     "\"history_store\",\"history_store_activity\",\"lsm\","
@@ -738,7 +738,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
     2},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"checkpoint\","
-    "\"checkpoint_gc\",\"checkpoint_progress\",\"compact\","
+    "\"checkpoint_cleanup\",\"checkpoint_progress\",\"compact\","
     "\"compact_progress\",\"error_returns\",\"evict\",\"evict_stuck\""
     ",\"evictserver\",\"fileops\",\"handleops\",\"log\","
     "\"history_store\",\"history_store_activity\",\"lsm\","
@@ -809,7 +809,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
     2},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"checkpoint\","
-    "\"checkpoint_gc\",\"checkpoint_progress\",\"compact\","
+    "\"checkpoint_cleanup\",\"checkpoint_progress\",\"compact\","
     "\"compact_progress\",\"error_returns\",\"evict\",\"evict_stuck\""
     ",\"evictserver\",\"fileops\",\"handleops\",\"log\","
     "\"history_store\",\"history_store_activity\",\"lsm\","
