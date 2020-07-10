@@ -1109,12 +1109,17 @@ void execCommandDatabase(OperationContext* opCtx,
         int maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
         int maxTimeMSOpOnly = uassertStatusOK(QueryRequest::parseMaxTimeMS(maxTimeMSOpOnlyField));
 
+        // The "hello" command should not inherit the deadline from the user op it is operating as a
+        // part of as that can interfere with replica set monitoring and host selection.
+        bool ignoreMaxTimeMSOpOnly = command->getName() == "hello"_sd;
+
         if ((maxTimeMS > 0 || maxTimeMSOpOnly > 0) &&
             command->getLogicalOp() != LogicalOp::opGetMore) {
             uassert(40119,
                     "Illegal attempt to set operation deadline within DBDirectClient",
                     !opCtx->getClient()->isInDirectClient());
-            if (maxTimeMSOpOnly > 0 && (maxTimeMS == 0 || maxTimeMSOpOnly < maxTimeMS)) {
+            if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > 0 &&
+                (maxTimeMS == 0 || maxTimeMSOpOnly < maxTimeMS)) {
                 opCtx->storeMaxTimeMS(Milliseconds{maxTimeMS});
                 opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMSOpOnly},
                                              ErrorCodes::MaxTimeMSExpired);

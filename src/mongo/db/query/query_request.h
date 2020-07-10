@@ -134,6 +134,14 @@ public:
 
     /**
      * Parses maxTimeMS from the BSONElement containing its value.
+     * The field name of the 'maxTimeMSElt' is used to determine what maximum value to enforce for
+     * the provided max time. 'maxTimeMSOpOnly' needs a slightly higher max value than regular
+     * 'maxTimeMS' to account for the case where a user provides the max possible value for
+     * 'maxTimeMS' to one server process (mongod or mongos), then that server process passes the max
+     * time on to another server as 'maxTimeMSOpOnly', but after adding a small amount to the max
+     * time to account for clock precision.  This can push the 'maxTimeMSOpOnly' sent to the mongod
+     * over the max value allowed for users to provide. This is safe because 'maxTimeMSOpOnly' is
+     * only allowed to be provided for internal intra-cluster requests.
      */
     static StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt);
 
@@ -166,6 +174,12 @@ public:
 
     // Allow using disk during the find command.
     static constexpr auto kAllowDiskUseField = "allowDiskUse";
+
+    // A constant by which 'maxTimeMSOpOnly' values are allowed to exceed the max allowed value for
+    // 'maxTimeMS'.  This is because mongod and mongos server processes add a small amount to the
+    // 'maxTimeMS' value they are given before passing it on as 'maxTimeMSOpOnly', to allow for
+    // clock precision.
+    static constexpr auto kMaxTimeMSOpOnlyMaxPadding = 100LL;
 
     const NamespaceString& nss() const {
         return _nss;

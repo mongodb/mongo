@@ -73,6 +73,8 @@ public:
     }
 
     void setUp() override {
+        resetIsInternalClient(true);
+
         net = makeNetworkInterface("ReplicaSetMonintorTest");
 
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(net.get());
@@ -83,8 +85,6 @@ public:
 
         replSetUri = uassertStatusOK(MongoURI::parse(getReplSetConnectionString()));
         numNodes = replSetUri.getServers().size();
-
-        resetIsInternalClient(true);
     };
 
     void tearDown() override {

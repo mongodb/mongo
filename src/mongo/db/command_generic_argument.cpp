@@ -87,7 +87,7 @@ static constexpr std::array<SpecialArgRecord, 34> specials{{
     {"lastCommittedOpTime"_sd,               0, 0, 1},
     {"readOnly"_sd,                          0, 0, 1},
     {"comment"_sd,                           1, 0, 0},
-    {"maxTimeMSOpOnly"_sd,                   1, 0, 0},
+    {"maxTimeMSOpOnly"_sd,                   1, 1, 0},
     {"$configTime"_sd,                       1, 1, 1},
     {"$topologyTime"_sd,                     1, 1, 1}}};
 // clang-format on

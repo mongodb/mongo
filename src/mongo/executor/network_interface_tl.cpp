@@ -34,6 +34,7 @@
 #include "mongo/executor/network_interface_tl.h"
 
 #include "mongo/db/server_options.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/hedging_metrics.h"
 #include "mongo/logv2/log.h"
@@ -324,42 +325,44 @@ AsyncDBClient* NetworkInterfaceTL::RequestState::getClient(const ConnectionHandl
 }
 
 void NetworkInterfaceTL::CommandStateBase::setTimer() {
-    if (deadline == kNoExpirationDate) {
+    if (deadline == kNoExpirationDate || !requestOnAny.enforceLocalTimeout) {
         return;
     }
 
+    const auto timeoutCode = requestOnAny.timeoutCode;
     const auto nowVal = interface->now();
     if (nowVal >= deadline) {
         auto connDuration = stopwatch.elapsed();
-        uasserted(ErrorCodes::NetworkInterfaceExceededTimeLimit,
+        uasserted(timeoutCode,
                   str::stream() << "Remote command timed out while waiting to get a "
                                    "connection from the pool, took "
                                 << connDuration << ", timeout was set to " << requestOnAny.timeout);
     }
 
     // TODO reform with SERVER-41459
-    timer->waitUntil(deadline, baton).getAsync([this, anchor = shared_from_this()](Status status) {
-        if (!status.isOK()) {
-            return;
-        }
+    timer->waitUntil(deadline, baton)
+        .getAsync([this, anchor = shared_from_this(), timeoutCode](Status status) {
+            if (!status.isOK()) {
+                return;
+            }
+            if (!finishLine.arriveStrongly()) {
+                // If we didn't cross the command finishLine first, the promise is already fulfilled
+                return;
+            }
 
-        if (!finishLine.arriveStrongly()) {
-            // If we didn't cross the command finishLine first, the promise is already fulfilled
-            return;
-        }
+            const std::string message = str::stream()
+                << "Request " << requestOnAny.id << " timed out"
+                << ", deadline was " << deadline.toString() << ", op was "
+                << redact(requestOnAny.toString());
 
-        const std::string message = str::stream() << "Request " << requestOnAny.id << " timed out"
-                                                  << ", deadline was " << deadline.toString()
-                                                  << ", op was " << redact(requestOnAny.toString());
-
-        LOGV2_DEBUG(22595,
-                    2,
-                    "Request timed out",
-                    "requestId"_attr = requestOnAny.id,
-                    "deadline"_attr = deadline,
-                    "request"_attr = requestOnAny);
-        fulfillFinalPromise(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, message));
-    });
+            LOGV2_DEBUG(22595,
+                        2,
+                        "Request timed out",
+                        "requestId"_attr = requestOnAny.id,
+                        "deadline"_attr = deadline,
+                        "request"_attr = requestOnAny);
+            fulfillFinalPromise(Status(timeoutCode, message));
+        });
 }
 
 void NetworkInterfaceTL::RequestState::returnConnection(Status status) noexcept {
@@ -742,29 +745,45 @@ void NetworkInterfaceTL::RequestManager::trySend(
                 "requestId"_attr = cmdState->requestOnAny.id,
                 "target"_attr = cmdState->requestOnAny.target[idx]);
 
+    auto request = &requestState->request.get();
+
     if (requestState->isHedge) {
-        auto& request = *requestState->request;
+        invariant(request->hedgeOptions);
+        invariant(WireSpec::instance().get()->isInternalClient);
 
-        invariant(request.hedgeOptions);
-        auto maxTimeMS = request.hedgeOptions->maxTimeMSForHedgedReads;
-
-        BSONObjBuilder updatedCmdBuilder;
-        updatedCmdBuilder.appendElements(request.cmdObj);
-        updatedCmdBuilder.append(kMaxTimeMSOpOnlyField, maxTimeMS);
-        request.cmdObj = updatedCmdBuilder.obj();
-
-        LOGV2_DEBUG(4647200,
-                    2,
-                    "Set maxTimeMS for request",
-                    "maxTime"_attr = Milliseconds(maxTimeMS),
-                    "requestId"_attr = cmdState->requestOnAny.id,
-                    "target"_attr = cmdState->requestOnAny.target[idx]);
+        auto hedgingMaxTimeMS = Milliseconds(request->hedgeOptions->maxTimeMSForHedgedReads);
+        if (request->timeout == RemoteCommandRequest::kNoTimeout ||
+            hedgingMaxTimeMS < request->timeout) {
+            LOGV2_DEBUG(4647200,
+                        2,
+                        "Set maxTimeMSOpOnly for hedged request",
+                        "originalMaxTime"_attr = request->timeout,
+                        "reducedMaxTime"_attr = hedgingMaxTimeMS,
+                        "requestId"_attr = cmdState->requestOnAny.id,
+                        "target"_attr = cmdState->requestOnAny.target[idx]);
+            request->timeout = hedgingMaxTimeMS;
+        }
 
         if (cmdState->interface->_svcCtx) {
             auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
             invariant(hm);
             hm->incrementNumTotalHedgedOperations();
         }
+    }
+
+    if (request->timeout != RemoteCommandRequest::kNoTimeout &&
+        WireSpec::instance().get()->isInternalClient) {
+        LOGV2_DEBUG(4924402,
+                    2,
+                    "Set maxTimeMSOpOnly for request",
+                    "maxTimeMSOpOnly"_attr = request->timeout,
+                    "requestId"_attr = cmdState->requestOnAny.id,
+                    "target"_attr = cmdState->requestOnAny.target[idx]);
+
+        BSONObjBuilder updatedCmdBuilder;
+        updatedCmdBuilder.appendElements(request->cmdObj);
+        updatedCmdBuilder.append(kMaxTimeMSOpOnlyField, request->timeout.count());
+        request->cmdObj = updatedCmdBuilder.obj();
     }
 
     networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();

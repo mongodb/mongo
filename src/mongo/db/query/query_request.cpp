@@ -658,10 +658,16 @@ StatusWith<int> QueryRequest::parseMaxTimeMS(BSONElement maxTimeMSElt) {
             (StringBuilder() << maxTimeMSElt.fieldNameStringData() << " must be a number").str());
     }
     long long maxTimeMSLongLong = maxTimeMSElt.safeNumberLong();  // returns 0 on EOO
-    if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > INT_MAX) {
-        return StatusWith<int>(
-            ErrorCodes::BadValue,
-            (StringBuilder() << maxTimeMSElt.fieldNameStringData() << " is out of range").str());
+
+    const long long maxVal = maxTimeMSElt.fieldNameStringData() == kMaxTimeMSOpOnlyField
+        ? (long long)(INT_MAX) + kMaxTimeMSOpOnlyMaxPadding
+        : INT_MAX;
+    if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > maxVal) {
+        return StatusWith<int>(ErrorCodes::BadValue,
+                               (StringBuilder()
+                                << maxTimeMSLongLong << " value for "
+                                << maxTimeMSElt.fieldNameStringData() << " is out of range")
+                                   .str());
     }
     double maxTimeMSDouble = maxTimeMSElt.numberDouble();
     if (maxTimeMSElt.type() == mongo::NumberDouble && floor(maxTimeMSDouble) != maxTimeMSDouble) {

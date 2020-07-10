@@ -47,6 +47,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/lockable_adapter.h"
 #include "mongo/util/time_support.h"
@@ -63,6 +64,19 @@ class StringData;
 namespace repl {
 class UnreplicatedWritesBlock;
 }  // namespace repl
+
+// Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
+// valid non-zero max time to fail immediately.  Any getmore operation on a cursor already
+// created with a valid non-zero max time will also fail immediately.
+//
+// This fail point cannot be used with the maxTimeNeverTimeOut fail point.
+extern FailPoint maxTimeAlwaysTimeOut;
+
+// Enabling the maxTimeNeverTimeOut fail point will cause the server to never time out any
+// query, command, or getmore operation, regardless of whether a max time is set.
+//
+// This fail point cannot be used with the maxTimeAlwaysTimeOut fail point.
+extern FailPoint maxTimeNeverTimeOut;
 
 /**
  * This class encompasses the state required by an operation and lives from the time a network

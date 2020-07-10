@@ -24,6 +24,8 @@ selector:
   - jstests/sharding/query/lookup.js
   # Enable when 5.0 becomes last-lts
   - jstests/sharding/mongos_dataSize.js
+  - jstests/sharding/query/merge_command_options.js
+  - jstests/sharding/max_time_ms_enforced_on_shard.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
   - jstests/sharding/repl_monitor_refresh.js

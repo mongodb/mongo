@@ -32,6 +32,7 @@
 #include <iosfwd>
 #include <string>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/transport/transport_layer.h"
@@ -88,7 +89,12 @@ struct RemoteCommandRequestBase {
 
     FireAndForgetMode fireAndForgetMode;
 
+    // When false, the network interface will refrain from enforcing the 'timeout' for this request,
+    // but will still pass the timeout on as maxTimeMSOpOnly.
+    bool enforceLocalTimeout = true;
+
     Milliseconds timeout = kNoTimeout;
+    ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit;
 
     // Time when the request was scheduled.
     boost::optional<Date_t> dateScheduled;
@@ -97,6 +103,16 @@ struct RemoteCommandRequestBase {
 
 protected:
     ~RemoteCommandRequestBase() = default;
+
+private:
+    /**
+     * Sets 'timeout' to the min of the current 'timeout' value and the remaining time on the OpCtx.
+     * If the remaining time is less than the provided 'timeout', remembers the timeout error code
+     * from the opCtx to use later if the timeout is indeed triggered.  This is important so that
+     * timeouts that are a direct result of a user-provided maxTimeMS return MaxTimeMSExpired rather
+     * than NetworkInterfaceExceededTimeLimit.
+     */
+    void _updateTimeoutFromOpCtxDeadline(const OperationContext* opCtx);
 };
 
 /**
