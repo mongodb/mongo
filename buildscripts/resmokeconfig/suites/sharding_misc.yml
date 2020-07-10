@@ -113,7 +113,6 @@ selector:
   - jstests/sharding/query_config.js
   - jstests/sharding/hash_basic.js
   - jstests/sharding/hash_shard1.js
-  - jstests/sharding/max_time_ms_sharded.js
   - jstests/sharding/change_stream_read_preference.js
   - jstests/sharding/features1.js
   - jstests/sharding/read_committed_lookup.js
