@@ -865,13 +865,13 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{{"_id", 1}, {"x", 2}}}},
+        {DSChangeStream::kDocumentKeyField, Document{{"_id", 1}, {"x", 2}}},
         {
             "updateDescription",
-            D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
+            D{{"updatedFields", D{}}, {"removedFields", {"y"_sd}}},
         }};
     checkTransformation(removeField, expectedRemoveField);
-}
+}  // namespace
 
 TEST_F(ChangeStreamStageTest, TransformReplace) {
     BSONObj o = BSON("_id" << 1 << "x" << 2 << "y" << 1);
@@ -2014,10 +2014,10 @@ TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kDocumentKeyField, D{{{"_id", 1}, {"x", 2}}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
         {
             "updateDescription",
-            D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
+            D{{"updatedFields", D{}}, {"removedFields", {"y"_sd}}},
         }};
     checkTransformation(removeField, expectedRemoveField);
 }

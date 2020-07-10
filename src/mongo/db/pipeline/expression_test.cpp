@@ -67,7 +67,7 @@ static Value evaluateExpression(const string& expressionName,
                                 const vector<ImplicitValue>& operands) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    const BSONObj obj = BSON(expressionName << ImplicitValue::convertToValue(operands));
+    const BSONObj obj = BSON(expressionName << Value(ImplicitValue::convertToValues(operands)));
     auto expression = Expression::parseExpression(&expCtx, obj, vps);
     Value result = expression->evaluate({}, &expCtx.variables);
     return result;
@@ -80,14 +80,14 @@ static Value evaluateExpression(const string& expressionName,
  */
 static void assertExpectedResults(
     const string& expression,
-    initializer_list<pair<vector<ImplicitValue>, ImplicitValue>> operations) {
+    initializer_list<pair<initializer_list<ImplicitValue>, ImplicitValue>> operations) {
     for (auto&& op : operations) {
         try {
             Value result = evaluateExpression(expression, op.first);
             ASSERT_VALUE_EQ(op.second, result);
             ASSERT_EQUALS(op.second.getType(), result.getType());
         } catch (...) {
-            LOGV2(24188, "failed", "argument"_attr = ImplicitValue::convertToValue(op.first));
+            LOGV2(24188, "failed", "argument"_attr = ImplicitValue::convertToValues(op.first));
             throw;
         }
     }
@@ -152,7 +152,7 @@ TEST(ExpressionArrayToObjectTest, KVFormatSimple) {
                                               << BSON("k"
                                                       << "key2"
                                                       << "v" << 3)))},
-                            {Value(BSON("key1" << 2 << "key2" << 3))}}});
+                            Value(BSON("key1" << 2 << "key2" << 3))}});
 }
 
 TEST(ExpressionArrayToObjectTest, KVFormatWithDuplicates) {
@@ -163,19 +163,19 @@ TEST(ExpressionArrayToObjectTest, KVFormatWithDuplicates) {
                                               << BSON("k"
                                                       << "hi"
                                                       << "v" << 3)))},
-                            {Value(BSON("hi" << 3))}}});
+                            Value(BSON("hi" << 3))}});
 }
 
 TEST(ExpressionArrayToObjectTest, ListFormatSimple) {
     assertExpectedResults("$arrayToObject",
                           {{{Value(BSON_ARRAY(BSON_ARRAY("key1" << 2) << BSON_ARRAY("key2" << 3)))},
-                            {Value(BSON("key1" << 2 << "key2" << 3))}}});
+                            Value(BSON("key1" << 2 << "key2" << 3))}});
 }
 
 TEST(ExpressionArrayToObjectTest, ListFormWithDuplicates) {
     assertExpectedResults("$arrayToObject",
                           {{{Value(BSON_ARRAY(BSON_ARRAY("key1" << 2) << BSON_ARRAY("key1" << 3)))},
-                            {Value(BSON("key1" << 3))}}});
+                            Value(BSON("key1" << 3))}});
 }
 
 /* ------------------------ ExpressionRange --------------------------- */
@@ -2103,7 +2103,7 @@ TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyAfterOptimization) {
 namespace ExpressionMergeObjects {
 
 TEST(ExpressionMergeObjects, MergingWithSingleObjectShouldLeaveUnchanged) {
-    assertExpectedResults("$mergeObjects", {{{}, {Document({})}}});
+    assertExpectedResults("$mergeObjects", {{{}, Document({})}});
 
     auto doc = Document({{"a", 1}, {"b", 1}});
     assertExpectedResults("$mergeObjects", {{{doc}, doc}});

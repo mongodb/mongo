@@ -385,6 +385,16 @@ public:
     template <typename T>
     ImplicitValue(T arg) : Value(std::move(arg)) {}
 
+    ImplicitValue(std::initializer_list<ImplicitValue> values) : Value(convertToValues(values)) {}
+
+    ImplicitValue(std::vector<int> values) : Value(convertToValues(values)) {}
+
+    static std::vector<Value> convertToValues(const std::vector<int>& vec) {
+        std::vector<Value> values;
+        for_each(vec.begin(), vec.end(), ([&](const int& val) { values.emplace_back(val); }));
+        return values;
+    }
+
     /**
      * Converts a vector of Implicit values to a single Value object.
      */
@@ -393,6 +403,17 @@ public:
         for_each(
             vec.begin(), vec.end(), ([&](const ImplicitValue& val) { values.push_back(val); }));
         return Value(values);
+    }
+
+    /**
+     * Converts a vector of Implicit values to a vector of Values.
+     */
+    static std::vector<Value> convertToValues(const std::vector<ImplicitValue>& list) {
+        std::vector<Value> values;
+        for (const ImplicitValue& val : list) {
+            values.push_back(val);
+        }
+        return values;
     }
 };
 }  // namespace mongo

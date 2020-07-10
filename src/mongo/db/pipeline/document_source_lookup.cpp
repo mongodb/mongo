@@ -732,10 +732,10 @@ void DocumentSourceLookUp::serializeToArray(
                                  {"pipeline", pipeline}}}};
     } else {
         doc = Document{{getSourceName(),
-                        {Document{{"from", fromValue},
-                                  {"as", _as.fullPath()},
-                                  {"localField", _localField->fullPath()},
-                                  {"foreignField", _foreignField->fullPath()}}}}};
+                        Document{{"from", fromValue},
+                                 {"as", _as.fullPath()},
+                                 {"localField", _localField->fullPath()},
+                                 {"foreignField", _foreignField->fullPath()}}}};
     }
 
     MutableDocument output(doc);

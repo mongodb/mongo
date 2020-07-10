@@ -491,8 +491,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
      *  \      /
      *   `> 3 '
      */
-    Document startDoc{{"_id", 0},
-                      {"to", std::vector<Value>{Value(1), Value(2), Value(3)}}};  // Note the array.
+    Document startDoc{{"_id", 0}, {"to", std::vector{1, 2, 3}}};
     Document middle1{{"_id", 1}, {"to", 4}};
     Document middle2{{"_id", 2}, {"to", 4}};
     Document middle3{{"_id", 3}, {"to", 4}};

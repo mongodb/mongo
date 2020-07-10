@@ -726,17 +726,15 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
 
     auto next = lookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(
-        next.releaseDocument(),
-        (Document{{"foreignId", 0}, {"foreignDocs", vector<Value>{Value(Document{{"_id", 0}})}}}));
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"foreignId", 0}, {"foreignDocs", {Document{{"_id", 0}}}}}));
 
     ASSERT_TRUE(lookup->getNext().isPaused());
 
     next = lookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(
-        next.releaseDocument(),
-        (Document{{"foreignId", 1}, {"foreignDocs", vector<Value>{Value(Document{{"_id", 1}})}}}));
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"foreignId", 1}, {"foreignDocs", {Document{{"_id", 1}}}}}));
 
     ASSERT_TRUE(lookup->getNext().isPaused());
 

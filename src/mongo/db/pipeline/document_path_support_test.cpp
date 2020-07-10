@@ -70,7 +70,7 @@ TEST(VisitAllValuesAtPathTest, NestedObjectWithEmptyArrayValue) {
 TEST(VisitAllValuesAtPathTest, NestedObjectWithSingletonArrayValue) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{{"a", Document{{"b", vector<Value>{Value(1)}}}}};
+    Document doc{{"a", Document{{"b", vector{1}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.b"), callback);
     ASSERT_EQ(values.size(), 1UL);
     ASSERT_EQ(values.count(Value(1)), 1UL);
@@ -79,7 +79,7 @@ TEST(VisitAllValuesAtPathTest, NestedObjectWithSingletonArrayValue) {
 TEST(VisitAllValuesAtPathTest, NestedObjectWithArrayValue) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{{"a", Document{{"b", vector<Value>{Value(1), Value(2), Value(3)}}}}};
+    Document doc{{"a", Document{{"b", vector{1, 2, 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.b"), callback);
     ASSERT_EQ(values.size(), 3UL);
     ASSERT_EQ(values.count(Value(1)), 1UL);
@@ -103,9 +103,9 @@ TEST(VisitAllValuesAtPathTest, ObjectWithArrayOfSubobjectsWithArrayValues) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
     Document doc{{"a",
-                  vector<Document>{Document{{"b", vector<Value>{Value(1), Value(2)}}},
-                                   Document{{"b", vector<Value>{Value(2), Value(3)}}},
-                                   Document{{"b", vector<Value>{Value(3), Value(1)}}}}}};
+                  vector<Document>{Document{{"b", vector{1, 2}}},
+                                   Document{{"b", vector{2, 3}}},
+                                   Document{{"b", vector{3, 1}}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.b"), callback);
     ASSERT_EQ(values.size(), 3UL);
     ASSERT_EQ(values.count(Value(1)), 1UL);
@@ -151,7 +151,7 @@ TEST(VisitAllValuesAtPathTest, AcceptsNumericFieldNames) {
 TEST(VisitAllValuesAtPathTest, UsesNumericFieldNameToExtractElementFromArray) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{{"a", vector<Value>{Value(1), Value(Document{{"0", 1}})}}};
+    Document doc{{"a", {1, Document{{"0", 1}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.0"), callback);
     ASSERT_EQ(values.size(), 1UL);
     ASSERT_EQ(values.count(Value(1)), 1UL);
@@ -160,10 +160,7 @@ TEST(VisitAllValuesAtPathTest, UsesNumericFieldNameToExtractElementFromArray) {
 TEST(VisitAllValuesAtPathTest, TreatsNegativeIndexAsFieldName) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{
-        {"a",
-         vector<Value>{
-             Value(0), Value(1), Value(Document{{"-1", "target"_sd}}), Value(Document{{"b", 3}})}}};
+    Document doc{{"a", {0, 1, Document{{"-1", "target"_sd}}, Document{{"b", 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.-1"), callback);
     ASSERT_EQ(values.size(), 1UL);
     ASSERT_EQ(values.count(Value("target"_sd)), 1UL);
@@ -172,8 +169,7 @@ TEST(VisitAllValuesAtPathTest, TreatsNegativeIndexAsFieldName) {
 TEST(VisitAllValuesAtPathTest, ExtractsNoValuesFromOutOfBoundsIndex) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{
-        {"a", vector<Value>{Value(1), Value(Document{{"b", 2}}), Value(Document{{"10", 3}})}}};
+    Document doc{{"a", {1, Document{{"b", 2}}, Document{{"10", 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.10"), callback);
     ASSERT_EQ(values.size(), 0UL);
 }
@@ -181,10 +177,7 @@ TEST(VisitAllValuesAtPathTest, ExtractsNoValuesFromOutOfBoundsIndex) {
 TEST(VisitAllValuesAtPathTest, DoesNotTreatHexStringAsIndexSpecification) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{{"a",
-                  vector<Value>{Value(1),
-                                Value(Document{{"0x2", 2}}),
-                                Value(Document{{"NOT THIS ONE", 3}})}}};
+    Document doc{{"a", {1, Document{{"0x2", 2}}, Document{{"NOT THIS ONE", 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.0x2"), callback);
     ASSERT_EQ(values.size(), 1UL);
     ASSERT_EQ(values.count(Value(2)), 1UL);
@@ -193,9 +186,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotTreatHexStringAsIndexSpecification) {
 TEST(VisitAllValuesAtPathTest, DoesNotAcceptLeadingPlusAsArrayIndex) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{{"a",
-                  vector<Value>{
-                      Value(1), Value(Document{{"+2", 2}}), Value(Document{{"NOT THIS ONE", 3}})}}};
+    Document doc{{"a", {1, Document{{"+2", 2}}, Document{{"NOT THIS ONE", 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.+2"), callback);
     ASSERT_EQ(values.size(), 1UL);
     ASSERT_EQ(values.count(Value(2)), 1UL);
@@ -204,10 +195,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotAcceptLeadingPlusAsArrayIndex) {
 TEST(VisitAllValuesAtPathTest, DoesNotAcceptTrailingCharactersForArrayIndex) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{{"a",
-                  vector<Value>{Value(1),
-                                Value(Document{{"2xyz", 2}}),
-                                Value(Document{{"NOT THIS ONE", 3}})}}};
+    Document doc{{"a", {1, Document{{"2xyz", 2}}, Document{{"NOT THIS ONE", 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.2xyz"), callback);
     ASSERT_EQ(values.size(), 1UL);
     ASSERT_EQ(values.count(Value(2)), 1UL);
@@ -216,10 +204,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotAcceptTrailingCharactersForArrayIndex) {
 TEST(VisitAllValuesAtPathTest, DoesNotAcceptNonDigitsForArrayIndex) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{{"a",
-                  vector<Value>{Value(1),
-                                Value(Document{{"2x4", 2}}),
-                                Value(Document{{"NOT THIS ONE", 3}})}}};
+    Document doc{{"a", {1, Document{{"2x4", 2}}, Document{{"NOT THIS ONE", 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.2x4"), callback);
     ASSERT_EQ(values.size(), 1UL);
     ASSERT_EQ(values.count(Value(2)), 1UL);
@@ -229,8 +214,7 @@ TEST(VisitAllValuesAtPathTest,
      DoesExtractNestedValuesFromWithinArraysTraversedWithPositionalPaths) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{
-        {"a", vector<Value>{Value(1), Value(Document{{"2", 2}}), Value(Document{{"target", 3}})}}};
+    Document doc{{"a", {1, Document{{"2", 2}}, Document{{"target", 3}}}}};
     visitAllValuesAtPath(doc, FieldPath("a.2.target"), callback);
     ASSERT_EQ(values.size(), 1UL);
     ASSERT_EQ(values.count(Value(3)), 1UL);
@@ -275,7 +259,7 @@ TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueToResults) {
 TEST(VisitAllValuesAtPathTest, DoesNotAddMissingValueWithinArrayToResults) {
     auto values = kDefaultValueComparator.makeUnorderedValueSet();
     auto callback = [&values](const Value& val) { values.insert(val); };
-    Document doc{{"a", vector<Value>{Value(1), Value(), Value(2)}}};
+    Document doc{{"a", {1, Value(), 2}}};
     visitAllValuesAtPath(doc, FieldPath("a"), callback);
     ASSERT_EQ(values.size(), 2UL);
     ASSERT_EQ(values.count(Value(1)), 1UL);

@@ -272,22 +272,20 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedExcludedFiel
 TEST(ExclusionProjectionExecutionTest, ShouldApplyDottedExclusionToEachElementInArray) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a.b" << false));
 
-    std::vector<Value> nestedValues = {
-        Value(1),
-        Value(Document{}),
-        Value(Document{{"b", 1}}),
-        Value(Document{{"b", 1}, {"c", 2}}),
-        Value(vector<Value>{}),
-        Value(vector<Value>{Value(1), Value(Document{{"c", 1}, {"b", 1}})})};
-    std::vector<Value> expectedNestedValues = {
-        Value(1),
-        Value(Document{}),
-        Value(Document{}),
-        Value(Document{{"c", 2}}),
-        Value(vector<Value>{}),
-        Value(vector<Value>{Value(1), Value(Document{{"c", 1}})})};
-    auto result = exclusion->applyTransformation(Document{{"a", nestedValues}});
-    auto expectedResult = Document{{"a", expectedNestedValues}};
+    auto result = exclusion->applyTransformation(Document{{"a",
+                                                           {1,
+                                                            Document{},
+                                                            Document{{"b", 1}},
+                                                            Document{{"b", 1}, {"c", 2}},
+                                                            vector<Value>{},
+                                                            {1, Document{{"c", 1}, {"b", 1}}}}}});
+    auto expectedResult = Document{{"a",
+                                    {1,
+                                     Document{},
+                                     Document{},
+                                     Document{{"c", 2}},
+                                     vector<Value>{},
+                                     {1, Document{{"c", 1}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -461,18 +459,14 @@ TEST(ExclusionProjectionExecutionTest, ShouldRecurseNestedArraysByDefault) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a.b" << false));
 
     // {a: [1, {b: 2, c: 3}, [{b: 4, c: 5}], {d: 6}]} => {a: [1, {c: 3}, [{c: 5}], {d: 6}]}
-    auto result = exclusion->applyTransformation(
-        Document{{"a",
-                  vector<Value>{Value(1),
-                                Value(Document{{"b", 2}, {"c", 3}}),
-                                Value(vector<Value>{Value(Document{{"b", 4}, {"c", 5}})}),
-                                Value(Document{{"d", 6}})}}});
+    auto result = exclusion->applyTransformation(Document{{"a",
+                                                           {1,
+                                                            Document{{"b", 2}, {"c", 3}},
+                                                            vector{Document{{"b", 4}, {"c", 5}}},
+                                                            Document{{"d", 6}}}}});
 
-    auto expectedResult = Document{{"a",
-                                    vector<Value>{Value(1),
-                                                  Value(Document{{"c", 3}}),
-                                                  Value(vector<Value>{Value(Document{{"c", 5}})}),
-                                                  Value(Document{{"d", 6}})}}};
+    auto expectedResult =
+        Document{{"a", {1, Document{{"c", 3}}, vector{Document{{"c", 5}}}, Document{{"d", 6}}}}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -482,19 +476,14 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotRecurseNestedArraysForNoRecurseP
 
     // {a: [1, {b: 2, c: 3}, [{b: 4, c: 5}], {d: 6}]} => {a: [1, {c: 3}, [{b: 4, c: 5}], {d:
     // 6}]}
-    auto result = exclusion->applyTransformation(
-        Document{{"a",
-                  vector<Value>{Value(1),
-                                Value(Document{{"b", 2}, {"c", 3}}),
-                                Value(vector<Value>{Value(Document{{"b", 4}, {"c", 5}})}),
-                                Value(Document{{"d", 6}})}}});
+    auto result = exclusion->applyTransformation(Document{{"a",
+                                                           {1,
+                                                            Document{{"b", 2}, {"c", 3}},
+                                                            vector{Document{{"b", 4}, {"c", 5}}},
+                                                            Document{{"d", 6}}}}});
 
-    auto expectedResult =
-        Document{{"a",
-                  vector<Value>{Value(1),
-                                Value(Document{{"c", 3}}),
-                                Value(vector<Value>{Value(Document{{"b", 4}, {"c", 5}})}),
-                                Value(Document{{"d", 6}})}}};
+    auto expectedResult = Document{
+        {"a", {1, Document{{"c", 3}}, vector{Document{{"b", 4}, {"c", 5}}}, Document{{"d", 6}}}}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -503,12 +492,11 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotRetainNestedArraysIfNoRecursionN
     auto exclusion = makeExclusionProjectionWithNoArrayRecursion(BSON("a" << false));
 
     // {a: [1, {b: 2, c: 3}, [{b: 4, c: 5}], {d: 6}]} => {}
-    const auto inputDoc =
-        Document{{"a",
-                  vector<Value>{Value(1),
-                                Value(Document{{"b", 2}, {"c", 3}}),
-                                Value(vector<Value>{Value(Document{{"b", 4}, {"c", 5}})}),
-                                Value(Document{{"d", 6}})}}};
+    const auto inputDoc = Document{{"a",
+                                    {1,
+                                     Document{{"b", 2}, {"c", 3}},
+                                     vector{Document{{"b", 4}, {"c", 5}}},
+                                     Document{{"d", 6}}}}};
 
     auto result = exclusion->applyTransformation(inputDoc);
     const auto expectedResult = Document{};

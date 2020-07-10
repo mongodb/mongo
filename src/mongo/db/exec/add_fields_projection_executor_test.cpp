@@ -450,23 +450,22 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AppliesDottedAdditionToEachElemen
     AddFieldsProjectionExecutor addition(expCtx);
     addition.parse(BSON("a.b" << true));
 
-    vector<Value> nestedValues = {Value(1),
-                                  Value(Document{}),
-                                  Value(Document{{"b", 1}}),
-                                  Value(Document{{"b", 1}, {"c", 2}}),
-                                  Value(vector<Value>{}),
-                                  Value(vector<Value>{Value(1), Value(Document{{"c", 1}})})};
 
+    auto result = addition.applyProjection(Document{{"a",
+                                                     {1,
+                                                      Document{},
+                                                      Document{{"b", 1}},
+                                                      Document{{"b", 1}, {"c", 2}},
+                                                      vector<Value>{},
+                                                      {1, Document{{"c", 1}}}}}});
     // Adds the field "b" to every object in the array. Recurses on non-empty nested arrays.
-    vector<Value> expectedNestedValues = {
-        Value(Document{{"b", true}}),
-        Value(Document{{"b", true}}),
-        Value(Document{{"b", true}}),
-        Value(Document{{"b", true}, {"c", 2}}),
-        Value(vector<Value>{}),
-        Value(vector<Value>{Value(Document{{"b", true}}), Value(Document{{"c", 1}, {"b", true}})})};
-    auto result = addition.applyProjection(Document{{"a", nestedValues}});
-    auto expectedResult = Document{{"a", expectedNestedValues}};
+    auto expectedResult = Document{{"a",
+                                    {Document{{"b", true}},
+                                     Document{{"b", true}},
+                                     Document{{"b", true}},
+                                     Document{{"b", true}, {"c", 2}},
+                                     vector<Value>{},
+                                     {Document{{"b", true}}, Document{{"c", 1}, {"b", true}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 

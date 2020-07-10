@@ -158,7 +158,7 @@ TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFields
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kPipelineName, std::vector<Value>{}},
                  {AggregationRequest::kCursorName, Value(kDefaultCursorOptionDocument)}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
@@ -181,7 +181,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kPipelineName, std::vector<Value>{}},
                  {AggregationRequest::kCursorName, Value(kDefaultCursorOptionDocument)}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
@@ -216,7 +216,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kPipelineName, std::vector<Value>{}},
                  {AggregationRequest::kAllowDiskUseName, true},
                  {AggregationRequest::kFromMongosName, true},
                  {AggregationRequest::kNeedsMergeName, true},
@@ -242,7 +242,7 @@ TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kPipelineName, std::vector<Value>{}},
                  {AggregationRequest::kCursorName,
                   Value(Document({{AggregationRequest::kBatchSizeName, 10}}))}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
@@ -254,7 +254,7 @@ TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAgg
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, 1},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kPipelineName, std::vector<Value>{}},
                  {AggregationRequest::kCursorName,
                   Value(Document({{AggregationRequest::kBatchSizeName,
                                    AggregationRequest::kDefaultBatchSize}}))}};
@@ -287,10 +287,9 @@ TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {
     request.setBatchSize(10);
     request.setExplain(ExplainOptions::Verbosity::kQueryPlanner);
 
-    auto expectedSerialization =
-        Document{{AggregationRequest::kCommandName, nss.coll()},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
-                 {AggregationRequest::kCursorName, Value(Document())}};
+    auto expectedSerialization = Document{{AggregationRequest::kCommandName, nss.coll()},
+                                          {AggregationRequest::kPipelineName, std::vector<Value>{}},
+                                          {AggregationRequest::kCursorName, Value(Document())}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 

@@ -213,9 +213,9 @@ TEST(DocumentComparatorTest, NestedObjectEqualityRespectsCollator) {
 
 TEST(DocumentComparatorTest, NestedArrayEqualityRespectsCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const Document doc1{{"foo", std::vector<Value>{Value("a"_sd), Value("b"_sd)}}};
-    const Document doc2{{"foo", std::vector<Value>{Value("c"_sd), Value("d"_sd)}}};
-    const Document doc3{{"foo", std::vector<Value>{Value("c"_sd), Value("d"_sd), Value("e"_sd)}}};
+    const Document doc1{{"foo", {"a"_sd, "b"_sd}}};
+    const Document doc2{{"foo", {"c"_sd, "d"_sd}}};
+    const Document doc3{{"foo", {"c"_sd, "d"_sd, "e"_sd}}};
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 == doc2));
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc2 == doc1));
     ASSERT_FALSE(DocumentComparator(&collator).evaluate(doc1 == doc3));
