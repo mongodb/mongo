@@ -733,7 +733,7 @@ connection_runtime_config = [
             'backup',
             'block',
             'checkpoint',
-            'checkpoint_gc',
+            'checkpoint_cleanup',
             'checkpoint_progress',
             'compact',
             'compact_progress',
