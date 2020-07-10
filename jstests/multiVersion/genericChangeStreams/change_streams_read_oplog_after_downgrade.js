@@ -141,7 +141,7 @@ const changeStreamsVariants = [
 ];
 
 function dumpLatestOpLogEntries(node, limit) {
-    const oplog = node.getDB("local").getCollection("oplog.rs");
+    const oplog = node.getCollection("local.oplog.rs");
     return oplog.find().sort({"ts": -1}).limit(limit).toArray();
 }
 
@@ -152,17 +152,22 @@ function dumpLatestOpLogEntries(node, limit) {
  * the test cases in isolation.
  */
 function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
-    function createSentinelEntry(testNum) {
-        return assert
-            .commandWorked(shardedColl.runCommand(
-                {insert: shardedColl.getName(), documents: [{_id: "sentinel_entry_" + testNum}]}))
-            .$clusterTime.clusterTime;
+    function createSentinelEntryAndGetTimeStamp(testNum) {
+        const documentId = "sentinel_entry_" + testNum;
+        assert.commandWorked(shardedColl.insert({_id: documentId}));
+
+        // Find the oplog entry for the document inserted above, and return its timestamp.
+        const oplog = st.rs0.getPrimary().getCollection("local.oplog.rs");
+        const opLogEntries =
+            oplog.find({op: "i", "o._id": documentId, ns: shardedColl.getFullName()}).toArray();
+        assert.eq(opLogEntries.length, 1);
+        return opLogEntries[0].ts;
     }
 
     // We write a sentinel entry before each test case so that the resumed changestreams will have a
     // known point at which to stop while running each test.
     let testNum = 0;
-    let testStartTime = createSentinelEntry(testNum);
+    let testStartTime = createSentinelEntryAndGetTimeStamp(testNum);
     const outputChangeStreams = [];
     for (let testCase of testCases) {
         jsTestLog(
@@ -205,7 +210,7 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
         testCase.generateOpLogEntry(shardedColl);
 
         // Insert a sentinel to separate this test-case from the next.
-        testStartTime = createSentinelEntry(++testNum);
+        testStartTime = createSentinelEntryAndGetTimeStamp(++testNum);
     }
     return outputChangeStreams;
 }
