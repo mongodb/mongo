@@ -97,10 +97,6 @@ function buildCommands(collName) {
             alwaysFail: true
         },
         {command: {create: "testCollection"}, alwaysFail: true},
-        {
-            command: {collMod: "viewOnFoo", viewOn: "unshardedFoo", pipeline: [{$match: {_id: 1}}]},
-            alwaysFail: true
-        },
     ];
     return commands;
 }
