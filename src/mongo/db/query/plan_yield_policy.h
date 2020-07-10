@@ -69,8 +69,9 @@ public:
         // Can be used in one of the following scenarios:
         //  - The caller will hold a lock continuously for the lifetime of this PlanExecutor.
         //  - This PlanExecutor doesn't logically belong to a Collection, and so does not need to be
-        //    locked during execution. For example, a PlanExecutor containing a PipelineProxyStage
-        //    which is being used to execute an aggregation pipeline.
+        //    locked during execution. For example, this yield policy is used for PlanExecutors
+        //    which unspool queued metadata ("virtual collection scans") for listCollections and
+        //    listIndexes.
         NO_YIELD,
 
         // Will not yield locks or storage engine resources, but will check for interrupt.

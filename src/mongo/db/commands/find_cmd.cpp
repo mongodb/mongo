@@ -418,7 +418,7 @@ public:
 
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+                CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
             }
 
             if (!collection) {
@@ -472,7 +472,7 @@ public:
                               "stats: {stats}",
                               "Plan executor error during find command",
                               "error"_attr = exception.toStatus(),
-                              "stats"_attr = redact(Explain::getWinningPlanStats(exec.get())));
+                              "stats"_attr = redact(exec->getStats()));
 
                 exception.addContext("Executor error during find command");
                 throw;

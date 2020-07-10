@@ -219,7 +219,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                           "min"_attr = redact(min),
                           "max"_attr = redact(max),
                           "namespace"_attr = nss,
-                          "stats"_attr = Explain::getWinningPlanStats(exec.get()),
+                          "stats"_attr = redact(exec->getStats()),
                           "error"_attr = redact(ex.toStatus()));
             throw;
         }

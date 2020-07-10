@@ -195,7 +195,7 @@ void DocumentSourceCursor::_updateOplogTimestamp() {
 
 void DocumentSourceCursor::recordPlanSummaryStats() {
     invariant(_exec);
-    Explain::getSummaryStats(*_exec, &_planSummaryStats);
+    _exec->getSummaryStats(&_planSummaryStats);
 }
 
 Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity> verbosity) const {
@@ -300,7 +300,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _exec->saveState();
 
-    _planSummary = Explain::getPlanSummary(_exec.get());
+    _planSummary = _exec->getPlanSummary();
     recordPlanSummaryStats();
 
     if (pExpCtx->explain) {

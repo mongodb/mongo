@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
@@ -119,5 +120,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+
+/**
+ * Constructs a plan executor for executing the given 'pipeline'.
+ */
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    bool isChangeStream);
 
 }  // namespace mongo::plan_executor_factory

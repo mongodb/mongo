@@ -107,8 +107,17 @@ public:
         return LockPolicy::kLocksInternally;
     }
 
-    bool isPipelineExecutor() const override {
-        return false;
+    // TODO: Support 'planSummary' for SBE.
+    std::string getPlanSummary() const override {
+        return "unsupported";
+    }
+
+    // TODO: Support collection of plan summary stats for SBE.
+    void getSummaryStats(PlanSummaryStats* statsOut) const override {}
+
+    // TODO: Support debug stats for SBE.
+    BSONObj getStats() const override {
+        return BSONObj{};
     }
 
 private:

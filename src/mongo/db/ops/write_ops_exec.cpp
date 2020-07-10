@@ -671,21 +671,19 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
     }
 
     exec->executePlan();
 
     PlanSummaryStats summary;
-    Explain::getSummaryStats(*exec, &summary);
+    exec->getSummaryStats(&summary);
     if (auto coll = collection->getCollection()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
 
     if (curOp.shouldDBProfile()) {
-        BSONObjBuilder execStatsBob;
-        Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-        curOp.debug().execStats = execStatsBob.obj();
+        curOp.debug().execStats = exec->getStats();
     }
 
     const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
@@ -911,7 +909,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
     }
 
     exec->executePlan();
@@ -919,16 +917,14 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     curOp.debug().additiveMetrics.ndeleted = n;
 
     PlanSummaryStats summary;
-    Explain::getSummaryStats(*exec, &summary);
+    exec->getSummaryStats(&summary);
     if (auto coll = collection.getCollection()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
     curOp.debug().setPlanSummaryMetrics(summary);
 
     if (curOp.shouldDBProfile()) {
-        BSONObjBuilder execStatsBob;
-        Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-        curOp.debug().execStats = execStatsBob.obj();
+        curOp.debug().execStats = exec->getStats();
     }
 
     LastError::get(opCtx->getClient()).recordDelete(n);

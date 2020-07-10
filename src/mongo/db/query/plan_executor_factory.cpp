@@ -34,6 +34,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/logv2/log.h"
@@ -154,6 +155,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     auto exec = new PlanExecutorSBE(
         opCtx, std::move(cq), std::move(root), std::move(nss), true, stash, std::move(yieldPolicy));
     return {{exec, PlanExecutor::Deleter{opCtx}}};
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    bool isChangeStream) {
+    auto* opCtx = expCtx->opCtx;
+    auto exec = new PlanExecutorPipeline(std::move(expCtx), std::move(pipeline), isChangeStream);
+    return {exec, PlanExecutor::Deleter{opCtx}};
 }
 
 }  // namespace mongo::plan_executor_factory

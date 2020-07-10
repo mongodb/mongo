@@ -157,18 +157,14 @@ public:
     }
 
     /**
-     * Sets the OperationContext of 'pCtx' to nullptr.
-     *
-     * The PipelineProxyStage is responsible for detaching the OperationContext and releasing any
-     * storage-engine state of the DocumentSourceCursor that may be present in '_sources'.
+     * Sets the OperationContext of 'pCtx' to nullptr and calls 'detachFromOperationContext()' on
+     * all underlying DocumentSources.
      */
     void detachFromOperationContext();
 
     /**
-     * Sets the OperationContext of 'pCtx' to 'opCtx'.
-     *
-     * The PipelineProxyStage is responsible for reattaching the OperationContext and reacquiring
-     * any storage-engine state of the DocumentSourceCursor that may be present in '_sources'.
+     * Sets the OperationContext of 'pCtx' to 'opCtx', and reattaches all underlying DocumentSources
+     * to 'opCtx'.
      */
     void reattachToOperationContext(OperationContext* opCtx);
 
@@ -185,6 +181,10 @@ public:
      *    deleting the Pipeline.
      */
     void dispose(OperationContext* opCtx);
+
+    bool isDisposed() const {
+        return _disposed;
+    }
 
     /**
      * Checks to see if disk is ever used within the pipeline.

@@ -40,16 +40,17 @@
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/near.h"
-#include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/text.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
@@ -78,120 +79,6 @@ void flattenStatsTree(const PlanStageStats* root, vector<const PlanStageStats*>*
     for (auto&& child : root->children) {
         flattenStatsTree(child.get(), flattened);
     }
-}
-
-/**
- * Traverse the tree rooted at 'root', and add all nodes into the list 'flattened'. If a
- * MultiPlanStage is encountered, only add the best plan and its children to 'flattened'.
- */
-void flattenExecTree(const PlanStage* root, vector<const PlanStage*>* flattened) {
-    flattened->push_back(root);
-
-    if (root->stageType() == STAGE_MULTI_PLAN) {
-        // Only add the winning plan from a MultiPlanStage.
-        auto mps = static_cast<const MultiPlanStage*>(root);
-        const PlanStage* winningStage = mps->getChildren()[mps->bestPlanIdx()].get();
-        return flattenExecTree(winningStage, flattened);
-    }
-
-    const auto& children = root->getChildren();
-    for (size_t i = 0; i < children.size(); ++i) {
-        flattenExecTree(children[i].get(), flattened);
-    }
-}
-
-/**
- * Traverse the stage tree, depth first and return the first stage of a given type.
- */
-PlanStage* findStageOfType(PlanStage* root, StageType desiredStageType) {
-    if (root->stageType() == desiredStageType) {
-        return root;
-    }
-
-    for (const auto& child : root->getChildren()) {
-        PlanStage* p = findStageOfType(child.get(), desiredStageType);
-        if (p) {
-            return p;
-        }
-    }
-    return nullptr;
-}
-
-/**
- * Gets a pointer to the MultiPlanStage inside the stage tree rooted at 'root'. Returns nullptr if
- * there is no MPS.
- */
-MultiPlanStage* getMultiPlanStage(PlanStage* root) {
-    PlanStage* ps = findStageOfType(root, STAGE_MULTI_PLAN);
-    invariant(ps == nullptr || ps->stageType() == STAGE_MULTI_PLAN);
-    return static_cast<MultiPlanStage*>(ps);
-}
-
-/**
- * Gets a pointer to the PipelineProxyStage if it is the root of the tree. Returns nullptr if
- * there is no PPS that is root.
- */
-PipelineProxyStage* getPipelineProxyStage(PlanStage* root) {
-    if (root->stageType() == STAGE_PIPELINE_PROXY ||
-        root->stageType() == STAGE_CHANGE_STREAM_PROXY) {
-        return static_cast<PipelineProxyStage*>(root);
-    }
-
-    return nullptr;
-}
-
-/**
- * Given the SpecificStats object for a stage and the type of the stage, returns the
- * number of index keys examined by the stage.
- *
- * This is used for getting the total number of keys examined by a plan. We need
- * to collect a 'totalKeysExamined' metric for a regular explain (in which case this
- * gets called from Explain::generateSinglePlanExecutionInfo()) or for the slow query log / profiler
- * (in which case this gets called from Explain::getSummaryStats()).
- */
-size_t getKeysExamined(StageType type, const SpecificStats* specific) {
-    if (STAGE_IXSCAN == type) {
-        const IndexScanStats* spec = static_cast<const IndexScanStats*>(specific);
-        return spec->keysExamined;
-    } else if (STAGE_IDHACK == type) {
-        const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
-        return spec->keysExamined;
-    } else if (STAGE_COUNT_SCAN == type) {
-        const CountScanStats* spec = static_cast<const CountScanStats*>(specific);
-        return spec->keysExamined;
-    } else if (STAGE_DISTINCT_SCAN == type) {
-        const DistinctScanStats* spec = static_cast<const DistinctScanStats*>(specific);
-        return spec->keysExamined;
-    }
-
-    return 0;
-}
-
-/**
- * Given the SpecificStats object for a stage and the type of the stage, returns the
- * number of documents examined by the stage.
- *
- * This is used for getting the total number of documents examined by a plan. We need
- * to collect a 'totalDocsExamined' metric for a regular explain (in which case this
- * gets called from Explain::generateSinglePlanExecutionInfo()) or for the slow query log / profiler
- * (in which case this gets called from Explain::getSummaryStats()).
- */
-size_t getDocsExamined(StageType type, const SpecificStats* specific) {
-    if (STAGE_COLLSCAN == type) {
-        const CollectionScanStats* spec = static_cast<const CollectionScanStats*>(specific);
-        return spec->docsTested;
-    } else if (STAGE_FETCH == type) {
-        const FetchStats* spec = static_cast<const FetchStats*>(specific);
-        return spec->docsExamined;
-    } else if (STAGE_IDHACK == type) {
-        const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
-        return spec->docsExamined;
-    } else if (STAGE_TEXT_OR == type) {
-        const TextOrStats* spec = static_cast<const TextOrStats*>(specific);
-        return spec->fetches;
-    }
-
-    return 0;
 }
 
 /**
@@ -269,10 +156,10 @@ void appendMultikeyPaths(const BSONObj& keyPattern,
  * Gather the PlanStageStats for all of the losing plans. If exec doesn't have a MultiPlanStage
  * (or any losing plans), will return an empty vector.
  */
-std::vector<std::unique_ptr<PlanStageStats>> getRejectedPlansTrialStats(PlanExecutor* exec) {
+std::vector<std::unique_ptr<PlanStageStats>> getRejectedPlansTrialStats(PlanExecutorImpl* exec) {
     // Inspect the tree to see if there is a MultiPlanStage. Plan selection has already happened at
     // this point, since we have a PlanExecutor.
-    const auto mps = getMultiPlanStage(exec->getRootStage());
+    const auto mps = exec->getMultiPlanStage();
     std::vector<std::unique_ptr<PlanStageStats>> res;
 
     // Get the stats from the trial period for all the plans.
@@ -291,8 +178,8 @@ std::vector<std::unique_ptr<PlanStageStats>> getRejectedPlansTrialStats(PlanExec
 /**
  * Get PlanExecutor's winning plan stats tree.
  */
-unique_ptr<PlanStageStats> getWinningPlanStatsTree(const PlanExecutor* exec) {
-    MultiPlanStage* mps = getMultiPlanStage(exec->getRootStage());
+unique_ptr<PlanStageStats> getWinningPlanStatsTree(const PlanExecutorImpl* exec) {
+    auto mps = exec->getMultiPlanStage();
     return mps ? std::move(mps->getStats()->children[mps->bestPlanIdx()])
                : std::move(exec->getRootStage()->getStats());
 }
@@ -303,7 +190,58 @@ namespace mongo {
 
 using str::stream;
 
-// static
+void Explain::flattenExecTree(const PlanStage* root, vector<const PlanStage*>* flattened) {
+    flattened->push_back(root);
+
+    if (root->stageType() == STAGE_MULTI_PLAN) {
+        // Only add the winning plan from a MultiPlanStage.
+        auto mps = static_cast<const MultiPlanStage*>(root);
+        const PlanStage* winningStage = mps->getChildren()[mps->bestPlanIdx()].get();
+        return flattenExecTree(winningStage, flattened);
+    }
+
+    const auto& children = root->getChildren();
+    for (size_t i = 0; i < children.size(); ++i) {
+        flattenExecTree(children[i].get(), flattened);
+    }
+}
+
+size_t Explain::getKeysExamined(StageType type, const SpecificStats* specific) {
+    if (STAGE_IXSCAN == type) {
+        const IndexScanStats* spec = static_cast<const IndexScanStats*>(specific);
+        return spec->keysExamined;
+    } else if (STAGE_IDHACK == type) {
+        const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
+        return spec->keysExamined;
+    } else if (STAGE_COUNT_SCAN == type) {
+        const CountScanStats* spec = static_cast<const CountScanStats*>(specific);
+        return spec->keysExamined;
+    } else if (STAGE_DISTINCT_SCAN == type) {
+        const DistinctScanStats* spec = static_cast<const DistinctScanStats*>(specific);
+        return spec->keysExamined;
+    }
+
+    return 0;
+}
+
+size_t Explain::getDocsExamined(StageType type, const SpecificStats* specific) {
+    if (STAGE_COLLSCAN == type) {
+        const CollectionScanStats* spec = static_cast<const CollectionScanStats*>(specific);
+        return spec->docsTested;
+    } else if (STAGE_FETCH == type) {
+        const FetchStats* spec = static_cast<const FetchStats*>(specific);
+        return spec->docsExamined;
+    } else if (STAGE_IDHACK == type) {
+        const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
+        return spec->docsExamined;
+    } else if (STAGE_TEXT_OR == type) {
+        const TextOrStats* spec = static_cast<const TextOrStats*>(specific);
+        return spec->fetches;
+    }
+
+    return 0;
+}
+
 void Explain::statsToBSON(const PlanStageStats& stats,
                           ExplainOptions::Verbosity verbosity,
                           BSONObjBuilder* bob,
@@ -621,7 +559,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     childrenBob.doneFast();
 }
 
-// static
 BSONObj Explain::statsToBSON(const PlanStageStats& stats, ExplainOptions::Verbosity verbosity) {
     BSONObjBuilder bob;
     statsToBSON(stats, &bob, verbosity);
@@ -634,33 +571,21 @@ BSONObj Explain::statsToBSON(const sbe::PlanStageStats& stats,
     return bob.obj();
 }
 
-// static
 void Explain::statsToBSON(const PlanStageStats& stats,
                           BSONObjBuilder* bob,
                           ExplainOptions::Verbosity verbosity) {
     statsToBSON(stats, verbosity, bob, bob);
 }
 
-// static
-BSONObj Explain::getWinningPlanStats(const PlanExecutor* exec) {
-    BSONObjBuilder bob;
-    if (!dynamic_cast<const PlanExecutorSBE*>(exec)) {
-        getWinningPlanStats(exec, &bob);
-    }
-    return bob.obj();
-}
-
-// static
-void Explain::getWinningPlanStats(const PlanExecutor* exec, BSONObjBuilder* bob) {
-    unique_ptr<PlanStageStats> winningStats = getWinningPlanStatsTree(exec);
-    statsToBSON(*winningStats, ExplainOptions::Verbosity::kExecStats, bob, bob);
-}
-
-// static
 void Explain::generatePlannerInfo(PlanExecutor* exec,
                                   const Collection* collection,
                                   BSONObj extraInfo,
                                   BSONObjBuilder* out) {
+    auto planExecImpl = dynamic_cast<PlanExecutorImpl*>(exec);
+    uassert(4847801,
+            "queryPlanner explain section is only supported for classic PlanStages",
+            planExecImpl);
+
     CanonicalQuery* query = exec->getCanonicalQuery();
 
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
@@ -716,12 +641,13 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     }
 
     BSONObjBuilder winningPlanBob(plannerBob.subobjStart("winningPlan"));
-    const auto winnerStats = getWinningPlanStatsTree(exec);
+    const auto winnerStats = getWinningPlanStatsTree(planExecImpl);
     statsToBSON(*winnerStats.get(), &winningPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
     winningPlanBob.doneFast();
 
     // Genenerate array of rejected plans.
-    const vector<unique_ptr<PlanStageStats>> rejectedStats = getRejectedPlansTrialStats(exec);
+    const vector<unique_ptr<PlanStageStats>> rejectedStats =
+        getRejectedPlansTrialStats(planExecImpl);
     BSONArrayBuilder allPlansBob(plannerBob.subarrayStart("rejectedPlans"));
     for (size_t i = 0; i < rejectedStats.size(); i++) {
         BSONObjBuilder childBob(allPlansBob.subobjStart());
@@ -774,9 +700,14 @@ void Explain::generateSinglePlanExecutionInfo(const PlanStageStats* stats,
 }
 
 std::unique_ptr<PlanStageStats> Explain::getWinningPlanTrialStats(PlanExecutor* exec) {
+    auto planExecImpl = dynamic_cast<PlanExecutorImpl*>(exec);
+    uassert(4847802,
+            "getWinningPlanTrialStats() is only supported for classic PlanStages",
+            planExecImpl);
+
     // Inspect the tree to see if there is a MultiPlanStage. Plan selection has already happened at
     // this point, since we have a PlanExecutor.
-    const auto mps = getMultiPlanStage(exec->getRootStage());
+    const auto mps = planExecImpl->getMultiPlanStage();
 
     if (mps) {
         const auto mpsStats = mps->getStats();
@@ -786,15 +717,19 @@ std::unique_ptr<PlanStageStats> Explain::getWinningPlanTrialStats(PlanExecutor* 
     return nullptr;
 }
 
-// static
 void Explain::generateExecutionInfo(PlanExecutor* exec,
                                     ExplainOptions::Verbosity verbosity,
                                     Status executePlanStatus,
                                     PlanStageStats* winningPlanTrialStats,
                                     BSONObjBuilder* out) {
+    auto planExecImpl = dynamic_cast<PlanExecutorImpl*>(exec);
+    uassert(4847800,
+            "executionStats explain section is only supported for classic PlanStages",
+            planExecImpl);
+
     invariant(verbosity >= ExplainOptions::Verbosity::kExecStats);
     if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans &&
-        findStageOfType(exec->getRootStage(), STAGE_MULTI_PLAN) != nullptr) {
+        planExecImpl->getMultiPlanStage()) {
         invariant(winningPlanTrialStats,
                   "winningPlanTrialStats must be non-null when requesting all execution stats");
     }
@@ -811,7 +746,7 @@ void Explain::generateExecutionInfo(PlanExecutor* exec,
     // Generate exec stats BSON for the winning plan.
     OperationContext* opCtx = exec->getOpCtx();
     long long totalTimeMillis = durationCount<Milliseconds>(CurOp::get(opCtx)->elapsedTimeTotal());
-    const auto winningExecStats = getWinningPlanStatsTree(exec);
+    const auto winningExecStats = getWinningPlanStatsTree(planExecImpl);
     generateSinglePlanExecutionInfo(winningExecStats.get(), verbosity, totalTimeMillis, &execBob);
 
     // Also generate exec stats for all plans, if the verbosity level is high enough.
@@ -831,7 +766,8 @@ void Explain::generateExecutionInfo(PlanExecutor* exec,
             planBob.doneFast();
         }
 
-        const vector<unique_ptr<PlanStageStats>> rejectedStats = getRejectedPlansTrialStats(exec);
+        const vector<unique_ptr<PlanStageStats>> rejectedStats =
+            getRejectedPlansTrialStats(planExecImpl);
         for (size_t i = 0; i < rejectedStats.size(); ++i) {
             BSONObjBuilder planBob(allPlansBob.subobjStart());
             generateSinglePlanExecutionInfo(
@@ -865,14 +801,11 @@ void Explain::explainStages(PlanExecutor* exec,
     }
 }
 
-// static
-void Explain::explainPipelineExecutor(PlanExecutor* exec,
+void Explain::explainPipelineExecutor(PlanExecutorPipeline* exec,
                                       ExplainOptions::Verbosity verbosity,
                                       BSONObjBuilder* out) {
+    invariant(exec);
     invariant(out);
-
-    PipelineProxyStage* pps = getPipelineProxyStage(exec->getRootStage());
-    invariant(pps, "Expected exec's root stage to be a PipelineProxyStage");
 
     // If we need execution stats, this runs the plan in order to gather the stats.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -881,20 +814,19 @@ void Explain::explainPipelineExecutor(PlanExecutor* exec,
         exec->executePlan();
     }
 
-    *out << "stages" << Value(pps->writeExplainOps(verbosity));
+    *out << "stages" << Value(exec->writeExplainOps(verbosity));
 
     explain_common::generateServerInfo(out);
 }
 
-// static
 void Explain::explainStages(PlanExecutor* exec,
                             const Collection* collection,
                             ExplainOptions::Verbosity verbosity,
                             BSONObj extraInfo,
                             BSONObjBuilder* out) {
     uassert(4822877,
-            "Explain facility is not supported for SBE plans",
-            !dynamic_cast<PlanExecutorSBE*>(exec));
+            "explainStages() is only supported for PlanStage trees",
+            dynamic_cast<PlanExecutorImpl*>(exec));
 
     auto winningPlanTrialStats = Explain::getWinningPlanTrialStats(exec);
 
@@ -927,24 +859,7 @@ void Explain::explainStages(PlanExecutor* exec,
     explain_common::generateServerInfo(out);
 }
 
-// static
-std::string Explain::getPlanSummary(const PlanExecutor* exec) {
-    // TODO: Handle planSummary when SBE is enabled.
-    if (dynamic_cast<const PlanExecutorSBE*>(exec)) {
-        return "unsupported";
-    }
-
-    return getPlanSummary(exec->getRootStage());
-}
-
-// static
 std::string Explain::getPlanSummary(const PlanStage* root) {
-    if (root->stageType() == STAGE_PIPELINE_PROXY ||
-        root->stageType() == STAGE_CHANGE_STREAM_PROXY) {
-        auto pipelineProxy = static_cast<const PipelineProxyStage*>(root);
-        return pipelineProxy->getPlanSummaryStr();
-    }
-
     std::vector<const PlanStage*> stages;
     flattenExecTree(root, &stages);
 
@@ -968,103 +883,9 @@ std::string Explain::getPlanSummary(const PlanStage* root) {
     return sb.str();
 }
 
-// static
 std::string Explain::getPlanSummary(const sbe::PlanStage* root) {
-    // TODO: Handle 'planSummary' when SBE is enabled.
+    // TODO: Support 'planSummary' for SBE plan stage trees.
     return "unsupported";
-}
-
-// static
-void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsOut) {
-    invariant(nullptr != statsOut);
-
-    // TODO: Handle 'getSummaryStats' when SBE is enabled.
-    if (dynamic_cast<const PlanExecutorSBE*>(&exec)) {
-        return;
-    }
-
-    PlanStage* root = exec.getRootStage();
-    if (root->stageType() == STAGE_PIPELINE_PROXY ||
-        root->stageType() == STAGE_CHANGE_STREAM_PROXY) {
-        auto pipelineProxy = static_cast<PipelineProxyStage*>(root);
-        pipelineProxy->getPlanSummaryStats(statsOut);
-        return;
-    }
-
-    // We can get some of the fields we need from the common stats stored in the
-    // root stage of the plan tree.
-    const CommonStats* common = root->getCommonStats();
-    statsOut->nReturned = common->advanced;
-
-    // The other fields are aggregations over the stages in the plan tree. We flatten
-    // the tree into a list and then compute these aggregations.
-    std::vector<const PlanStage*> stages;
-    flattenExecTree(root, &stages);
-
-    statsOut->totalKeysExamined = 0;
-    statsOut->totalDocsExamined = 0;
-
-    for (size_t i = 0; i < stages.size(); i++) {
-        statsOut->totalKeysExamined +=
-            getKeysExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
-        statsOut->totalDocsExamined +=
-            getDocsExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
-
-        if (isSortStageType(stages[i]->stageType())) {
-            statsOut->hasSortStage = true;
-
-            auto sortStage = static_cast<const SortStage*>(stages[i]);
-            auto sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
-            statsOut->usedDisk = sortStats->wasDiskUsed;
-        }
-
-        if (STAGE_IXSCAN == stages[i]->stageType()) {
-            const IndexScan* ixscan = static_cast<const IndexScan*>(stages[i]);
-            const IndexScanStats* ixscanStats =
-                static_cast<const IndexScanStats*>(ixscan->getSpecificStats());
-            statsOut->indexesUsed.insert(ixscanStats->indexName);
-        } else if (STAGE_COUNT_SCAN == stages[i]->stageType()) {
-            const CountScan* countScan = static_cast<const CountScan*>(stages[i]);
-            const CountScanStats* countScanStats =
-                static_cast<const CountScanStats*>(countScan->getSpecificStats());
-            statsOut->indexesUsed.insert(countScanStats->indexName);
-        } else if (STAGE_IDHACK == stages[i]->stageType()) {
-            const IDHackStage* idHackStage = static_cast<const IDHackStage*>(stages[i]);
-            const IDHackStats* idHackStats =
-                static_cast<const IDHackStats*>(idHackStage->getSpecificStats());
-            statsOut->indexesUsed.insert(idHackStats->indexName);
-        } else if (STAGE_DISTINCT_SCAN == stages[i]->stageType()) {
-            const DistinctScan* distinctScan = static_cast<const DistinctScan*>(stages[i]);
-            const DistinctScanStats* distinctScanStats =
-                static_cast<const DistinctScanStats*>(distinctScan->getSpecificStats());
-            statsOut->indexesUsed.insert(distinctScanStats->indexName);
-        } else if (STAGE_TEXT == stages[i]->stageType()) {
-            const TextStage* textStage = static_cast<const TextStage*>(stages[i]);
-            const TextStats* textStats =
-                static_cast<const TextStats*>(textStage->getSpecificStats());
-            statsOut->indexesUsed.insert(textStats->indexName);
-        } else if (STAGE_GEO_NEAR_2D == stages[i]->stageType() ||
-                   STAGE_GEO_NEAR_2DSPHERE == stages[i]->stageType()) {
-            const NearStage* nearStage = static_cast<const NearStage*>(stages[i]);
-            const NearStats* nearStats =
-                static_cast<const NearStats*>(nearStage->getSpecificStats());
-            statsOut->indexesUsed.insert(nearStats->indexName);
-        } else if (STAGE_CACHED_PLAN == stages[i]->stageType()) {
-            const CachedPlanStage* cachedPlan = static_cast<const CachedPlanStage*>(stages[i]);
-            const CachedPlanStats* cachedStats =
-                static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
-            statsOut->replanReason = cachedStats->replanReason;
-        } else if (STAGE_MULTI_PLAN == stages[i]->stageType()) {
-            statsOut->fromMultiPlanner = true;
-        } else if (STAGE_COLLSCAN == stages[i]->stageType()) {
-            statsOut->collectionScans++;
-            const auto collScan = static_cast<const CollectionScan*>(stages[i]);
-            const auto collScanStats =
-                static_cast<const CollectionScanStats*>(collScan->getSpecificStats());
-            if (!collScanStats->tailable)
-                statsOut->collectionScansNonTailable++;
-        }
-    }
 }
 
 void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out) {

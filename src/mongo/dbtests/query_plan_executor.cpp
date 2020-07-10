@@ -42,7 +42,6 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/json.h"
@@ -51,6 +50,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/dbtests/dbtests.h"
@@ -223,18 +223,8 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
         collection, std::move(innerExec), _expCtx, DocumentSourceCursor::CursorType::kRegular);
     auto pipeline = Pipeline::create({cursorSource}, _expCtx);
 
-    // Create the output PlanExecutor that pulls results from the pipeline.
-    auto ws = std::make_unique<WorkingSet>();
-    auto proxy = std::make_unique<PipelineProxyStage>(_expCtx.get(), std::move(pipeline), ws.get());
-
-    auto statusWithPlanExecutor =
-        plan_executor_factory::make(_expCtx,
-                                    std::move(ws),
-                                    std::move(proxy),
-                                    collection,
-                                    PlanYieldPolicy::YieldPolicy::NO_YIELD);
-    ASSERT_OK(statusWithPlanExecutor.getStatus());
-    auto outerExec = std::move(statusWithPlanExecutor.getValue());
+    auto outerExec =
+        plan_executor_factory::make(_expCtx, std::move(pipeline), false /* isChangeStream */);
 
     dropCollection();
 

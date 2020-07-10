@@ -133,7 +133,7 @@ void endQueryOp(OperationContext* opCtx,
 
     // Fill out CurOp based on explain summary statistics.
     PlanSummaryStats summaryStats;
-    Explain::getSummaryStats(exec, &summaryStats);
+    exec.getSummaryStats(&summaryStats);
     curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (collection) {
@@ -141,9 +141,7 @@ void endQueryOp(OperationContext* opCtx,
     }
 
     if (curOp->shouldDBProfile()) {
-        BSONObjBuilder statsBob;
-        Explain::getWinningPlanStats(&exec, &statsBob);
-        curOp->debug().execStats = statsBob.obj();
+        curOp->debug().execStats = exec.getStats();
     }
 }
 
@@ -185,7 +183,7 @@ void generateBatch(int ntoreturn,
         LOGV2_ERROR(20918,
                     "getMore executor error, stats: {stats}",
                     "getMore executor error",
-                    "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
+                    "stats"_attr = redact(exec->getStats()));
         exception.addContext("Executor error during OP_GET_MORE");
         throw;
     }
@@ -414,7 +412,7 @@ Message getMore(OperationContext* opCtx,
     exec->reattachToOperationContext(opCtx);
     exec->restoreState();
 
-    auto planSummary = Explain::getPlanSummary(exec);
+    auto planSummary = exec->getPlanSummary();
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setPlanSummary_inlock(planSummary);
@@ -450,7 +448,7 @@ Message getMore(OperationContext* opCtx,
     // these values we need to take a diff of the pre-execution and post-execution metrics, as they
     // accumulate over the course of a cursor's lifetime.
     PlanSummaryStats preExecutionStats;
-    Explain::getSummaryStats(*exec, &preExecutionStats);
+    exec->getSummaryStats(&preExecutionStats);
     if (MONGO_unlikely(waitWithPinnedCursorDuringGetMoreBatch.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitWithPinnedCursorDuringGetMoreBatch,
                                                          opCtx,
@@ -486,7 +484,7 @@ Message getMore(OperationContext* opCtx,
     }
 
     PlanSummaryStats postExecutionStats;
-    Explain::getSummaryStats(*exec, &postExecutionStats);
+    exec->getSummaryStats(&postExecutionStats);
     postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
     postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
     curOp.debug().setPlanSummaryMetrics(postExecutionStats);
@@ -498,9 +496,7 @@ Message getMore(OperationContext* opCtx,
     // cost.
     if (cursorPin->getExecutor()->lockPolicy() != PlanExecutor::LockPolicy::kLocksInternally &&
         curOp.shouldDBProfile()) {
-        BSONObjBuilder execStatsBob;
-        Explain::getWinningPlanStats(exec, &execStatsBob);
-        curOp.debug().execStats = execStatsBob.obj();
+        curOp.debug().execStats = exec->getStats();
     }
 
     // Our two possible ClientCursorPin cleanup paths are:
@@ -692,7 +688,7 @@ bool runQuery(OperationContext* opCtx,
     // Get summary info about which plan the executor is using.
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+        curOp.setPlanSummary_inlock(exec->getPlanSummary());
     }
 
     try {
@@ -726,7 +722,7 @@ bool runQuery(OperationContext* opCtx,
                     "Plan executor error during find: {error}, stats: {stats}",
                     "Plan executor error during find",
                     "error"_attr = redact(exception.toStatus()),
-                    "stats"_attr = redact(Explain::getWinningPlanStats(exec.get())));
+                    "stats"_attr = redact(exec->getStats()));
 
         exception.addContext("Executor error during find");
         throw;

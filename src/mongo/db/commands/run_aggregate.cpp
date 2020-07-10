@@ -42,7 +42,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/exec/change_stream_proxy.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -166,9 +166,9 @@ bool handleCursorCommand(OperationContext* opCtx,
     invariant(exec);
 
     bool stashedResult = false;
+    // We are careful to avoid ever calling 'getNext()' on the PlanExecutor when the batchSize is
+    // zero to avoid doing any query execution work.
     for (int objCount = 0; objCount < batchSize; objCount++) {
-        // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
-        // do it when batchSize is 0 since that indicates a desire for a fast return.
         PlanExecutor::ExecState state;
         BSONObj nextDoc;
 
@@ -185,7 +185,7 @@ bool handleCursorCommand(OperationContext* opCtx,
                           "Aggregate command executor error: {error}, stats: {stats}",
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
-                          "stats"_attr = redact(Explain::getWinningPlanStats(exec)));
+                          "stats"_attr = redact(exec->getStats()));
 
             exception.addContext("PlanExecutor error during aggregation");
             throw;
@@ -445,35 +445,6 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
 
     return pipelines;
 }
-
-/**
- * Create a PlanExecutor to execute the given 'pipeline'.
- */
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createOuterPipelineProxyExecutor(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    bool hasChangeStream) {
-    boost::intrusive_ptr<ExpressionContext> expCtx(pipeline->getContext());
-
-    // Transfer ownership of the Pipeline to the PipelineProxyStage.
-    auto ws = std::make_unique<WorkingSet>();
-    auto proxy = hasChangeStream
-        ? std::make_unique<ChangeStreamProxyStage>(expCtx.get(), std::move(pipeline), ws.get())
-        : std::make_unique<PipelineProxyStage>(expCtx.get(), std::move(pipeline), ws.get());
-
-    // This PlanExecutor will simply forward requests to the Pipeline, so does not need
-    // to yield or to be registered with any collection's CursorManager to receive
-    // invalidations. The Pipeline may contain PlanExecutors which *are* yielding
-    // PlanExecutors and which *are* registered with their respective collection's
-    // CursorManager
-    return uassertStatusOK(plan_executor_factory::make(std::move(expCtx),
-                                                       std::move(ws),
-                                                       std::move(proxy),
-                                                       nullptr,
-                                                       PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                       nss));
-}
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
@@ -672,8 +643,13 @@ Status runAggregate(OperationContext* opCtx,
             auto pipelines =
                 createExchangePipelinesIfNeeded(opCtx, expCtx, request, std::move(pipeline), uuid);
             for (auto&& pipelineIt : pipelines) {
-                execs.emplace_back(createOuterPipelineProxyExecutor(
-                    opCtx, nss, std::move(pipelineIt), liteParsedPipeline.hasChangeStream()));
+                // There are separate ExpressionContexts for each exchange pipeline, so make sure to
+                // pass the pipeline's ExpressionContext to the plan executor factory.
+                auto pipelineExpCtx = pipelineIt->getContext();
+                execs.emplace_back(
+                    plan_executor_factory::make(std::move(pipelineExpCtx),
+                                                std::move(pipelineIt),
+                                                liteParsedPipeline.hasChangeStream()));
             }
 
             // With the pipelines created, we can relinquish locks as they will manage the locks
@@ -685,7 +661,7 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         {
-            auto planSummary = Explain::getPlanSummary(execs[0].get());
+            auto planSummary = execs[0]->getPlanSummary();
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(std::move(planSummary));
         }
@@ -735,8 +711,8 @@ Status runAggregate(OperationContext* opCtx,
     if (expCtx->explain) {
         auto explainExecutor = pins[0]->getExecutor();
         auto bodyBuilder = result->getBodyBuilder();
-        if (explainExecutor->isPipelineExecutor()) {
-            Explain::explainPipelineExecutor(explainExecutor, *(expCtx->explain), &bodyBuilder);
+        if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
+            Explain::explainPipelineExecutor(pipelineExec, *(expCtx->explain), &bodyBuilder);
         } else {
             invariant(pins[0]->getExecutor()->lockPolicy() ==
                       PlanExecutor::LockPolicy::kLockExternally);
@@ -759,7 +735,7 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         PlanSummaryStats stats;
-        Explain::getSummaryStats(*(pins[0].getCursor()->getExecutor()), &stats);
+        pins[0].getCursor()->getExecutor()->getSummaryStats(&stats);
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
         // For an optimized away pipeline, signal the cache that a query operation has completed.

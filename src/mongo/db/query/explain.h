@@ -43,6 +43,7 @@ namespace mongo {
 
 class Collection;
 class OperationContext;
+class PlanExecutorPipeline;
 struct PlanSummaryStats;
 
 /**
@@ -89,7 +90,7 @@ public:
      * - 'winningPlanTrialStats' is the stats of the winning plan during the trial period. May be
      * nullptr.
      * - 'out' is the builder for the explain output.
-     **/
+     */
     static void explainStages(PlanExecutor* exec,
                               const Collection* collection,
                               ExplainOptions::Verbosity verbosity,
@@ -99,26 +100,14 @@ public:
                               BSONObjBuilder* out);
 
     /**
-     * Gets explain BSON for the document sources contained by 'exec'. Use this function if you
-     * have a PlanExecutor whose root is a PipelineProxyStage and want to turn it into a human
-     * readable explain format.
+     * Gets explain BSON for the document sources contained by 'exec'. Use this function if you have
+     * a PlanExecutor for a pipeline and want to turn it into a human readable explain format.
      *
      * The explain information is generated with the level of detail specified by 'verbosity'.
-     **/
-    static void explainPipelineExecutor(PlanExecutor* exec,
+     */
+    static void explainPipelineExecutor(PlanExecutorPipeline* exec,
                                         ExplainOptions::Verbosity verbosity,
                                         BSONObjBuilder* out);
-
-    /**
-     * Converts the PlanExecutor's winning plan stats tree to BSON and returns to the caller.
-     */
-    static BSONObj getWinningPlanStats(const PlanExecutor* exec);
-
-    /**
-     * Converts the PlanExecutor's winning plan stats tree to BSON and returns the result through
-     * the out-parameter 'bob'.
-     */
-    static void getWinningPlanStats(const PlanExecutor* exec, BSONObjBuilder* bob);
 
     /**
      * Converts the stats tree 'stats' into a corresponding BSON object containing
@@ -149,24 +138,8 @@ public:
     /**
      * Returns a short plan summary std::string describing the leaves of the query plan.
      */
-    static std::string getPlanSummary(const PlanExecutor* exec);
     static std::string getPlanSummary(const PlanStage* root);
     static std::string getPlanSummary(const sbe::PlanStage* root);
-
-    /**
-     * Fills out 'statsOut' with summary stats using the execution tree contained
-     * in 'exec'.
-     *
-     * The summary stats are consumed by debug mechanisms such as the profiler and
-     * the slow query log.
-     *
-     * This is a lightweight alternative for explainStages(...) above which is useful
-     * when operations want to request debug information without doing all the work
-     * to generate a full explain.
-     *
-     * Does not take ownership of its arguments.
-     */
-    static void getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsOut);
 
     /**
      * If exec's root stage is a MultiPlanStage, returns the stats for the trial period of of the
@@ -176,6 +149,32 @@ public:
      **/
     static std::unique_ptr<PlanStageStats> getWinningPlanTrialStats(PlanExecutor* exec);
 
+    /**
+     * Serializes a PlanCacheEntry to the provided BSON object builder. The output format is
+     * intended to be human readable, and useful for debugging query performance problems related to
+     * the plan cache.
+     */
+    static void planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out);
+
+    /**
+     * Traverses the tree rooted at 'root', and adds all nodes into the list 'flattened'. If a
+     * MultiPlanStage is encountered, only adds the best plan and its children to 'flattened'.
+     */
+    static void flattenExecTree(const PlanStage* root, std::vector<const PlanStage*>* flattened);
+
+    /**
+     * Given the SpecificStats object for a stage and the type of the stage, returns the number of
+     * index keys examined by the stage.
+     */
+    static size_t getKeysExamined(StageType type, const SpecificStats* specific);
+
+    /**
+     * Given the SpecificStats object for a stage and the type of the stage, returns the number of
+     * documents examined by the stage.
+     */
+    static size_t getDocsExamined(StageType type, const SpecificStats* specific);
+
+private:
     /**
      * Generates the execution stats section for the stats tree 'stats', adding the resulting BSON
      * to 'out'.
@@ -192,14 +191,6 @@ public:
                                                 boost::optional<long long> totalTimeMillis,
                                                 BSONObjBuilder* out);
 
-    /**
-     * Serializes a PlanCacheEntry to the provided BSON object builder. The output format is
-     * intended to be human readable, and useful for debugging query performance problems related to
-     * the plan cache.
-     */
-    static void planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out);
-
-private:
     /**
      * Adds the 'queryPlanner' explain section to the BSON object being built
      * by 'out'.

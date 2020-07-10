@@ -350,7 +350,6 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 expCtx, esn->pattern, _ws, std::move(childStage));
         }
         case STAGE_CACHED_PLAN:
-        case STAGE_CHANGE_STREAM_PROXY:
         case STAGE_COUNT:
         case STAGE_DELETE:
         case STAGE_EOF:
@@ -358,7 +357,6 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_MOCK:
         case STAGE_MULTI_ITERATOR:
         case STAGE_MULTI_PLAN:
-        case STAGE_PIPELINE_PROXY:
         case STAGE_QUEUED_DATA:
         case STAGE_RECORD_STORE_FAST_COUNT:
         case STAGE_SUBPLAN:

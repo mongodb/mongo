@@ -239,8 +239,7 @@ public:
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setPlanSummary_inlock(
-                Explain::getPlanSummary(executor.getValue().get()));
+            CurOp::get(opCtx)->setPlanSummary_inlock(executor.getValue()->getPlanSummary());
         }
 
         const auto key = cmdObj[ParsedDistinct::kKeyField].valuestrsafe();
@@ -286,8 +285,7 @@ public:
                           "stats: {stats}",
                           "Plan executor error during distinct command",
                           "error"_attr = exception.toStatus(),
-                          "stats"_attr =
-                              redact(Explain::getWinningPlanStats(executor.getValue().get())));
+                          "stats"_attr = redact(executor.getValue()->getStats()));
 
             exception.addContext("Executor error during distinct command");
             throw;
@@ -297,16 +295,14 @@ public:
 
         // Get summary information about the plan.
         PlanSummaryStats stats;
-        Explain::getSummaryStats(*executor.getValue(), &stats);
+        executor.getValue()->getSummaryStats(&stats);
         if (collection) {
             CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, stats);
         }
         curOp->debug().setPlanSummaryMetrics(stats);
 
         if (curOp->shouldDBProfile()) {
-            BSONObjBuilder execStatsBob;
-            Explain::getWinningPlanStats(executor.getValue().get(), &execStatsBob);
-            curOp->debug().execStats = execStatsBob.obj();
+            curOp->debug().execStats = executor.getValue()->getStats();
         }
 
         BSONArrayBuilder valueListBuilder(result.subarrayStart("values"));

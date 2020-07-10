@@ -256,22 +256,20 @@ public:
         auto curOp = CurOp::get(opCtx);
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+            curOp->setPlanSummary_inlock(exec->getPlanSummary());
         }
 
         exec->executePlan();
 
         PlanSummaryStats summaryStats;
-        Explain::getSummaryStats(*exec, &summaryStats);
+        exec->getSummaryStats(&summaryStats);
         if (collection) {
             CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 
         if (curOp->shouldDBProfile()) {
-            BSONObjBuilder execStatsBob;
-            Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-            curOp->debug().execStats = execStatsBob.obj();
+            curOp->debug().execStats = exec->getStats();
         }
 
         // Plan is done executing. We just need to pull the count out of the root stage.
