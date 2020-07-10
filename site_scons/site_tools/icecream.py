@@ -54,8 +54,31 @@ def icecc_create_env(env, target, source, for_signature):
 
     # Create the env, use awk to get just the tarball name and we store it in
     # the shell variable $ICECC_VERSION_TMP so the subsequent mv command and
-    # store it in a known location.
-    create_env = "ICECC_VERSION_TMP=$$($ICECC_CREATE_ENV --$ICECC_COMPILER_TYPE $CC $CXX | awk '/^creating .*\\.tar\\.gz/ { print $$2 }')"
+    # store it in a known location. Add any files requested from the user environment.
+    create_env = "ICECC_VERSION_TMP=$$($ICECC_CREATE_ENV --$ICECC_COMPILER_TYPE $CC $CXX"
+    for addfile in env.get('ICECC_CREATE_ENV_ADDFILES', []):
+        if (type(addfile) == tuple
+            and len(addfile) == 2):
+            if env['ICECREAM_VERSION'] > parse_version('1.1'):
+                raise Exception("This version of icecream does not support addfile remapping.")
+            create_env += " --addfile {}={}".format(
+                env.File(addfile[0]).srcnode().abspath,
+                env.File(addfile[1]).srcnode().abspath)
+            env.Depends('$ICECC_VERSION', addfile[1])
+        elif type(addfile) == str:
+            create_env += " --addfile {}".format(env.File(addfile).srcnode().abspath)
+            env.Depends('$ICECC_VERSION', addfile)
+        else:
+            # NOTE: abspath is required by icecream because of
+            # this line in icecc-create-env:
+            # https://github.com/icecc/icecream/blob/10b9468f5bd30a0fdb058901e91e7a29f1bfbd42/client/icecc-create-env.in#L534
+            # which cuts out the two files based off the equals sign and
+            # starting slash of the second file
+            raise Exception("Found incorrect icecream addfile format: {}" +
+                "\nicecream addfiles must be a single path or tuple path format: " +
+                "('chroot dest path', 'source file path')".format(
+                str(addfile)))
+    create_env += " | awk '/^creating .*\\.tar\\.gz/ { print $$2 }')"
 
     # Simply move our tarball to the expected locale.
     mv = "mv $$ICECC_VERSION_TMP $TARGET"
@@ -69,6 +92,14 @@ def generate(env):
 
     if not exists(env):
         return
+
+    # icecc lower then 1.1 supports addfile remapping accidentally
+    # and above it adds an empty cpuinfo so handle cpuinfo issues for icecream
+    # below version 1.1
+    if (env['ICECREAM_VERSION'] <= parse_version('1.1')
+        and env.ToolchainIs("clang")
+        and os.path.exists('/proc/cpuinfo')):
+        env.AppendUnique(ICECC_CREATE_ENV_ADDFILES=[('/proc/cpuinfo', '/dev/null')])
 
     env["ICECCENVCOMSTR"] = env.get("ICECCENVCOMSTR", "Generating environment: $TARGET")
     env["ICECC_COMPILER_TYPE"] = env.get(
