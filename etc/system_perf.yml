@@ -915,6 +915,7 @@ buildvariants:
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=linux-64-amzn-build
+      --separate-debug
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -964,6 +965,7 @@ buildvariants:
     <<: *compile-linux-64-amzn-expansions
     compile_flags: >-
       --ssl
+      --separate-debug
       MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
