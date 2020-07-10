@@ -50,9 +50,9 @@ assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 
 // Ensure we see the sync source progress logs.
 setLogVerbosity(rst.nodes, {"replication": {"verbosity": 2}});
 
-// Verify we haven't changed sync sources due to finding a significantly closer node yet.
 let serverStatus = assert.commandWorked(testNode.adminCommand({serverStatus: 1})).metrics.repl;
-assert.eq(0, serverStatus.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode);
+const numSyncSourceChanges =
+    serverStatus.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode;
 
 jsTestLog("Forcing sync sources for the secondaries");
 const secondaryForceSyncSource = forceSyncSource(rst, secondary, primary);
@@ -110,7 +110,8 @@ rst.awaitSyncSource(testNode, primary);
 
 // Verify that the metric was incremented correctly.
 serverStatus = assert.commandWorked(testNode.adminCommand({serverStatus: 1})).metrics.repl;
-assert.eq(1, serverStatus.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode);
+assert.eq(numSyncSourceChanges + 1,
+          serverStatus.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode);
 
 rst.stopSet();
 })();
