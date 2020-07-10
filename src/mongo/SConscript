@@ -965,7 +965,10 @@ compass_installer = env.Substfile(
   ],
 )
 
-compass_script_installer = env.AutoInstall(
+if env.TargetOSIs('posix'):
+    env.AddPostAction(compass_installer, Chmod('$TARGET', 0o755))
+
+env.AutoInstall(
     target='$PREFIX_BINDIR',
     source=[
         compass_installer,
