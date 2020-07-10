@@ -5202,6 +5202,19 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "rotateCertificates",
+          command: {rotateCertificates: 1},
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_hostManager,
+                privileges: [{resource: {cluster: true}, actions: ["rotateCertificates"]}]
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "serverStatus",
           command: {serverStatus: 1},
           testcases: [

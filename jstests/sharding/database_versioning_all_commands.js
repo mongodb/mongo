@@ -596,6 +596,7 @@ let testCases = {
     revokeRolesFromRole: {skip: "always targets the config server"},
     revokeRolesFromUser: {skip: "always targets the config server"},
     rolesInfo: {skip: "always targets the config server"},
+    rotateCertificates: {skip: "executes locally on mongos (not sent to any remote node)"},
     saslContinue: {skip: "not on a user database"},
     saslStart: {skip: "not on a user database"},
     serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},

@@ -266,6 +266,7 @@ const allCommands = {
     revokeRolesFromRole: {skip: isPrimaryOnly},
     revokeRolesFromUser: {skip: isPrimaryOnly},
     rolesInfo: {skip: isPrimaryOnly},
+    rotateCertificates: {skip: isNotAUserDataRead},
     saslContinue: {skip: isPrimaryOnly},
     saslStart: {skip: isPrimaryOnly},
     sbe: {skip: isAnInternalCommand},

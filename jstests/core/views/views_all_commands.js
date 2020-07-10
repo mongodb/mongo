@@ -485,6 +485,7 @@ let viewsCommandTests = {
     revokeRolesFromRole: {skip: isUnrelated},
     revokeRolesFromUser: {skip: isUnrelated},
     rolesInfo: {skip: isUnrelated},
+    rotateCertificates: {skip: isUnrelated},
     saslContinue: {skip: isUnrelated},
     saslStart: {skip: isUnrelated},
     sbe: {skip: isAnInternalCommand},

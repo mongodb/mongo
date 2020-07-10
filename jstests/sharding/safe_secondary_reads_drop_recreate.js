@@ -272,6 +272,7 @@ let testCases = {
     revokeRolesFromRole: {skip: "primary only"},
     revokeRolesFromUser: {skip: "primary only"},
     rolesInfo: {skip: "primary only"},
+    rotateCertificates: {skip: "does not return user data"},
     saslContinue: {skip: "primary only"},
     saslStart: {skip: "primary only"},
     sbe: {skip: "internal command"},

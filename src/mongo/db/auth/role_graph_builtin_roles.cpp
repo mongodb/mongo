@@ -222,7 +222,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::killop
         << ActionType::replSetResizeOplog
         << ActionType::resync  // clusterManager gets this also
-        << ActionType::trafficRecord;
+        << ActionType::trafficRecord
+        << ActionType::rotateCertificates;
 
     // hostManager role actions that target the database resource
     hostManagerRoleDatabaseActions
