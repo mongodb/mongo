@@ -12,8 +12,6 @@ selector:
   - jstests/noPassthrough/inmem_full.js
   # Multiversion backup-restore tests must run in the multiversion suite.
   - src/mongo/db/modules/*/jstests/hot_backups/*last_stable*.js
-  # TODO SERVER-49359 Enable sharded_backup_restore_add_remove_shard_while_backup.js from noPassthrough suite
-  - src/mongo/db/modules/*/jstests/hot_backups/sharded_backup_restore_add_remove_shard_while_backup.js
 
 # noPassthrough tests start their own mongod's.
 executor:
