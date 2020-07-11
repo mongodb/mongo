@@ -158,7 +158,7 @@ TEST(Unwind, Linkage) {
 
     std::string_view view = stacktrace;
 
-    LOGV2_OPTIONS(31429, {logv2::LogTruncation::Disabled}, "trace: {trace}", "trace"_attr = view);
+    LOGV2_OPTIONS(31429, {logv2::LogTruncation::Disabled}, "Trace", "trace"_attr = view);
 
     // Remove the backtrace JSON object, which is all one line.
     assertAndRemovePrefix(view, R"(BACKTRACE: {"backtrace":)");
@@ -186,10 +186,10 @@ TEST(Unwind, Linkage) {
         auto pos = remainder.find(name);
         if (pos == remainder.npos) {
             LOGV2_OPTIONS(
-                31378, {logv2::LogTruncation::Disabled}, "BACKTRACE: {trace}", "trace"_attr = view);
+                31378, {logv2::LogTruncation::Disabled}, "BACKTRACE", "trace"_attr = view);
             FAIL("name '{}' is missing or out of order in sample backtrace"_format(name));
         }
-        LOGV2(31379, "Removing prefix: {prefix}", "prefix"_attr = remainder.substr(0, pos));
+        LOGV2(31379, "Removing prefix", "prefix"_attr = remainder.substr(0, pos));
         remainder.remove_prefix(pos);
     }
 }
