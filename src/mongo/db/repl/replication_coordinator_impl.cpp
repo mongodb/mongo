@@ -112,7 +112,6 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
-MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 // Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
 MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
@@ -4858,11 +4857,6 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_chooseStableOpTi
         maximumStableTimestamp = std::min(_storage->getAllDurableTimestamp(_service),
                                           maximumStableOpTime.opTime.getTimestamp());
     }
-
-    holdStableTimestampAtSpecificTimestamp.execute([&](const BSONObj& dataObj) {
-        const auto holdStableTimestamp = dataObj["timestamp"].timestamp();
-        maximumStableTimestamp = std::min(maximumStableTimestamp, holdStableTimestamp);
-    });
 
     maximumStableOpTime = {OpTime(maximumStableTimestamp, maximumStableOpTime.opTime.getTerm()),
                            maximumStableOpTime.wallTime};

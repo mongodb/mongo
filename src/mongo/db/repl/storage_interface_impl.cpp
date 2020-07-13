@@ -85,6 +85,8 @@
 namespace mongo {
 namespace repl {
 
+MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
+
 const char StorageInterfaceImpl::kDefaultRollbackIdNamespace[] = "local.system.rollback.id";
 const char StorageInterfaceImpl::kRollbackIdFieldName[] = "rollbackId";
 const char StorageInterfaceImpl::kRollbackIdDocumentId[] = "rollbackId";
@@ -1228,7 +1230,18 @@ StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
 }
 
 void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) {
-    serviceCtx->getStorageEngine()->setStableTimestamp(snapshotName);
+    auto newStableTimestamp = snapshotName;
+    // Hold the stable timestamp back if this failpoint is enabled.
+    holdStableTimestampAtSpecificTimestamp.execute([&](const BSONObj& dataObj) {
+        const auto holdStableTimestamp = dataObj["timestamp"].timestamp();
+        if (newStableTimestamp > holdStableTimestamp) {
+            newStableTimestamp = holdStableTimestamp;
+            LOGV2(4784410,
+                  "holdStableTimestampAtSpecificTimestamp holding the stable timestamp",
+                  "holdStableTimestamp"_attr = holdStableTimestamp);
+        }
+    });
+    serviceCtx->getStorageEngine()->setStableTimestamp(newStableTimestamp);
 }
 
 void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,
