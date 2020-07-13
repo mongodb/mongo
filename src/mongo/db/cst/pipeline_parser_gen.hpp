@@ -369,6 +369,8 @@ public:
         union union_type {
             // stageList
             // stage
+            // inhibitOptimization
+            // unionWith
             char dummy1[sizeof(CNode)];
 
             // BOOL
@@ -429,16 +431,17 @@ public:
             YYUNDEF = 2,                     // "invalid token"
             START_OBJECT = 3,                // START_OBJECT
             END_OBJECT = 4,                  // END_OBJECT
-            START_ORDERED_OBJECT = 5,        // START_ORDERED_OBJECT
-            END_ORDERED_OBJECT = 6,          // END_ORDERED_OBJECT
-            START_ARRAY = 7,                 // START_ARRAY
-            END_ARRAY = 8,                   // END_ARRAY
-            STAGE_INHIBIT_OPTIMIZATION = 9,  // STAGE_INHIBIT_OPTIMIZATION
-            STRING = 10,                     // STRING
-            NUMBER_INT = 11,                 // NUMBER_INT
-            NUMBER_LONG = 12,                // NUMBER_LONG
-            NUMBER_DOUBLE = 13,              // NUMBER_DOUBLE
-            BOOL = 14                        // BOOL
+            START_ARRAY = 5,                 // START_ARRAY
+            END_ARRAY = 6,                   // END_ARRAY
+            STAGE_INHIBIT_OPTIMIZATION = 7,  // STAGE_INHIBIT_OPTIMIZATION
+            STAGE_UNION_WITH = 8,            // STAGE_UNION_WITH
+            COLL_ARG = 9,                    // COLL_ARG
+            PIPELINE_ARG = 10,               // PIPELINE_ARG
+            STRING = 11,                     // STRING
+            NUMBER_INT = 12,                 // NUMBER_INT
+            NUMBER_LONG = 13,                // NUMBER_LONG
+            NUMBER_DOUBLE = 14,              // NUMBER_DOUBLE
+            BOOL = 15                        // BOOL
         };
         /// Backward compatibility alias (Bison 3.6).
         typedef token_kind_type yytokentype;
@@ -453,27 +456,32 @@ public:
     /// Symbol kinds.
     struct symbol_kind {
         enum symbol_kind_type {
-            YYNTOKENS = 15,  ///< Number of tokens.
+            YYNTOKENS = 16,  ///< Number of tokens.
             S_YYEMPTY = -2,
             S_YYEOF = 0,                       // "EOF"
             S_YYerror = 1,                     // error
             S_YYUNDEF = 2,                     // "invalid token"
             S_START_OBJECT = 3,                // START_OBJECT
             S_END_OBJECT = 4,                  // END_OBJECT
-            S_START_ORDERED_OBJECT = 5,        // START_ORDERED_OBJECT
-            S_END_ORDERED_OBJECT = 6,          // END_ORDERED_OBJECT
-            S_START_ARRAY = 7,                 // START_ARRAY
-            S_END_ARRAY = 8,                   // END_ARRAY
-            S_STAGE_INHIBIT_OPTIMIZATION = 9,  // STAGE_INHIBIT_OPTIMIZATION
-            S_STRING = 10,                     // STRING
-            S_NUMBER_INT = 11,                 // NUMBER_INT
-            S_NUMBER_LONG = 12,                // NUMBER_LONG
-            S_NUMBER_DOUBLE = 13,              // NUMBER_DOUBLE
-            S_BOOL = 14,                       // BOOL
-            S_YYACCEPT = 15,                   // $accept
-            S_stageList = 16,                  // stageList
-            S_stage = 17,                      // stage
-            S_pipeline = 18                    // pipeline
+            S_START_ARRAY = 5,                 // START_ARRAY
+            S_END_ARRAY = 6,                   // END_ARRAY
+            S_STAGE_INHIBIT_OPTIMIZATION = 7,  // STAGE_INHIBIT_OPTIMIZATION
+            S_STAGE_UNION_WITH = 8,            // STAGE_UNION_WITH
+            S_COLL_ARG = 9,                    // COLL_ARG
+            S_PIPELINE_ARG = 10,               // PIPELINE_ARG
+            S_STRING = 11,                     // STRING
+            S_NUMBER_INT = 12,                 // NUMBER_INT
+            S_NUMBER_LONG = 13,                // NUMBER_LONG
+            S_NUMBER_DOUBLE = 14,              // NUMBER_DOUBLE
+            S_BOOL = 15,                       // BOOL
+            S_YYACCEPT = 16,                   // $accept
+            S_stageList = 17,                  // stageList
+            S_stage = 18,                      // stage
+            S_inhibitOptimization = 19,        // inhibitOptimization
+            S_unionWith = 20,                  // unionWith
+            S_pipeline = 21,                   // pipeline
+            S_START_ORDERED_OBJECT = 22,       // START_ORDERED_OBJECT
+            S_23_1 = 23                        // $@1
         };
     };
 
@@ -502,28 +510,30 @@ public:
         basic_symbol(basic_symbol&& that)
             : Base(std::move(that)), value(), location(std::move(that.location)) {
             switch (this->kind()) {
-                case 16:  // stageList
-                case 17:  // stage
+                case 17:  // stageList
+                case 18:  // stage
+                case 19:  // inhibitOptimization
+                case 20:  // unionWith
                     value.move<CNode>(std::move(that.value));
                     break;
 
-                case 14:  // BOOL
+                case 15:  // BOOL
                     value.move<bool>(std::move(that.value));
                     break;
 
-                case 13:  // NUMBER_DOUBLE
+                case 14:  // NUMBER_DOUBLE
                     value.move<double>(std::move(that.value));
                     break;
 
-                case 11:  // NUMBER_INT
+                case 12:  // NUMBER_INT
                     value.move<int>(std::move(that.value));
                     break;
 
-                case 12:  // NUMBER_LONG
+                case 13:  // NUMBER_LONG
                     value.move<long long>(std::move(that.value));
                     break;
 
-                case 10:  // STRING
+                case 11:  // STRING
                     value.move<std::string>(std::move(that.value));
                     break;
 
@@ -604,28 +614,30 @@ public:
 
             // Value type destructor.
             switch (yykind) {
-                case 16:  // stageList
-                case 17:  // stage
+                case 17:  // stageList
+                case 18:  // stage
+                case 19:  // inhibitOptimization
+                case 20:  // unionWith
                     value.template destroy<CNode>();
                     break;
 
-                case 14:  // BOOL
+                case 15:  // BOOL
                     value.template destroy<bool>();
                     break;
 
-                case 13:  // NUMBER_DOUBLE
+                case 14:  // NUMBER_DOUBLE
                     value.template destroy<double>();
                     break;
 
-                case 11:  // NUMBER_INT
+                case 12:  // NUMBER_INT
                     value.template destroy<int>();
                     break;
 
-                case 12:  // NUMBER_LONG
+                case 13:  // NUMBER_LONG
                     value.template destroy<long long>();
                     break;
 
-                case 10:  // STRING
+                case 11:  // STRING
                     value.template destroy<std::string>();
                     break;
 
@@ -719,17 +731,17 @@ public:
         symbol_type(int tok, location_type l) : super_type(token_type(tok), std::move(l)) {
             YY_ASSERT(tok == token::END_OF_FILE || tok == token::YYerror || tok == token::YYUNDEF ||
                       tok == token::START_OBJECT || tok == token::END_OBJECT ||
-                      tok == token::START_ORDERED_OBJECT || tok == token::END_ORDERED_OBJECT ||
                       tok == token::START_ARRAY || tok == token::END_ARRAY ||
-                      tok == token::STAGE_INHIBIT_OPTIMIZATION);
+                      tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
+                      tok == token::COLL_ARG || tok == token::PIPELINE_ARG);
         }
 #else
         symbol_type(int tok, const location_type& l) : super_type(token_type(tok), l) {
             YY_ASSERT(tok == token::END_OF_FILE || tok == token::YYerror || tok == token::YYUNDEF ||
                       tok == token::START_OBJECT || tok == token::END_OBJECT ||
-                      tok == token::START_ORDERED_OBJECT || tok == token::END_ORDERED_OBJECT ||
                       tok == token::START_ARRAY || tok == token::END_ARRAY ||
-                      tok == token::STAGE_INHIBIT_OPTIMIZATION);
+                      tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
+                      tok == token::COLL_ARG || tok == token::PIPELINE_ARG);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -790,7 +802,7 @@ public:
     };
 
     /// Build a parser object.
-    PipelineParserGen(BSONLexer& driver_yyarg, CNode* cst_yyarg);
+    PipelineParserGen(BSONLexer& lexer_yyarg, CNode* cst_yyarg);
     virtual ~PipelineParserGen();
 
 #if 201103L <= YY_CPLUSPLUS
@@ -884,24 +896,6 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_START_ORDERED_OBJECT(location_type l) {
-        return symbol_type(token::START_ORDERED_OBJECT, std::move(l));
-    }
-#else
-    static symbol_type make_START_ORDERED_OBJECT(const location_type& l) {
-        return symbol_type(token::START_ORDERED_OBJECT, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_END_ORDERED_OBJECT(location_type l) {
-        return symbol_type(token::END_ORDERED_OBJECT, std::move(l));
-    }
-#else
-    static symbol_type make_END_ORDERED_OBJECT(const location_type& l) {
-        return symbol_type(token::END_ORDERED_OBJECT, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_START_ARRAY(location_type l) {
         return symbol_type(token::START_ARRAY, std::move(l));
     }
@@ -926,6 +920,33 @@ public:
 #else
     static symbol_type make_STAGE_INHIBIT_OPTIMIZATION(const location_type& l) {
         return symbol_type(token::STAGE_INHIBIT_OPTIMIZATION, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_STAGE_UNION_WITH(location_type l) {
+        return symbol_type(token::STAGE_UNION_WITH, std::move(l));
+    }
+#else
+    static symbol_type make_STAGE_UNION_WITH(const location_type& l) {
+        return symbol_type(token::STAGE_UNION_WITH, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_COLL_ARG(location_type l) {
+        return symbol_type(token::COLL_ARG, std::move(l));
+    }
+#else
+    static symbol_type make_COLL_ARG(const location_type& l) {
+        return symbol_type(token::COLL_ARG, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_PIPELINE_ARG(location_type l) {
+        return symbol_type(token::PIPELINE_ARG, std::move(l));
+    }
+#else
+    static symbol_type make_PIPELINE_ARG(const location_type& l) {
+        return symbol_type(token::PIPELINE_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1249,14 +1270,14 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 8,  ///< Last index in yytable_.
-        yynnts_ = 4,  ///< Number of nonterminal symbols.
-        yyfinal_ = 5  ///< Termination state number.
+        yylast_ = 25,  ///< Last index in yytable_.
+        yynnts_ = 8,   ///< Number of nonterminal symbols.
+        yyfinal_ = 5   ///< Termination state number.
     };
 
 
     // User arguments.
-    BSONLexer& driver;
+    BSONLexer& lexer;
     CNode* cst;
 };
 
@@ -1269,28 +1290,30 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
     switch (this->kind()) {
-        case 16:  // stageList
-        case 17:  // stage
+        case 17:  // stageList
+        case 18:  // stage
+        case 19:  // inhibitOptimization
+        case 20:  // unionWith
             value.copy<CNode>(YY_MOVE(that.value));
             break;
 
-        case 14:  // BOOL
+        case 15:  // BOOL
             value.copy<bool>(YY_MOVE(that.value));
             break;
 
-        case 13:  // NUMBER_DOUBLE
+        case 14:  // NUMBER_DOUBLE
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 11:  // NUMBER_INT
+        case 12:  // NUMBER_INT
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 12:  // NUMBER_LONG
+        case 13:  // NUMBER_LONG
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
-        case 10:  // STRING
+        case 11:  // STRING
             value.copy<std::string>(YY_MOVE(that.value));
             break;
 
@@ -1315,28 +1338,30 @@ template <typename Base>
 void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
     switch (this->kind()) {
-        case 16:  // stageList
-        case 17:  // stage
+        case 17:  // stageList
+        case 18:  // stage
+        case 19:  // inhibitOptimization
+        case 20:  // unionWith
             value.move<CNode>(YY_MOVE(s.value));
             break;
 
-        case 14:  // BOOL
+        case 15:  // BOOL
             value.move<bool>(YY_MOVE(s.value));
             break;
 
-        case 13:  // NUMBER_DOUBLE
+        case 14:  // NUMBER_DOUBLE
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 11:  // NUMBER_INT
+        case 12:  // NUMBER_INT
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 12:  // NUMBER_LONG
+        case 13:  // NUMBER_LONG
             value.move<long long>(YY_MOVE(s.value));
             break;
 
-        case 10:  // STRING
+        case 11:  // STRING
             value.move<std::string>(YY_MOVE(s.value));
             break;
 
@@ -1380,7 +1405,7 @@ inline PipelineParserGen::symbol_kind_type PipelineParserGen::by_kind::type_get(
 
 #line 52 "pipeline_grammar.yy"
 }  // namespace mongo
-#line 1658 "pipeline_parser_gen.hpp"
+#line 1689 "pipeline_parser_gen.hpp"
 
 
 #endif  // !YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED

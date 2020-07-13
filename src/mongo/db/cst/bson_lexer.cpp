@@ -37,66 +37,108 @@ namespace mongo {
 
 namespace {
 
-// Structure to annotate reserved tokens, used to hint the lexer into behavior once the token is
-// seen. There are no semantic values associated with these tokens.
-struct KeywordToken {
-    boost::optional<PipelineParserGen::token_type> type;
-    bool traverseChild;
-    bool orderedArguments;
+// Mapping of reserved keywords to BSON token. Any key which is not included in this map is assumed
+// to be a user field name and is treated as a terminal by the parser.
+const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
+    {"$_internalInhibitOptimization", PipelineParserGen::token::STAGE_INHIBIT_OPTIMIZATION},
+    {"$unionWith", PipelineParserGen::token::STAGE_UNION_WITH},
+    {"coll", PipelineParserGen::token::COLL_ARG},
+    {"pipeline", PipelineParserGen::token::PIPELINE_ARG},
 };
-
-// Mapping of reserved keywords to BSON token. Any key which is not included in this map is treated
-// as a terminal.
-const StringMap<KeywordToken> reservedKeyLookup = {
-    {"$_internalInhibitOptimization",
-     {
-         PipelineParserGen::token::STAGE_INHIBIT_OPTIMIZATION,
-         false /* traverseChild */,
-         false /* orderedArguments */
-     }},
-};
+bool isCompound(PipelineParserGen::symbol_type token) {
+    return token.type_get() == static_cast<int>(PipelineParserGen::token::START_OBJECT) ||
+        token.type_get() == static_cast<int>(PipelineParserGen::token::START_ARRAY);
+}
 
 }  // namespace
 
-void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
-    // The rules for tokenizing element field names fall into two buckets:
-    //      1. It matches a reserved keyword or operator. In this case, the traversal rules and
-    //      sensitivity to ordered nested arguments is dictated by the annotation in the lookup
-    //      table.
-    //      2. It is not a reserved keyword and thus is treated as a STRING literal token. The
-    //      traversal rules for such elements is always to traverse but ignore argument order if the
-    //      value is an object.
-    KeywordToken fieldNameToken = [&] {
-        if (includeFieldName) {
-            if (auto it = reservedKeyLookup.find(elem.fieldNameStringData());
-                it != reservedKeyLookup.end()) {
-                _tokens.emplace_back(*it->second.type, getNextLoc());
-                return it->second;
-            } else {
-                _tokens.emplace_back(
-                    PipelineParserGen::make_STRING(elem.fieldName(), getNextLoc()));
-                return KeywordToken{PipelineParserGen::token::STRING, true, false};
-            }
+void BSONLexer::sortObjTokens() {
+    // A TokenElement is similar to a BSONElement, with the payload being a vector of Bison symbols
+    // if the type is compound (object or array).
+    using TokenElement =
+        std::pair<PipelineParserGen::symbol_type, std::vector<PipelineParserGen::symbol_type>>;
+    struct TokenElementCompare {
+        bool operator()(const TokenElement& elem1, const TokenElement& elem2) const {
+            return elem1.first.type_get() < elem2.first.type_get();
         }
-        return KeywordToken{boost::none, true, false};
-    }();
+    };
+
+    auto currentPosition = _position;
+    if (_tokens[currentPosition].type_get() !=
+        static_cast<int>(PipelineParserGen::token::START_OBJECT)) {
+        return;
+    }
+
+    std::list<TokenElement> sortedTokenPairs;
+    // Increment to get to the first token after the START_OBJECT. We will sort tokens until the
+    // matching END_OBJECT is found.
+    currentPosition++;
+    while (_tokens[currentPosition].type_get() !=
+           static_cast<int>(PipelineParserGen::token::END_OBJECT)) {
+        invariant(size_t(currentPosition) < _tokens.size());
+
+        auto keyToken = _tokens[currentPosition++];
+
+        std::vector<PipelineParserGen::symbol_type> rhsTokens;
+        rhsTokens.push_back(_tokens[currentPosition]);
+        if (isCompound(_tokens[currentPosition])) {
+            auto braceCount = 1;
+            currentPosition++;
+            // Only sort the top level tokens. If we encounter a compound type, then jump to its
+            // matching bracket or brace.
+            while (braceCount > 0) {
+                if (isCompound(_tokens[currentPosition]))
+                    braceCount++;
+                if (_tokens[currentPosition].type_get() ==
+                        static_cast<int>(PipelineParserGen::token::END_OBJECT) ||
+                    _tokens[currentPosition].type_get() ==
+                        static_cast<int>(PipelineParserGen::token::END_ARRAY))
+                    braceCount--;
+
+                rhsTokens.push_back(_tokens[currentPosition++]);
+            }
+        } else {
+            // Scalar, already added above.
+            currentPosition++;
+        }
+        sortedTokenPairs.push_back(std::make_pair(keyToken, rhsTokens));
+    }
+    sortedTokenPairs.sort(TokenElementCompare());
+
+    // _position is at the initial START_OBJECT, and currentPosition is at its matching
+    // END_OBJECT. We need to flatten the sorted list of KV pairs to get the correct order of
+    // tokens.
+    auto replacePosition = _position + 1;
+    for (auto&& [key, rhsTokens] : sortedTokenPairs) {
+        _tokens[replacePosition].clear();
+        _tokens[replacePosition++].move(key);
+        for (auto&& token : rhsTokens) {
+            _tokens[replacePosition].clear();
+            _tokens[replacePosition++].move(token);
+        }
+    }
+}
+
+void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
+    // Skipped when we are tokenizing arrays.
+    if (includeFieldName) {
+        if (auto it = reservedKeyLookup.find(elem.fieldNameStringData());
+            it != reservedKeyLookup.end()) {
+            // Place the token expected by the parser if this is a reserved keyword.
+            _tokens.emplace_back(it->second, getNextLoc());
+        } else {
+            // If we don't care about the keyword, the fieldname is treated as a normal string.
+            _tokens.emplace_back(PipelineParserGen::make_STRING(elem.fieldName(), getNextLoc()));
+        }
+    }
 
     switch (elem.type()) {
         case BSONType::Object:
-            if (fieldNameToken.orderedArguments) {
-                _tokens.emplace_back(PipelineParserGen::token::START_ORDERED_OBJECT, getNextLoc());
-                BSONObjIteratorSorted sortedIt(elem.embeddedObject());
-                while (sortedIt.more()) {
-                    tokenize(sortedIt.next(), true);
-                }
-                _tokens.emplace_back(PipelineParserGen::token::END_ORDERED_OBJECT, getNextLoc());
-            } else {
-                _tokens.emplace_back(PipelineParserGen::token::START_OBJECT, getNextLoc());
-                for (auto&& nestedElem : elem.embeddedObject()) {
-                    tokenize(nestedElem, true);
-                }
-                _tokens.emplace_back(PipelineParserGen::token::END_OBJECT, getNextLoc());
+            _tokens.emplace_back(PipelineParserGen::token::START_OBJECT, getNextLoc());
+            for (auto&& nestedElem : elem.embeddedObject()) {
+                tokenize(nestedElem, true);
             }
+            _tokens.emplace_back(PipelineParserGen::token::END_OBJECT, getNextLoc());
             break;
         case BSONType::Array:
             _tokens.emplace_back(PipelineParserGen::token::START_ARRAY, getNextLoc());

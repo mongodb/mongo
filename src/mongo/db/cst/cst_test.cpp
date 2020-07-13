@@ -79,14 +79,14 @@ TEST(CstGrammarTest, InvalidPipelineSpec) {
         auto input = fromjson("{pipeline: [{}]}");
         BSONLexer lexer(input["pipeline"].Array());
         auto parseTree = PipelineParserGen(lexer, &output);
-        ASSERT_EQ(1, parseTree.parse());
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
     }
     {
         CNode output;
         auto input = fromjson("{pipeline: [{$unknownStage: {}}]}");
         BSONLexer lexer(input["pipeline"].Array());
         auto parseTree = PipelineParserGen(lexer, &output);
-        ASSERT_EQ(1, parseTree.parse());
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
     }
     {
         ASSERT_THROWS_CODE(
@@ -116,7 +116,33 @@ TEST(CstGrammarTest, ParsesInternalInhibitOptimization) {
         auto input = fromjson("{pipeline: [{$_internalInhibitOptimization: 'invalid'}]}");
         BSONLexer lexer(input["pipeline"].Array());
         auto parseTree = PipelineParserGen(lexer, &output);
-        ASSERT_EQ(1, parseTree.parse());
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstGrammarTest, ParsesUnionWith) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$unionWith: {coll: 'hey', pipeline: 1.0}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::unionWith == stages[0].firstKeyFieldname());
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$unionWith: {pipeline: 1.0, coll: 'hey'}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::unionWith == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ unionWith: { collArg: \"<UserString hey>\", pipelineArg: \"<UserDouble "
+                  "1.000000>\" } }");
     }
 }
 

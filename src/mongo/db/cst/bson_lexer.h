@@ -49,6 +49,19 @@ public:
         return _tokens[_position++];
     }
 
+    /**
+     * Sorts the object that starts at the current position, based on the enum for each of the field
+     * name tokens.
+     */
+    void sortObjTokens();
+
+    /**
+     * Convenience for retrieving the token at the given offset.
+     */
+    auto& operator[](int offset) {
+        return _tokens[offset];
+    }
+
 private:
     // Tokenizes the given BSONElement, traversing its children if necessary. If the field name
     // should not be considered, set 'includeFieldName' to false.

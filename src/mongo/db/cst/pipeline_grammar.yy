@@ -81,13 +81,17 @@
         // Mandatory error function.
         void PipelineParserGen::error (const PipelineParserGen::location_type& loc, 
                                        const std::string& msg) {
-          std::cerr << msg << " at loc " << loc << std::endl;
+            uasserted(ErrorCodes::FailedToParse, str::stream() << msg <<
+                    " at location " <<
+                    loc.begin.line << ":" << loc.begin.column <<
+                    " of input BSON. Lexer produced token of type " <<
+                    lexer[loc.begin.column].type_get() << "." );
         }
     }  // namespace mongo
 }
 
 // Parsing parameters, funneled through yyparse() to yylex().
-%param {BSONLexer& driver}
+%param {BSONLexer& lexer}
 // yyparse() parameter only.
 %parse-param {CNode* cst}
 
@@ -98,13 +102,16 @@
 %token 
     START_OBJECT
     END_OBJECT
-    START_ORDERED_OBJECT
-    END_ORDERED_OBJECT
     START_ARRAY
     END_ARRAY
 
     // Reserve pipeline stage names.
     STAGE_INHIBIT_OPTIMIZATION
+    STAGE_UNION_WITH
+
+    // $unionWith arguments.
+    COLL_ARG
+    PIPELINE_ARG
 
     END_OF_FILE 0 "EOF"
 ;
@@ -118,7 +125,7 @@
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
-%nterm <CNode> stageList stage
+%nterm <CNode> stageList stage inhibitOptimization unionWith
 
 //
 // Grammar rules
@@ -133,16 +140,34 @@ pipeline: START_ARRAY stageList END_ARRAY {
 stageList[result]:
     %empty { }
     | START_OBJECT stage END_OBJECT stageList[stagesArg] { 
-        $result = std::move($stagesArg);
-        auto& children = stdx::get<CNode::ArrayChildren>($result.payload);
-        children.emplace_back(std::move($stage));
+        $result = CNode{CNode::ArrayChildren{$stage}};
     }
 ;
 
+// Special rule to hint to the lexer that the next set of tokens should be sorted. Note that the 
+// sort order is not lexicographical, but rather based on the enum generated from the %token list
+// above.
+START_ORDERED_OBJECT: { lexer.sortObjTokens(); } START_OBJECT;
+
 stage:
-    STAGE_INHIBIT_OPTIMIZATION START_OBJECT END_OBJECT { 
-        $stage = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
-    }
+    inhibitOptimization | unionWith
 ;
+
+inhibitOptimization:
+    STAGE_INHIBIT_OPTIMIZATION START_OBJECT END_OBJECT { 
+        $inhibitOptimization =
+CNode{CNode::ObjectChildren{std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
+    };
+
+unionWith:
+    STAGE_UNION_WITH START_ORDERED_OBJECT COLL_ARG STRING PIPELINE_ARG NUMBER_DOUBLE END_OBJECT {
+    auto coll = CNode{UserString($STRING)};
+    auto pipeline = CNode{UserDouble($NUMBER_DOUBLE)};
+    $unionWith = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::unionWith,
+        CNode{CNode::ObjectChildren{
+            {KeyFieldname::collArg, std::move(coll)},
+            {KeyFieldname::pipelineArg, std::move(pipeline)}
+     }}}}};
+};
 
 %%
