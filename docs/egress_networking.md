@@ -22,7 +22,10 @@ The scheduling of requests is managed by the [task executor][task_executor_h], w
 
 Client-side legacy networking draws upon the `DBClientBase` class, of which there are multiple subclasses residing in the `src/mongo/client` folder. The [replica set DBClient][dbclient_rs_h] discerns which one of multiple servers in a replica set is the primary/master at construction time, and establishes a connection (using the `DBClientConnection` wrapper class, also extended from `DBClientBase`) with the replica set via the primary/master. In cases where the primary/master server is unresponsive within a specified time range, the RS DBClient will automatically attempt to establish a secondary/slave server as the new primary/master (see [automatic failover][automatic_failover]).
 
-**See also:** [Internal Ingress Networking][ingress_networking]
+## See Also
+Below are links to relevant server-related internal documentation.
+- [Ingress Networking][ingress_networking]
+- Transport Layer (in progress)
 
 [remote_command_request_h]: ../src/mongo/executor/remote_command_request.h
 [remote_command_response_h]: ../src/mongo/executor/remote_command_response.h
