@@ -290,13 +290,14 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
     if (!getrlimit(RLIMIT_NOFILE, &rlnofile)) {
         if (rlnofile.rlim_cur < minNumFiles) {
-            LOGV2_WARNING_OPTIONS(
-                22184,
-                {logv2::LogTag::kStartupWarnings},
-                "Soft rlimits is {currentValue}, recommended minimum is {recommendedMinimum}",
-                "Soft rlimits too low",
-                "currentValue"_attr = rlnofile.rlim_cur,
-                "recommendedMinimum"_attr = minNumFiles);
+            LOGV2_WARNING_OPTIONS(22184,
+                                  {logv2::LogTag::kStartupWarnings},
+                                  "** WARNING: Soft rlimits too low. The limit for open file "
+                                  "descriptors is {currentValue}, recommended "
+                                  "minimum is {recommendedMinimum}",
+                                  "Soft rlimits for open file descriptors too low",
+                                  "currentValue"_attr = rlnofile.rlim_cur,
+                                  "recommendedMinimum"_attr = minNumFiles);
         }
     } else {
         const auto errmsg = errnoWithDescription();
@@ -316,14 +317,15 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
     if (!getrlimit(RLIMIT_MEMLOCK, &rlmemlock)) {
         if ((rlmemlock.rlim_cur / ProcessInfo::getPageSize()) < minLockedPages) {
-            LOGV2_WARNING_OPTIONS(
-                22188,
-                {logv2::LogTag::kStartupWarnings},
-                "** WARNING: Soft rlimits too low. The locked memory size is {lockedMemoryBytes} "
-                "bytes, it should be at least {minLockedMemoryBytes} bytes",
-                "Soft rlimits too low",
-                "lockedMemoryBytes"_attr = rlmemlock.rlim_cur,
-                "minLockedMemoryBytes"_attr = minLockedPages * ProcessInfo::getPageSize());
+            LOGV2_WARNING_OPTIONS(22188,
+                                  {logv2::LogTag::kStartupWarnings},
+                                  "** WARNING: Soft rlimits too low. The limit for locked memory "
+                                  "size is {lockedMemoryBytes} "
+                                  "bytes, it should be at least {minLockedMemoryBytes} bytes",
+                                  "Soft rlimit for locked memory too low",
+                                  "lockedMemoryBytes"_attr = rlmemlock.rlim_cur,
+                                  "minLockedMemoryBytes"_attr =
+                                      minLockedPages * ProcessInfo::getPageSize());
         }
     } else {
         const auto errmsg = errnoWithDescription();
