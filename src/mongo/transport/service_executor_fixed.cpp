@@ -109,7 +109,7 @@ Status ServiceExecutorFixed::shutdown(Milliseconds timeout) {
     return waitForShutdown();
 }
 
-Status ServiceExecutorFixed::schedule(Task task, ScheduleFlags flags) {
+Status ServiceExecutorFixed::scheduleTask(Task task, ScheduleFlags flags) {
     if (!_canScheduleWork.load()) {
         return Status(ErrorCodes::ShutdownInProgress, "Executor is not running");
     }

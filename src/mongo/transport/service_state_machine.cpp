@@ -597,7 +597,7 @@ void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
         ssm->_runNextInGuard(std::move(guard));
     };
     guard.release();
-    Status status = _serviceExecutor->schedule(std::move(func), flags);
+    Status status = _serviceExecutor->scheduleTask(std::move(func), flags);
     if (status.isOK()) {
         return;
     }

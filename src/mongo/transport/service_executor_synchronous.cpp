@@ -78,7 +78,7 @@ Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
                  "passthrough executor couldn't shutdown all worker threads within time limit.");
 }
 
-Status ServiceExecutorSynchronous::schedule(Task task, ScheduleFlags flags) {
+Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) {
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }
@@ -109,7 +109,7 @@ Status ServiceExecutorSynchronous::schedule(Task task, ScheduleFlags flags) {
         return Status::OK();
     }
 
-    // First call to schedule() for this connection, spawn a worker thread that will push jobs
+    // First call to scheduleTask() for this connection, spawn a worker thread that will push jobs
     // into the thread local job queue.
     LOGV2_DEBUG(22983, 3, "Starting new executor thread in passthrough mode");
 

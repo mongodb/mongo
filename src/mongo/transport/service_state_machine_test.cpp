@@ -252,7 +252,7 @@ public:
     Status shutdown(Milliseconds timeout) override {
         return Status::OK();
     }
-    Status schedule(Task task, ScheduleFlags flags) override {
+    Status scheduleTask(Task task, ScheduleFlags flags) override {
         if (!_scheduleHook) {
             return Status::OK();
         } else {

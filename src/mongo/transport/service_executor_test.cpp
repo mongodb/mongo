@@ -146,7 +146,7 @@ void scheduleBasicTask(ServiceExecutor* exec, bool expectSuccess) {
     auto barrier = std::make_shared<unittest::Barrier>(2);
     auto task = [barrier] { barrier->countDownAndWait(); };
 
-    auto status = exec->schedule(std::move(task), ServiceExecutor::kEmptyFlags);
+    auto status = exec->scheduleTask(std::move(task), ServiceExecutor::kEmptyFlags);
     if (expectSuccess) {
         ASSERT_OK(status);
         barrier->countDownAndWait();
@@ -213,7 +213,7 @@ private:
 
 TEST_F(ServiceExecutorFixedFixture, ScheduleFailsBeforeStartup) {
     auto executor = getServiceExecutor();
-    ASSERT_NOT_OK(executor->schedule([] {}, ServiceExecutor::kEmptyFlags));
+    ASSERT_NOT_OK(executor->scheduleTask([] {}, ServiceExecutor::kEmptyFlags));
 }
 
 DEATH_TEST_F(ServiceExecutorFixedFixture, DestructorFailsBeforeShutdown, "invariant") {
@@ -224,8 +224,8 @@ DEATH_TEST_F(ServiceExecutorFixedFixture, DestructorFailsBeforeShutdown, "invari
 TEST_F(ServiceExecutorFixedFixture, BasicTaskRuns) {
     auto executor = startAndGetServiceExecutor();
     auto barrier = std::make_shared<unittest::Barrier>(2);
-    ASSERT_OK(executor->schedule([barrier]() mutable { barrier->countDownAndWait(); },
-                                 ServiceExecutor::kEmptyFlags));
+    ASSERT_OK(executor->scheduleTask([barrier]() mutable { barrier->countDownAndWait(); },
+                                     ServiceExecutor::kEmptyFlags));
     barrier->countDownAndWait();
 }
 
@@ -237,7 +237,7 @@ TEST_F(ServiceExecutorFixedFixture, RecursiveTask) {
     recursiveTask = [&, barrier] {
         auto recursionGuard = makeRecursionGuard();
         if (getRecursionDepth() < fixedServiceExecutorRecursionLimit.load()) {
-            ASSERT_OK(executor->schedule(recursiveTask, ServiceExecutor::kMayRecurse));
+            ASSERT_OK(executor->scheduleTask(recursiveTask, ServiceExecutor::kMayRecurse));
         } else {
             // This test never returns unless the service executor can satisfy the recursion depth.
             barrier->countDownAndWait();
@@ -245,7 +245,7 @@ TEST_F(ServiceExecutorFixedFixture, RecursiveTask) {
     };
 
     // Schedule recursive task and wait for the recursion to stop
-    ASSERT_OK(executor->schedule(recursiveTask, ServiceExecutor::kMayRecurse));
+    ASSERT_OK(executor->scheduleTask(recursiveTask, ServiceExecutor::kMayRecurse));
     barrier->countDownAndWait();
 }
 
@@ -262,7 +262,7 @@ TEST_F(ServiceExecutorFixedFixture, FlattenRecursiveScheduledTasks) {
         auto recursionGuard = makeRecursionGuard();
         ASSERT_EQ(getRecursionDepth(), 1);
         if (tasksToSchedule.fetchAndSubtract(1) > 0) {
-            ASSERT_OK(executor->schedule(recursiveTask, ServiceExecutor::kEmptyFlags));
+            ASSERT_OK(executor->scheduleTask(recursiveTask, ServiceExecutor::kEmptyFlags));
         } else {
             // Once there are no more tasks to schedule, notify the main thread to proceed.
             barrier->countDownAndWait();
@@ -270,7 +270,7 @@ TEST_F(ServiceExecutorFixedFixture, FlattenRecursiveScheduledTasks) {
     };
 
     // Schedule the recursive task and wait for the execution to finish.
-    ASSERT_OK(executor->schedule(recursiveTask, ServiceExecutor::kMayYieldBeforeSchedule));
+    ASSERT_OK(executor->scheduleTask(recursiveTask, ServiceExecutor::kMayYieldBeforeSchedule));
     barrier->countDownAndWait();
 }
 
@@ -279,7 +279,7 @@ TEST_F(ServiceExecutorFixedFixture, ShutdownTimeLimit) {
     auto invoked = std::make_shared<SharedPromise<void>>();
     auto mayReturn = std::make_shared<SharedPromise<void>>();
 
-    ASSERT_OK(executor->schedule(
+    ASSERT_OK(executor->scheduleTask(
         [executor, invoked, mayReturn]() mutable {
             invoked->emplaceValue();
             mayReturn->getFuture().get();
@@ -304,7 +304,7 @@ TEST_F(ServiceExecutorFixedFixture, Stats) {
     };
 
     for (auto i = 0; i < kNumExecutorThreads; i++) {
-        ASSERT_OK(executor->schedule(task, ServiceExecutor::kEmptyFlags));
+        ASSERT_OK(executor->scheduleTask(task, ServiceExecutor::kEmptyFlags));
     }
 
     // The main thread waits for the executor threads to bump up "threadsRunning" while picking up a
@@ -337,7 +337,7 @@ TEST_F(ServiceExecutorFixedFixture, ScheduleFailsAfterShutdown) {
         FailPointEnableBlock failpoint("hangBeforeSchedulingServiceExecutorFixedTask");
         schedulerThread = std::make_unique<stdx::thread>([executor] {
             ASSERT_NOT_OK(
-                executor->schedule([] { MONGO_UNREACHABLE; }, ServiceExecutor::kEmptyFlags));
+                executor->scheduleTask([] { MONGO_UNREACHABLE; }, ServiceExecutor::kEmptyFlags));
         });
         failpoint->waitForTimesEntered(1);
         ASSERT_OK(executor->shutdown(kShutdownTime));
