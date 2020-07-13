@@ -40,10 +40,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
-
 /**
  * All-thread backtrace is only implemented on Linux. Even on Linux, it's only AS-safe
  * when we are using the libunwind backtrace implementation. The feature and related
@@ -51,19 +47,9 @@
  *    - setupStackTraceSignalAction
  *    - markAsStackTraceProcessingThread
  *    - printAllThreadStacks
- *
- *    This feature currently does not work with TSAN because TSAN introduces internal
- *    threads which block SIGUSR2, and that violates our assumption that all threads
- *    are known and accept SIGUSR2. With this enabled, users could try getting a
- *    stack trace and get a segfault instead. For the time being, we are disabling
- *    this feature with TSAN. However, this feature will need to be fixed to work with
- *    TSAN so developers can diagnose TSAN test failures with on-demand stack traces.
- *    TODO: https://jira.mongodb.org/browse/SERVER-48622
  */
-#if defined(__linux__)
-#if defined(MONGO_CONFIG_USE_LIBUNWIND) && !__has_feature(thread_sanitizer)
+#if defined(__linux__) && defined(MONGO_CONFIG_USE_LIBUNWIND)
 #define MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS
-#endif
 #endif
 
 namespace mongo {

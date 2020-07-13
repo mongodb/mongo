@@ -2917,6 +2917,20 @@ def doConfigure(myenv):
             myenv.AppendUnique(CPPDEFINES=['ADDRESS_SANITIZER'])
 
         if using_tsan:
+
+            if use_libunwind:
+                # TODO: SERVER-48622
+                #
+                # See https://github.com/google/sanitizers/issues/943
+                # for why we disallow combining TSAN with
+                # libunwind. We could, atlernatively, have added logic
+                # to automate the decision about whether to enable
+                # libunwind based on whether TSAN is enabled, but that
+                # logic is already complex, and it feels better to
+                # make it explicit that using TSAN means you won't get
+                # the benefits of libunwind. Fixing this is:
+                env.FatalError("Cannot use libunwind with TSAN, please add --use-libunwind=off to your compile flags")
+
             # die_after_fork=0 is a temporary setting to allow tests to continue while we figure out why
             # we're running afoul of it. If we remove it here, it also needs to be removed from the test
             # variant in etc/evergreen.yml
