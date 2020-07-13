@@ -39,10 +39,20 @@
 
 namespace mongo::stage_builder {
 /**
+ * Creates a new compilation environment and registers global values within the
+ * new environment.
+ */
+std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
+    OperationContext* opCtx, sbe::value::SlotIdGenerator* slotIdGenerator);
+
+/**
  * Some auxiliary data returned by a 'SlotBasedStageBuilder' along with a PlanStage tree root, which
  * is needed to execute the PlanStage tree.
  */
 struct PlanStageData {
+    PlanStageData(std::unique_ptr<sbe::RuntimeEnvironment> env)
+        : env{env.get()}, ctx{std::move(env)} {}
+
     std::string debugString() const {
         StringBuilder builder;
 
@@ -56,15 +66,19 @@ struct PlanStageData {
             builder << "$$OPLOGTS=s" << *oplogTsSlot << " ";
         }
 
+        env->debugString(&builder);
+
         return builder.str();
     }
 
     boost::optional<sbe::value::SlotId> resultSlot;
     boost::optional<sbe::value::SlotId> recordIdSlot;
     boost::optional<sbe::value::SlotId> oplogTsSlot;
+    sbe::RuntimeEnvironment* env{nullptr};
     sbe::CompileCtx ctx;
     bool shouldTrackLatestOplogTimestamp{false};
     bool shouldTrackResumeToken{false};
+    bool shouldUseTailableScan{false};
     // Used during the trial run of the runtime planner to track progress of the work done so far.
     std::unique_ptr<TrialRunProgressTracker> trialRunProgressTracker;
 };
@@ -114,6 +128,8 @@ private:
         sbe::value::SlotId recordIdKeySlot,
         const sbe::value::SlotVector& slotsToForward = {});
 
+    std::unique_ptr<sbe::PlanStage> makeUnionForTailableCollScan(const QuerySolutionNode* root);
+
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
@@ -127,10 +143,16 @@ private:
     // should inflate each index entry into an object and bind it to this slot.
     boost::optional<sbe::value::SlotId> _returnKeySlot;
 
+    // These two flags control whether we're in the middle of the process of building a special
+    // union sub-tree implementing a tailable cursor collection scan, and if so, whether we're
+    // building an anchor or resume branch.
+    bool _isBuildingUnionForTailableCollScan{false};
+    bool _isTailableCollScanResumeBranch{false};
+
     PlanYieldPolicySBE* const _yieldPolicy;
 
     // Apart from generating just an execution tree, this builder will also produce some auxiliary
     // data which is needed to execute the tree, such as a result slot, or a recordId slot.
-    PlanStageData _data;
+    PlanStageData _data{makeRuntimeEnvironment(_opCtx, &_slotIdGenerator)};
 };
 }  // namespace mongo::stage_builder

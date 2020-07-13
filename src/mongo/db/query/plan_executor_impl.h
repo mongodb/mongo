@@ -117,33 +117,6 @@ private:
      */
     Status _pickBestPlan();
 
-    /**
-     * Returns true if the PlanExecutor should listen for inserts, which is when a getMore is called
-     * on a tailable and awaitData cursor that still has time left and hasn't been interrupted.
-     */
-    bool _shouldListenForInserts();
-
-    /**
-     * Returns true if the PlanExecutor should wait for data to be inserted, which is when a getMore
-     * is called on a tailable and awaitData cursor on a capped collection.  Returns false if an EOF
-     * should be returned immediately.
-     */
-    bool _shouldWaitForInserts();
-
-    /**
-     * Gets the CappedInsertNotifier for a capped collection.  Returns nullptr if this plan executor
-     * is not capable of yielding based on a notifier.
-     */
-    std::shared_ptr<CappedInsertNotifier> _getCappedInsertNotifier();
-
-    /**
-     * Called for tailable and awaitData cursors in order to yield locks and waits for inserts to
-     * the collection being tailed. Returns control to the caller once there has been an insertion
-     * and there may be new results. If the PlanExecutor was killed during a yield, throws an
-     * exception.
-     */
-    void _waitForInserts(CappedInsertNotifierData* notifierData);
-
     ExecState _getNextImpl(Snapshotted<Document>* objOut, RecordId* dlOut);
 
     // The OperationContext that we're executing within. This can be updated if necessary by using

@@ -692,6 +692,88 @@ std::vector<DebugPrinter::Block> ETypeMatch::debugPrint() const {
     return ret;
 }
 
+RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment& other)
+    : _state{other._state}, _isSmp{other._isSmp} {
+    for (auto&& [type, slot] : _state->slots) {
+        emplaceAccessor(slot.first, slot.second);
+    }
+}
+
+RuntimeEnvironment::~RuntimeEnvironment() {
+    if (_state.use_count() == 1) {
+        for (size_t idx = 0; idx < _state->vals.size(); ++idx) {
+            if (_state->owned[idx]) {
+                releaseValue(_state->typeTags[idx], _state->vals[idx]);
+            }
+        }
+    }
+}
+
+value::SlotId RuntimeEnvironment::registerSlot(StringData type,
+                                               value::TypeTags tag,
+                                               value::Value val,
+                                               bool owned,
+                                               value::SlotIdGenerator* slotIdGenerator) {
+    if (auto it = _state->slots.find(type); it == _state->slots.end()) {
+        invariant(slotIdGenerator);
+        auto slot = slotIdGenerator->generate();
+        emplaceAccessor(slot, _state->pushSlot(type, slot));
+        _accessors.at(slot).reset(owned, tag, val);
+        return slot;
+    }
+
+    uasserted(4946303, str::stream() << "slot already registered:" << type);
+}
+
+value::SlotId RuntimeEnvironment::getSlot(StringData type) {
+    if (auto it = _state->slots.find(type); it != _state->slots.end()) {
+        return it->second.first;
+    }
+
+    uasserted(4946305, str::stream() << "environment slot is not registered for type: " << type);
+}
+
+void RuntimeEnvironment::resetSlot(value::SlotId slot,
+                                   value::TypeTags tag,
+                                   value::Value val,
+                                   bool owned) {
+    // With intra-query parallelism enabled the global environment can hold only read-only values.
+    invariant(!_isSmp);
+
+    if (auto it = _accessors.find(slot); it != _accessors.end()) {
+        it->second.reset(owned, tag, val);
+        return;
+    }
+
+    uasserted(4946300, str::stream() << "undefined slot accessor:" << slot);
+}
+
+value::SlotAccessor* RuntimeEnvironment::getAccessor(value::SlotId slot) {
+    if (auto it = _accessors.find(slot); it != _accessors.end()) {
+        return &it->second;
+    }
+
+    uasserted(4946301, str::stream() << "undefined slot accessor:" << slot);
+}
+
+std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopy(bool isSmp) {
+    // Once this environment is used to create a copy for a parallel plan execution, it becomes
+    // a parallel environment itself.
+    if (isSmp) {
+        _isSmp = isSmp;
+    }
+
+    return std::unique_ptr<RuntimeEnvironment>(new RuntimeEnvironment(*this));
+}
+
+void RuntimeEnvironment::debugString(StringBuilder* builder) {
+    *builder << "env: { ";
+    for (auto&& [type, slot] : _state->slots) {
+        *builder << type << "=s" << slot.first << " ";
+    }
+    *builder << "}";
+}
+
 value::SlotAccessor* CompileCtx::getAccessor(value::SlotId slot) {
     for (auto it = correlated.rbegin(); it != correlated.rend(); ++it) {
         if (it->first == slot) {
@@ -699,7 +781,7 @@ value::SlotAccessor* CompileCtx::getAccessor(value::SlotId slot) {
         }
     }
 
-    uasserted(4822848, str::stream() << "undefined slot accessor:" << slot);
+    return env->getAccessor(slot);
 }
 
 std::shared_ptr<SpoolBuffer> CompileCtx::getSpoolBuffer(SpoolId spool) {
@@ -715,6 +797,10 @@ void CompileCtx::pushCorrelated(value::SlotId slot, value::SlotAccessor* accesso
 
 void CompileCtx::popCorrelated() {
     correlated.pop_back();
+}
+
+CompileCtx CompileCtx::makeCopy(bool isSmp) {
+    return {env->makeCopy(isSmp)};
 }
 }  // namespace sbe
 }  // namespace mongo

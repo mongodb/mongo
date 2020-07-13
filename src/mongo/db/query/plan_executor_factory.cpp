@@ -113,6 +113,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    const Collection* collection,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
 
@@ -129,6 +130,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     auto exec = new PlanExecutorSBE(opCtx,
                                     std::move(cq),
                                     std::move(root),
+                                    collection,
                                     std::move(nss),
                                     false,
                                     boost::none,
@@ -140,6 +142,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    const Collection* collection,
     NamespaceString nss,
     std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
@@ -152,8 +155,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 "slots"_attr = data.debugString(),
                 "stages"_attr = sbe::DebugPrinter{}.print(rootStage.get()));
 
-    auto exec = new PlanExecutorSBE(
-        opCtx, std::move(cq), std::move(root), std::move(nss), true, stash, std::move(yieldPolicy));
+    auto exec = new PlanExecutorSBE(opCtx,
+                                    std::move(cq),
+                                    std::move(root),
+                                    collection,
+                                    std::move(nss),
+                                    true,
+                                    stash,
+                                    std::move(yieldPolicy));
     return {{exec, PlanExecutor::Deleter{opCtx}}};
 }
 

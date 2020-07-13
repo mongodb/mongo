@@ -34,27 +34,185 @@
 #include <vector>
 
 #include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/id_generators.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace sbe {
 using SpoolBuffer = std::vector<value::MaterializedRow>;
 
+/**
+ * A holder for slots and accessors which are used in a PlanStage tree but:
+ *  - Cannot be made constants due to restrictions on the lifetime of such values (e.g., they're
+ *    singleton instances owned somewhere else).
+ *  - Can be changed in runtime outside of the PlanStage tree (e.g., a resume recordId changed by a
+ *    PlanExecutor).
+ *
+ * A RuntimeEnvironment object is created once per an execution thread. That means that each
+ * producer and consumer in a parallel plan will have their own compilation environment, with their
+ * own slot accessors. However, slot accessors in each of such environment will access shared data,
+ * which is the same across all environments.
+ *
+ * To avoid data races, the values stored in the runtime environment are considered read-only when
+ * used with a parallel plan. An attempt to change any slot with 'resetValue' will result in a user
+ * exception.
+ *
+ * If the runtime environment is used in a serial plan, modifications of the slots is allowed.
+ */
+class RuntimeEnvironment {
+public:
+    RuntimeEnvironment() = default;
+    RuntimeEnvironment(RuntimeEnvironment&&) = delete;
+    RuntimeEnvironment& operator=(const RuntimeEnvironment&) = delete;
+    RuntimeEnvironment& operator=(const RuntimeEnvironment&&) = delete;
+    ~RuntimeEnvironment();
+
+    /**
+     * Registers and returns a SlotId for the given slot 'type'. The 'slotIdGenerartor' is used to
+     * generated a new SlotId for the given slot 'type', which is then registered with this
+     * environment by creating a new SlotAccessor. The value 'val' is then stored within the
+     * SlotAccessor and the newly generated SlotId is returned.
+     *
+     * Both owned and unowned values can be stored in the runtime environment.
+     *
+     * A user exception is raised if this slot 'type' has been already registered.
+     */
+    value::SlotId registerSlot(StringData type,
+                               value::TypeTags tag,
+                               value::Value val,
+                               bool owned,
+                               value::SlotIdGenerator* slotIdGenerator);
+
+    /**
+     * Returns a SlotId registered for the given slot 'type'. If the slot hasn't been registered
+     * yet, a user exception is raised..
+     */
+    value::SlotId getSlot(StringData type);
+
+    /**
+     * Store the given value in the specified slot within this runtime environment instance.
+     *
+     * A user exception is raised if the SlotId is not registered within this environment, or
+     * if this environment is used with a parallel plan.
+     */
+    void resetSlot(value::SlotId slot, value::TypeTags tag, value::Value val, bool owned);
+
+    /**
+     * Returns a SlotAccessor for the given SlotId which must be previously registered within this
+     * Environment by invoking 'registerSlot' method.
+     *
+     * A user exception is raised if the SlotId is not registered within this environment.
+     */
+    value::SlotAccessor* getAccessor(value::SlotId slot);
+
+    /**
+     * Make a copy of his environment. The new environment will have its own set of SlotAccessors
+     * pointing to the same shared data holding slot values.
+     *
+     * To create a copy of the runtime environment for a parallel execution plan, the 'isSmp' flag
+     * must be set to 'true'. This will result in this environment being unconverted to a parallel
+     * environment, as well as the newly created copy.
+     */
+    std::unique_ptr<RuntimeEnvironment> makeCopy(bool isSmp);
+
+    /**
+     * Dumps all the slots currently defined in this environment into the given string builder.
+     */
+    void debugString(StringBuilder* builder);
+
+private:
+    RuntimeEnvironment(const RuntimeEnvironment&);
+
+    struct State {
+        auto pushSlot(StringData type, value::SlotId slot) {
+            auto index = vals.size();
+
+            typeTags.push_back(value::TypeTags::Nothing);
+            vals.push_back(0);
+            owned.push_back(false);
+
+            auto [it, inserted] = slots.emplace(type, std::make_pair(slot, index));
+            uassert(4946302, str::stream() << "duplicate environment slot: " << slot, inserted);
+            return index;
+        }
+
+        StringMap<std::pair<value::SlotId, size_t>> slots;
+        std::vector<value::TypeTags> typeTags;
+        std::vector<value::Value> vals;
+        std::vector<bool> owned;
+    };
+
+    class Accessor final : public value::SlotAccessor {
+    public:
+        Accessor(RuntimeEnvironment* env, size_t index) : _env{env}, _index{index} {}
+
+        std::pair<value::TypeTags, value::Value> getViewOfValue() const override {
+            return {_env->_state->typeTags[_index], _env->_state->vals[_index]};
+        }
+
+        std::pair<value::TypeTags, value::Value> copyOrMoveValue() override {
+            // Always make a copy.
+            return copyValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
+        }
+
+        void reset(bool owned, value::TypeTags tag, value::Value val) {
+            release();
+
+            _env->_state->typeTags[_index] = tag;
+            _env->_state->vals[_index] = val;
+            _env->_state->owned[_index] = owned;
+        }
+
+    private:
+        void release() {
+            if (_env->_state->owned[_index]) {
+                releaseValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
+                _env->_state->owned[_index] = false;
+            }
+        }
+
+        RuntimeEnvironment* const _env;
+        const size_t _index;
+    };
+
+    void emplaceAccessor(value::SlotId slot, size_t index) {
+        _accessors.emplace(slot, Accessor{this, index});
+    }
+
+    std::shared_ptr<State> _state{std::make_shared<State>()};
+    value::SlotMap<Accessor> _accessors;
+    bool _isSmp{false};
+
+    friend class Accessor;
+};
+
 class PlanStage;
 struct CompileCtx {
+    CompileCtx(std::unique_ptr<RuntimeEnvironment> env) : env{std::move(env)} {}
+
     value::SlotAccessor* getAccessor(value::SlotId slot);
     std::shared_ptr<SpoolBuffer> getSpoolBuffer(SpoolId spool);
 
     void pushCorrelated(value::SlotId slot, value::SlotAccessor* accessor);
     void popCorrelated();
 
+    CompileCtx makeCopy(bool isSmp);
+
     PlanStage* root{nullptr};
     value::SlotAccessor* accumulator{nullptr};
     std::vector<std::pair<value::SlotId, value::SlotAccessor*>> correlated;
     stdx::unordered_map<SpoolId, std::shared_ptr<SpoolBuffer>> spoolBuffers;
     bool aggExpression{false};
+
+private:
+    // Any data that a PlanStage needs from the RuntimeEnvironment should not be accessed directly
+    // but insteady by looking up the corresponding slots. These slots are set up during the process
+    // of building PlanStages, so the PlanStages themselves should never need to add new slots to
+    // the RuntimeEnvironment.
+    std::unique_ptr<RuntimeEnvironment> env;
 };
 
 /**

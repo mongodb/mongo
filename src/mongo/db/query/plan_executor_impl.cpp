@@ -37,8 +37,6 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
@@ -56,9 +54,8 @@
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -77,16 +74,10 @@ using std::vector;
 const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime =
     OperationContext::declareDecoration<repl::OpTime>();
 
-struct CappedInsertNotifierData {
-    shared_ptr<CappedInsertNotifier> notifier;
-    uint64_t lastEOFVersion = ~0;
-};
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
 MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
-MONGO_FAIL_POINT_DEFINE(planExecutorHangWhileYieldedInWaitForInserts);
 
 /**
  * Constructs a PlanYieldPolicy based on 'policy'.
@@ -326,77 +317,6 @@ PlanExecutor::ExecState PlanExecutorImpl::getNextDocument(Document* objOut, Reco
     return state;
 }
 
-bool PlanExecutorImpl::_shouldListenForInserts() {
-    return _cq && _cq->getQueryRequest().isTailableAndAwaitData() &&
-        awaitDataState(_opCtx).shouldWaitForInserts && _opCtx->checkForInterruptNoAssert().isOK() &&
-        awaitDataState(_opCtx).waitForInsertsDeadline >
-        _opCtx->getServiceContext()->getPreciseClockSource()->now();
-}
-
-bool PlanExecutorImpl::_shouldWaitForInserts() {
-    // If this is an awaitData-respecting operation and we have time left and we're not interrupted,
-    // we should wait for inserts.
-    if (_shouldListenForInserts()) {
-        // We expect awaitData cursors to be yielding.
-        invariant(_yieldPolicy->canReleaseLocksDuringExecution());
-
-        // For operations with a last committed opTime, we should not wait if the replication
-        // coordinator's lastCommittedOpTime has progressed past the client's lastCommittedOpTime.
-        // In that case, we will return early so that we can inform the client of the new
-        // lastCommittedOpTime immediately.
-        if (!clientsLastKnownCommittedOpTime(_opCtx).isNull()) {
-            auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-            return clientsLastKnownCommittedOpTime(_opCtx) >= replCoord->getLastCommittedOpTime();
-        }
-        return true;
-    }
-    return false;
-}
-
-std::shared_ptr<CappedInsertNotifier> PlanExecutorImpl::_getCappedInsertNotifier() {
-    // We don't expect to need a capped insert notifier for non-yielding plans.
-    invariant(_yieldPolicy->canReleaseLocksDuringExecution());
-
-    // We can only wait if we have a collection; otherwise we should retry immediately when
-    // we hit EOF.
-    dassert(_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
-    auto databaseHolder = DatabaseHolder::get(_opCtx);
-    auto db = databaseHolder->getDb(_opCtx, _nss.db());
-    invariant(db);
-    auto collection = CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(_opCtx, _nss);
-    invariant(collection);
-
-    return collection->getCappedInsertNotifier();
-}
-
-void PlanExecutorImpl::_waitForInserts(CappedInsertNotifierData* notifierData) {
-    invariant(notifierData->notifier);
-
-    // The notifier wait() method will not wait unless the version passed to it matches the
-    // current version of the notifier.  Since the version passed to it is the current version
-    // of the notifier at the time of the previous EOF, we require two EOFs in a row with no
-    // notifier version change in order to wait.  This is sufficient to ensure we never wait
-    // when data is available.
-    auto curOp = CurOp::get(_opCtx);
-    curOp->pauseTimer();
-    ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
-    auto opCtx = _opCtx;
-    uint64_t currentNotifierVersion = notifierData->notifier->getVersion();
-    auto yieldResult = _yieldPolicy->yieldOrInterrupt(opCtx, [opCtx, notifierData] {
-        const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
-        notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
-        if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
-            LOGV2(4452903,
-                  "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point enabled. "
-                  "Blocking until fail point is disabled");
-            planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
-        }
-    });
-    notifierData->lastEOFVersion = currentNotifierVersion;
-
-    uassertStatusOK(yieldResult);
-}
-
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* objOut,
                                                        RecordId* dlOut) {
     if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
@@ -422,10 +342,11 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
     // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
     // insert notifier the entire time we are in the loop.  Holding a shared pointer to the capped
     // insert notifier is necessary for the notifierVersion to advance.
-    CappedInsertNotifierData cappedInsertNotifierData;
-    if (_shouldListenForInserts()) {
+    insert_listener::CappedInsertNotifierData cappedInsertNotifierData;
+    if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
         // We always construct the CappedInsertNotifier for awaitData cursors.
-        cappedInsertNotifierData.notifier = _getCappedInsertNotifier();
+        cappedInsertNotifierData.notifier =
+            insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
     }
     for (;;) {
         // These are the conditions which can cause us to yield:
@@ -519,10 +440,13 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                       "enabled. Blocking until fail point is disabled");
                 planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
             }
-            if (!_shouldWaitForInserts()) {
+
+            if (!insert_listener::shouldWaitForInserts(_opCtx, _cq.get(), _yieldPolicy.get())) {
                 return PlanExecutor::IS_EOF;
             }
-            _waitForInserts(&cappedInsertNotifierData);
+
+            insert_listener::waitForInserts(_opCtx, _yieldPolicy.get(), &cappedInsertNotifierData);
+
             // There may be more results, keep going.
             continue;
         }

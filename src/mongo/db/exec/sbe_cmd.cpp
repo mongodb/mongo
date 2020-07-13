@@ -78,12 +78,12 @@ public:
 
         NamespaceString nss{dbname};
 
+        stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};
+        data.resultSlot = resultSlot;
+        data.recordIdSlot = recordIdSlot;
+
         exec = uassertStatusOK(plan_executor_factory::make(
-            opCtx,
-            nullptr,
-            {std::move(root), stage_builder::PlanStageData{resultSlot, recordIdSlot}},
-            nss,
-            nullptr));
+            opCtx, nullptr, {std::move(root), std::move(data)}, nullptr, nss, nullptr));
 
         for (long long objCount = 0; objCount < batchSize; objCount++) {
             BSONObj next;

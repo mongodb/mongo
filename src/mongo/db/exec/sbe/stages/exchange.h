@@ -196,6 +196,11 @@ public:
     auto& producerPlans() {
         return _producerPlans;
     }
+
+    auto& producerCompileCtxs() {
+        return _producerCompileCtxs;
+    }
+
     auto& producerResults() {
         return _producerResults;
     }
@@ -218,6 +223,7 @@ private:
     std::vector<ExchangeConsumer*> _consumers;
     std::vector<ExchangeProducer*> _producers;
     std::vector<std::unique_ptr<PlanStage>> _producerPlans;
+    std::vector<CompileCtx> _producerCompileCtxs;
     std::vector<Future<void>> _producerResults;
 
     // Variables (fields) that pass through the exchange.
@@ -296,7 +302,9 @@ class ExchangeProducer final : public PlanStage {
 public:
     ExchangeProducer(std::unique_ptr<PlanStage> input, std::shared_ptr<ExchangeState> state);
 
-    static void start(OperationContext* opCtx, std::unique_ptr<PlanStage> producer);
+    static void start(OperationContext* opCtx,
+                      CompileCtx& ctx,
+                      std::unique_ptr<PlanStage> producer);
 
     std::unique_ptr<PlanStage> clone() const final;
 

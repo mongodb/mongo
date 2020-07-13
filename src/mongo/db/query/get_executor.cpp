@@ -898,7 +898,7 @@ protected:
         auto result = makeResult();
         result->emplace(
             {sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), 0, boost::none),
-             stage_builder::PlanStageData{}},
+             stage_builder::PlanStageData{std::make_unique<sbe::RuntimeEnvironment>()}},
             nullptr);
         return result;
     }
@@ -1072,6 +1072,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
         return plan_executor_factory::make(opCtx,
                                            std::move(cq),
                                            {std::move(plan.root), std::move(plan.data)},
+                                           collection,
                                            {},
                                            std::move(plan.results),
                                            std::move(yieldPolicy));
@@ -1079,7 +1080,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     // No need for runtime planning, just use the constructed plan stage tree.
     invariant(roots.size() == 1);
     return plan_executor_factory::make(
-        opCtx, std::move(cq), std::move(roots[0]), {}, std::move(yieldPolicy));
+        opCtx, std::move(cq), std::move(roots[0]), collection, {}, std::move(yieldPolicy));
 }
 }  // namespace
 

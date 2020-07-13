@@ -181,6 +181,10 @@ void ExchangeConsumer::prepare(CompileCtx& ctx) {
     for (size_t idx = 0; idx < _state->fields().size(); ++idx) {
         _outgoing.emplace_back(ExchangeBuffer::Accessor{});
     }
+
+    for (size_t idx = 0; idx < _state->numOfProducers(); ++idx) {
+        _state->producerCompileCtxs().push_back(ctx.makeCopy(true));
+    }
     // Compile '<' function once we implement order preserving exchange.
 }
 value::SlotAccessor* ExchangeConsumer::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -245,6 +249,7 @@ void ExchangeConsumer::open(bool reOpen) {
             }
 
             // Start n producers.
+            invariant(_state->producerCompileCtxs().size() == _state->numOfProducers());
             for (size_t idx = 0; idx < _state->numOfProducers(); ++idx) {
                 auto pf = makePromiseFuture<void>();
                 s_globalThreadPool->schedule(
@@ -255,6 +260,7 @@ void ExchangeConsumer::open(bool reOpen) {
 
                         promise.setWith([&] {
                             ExchangeProducer::start(opCtx.get(),
+                                                    _state->producerCompileCtxs()[idx],
                                                     std::move(_state->producerPlans()[idx]));
                         });
                     });
@@ -446,13 +452,14 @@ ExchangeProducer::ExchangeProducer(std::unique_ptr<PlanStage> input,
     }
 }
 
-void ExchangeProducer::start(OperationContext* opCtx, std::unique_ptr<PlanStage> producer) {
+void ExchangeProducer::start(OperationContext* opCtx,
+                             CompileCtx& ctx,
+                             std::unique_ptr<PlanStage> producer) {
     ExchangeProducer* p = static_cast<ExchangeProducer*>(producer.get());
 
     p->attachFromOperationContext(opCtx);
 
     try {
-        CompileCtx ctx;
         p->prepare(ctx);
         p->open(false);
 
@@ -475,6 +482,7 @@ std::unique_ptr<PlanStage> ExchangeProducer::clone() const {
 
 void ExchangeProducer::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
+
     for (auto& f : _state->fields()) {
         _incoming.emplace_back(_children[0]->getAccessor(ctx, f));
     }

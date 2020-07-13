@@ -104,7 +104,7 @@ protected:
         ASSERT_EQUALS(tag, value::TypeTags::Nothing);
     }
 
-    CompileCtx _ctx;
+    CompileCtx _ctx{std::make_unique<RuntimeEnvironment>()};
     CoScanStage _emptyStage;
 
     vm::ByteCode _interpreter;

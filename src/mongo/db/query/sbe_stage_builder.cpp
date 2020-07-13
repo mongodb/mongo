@@ -52,8 +52,15 @@
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
+#include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo::stage_builder {
+std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
+    OperationContext* opCtx, sbe::value::SlotIdGenerator* slotIdGenerator) {
+    auto env = std::make_unique<sbe::RuntimeEnvironment>();
+    return env;
+}
+
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildCollScan(
     const QuerySolutionNode* root) {
     auto csn = static_cast<const CollectionScanNode*>(root);
@@ -63,12 +70,15 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildCollScan(
                          csn,
                          &_slotIdGenerator,
                          _yieldPolicy,
+                         _data.env,
+                         _isTailableCollScanResumeBranch,
                          _data.trialRunProgressTracker.get());
     _data.resultSlot = resultSlot;
     _data.recordIdSlot = recordIdSlot;
     _data.oplogTsSlot = oplogTsSlot;
     _data.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
     _data.shouldTrackResumeToken = csn->requestResumeToken;
+    _data.shouldUseTailableScan = csn->tailable;
 
     if (_returnKeySlot) {
         // Assign the '_returnKeySlot' to be the empty object.
@@ -144,14 +154,15 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildFetch(const QuerySol
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildLimit(const QuerySolutionNode* root) {
     const auto ln = static_cast<const LimitNode*>(root);
-    // If we have both limit and skip stages and the skip stage is beneath the limit, then we can
-    // combine these two stages into one. So, save the _limit value and let the skip stage builder
-    // handle it.
+    // If we have both limit and skip stages and the skip stage is beneath the limit, then we
+    // can combine these two stages into one. So, save the _limit value and let the skip stage
+    // builder handle it.
     if (ln->children[0]->getType() == StageType::STAGE_SKIP) {
         _limit = ln->limit;
     }
+
     auto inputStage = build(ln->children[0]);
-    return _limit
+    return _limit || _isTailableCollScanResumeBranch
         ? std::move(inputStage)
         : std::make_unique<sbe::LimitSkipStage>(std::move(inputStage), ln->limit, boost::none);
 }
@@ -159,7 +170,9 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildLimit(const QuerySol
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSkip(const QuerySolutionNode* root) {
     const auto sn = static_cast<const SkipNode*>(root);
     auto inputStage = build(sn->children[0]);
-    return std::make_unique<sbe::LimitSkipStage>(std::move(inputStage), _limit, sn->skip);
+    return _isTailableCollScanResumeBranch
+        ? std::move(inputStage)
+        : std::make_unique<sbe::LimitSkipStage>(std::move(inputStage), _limit, sn->skip);
 }
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolutionNode* root) {
@@ -464,6 +477,86 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildReturnKey(
     return stage;
 }
 
+std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeUnionForTailableCollScan(
+    const QuerySolutionNode* root) {
+    using namespace std::literals;
+
+    // Register a SlotId in the global environment which would contain a recordId to resume a
+    // tailable collection scan from. A PlanStage executor will track the last seen recordId and
+    // will reset a SlotAccessor for the resumeRecordIdSlot with this recordId.
+    auto resumeRecordIdSlot = _data.env->registerSlot(
+        "resumeRecordId"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
+
+    // For tailable collection scan we need to build a special union sub-tree consisting of two
+    // branches:
+    //   1) An anchor branch implementing an initial collection scan before the first EOF is hit.
+    //   2) A resume branch implementing all consecutive collection scans from a recordId which was
+    //      seen last.
+    //
+    // The 'makeStage' parameter is used to build a PlanStage tree which is served as a root stage
+    // for each of the union branches. The same machanism is used to build each union branch, and
+    // the special logic which needs to be triggered depending on which branch we build is
+    // controlled by setting the _isTailableCollScanResumeBranch flag.
+
+    _isBuildingUnionForTailableCollScan = true;
+
+    auto makeUnionBranch = [&](bool isTailableCollScanResumeBranch)
+        -> std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> {
+        _isTailableCollScanResumeBranch = isTailableCollScanResumeBranch;
+        auto branch = build(root);
+        auto branchSlots = sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot);
+        if (_data.oplogTsSlot) {
+            branchSlots.push_back(*_data.oplogTsSlot);
+        }
+        if (_returnKeySlot) {
+            branchSlots.push_back(*_returnKeySlot);
+        }
+        return {std::move(branchSlots), std::move(branch)};
+    };
+
+    // Build an anchor branch of the union and add a constant filter on top of it, so that it would
+    // only execute on an initial collection scan, that is, when resumeRecordId is not available
+    // yet.
+    auto&& [anchorBranchSlots, anchorBranch] = makeUnionBranch(false);
+    anchorBranch = sbe::makeS<sbe::FilterStage<true>>(
+        std::move(anchorBranch),
+        sbe::makeE<sbe::EPrimUnary>(
+            sbe::EPrimUnary::logicNot,
+            sbe::makeE<sbe::EFunction>(
+                "exists"sv, sbe::makeEs(sbe::makeE<sbe::EVariable>(resumeRecordIdSlot)))));
+
+    // Build a resume branch of the union and add a constant filter on op of it, so that it would
+    // only execute when we resume a collection scan from the resumeRecordId.
+    auto&& [resumeBranchSlots, resumeBranch] = makeUnionBranch(true);
+    resumeBranch = sbe::makeS<sbe::FilterStage<true>>(
+        sbe::makeS<sbe::LimitSkipStage>(std::move(resumeBranch), boost::none, 1),
+        sbe::makeE<sbe::EFunction>("exists"sv,
+                                   sbe::makeEs(sbe::makeE<sbe::EVariable>(resumeRecordIdSlot))));
+
+    invariant(anchorBranchSlots.size() == resumeBranchSlots.size());
+
+    // A vector of the output slots for each union branch.
+    auto branchSlots = make_vector<sbe::value::SlotVector>(std::move(anchorBranchSlots),
+                                                           std::move(resumeBranchSlots));
+
+    _data.resultSlot = _slotIdGenerator.generate();
+    _data.recordIdSlot = _slotIdGenerator.generate();
+    auto unionOutputSlots = sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot);
+    if (_data.oplogTsSlot) {
+        _data.oplogTsSlot = _slotIdGenerator.generate();
+        unionOutputSlots.push_back(*_data.oplogTsSlot);
+    }
+
+    // Branch output slots become the input slots to the union.
+    auto unionStage =
+        sbe::makeS<sbe::UnionStage>(make_vector<std::unique_ptr<sbe::PlanStage>>(
+                                        std::move(anchorBranch), std::move(resumeBranch)),
+                                    branchSlots,
+                                    unionOutputSlots);
+    _isBuildingUnionForTailableCollScan = false;
+    return unionStage;
+}
+
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
@@ -488,6 +581,22 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     uassert(4822884,
             str::stream() << "Can't build exec tree for node: " << root->toString(),
             kStageBuilders.find(root->getType()) != kStageBuilders.end());
+
+    // If this plan is for a tailable cursor scan, and we're not already in the process of building
+    // a special union sub-tree implementing such scans, then start building a union sub-tree. Note
+    // that LIMIT or SKIP stage is used as a splitting point of the two union branches, if present,
+    // because we need to apply limit (or skip) only in the initial scan (in the anchor branch), and
+    // the resume branch should not have it.
+    switch (root->getType()) {
+        case STAGE_COLLSCAN:
+        case STAGE_LIMIT:
+        case STAGE_SKIP:
+            if (_cq.getQueryRequest().isTailable() && !_isBuildingUnionForTailableCollScan) {
+                return makeUnionForTailableCollScan(root);
+            }
+        default:
+            break;
+    }
 
     return std::invoke(kStageBuilders.at(root->getType()), *this, root);
 }

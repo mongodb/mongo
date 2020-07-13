@@ -105,6 +105,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    const Collection* collection,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
@@ -117,6 +118,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    const Collection* collection,
     NamespaceString nss,
     std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
