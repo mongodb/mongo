@@ -69,7 +69,6 @@
 
 namespace mongo {
 
-extern SSLManagerInterface* theSSLManager;
 extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
 namespace {
@@ -1519,11 +1518,8 @@ unsigned long long FiletimeToEpocMillis(FILETIME ft) {
     return ns100 / 10000;
 }
 
-// MongoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes
-StatusWith<SSLX509Name> getCertificateSubjectName(PCCERT_CONTEXT cert) {
-
-    auto swBlob =
-        decodeObject(X509_NAME, cert->pCertInfo->Subject.pbData, cert->pCertInfo->Subject.cbData);
+StatusWith<SSLX509Name> blobToName(CERT_NAME_BLOB blob) {
+    auto swBlob = decodeObject(X509_NAME, blob.pbData, blob.cbData);
 
     if (!swBlob.isOK()) {
         return swBlob.getStatus();
@@ -1583,6 +1579,11 @@ StatusWith<SSLX509Name> getCertificateSubjectName(PCCERT_CONTEXT cert) {
     }
 
     return SSLX509Name(std::move(entries));
+}
+
+// MongoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes
+StatusWith<SSLX509Name> getCertificateSubjectName(PCCERT_CONTEXT cert) {
+    return blobToName(cert->pCertInfo->Subject);
 }
 
 Status SSLManagerWindows::_validateCertificate(PCCERT_CONTEXT cert,
@@ -2049,8 +2050,78 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     }
 }
 
+constexpr size_t kSHA1HashBytes = 20;
+
+Status getCertInfo(CertInformationToLog* info, PCCERT_CONTEXT cert) {
+    info->subject = uassertStatusOK(getCertificateSubjectName(cert));
+    info->issuer = uassertStatusOK(blobToName(cert->pCertInfo->Issuer));
+
+    DWORD bufSize = kSHA1HashBytes;
+    info->thumbprint.resize(kSHA1HashBytes);
+
+    if (!CertGetCertificateContextProperty(
+            cert, CERT_SHA1_HASH_PROP_ID, info->thumbprint.data(), &bufSize)) {
+        DWORD gle = GetLastError();
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "getCertInfo failed to get certificate thumbprint: "
+                                    << errnoWithDescription(gle));
+    }
+
+    info->validityNotBefore =
+        Date_t::fromMillisSinceEpoch(FiletimeToEpocMillis(cert->pCertInfo->NotBefore));
+    info->validityNotAfter =
+        Date_t::fromMillisSinceEpoch(FiletimeToEpocMillis(cert->pCertInfo->NotAfter));
+
+    return Status::OK();
+}
+
+Status getCRLInfo(CRLInformationToLog* info, PCCRL_CONTEXT crl) {
+    DWORD bufSize = kSHA1HashBytes;
+    info->thumbprint.resize(kSHA1HashBytes);
+
+    if (!CertGetCRLContextProperty(
+            crl, CERT_SHA1_HASH_PROP_ID, info->thumbprint.data(), &bufSize)) {
+        DWORD gle = GetLastError();
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "getCRLInfo failed to get CRL thumbprint: "
+                                    << errnoWithDescription(gle));
+    }
+
+    info->validityNotBefore =
+        Date_t::fromMillisSinceEpoch(FiletimeToEpocMillis(crl->pCrlInfo->ThisUpdate));
+    info->validityNotAfter =
+        Date_t::fromMillisSinceEpoch(FiletimeToEpocMillis(crl->pCrlInfo->NextUpdate));
+
+    return Status::OK();
+}
+
 SSLInformationToLog SSLManagerWindows::getSSLInformationToLog() const {
     SSLInformationToLog info;
+
+    auto serverCert = _serverCertificates[0];
+    if (serverCert != nullptr) {
+        uassertStatusOK(getCertInfo(&info.server, serverCert));
+    }
+
+    auto clientCert = _clientCertificates[0];
+    if (clientCert != nullptr) {
+        CertInformationToLog cluster;
+        uassertStatusOK(getCertInfo(&cluster, clientCert));
+        info.cluster = cluster;
+    }
+
+    if (_serverEngine.hasCRL) {
+        HCERTSTORE store = const_cast<UniqueCertStore&>(_serverEngine.CAstore);
+        DWORD flags = 0;
+        auto crl = CertGetCRLFromStore(store, nullptr, nullptr, &flags);
+        if (crl != nullptr) {
+            UniqueCRL crlHolder(crl);
+            CRLInformationToLog crlInfo;
+            uassertStatusOK(getCRLInfo(&crlInfo, crl));
+            info.crl = crlInfo;
+        }
+    }
+
     return info;
 }
 
