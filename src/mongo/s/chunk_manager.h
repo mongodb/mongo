@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -40,6 +39,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
@@ -62,7 +62,7 @@ struct ShardVersionTargetingInfo {
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
 // shard is currently marked as needing a catalog cache refresh (stale).
-using ShardVersionMap = std::map<ShardId, ShardVersionTargetingInfo>;
+using ShardVersionMap = stdx::unordered_map<ShardId, ShardVersionTargetingInfo, ShardId::Hasher>;
 
 // This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
 // provides a simpler, high-level interface for domain specific operations without exposing the

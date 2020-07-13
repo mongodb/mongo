@@ -478,13 +478,6 @@ Status ChunkType::validate() const {
                       str::stream() << "missing " << shard.name() << " field");
     }
 
-    // 'min' and 'max' must share the same fields.
-    if (_min->nFields() != _max->nFields()) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "min and max don't have the same number of keys: " << *_min << ", "
-                              << *_max};
-    }
-
     BSONObjIterator minIt(getMin());
     BSONObjIterator maxIt(getMax());
     while (minIt.more() && maxIt.more()) {
@@ -496,6 +489,12 @@ Status ChunkType::validate() const {
                                   << *_max};
         }
     }
+
+    // 'min' and 'max' must share the same fields.
+    if (minIt.more() || maxIt.more())
+        return {ErrorCodes::BadValue,
+                str::stream() << "min and max don't have the same number of keys: " << *_min << ", "
+                              << *_max};
 
     // 'max' should be greater than 'min'.
     if (_min->woCompare(getMax()) >= 0) {
