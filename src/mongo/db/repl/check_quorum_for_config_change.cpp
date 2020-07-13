@@ -227,25 +227,6 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
         return;
     }
 
-    if (!hbResp.getReplicaSetName().empty()) {
-        if (hbResp.getConfigVersionAndTerm() >= _rsConfig->getConfigVersionAndTerm()) {
-            static constexpr char message[] =
-                "Our config (term, version) is no larger than that of the request target";
-            _vetoStatus = {ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                           str::stream() << message << ", rsConfig: "
-                                         << _rsConfig->getConfigVersionAndTerm().toString()
-                                         << ", requestTarget: " << request.target.toString()
-                                         << ", requestTargetConfig: "
-                                         << hbResp.getConfigVersionAndTerm().toString()};
-            LOGV2_WARNING(23725,
-                          message,
-                          "rsConfig"_attr = _rsConfig->getConfigVersionAndTerm(),
-                          "requestTarget"_attr = request.target.toString(),
-                          "requestTargetConfig"_attr = hbResp.getConfigVersionAndTerm());
-            return;
-        }
-    }
-
     if (_rsConfig->hasReplicaSetId()) {
         StatusWith<rpc::ReplSetMetadata> replMetadata =
             rpc::ReplSetMetadata::readFromMetadata(response.data);
