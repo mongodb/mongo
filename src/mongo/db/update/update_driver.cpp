@@ -35,6 +35,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -50,6 +51,8 @@
 #include "mongo/util/visit_helper.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangAfterPipelineUpdateFCVCheck);
 
 using pathsupport::EqualityMatches;
 
@@ -147,6 +150,9 @@ void UpdateDriver::parse(
                 "arrayFilters may not be specified for delta-syle updates",
                 arrayFilters.empty());
 
+        // Delta updates should only be applied as part of oplog application.
+        invariant(_fromOplogApplication);
+
         _updateType = UpdateType::kDelta;
         _updateExecutor = std::make_unique<DeltaExecutor>(updateMod.getDiff());
         return;
@@ -240,7 +246,8 @@ Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query
     return status;
 }
 
-Status UpdateDriver::update(StringData matchedField,
+Status UpdateDriver::update(OperationContext* opCtx,
+                            StringData matchedField,
                             mutablebson::Document* doc,
                             bool validateForStorage,
                             const FieldRefSet& immutablePaths,
@@ -265,9 +272,19 @@ Status UpdateDriver::update(StringData matchedField,
     invariant(!modifiedPaths || modifiedPaths->empty());
 
     if (_logOp && logOpRec) {
-        applyParams.logMode = internalQueryEnableLoggingV2OplogEntries.load()
+        const auto& fcv = serverGlobalParams.featureCompatibility;
+        const bool fcvAllowsV2Entries = fcv.isVersionInitialized() &&
+            fcv.getVersion() == ServerGlobalParams::FeatureCompatibility::Version::kVersion451;
+
+        applyParams.logMode = fcvAllowsV2Entries && internalQueryEnableLoggingV2OplogEntries.load()
             ? ApplyParams::LogMode::kGenerateOplogEntry
             : ApplyParams::LogMode::kGenerateOnlyV1OplogEntry;
+
+        if (MONGO_unlikely(hangAfterPipelineUpdateFCVCheck.shouldFail()) &&
+            type() == UpdateType::kPipeline) {
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangAfterPipelineUpdateFCVCheck, opCtx, "hangAfterPipelineUpdateFCVCheck");
+        }
     }
 
     invariant(_updateExecutor);

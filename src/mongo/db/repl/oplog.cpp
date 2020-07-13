@@ -1225,7 +1225,47 @@ Status applyOperation_inlock(OperationContext* opCtx,
             auto request = UpdateRequest();
             request.setNamespaceString(requestNss);
             request.setQuery(updateCriteria);
-            request.setUpdateModification(write_ops::UpdateModification::parseFromOplogEntry(o));
+            auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(o);
+            if (updateMod.type() == write_ops::UpdateModification::Type::kDelta) {
+                // We may only use delta oplog entries when in FCV 4.5 or in the "downgrading to
+                // 4.4" state. The latter case can happen when a $v:2 update is logged in the
+                // window between the oplog entry which sets the target FCV to 4.4 (putting the
+                // node in a "downgrading state") and the entry which removes the target FCV
+                // (putting the node in a "downgraded" state).
+                //
+                // However, we should not allow user-run applyOps to log $v:2 updates while the FCV
+                // is in the "downgrading to 4.4" state. If we did so, it would be possible for the
+                // following sequence of events to happen:
+                //
+                // (Thread A): Begins {setFCV: "4.4"} command, which sets the target version to
+                // 4.4. The server is now in a "downgrading" state.
+                //
+                // (Thread A) Takes MODE_S lock and then immediately drops it. It will proceed on
+                // the assumption that no new commands will perform 4.4-incompatible writes.
+                //
+                // (Thread B) Runs applyOps, checks the FCV, and sees that the server is in a
+                // downgrading state. It continues on the $v:2 oplog entry code path.
+                //
+                // (Thread A) setFCV command completes. The server is now in FCV 4.4.
+                //
+                // (Thread B) The applyOps completes, and a $v:2 oplog entry is logged.
+                //
+                // This would mean that a 4.4-incompatible write is performed after the FCV is set
+                // to 4.4, which is illegal.
+                const auto fcvVersion = serverGlobalParams.featureCompatibility.getVersion();
+                const bool fromApplyOpsCmd = mode == OplogApplication::Mode::kApplyOpsCmd;
+
+                uassert(4773100,
+                        "Delta oplog entries may not be used in FCV below 4.5",
+                        fcvVersion ==
+                                ServerGlobalParams::FeatureCompatibility::Version::kVersion451 ||
+                            (!fromApplyOpsCmd &&
+                             fcvVersion ==
+                                 ServerGlobalParams::FeatureCompatibility::Version::
+                                     kDowngradingFrom451To44));
+            }
+
+            request.setUpdateModification(std::move(updateMod));
             request.setUpsert(upsert);
             request.setFromOplogApplication(true);
 

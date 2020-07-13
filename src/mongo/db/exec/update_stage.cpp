@@ -184,7 +184,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     }
     if (!driver->needMatchDetails()) {
         // If we don't need match details, avoid doing the rematch
-        status = driver->update(StringData(),
+        status = driver->update(opCtx(),
+                                StringData(),
                                 &_doc,
                                 _isUserInitiatedWrite,
                                 immutablePaths,
@@ -203,7 +204,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (matchDetails.hasElemMatchKey())
             matchedField = matchDetails.elemMatchKey();
 
-        status = driver->update(matchedField,
+        status = driver->update(opCtx(),
+                                matchedField,
                                 &_doc,
                                 _isUserInitiatedWrite,
                                 immutablePaths,

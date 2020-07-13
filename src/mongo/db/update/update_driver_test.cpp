@@ -185,8 +185,14 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     bool modified = false;
     mutablebson::Document doc(fromjson("{a: 'cba'}"));
     driver.setCollator(&reverseStringCollator);
-    ASSERT_OK(driver.update(
-        StringData(), &doc, validateForStorage, emptyImmutablePaths, isInsert, nullptr, &modified));
+    ASSERT_OK(driver.update(expCtx->opCtx,
+                            StringData(),
+                            &doc,
+                            validateForStorage,
+                            emptyImmutablePaths,
+                            isInsert,
+                            nullptr,
+                            &modified));
 
     ASSERT_TRUE(modified);
 }
@@ -579,7 +585,8 @@ public:
         const FieldRefSet emptyImmutablePaths;
         const bool isInsert = false;
         FieldRefSetWithStorage modifiedPaths;
-        ASSERT_OK(driver.update(matchedField,
+        ASSERT_OK(driver.update(expCtx->opCtx,
+                                matchedField,
                                 doc,
                                 validateForStorage,
                                 emptyImmutablePaths,

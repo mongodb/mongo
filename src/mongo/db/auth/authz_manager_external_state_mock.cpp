@@ -200,8 +200,13 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
         const FieldRefSet emptyImmutablePaths;
         const bool isInsert = false;
         BSONObj logObj;
-        status = driver.update(
-            StringData(), &document, validateForStorage, emptyImmutablePaths, isInsert, &logObj);
+        status = driver.update(opCtx,
+                               StringData(),
+                               &document,
+                               validateForStorage,
+                               emptyImmutablePaths,
+                               isInsert,
+                               &logObj);
         if (!status.isOK())
             return status;
         BSONObj newObj = document.getObject().copy();
@@ -229,7 +234,7 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
         const FieldRefSet emptyImmutablePaths;
         const bool isInsert = false;
         status = driver.update(
-            StringData(), &document, validateForStorage, emptyImmutablePaths, isInsert);
+            opCtx, StringData(), &document, validateForStorage, emptyImmutablePaths, isInsert);
         if (!status.isOK()) {
             return status;
         }

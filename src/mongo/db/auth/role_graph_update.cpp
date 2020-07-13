@@ -227,7 +227,7 @@ Status handleOplogUpdate(OperationContext* opCtx,
     const FieldRefSet emptyImmutablePaths;
     bool isInsert = false;
     status = driver.update(
-        StringData(), &roleDocument, validateForStorage, emptyImmutablePaths, isInsert);
+        opCtx, StringData(), &roleDocument, validateForStorage, emptyImmutablePaths, isInsert);
     if (!status.isOK())
         return status;
 

@@ -101,5 +101,4 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
 
     return UpdateStage::makeUpdateResult(updateStats);
 }
-
 }  // namespace mongo

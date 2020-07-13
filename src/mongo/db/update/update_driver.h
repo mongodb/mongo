@@ -115,7 +115,8 @@ public:
      * The caller must either provide a null pointer, or a non-null pointer to an empty field ref
      * set.
      */
-    Status update(StringData matchedField,
+    Status update(OperationContext* opCtx,
+                  StringData matchedField,
                   mutablebson::Document* doc,
                   bool validateForStorage,
                   const FieldRefSet& immutablePaths,

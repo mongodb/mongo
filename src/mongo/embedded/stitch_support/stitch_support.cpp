@@ -591,7 +591,8 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
 
         mongo::FieldRefSetWithStorage modifiedPaths;
 
-        uassertStatusOK(update->updateDriver.update(matchedField,
+        uassertStatusOK(update->updateDriver.update(update->opCtx.get(),
+                                                    matchedField,
                                                     &mutableDoc,
                                                     false /* validateForStorage */,
                                                     immutablePaths,
@@ -637,7 +638,8 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
                 mutableDoc));
         }
 
-        uassertStatusOK(update->updateDriver.update(mongo::StringData() /* matchedField */,
+        uassertStatusOK(update->updateDriver.update(update->opCtx.get(),
+                                                    mongo::StringData() /* matchedField */,
                                                     &mutableDoc,
                                                     false /* validateForStorage */,
                                                     immutablePaths,
