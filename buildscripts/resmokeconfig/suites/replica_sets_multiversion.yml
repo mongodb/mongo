@@ -10,7 +10,6 @@ selector:
   - jstests/replsets/initial_sync_rename_collection.js
   - jstests/replsets/initial_sync_drop_collection.js
   - jstests/replsets/step_down_chaining_disabled.js
-  - jstests/replsets/rollback_via_refetch_anomaly.js
 executor:
   config:
     shell_options:

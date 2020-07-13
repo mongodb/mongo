@@ -70,8 +70,7 @@ CommonOps(rollbackTest.getPrimary());
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
 RollbackOps(rollbackNode);
 
-let syncSourceNode = rollbackTest.transitionToSyncSourceOperationsBeforeRollback(
-    {awaitPrimaryAppliedSurpassesRollbackApplied: true});
+let syncSourceNode = rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 SyncSourceOps(syncSourceNode);
 
 // Wait for rollback to finish.

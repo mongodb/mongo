@@ -323,6 +323,8 @@ public:
     Timestamp getOldestTimestamp() const override;
     Timestamp getCheckpointTimestamp() const override;
 
+    Timestamp getInitialDataTimestamp() const;
+
     /**
      * Returns the data file path associated with an ident on disk. Returns boost::none if the data
      * file can not be found. This will attempt to locate a file even if the storage engine's own

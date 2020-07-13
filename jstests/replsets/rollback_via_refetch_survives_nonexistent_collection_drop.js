@@ -42,8 +42,7 @@ assert.commandWorked(rollbackDB.adminCommand(
 assert.commandWorked(rollbackDB.runCommand({create: collName}));
 
 // Step down the current primary and elect the node that does not have the collection.
-rollbackTest.transitionToSyncSourceOperationsBeforeRollback(
-    {awaitPrimaryAppliedSurpassesRollbackApplied: true});
+rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
 jsTestLog("Attempting to roll back.");
 // Make the old primary rollback against the new primary. This attempt should fail because the
