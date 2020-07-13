@@ -225,6 +225,13 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
     return fromInnerBSON(elem.Obj());
 }
 
+ReadPreferenceSetting ReadPreferenceSetting::fromInnerBSONForIDL(const BSONObj& readPrefObj) {
+    StatusWith<ReadPreferenceSetting> rps = fromInnerBSON(readPrefObj);
+    uassertStatusOK(rps.getStatus());
+
+    return rps.getValue();
+}
+
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromContainingBSON(
     const BSONObj& obj, ReadPreference defaultReadPref) {
     if (auto elem = obj["$readPreference"]) {

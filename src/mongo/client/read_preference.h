@@ -181,6 +181,12 @@ struct ReadPreferenceSetting {
     static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONElement& readPrefSettingObj);
 
     /**
+        Utilized by IDL types in order to get the unwrapped ReadPreferenceSetting object.
+        It checks that the status is OK and then if so it will return the underlying object.
+    */
+    static ReadPreferenceSetting fromInnerBSONForIDL(const BSONObj& readPrefSettingObj);
+
+    /**
      * Parses a ReadPreference setting from an object that may contain a $readPreference object
      * field with the contents described in fromInnerObject(). If the field is missing, returns the
      * default read preference.

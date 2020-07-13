@@ -388,6 +388,7 @@ env.Library(
         "haystack.cpp",
         "internal_rename_if_options_and_indexes_match_cmd.cpp",
         "map_reduce_command.cpp",
+        "migrate_tenant_cmds.cpp",
         "oplog_application_checks.cpp",
         "oplog_note.cpp",
         'read_write_concern_defaults_server_status.cpp',
@@ -404,6 +405,7 @@ env.Library(
         "user_management_commands.cpp",
         "vote_commit_index_build_command.cpp",
         env.Idlc('internal_rename_if_options_and_indexes_match.idl')[0],
+        env.Idlc('migrate_tenant_cmds.idl')[0],
         env.Idlc('vote_commit_index_build.idl')[0],
     ],
     LIBDEPS=[

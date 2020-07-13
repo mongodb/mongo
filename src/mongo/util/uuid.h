@@ -89,6 +89,9 @@ class UUID {
     friend class ShardCollectionTypeBase;
     friend class TenantMigrationDonorDocument;
     friend class VoteCommitIndexBuild;
+    friend class DonorStartMigration;
+    friend class DonorWaitForMigrationToCommit;
+    friend class DonorForgetMigration;
 
 public:
     /**

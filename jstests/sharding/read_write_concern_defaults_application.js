@@ -289,6 +289,9 @@ let testCases = {
         checkReadConcern: true,
         checkWriteConcern: false,
     },
+    donorForgetMigration: {skip: "does not accept read or write concern"},
+    donorStartMigration: {skip: "does not accept read or write concern"},
+    donorWaitForMigrationToCommit: {skip: "does not accept read or write concern"},
     driverOIDTest: {skip: "internal command"},
     drop: {
         setUp: function(conn) {
