@@ -2954,7 +2954,15 @@ def doConfigure(myenv):
             # lld has problems with separate debug info on some platforms. See:
             # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
             # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
-            if get_option('separate-debug') == 'off':
+            #
+            # lld also apparently has problems with symbol resolution
+            # in some esoteric configurations that apply for us when
+            # using --link-model=dynamic mode, so disable lld there
+            # too. See:
+            # - https://bugs.llvm.org/show_bug.cgi?id=46676
+            #
+            # We should revisit all of these issues the next time we upgrade our clang minimum.
+            if get_option('separate-debug') == 'off' and get_option('link-model') != 'dynamic':
                 if not AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=lld'):
                     AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
             else:
