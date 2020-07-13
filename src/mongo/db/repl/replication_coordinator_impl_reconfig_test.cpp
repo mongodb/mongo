@@ -329,7 +329,7 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord,
     *status = replCoord->processReplSetReconfig(opCtx, args, &garbage);
 }
 
-TEST_F(ReplCoordTest, QuorumCheckFailsWhenOtherNodesHaveHigherTerm) {
+TEST_F(ReplCoordTest, QuorumCheckSucceedsWhenOtherNodesHaveHigherTerm) {
     // Initiate a config without a term to avoid stepup auto-reconfig.
     auto configObj =
         configWithMembers(2, -1, BSON_ARRAY(member(1, "node1:12345") << member(2, "node2:12345")));
@@ -356,7 +356,9 @@ TEST_F(ReplCoordTest, QuorumCheckFailsWhenOtherNodesHaveHigherTerm) {
     repl::ReplSetHeartbeatResponse hbResp;
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
-    // The config version from the remote is lower, but its term is higher.
+    // The config version from the remote is lower, but its term is higher. The quorum checker
+    // does not compare config versions or terms of remotes nodes, so this should always
+    // succeed.
     hbResp.setConfigVersion(2);
     hbResp.setConfigTerm(getReplCoord()->getTerm() + 1);
     hbResp.setAppliedOpTimeAndWallTime({opTime, net->now()});
@@ -365,7 +367,7 @@ TEST_F(ReplCoordTest, QuorumCheckFailsWhenOtherNodesHaveHigherTerm) {
     net->runReadyNetworkOperations();
     net->exitNetwork();
     reconfigThread.join();
-    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
+    ASSERT_OK(status);
 }
 
 TEST_F(ReplCoordTest, QuorumCheckSucceedsWhenOtherNodesHaveLowerTerm) {
@@ -395,7 +397,9 @@ TEST_F(ReplCoordTest, QuorumCheckSucceedsWhenOtherNodesHaveLowerTerm) {
     repl::ReplSetHeartbeatResponse hbResp;
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
-    // The config version from the remote is higher, but its term is lower.
+    // The config version from the remote is higher, but its term is lower. The quorum checker
+    // does not compare config versions or terms of remotes nodes, so this should always
+    // succeed.
     hbResp.setConfigVersion(4);
     hbResp.setConfigTerm(getReplCoord()->getTerm() - 1);
     hbResp.setAppliedOpTimeAndWallTime({opTime, net->now()});
