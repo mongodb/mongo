@@ -164,9 +164,10 @@ bool requiresTimestampForCatalogWrite(OperationContext* opCtx, const NamespaceSt
 
     // Nodes in `startup` do not need to timestamp writes.
     // Nodes in the oplog application phase of initial sync (`startup2`) must not timestamp writes
-    // before the `initialDataTimestamp`.
+    // before the `initialDataTimestamp`.  Nodes in initial sync may also be in the `removed` state
+    // due to DNS resolution errors; they may continue writing during that time.
     const auto memberState = replCoord->getMemberState();
-    if (memberState.startup() || memberState.startup2()) {
+    if (memberState.startup() || memberState.startup2() || memberState.removed()) {
         return false;
     }
 

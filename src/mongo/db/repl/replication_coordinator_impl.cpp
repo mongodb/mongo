@@ -797,12 +797,16 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         if (startCompleted) {
             startCompleted();
         }
-        // Because initial sync completed, we can only be in STARTUP2, not REMOVED.
         // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
-        invariant(getMemberState().startup2());
+        // If the member state is REMOVED, this will do nothing until we receive a config with
+        // ourself in it.
+        const auto memberState = getMemberState();
+        invariant(memberState.startup2() || memberState.removed());
         invariant(setFollowerMode(MemberState::RS_RECOVERING));
         auto opCtxHolder = cc().makeOperationContext();
         _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
+        // This log is used in tests to ensure we made it to this point.
+        LOGV2_DEBUG(4853000, 1, "initial sync complete.");
     };
 
     std::shared_ptr<InitialSyncer> initialSyncerCopy;
