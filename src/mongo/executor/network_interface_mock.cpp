@@ -617,6 +617,18 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
     _waitingToRunMask &= ~kNetworkThread;
 }
 
+bool NetworkInterfaceMock::hasReadyNetworkOperations() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(_currentlyRunning == kNetworkThread);
+    if (!_alarms.empty() && _now_inlock() >= _alarms.top().when) {
+        return true;
+    }
+    if (!_scheduled.empty() && _scheduled.front().getResponseDate() <= _now_inlock()) {
+        return true;
+    }
+    return false;
+}
+
 void NetworkInterfaceMock::_waitForWork_inlock(stdx::unique_lock<stdx::mutex>* lk) {
     if (_waitingToRunMask & kExecutorThread) {
         _waitingToRunMask &= ~kExecutorThread;

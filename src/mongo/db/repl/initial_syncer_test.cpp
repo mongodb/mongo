@@ -46,6 +46,7 @@
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/mock_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/oplog_fetcher_mock.h"
@@ -106,6 +107,7 @@ namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
+using namespace mongo::test::mock;
 
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
@@ -1713,6 +1715,42 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
     assertFCVRequest(request);
 }
 
+// This is to demonstrate the unit testing mock framework. The logic is the same as the following
+// test.
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError_Mock) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    MockNetwork mock(getNet());
+
+    // Set up default behavior.
+    mock.expect("replSetGetRBID", makeRollbackCheckerResponse(1));
+
+    mock.expect([](auto& request) { return request["find"].str() == "oplog.rs"; },
+                makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
+
+    mock.expect(
+        [](auto& request) { return request["find"].str() == "transactions"; },
+        makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+
+    // This is what we want to test.
+    mock.expect([](auto& request) { return request["find"].str() == "system.version"; },
+                RemoteCommandResponse(ErrorCodes::OperationFailed,
+                                      "find command failed at sync source"))
+        .times(1);
+
+    // Start the real work.
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    // Run mock.
+    mock.runUntilExpectationsSatisfied();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -1941,6 +1979,65 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+// This is to demonstrate the unit testing mock framework. The logic is the same as the following
+// test.
+TEST_F(
+    InitialSyncerTest,
+    InitialSyncerPassesThroughOplogFetcherRestartsBasedOnInitialSyncFetcherRestartDecision_Mock) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    const std::uint32_t initialSyncMaxAttempts = 2U;
+
+    auto lastOp = makeOplogEntry(2);
+
+    MockNetwork mock(getNet());
+
+    // Set up default behavior.
+    mock.expect("replSetGetRBID", makeRollbackCheckerResponse(1));
+
+    mock.expect([](auto& request) { return request["find"].str() == "oplog.rs"; },
+                makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    mock.expect([](auto& request) { return request["find"].str() == "transactions"; },
+                makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}));
+
+    // This is what we want to test.
+    FeatureCompatibilityVersionDocument fcvDoc;
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    mock.expect([](auto& request) { return request["find"].str() == "system.version"; },
+                makeCursorResponse(
+                    0LL, NamespaceString::kServerConfigurationNamespace, {fcvDoc.toBSON()}))
+        .times(1);
+
+    FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
+
+    // Start the real work.
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), initialSyncMaxAttempts));
+
+    mock.runUntilExpectationsSatisfied();
+
+    // Simulate response to OplogFetcher so it has enough operations to reach end timestamp.
+    getOplogFetcher()->receiveBatch(1LL, {makeOplogEntryObj(1), lastOp.toBSON()});
+    // Simulate a network error response that restarts the OplogFetcher.
+    getOplogFetcher()->simulateResponseError(Status(ErrorCodes::NetworkTimeout, "network error"));
+
+    mock.expect([](auto& request) { return request["find"].str() == "oplog.rs"; },
+                makeCursorResponse(0LL, _options.localOplogNS, {lastOp.toBSON()}))
+        .times(1);
+
+    mock.runUntilExpectationsSatisfied();
+
+    initialSyncer->join();
+    ASSERT_OK(_lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,

@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/mock_fixture.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -55,6 +56,8 @@
 namespace mongo {
 namespace repl {
 namespace {
+
+using namespace mongo::test::mock;
 
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
@@ -337,6 +340,77 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
 
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Election succeeded"));
+}
+
+// This is to demonstrate the unit testing mock framework. The logic is the same as the following
+// test.
+TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun_Mock) {
+    startCapturingLogMessages();
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion" << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    OperationContextNoop opCtx;
+    OpTime time1(Timestamp(100, 1), 0);
+    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    simulateEnoughHeartbeatsForAllNodesUp();
+
+    // Check that the node's election candidate metrics are unset before it becomes primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
+
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    LOGV2(2145401,
+          "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
+          "electionTimeoutWhen"_attr = electionTimeoutWhen);
+
+    MockNetwork mock(getNet());
+
+    // Heartbeat default behavior.
+    OpTime lastApplied(Timestamp(100, 1), 0);
+    ReplSetHeartbeatResponse hbResp;
+    auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    hbResp.setSetName(rsConfig.getReplSetName());
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    hbResp.setConfigTerm(rsConfig.getConfigTerm());
+    hbResp.setAppliedOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+    hbResp.setDurableOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+
+    mock.expect("replSetHeartbeat", hbResp.toBSON());
+
+    mock.expect("replSetRequestVotes",
+                BSON("ok" << 1 << "term" << 0 << "voteGranted" << false << "reason"
+                          << "don't like him much"))
+        .times(2);
+
+    // Trigger election.
+    mock.runUntil(electionTimeoutWhen);
+
+    mock.runUntilExpectationsSatisfied();
+
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Not running for primary, we received insufficient votes"));
+
+    // Check that the node's election candidate metrics have been cleared, since it lost the dry-run
+    // election and will not become primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun) {

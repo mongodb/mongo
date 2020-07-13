@@ -287,6 +287,12 @@ public:
                                        const std::vector<NetworkOperationList*>& queuesToCheck,
                                        const TaskExecutor::ResponseStatus& response);
 
+    /**
+     * Returns true if there is no scheduled work (i.e. alarms and scheduled responses) for the
+     * network thread to process.
+     */
+    bool hasReadyNetworkOperations();
+
 private:
     /**
      * Information describing a scheduled alarm.
