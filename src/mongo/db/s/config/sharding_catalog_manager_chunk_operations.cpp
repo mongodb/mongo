@@ -410,26 +410,6 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                               << ", cmd epoch: " << requestEpoch};
     }
 
-    // Get the shard version (max chunk version) for the shard requesting the split.
-    auto swShardVersion = getMaxChunkVersionFromQueryResponse(
-        nss,
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
-            ChunkType::ConfigNS,
-            BSON("ns" << nss.ns() << "shard"
-                      << shardName),         // Query all chunks for this namespace and shard.
-            BSON(ChunkType::lastmod << -1),  // Sort by version.
-            1));                             // Limit 1.
-
-    if (!swShardVersion.isOK()) {
-        return swShardVersion.getStatus().withContext(
-            str::stream() << "splitChunk cannot split chunk " << range.toString() << ".");
-    }
-
-    auto shardVersion = swShardVersion.getValue();
-
     // Find the chunk history.
     const auto origChunk = _findChunkOnConfig(opCtx, nss, range.getMin());
     if (!origChunk.isOK()) {
@@ -439,11 +419,6 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     std::vector<ChunkType> newChunks;
 
     ChunkVersion currentMaxVersion = collVersion;
-    // Increment the major version only if the shard that owns the chunk being split has version ==
-    // collection version. See SERVER-41480 for details.
-    if (shardVersion == collVersion) {
-        currentMaxVersion.incMajor();
-    }
 
     auto startKey = range.getMin();
     auto newChunkBounds(splitPoints);

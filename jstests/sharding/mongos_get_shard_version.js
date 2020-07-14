@@ -128,8 +128,8 @@ assert.commandWorked(
 // because the chunk size exceeds the limit.
 res = st.s.adminCommand({getShardVersion: ns, fullMetadata: true});
 assert.commandWorked(res);
-assert.eq(res.version.t, 3);
-assert.eq(res.version.i, 10001);
+assert.eq(res.version.t, 1);
+assert.eq(res.version.i, 20002);
 assert.eq(undefined, res.chunks);
 
 st.stop();
