@@ -87,6 +87,7 @@
 #include "mongo/db/query/sbe_sub_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -197,8 +198,8 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     const WildcardProjection* wildcardProjection = nullptr;
     std::set<FieldRef> multikeyPathSet;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-        wildcardProjection =
-            static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
+        auto wam = static_cast<const WildcardAccessMethod*>(accessMethod);
+        wildcardProjection = wam->getWildcardProjection();
         if (isMultikey) {
             MultikeyMetadataAccessStats mkAccessStats;
 
@@ -209,9 +210,9 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                     wildcardProjection->exec(), fields);
 
                 multikeyPathSet =
-                    accessMethod->getMultikeyPathSet(opCtx, projectedFields, &mkAccessStats);
+                    getWildcardMultikeyPathSet(wam, opCtx, projectedFields, &mkAccessStats);
             } else {
-                multikeyPathSet = accessMethod->getMultikeyPathSet(opCtx, &mkAccessStats);
+                multikeyPathSet = getWildcardMultikeyPathSet(wam, opCtx, &mkAccessStats);
             }
 
             LOGV2_DEBUG(20920,

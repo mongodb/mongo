@@ -158,7 +158,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/query_exec',
         'index_access_method',
         'key_generator',
     ],

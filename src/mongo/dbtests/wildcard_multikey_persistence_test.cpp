@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
@@ -147,7 +148,9 @@ protected:
         auto collection = autoColl.getCollection();
         auto indexAccessMethod = getIndex(collection, indexName);
         MultikeyMetadataAccessStats stats;
-        auto multikeyPathSet = indexAccessMethod->getMultikeyPathSet(opCtx(), &stats);
+        auto wam = dynamic_cast<const WildcardAccessMethod*>(indexAccessMethod);
+        ASSERT(wam != nullptr);
+        auto multikeyPathSet = getWildcardMultikeyPathSet(wam, opCtx(), &stats);
 
         ASSERT(expectedFieldRefs == multikeyPathSet);
     }

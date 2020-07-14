@@ -59,16 +59,6 @@ class HaystackAccessMethod : public AbstractIndexAccessMethod {
 public:
     HaystackAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 
-protected:
-    friend class GeoHaystackSearchCommand;
-    void searchCommand(OperationContext* opCtx,
-                       Collection* collection,
-                       const BSONObj& nearObj,
-                       double maxDistance,
-                       const BSONObj& search,
-                       BSONObjBuilder* result,
-                       unsigned limit) const;
-
 private:
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
@@ -87,6 +77,8 @@ private:
     std::string _geoField;
     std::vector<std::string> _otherFields;
     double _bucketSize;
+
+    friend class GeoHaystackSearchCommand;
 };
 
 }  // namespace mongo

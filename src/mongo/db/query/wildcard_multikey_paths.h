@@ -27,37 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/index/wildcard_access_method.h"
+#include <set>
+#include <string>
 
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
-WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
-                                           std::unique_ptr<SortedDataInterface> btree)
-    : AbstractIndexAccessMethod(wildcardState, std::move(btree)),
-      _keyGen(_descriptor->keyPattern(),
-              _descriptor->pathProjection(),
-              _indexCatalogEntry->getCollator(),
-              getSortedDataInterface()->getKeyStringVersion(),
-              getSortedDataInterface()->getOrdering()) {}
+struct IndexBounds;
+struct IndexKeyEntry;
+struct Interval;
+struct MultikeyMetadataAccessStats;
+class OperationContext;
+class WildcardAccessMethod;
 
-bool WildcardAccessMethod::shouldMarkIndexAsMultikey(size_t numberOfKeys,
-                                                     const KeyStringSet& multikeyMetadataKeys,
-                                                     const MultikeyPaths& multikeyPaths) const {
-    return !multikeyMetadataKeys.empty();
-}
+/**
+ * Returns an exact set or super-set of the bounds required to fetch the multikey metadata keys
+ * relevant to 'field'.
+ */
+std::vector<Interval> getMultikeyPathIndexIntervalsForField(FieldRef field);
 
-void WildcardAccessMethod::doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                                     const BSONObj& obj,
-                                     GetKeysContext context,
-                                     KeyStringSet* keys,
-                                     KeyStringSet* multikeyMetadataKeys,
-                                     MultikeyPaths* multikeyPaths,
-                                     boost::optional<RecordId> id) const {
-    _keyGen.generateKeys(pooledBufferBuilder, obj, keys, multikeyMetadataKeys, id);
-}
+/**
+ * Returns the intersection of 'fields' and the set of multikey metadata paths stored in the
+ * wildcard index. Statistics reporting index seeks and keys examined are written to 'stats'.
+ */
+std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
+                                              OperationContext* opCtx,
+                                              const stdx::unordered_set<std::string>& fieldSet,
+                                              MultikeyMetadataAccessStats* stats);
+
+/**
+ * Returns the set of all paths for which the wildcard index has multikey metadata keys.
+ * Statistics reporting index seeks and keys examined are written to 'stats'.
+ */
+std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
+                                              OperationContext* opCtx,
+                                              MultikeyMetadataAccessStats* stats);
+
 }  // namespace mongo

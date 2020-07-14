@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/query_planner_test_lib.h"
+#include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -43,8 +44,7 @@ void assertCorrectMultikeyMetadataPathBoundsGenerated(StringData field,
 
     OrderedIntervalList orderedIntervalList;
     FieldRef fieldRef(field);
-    orderedIntervalList.intervals =
-        WildcardAccessMethod::getMultikeyPathIndexIntervalsForField(std::move(fieldRef));
+    orderedIntervalList.intervals = getMultikeyPathIndexIntervalsForField(std::move(fieldRef));
 
     indexBounds.fields.push_back(std::move(orderedIntervalList));
 

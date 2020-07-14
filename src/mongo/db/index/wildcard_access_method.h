@@ -45,17 +45,6 @@ namespace mongo {
  */
 class WildcardAccessMethod final : public AbstractIndexAccessMethod {
 public:
-    /**
-     * Returns an exact set or super-set of the bounds required to fetch the multikey metadata keys
-     * relevant to 'field'.
-     */
-    static std::vector<Interval> getMultikeyPathIndexIntervalsForField(FieldRef field);
-
-    /**
-     * Extracts the multikey path from a metadata key stored within a wildcard index.
-     */
-    static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry);
-
     WildcardAccessMethod(IndexCatalogEntry* wildcardState,
                          std::unique_ptr<SortedDataInterface> btree);
 
@@ -77,21 +66,6 @@ public:
         return _keyGen.getWildcardProjection();
     }
 
-    /**
-     * Returns the intersection of 'fieldSet' and the set of paths for which the $** has multikey
-     * metadata keys.
-     */
-    std::set<FieldRef> getMultikeyPathSet(OperationContext*,
-                                          const stdx::unordered_set<std::string>& fieldSet,
-                                          MultikeyMetadataAccessStats* stats) const final;
-
-
-    /**
-     * Returns the entire set of paths for which the $** has multikey metadata keys.
-     */
-    std::set<FieldRef> getMultikeyPathSet(OperationContext* opCtx,
-                                          MultikeyMetadataAccessStats* stats) const final;
-
 private:
     void doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                    const BSONObj& obj,
@@ -100,10 +74,6 @@ private:
                    KeyStringSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths,
                    boost::optional<RecordId> id) const final;
-
-    std::set<FieldRef> _getMultikeyPathSet(OperationContext* opCtx,
-                                           const IndexBounds& indexBounds,
-                                           MultikeyMetadataAccessStats* stats) const;
 
     const WildcardKeyGenerator _keyGen;
 };

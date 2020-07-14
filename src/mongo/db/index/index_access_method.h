@@ -339,29 +339,6 @@ public:
                                            const MultikeyPaths& multikeyPaths) const = 0;
 
     /**
-     * Returns the intersection of 'fields' and the set of multikey metadata paths stored in the
-     * index. Only index types which can store metadata describing an arbitrarily large set of
-     * multikey paths need to override this method. Statistics reporting index seeks and keys
-     * examined are written to 'stats'.
-     */
-    virtual std::set<FieldRef> getMultikeyPathSet(OperationContext*,
-                                                  const stdx::unordered_set<std::string>& fields,
-                                                  MultikeyMetadataAccessStats* stats) const {
-        return {};
-    }
-
-    /**
-     * Returns the set of all paths for which the index has multikey metadata keys. Only index types
-     * which can store metadata describing an arbitrarily large set of multikey paths need to
-     * override this method. Statistics reporting index seeks and keys examined are written to
-     * 'stats'.
-     */
-    virtual std::set<FieldRef> getMultikeyPathSet(OperationContext* opCtx,
-                                                  MultikeyMetadataAccessStats* stats) const {
-        return {};
-    }
-
-    /**
      * Provides direct access to the SortedDataInterface. This should not be used to insert
      * documents into an index, except for testing purposes.
      */
