@@ -5,7 +5,7 @@
 (function() {
 'use strict';
 
-load('jstests/sharding/libs/last_stable_mongos_commands.js');
+load('jstests/sharding/libs/last_lts_mongos_commands.js');
 
 function getNewDbName(dbName) {
     if (!getNewDbName.counter) {

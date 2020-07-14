@@ -11,7 +11,7 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOD_BINARY
+from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures import replicaset_utils
 from buildscripts.resmokelib.testing.fixtures import standalone
@@ -64,13 +64,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             mongod_executable = utils.default_if_none(config.MONGOD_EXECUTABLE,
                                                       config.DEFAULT_MONGOD_EXECUTABLE)
             latest_mongod = mongod_executable
-            # The last-stable binary is currently expected to live in '/data/multiversion', which is
+            # The last-lts binary is currently expected to live in '/data/multiversion', which is
             # part of the PATH.
             is_config_svr = "configsvr" in self.replset_config_options and self.replset_config_options[
                 "configsvr"]
             if not is_config_svr:
                 self.mixed_bin_versions = [
-                    latest_mongod if (x == "new") else LAST_STABLE_MONGOD_BINARY
+                    latest_mongod if (x == "new") else LAST_LTS_MONGOD_BINARY
                     for x in self.mixed_bin_versions
                 ]
             else:
@@ -122,7 +122,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         for i in range(self.num_nodes):
             steady_state_constraint_param = "oplogApplicationEnforcesSteadyStateConstraints"
-            # TODO (SERVER-47813): Set steady state constraint parameters on last-stable nodes.
+            # TODO (SERVER-47813): Set steady state constraint parameters on last-lts nodes.
             if (steady_state_constraint_param not in self.nodes[i].mongod_options["set_parameters"]
                     and self.mixed_bin_versions is not None
                     and self.mixed_bin_versions[i] == "new"):
@@ -222,12 +222,12 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                     raise errors.ServerFailure(msg)
 
             # Initiating a replica set with a single node will use "latest" FCV. This will
-            # cause IncompatibleServerVersion errors if additional "last-stable" binary version
+            # cause IncompatibleServerVersion errors if additional "last-lts" binary version
             # nodes are subsequently added to the set, since such nodes cannot set their FCV to
-            # "latest". Therefore, we make sure the primary is "last-stable" FCV before adding in
+            # "latest". Therefore, we make sure the primary is "last-lts" FCV before adding in
             # nodes of different binary versions to the replica set.
             client.admin.command(
-                {"setFeatureCompatibilityVersion": ReplicaSetFixture._LAST_STABLE_FCV})
+                {"setFeatureCompatibilityVersion": ReplicaSetFixture._LAST_LTS_FCV})
 
         if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig

@@ -20,7 +20,7 @@ const st = new ShardingTest(
     {mongos: [{setParameter: {replicaSetMonitorProtocol: "sdam"}}], config: 1, shards: 0});
 
 const latestWireVersion = st.configRS.getPrimary().getMaxWireVersion();
-const lastStableRegex =
+const lastContinuousRegex =
     makeTopologyChangeLogMsgRegex(st.configRS, latestWireVersion - 1, latestWireVersion);
 const latestRegex =
     makeTopologyChangeLogMsgRegex(st.configRS, latestWireVersion, latestWireVersion);
@@ -31,8 +31,8 @@ checkLog.contains(st.s, latestRegex);
 
 jsTest.log("Downgrade FCV and verify that the RSM on the mongos detects the topology change");
 assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-checkLog.contains(st.s, lastStableRegex);
+assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV}));
+checkLog.contains(st.s, lastContinuousRegex);
 
 jsTest.log("Upgrade FCV and verify that the RSM on the mongos detects the topology change");
 assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));

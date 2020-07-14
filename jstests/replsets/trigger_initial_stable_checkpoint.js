@@ -1,7 +1,7 @@
 /**
  * Ensure that we properly trigger a stable checkpoint when starting up a replica set node.
  *
- * We don't support unclean shutdowns with restarts into a last-stable binary.
+ * We don't support unclean shutdowns with restarts into a last-lts binary.
  * @tags: [requires_persistence, multiversion_incompatible]
  */
 (function() {

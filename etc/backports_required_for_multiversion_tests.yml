@@ -1,11 +1,11 @@
 # This file is intended to track tests that should be blacklisted from multiversion testing due to
-# changes that have not yet been backported to the last-stable development branch.
+# changes that have not yet been backported to the last-lts development branch.
 #
 # Usage:
 # Add the server ticket number and the path to the test file for the test you intend to blacklist
 # under the appropriate suite. Any test in a (ticket, test_file) pair that appears in this file but
-# not in the last-stable branch version of this file indicates that a commit has not yet been
-# backported to the last-stable branch and will be excluded from the multiversion suite
+# not in the last-lts branch version of this file indicates that a commit has not yet been
+# backported to the last-lts branch and will be excluded from the multiversion suite
 # corresponding to the root level suite key.
 #
 # Example:
@@ -15,7 +15,7 @@
 #
 # The above example will blacklist jstests/core/my_test_file.js from the
 # 'replica_sets_multiversion_gen' task until this file has been updated with the same
-# (ticket, test_file) pair on the last-stable branch.
+# (ticket, test_file) pair on the last-lts branch.
 #
 # Note:
 # For tests that need to be blacklisted for the 'replica_sets_multiversion' and

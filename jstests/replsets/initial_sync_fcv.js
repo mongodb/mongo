@@ -80,16 +80,16 @@ function runInitialSync(cmd, initialFCV) {
 
 // Ensure that attempting to downgrade the featureCompatibilityVersion during initial sync
 // fails.
-runInitialSync({setFeatureCompatibilityVersion: lastStableFCV}, /*initialFCV*/ latestFCV);
+runInitialSync({setFeatureCompatibilityVersion: lastLTSFCV}, /*initialFCV*/ latestFCV);
 
 // Ensure that attempting to upgrade the featureCompatibilityVersion during initial sync fails.
-runInitialSync({setFeatureCompatibilityVersion: latestFCV}, /*initialFCV*/ lastStableFCV);
+runInitialSync({setFeatureCompatibilityVersion: latestFCV}, /*initialFCV*/ lastLTSFCV);
 
 // Modifications to the featureCompatibilityVersion document during initial sync should be
 // caught and cause initial sync to fail.
 runInitialSync({
     update: 'system.version',
-    updates: [{q: {_id: 'featureCompatibilityVersion'}, u: {'version': lastStableFCV}}]
+    updates: [{q: {_id: 'featureCompatibilityVersion'}, u: {'version': lastLTSFCV}}]
 },
                /*initialFCV*/ latestFCV);
 

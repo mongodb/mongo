@@ -22,16 +22,14 @@ var configureMaxTimeAlwaysTimeOut = function(mode) {
 jsTestLog("Positive test for setFeatureCompatibilityVersion");
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 assert.commandFailedWithCode(
-    admin.runCommand(
-        {setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
+    admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
     ErrorCodes.MaxTimeMSExpired,
     "expected setFeatureCompatibilityVersion to fail due to maxTimeAlwaysTimeOut fail point");
 
 jsTestLog("Negative test for setFeatureCompatibilityVersion to downgrade");
 configureMaxTimeAlwaysTimeOut("off");
 assert.commandWorked(
-    admin.runCommand(
-        {setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
+    admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
     "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
 
 jsTestLog("Negative test for setFeatureCompatibilityVersion to upgrade");

@@ -54,7 +54,7 @@ ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd)
 ReplSetTest.prototype.upgradeArbiters = function(primary, options, user, pwd) {
     // We don't support downgrading data files for arbiters. We need to instead delete the dbpath.
     const oldStartClean = {startClean: (options && !!options["startClean"])};
-    if (options && options.binVersion == "last-stable") {
+    if (options && options.binVersion == "last-lts") {
         options["startClean"] = true;
     }
     this.upgradeMembers(primary, this.getArbiters(), options, user, pwd);

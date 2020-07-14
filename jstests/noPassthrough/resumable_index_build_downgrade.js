@@ -21,7 +21,7 @@ const testDB = primary.getDB("test");
 const coll = testDB.getCollection(collName);
 
 assert.commandWorked(coll.insert({a: 1}));
-assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
 const fp = configureFailPoint(primary, "leaveIndexBuildUnfinishedForShutdown");
 

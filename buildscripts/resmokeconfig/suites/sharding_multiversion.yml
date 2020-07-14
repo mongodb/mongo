@@ -20,4 +20,4 @@ executor:
       global_vars:
         TestData:
           useRandomBinVersionsWithinReplicaSet: true
-          mongosBinVersion: 'last-stable'
+          mongosBinVersion: 'last-lts'

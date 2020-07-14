@@ -52,7 +52,7 @@ doStartupFailTests(latest, dbpath);
 
 // --repair can be used to restore a missing featureCompatibilityVersion document to an existing
 // admin database, as long as all collections have UUIDs. The FCV should be initialized to
-// lastStableFCV / downgraded FCV.
+// lastLTSFCV / downgraded FCV.
 connection = setupMissingFCVDoc(latest, dbpath);
 let returnCode =
     runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
@@ -67,7 +67,7 @@ assert.neq(null,
            "mongod was unable to start up with version=" + latest + " and existing data files");
 adminDB = connection.getDB("admin");
 const fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
-assert.eq(fcvDoc.version, lastStableFCV);
+assert.eq(fcvDoc.version, lastLTSFCV);
 assert.eq(fcvDoc.targetVersion, undefined);
 assert.eq(fcvDoc.previousVersion, undefined);
 MongoRunner.stopMongod(connection);

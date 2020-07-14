@@ -37,7 +37,7 @@ const versions = [
     {binVersion: '4.0', featureCompatibilityVersion: '4.0', testCollection: 'four_zero'},
     {binVersion: '4.2', featureCompatibilityVersion: '4.2', testCollection: 'four_two'},
     {binVersion: '4.4', featureCompatibilityVersion: '4.4', testCollection: 'four_four'},
-    {binVersion: 'last-stable', testCollection: 'last_stable'},
+    {binVersion: 'last-lts', testCollection: 'last_lts'},
     {binVersion: 'latest', featureCompatibilityVersion: '4.5.1', testCollection: 'latest'},
 ];
 

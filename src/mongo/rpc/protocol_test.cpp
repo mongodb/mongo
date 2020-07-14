@@ -147,28 +147,28 @@ TEST(Protocol, validateWireVersion) {
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD 'latest' client -> MongoD downgraded 'last-stable' server
+    // MongoD 'latest' client -> MongoD downgraded 'last-lts' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoD 'latest' client -> MongoD upgraded 'last-stable' server
+    // MongoD 'latest' client -> MongoD upgraded 'last-lts' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoD downgraded 'last-stable' client -> MongoD 'latest' server
+    // MongoD downgraded 'last-lts' client -> MongoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD upgraded 'last-stable' client -> MongoD 'latest' server
+    // MongoD upgraded 'last-lts' client -> MongoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
@@ -182,7 +182,7 @@ TEST(Protocol, validateWireVersion) {
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoS 'last-stable' client -> MongoD 'latest' server
+    // MongoS 'last-lts' client -> MongoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
@@ -199,28 +199,28 @@ TEST(Protocol, validateWireVersion) {
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD 'latest' client -> MongoD downgraded 'last-stable' server
+    // MongoD 'latest' client -> MongoD downgraded 'last-lts' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoD 'latest' client -> MongoD upgraded 'last-stable' server
+    // MongoD 'latest' client -> MongoD upgraded 'last-lts' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoD downgraded 'last-stable' client -> MongoD 'latest' server
+    // MongoD downgraded 'last-lts' client -> MongoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD upgraded 'last-stable' client -> MongoD 'latest' server
+    // MongoD upgraded 'last-lts' client -> MongoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
@@ -234,7 +234,7 @@ TEST(Protocol, validateWireVersion) {
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoS 'last-stable' client -> MongoD 'latest' server
+    // MongoS 'last-lts' client -> MongoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
@@ -265,14 +265,14 @@ TEST(Protocol, validateWireVersion) {
      * of FCV.
      */
 
-    // MongoS 'latest' -> MongoD downgraded 'last-stable' server
+    // MongoS 'latest' -> MongoD downgraded 'last-lts' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoS 'latest' -> MongoD upgraded 'last-stable' server
+    // MongoS 'latest' -> MongoD upgraded 'last-lts' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,

@@ -20,7 +20,7 @@ const invalidField = {
     invalidField: true
 };
 
-assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
 db.system.views.drop();
 assert.commandWorked(db.createCollection("system.views"));

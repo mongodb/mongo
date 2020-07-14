@@ -1,6 +1,6 @@
 /**
- * Verifies that a change stream which is resumed on a downgraded last-stable binary does not crash
- * the server, even when reading oplog entries which the last-stable binary may not understand.
+ * Verifies that a change stream which is resumed on a downgraded last-lts binary does not crash
+ * the server, even when reading oplog entries which the last-lts binary may not understand.
  *
  * @tags: [uses_change_streams, requires_replication]
  */
@@ -220,7 +220,7 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
  * should be an array and each entry should have fields 'watch', 'resumeToken' and
  * 'endSentinelEntry'.
  */
-function resumeStreamsOnLastStableVersion(changeStreams) {
+function resumeStreamsOnLastLTSVersion(changeStreams) {
     for (let changeStream of changeStreams) {
         jsTestLog("Validating change stream for " + tojson(changeStream));
         const csCursor = changeStream.watch({resumeAfter: changeStream.resumeToken});
@@ -252,17 +252,16 @@ function resumeStreamsOnLastStableVersion(changeStreams) {
 // cluster has been downgraded.
 const changeStreamsToBeValidated = writeOplogEntriesAndCreateResumePointsOnLatestVersion();
 
-// Downgrade the entire cluster to 'last-stable' binVersion.
-assert.commandWorked(
-    st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-st.upgradeCluster("last-stable");
+// Downgrade the entire cluster to 'last-lts' binVersion.
+assert.commandWorked(st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+st.upgradeCluster("last-lts");
 
 // Refresh our reference to the sharded collection post-downgrade.
 shardedColl = st.s.getDB(dbName)[collName];
 
 // Resume all the change streams that were created on latest version and validate that the change
 // stream doesn't crash the server after downgrade.
-resumeStreamsOnLastStableVersion(changeStreamsToBeValidated);
+resumeStreamsOnLastLTSVersion(changeStreamsToBeValidated);
 
 st.stop();
 }());

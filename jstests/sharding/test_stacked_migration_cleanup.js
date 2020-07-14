@@ -3,7 +3,7 @@
 (function() {
 'use strict';
 
-const clusterInFCV44 = jsTestOptions().mongosBinVersion != 'last-stable';
+const clusterInFCV44 = jsTestOptions().mongosBinVersion != 'last-lts';
 
 // start up a new sharded cluster
 var st = new ShardingTest({shards: 2, mongos: 1});

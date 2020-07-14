@@ -19,8 +19,7 @@ from evergreen.api import RetryingEvergreenApi, EvergreenApi
 from shrub.v2 import ShrubProject, FunctionCall, Task, TaskDependency, BuildVariant, ExistingTask
 
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib.multiversionconstants import (LAST_STABLE_MONGO_BINARY,
-                                                           REQUIRES_FCV_TAG)
+from buildscripts.resmokelib.multiversionconstants import (LAST_LTS_MONGO_BINARY, REQUIRES_FCV_TAG)
 import buildscripts.resmokelib.parser
 import buildscripts.util.taskname as taskname
 from buildscripts.util.fileops import write_file_to_dir
@@ -88,11 +87,11 @@ def get_multiversion_resmoke_args(is_sharded: bool) -> str:
     return "--numReplSetNodes=3 --linearChain=on "
 
 
-def get_backports_required_last_stable_hash(task_path_suffix: str):
-    """Parse the last-stable shell binary to get the commit hash."""
-    last_stable_shell_exec = os.path.join(task_path_suffix, LAST_STABLE_MONGO_BINARY)
-    shell_version = check_output([last_stable_shell_exec, "--version"]).decode('utf-8')
-    last_stable_commit_hash = ""
+def get_backports_required_last_lts_hash(task_path_suffix: str):
+    """Parse the last-lts shell binary to get the commit hash."""
+    last_lts_shell_exec = os.path.join(task_path_suffix, LAST_LTS_MONGO_BINARY)
+    shell_version = check_output([last_lts_shell_exec, "--version"]).decode('utf-8')
+    last_lts_commit_hash = ""
     for line in shell_version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(':')[1]
@@ -101,31 +100,29 @@ def get_backports_required_last_stable_hash(task_path_suffix: str):
             if result:
                 commit_hash = result.group().strip('"')
                 if not commit_hash.isalnum():
-                    raise ValueError(f"Error parsing last-stable commit hash. Expected an "
+                    raise ValueError(f"Error parsing last-lts commit hash. Expected an "
                                      f"alpha-numeric string but got: {commit_hash}")
                 return commit_hash
             else:
                 break
-    raise ValueError("Could not find a valid commit hash from the last-stable mongo binary.")
+    raise ValueError("Could not find a valid commit hash from the last-lts mongo binary.")
 
 
-def get_last_stable_yaml(last_stable_commit_hash, suite_name):
-    """Download BACKPORTS_REQUIRED_FILE from the last stable commit and return the yaml."""
-    LOGGER.info(
-        f"Downloading file from commit hash of last-stable branch {last_stable_commit_hash}")
+def get_last_lts_yaml(last_lts_commit_hash, suite_name):
+    """Download BACKPORTS_REQUIRED_FILE from the last LTS commit and return the yaml."""
+    LOGGER.info(f"Downloading file from commit hash of last-lts branch {last_lts_commit_hash}")
     response = requests.get(
-        f'{BACKPORTS_REQUIRED_BASE_URL}/{last_stable_commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}'
-    )
+        f'{BACKPORTS_REQUIRED_BASE_URL}/{last_lts_commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}')
     # If the response was successful, no exception will be raised.
     response.raise_for_status()
 
-    last_stable_file = f"{last_stable_commit_hash}_{BACKPORTS_REQUIRED_FILE}"
+    last_lts_file = f"{last_lts_commit_hash}_{BACKPORTS_REQUIRED_FILE}"
     temp_dir = tempfile.mkdtemp()
-    with open(os.path.join(temp_dir, last_stable_file), "w") as fileh:
+    with open(os.path.join(temp_dir, last_lts_file), "w") as fileh:
         fileh.write(response.text)
 
-    backports_required_last_stable = generate_resmoke.read_yaml(temp_dir, last_stable_file)
-    return backports_required_last_stable[suite_name]
+    backports_required_last_lts = generate_resmoke.read_yaml(temp_dir, last_lts_file)
+    return backports_required_last_lts[suite_name]
 
 
 def get_exclude_files(suite_name, task_path_suffix):
@@ -141,18 +138,18 @@ def get_exclude_files(suite_name, task_path_suffix):
         LOGGER.info(f"No tests need to be excluded from suite '{suite_name}'.")
         return set()
 
-    # Get the state of the backports_required_for_multiversion_tests.yml file for the last-stable
-    # binary we are running tests against. We do this by using the commit hash from the last-stable
+    # Get the state of the backports_required_for_multiversion_tests.yml file for the last-lts
+    # binary we are running tests against. We do this by using the commit hash from the last-lts
     # mongo shell executable.
-    last_stable_commit_hash = get_backports_required_last_stable_hash(task_path_suffix)
+    last_lts_commit_hash = get_backports_required_last_lts_hash(task_path_suffix)
 
-    # Get the yaml contents under the 'suite_name' key from the last-stable commit.
-    last_stable_suite_yaml = get_last_stable_yaml(last_stable_commit_hash, suite_name)
-    if last_stable_suite_yaml is None:
+    # Get the yaml contents under the 'suite_name' key from the last-lts commit.
+    last_lts_suite_yaml = get_last_lts_yaml(last_lts_commit_hash, suite_name)
+    if last_lts_suite_yaml is None:
         return set(elem["test_file"] for elem in latest_suite_yaml)
     else:
         return set(
-            elem["test_file"] for elem in latest_suite_yaml if elem not in last_stable_suite_yaml)
+            elem["test_file"] for elem in latest_suite_yaml if elem not in last_lts_suite_yaml)
 
 
 def _generate_resmoke_args(suite_file: str, mixed_version_config: str, is_sharded: bool, options,
@@ -414,7 +411,7 @@ def generate_exclude_yaml(suite: str, task_path_suffix: str, is_generated_suite:
     Update the given multiversion suite configuration yaml to exclude tests.
 
     Compares the BACKPORTS_REQUIRED_FILE on the current branch with the same file on the
-    last-stable branch to determine which tests should be blacklisted.
+    last-lts branch to determine which tests should be blacklisted.
     """
 
     enable_logging()

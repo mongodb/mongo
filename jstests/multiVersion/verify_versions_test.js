@@ -2,7 +2,7 @@
  * These tests check the version comparison logic in the multiversion test support code.
  *
  * In particular, it tests that the shell version (returned by version()) compares equal to
- * "latest", not equal to "last-stable", and x.y compares equal to x.y.z, but that x.w does
+ * "latest", not equal to "last-lts", and x.y compares equal to x.y.z, but that x.w does
  * not.
  */
 
@@ -45,7 +45,7 @@ function assertBinVersionComparesEqual(v1, v2) {
 assertBinVersionsEqual("4.5", version());
 assertBinVersionComparesEqual("4.5", version());
 
-// "latest" is the same version as the shell, "last-stable" is not.
+// "latest" is the same version as the shell, "last-lts" is not.
 assertBinVersionsEqual("latest", version());
 assertBinVersionsEqual("", "latest");
 assertBinVersionsEqual("", version());
@@ -54,11 +54,11 @@ assertBinVersionComparesEqual("latest", version());
 assertBinVersionComparesEqual("", "latest");
 assertBinVersionComparesEqual("", version());
 
-assertBinVersionsNotEqual("latest", "last-stable");
-assertBinVersionsNotEqual("last-stable", version());
+assertBinVersionsNotEqual("latest", "last-lts");
+assertBinVersionsNotEqual("last-lts", version());
 
-assertBinVersionComparesHigher("latest", "last-stable");
-assertBinVersionComparesLower("last-stable", version());
+assertBinVersionComparesHigher("latest", "last-lts");
+assertBinVersionComparesLower("last-lts", version());
 
 // 3.2 means 3.2.z for any value of z. It does not mean 3.0 or 3.0.w.
 assertBinVersionsEqual("3.2", "3.2.4");

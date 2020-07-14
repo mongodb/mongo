@@ -6,7 +6,7 @@
 load("jstests/libs/write_concern_util.js");
 
 const latest = "latest";
-const downgrade = "last-stable";
+const downgrade = "last-lts";
 
 // Start a new replica set with two latest version nodes.
 let rst = new ReplSetTest({
@@ -22,7 +22,7 @@ let latestSecondary = rst.getSecondary();
 // Set the featureCompatibilityVersion to the downgrade version so that a downgrade node can
 // join the set.
 assert.commandWorked(
-    primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
 // Add a downgrade node to the set.
 let downgradeSecondary = rst.add({binVersion: downgrade, rsConfig: {priority: 0}});

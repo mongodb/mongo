@@ -2,7 +2,7 @@
 // featureCompatibilityVersion values.
 
 /**
- * These constants represent the current "latest" and "last-stable" values for the
+ * These constants represent the current "latest", "last-continuous" and "last-lts" values for the
  * featureCompatibilityVersion parameter. They should only be used for testing of upgrade-downgrade
  * scenarios that are intended to be maintained between releases.
  *
@@ -11,7 +11,8 @@
  */
 
 var latestFCV = "4.5.1";
-var lastStableFCV = "4.4";
+var lastContinuousFCV = "4.4";
+var lastLTSFCV = "4.4";
 
 /**
  * Checks the featureCompatibilityVersion document and server parameter. The
@@ -25,10 +26,11 @@ function checkFCV(adminDB, version, targetVersion) {
     assert.commandWorked(res);
     assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
     assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
-    // When both version and targetVersion are equal to lastStableFCV, downgrade is in progress.
-    // This tests that previousVersion is always equal to latestFCV in downgrading states or
-    // undefined otherwise.
-    const isDowngrading = (version === lastStableFCV && targetVersion === lastStableFCV);
+    // When both version and targetVersion are equal to lastContinuousFCV or lastLTSFCV, downgrade
+    // is in progress. This tests that previousVersion is always equal to latestFCV in downgrading
+    // states or undefined otherwise.
+    const isDowngrading = (version === lastLTSFCV && targetVersion === lastLTSFCV) ||
+        (version === lastContinuousFCV && targetVersion === lastContinuousFCV);
     if (isDowngrading) {
         assert.eq(res.featureCompatibilityVersion.previousVersion, latestFCV, tojson(res));
     } else {

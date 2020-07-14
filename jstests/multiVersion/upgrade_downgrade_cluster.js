@@ -1,6 +1,6 @@
 /**
  * Tests that CRUD and aggregation commands through the mongos continue to work as expected on both
- * sharded and unsharded collection at each step of cluster upgrade from last-stable to latest.
+ * sharded and unsharded collection at each step of cluster upgrade from last-lts to latest.
  */
 (function() {
 "use strict";
@@ -37,11 +37,11 @@ var st = new ShardingTest({
     shards: 2,
     mongos: 1,
     other: {
-        mongosOptions: {binVersion: "last-stable"},
-        configOptions: {binVersion: "last-stable"},
-        shardOptions: {binVersion: "last-stable"},
+        mongosOptions: {binVersion: "last-lts"},
+        configOptions: {binVersion: "last-lts"},
+        shardOptions: {binVersion: "last-lts"},
 
-        rsOptions: {binVersion: "last-stable"},
+        rsOptions: {binVersion: "last-lts"},
         rs: true,
     }
 });
@@ -120,7 +120,7 @@ assert.eq(version.excluding, undefined);
 // Downgrade back
 
 jsTest.log('downgrading mongos servers');
-st.upgradeCluster("last-stable", {upgradeConfigs: false, upgradeShards: false});
+st.upgradeCluster("last-lts", {upgradeConfigs: false, upgradeShards: false});
 
 testCRUDAndAgg(st.s.getDB('unsharded'));
 testCRUDAndAgg(st.s.getDB('sharded'));
@@ -132,7 +132,7 @@ testCRUDAndAgg(st.s.getDB('unsharded'));
 testCRUDAndAgg(st.s.getDB('sharded'));
 
 jsTest.log('downgrading shard servers');
-st.upgradeCluster("last-stable", {upgradeMongos: false, upgradeConfigs: false});
+st.upgradeCluster("last-lts", {upgradeMongos: false, upgradeConfigs: false});
 
 awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
 awaitRSClientHosts(st.s, st.rs1.getPrimary(), {ok: true, ismaster: true});
@@ -147,7 +147,7 @@ testCRUDAndAgg(st.s.getDB('unsharded'));
 testCRUDAndAgg(st.s.getDB('sharded'));
 
 jsTest.log('downgrading config servers');
-st.upgradeCluster("last-stable", {upgradeMongos: false, upgradeShards: false});
+st.upgradeCluster("last-lts", {upgradeMongos: false, upgradeShards: false});
 
 testCRUDAndAgg(st.s.getDB('unsharded'));
 testCRUDAndAgg(st.s.getDB('sharded'));

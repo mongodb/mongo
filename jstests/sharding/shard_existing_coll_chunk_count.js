@@ -129,8 +129,8 @@ runCase({
 });
 
 // Lower chunksize to 1MB, and restart the mongod for it to take. We also
-// need to restart mongos for the case of the last-stable suite where the
-// shard is also last-stable.
+// need to restart mongos for the case of the last-lts suite where the
+// shard is also last-lts.
 assert.commandWorked(
     s.getDB("config").getCollection("settings").update({_id: "chunksize"}, {$set: {value: 1}}, {
         upsert: true

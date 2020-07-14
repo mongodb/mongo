@@ -28,7 +28,7 @@ assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
 // returns minWireVersion == maxWireVersion.
 assert.commandWorked(
     adminDB.system.version.update({_id: "featureCompatibilityVersion"},
-                                  {$set: {version: lastStableFCV, targetVersion: latestFCV}},
+                                  {$set: {version: lastLTSFCV, targetVersion: latestFCV}},
                                   {writeConcern: {w: 1}}));
 res = adminDB.runCommand(isMasterCommand);
 assert.commandWorked(res);
@@ -38,7 +38,7 @@ assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
 // returns minWireVersion == maxWireVersion.
 assert.commandWorked(adminDB.system.version.update(
     {_id: "featureCompatibilityVersion"},
-    {$set: {version: lastStableFCV, targetVersion: lastStableFCV, previousVersion: latestFCV}},
+    {$set: {version: lastLTSFCV, targetVersion: lastLTSFCV, previousVersion: latestFCV}},
     {writeConcern: {w: 1}}));
 res = adminDB.runCommand(isMasterCommand);
 assert.commandWorked(res);
@@ -47,7 +47,7 @@ assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
 // When the featureCompatibilityVersion is equal to the downgrade version, running isMaster with
 // internalClient returns minWireVersion + 1 == maxWireVersion.
 assert.commandWorked(
-    adminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, writeConcern: {w: 1}}));
+    adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, writeConcern: {w: 1}}));
 res = adminDB.runCommand(isMasterCommand);
 assert.commandWorked(res);
 assert.eq(res.minWireVersion + 1, res.maxWireVersion, tojson(res));

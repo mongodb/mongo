@@ -3,10 +3,11 @@
 
 load("jstests/replsets/libs/rename_across_dbs.js");
 
-const nodes = [{binVersion: 'last-stable'}, {binVersion: 'latest'}, {}];
+const nodes = [{binVersion: 'last-lts'}, {binVersion: 'latest'}, {}];
 const options = {
     nodes: nodes,
-    setFeatureCompatibilityVersion: lastStableFCV,
+    setFeatureCompatibilityVersion: lastLTSFCV,
+    dropTarget: true,
 };
 
 new RenameAcrossDatabasesTest(options).run();

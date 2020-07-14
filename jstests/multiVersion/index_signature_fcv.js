@@ -76,7 +76,7 @@ coll = testDB.test;
 assertIndexedQuery({a: -1}, 0);
 
 // Test that these indexes are retained and can be used by the planner when we downgrade to FCV 4.4.
-testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV});
+testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV});
 assertIndexedQuery({a: 1}, 0);
 assertIndexedQuery({a: 11}, 1);
 assertIndexedQuery({a: 101}, 2);
@@ -99,7 +99,7 @@ const cmdRes = assert.commandWorked(
 assert.eq(cmdRes.numIndexesBefore, cmdRes.numIndexesAfter);
 
 // Test that downgrading to binary 4.4 with overlapping partial indexes present does not fassert.
-rst.upgradeSet({binVersion: "last-stable"});
+rst.upgradeSet({binVersion: "last-lts"});
 testDB = rst.getPrimary().getDB(jsTestName());
 coll = testDB.test;
 

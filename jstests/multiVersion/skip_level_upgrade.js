@@ -2,7 +2,7 @@
  * Tests that skip level upgrades from old binary versions to the latest binary version are both
  * not successful and do not corrupt anything to prevent correct binary version start up.
  *
- * For each binary version older than last-stable:
+ * For each binary version older than last-lts:
  * - Start a clean node of that version
  * - Create a new collection.
  * - Insert a document into the new collection.
@@ -27,7 +27,7 @@ const defaultOptions = {
     noCleanData: true,
 };
 
-// This lists all binary versions older than the last-stable version.
+// This lists all binary versions older than the last-lts version.
 // TODO SERVER-26792: In the future, we should have a common place from which both the
 // multiversion setup procedure and this test get information about supported major releases.
 const versions = [

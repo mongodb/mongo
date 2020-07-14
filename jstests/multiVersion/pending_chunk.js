@@ -13,8 +13,7 @@ var coll = mongos.getCollection('foo.bar');
 var ns = coll.getFullName();
 var dbName = coll.getDB().getName();
 
-assert.commandWorked(
-    st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+assert.commandWorked(st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
 assert.commandWorked(admin.runCommand({enableSharding: dbName}));
 printjson(admin.runCommand({movePrimary: dbName, to: st.shard0.shardName}));

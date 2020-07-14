@@ -33,7 +33,7 @@
 
 load('jstests/libs/profiler.js');
 load("jstests/libs/logv2_helpers.js");
-load('jstests/sharding/libs/last_stable_mongod_commands.js');
+load('jstests/sharding/libs/last_lts_mongod_commands.js');
 
 let db = "test";
 let coll = "foo";

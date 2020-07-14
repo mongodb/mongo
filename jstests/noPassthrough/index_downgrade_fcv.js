@@ -36,7 +36,7 @@ IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
 // Downgrade the primary using the setFeatureCompatibilityVersion command.
 try {
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 } finally {
     IndexBuildTest.resumeIndexBuilds(primary);
 }
@@ -49,7 +49,7 @@ IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 
 // This confirms that the downgrade command will complete successfully after the index build has
 // completed.
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
 rst.stopSet();
 })();

@@ -1,4 +1,4 @@
-// Test that resume tokens from a replica set running the "last-stable" mongod can be used to resume
+// Test that resume tokens from a replica set running the "last-lts" mongod can be used to resume
 // a change stream after upgrading the replica set to the "latest" mongod, even when the change
 // stream includes multi-statement transactions.
 //
@@ -11,7 +11,7 @@ load("jstests/replsets/rslib.js");              // For startSetIfSupportsReadMaj
 
 const rst = new ReplSetTest({
     nodes: 2,
-    nodeOptions: {binVersion: "last-stable"},
+    nodeOptions: {binVersion: "last-lts"},
 });
 
 if (!startSetIfSupportsReadMajority(rst)) {

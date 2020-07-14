@@ -95,8 +95,8 @@ assertVoteCount(primary, {
     totalMembersCount: 2,
 });
 
-jsTestLog("Downgrade FCV to " + lastStableFCV);
-assert.commandFailedWithCode(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}),
+jsTestLog("Downgrade FCV to " + lastLTSFCV);
+assert.commandFailedWithCode(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
                              ErrorCodes.ConflictingOperationInProgress);
 
 checkFCV({version: latestFCV, targetVersion: null});
@@ -121,8 +121,8 @@ jsTestLog("Wait for reconfig command on primary to hang before storing the new c
 checkLog.containsJson(primary, 4637900);
 
 let fcvDowngradeThread = startParallelShell(() => {
-    jsTestLog("Downgrade FCV to " + lastStableFCV);
-    assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}),
+    jsTestLog("Downgrade FCV to " + lastLTSFCV);
+    assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
                                  ErrorCodes.ConflictingOperationInProgress);
 }, primary.port);
 
@@ -131,7 +131,7 @@ assert.soon(
     () => {
         return primaryAdminDB
                    .currentOp({
-                       "command.setFeatureCompatibilityVersion": lastStableFCV,
+                       "command.setFeatureCompatibilityVersion": lastLTSFCV,
                        waitingForLock: true,
                        "lockStats.Mutex.acquireWaitCount.W": NumberLong(1)
                    })
@@ -190,10 +190,10 @@ assertVoteCount(primary, {
 
 // FCV downgrade should fail as secondary0 config version is not up-to-date with primary's config
 // version.
-jsTestLog("Downgrade FCV to " + lastStableFCV);
+jsTestLog("Downgrade FCV to " + lastLTSFCV);
 const res = assert.commandFailedWithCode(
     primary.adminCommand(
-        {setFeatureCompatibilityVersion: lastStableFCV, "writeConcern": {wtimeout: 5 * 1000}}),
+        {setFeatureCompatibilityVersion: lastLTSFCV, "writeConcern": {wtimeout: 5 * 1000}}),
     ErrorCodes.WriteConcernFailed);
 assert(res.errmsg.startsWith(
            "Failed to wait for the current replica set config to propagate to all nodes"),
@@ -207,10 +207,10 @@ assert.commandWorked(
 testCleanup(newNode.conn);
 
 // Scenario # 4: Test that no 'newlyAdded' members in repl config on fcv downgrade.
-jsTestLog("Downgrade FCV to " + lastStableFCV);
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+jsTestLog("Downgrade FCV to " + lastLTSFCV);
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
-checkFCV({version: lastStableFCV, targetVersion: null});
+checkFCV({version: lastLTSFCV, targetVersion: null});
 
 // Check that the "newlyAdded" field doesn't exist in the config document on all nodes.
 rst.nodes.forEach(function(node) {

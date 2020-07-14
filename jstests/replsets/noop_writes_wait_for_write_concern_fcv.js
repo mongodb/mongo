@@ -1,7 +1,7 @@
 /**
  * Tests that a no-op setFeatureCompatibilityVersion request still waits for write concern.
  *
- * This tests behavior on both latest and last-stable FCVs.
+ * This tests behavior on both latest and last-lts FCVs.
  * @tags: [multiversion_incompatible]
  */
 (function() {
@@ -69,6 +69,6 @@ function testFCVNoop(targetVersion) {
     replTest.stopSet();
 }
 
-testFCVNoop(lastStableFCV);
+testFCVNoop(lastLTSFCV);
 testFCVNoop(latestFCV);
 })();

@@ -2,7 +2,7 @@
  * Run the kill_sessions tests against a sharded cluster.
  *
  * TODO SERVER-45385: These tests can be enabled in multiversion once the logging of session cursor
- * cleanup has been backported and released in last-stable.
+ * cleanup has been backported and released in last-lts.
  * @tags: [multiversion_incompatible]
  */
 

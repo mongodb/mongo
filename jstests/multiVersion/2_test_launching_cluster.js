@@ -7,9 +7,9 @@ load('./jstests/multiVersion/libs/verify_versions.js');
 (function() {
 "use strict";
 // Check our latest versions
-var versionsToCheck = ["last-stable", "latest"];
+var versionsToCheck = ["last-lts", "latest"];
 var versionsToCheckConfig = ["latest"];
-var versionsToCheckMongos = ["last-stable"];
+var versionsToCheckMongos = ["last-lts"];
 
 jsTest.log("Testing mixed versions...");
 

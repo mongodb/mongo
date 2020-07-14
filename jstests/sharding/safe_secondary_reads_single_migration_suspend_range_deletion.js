@@ -27,7 +27,7 @@
 "use strict";
 
 load('jstests/libs/profiler.js');
-load('jstests/sharding/libs/last_stable_mongos_commands.js');
+load('jstests/sharding/libs/last_lts_mongos_commands.js');
 
 let db = "test";
 let coll = "foo";

@@ -33,13 +33,13 @@ assert.commandWorked(
 runWriteConcernRetryabilityTest(priConn,
                                 secConn,
                                 {
-                                    setFeatureCompatibilityVersion: lastStableFCV,
+                                    setFeatureCompatibilityVersion: lastLTSFCV,
                                     writeConcern: {w: 'majority', wtimeout: 200},
                                 },
                                 kNodes,
                                 'admin');
-assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-checkFCV(priConn.getDB('admin'), lastStableFCV);
+assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+checkFCV(priConn.getDB('admin'), lastLTSFCV);
 
 runWriteConcernRetryabilityTest(priConn,
                                 secConn,

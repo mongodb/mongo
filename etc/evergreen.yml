@@ -6772,7 +6772,7 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 31
 
-- name: sharding_last_stable_mongos_and_mixed_shards_gen
+- name: sharding_last_lts_mongos_and_mixed_shards_gen
   tags: ["sharding", "common", "multiversion"]
   commands:
   - func: "generate resmoke tasks"

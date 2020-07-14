@@ -32,8 +32,8 @@ function setDisableResumableRangeDeleter(value, rs) {
 }
 
 const st = new ShardingTest({
-    shards: {rs0: {nodes: [{binVersion: "latest"}]}, rs1: {nodes: [{binVersion: "last-stable"}]}},
-    other: {mongosOptions: {binVersion: "last-stable"}}
+    shards: {rs0: {nodes: [{binVersion: "latest"}]}, rs1: {nodes: [{binVersion: "last-lts"}]}},
+    other: {mongosOptions: {binVersion: "last-lts"}}
 });
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));

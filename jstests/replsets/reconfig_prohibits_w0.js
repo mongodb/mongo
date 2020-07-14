@@ -18,7 +18,7 @@ function testReconfig(gleDefaults) {
     conf.version++;
 
     var response = admin.runCommand({replSetReconfig: conf});
-    // TODO (SERVER-48065): Once 4.6 is last-stable, remove
+    // TODO (SERVER-48065): Once 4.6 is last-lts, remove
     // ErrorCodes.NewReplicaSetConfigurationIncompatible.
     assert.commandFailedWithCode(
         response,

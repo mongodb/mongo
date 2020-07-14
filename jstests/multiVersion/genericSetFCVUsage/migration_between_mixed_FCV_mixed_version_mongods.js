@@ -16,7 +16,7 @@
 TestData.skipCheckOrphans = true;
 
 let st = new ShardingTest({
-    shards: [{binVersion: "latest"}, {binVersion: "last-stable"}],
+    shards: [{binVersion: "latest"}, {binVersion: "last-lts"}],
     mongos: {binVersion: "latest"},
     other: {shardAsReplicaSet: false},
 });
@@ -32,13 +32,13 @@ assert.commandWorked(st.s.adminCommand({shardCollection: testDB.coll.getFullName
 // featureCompatibilityVersion cannot be set to latestFCV on shard 1, but it will set the
 // featureCompatibilityVersion to latestFCV on shard 0.
 assert.commandFailed(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-checkFCV(st.configRS.getPrimary().getDB("admin"), lastStableFCV, latestFCV);
+checkFCV(st.configRS.getPrimary().getDB("admin"), lastLTSFCV, latestFCV);
 checkFCV(st.shard0.getDB("admin"), latestFCV);
-checkFCV(st.shard1.getDB("admin"), lastStableFCV);
+checkFCV(st.shard1.getDB("admin"), lastLTSFCV);
 
-// It is not possible to move a chunk from a latestFCV shard to a last-stable binary version
+// It is not possible to move a chunk from a latestFCV shard to a last-lts binary version
 // shard. Pass explicit writeConcern (which requires secondaryThrottle: true) to avoid problems
-// if the last-stable doesn't automatically include writeConcern when running _recvChunkStart on the
+// if the last-lts doesn't automatically include writeConcern when running _recvChunkStart on the
 // newer shard.
 assert.commandFailedWithCode(st.s.adminCommand({
     moveChunk: testDB.coll.getFullName(),

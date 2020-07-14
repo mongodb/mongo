@@ -349,8 +349,8 @@ jsTestOptions = function() {
             roleGraphInvalidationIsFatal: TestData.roleGraphInvalidationIsFatal || false,
             networkErrorAndTxnOverrideConfig: TestData.networkErrorAndTxnOverrideConfig || {},
             // When useRandomBinVersionsWithinReplicaSet is true, randomly assign the binary
-            // versions of each node in the replica set to 'latest' or 'last-stable'.
-            // This flag is currently a placeholder and only sets the replica set to last-stable
+            // versions of each node in the replica set to 'latest' or 'last-lts'.
+            // This flag is currently a placeholder and only sets the replica set to last-lts
             // FCV.
             useRandomBinVersionsWithinReplicaSet:
                 TestData.useRandomBinVersionsWithinReplicaSet || false,

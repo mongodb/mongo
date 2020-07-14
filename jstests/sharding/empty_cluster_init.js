@@ -4,7 +4,7 @@
 // version initialization.
 //
 // This test manually starts routers with the latest binary which can't connect to config server
-// nodes using the last-stable binary because their wire versions are incompatible.
+// nodes using the last-lts binary because their wire versions are incompatible.
 // @tags: [multiversion_incompatible]
 //
 

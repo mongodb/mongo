@@ -25,7 +25,7 @@ const primaryColl = primaryDB[collName];
 const primaryAdminDB = primary.getDB("admin");
 
 // Set FCV to 4.4 to test the upgrade behavior.
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 
 let startupParams = {};

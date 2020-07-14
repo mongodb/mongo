@@ -34,9 +34,8 @@ try {
         {configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "alwaysOn"}));
 
     jsTestLog("Attempt to downgrade the featureCompatibilityVersion.");
-    assert.commandFailedWithCode(
-        testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}),
-        ErrorCodes.LockTimeout);
+    assert.commandFailedWithCode(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
+                                 ErrorCodes.LockTimeout);
 
     assert.commandWorked(
         testDB.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
@@ -45,8 +44,8 @@ try {
     assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     jsTestLog("Rerun the setFCV command and let it complete successfully.");
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-    checkFCV(adminDB, lastStableFCV);
+    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    checkFCV(adminDB, lastLTSFCV);
 
 } finally {
     assert.commandWorked(

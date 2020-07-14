@@ -42,10 +42,9 @@ assert.commandWorked(deletionsColl.insert(deletionTask));
 // Verify deletion count.
 assert.eq(deletionsColl.find().itcount(), 1);
 
-print("setting fcv: " + lastStableFCV);
-assert.commandWorked(
-    st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-checkFCV(st.shard0.getDB("admin"), lastStableFCV);
+print("setting fcv: " + lastLTSFCV);
+assert.commandWorked(st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+checkFCV(st.shard0.getDB("admin"), lastLTSFCV);
 
 // Verify deletion count.
 assert.eq(deletionsColl.find().itcount(), 0);

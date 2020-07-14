@@ -32,7 +32,7 @@ function rollbackFCVFromDowngradingOrUpgrading(fromFCV, toFCV) {
     // Ensure the cluster starts at the correct FCV.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
 
-    jsTestLog("Testing rolling back FCV from {version: " + lastStableFCV +
+    jsTestLog("Testing rolling back FCV from {version: " + lastLTSFCV +
               ", targetVersion: " + fromFCV + "} to {version: " + toFCV + "}");
 
     rollbackTest.transitionToRollbackOperations();
@@ -74,7 +74,7 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
 
     jsTestLog("Testing rolling back FCV from {version: " + fromFCV +
-              "} to {version: " + lastStableFCV + ", targetVersion: " + fromFCV + "}");
+              "} to {version: " + lastLTSFCV + ", targetVersion: " + fromFCV + "}");
 
     // A failpoint to hang right before unsetting the targetVersion.
     const hangBeforeUnsettingTargetVersion = configureFailPoint(primary, failPoint);
@@ -92,13 +92,13 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     }, "Failed waiting for server to unset the targetVersion or to set the FCV to " + fromFCV);
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     // The secondary should never have received the update to unset the targetVersion.
-    checkFCV(secondaryAdminDB, lastStableFCV, fromFCV);
+    checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     setFCVInParallel();
     rollbackTest.transitionToSteadyStateOperations();
     // The primary should have rolled back their FCV to contain the targetVersion.
-    checkFCV(primaryAdminDB, lastStableFCV, fromFCV);
-    checkFCV(secondaryAdminDB, lastStableFCV, fromFCV);
+    checkFCV(primaryAdminDB, lastLTSFCV, fromFCV);
+    checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
 
     let newPrimary = rollbackTest.getPrimary();
     // As a rule, we forbid downgrading a node while a node is still in the upgrading state and
@@ -113,16 +113,16 @@ const testName = jsTest.name();
 const rollbackTest = new RollbackTest(testName);
 
 // Tests the case where we roll back the FCV state from downgrading to fully upgraded.
-rollbackFCVFromDowngradingOrUpgrading(lastStableFCV, latestFCV);
+rollbackFCVFromDowngradingOrUpgrading(lastLTSFCV, latestFCV);
 
 // Tests the case where we roll back the FCV state from upgrading to fully downgraded.
-rollbackFCVFromDowngradingOrUpgrading(latestFCV, lastStableFCV);
+rollbackFCVFromDowngradingOrUpgrading(latestFCV, lastLTSFCV);
 
 // Tests the case where we roll back the FCV state from fully downgraded to downgrading.
-rollbackFCVFromDowngradedOrUpgraded(lastStableFCV, latestFCV, "hangWhileDowngrading");
+rollbackFCVFromDowngradedOrUpgraded(lastLTSFCV, latestFCV, "hangWhileDowngrading");
 
 // Tests the case where we roll back the FCV state from fully upgraded to upgrading.
-rollbackFCVFromDowngradedOrUpgraded(latestFCV, lastStableFCV, "hangWhileUpgrading");
+rollbackFCVFromDowngradedOrUpgraded(latestFCV, lastLTSFCV, "hangWhileUpgrading");
 
 rollbackTest.stop();
 }());

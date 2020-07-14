@@ -10,7 +10,7 @@ load("jstests/replsets/rslib.js");              // For startSetIfSupportsReadMaj
 
 const rst = new ReplSetTest({
     nodes: 2,
-    nodeOptions: {binVersion: "last-stable"},
+    nodeOptions: {binVersion: "last-lts"},
 });
 
 if (!startSetIfSupportsReadMajority(rst)) {
@@ -33,17 +33,17 @@ assert.soon(() => streamStartedOnOldVersion.hasNext());
 let change = streamStartedOnOldVersion.next();
 assert.eq(change.operationType, "insert", tojson(change));
 assert.eq(change.documentKey._id, "first insert, just for resume token", tojson(change));
-const resumeTokenFromLastStable = change._id;
+const resumeTokenFromLastLTS = change._id;
 
 assert.commandWorked(coll.insert({_id: "before binary upgrade"}));
 // Upgrade the set to the new binary version, but keep the feature compatibility version at
-// last-stable.
+// last-lts.
 rst.upgradeSet({binVersion: "latest"});
 testDB = rst.getPrimary().getDB(jsTestName());
 coll = testDB.change_stream_upgrade;
 
 // Test that we can resume the stream on the new binaries.
-streamStartedOnOldVersion = coll.watch([], {resumeAfter: resumeTokenFromLastStable});
+streamStartedOnOldVersion = coll.watch([], {resumeAfter: resumeTokenFromLastLTS});
 assert.soon(() => streamStartedOnOldVersion.hasNext());
 change = streamStartedOnOldVersion.next();
 assert.eq(change.operationType, "insert", tojson(change));
@@ -73,7 +73,7 @@ const streamStartedOnNewVersion = coll.watch();
 
 // Test that we can still resume with the token from the old version. We should see the same
 // document again.
-streamStartedOnOldVersion = coll.watch([], {resumeAfter: resumeTokenFromLastStable});
+streamStartedOnOldVersion = coll.watch([], {resumeAfter: resumeTokenFromLastLTS});
 assert.soon(() => streamStartedOnOldVersion.hasNext());
 change = streamStartedOnOldVersion.next();
 assert.eq(change.operationType, "insert", tojson(change));

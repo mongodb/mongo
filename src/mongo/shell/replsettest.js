@@ -1290,17 +1290,17 @@ var ReplSetTest = function(opts) {
         cmd[cmdKey] = config;
 
         // Initiating a replica set with a single node will use "latest" FCV. This will
-        // cause IncompatibleServerVersion errors if additional "last-stable" binary version
+        // cause IncompatibleServerVersion errors if additional "last-lts" binary version
         // nodes are subsequently added to the set, since such nodes cannot set their FCV to
-        // "latest". Therefore, we make sure the primary is "last-stable" FCV before adding in
+        // "latest". Therefore, we make sure the primary is "last-lts" FCV before adding in
         // nodes of different binary versions to the replica set.
-        let lastStableBinVersionWasSpecifiedForSomeNode = false;
+        let lastLTSBinVersionWasSpecifiedForSomeNode = false;
         let explicitBinVersionWasSpecifiedForSomeNode = false;
         Object.keys(this.nodeOptions).forEach(function(key, index) {
             let val = self.nodeOptions[key];
             if (typeof (val) === "object" && val.hasOwnProperty("binVersion")) {
-                lastStableBinVersionWasSpecifiedForSomeNode =
-                    MongoRunner.areBinVersionsTheSame(val.binVersion, lastStableFCV);
+                lastLTSBinVersionWasSpecifiedForSomeNode =
+                    MongoRunner.areBinVersionsTheSame(val.binVersion, lastLTSFCV);
                 explicitBinVersionWasSpecifiedForSomeNode = true;
             }
         });
@@ -1343,26 +1343,26 @@ var ReplSetTest = function(opts) {
         print("ReplSetTest initiate command took " + (new Date() - initiateStart) + "ms for " +
               this.nodes.length + " nodes in set '" + this.name + "'");
 
-        // Set the FCV to 'last-stable' if we are running a mixed version replica set. If this is a
+        // Set the FCV to 'last-lts' if we are running a mixed version replica set. If this is a
         // config server, the FCV will be set as part of ShardingTest.
-        let setLastStableFCV = (lastStableBinVersionWasSpecifiedForSomeNode ||
-                                jsTest.options().useRandomBinVersionsWithinReplicaSet) &&
+        let setLastLTSFCV = (lastLTSBinVersionWasSpecifiedForSomeNode ||
+                             jsTest.options().useRandomBinVersionsWithinReplicaSet) &&
             !self.isConfigServer;
-        if (setLastStableFCV && jsTest.options().replSetFeatureCompatibilityVersion) {
+        if (setLastLTSFCV && jsTest.options().replSetFeatureCompatibilityVersion) {
             throw new Error(
-                "The FCV will be set to 'last-stable' automatically when starting up a replica " +
+                "The FCV will be set to 'last-lts' automatically when starting up a replica " +
                 "set with mixed binary versions. Therefore, we expect an empty value for " +
                 "'replSetFeatureCompatibilityVersion'.");
         }
 
-        if (setLastStableFCV) {
+        if (setLastLTSFCV) {
             // Authenticate before running the command.
             asCluster(self.nodes, function setFCV() {
-                let fcv = lastStableFCV;
+                let fcv = lastLTSFCV;
                 print("Setting feature compatibility version for replica set to '" + fcv + "'");
                 assert.commandWorked(
                     self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv}));
-                checkFCV(self.getPrimary().getDB("admin"), lastStableFCV);
+                checkFCV(self.getPrimary().getDB("admin"), lastLTSFCV);
                 print("Fetch the config version from primay since 4.4 downgrade runs a reconfig.");
                 config.version = self.getReplSetConfigFromNode().version;
             });
@@ -2939,7 +2939,7 @@ var ReplSetTest = function(opts) {
                 options.binVersion = "latest";
             } else {
                 const rand = Random.rand();
-                options.binVersion = rand < 0.5 ? "latest" : "last-stable";
+                options.binVersion = rand < 0.5 ? "latest" : "last-lts";
             }
             print("Randomly assigned binary version: " + options.binVersion + " to node: " + n);
         }

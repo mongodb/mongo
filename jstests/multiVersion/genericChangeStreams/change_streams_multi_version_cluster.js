@@ -17,17 +17,17 @@ const dbName = "test";
 const collName = "change_streams_multi_version_sortkey";
 const namespace = dbName + "." + collName;
 
-// Start a sharded cluster in which all mongod and mongos processes are "last-stable" binVersion. We
+// Start a sharded cluster in which all mongod and mongos processes are "last-lts" binVersion. We
 // set "writePeriodicNoops" to write to the oplog every 1 second, which ensures that test change
 // streams do not wait for longer than 1 second if one of the shards has no changes to report.
 var st = new ShardingTest({
     shards: 2,
     rs: {
         nodes: 2,
-        binVersion: "last-stable",
+        binVersion: "last-lts",
         setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
     },
-    other: {mongosOptions: {binVersion: "last-stable"}}
+    other: {mongosOptions: {binVersion: "last-lts"}}
 });
 
 let mongosConn = st.s;
@@ -73,7 +73,7 @@ function insertAndValidateChanges(coll, changeStream) {
 }
 
 //
-// Open and read a change stream on the "last-stable" cluster.
+// Open and read a change stream on the "last-lts" cluster.
 //
 let coll = mongosConn.getDB(dbName)[collName];
 let resumeToken = insertAndValidateChanges(coll, coll.watch());
@@ -84,14 +84,14 @@ let resumeToken = insertAndValidateChanges(coll, coll.watch());
 st.upgradeCluster("latest", {upgradeShards: true, upgradeConfigs: true, upgradeMongos: false});
 
 //
-// Open and read a change stream on the upgraded cluster but still using a "last-stable" version of
-// mongos and "last-stable" for the FCV.
+// Open and read a change stream on the upgraded cluster but still using a "last-lts" version of
+// mongos and "last-lts" for the FCV.
 //
 resumeToken = insertAndValidateChanges(coll, coll.watch([], {resumeAfter: resumeToken}));
 
 //
 // Upgrade mongos to the "latest" binVersion and then open and read a change stream, this time with
-// all cluster nodes upgraded but still in "last-stable" FCV.
+// all cluster nodes upgraded but still in "last-lts" FCV.
 //
 st.upgradeCluster("latest", {upgradeShards: false, upgradeConfigs: false, upgradeMongos: true});
 mongosConn = st.s;

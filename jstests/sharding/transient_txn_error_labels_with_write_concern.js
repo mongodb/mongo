@@ -11,7 +11,7 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/rslib.js");
 
-const clusterInFCV44 = jsTestOptions().mongosBinVersion != 'last-stable';
+const clusterInFCV44 = jsTestOptions().mongosBinVersion != 'last-lts';
 
 const dbName = "test";
 const collName = "transient_txn_error_labels_with_write_concern";

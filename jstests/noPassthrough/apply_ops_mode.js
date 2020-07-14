@@ -61,7 +61,7 @@ const systemVersionColl = adminDB.getCollection("system.version");
 var updateOp = {
     op: 'u',
     ns: systemVersionColl.getFullName(),
-    o: {_id: "featureCompatibilityVersion", version: lastStableFCV},
+    o: {_id: "featureCompatibilityVersion", version: lastLTSFCV},
     o2: {_id: "featureCompatibilityVersion"}
 };
 assert.commandFailed(db.adminCommand({applyOps: [updateOp], oplogApplicationMode: "InitialSync"}));

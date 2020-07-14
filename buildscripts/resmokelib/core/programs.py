@@ -12,8 +12,8 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.core import process
-from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOD_BINARY
-from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOS_BINARY
+from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY
+from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOS_BINARY
 
 # The below parameters define the default 'logComponentVerbosity' object passed to mongod processes
 # started either directly via resmoke or those that will get started by the mongo shell. We allow
@@ -27,9 +27,7 @@ DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {
     "replication": {"rollback": 2}, "sharding": {"migration": 2}, "transaction": 4
 }
 
-DEFAULT_LAST_STABLE_MONGOD_LOG_COMPONENT_VERBOSITY = {
-    "replication": {"rollback": 2}, "transaction": 4
-}
+DEFAULT_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"rollback": 2}, "transaction": 4}
 
 # The default verbosity setting for any mongod processes running in Evergreen i.e. started with an Evergreen
 # task id.
@@ -38,9 +36,9 @@ DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
     "sharding": {"migration": 2}, "storage": {"recovery": 2}, "transaction": 4
 }
 
-# The default verbosity setting for any last stable mongod processes running in Evergreen i.e. started
+# The default verbosity setting for any last-lts mongod processes running in Evergreen i.e. started
 # with an Evergreen task id.
-DEFAULT_EVERGREEN_LAST_STABLE_MONGOD_LOG_COMPONENT_VERBOSITY = {
+DEFAULT_EVERGREEN_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY = {
     "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
     "storage": {"recovery": 2}, "transaction": 4
 }
@@ -86,11 +84,11 @@ def default_mongod_log_component_verbosity():
     return DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY
 
 
-def default_last_stable_mongod_log_component_verbosity():
-    """Return the default 'logComponentVerbosity' value to use for last stable mongod processes."""
+def default_last_lts_mongod_log_component_verbosity():
+    """Return the default 'logComponentVerbosity' value to use for last-lts mongod processes."""
     if config.EVERGREEN_TASK_ID:
-        return DEFAULT_EVERGREEN_LAST_STABLE_MONGOD_LOG_COMPONENT_VERBOSITY
-    return DEFAULT_LAST_STABLE_MONGOD_LOG_COMPONENT_VERBOSITY
+        return DEFAULT_EVERGREEN_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY
+    return DEFAULT_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY
 
 
 def default_mongos_log_component_verbosity():
@@ -102,8 +100,8 @@ def default_mongos_log_component_verbosity():
 
 def get_default_log_component_verbosity_for_mongod(executable):
     """Return the correct default 'logComponentVerbosity' value for the executable version."""
-    if executable == LAST_STABLE_MONGOD_BINARY:
-        return default_last_stable_mongod_log_component_verbosity()
+    if executable == LAST_LTS_MONGOD_BINARY:
+        return default_last_lts_mongod_log_component_verbosity()
     return default_mongod_log_component_verbosity()
 
 
@@ -157,7 +155,7 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     # Set coordinateCommitReturnImmediatelyAfterPersistingDecision to false so that tests do
     # not need to rely on causal consistency or explicity wait for the transaction to finish
     # committing.
-    if executable != LAST_STABLE_MONGOD_BINARY and \
+    if executable != LAST_LTS_MONGOD_BINARY and \
         "coordinateCommitReturnImmediatelyAfterPersistingDecision" not in suite_set_parameters:
         suite_set_parameters["coordinateCommitReturnImmediatelyAfterPersistingDecision"] = False
 
@@ -189,7 +187,7 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     # TODO(SERVER-47797): Remove reference to waitForStepDownOnNonCommandShutdown.
     if ("replSet" in kwargs and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters
             and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters):
-        if executable == LAST_STABLE_MONGOD_BINARY:
+        if executable == LAST_LTS_MONGOD_BINARY:
             suite_set_parameters["waitForStepDownOnNonCommandShutdown"] = False
         else:
             suite_set_parameters["shutdownTimeoutMillisForSignaledShutdown"] = 100
@@ -203,8 +201,8 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
             "mode": "alwaysOn", "data": {"numTickets": config.FLOW_CONTROL_TICKETS}
         }
 
-    # TODO(SERVER-48645): Only keep the else block once v4.4 is not longer the last stable version
-    if executable == LAST_STABLE_MONGOD_BINARY:
+    # TODO(SERVER-48645): Only keep the else block once v4.4 is not longer the last-lts version
+    if executable == LAST_LTS_MONGOD_BINARY:
         suite_set_parameters.setdefault("enableTestCommands", True)
     else:
         _add_testing_set_parameters(suite_set_parameters)
@@ -285,8 +283,8 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     if "logComponentVerbosity" not in suite_set_parameters:
         suite_set_parameters["logComponentVerbosity"] = default_mongos_log_component_verbosity()
 
-    # TODO(SERVER-48645): Only keep the else block once v4.4 is not longer the last stable version
-    if executable == LAST_STABLE_MONGOS_BINARY:
+    # TODO(SERVER-48645): Only keep the else block once v4.4 is not longer the last-lts version
+    if executable == LAST_LTS_MONGOS_BINARY:
         suite_set_parameters.setdefault("enableTestCommands", True)
     else:
         _add_testing_set_parameters(suite_set_parameters)

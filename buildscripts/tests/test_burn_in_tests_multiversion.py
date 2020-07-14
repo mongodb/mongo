@@ -128,7 +128,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         # We should not generate any tasks that are not part of the burn_in_multiversion suite.
         self.assertEqual(0, len(evg_config_dict["tasks"]))
 
-    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
+    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_lts_hash")
     def test_one_task_one_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 1
@@ -145,7 +145,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         tasks = evg_config_dict["tasks"]
         self.assertEqual(len(tasks), NUM_REPL_MIXED_VERSION_CONFIGS * n_tests)
 
-    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
+    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_lts_hash")
     def test_n_task_one_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 2
@@ -164,7 +164,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
             len(tasks),
             (NUM_REPL_MIXED_VERSION_CONFIGS + NUM_SHARDED_MIXED_VERSION_CONFIGS) * n_tests)
 
-    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
+    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_lts_hash")
     def test_one_task_n_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 1
@@ -181,7 +181,7 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
         tasks = evg_config_dict["tasks"]
         self.assertEqual(len(tasks), NUM_REPL_MIXED_VERSION_CONFIGS * n_tests)
 
-    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_stable_hash")
+    @patch("buildscripts.evergreen_gen_multiversion_tests.get_backports_required_last_lts_hash")
     def test_n_task_m_test(self, mock_hash):
         mock_hash.return_value = MONGO_4_2_HASH
         n_tasks = 2

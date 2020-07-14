@@ -7,7 +7,7 @@ jsTest.log("Starting cluster...");
 var options = {
     mongosOptions: {verbose: 1, useLogFiles: true},
     configOptions: {},
-    shardOptions: {binVersion: ["latest", "last-stable"]},
+    shardOptions: {binVersion: ["latest", "last-lts"]},
     enableBalancer: true
 };
 

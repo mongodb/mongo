@@ -11,7 +11,7 @@ selector:
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
   # Multiversion backup-restore tests must run in the multiversion suite.
-  - src/mongo/db/modules/*/jstests/hot_backups/*last_stable*.js
+  - src/mongo/db/modules/*/jstests/hot_backups/*last_lts*.js
 
 # noPassthrough tests start their own mongod's.
 executor:

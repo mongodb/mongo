@@ -12,10 +12,9 @@ const ns = dbName + "." + collName;
 // Create 2 shards with 3 replicas each.
 let st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
-jsTestLog("Setting FCV: " + lastStableFCV);
-assert.commandWorked(
-    st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-checkFCV(st.shard0.getDB("admin"), lastStableFCV);
+jsTestLog("Setting FCV: " + lastLTSFCV);
+assert.commandWorked(st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+checkFCV(st.shard0.getDB("admin"), lastLTSFCV);
 
 // Create a sharded collection with four chunks: [-inf, 50), [50, 100), [100, 150) [150, inf)
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));

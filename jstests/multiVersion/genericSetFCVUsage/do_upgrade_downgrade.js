@@ -9,7 +9,7 @@ load("jstests/libs/check_uuids.js");
 load("jstests/libs/check_unique_indexes.js");
 
 const latestBinary = "latest";
-const lastStableBinary = "last-stable";
+const lastLTSBinary = "last-lts";
 
 let setFCV = function(adminDB, version) {
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: version}));
@@ -139,7 +139,7 @@ let standaloneTest = function(nodeOptions) {
 
     if (!nodeOptions.hasOwnProperty("shardsvr")) {
         // Initially featureCompatibilityVersion is latest except for when we run with shardsvr.
-        // We expect featureCompatibilityVersion to be last-stable for shardsvr.
+        // We expect featureCompatibilityVersion to be last-lts for shardsvr.
         checkFCV(adminDB, latestFCV);
 
         // Ensure all collections have UUIDs and all unique indexes have new version in latest
@@ -147,12 +147,12 @@ let standaloneTest = function(nodeOptions) {
         checkCollectionUUIDs(adminDB);
         checkUniqueIndexFormatVersion(adminDB);
 
-        // Set featureCompatibilityVersion to last-stable.
-        setFCV(adminDB, lastStableFCV);
+        // Set featureCompatibilityVersion to last-lts.
+        setFCV(adminDB, lastLTSFCV);
     }
 
-    // Ensure featureCompatibilityVersion is last-stable and all collections still have UUIDs.
-    checkFCV(adminDB, lastStableFCV);
+    // Ensure featureCompatibilityVersion is last-lts and all collections still have UUIDs.
+    checkFCV(adminDB, lastLTSFCV);
     checkCollectionUUIDs(adminDB);
 
     // Drop and recreate unique indexes with the older FCV
@@ -161,19 +161,19 @@ let standaloneTest = function(nodeOptions) {
     // Stop latest binary version mongod.
     MongoRunner.stopMongod(conn);
 
-    // Start last-stable binary version mongod with same dbpath
-    jsTest.log("Starting a last-stable binVersion standalone to test downgrade");
-    let lastStableConn = startMongodWithVersion(noCleanDataOptions, lastStableBinary);
-    let lastStableAdminDB = lastStableConn.getDB("admin");
+    // Start last-lts binary version mongod with same dbpath
+    jsTest.log("Starting a last-lts binVersion standalone to test downgrade");
+    let lastLTSConn = startMongodWithVersion(noCleanDataOptions, lastLTSBinary);
+    let lastLTSAdminDB = lastLTSConn.getDB("admin");
 
     // Check FCV document.
-    checkFCV(lastStableAdminDB, lastStableFCV);
+    checkFCV(lastLTSAdminDB, lastLTSFCV);
 
-    // Ensure all collections still have UUIDs on a last-stable mongod.
-    checkCollectionUUIDs(lastStableAdminDB);
+    // Ensure all collections still have UUIDs on a last-lts mongod.
+    checkCollectionUUIDs(lastLTSAdminDB);
 
-    // Stop last-stable binary version mongod.
-    MongoRunner.stopMongod(lastStableConn);
+    // Stop last-lts binary version mongod.
+    MongoRunner.stopMongod(lastLTSConn);
 
     // Start latest binary version mongod again.
     jsTest.log("Starting a latest binVersion standalone to test upgrade");
@@ -215,7 +215,7 @@ let replicaSetTest = function(nodeOptions) {
 
     if (!nodeOptions.hasOwnProperty("shardsvr")) {
         // Initially featureCompatibilityVersion is latest on primary and secondaries except for
-        // when we run with shardsvr. We expect featureCompatibilityVersion to be last-stable
+        // when we run with shardsvr. We expect featureCompatibilityVersion to be last-lts
         // for shardsvr.
         checkFCV(primaryAdminDB, latestFCV);
 
@@ -234,16 +234,16 @@ let replicaSetTest = function(nodeOptions) {
             checkUniqueIndexFormatVersion(secondaryAdminDB);
         }
 
-        // Change featureCompatibilityVersion to last-stable.
-        setFCV(primaryAdminDB, lastStableFCV);
+        // Change featureCompatibilityVersion to last-lts.
+        setFCV(primaryAdminDB, lastLTSFCV);
         rst.awaitReplication();
     }
 
-    // Ensure featureCompatibilityVersion is last-stable and all collections still have UUIDs.
-    checkFCV(primaryAdminDB, lastStableFCV);
+    // Ensure featureCompatibilityVersion is last-lts and all collections still have UUIDs.
+    checkFCV(primaryAdminDB, lastLTSFCV);
     for (let j = 0; j < secondaries.length; j++) {
         let secondaryAdminDB = secondaries[j].getDB("admin");
-        checkFCV(secondaryAdminDB, lastStableFCV);
+        checkFCV(secondaryAdminDB, lastLTSFCV);
     }
 
     checkCollectionUUIDs(primaryAdminDB);
@@ -265,23 +265,23 @@ let replicaSetTest = function(nodeOptions) {
     rst.stopSet(null /* signal */, true /* forRestart */);
 
     // Downgrade the ReplSetTest binaries and make sure everything is okay.
-    jsTest.log("Starting a last-stable binVersion ReplSetTest to test downgrade");
-    rst.startSet({restart: true, binVersion: lastStableBinary});
+    jsTest.log("Starting a last-lts binVersion ReplSetTest to test downgrade");
+    rst.startSet({restart: true, binVersion: lastLTSBinary});
 
-    // Check that the featureCompatiblityVersion is set to last-stable and all
+    // Check that the featureCompatiblityVersion is set to last-lts and all
     // collections still have UUIDs.
-    let lastStablePrimaryAdminDB = rst.getPrimary().getDB("admin");
-    let lastStableSecondaries = rst.getSecondaries();
+    let lastLTSPrimaryAdminDB = rst.getPrimary().getDB("admin");
+    let lastLTSSecondaries = rst.getSecondaries();
 
-    checkFCV(lastStablePrimaryAdminDB, lastStableFCV);
-    for (let j = 0; j < lastStableSecondaries.length; j++) {
-        let secondaryAdminDB = lastStableSecondaries[j].getDB("admin");
-        checkFCV(secondaryAdminDB, lastStableFCV);
+    checkFCV(lastLTSPrimaryAdminDB, lastLTSFCV);
+    for (let j = 0; j < lastLTSSecondaries.length; j++) {
+        let secondaryAdminDB = lastLTSSecondaries[j].getDB("admin");
+        checkFCV(secondaryAdminDB, lastLTSFCV);
     }
 
-    checkCollectionUUIDs(lastStablePrimaryAdminDB);
+    checkCollectionUUIDs(lastLTSPrimaryAdminDB);
     for (let j = 0; j < secondaries.length; j++) {
-        let secondaryAdminDB = lastStableSecondaries[j].getDB("admin");
+        let secondaryAdminDB = lastLTSSecondaries[j].getDB("admin");
         checkCollectionUUIDs(secondaryAdminDB);
     }
 

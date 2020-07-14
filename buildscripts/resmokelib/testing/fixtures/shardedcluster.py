@@ -11,7 +11,7 @@ from buildscripts.resmokelib import core
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.multiversionconstants import LAST_STABLE_MONGOS_BINARY
+from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOS_BINARY
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import standalone
@@ -343,9 +343,9 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         mongos_options = self.mongos_options.copy()
         mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
 
-        # The last-stable binary is currently expected to live in '/data/multiversion', which is
+        # The last-lts binary is currently expected to live in '/data/multiversion', which is
         # part of the PATH.
-        mongos_executable = self.mongos_executable if self.mixed_bin_versions is None else LAST_STABLE_MONGOS_BINARY
+        mongos_executable = self.mongos_executable if self.mixed_bin_versions is None else LAST_LTS_MONGOS_BINARY
 
         return _MongoSFixture(mongos_logger, self.job_num, dbpath_prefix=self._dbpath_prefix,
                               mongos_executable=mongos_executable, mongos_options=mongos_options)

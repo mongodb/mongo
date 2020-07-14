@@ -1,6 +1,6 @@
 //
-// Testing migrations between latest and last-stable mongod versions, where the
-// donor is the latest version and the recipient the last-stable, and vice versa.
+// Testing migrations between latest and last-lts mongod versions, where the
+// donor is the latest version and the recipient the last-lts, and vice versa.
 // Migrations should be successful.
 //
 
@@ -14,23 +14,23 @@ load("./jstests/multiVersion/libs/verify_versions.js");
 
 var options = {
     shards: [
-        {binVersion: "last-stable"},
-        {binVersion: "last-stable"},
+        {binVersion: "last-lts"},
+        {binVersion: "last-lts"},
         {binVersion: "latest"},
         {binVersion: "latest"}
     ],
     mongos: 1,
-    other: {mongosOptions: {binVersion: "last-stable"}}
+    other: {mongosOptions: {binVersion: "last-lts"}}
 };
 
 var st = new ShardingTest(options);
 st.stopBalancer();
 
-assert.binVersion(st.shard0, "last-stable");
-assert.binVersion(st.shard1, "last-stable");
+assert.binVersion(st.shard0, "last-lts");
+assert.binVersion(st.shard1, "last-lts");
 assert.binVersion(st.shard2, "latest");
 assert.binVersion(st.shard3, "latest");
-assert.binVersion(st.s0, "last-stable");
+assert.binVersion(st.s0, "last-lts");
 
 var mongos = st.s0, admin = mongos.getDB('admin'),
     shards = mongos.getCollection('config.shards').find().toArray(),
@@ -71,8 +71,8 @@ assert.eq(2, barColl.count());
 
 /**
  * Perform two migrations:
- *      shard0 (last-stable) -> foo chunk -> shard2 (latest)
- *      shard3 (latest)      -> bar chunk -> shard1 (last-stable)
+ *      shard0 (last-lts) -> foo chunk -> shard2 (latest)
+ *      shard3 (latest)      -> bar chunk -> shard1 (last-lts)
  */
 
 assert.commandWorked(
@@ -82,27 +82,27 @@ assert.commandWorked(
 assert.eq(1,
           fooRecipientColl.count(),
           "Foo collection migration failed. " +
-              "Last-stable -> latest mongod version migration failure.");
+              "Last-lts -> latest mongod version migration failure.");
 assert.eq(1,
           fooDonorColl.count(),
           "Foo donor lost its document. " +
-              "Last-stable -> latest mongod version migration failure.");
+              "Last-lts -> latest mongod version migration failure.");
 assert.eq(2,
           fooColl.count(),
           "Incorrect number of documents in foo collection. " +
-              "Last-stable -> latest mongod version migration failure.");
+              "Last-lts -> latest mongod version migration failure.");
 assert.eq(1,
           barRecipientColl.count(),
           "Bar collection migration failed. " +
-              "Latest -> last-stable mongod version migration failure.");
+              "Latest -> last-lts mongod version migration failure.");
 assert.eq(1,
           barDonorColl.count(),
           "Bar donor lost its document. " +
-              "Latest -> last-stable mongod version migration failure.");
+              "Latest -> last-lts mongod version migration failure.");
 assert.eq(2,
           barColl.count(),
           "Incorrect number of documents in bar collection. " +
-              "Latest -> last-stable mongod version migration failure.");
+              "Latest -> last-lts mongod version migration failure.");
 
 st.stop();
 })();

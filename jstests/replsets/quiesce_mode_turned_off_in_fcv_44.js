@@ -17,7 +17,7 @@ rst.initiateWithHighElectionTimeout();
 const primary = rst.getPrimary();
 
 // Set FCV to 4.4 to test that quiesce mode is ignored.
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 
 // Shutdown the node.

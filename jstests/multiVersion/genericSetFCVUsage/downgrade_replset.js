@@ -1,11 +1,11 @@
 // Test the downgrade of a replica set from latest version
-// to last-stable version succeeds, while reads and writes continue.
+// to last-lts version succeeds, while reads and writes continue.
 
 load('./jstests/multiVersion/libs/multi_rs.js');
 load('./jstests/libs/test_background_ops.js');
 
 let newVersion = "latest";
-let oldVersion = "last-stable";
+let oldVersion = "last-lts";
 
 let name = "replsetdowngrade";
 let nodes = {
@@ -26,11 +26,11 @@ function runDowngradeTest() {
     let primaryAdminDB = rst.getPrimary().getDB("admin");
     checkFCV(primaryAdminDB, latestFCV);
 
-    // We wait for the feature compatibility version to be set to lastStableFCV on all nodes of the
+    // We wait for the feature compatibility version to be set to lastLTSFCV on all nodes of the
     // replica set in order to ensure that all nodes can be successfully downgraded. This
     // effectively allows us to emulate upgrading to the latest version with existing data files and
-    // then trying to downgrade back to lastStableFCV.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    // then trying to downgrade back to lastLTSFCV.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
     rst.awaitReplication();
 
     jsTest.log("Inserting documents into collection.");

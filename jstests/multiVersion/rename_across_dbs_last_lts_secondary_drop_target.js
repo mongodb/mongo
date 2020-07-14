@@ -3,10 +3,10 @@
 
 load("jstests/replsets/libs/rename_across_dbs.js");
 
-const nodes = [{binVersion: 'latest'}, {binVersion: 'last-stable'}, {}];
+const nodes = [{binVersion: 'latest'}, {binVersion: 'last-lts'}, {}];
 const options = {
     nodes: nodes,
-    setFeatureCompatibilityVersion: lastStableFCV,
+    setFeatureCompatibilityVersion: lastLTSFCV,
     dropTarget: true,
 };
 

@@ -629,7 +629,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
 
     LOGV2_DEBUG(21168,
                 2,
-                "Resetting feature compatibility version to last-stable. If the sync source is in "
+                "Resetting feature compatibility version to last-lts. If the sync source is in "
                 "latest feature compatibility version, we will find out when we clone the "
                 "server configuration collection (admin.system.version)");
     serverGlobalParams.featureCompatibility.reset();

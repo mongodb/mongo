@@ -31,8 +31,8 @@ try {
                                  ErrorCodes.MaxTimeMSExpired);
 
     jsTestLog("Downgrade the featureCompatibilityVersion.");
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-    checkFCV(adminDB, lastStableFCV);
+    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    checkFCV(adminDB, lastLTSFCV);
 
     jsTestLog("Drop the collection. This should succeed, since the transaction was aborted.");
     assert.commandWorked(testDB.runCommand({drop: collName}));

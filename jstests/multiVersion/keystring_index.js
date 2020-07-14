@@ -1,13 +1,13 @@
 /**
- * Regression test that ensure there have been no KeyString encoding changes between last-stable the
+ * Regression test that ensure there have been no KeyString encoding changes between last-lts the
  * current version. Has the following procedure:
- * - Start mongod with the last-stable version.
+ * - Start mongod with the last-lts version.
  * - For each index type, create a new collection, insert documents, and create an index.
  * - Shutdown mongod and restart with the latest version.
  * - Run validate.
  * - Drop all collections.
  * - Recreate all indexes.
- * - Shuwdown mongod and restart with the last-stable version.
+ * - Shuwdown mongod and restart with the last-lts version.
  * - Run validate.
  *
  * The following index types are tested:
@@ -126,17 +126,17 @@ const defaultOptions = {
 
 const kCollectionPrefix = 'testColl';
 
-let mongodOptionsLastStable = Object.extend({binVersion: 'last-stable'}, defaultOptions);
+let mongodOptionsLastLTS = Object.extend({binVersion: 'last-lts'}, defaultOptions);
 let mongodOptionsCurrent = Object.extend({binVersion: 'latest'}, defaultOptions);
 
-// We will first start up a last-stable version mongod, populate the database, upgrade, then
+// We will first start up a last-lts version mongod, populate the database, upgrade, then
 // validate.
 
-jsTestLog("Starting version: last-stable");
-let conn = MongoRunner.runMongod(mongodOptionsLastStable);
+jsTestLog("Starting version: last-lts");
+let conn = MongoRunner.runMongod(mongodOptionsLastLTS);
 
 assert.neq(
-    null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptionsLastStable));
+    null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptionsLastLTS));
 
 let testDb = conn.getDB('test');
 
@@ -151,9 +151,8 @@ assert.neq(null, conn, 'mongod was unable to start with the latest version');
 testDb = conn.getDB('test');
 assert.gt(testDb.getCollectionInfos().length, 0);
 
-jsTestLog(
-    "Validating indexes created with a 'last-stable' version binary using a 'latest' version " +
-    "binary");
+jsTestLog("Validating indexes created with a 'last-lts' version binary using a 'latest' version " +
+          "binary");
 
 // Validate all the indexes.
 assert.commandWorked(validateCollections(testDb, {full: true}));
@@ -163,15 +162,15 @@ dropAllUserCollections(testDb);
 populateDb(testDb);
 MongoRunner.stopMongod(conn);
 
-conn = MongoRunner.runMongod(mongodOptionsLastStable);
+conn = MongoRunner.runMongod(mongodOptionsLastLTS);
 assert.neq(
-    null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptionsLastStable));
+    null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptionsLastLTS));
 
 testDb = conn.getDB('test');
 assert.gt(testDb.getCollectionInfos().length, 0);
 
 jsTestLog(
-    "Validating indexes created with 'latest' version binary using a 'last-stable' version binary");
+    "Validating indexes created with 'latest' version binary using a 'last-lts' version binary");
 
 assert.commandWorked(validateCollections(testDb, {full: true}));
 MongoRunner.stopMongod(conn);

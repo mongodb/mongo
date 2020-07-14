@@ -3,7 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/multiVersion/**/*.js
-  - src/mongo/db/modules/*/jstests/hot_backups/*last_stable*.js
+  - src/mongo/db/modules/*/jstests/hot_backups/*last_lts*.js
   exclude_files:
   # Do not execute files with helper functions.
   - jstests/multiVersion/libs/*.js

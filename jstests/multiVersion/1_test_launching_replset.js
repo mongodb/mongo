@@ -3,7 +3,7 @@
 //
 
 // Check our latest versions
-var versionsToCheck = ["last-stable", "latest"];
+var versionsToCheck = ["last-lts", "latest"];
 
 load('./jstests/multiVersion/libs/verify_versions.js');
 
