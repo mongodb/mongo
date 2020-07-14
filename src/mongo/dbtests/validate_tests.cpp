@@ -102,11 +102,12 @@ protected:
             return _full ? CollectionValidation::ValidateMode::kForegroundFull
                          : CollectionValidation::ValidateMode::kForeground;
         }();
+        auto repairMode = CollectionValidation::RepairMode::kNone;
         ValidateResults results;
         BSONObjBuilder output;
 
         ASSERT_OK(CollectionValidation::validate(
-            &_opCtx, _nss, mode, &results, &output, kTurnOnExtraLoggingForTest));
+            &_opCtx, _nss, mode, repairMode, &results, &output, kTurnOnExtraLoggingForTest));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
@@ -1203,6 +1204,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -1321,6 +1323,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -1412,6 +1415,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -1787,6 +1791,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kNone,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -1806,6 +1811,9 @@ public:
 
             dumpOnErrorGuard.dismiss();
         }
+
+        // TODO SERVER-49341: Call validate with repair true, expect corrupt BSON records are
+        // removed and results to be valid
     }
 };
 

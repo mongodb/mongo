@@ -91,18 +91,21 @@ public:
  * Calls validate on collection kNss with both kValidateFull and kValidateNormal validation levels
  * and verifies the results.
  */
-void foregroundValidate(OperationContext* opCtx,
-                        bool valid,
-                        int numRecords,
-                        int numInvalidDocuments,
-                        int numErrors,
-                        std::initializer_list<CollectionValidation::ValidateMode> modes = {
-                            CollectionValidation::ValidateMode::kForeground,
-                            CollectionValidation::ValidateMode::kForegroundFull}) {
+void foregroundValidate(
+    OperationContext* opCtx,
+    bool valid,
+    int numRecords,
+    int numInvalidDocuments,
+    int numErrors,
+    std::initializer_list<CollectionValidation::ValidateMode> modes =
+        {CollectionValidation::ValidateMode::kForeground,
+         CollectionValidation::ValidateMode::kForegroundFull},
+    CollectionValidation::RepairMode repairMode = CollectionValidation::RepairMode::kNone) {
     for (auto mode : modes) {
         ValidateResults validateResults;
         BSONObjBuilder output;
-        ASSERT_OK(CollectionValidation::validate(opCtx, kNss, mode, &validateResults, &output));
+        ASSERT_OK(CollectionValidation::validate(
+            opCtx, kNss, mode, repairMode, &validateResults, &output));
         ASSERT_EQ(validateResults.valid, valid);
         ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors));
 
@@ -134,8 +137,12 @@ void backgroundValidate(OperationContext* opCtx,
 
     ValidateResults validateResults;
     BSONObjBuilder output;
-    ASSERT_OK(CollectionValidation::validate(
-        opCtx, kNss, CollectionValidation::ValidateMode::kBackground, &validateResults, &output));
+    ASSERT_OK(CollectionValidation::validate(opCtx,
+                                             kNss,
+                                             CollectionValidation::ValidateMode::kBackground,
+                                             CollectionValidation::RepairMode::kNone,
+                                             &validateResults,
+                                             &output));
     BSONObj obj = output.obj();
 
     ASSERT_EQ(validateResults.valid, valid);

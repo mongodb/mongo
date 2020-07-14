@@ -406,6 +406,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
             CollectionValidation::validate(_opCtx.get(),
                                            nss,
                                            CollectionValidation::ValidateMode::kForegroundFull,
+                                           CollectionValidation::RepairMode::kNone,
                                            &validateResults,
                                            &bob));
         ASSERT_TRUE(validateResults.valid);

@@ -62,6 +62,7 @@ public:
     ValidateState(OperationContext* opCtx,
                   const NamespaceString& nss,
                   ValidateMode mode,
+                  RepairMode repairMode,
                   bool turnOnExtraLoggingForTest = false);
 
     const NamespaceString& nss() const {
@@ -83,6 +84,10 @@ public:
 
     bool isFullIndexValidation() const {
         return isFullValidation() || _mode == ValidateMode::kForegroundFullIndexOnly;
+    }
+
+    bool shouldRunRepair() const {
+        return _repairMode == RepairMode::kRepair;
     }
 
     const UUID uuid() const {
@@ -191,6 +196,7 @@ private:
 
     NamespaceString _nss;
     ValidateMode _mode;
+    RepairMode _repairMode;
     OptionalCollectionUUID _uuid;
 
     boost::optional<Lock::GlobalLock> _globalLock;

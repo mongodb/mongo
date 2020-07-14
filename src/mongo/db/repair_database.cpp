@@ -168,6 +168,7 @@ Status repairCollections(OperationContext* opCtx,
             opCtx,
             nss,
             CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
+            CollectionValidation::RepairMode::kRepair,
             &validateResults,
             &output);
         if (!status.isOK()) {
@@ -176,6 +177,17 @@ Status repairCollections(OperationContext* opCtx,
 
         LOGV2(21028, "Collection validation", "results"_attr = output.done());
 
+        if (validateResults.repaired) {
+            if (validateResults.valid) {
+                LOGV2(4934000, "Validate successfully repaired all data", "collection"_attr = nss);
+            } else {
+                LOGV2(4934001, "Validate was unable to repair all data", "collection"_attr = nss);
+            }
+        } else {
+            LOGV2(4934002, "Validate did not make any repairs", "collection"_attr = nss);
+        }
+
+        // If not valid, whether repair ran or not, indexes will need to be rebuilt.
         if (!validateResults.valid) {
             status = rebuildIndexesForNamespace(opCtx, nss, engine);
             if (!status.isOK()) {

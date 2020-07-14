@@ -570,6 +570,7 @@ protected:
 
 struct ValidateResults {
     bool valid = true;
+    bool repaired = false;
     boost::optional<Timestamp> readTimestamp = boost::none;
     std::vector<std::string> errors;
     std::vector<std::string> warnings;

@@ -63,6 +63,17 @@ enum class ValidateMode {
 };
 
 /**
+ * RepairMode indicates whether validate should repair the data inconsistencies it detects. When set
+ * to kRepair, if any repairs are made, the 'repaired' flag in ValidateResults will be set to true.
+ * If all errors are fixed, then 'valid' will also be set to true. kRepair is incompatible with the
+ * ValidateModes kBackground and kForegroundFullEnforceFastCount.
+ */
+enum class RepairMode {
+    kNone,
+    kRepair,
+};
+
+/**
  * Expects the caller to hold no locks.
  *
  * Background validation does not support any type of full validation above.
@@ -76,6 +87,7 @@ enum class ValidateMode {
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidateMode mode,
+                RepairMode repairMode,
                 ValidateResults* results,
                 BSONObjBuilder* output,
                 bool turnOnExtraLoggingForTest = false);

@@ -423,14 +423,19 @@ void _validateCatalogEntry(OperationContext* opCtx,
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidateMode mode,
+                RepairMode repairMode,
                 ValidateResults* results,
                 BSONObjBuilder* output,
                 bool turnOnExtraLoggingForTest) {
     invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
 
+    if (repairMode == RepairMode::kRepair) {
+        invariant(storageGlobalParams.repair);
+    }
+
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
-    ValidateState validateState(opCtx, nss, mode, turnOnExtraLoggingForTest);
+    ValidateState validateState(opCtx, nss, mode, repairMode, turnOnExtraLoggingForTest);
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // Check whether we are allowed to read from this node after acquiring our locks. If we are
