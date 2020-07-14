@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/initialize_api_parameters_gen.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -37,6 +38,47 @@ namespace mongo {
  * Parses a command's API Version parameters from a request and stores the apiVersion, apiStrict,
  * and apiDeprecationErrors fields.
  */
-APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody);
+const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody);
+
+/**
+ * Decorates operation context with methods to retrieve apiVersion, apiStrict, and
+ * apiDeprecationErrors.
+ */
+class APIParameters {
+
+public:
+    APIParameters();
+    static APIParameters& get(OperationContext* opCtx);
+    static APIParameters fromClient(const APIParametersFromClient& apiParamsFromClient);
+
+    const StringData getAPIVersion() const {
+        return _apiVersion;
+    }
+
+    void setAPIVersion(StringData apiVersion) {
+        _apiVersion = apiVersion;
+    }
+
+    const bool getAPIStrict() const {
+        return _apiStrict;
+    }
+
+    void setAPIStrict(bool apiStrict) {
+        _apiStrict = apiStrict;
+    }
+
+    const bool getAPIDeprecationErrors() const {
+        return _apiDeprecationErrors;
+    }
+
+    void setAPIDeprecationErrors(bool apiDeprecationErrors) {
+        _apiDeprecationErrors = apiDeprecationErrors;
+    }
+
+private:
+    StringData _apiVersion;
+    bool _apiStrict;
+    bool _apiDeprecationErrors;
+};
 
 }  // namespace mongo

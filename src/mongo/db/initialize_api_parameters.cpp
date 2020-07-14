@@ -31,22 +31,55 @@
 
 namespace mongo {
 
-APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody) {
+const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody) {
 
-    auto vAPI = APIParametersFromClient::parse("APIParametersFromClient"_sd, requestBody);
+    auto apiParamsFromClient =
+        APIParametersFromClient::parse("APIParametersFromClient"_sd, requestBody);
 
-    if (vAPI.getApiDeprecationErrors() || vAPI.getApiStrict()) {
+    if (apiParamsFromClient.getApiDeprecationErrors() || apiParamsFromClient.getApiStrict()) {
         uassert(4886600,
                 "Provided apiStrict and/or apiDeprecationErrors without passing apiVersion",
-                vAPI.getApiVersion());
+                apiParamsFromClient.getApiVersion());
     }
 
-    if (vAPI.getApiVersion()) {
+    if (apiParamsFromClient.getApiVersion()) {
         uassert(ErrorCodes::APIVersionError,
                 "API version must be \"1\"",
-                "1" == vAPI.getApiVersion().value());
+                "1" == apiParamsFromClient.getApiVersion().value());
     }
-    return vAPI;
+
+    return apiParamsFromClient;
+}
+
+const OperationContext::Decoration<APIParameters> handle =
+    OperationContext::declareDecoration<APIParameters>();
+
+APIParameters& APIParameters::get(OperationContext* opCtx) {
+    return handle(opCtx);
+}
+
+APIParameters::APIParameters()
+    : _apiVersion("1"), _apiStrict(false), _apiDeprecationErrors(false) {}
+
+APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParamsFromClient) {
+    APIParameters apiParameters = APIParameters();
+    auto apiVersion = apiParamsFromClient.getApiVersion();
+    auto apiStrict = apiParamsFromClient.getApiStrict();
+    auto apiDeprecationErrors = apiParamsFromClient.getApiDeprecationErrors();
+
+    if (apiVersion) {
+        apiParameters.setAPIVersion(apiVersion.value());
+    }
+
+    if (apiStrict) {
+        apiParameters.setAPIStrict(apiStrict.value());
+    }
+
+    if (apiDeprecationErrors) {
+        apiParameters.setAPIDeprecationErrors(apiDeprecationErrors.value());
+    }
+
+    return apiParameters;
 }
 
 }  // namespace mongo
