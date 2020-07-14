@@ -180,6 +180,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                 index.block->finalizeTemporaryTables(
                     opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
             }
+            _indexes.clear();
             _buildIsCleanedUp = true;
         });
 
