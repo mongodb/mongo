@@ -49,6 +49,7 @@
 namespace mongo {
 
 using UserFieldname = std::string;
+using NonZeroKey = stdx::variant<int, long long, double, Decimal128>;
 // These are the non-compound types from bsonspec.org.
 using UserDouble = double;
 using UserString = std::string;
@@ -158,6 +159,7 @@ public:
     stdx::variant<ArrayChildren,
                   ObjectChildren,
                   KeyValue,
+                  NonZeroKey,
                   UserDouble,
                   UserString,
                   UserBinary,

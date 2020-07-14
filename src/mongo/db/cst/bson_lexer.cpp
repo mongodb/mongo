@@ -40,12 +40,16 @@ namespace {
 // Mapping of reserved keywords to BSON token. Any key which is not included in this map is assumed
 // to be a user field name and is treated as a terminal by the parser.
 const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
+    {"_id", PipelineParserGen::token::ID},
     {"$_internalInhibitOptimization", PipelineParserGen::token::STAGE_INHIBIT_OPTIMIZATION},
     {"$unionWith", PipelineParserGen::token::STAGE_UNION_WITH},
-    {"coll", PipelineParserGen::token::COLL_ARG},
-    {"pipeline", PipelineParserGen::token::PIPELINE_ARG},
+    {"$project", PipelineParserGen::token::STAGE_PROJECT},
     {"$skip", PipelineParserGen::token::STAGE_SKIP},
     {"$limit", PipelineParserGen::token::STAGE_LIMIT},
+    {"coll", PipelineParserGen::token::COLL_ARG},
+    {"pipeline", PipelineParserGen::token::PIPELINE_ARG},
+    {"$add", PipelineParserGen::token::ADD},
+    {"$atan2", PipelineParserGen::token::ATAN2},
 };
 bool isCompound(PipelineParserGen::symbol_type token) {
     return token.type_get() == static_cast<int>(PipelineParserGen::token::START_OBJECT) ||
@@ -129,8 +133,8 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
             // Place the token expected by the parser if this is a reserved keyword.
             _tokens.emplace_back(it->second, getNextLoc());
         } else {
-            // If we don't care about the keyword, the fieldname is treated as a normal string.
-            _tokens.emplace_back(PipelineParserGen::make_STRING(elem.fieldName(), getNextLoc()));
+            // If we don't care about the keyword, then it's treated as a generic fieldname.
+            _tokens.emplace_back(PipelineParserGen::make_FIELDNAME(elem.fieldName(), getNextLoc()));
         }
     }
 
@@ -154,19 +158,30 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
             _tokens.emplace_back(PipelineParserGen::make_STRING(elem.String(), getNextLoc()));
             break;
         case NumberLong:
-            _tokens.emplace_back(
-                PipelineParserGen::make_NUMBER_LONG(elem.numberLong(), getNextLoc()));
+            if (elem.numberLong() == 0ll)
+                _tokens.emplace_back(PipelineParserGen::token::LONG_ZERO, getNextLoc());
+            else
+                _tokens.emplace_back(
+                    PipelineParserGen::make_LONG_NON_ZERO(elem.numberLong(), getNextLoc()));
             break;
         case NumberInt:
-            _tokens.emplace_back(
-                PipelineParserGen::make_NUMBER_INT(elem.numberInt(), getNextLoc()));
+            if (elem.numberInt() == 0)
+                _tokens.emplace_back(PipelineParserGen::token::INT_ZERO, getNextLoc());
+            else
+                _tokens.emplace_back(
+                    PipelineParserGen::make_INT_NON_ZERO(elem.numberInt(), getNextLoc()));
             break;
         case NumberDouble:
-            _tokens.emplace_back(
-                PipelineParserGen::make_NUMBER_DOUBLE(elem.numberDouble(), getNextLoc()));
+            if (elem.numberDouble() == 0.0)
+                _tokens.emplace_back(PipelineParserGen::token::DOUBLE_ZERO, getNextLoc());
+            else
+                _tokens.emplace_back(
+                    PipelineParserGen::make_DOUBLE_NON_ZERO(elem.numberDouble(), getNextLoc()));
             break;
         case Bool:
-            _tokens.emplace_back(PipelineParserGen::make_BOOL(elem.boolean(), getNextLoc()));
+            _tokens.emplace_back(elem.boolean() ? PipelineParserGen::token::TRUE
+                                                : PipelineParserGen::token::FALSE,
+                                 getNextLoc());
             break;
         default:
             MONGO_UNREACHABLE;

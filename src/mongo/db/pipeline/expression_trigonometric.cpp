@@ -139,43 +139,6 @@ CREATE_TRIGONOMETRIC_CLASS(HyperbolicTangent, tanh);
 
 #undef CREATE_TRIGONOMETRIC_CLASS
 
-
-/* ----------------------- ExpressionArcTangent2 ---------------------------- */
-
-class ExpressionArcTangent2 final : public ExpressionTwoNumericArgs<ExpressionArcTangent2> {
-public:
-    explicit ExpressionArcTangent2(ExpressionContext* const expCtx)
-        : ExpressionTwoNumericArgs(expCtx) {}
-
-    Value evaluateNumericArgs(const Value& numericArg1, const Value& numericArg2) const final {
-        auto totalType = BSONType::NumberDouble;
-        // If the type of either argument is NumberDecimal, we promote to Decimal128.
-        if (numericArg1.getType() == BSONType::NumberDecimal ||
-            numericArg2.getType() == BSONType::NumberDecimal) {
-            totalType = BSONType::NumberDecimal;
-        }
-        switch (totalType) {
-            case BSONType::NumberDecimal: {
-                auto dec = numericArg1.coerceToDecimal();
-                return Value(dec.atan2(numericArg2.coerceToDecimal()));
-            }
-            case BSONType::NumberDouble: {
-                return Value(
-                    std::atan2(numericArg1.coerceToDouble(), numericArg2.coerceToDouble()));
-            }
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }
-
-    const char* getOpName() const final {
-        return "$atan2";
-    }
-
-    void acceptVisitor(ExpressionVisitor* visitor) final {
-        return visitor->visit(this);
-    }
-};
 REGISTER_EXPRESSION(atan2, ExpressionArcTangent2::parse);
 
 

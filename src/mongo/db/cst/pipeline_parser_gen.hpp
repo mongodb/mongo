@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.6.
+// A Bison parser, made by GNU Bison 3.6.3.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
@@ -32,7 +32,7 @@
 
 
 /**
- ** \file src/mongo/db/cst/pipeline_parser_gen.hpp
+ ** \file pipeline_parser_gen.hpp
  ** Define the mongo::parser class.
  */
 
@@ -42,10 +42,10 @@
 // especially those whose name start with YY_ or yy_.  They are
 // private implementation details that can be changed or removed.
 
-#ifndef YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
-#define YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#ifndef YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#define YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
 // "%code requires" blocks.
-#line 60 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 66 "pipeline_grammar.yy"
 
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/key_fieldname.h"
@@ -61,7 +61,7 @@ class BSONLexer;
 #pragma warning(disable : 4065)
 #endif
 
-#line 65 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 65 "pipeline_parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -190,9 +190,9 @@ class BSONLexer;
 #define YYDEBUG 0
 #endif
 
-#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 58 "pipeline_grammar.yy"
 namespace mongo {
-#line 200 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 200 "pipeline_parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -374,22 +374,46 @@ public:
             // num
             // skip
             // limit
+            // project
+            // projectFields
+            // projection
+            // compoundExpression
+            // expression
+            // maths
+            // add
+            // atan2
+            // string
+            // int
+            // long
+            // double
+            // bool
+            // value
             char dummy1[sizeof(CNode)];
 
-            // BOOL
-            char dummy2[sizeof(bool)];
+            // projectionFieldname
+            char dummy2[sizeof(CNode::Fieldname)];
 
-            // NUMBER_DOUBLE
-            char dummy3[sizeof(double)];
+            // DECIMAL_NON_ZERO
+            char dummy3[sizeof(Decimal128)];
 
-            // NUMBER_INT
-            char dummy4[sizeof(int)];
+            // DOUBLE_NON_ZERO
+            char dummy4[sizeof(double)];
 
-            // NUMBER_LONG
-            char dummy5[sizeof(long long)];
+            // INT_NON_ZERO
+            char dummy5[sizeof(int)];
 
+            // LONG_NON_ZERO
+            char dummy6[sizeof(long long)];
+
+            // projectField
+            char dummy7[sizeof(std::pair<CNode::Fieldname, CNode>)];
+
+            // FIELDNAME
             // STRING
-            char dummy6[sizeof(std::string)];
+            char dummy8[sizeof(std::string)];
+
+            // expressions
+            char dummy9[sizeof(std::vector<CNode>)];
         };
 
         /// The size of the largest semantic type.
@@ -429,24 +453,35 @@ public:
     struct token {
         enum token_kind_type {
             YYEMPTY = -2,
-            END_OF_FILE = 0,                 // "EOF"
-            YYerror = 1,                     // error
-            YYUNDEF = 2,                     // "invalid token"
-            START_OBJECT = 3,                // START_OBJECT
-            END_OBJECT = 4,                  // END_OBJECT
-            START_ARRAY = 5,                 // START_ARRAY
-            END_ARRAY = 6,                   // END_ARRAY
-            STAGE_INHIBIT_OPTIMIZATION = 7,  // STAGE_INHIBIT_OPTIMIZATION
-            STAGE_UNION_WITH = 8,            // STAGE_UNION_WITH
-            STAGE_SKIP = 9,                  // STAGE_SKIP
-            STAGE_LIMIT = 10,                // STAGE_LIMIT
-            COLL_ARG = 11,                   // COLL_ARG
-            PIPELINE_ARG = 12,               // PIPELINE_ARG
-            STRING = 13,                     // STRING
-            NUMBER_INT = 14,                 // NUMBER_INT
-            NUMBER_LONG = 15,                // NUMBER_LONG
-            NUMBER_DOUBLE = 16,              // NUMBER_DOUBLE
-            BOOL = 17                        // BOOL
+            END_OF_FILE = 0,                  // "EOF"
+            YYerror = 1,                      // error
+            YYUNDEF = 2,                      // "invalid token"
+            START_OBJECT = 3,                 // START_OBJECT
+            END_OBJECT = 4,                   // END_OBJECT
+            START_ARRAY = 5,                  // START_ARRAY
+            END_ARRAY = 6,                    // END_ARRAY
+            ID = 7,                           // ID
+            INT_ZERO = 8,                     // INT_ZERO
+            LONG_ZERO = 9,                    // LONG_ZERO
+            DOUBLE_ZERO = 10,                 // DOUBLE_ZERO
+            DECIMAL_ZERO = 11,                // DECIMAL_ZERO
+            TRUE = 12,                        // TRUE
+            FALSE = 13,                       // FALSE
+            STAGE_INHIBIT_OPTIMIZATION = 14,  // STAGE_INHIBIT_OPTIMIZATION
+            STAGE_UNION_WITH = 15,            // STAGE_UNION_WITH
+            STAGE_SKIP = 16,                  // STAGE_SKIP
+            STAGE_LIMIT = 17,                 // STAGE_LIMIT
+            STAGE_PROJECT = 18,               // STAGE_PROJECT
+            COLL_ARG = 19,                    // COLL_ARG
+            PIPELINE_ARG = 20,                // PIPELINE_ARG
+            ADD = 21,                         // ADD
+            ATAN2 = 22,                       // ATAN2
+            FIELDNAME = 23,                   // FIELDNAME
+            STRING = 24,                      // STRING
+            INT_NON_ZERO = 25,                // INT_NON_ZERO
+            LONG_NON_ZERO = 26,               // LONG_NON_ZERO
+            DOUBLE_NON_ZERO = 27,             // DOUBLE_NON_ZERO
+            DECIMAL_NON_ZERO = 28             // DECIMAL_NON_ZERO
         };
         /// Backward compatibility alias (Bison 3.6).
         typedef token_kind_type yytokentype;
@@ -461,37 +496,65 @@ public:
     /// Symbol kinds.
     struct symbol_kind {
         enum symbol_kind_type {
-            YYNTOKENS = 18,  ///< Number of tokens.
+            YYNTOKENS = 29,  ///< Number of tokens.
             S_YYEMPTY = -2,
-            S_YYEOF = 0,                       // "EOF"
-            S_YYerror = 1,                     // error
-            S_YYUNDEF = 2,                     // "invalid token"
-            S_START_OBJECT = 3,                // START_OBJECT
-            S_END_OBJECT = 4,                  // END_OBJECT
-            S_START_ARRAY = 5,                 // START_ARRAY
-            S_END_ARRAY = 6,                   // END_ARRAY
-            S_STAGE_INHIBIT_OPTIMIZATION = 7,  // STAGE_INHIBIT_OPTIMIZATION
-            S_STAGE_UNION_WITH = 8,            // STAGE_UNION_WITH
-            S_STAGE_SKIP = 9,                  // STAGE_SKIP
-            S_STAGE_LIMIT = 10,                // STAGE_LIMIT
-            S_COLL_ARG = 11,                   // COLL_ARG
-            S_PIPELINE_ARG = 12,               // PIPELINE_ARG
-            S_STRING = 13,                     // STRING
-            S_NUMBER_INT = 14,                 // NUMBER_INT
-            S_NUMBER_LONG = 15,                // NUMBER_LONG
-            S_NUMBER_DOUBLE = 16,              // NUMBER_DOUBLE
-            S_BOOL = 17,                       // BOOL
-            S_YYACCEPT = 18,                   // $accept
-            S_stageList = 19,                  // stageList
-            S_stage = 20,                      // stage
-            S_inhibitOptimization = 21,        // inhibitOptimization
-            S_unionWith = 22,                  // unionWith
-            S_num = 23,                        // num
-            S_skip = 24,                       // skip
-            S_limit = 25,                      // limit
-            S_pipeline = 26,                   // pipeline
-            S_START_ORDERED_OBJECT = 27,       // START_ORDERED_OBJECT
-            S_28_1 = 28                        // $@1
+            S_YYEOF = 0,                        // "EOF"
+            S_YYerror = 1,                      // error
+            S_YYUNDEF = 2,                      // "invalid token"
+            S_START_OBJECT = 3,                 // START_OBJECT
+            S_END_OBJECT = 4,                   // END_OBJECT
+            S_START_ARRAY = 5,                  // START_ARRAY
+            S_END_ARRAY = 6,                    // END_ARRAY
+            S_ID = 7,                           // ID
+            S_INT_ZERO = 8,                     // INT_ZERO
+            S_LONG_ZERO = 9,                    // LONG_ZERO
+            S_DOUBLE_ZERO = 10,                 // DOUBLE_ZERO
+            S_DECIMAL_ZERO = 11,                // DECIMAL_ZERO
+            S_TRUE = 12,                        // TRUE
+            S_FALSE = 13,                       // FALSE
+            S_STAGE_INHIBIT_OPTIMIZATION = 14,  // STAGE_INHIBIT_OPTIMIZATION
+            S_STAGE_UNION_WITH = 15,            // STAGE_UNION_WITH
+            S_STAGE_SKIP = 16,                  // STAGE_SKIP
+            S_STAGE_LIMIT = 17,                 // STAGE_LIMIT
+            S_STAGE_PROJECT = 18,               // STAGE_PROJECT
+            S_COLL_ARG = 19,                    // COLL_ARG
+            S_PIPELINE_ARG = 20,                // PIPELINE_ARG
+            S_ADD = 21,                         // ADD
+            S_ATAN2 = 22,                       // ATAN2
+            S_FIELDNAME = 23,                   // FIELDNAME
+            S_STRING = 24,                      // STRING
+            S_INT_NON_ZERO = 25,                // INT_NON_ZERO
+            S_LONG_NON_ZERO = 26,               // LONG_NON_ZERO
+            S_DOUBLE_NON_ZERO = 27,             // DOUBLE_NON_ZERO
+            S_DECIMAL_NON_ZERO = 28,            // DECIMAL_NON_ZERO
+            S_YYACCEPT = 29,                    // $accept
+            S_stageList = 30,                   // stageList
+            S_stage = 31,                       // stage
+            S_inhibitOptimization = 32,         // inhibitOptimization
+            S_unionWith = 33,                   // unionWith
+            S_num = 34,                         // num
+            S_skip = 35,                        // skip
+            S_limit = 36,                       // limit
+            S_project = 37,                     // project
+            S_projectFields = 38,               // projectFields
+            S_projection = 39,                  // projection
+            S_compoundExpression = 40,          // compoundExpression
+            S_expression = 41,                  // expression
+            S_maths = 42,                       // maths
+            S_add = 43,                         // add
+            S_atan2 = 44,                       // atan2
+            S_string = 45,                      // string
+            S_int = 46,                         // int
+            S_long = 47,                        // long
+            S_double = 48,                      // double
+            S_bool = 49,                        // bool
+            S_value = 50,                       // value
+            S_projectionFieldname = 51,         // projectionFieldname
+            S_projectField = 52,                // projectField
+            S_expressions = 53,                 // expressions
+            S_pipeline = 54,                    // pipeline
+            S_START_ORDERED_OBJECT = 55,        // START_ORDERED_OBJECT
+            S_56_1 = 56                         // $@1
         };
     };
 
@@ -520,34 +583,61 @@ public:
         basic_symbol(basic_symbol&& that)
             : Base(std::move(that)), value(), location(std::move(that.location)) {
             switch (this->kind()) {
-                case 19:  // stageList
-                case 20:  // stage
-                case 21:  // inhibitOptimization
-                case 22:  // unionWith
-                case 23:  // num
-                case 24:  // skip
-                case 25:  // limit
+                case 30:  // stageList
+                case 31:  // stage
+                case 32:  // inhibitOptimization
+                case 33:  // unionWith
+                case 34:  // num
+                case 35:  // skip
+                case 36:  // limit
+                case 37:  // project
+                case 38:  // projectFields
+                case 39:  // projection
+                case 40:  // compoundExpression
+                case 41:  // expression
+                case 42:  // maths
+                case 43:  // add
+                case 44:  // atan2
+                case 45:  // string
+                case 46:  // int
+                case 47:  // long
+                case 48:  // double
+                case 49:  // bool
+                case 50:  // value
                     value.move<CNode>(std::move(that.value));
                     break;
 
-                case 17:  // BOOL
-                    value.move<bool>(std::move(that.value));
+                case 51:  // projectionFieldname
+                    value.move<CNode::Fieldname>(std::move(that.value));
                     break;
 
-                case 16:  // NUMBER_DOUBLE
+                case 28:  // DECIMAL_NON_ZERO
+                    value.move<Decimal128>(std::move(that.value));
+                    break;
+
+                case 27:  // DOUBLE_NON_ZERO
                     value.move<double>(std::move(that.value));
                     break;
 
-                case 14:  // NUMBER_INT
+                case 25:  // INT_NON_ZERO
                     value.move<int>(std::move(that.value));
                     break;
 
-                case 15:  // NUMBER_LONG
+                case 26:  // LONG_NON_ZERO
                     value.move<long long>(std::move(that.value));
                     break;
 
-                case 13:  // STRING
+                case 52:  // projectField
+                    value.move<std::pair<CNode::Fieldname, CNode>>(std::move(that.value));
+                    break;
+
+                case 23:  // FIELDNAME
+                case 24:  // STRING
                     value.move<std::string>(std::move(that.value));
+                    break;
+
+                case 53:  // expressions
+                    value.move<std::vector<CNode>>(std::move(that.value));
                     break;
 
                 default:
@@ -574,10 +664,17 @@ public:
             : Base(t), value(v), location(l) {}
 #endif
 #if 201103L <= YY_CPLUSPLUS
-        basic_symbol(typename Base::kind_type t, bool&& v, location_type&& l)
+        basic_symbol(typename Base::kind_type t, CNode::Fieldname&& v, location_type&& l)
             : Base(t), value(std::move(v)), location(std::move(l)) {}
 #else
-        basic_symbol(typename Base::kind_type t, const bool& v, const location_type& l)
+        basic_symbol(typename Base::kind_type t, const CNode::Fieldname& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, Decimal128&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const Decimal128& v, const location_type& l)
             : Base(t), value(v), location(l) {}
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -602,10 +699,30 @@ public:
             : Base(t), value(v), location(l) {}
 #endif
 #if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t,
+                     std::pair<CNode::Fieldname, CNode>&& v,
+                     location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t,
+                     const std::pair<CNode::Fieldname, CNode>& v,
+                     const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, std::string&& v, location_type&& l)
             : Base(t), value(std::move(v)), location(std::move(l)) {}
 #else
         basic_symbol(typename Base::kind_type t, const std::string& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, std::vector<CNode>&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t,
+                     const std::vector<CNode>& v,
+                     const location_type& l)
             : Base(t), value(v), location(l) {}
 #endif
 
@@ -627,34 +744,61 @@ public:
 
             // Value type destructor.
             switch (yykind) {
-                case 19:  // stageList
-                case 20:  // stage
-                case 21:  // inhibitOptimization
-                case 22:  // unionWith
-                case 23:  // num
-                case 24:  // skip
-                case 25:  // limit
+                case 30:  // stageList
+                case 31:  // stage
+                case 32:  // inhibitOptimization
+                case 33:  // unionWith
+                case 34:  // num
+                case 35:  // skip
+                case 36:  // limit
+                case 37:  // project
+                case 38:  // projectFields
+                case 39:  // projection
+                case 40:  // compoundExpression
+                case 41:  // expression
+                case 42:  // maths
+                case 43:  // add
+                case 44:  // atan2
+                case 45:  // string
+                case 46:  // int
+                case 47:  // long
+                case 48:  // double
+                case 49:  // bool
+                case 50:  // value
                     value.template destroy<CNode>();
                     break;
 
-                case 17:  // BOOL
-                    value.template destroy<bool>();
+                case 51:  // projectionFieldname
+                    value.template destroy<CNode::Fieldname>();
                     break;
 
-                case 16:  // NUMBER_DOUBLE
+                case 28:  // DECIMAL_NON_ZERO
+                    value.template destroy<Decimal128>();
+                    break;
+
+                case 27:  // DOUBLE_NON_ZERO
                     value.template destroy<double>();
                     break;
 
-                case 14:  // NUMBER_INT
+                case 25:  // INT_NON_ZERO
                     value.template destroy<int>();
                     break;
 
-                case 15:  // NUMBER_LONG
+                case 26:  // LONG_NON_ZERO
                     value.template destroy<long long>();
                     break;
 
-                case 13:  // STRING
+                case 52:  // projectField
+                    value.template destroy<std::pair<CNode::Fieldname, CNode>>();
+                    break;
+
+                case 23:  // FIELDNAME
+                case 24:  // STRING
                     value.template destroy<std::string>();
+                    break;
+
+                case 53:  // expressions
+                    value.template destroy<std::vector<CNode>>();
                     break;
 
                 default:
@@ -663,6 +807,14 @@ public:
 
             Base::clear();
         }
+
+#if YYDEBUG || 0
+        /// The user-facing name of this symbol.
+        const char* name() const YY_NOEXCEPT {
+            return PipelineParserGen::symbol_name(this->kind());
+        }
+#endif  // #if YYDEBUG || 0
+
 
         /// Backward compatibility (Bison 3.6).
         symbol_kind_type type_get() const YY_NOEXCEPT;
@@ -739,74 +891,82 @@ public:
         symbol_type(int tok, location_type l) : super_type(token_type(tok), std::move(l)) {
             YY_ASSERT(tok == token::END_OF_FILE || tok == token::YYerror || tok == token::YYUNDEF ||
                       tok == token::START_OBJECT || tok == token::END_OBJECT ||
-                      tok == token::START_ARRAY || tok == token::END_ARRAY ||
+                      tok == token::START_ARRAY || tok == token::END_ARRAY || tok == token::ID ||
+                      tok == token::INT_ZERO || tok == token::LONG_ZERO ||
+                      tok == token::DOUBLE_ZERO || tok == token::DECIMAL_ZERO ||
+                      tok == token::TRUE || tok == token::FALSE ||
                       tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
                       tok == token::STAGE_SKIP || tok == token::STAGE_LIMIT ||
-                      tok == token::COLL_ARG || tok == token::PIPELINE_ARG);
+                      tok == token::STAGE_PROJECT || tok == token::COLL_ARG ||
+                      tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2);
         }
 #else
         symbol_type(int tok, const location_type& l) : super_type(token_type(tok), l) {
             YY_ASSERT(tok == token::END_OF_FILE || tok == token::YYerror || tok == token::YYUNDEF ||
                       tok == token::START_OBJECT || tok == token::END_OBJECT ||
-                      tok == token::START_ARRAY || tok == token::END_ARRAY ||
+                      tok == token::START_ARRAY || tok == token::END_ARRAY || tok == token::ID ||
+                      tok == token::INT_ZERO || tok == token::LONG_ZERO ||
+                      tok == token::DOUBLE_ZERO || tok == token::DECIMAL_ZERO ||
+                      tok == token::TRUE || tok == token::FALSE ||
                       tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
                       tok == token::STAGE_SKIP || tok == token::STAGE_LIMIT ||
-                      tok == token::COLL_ARG || tok == token::PIPELINE_ARG);
+                      tok == token::STAGE_PROJECT || tok == token::COLL_ARG ||
+                      tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-        symbol_type(int tok, bool v, location_type l)
+        symbol_type(int tok, Decimal128 v, location_type l)
             : super_type(token_type(tok), std::move(v), std::move(l)) {
-            YY_ASSERT(tok == token::BOOL);
+            YY_ASSERT(tok == token::DECIMAL_NON_ZERO);
         }
 #else
-        symbol_type(int tok, const bool& v, const location_type& l)
+        symbol_type(int tok, const Decimal128& v, const location_type& l)
             : super_type(token_type(tok), v, l) {
-            YY_ASSERT(tok == token::BOOL);
+            YY_ASSERT(tok == token::DECIMAL_NON_ZERO);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok, double v, location_type l)
             : super_type(token_type(tok), std::move(v), std::move(l)) {
-            YY_ASSERT(tok == token::NUMBER_DOUBLE);
+            YY_ASSERT(tok == token::DOUBLE_NON_ZERO);
         }
 #else
         symbol_type(int tok, const double& v, const location_type& l)
             : super_type(token_type(tok), v, l) {
-            YY_ASSERT(tok == token::NUMBER_DOUBLE);
+            YY_ASSERT(tok == token::DOUBLE_NON_ZERO);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok, int v, location_type l)
             : super_type(token_type(tok), std::move(v), std::move(l)) {
-            YY_ASSERT(tok == token::NUMBER_INT);
+            YY_ASSERT(tok == token::INT_NON_ZERO);
         }
 #else
         symbol_type(int tok, const int& v, const location_type& l)
             : super_type(token_type(tok), v, l) {
-            YY_ASSERT(tok == token::NUMBER_INT);
+            YY_ASSERT(tok == token::INT_NON_ZERO);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok, long long v, location_type l)
             : super_type(token_type(tok), std::move(v), std::move(l)) {
-            YY_ASSERT(tok == token::NUMBER_LONG);
+            YY_ASSERT(tok == token::LONG_NON_ZERO);
         }
 #else
         symbol_type(int tok, const long long& v, const location_type& l)
             : super_type(token_type(tok), v, l) {
-            YY_ASSERT(tok == token::NUMBER_LONG);
+            YY_ASSERT(tok == token::LONG_NON_ZERO);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok, std::string v, location_type l)
             : super_type(token_type(tok), std::move(v), std::move(l)) {
-            YY_ASSERT(tok == token::STRING);
+            YY_ASSERT(tok == token::FIELDNAME || tok == token::STRING);
         }
 #else
         symbol_type(int tok, const std::string& v, const location_type& l)
             : super_type(token_type(tok), v, l) {
-            YY_ASSERT(tok == token::STRING);
+            YY_ASSERT(tok == token::FIELDNAME || tok == token::STRING);
         }
 #endif
     };
@@ -851,6 +1011,13 @@ public:
 
     /// Report a syntax error.
     void error(const syntax_error& err);
+
+#if YYDEBUG || 0
+    /// The user-facing name of the symbol whose (internal) number is
+    /// YYSYMBOL.  No bounds checking.
+    static const char* symbol_name(symbol_kind_type yysymbol);
+#endif  // #if YYDEBUG || 0
+
 
     // Implementation of make_symbol for each symbol type.
 #if 201103L <= YY_CPLUSPLUS
@@ -917,6 +1084,69 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ID(location_type l) {
+        return symbol_type(token::ID, std::move(l));
+    }
+#else
+    static symbol_type make_ID(const location_type& l) {
+        return symbol_type(token::ID, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_INT_ZERO(location_type l) {
+        return symbol_type(token::INT_ZERO, std::move(l));
+    }
+#else
+    static symbol_type make_INT_ZERO(const location_type& l) {
+        return symbol_type(token::INT_ZERO, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_LONG_ZERO(location_type l) {
+        return symbol_type(token::LONG_ZERO, std::move(l));
+    }
+#else
+    static symbol_type make_LONG_ZERO(const location_type& l) {
+        return symbol_type(token::LONG_ZERO, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DOUBLE_ZERO(location_type l) {
+        return symbol_type(token::DOUBLE_ZERO, std::move(l));
+    }
+#else
+    static symbol_type make_DOUBLE_ZERO(const location_type& l) {
+        return symbol_type(token::DOUBLE_ZERO, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DECIMAL_ZERO(location_type l) {
+        return symbol_type(token::DECIMAL_ZERO, std::move(l));
+    }
+#else
+    static symbol_type make_DECIMAL_ZERO(const location_type& l) {
+        return symbol_type(token::DECIMAL_ZERO, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_TRUE(location_type l) {
+        return symbol_type(token::TRUE, std::move(l));
+    }
+#else
+    static symbol_type make_TRUE(const location_type& l) {
+        return symbol_type(token::TRUE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_FALSE(location_type l) {
+        return symbol_type(token::FALSE, std::move(l));
+    }
+#else
+    static symbol_type make_FALSE(const location_type& l) {
+        return symbol_type(token::FALSE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_STAGE_INHIBIT_OPTIMIZATION(location_type l) {
         return symbol_type(token::STAGE_INHIBIT_OPTIMIZATION, std::move(l));
     }
@@ -953,6 +1183,15 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_STAGE_PROJECT(location_type l) {
+        return symbol_type(token::STAGE_PROJECT, std::move(l));
+    }
+#else
+    static symbol_type make_STAGE_PROJECT(const location_type& l) {
+        return symbol_type(token::STAGE_PROJECT, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_COLL_ARG(location_type l) {
         return symbol_type(token::COLL_ARG, std::move(l));
     }
@@ -971,6 +1210,33 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ADD(location_type l) {
+        return symbol_type(token::ADD, std::move(l));
+    }
+#else
+    static symbol_type make_ADD(const location_type& l) {
+        return symbol_type(token::ADD, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ATAN2(location_type l) {
+        return symbol_type(token::ATAN2, std::move(l));
+    }
+#else
+    static symbol_type make_ATAN2(const location_type& l) {
+        return symbol_type(token::ATAN2, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_FIELDNAME(std::string v, location_type l) {
+        return symbol_type(token::FIELDNAME, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_FIELDNAME(const std::string& v, const location_type& l) {
+        return symbol_type(token::FIELDNAME, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_STRING(std::string v, location_type l) {
         return symbol_type(token::STRING, std::move(v), std::move(l));
     }
@@ -980,39 +1246,39 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_NUMBER_INT(int v, location_type l) {
-        return symbol_type(token::NUMBER_INT, std::move(v), std::move(l));
+    static symbol_type make_INT_NON_ZERO(int v, location_type l) {
+        return symbol_type(token::INT_NON_ZERO, std::move(v), std::move(l));
     }
 #else
-    static symbol_type make_NUMBER_INT(const int& v, const location_type& l) {
-        return symbol_type(token::NUMBER_INT, v, l);
+    static symbol_type make_INT_NON_ZERO(const int& v, const location_type& l) {
+        return symbol_type(token::INT_NON_ZERO, v, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_NUMBER_LONG(long long v, location_type l) {
-        return symbol_type(token::NUMBER_LONG, std::move(v), std::move(l));
+    static symbol_type make_LONG_NON_ZERO(long long v, location_type l) {
+        return symbol_type(token::LONG_NON_ZERO, std::move(v), std::move(l));
     }
 #else
-    static symbol_type make_NUMBER_LONG(const long long& v, const location_type& l) {
-        return symbol_type(token::NUMBER_LONG, v, l);
+    static symbol_type make_LONG_NON_ZERO(const long long& v, const location_type& l) {
+        return symbol_type(token::LONG_NON_ZERO, v, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_NUMBER_DOUBLE(double v, location_type l) {
-        return symbol_type(token::NUMBER_DOUBLE, std::move(v), std::move(l));
+    static symbol_type make_DOUBLE_NON_ZERO(double v, location_type l) {
+        return symbol_type(token::DOUBLE_NON_ZERO, std::move(v), std::move(l));
     }
 #else
-    static symbol_type make_NUMBER_DOUBLE(const double& v, const location_type& l) {
-        return symbol_type(token::NUMBER_DOUBLE, v, l);
+    static symbol_type make_DOUBLE_NON_ZERO(const double& v, const location_type& l) {
+        return symbol_type(token::DOUBLE_NON_ZERO, v, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_BOOL(bool v, location_type l) {
-        return symbol_type(token::BOOL, std::move(v), std::move(l));
+    static symbol_type make_DECIMAL_NON_ZERO(Decimal128 v, location_type l) {
+        return symbol_type(token::DECIMAL_NON_ZERO, std::move(v), std::move(l));
     }
 #else
-    static symbol_type make_BOOL(const bool& v, const location_type& l) {
-        return symbol_type(token::BOOL, v, l);
+    static symbol_type make_DECIMAL_NON_ZERO(const Decimal128& v, const location_type& l) {
+        return symbol_type(token::DECIMAL_NON_ZERO, v, l);
     }
 #endif
 
@@ -1051,10 +1317,6 @@ private:
     static symbol_kind_type yytranslate_(int t);
 
 #if YYDEBUG || 0
-    /// The user-facing name of the symbol whose (internal) number is
-    /// YYSYMBOL.  No bounds checking.
-    static const char* symbol_name(symbol_kind_type yysymbol);
-
     /// For a symbol, its name in clear.
     static const char* const yytname_[];
 #endif  // #if YYDEBUG || 0
@@ -1096,7 +1358,7 @@ private:
 
 #if YYDEBUG
     // YYRLINE[YYN] -- Source line where rule number YYN was defined.
-    static const unsigned char yyrline_[];
+    static const short yyrline_[];
     /// Report on the debug stream that the rule \a r is going to be reduced.
     virtual void yy_reduce_print_(int r) const;
     /// Print the state stack on the debug stream.
@@ -1295,8 +1557,8 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 23,  ///< Last index in yytable_.
-        yynnts_ = 11,  ///< Number of nonterminal symbols.
+        yylast_ = 89,  ///< Last index in yytable_.
+        yynnts_ = 28,  ///< Number of nonterminal symbols.
         yyfinal_ = 5   ///< Termination state number.
     };
 
@@ -1315,34 +1577,61 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
     switch (this->kind()) {
-        case 19:  // stageList
-        case 20:  // stage
-        case 21:  // inhibitOptimization
-        case 22:  // unionWith
-        case 23:  // num
-        case 24:  // skip
-        case 25:  // limit
+        case 30:  // stageList
+        case 31:  // stage
+        case 32:  // inhibitOptimization
+        case 33:  // unionWith
+        case 34:  // num
+        case 35:  // skip
+        case 36:  // limit
+        case 37:  // project
+        case 38:  // projectFields
+        case 39:  // projection
+        case 40:  // compoundExpression
+        case 41:  // expression
+        case 42:  // maths
+        case 43:  // add
+        case 44:  // atan2
+        case 45:  // string
+        case 46:  // int
+        case 47:  // long
+        case 48:  // double
+        case 49:  // bool
+        case 50:  // value
             value.copy<CNode>(YY_MOVE(that.value));
             break;
 
-        case 17:  // BOOL
-            value.copy<bool>(YY_MOVE(that.value));
+        case 51:  // projectionFieldname
+            value.copy<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 16:  // NUMBER_DOUBLE
+        case 28:  // DECIMAL_NON_ZERO
+            value.copy<Decimal128>(YY_MOVE(that.value));
+            break;
+
+        case 27:  // DOUBLE_NON_ZERO
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 14:  // NUMBER_INT
+        case 25:  // INT_NON_ZERO
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 15:  // NUMBER_LONG
+        case 26:  // LONG_NON_ZERO
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
-        case 13:  // STRING
+        case 52:  // projectField
+            value.copy<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
+            break;
+
+        case 23:  // FIELDNAME
+        case 24:  // STRING
             value.copy<std::string>(YY_MOVE(that.value));
+            break;
+
+        case 53:  // expressions
+            value.copy<std::vector<CNode>>(YY_MOVE(that.value));
             break;
 
         default:
@@ -1366,34 +1655,61 @@ template <typename Base>
 void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
     switch (this->kind()) {
-        case 19:  // stageList
-        case 20:  // stage
-        case 21:  // inhibitOptimization
-        case 22:  // unionWith
-        case 23:  // num
-        case 24:  // skip
-        case 25:  // limit
+        case 30:  // stageList
+        case 31:  // stage
+        case 32:  // inhibitOptimization
+        case 33:  // unionWith
+        case 34:  // num
+        case 35:  // skip
+        case 36:  // limit
+        case 37:  // project
+        case 38:  // projectFields
+        case 39:  // projection
+        case 40:  // compoundExpression
+        case 41:  // expression
+        case 42:  // maths
+        case 43:  // add
+        case 44:  // atan2
+        case 45:  // string
+        case 46:  // int
+        case 47:  // long
+        case 48:  // double
+        case 49:  // bool
+        case 50:  // value
             value.move<CNode>(YY_MOVE(s.value));
             break;
 
-        case 17:  // BOOL
-            value.move<bool>(YY_MOVE(s.value));
+        case 51:  // projectionFieldname
+            value.move<CNode::Fieldname>(YY_MOVE(s.value));
             break;
 
-        case 16:  // NUMBER_DOUBLE
+        case 28:  // DECIMAL_NON_ZERO
+            value.move<Decimal128>(YY_MOVE(s.value));
+            break;
+
+        case 27:  // DOUBLE_NON_ZERO
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 14:  // NUMBER_INT
+        case 25:  // INT_NON_ZERO
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 15:  // NUMBER_LONG
+        case 26:  // LONG_NON_ZERO
             value.move<long long>(YY_MOVE(s.value));
             break;
 
-        case 13:  // STRING
+        case 52:  // projectField
+            value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(s.value));
+            break;
+
+        case 23:  // FIELDNAME
+        case 24:  // STRING
             value.move<std::string>(YY_MOVE(s.value));
+            break;
+
+        case 53:  // expressions
+            value.move<std::vector<CNode>>(YY_MOVE(s.value));
             break;
 
         default:
@@ -1434,9 +1750,9 @@ inline PipelineParserGen::symbol_kind_type PipelineParserGen::by_kind::type_get(
     return this->kind();
 }
 
-#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 58 "pipeline_grammar.yy"
 }  // namespace mongo
-#line 1728 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 2116 "pipeline_parser_gen.hpp"
 
 
-#endif  // !YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#endif  // !YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED

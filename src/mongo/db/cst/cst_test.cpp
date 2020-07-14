@@ -241,6 +241,7 @@ TEST(CstGrammarTest, InvalidParseLimitString) {
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
 }
+
 TEST(CstGrammarTest, InvalidParseLimitObject) {
     CNode output;
     auto input = fromjson("{pipeline: [{$limit: {}}]}");
@@ -255,6 +256,55 @@ TEST(CstGrammarTest, InvalidParseLimitArray) {
     BSONLexer lexer(input["pipeline"].Array());
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+
+TEST(CstGrammarTest, ParsesProject) {
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: {a: 1.0, b: NumberInt(1), _id: NumberLong(1)}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ project: { a: \"<NonZeroKey of type double 1.000000>\", b: \"<NonZeroKey of "
+                  "type int 1>\", id: \"<NonZeroKey of type long 1>\" } }");
+    }
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: {a: 0.0, b: NumberInt(0), c: NumberLong(0)}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ project: { a: \"<KeyValue doubleZeroKey>\", b: \"<KeyValue intZeroKey>\", "
+                  "c: \"<KeyValue longZeroKey>\" } }");
+    }
+    {
+        CNode output;
+        auto input = fromjson(
+            "{pipeline: [{$project: {_id: 9.10, a: {$add: [4, 5, {$add: [6, 7, 8]}]}, b: "
+            "{$atan2: "
+            "[1.0, {$add: [2, -3]}]}}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { add: [ "
+                  "\"<UserInt 4>\", \"<UserInt 5>\", { add: [ \"<UserInt 6>\", \"<UserInt 7>\", "
+                  "\"<UserInt 8>\" ] } ] }, b: { atan2: [ \"<UserDouble 1.000000>\", { add: [ "
+                  "\"<UserInt 2>\", \"<UserInt -3>\" ] } ] } } }");
+    }
 }
 
 }  // namespace

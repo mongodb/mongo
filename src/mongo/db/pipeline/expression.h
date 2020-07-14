@@ -325,6 +325,8 @@ public:
 
 protected:
     explicit ExpressionNary(ExpressionContext* const expCtx) : Expression(expCtx) {}
+    ExpressionNary(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : Expression(expCtx, std::move(children)) {}
 
     void _doAddDependencies(DepsTracker* deps) const override;
 };
@@ -345,6 +347,8 @@ public:
 
 protected:
     explicit ExpressionNaryBase(ExpressionContext* const expCtx) : ExpressionNary(expCtx) {}
+    ExpressionNaryBase(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionNary(expCtx, std::move(children)) {}
 };
 
 /// Inherit from this class if your expression takes a variable number of arguments.
@@ -353,6 +357,8 @@ class ExpressionVariadic : public ExpressionNaryBase<SubClass> {
 public:
     explicit ExpressionVariadic(ExpressionContext* const expCtx)
         : ExpressionNaryBase<SubClass>(expCtx) {}
+    ExpressionVariadic(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
+        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
 };
 
 /**
@@ -380,6 +386,8 @@ class ExpressionFixedArity : public ExpressionNaryBase<SubClass> {
 public:
     explicit ExpressionFixedArity(ExpressionContext* const expCtx)
         : ExpressionNaryBase<SubClass>(expCtx) {}
+    ExpressionFixedArity(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
+        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
 
     void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(16020,
@@ -480,6 +488,9 @@ class ExpressionTwoNumericArgs : public ExpressionFixedArity<SubClass, 2> {
 public:
     explicit ExpressionTwoNumericArgs(ExpressionContext* const expCtx)
         : ExpressionFixedArity<SubClass, 2>(expCtx) {}
+    ExpressionTwoNumericArgs(ExpressionContext* const expCtx,
+                             Expression::ExpressionVector&& children)
+        : ExpressionFixedArity<SubClass, 2>(expCtx, std::move(children)) {}
 
     virtual ~ExpressionTwoNumericArgs() = default;
 
@@ -745,6 +756,9 @@ class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
     explicit ExpressionAdd(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionAdd>(expCtx) {}
+
+    ExpressionAdd(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionAdd>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

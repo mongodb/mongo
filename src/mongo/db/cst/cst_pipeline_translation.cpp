@@ -30,8 +30,10 @@
 
 #include <algorithm>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
 #include <iterator>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
@@ -41,7 +43,9 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_trigonometric.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_parser.h"
@@ -50,13 +54,144 @@
 
 namespace mongo::cst_pipeline_translation {
 namespace {
+boost::intrusive_ptr<Expression> translateExpression(
+    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 /**
- * Walk a projection CNode and produce a ProjectionASTNode.
+ * Walk a literal array payload and produce an ExpressionArray.
+ */
+auto translateLiteralArray(const CNode::ArrayChildren& array,
+                           const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto expressions = std::vector<boost::intrusive_ptr<Expression>>{};
+    static_cast<void>(std::transform(
+        array.begin(), array.end(), std::back_inserter(expressions), [&](auto&& elem) {
+            return translateExpression(elem, expCtx);
+        }));
+    return ExpressionArray::create(expCtx.get(), std::move(expressions));
+}
+
+/**
+ * Walk a literal object payload and produce an ExpressionObject.
+ */
+auto translateLiteralObject(const CNode::ObjectChildren& object,
+                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto fields = std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>{};
+    static_cast<void>(
+        std::transform(object.begin(), object.end(), std::back_inserter(fields), [&](auto&& field) {
+            return std::pair{std::string{stdx::get<UserFieldname>(field.first)},
+                             translateExpression(field.second, expCtx)};
+        }));
+    return ExpressionObject::create(expCtx.get(), std::move(fields));
+}
+
+/**
+ * Walk an agg function/operator object payload and produce an Expression.
+ */
+boost::intrusive_ptr<Expression> translateFunctionObject(
+    const CNode::ObjectChildren& object, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto expressions = std::vector<boost::intrusive_ptr<Expression>>{};
+    // This assumes the Expression is in array-form.
+    auto&& array = object[0].second.arrayChildren();
+    static_cast<void>(std::transform(
+        array.begin(), array.end(), std::back_inserter(expressions), [&](auto&& elem) {
+            return translateExpression(elem, expCtx);
+        }));
+    switch (stdx::get<KeyFieldname>(object[0].first)) {
+        case KeyFieldname::add:
+            return make_intrusive<ExpressionAdd>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::atan2:
+            return make_intrusive<ExpressionArcTangent2>(expCtx.get(), std::move(expressions));
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+/**
+ * Walk a literal leaf CNode and produce an agg Value.
+ */
+auto translateLiteralLeaf(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            // These are illegal since they're non-leaf.
+            [](const CNode::ArrayChildren&) -> Value { MONGO_UNREACHABLE; },
+            [](const CNode::ObjectChildren&) -> Value { MONGO_UNREACHABLE; },
+            // These are illegal since they're non-literal.
+            [](const KeyValue&) -> Value { MONGO_UNREACHABLE; },
+            [](const NonZeroKey&) -> Value { MONGO_UNREACHABLE; },
+            // These payloads require a special translation to DocumentValue parlance.
+            [](const UserUndefined&) { return Value{BSONUndefined}; },
+            [](const UserNull&) { return Value{BSONNULL}; },
+            [](const UserMinKey&) { return Value{MINKEY}; },
+            [](const UserMaxKey&) { return Value{MAXKEY}; },
+            // The rest convert directly.
+            [](auto&& payload) { return Value{payload}; }},
+        cst.payload);
+}
+
+/**
+ * Walk an expression CNode and produce an agg Expression.
+ */
+boost::intrusive_ptr<Expression> translateExpression(
+    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            // When we're not inside an agg operator/function, this is a non-leaf literal.
+            [&](const CNode::ArrayChildren& array) -> boost::intrusive_ptr<Expression> {
+                return translateLiteralArray(array, expCtx);
+            },
+            // This is either a literal object or an agg operator/function.
+            [&](const CNode::ObjectChildren& object) -> boost::intrusive_ptr<Expression> {
+                if (!object.empty() && stdx::holds_alternative<KeyFieldname>(object[0].first))
+                    return translateFunctionObject(object, expCtx);
+                else
+                    return translateLiteralObject(object, expCtx);
+            },
+            // If a key occurs outside a particular agg operator/function, it was misplaced.
+            [](const KeyValue&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
+            [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
+            // Everything else is a literal leaf.
+            [&](auto &&) -> boost::intrusive_ptr<Expression> {
+                return ExpressionConstant::create(expCtx.get(), translateLiteralLeaf(cst, expCtx));
+            }},
+        cst.payload);
+}
+
+/**
+ * Walk a projection CNode and produce a ProjectionASTNode. Also returns whether this was an
+ * inclusion (or expressive projection) or an exclusion projection.
  */
 auto translateProjection(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     using namespace projection_ast;
-    // TODO SERVER-48834: Support more than inclusion projection.
-    return std::make_unique<BooleanConstantASTNode>(true);
+    // Returns whether a KeyValue indicates inclusion or exclusion.
+    auto isInclusionKeyValue = [](auto&& keyValue) {
+        switch (stdx::get<KeyValue>(keyValue)) {
+            case KeyValue::trueKey:
+                return true;
+            case KeyValue::intZeroKey:
+            case KeyValue::longZeroKey:
+            case KeyValue::doubleZeroKey:
+            case KeyValue::decimalZeroKey:
+            case KeyValue::falseKey:
+                return false;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    };
+
+    if (stdx::holds_alternative<NonZeroKey>(cst.payload) ||
+        (stdx::holds_alternative<KeyValue>(cst.payload) && isInclusionKeyValue(cst.payload)))
+        // This is an inclusion Key.
+        return std::pair{std::unique_ptr<ASTNode>{std::make_unique<BooleanConstantASTNode>(true)},
+                         true};
+    else if (stdx::holds_alternative<KeyValue>(cst.payload) && !isInclusionKeyValue(cst.payload))
+        // This is an exclusion Key.
+        return std::pair{std::unique_ptr<ASTNode>{std::make_unique<BooleanConstantASTNode>(false)},
+                         false};
+    else
+        // This is an arbitrary expression to produce a computed field (this counts as inclusion).
+        return std::pair{std::unique_ptr<ASTNode>{
+                             std::make_unique<ExpressionASTNode>(translateExpression(cst, expCtx))},
+                         true};
 }
 
 /**
@@ -66,21 +201,56 @@ auto translateProject(const CNode& cst, const boost::intrusive_ptr<ExpressionCon
     using namespace projection_ast;
     auto root = ProjectionPathASTNode{};
     bool sawId = false;
+    bool removeId = false;
+    boost::optional<bool> inclusion;
 
     for (auto&& [name, child] : cst.objectChildren()) {
-        if (stdx::get<UserFieldname>(name) == UserFieldname{"_id"})
+        // Turn the CNode into a projection AST node.
+        auto&& [projection, wasInclusion] = translateProjection(child, expCtx);
+        // If we see a key fieldname, make sure it's _id.
+        if (auto keyFieldname = stdx::get_if<KeyFieldname>(&name);
+            keyFieldname && *keyFieldname == KeyFieldname::id) {
+            // Keep track of whether we've ever seen _id at all.
             sawId = true;
-        addNodeAtPath(&root, stdx::get<UserFieldname>(name), translateProjection(child, expCtx));
+            // Keep track of whether we will need to remove the _id field to get around an exclusion
+            // projection bug in the case where it was manually included.
+            removeId = wasInclusion;
+            // Add node to the projection AST.
+            addNodeAtPath(&root, "_id", std::move(projection));
+        } else {
+            // This conditional changes the status of 'inclusion' to indicate whether we're in an
+            // inclusion or exclusion projection.
+            // TODO SERVER-48810: Improve error message with BSON locations.
+            inclusion = !inclusion ? wasInclusion
+                                   : *inclusion == wasInclusion ? wasInclusion : []() -> bool {
+                uasserted(4933100,
+                          "$project must include only exclusion "
+                          "projection or only inclusion projection");
+            }();
+            // Add node to the projection AST.
+            addNodeAtPath(&root, stdx::get<UserFieldname>(name), std::move(projection));
+        }
     }
 
-    if (!sawId)
-        addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
-
-    return DocumentSourceProject::create(
-        // TODO SERVER-48834: Support more than inclusion projection.
-        Projection{root, ProjectType::kInclusion},
-        expCtx,
-        "$project");
+    // If we saw any non-_id exclusions, this is an exclusion projection.
+    if (inclusion && !*inclusion) {
+        // If we saw an inclusion _id for an exclusion projection, we must manually remove it or
+        // projection AST will turn it into an _id exclusion due to a bug.
+        // TODO Fix the bug or organize this code to circumvent projection AST.
+        if (removeId)
+            static_cast<void>(root.removeChild("_id"));
+        return DocumentSourceProject::create(
+            Projection{root, ProjectType::kExclusion}, expCtx, "$project");
+        // If we saw any non-_id inclusions or computed fields, this is an inclusion projectioion.
+        // Also if inclusion was not determinted, it is the default.
+    } else {
+        // If we didn't see _id we need to add it in manually for inclusion or projection AST
+        // will incorrectly assume we want it gone.
+        if (!sawId)
+            addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
+        return DocumentSourceProject::create(
+            Projection{root, ProjectType::kInclusion}, expCtx, "$project");
+    }
 }
 
 /**

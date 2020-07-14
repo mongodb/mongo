@@ -57,6 +57,16 @@ auto printFieldname(const CNode::Fieldname& fieldname) {
         fieldname);
 }
 
+auto printNonZeroKey(const NonZeroKey& nonZeroKey) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [](const int& keyInt) { return "int "s + std::to_string(keyInt); },
+            [](const long long& keyLong) { return "long "s + std::to_string(keyLong); },
+            [](const double& keyDouble) { return "double "s + std::to_string(keyDouble); },
+            [](const Decimal128& keyDecimal) { return "decimal "s + keyDecimal.toString(); }},
+        nonZeroKey);
+}
+
 template <typename T>
 auto printValue(const T& payload) {
     return stdx::visit(
@@ -66,6 +76,9 @@ auto printValue(const T& payload) {
             [](const KeyValue& value) {
                 return "<KeyValue "s +
                     key_value::toString[static_cast<std::underlying_type_t<KeyValue>>(value)] + ">";
+            },
+            [](const NonZeroKey& nonZeroKey) {
+                return "<NonZeroKey of type "s + printNonZeroKey(nonZeroKey) + ">";
             },
             [](const UserDouble& userDouble) {
                 return "<UserDouble "s + std::to_string(userDouble) + ">";

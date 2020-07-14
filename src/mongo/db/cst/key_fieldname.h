@@ -34,6 +34,7 @@
 #include "mongo/util/printable_enum.h"
 
 #define KEYFIELDNAMES(ENUMIFY)   \
+    ENUMIFY(add)                 \
     ENUMIFY(atan2)               \
     ENUMIFY(id)                  \
     ENUMIFY(project)             \

@@ -33,8 +33,12 @@
 
 #include "mongo/util/printable_enum.h"
 
-#define KEYVALUES(ENUMIFY) \
-    ENUMIFY(trueKey)       \
+#define KEYVALUES(ENUMIFY)  \
+    ENUMIFY(intZeroKey)     \
+    ENUMIFY(longZeroKey)    \
+    ENUMIFY(doubleZeroKey)  \
+    ENUMIFY(decimalZeroKey) \
+    ENUMIFY(trueKey)        \
     ENUMIFY(falseKey)
 
 MAKE_PRINTABLE_ENUM(KeyValue, KEYVALUES);

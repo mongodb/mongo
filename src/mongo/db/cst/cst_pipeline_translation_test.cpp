@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
-#include <iostream>
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
@@ -51,21 +50,22 @@ namespace mongo {
 namespace {
 using namespace std::string_literals;
 
-TEST(CstTest, TranslatesEmpty) {
+auto getExpCtx() {
     auto nss = NamespaceString{"db", "coll"};
+    return boost::intrusive_ptr<ExpressionContextForTest>{new ExpressionContextForTest(nss)};
+}
+
+TEST(CstTest, TranslatesEmpty) {
     const auto cst = CNode{CNode::ArrayChildren{}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(0u, sources.size());
 }
 
 TEST(CstTest, TranslatesEmptyProject) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
@@ -73,13 +73,11 @@ TEST(CstTest, TranslatesEmptyProject) {
 }
 
 TEST(CstTest, TranslatesEmptyProjects) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}},
         CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}},
         CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(3u, sources.size());
     auto iter = sources.begin();
@@ -89,12 +87,10 @@ TEST(CstTest, TranslatesEmptyProjects) {
 }
 
 TEST(CstTest, TranslatesOneFieldInclusionProjectionStage) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}}}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
@@ -106,14 +102,12 @@ TEST(CstTest, TranslatesOneFieldInclusionProjectionStage) {
 }
 
 TEST(CstTest, TranslatesMultifieldInclusionProjection) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
-         CNode{CNode::ObjectChildren{{UserFieldname{"_id"}, CNode{KeyValue::trueKey}},
-                                     {UserFieldname{"a"}, CNode{KeyValue::trueKey}},
-                                     {UserFieldname{"b"}, CNode{KeyValue::trueKey}}}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+         CNode{CNode::ObjectChildren{{KeyFieldname::id, CNode{KeyValue::trueKey}},
+                                     {UserFieldname{"a"}, CNode{NonZeroKey{7}}},
+                                     {UserFieldname{"b"}, CNode{NonZeroKey{-99999999999ll}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
@@ -124,21 +118,144 @@ TEST(CstTest, TranslatesMultifieldInclusionProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, TranslatesMultipleInclusionProjectionStages) {
-    auto nss = NamespaceString{"db", "coll"};
+TEST(CstTest, TranslatesOneFieldExclusionProjectionStage) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::falseKey}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("a" << false) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
+TEST(CstTest, TranslatesMultifieldExclusionProjection) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{{KeyFieldname::id, CNode{KeyValue::falseKey}},
+                                     {UserFieldname{"a"}, CNode{KeyValue::doubleZeroKey}},
+                                     {UserFieldname{"b"}, CNode{KeyValue::decimalZeroKey}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << false << "a" << false << "b" << false) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
+TEST(CstTest, FailsToTranslateInclusionExclusionMixedProjectionStage) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}},
+                                     {UserFieldname{"b"}, CNode{KeyValue::falseKey}}}}}}}}};
+    ASSERT_THROWS_CODE(
+        cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 4933100);
+}
+
+TEST(CstTest, TranslatesComputedProjection) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{
+             {UserFieldname{"a"},
+              CNode{CNode::ObjectChildren{
+                  {KeyFieldname::atan2,
+                   CNode{CNode::ArrayChildren{CNode{UserInt{1}}, CNode{UserInt{0}}}}}}}},
+             {UserFieldname{"b"},
+              CNode{
+                  CNode::ObjectChildren{{KeyFieldname::add,
+                                         CNode{CNode::ArrayChildren{CNode{UserInt{1}},
+                                                                    CNode{UserInt{2}},
+                                                                    CNode{UserInt{3}},
+                                                                    CNode{UserInt{4}}}}}}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << true << "a"
+                   << BSON("$atan2" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 0)))
+                   << "b"
+                   << BSON("$add" << BSON_ARRAY(BSON("$const" << 1)
+                                                << BSON("$const" << 2) << BSON("$const" << 3)
+                                                << BSON("$const" << 4)))) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
+TEST(CstTest, FailsToTranslateComputedExclusionMixedProjectionStage) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{
+             {UserFieldname{"a"},
+              CNode{CNode::ObjectChildren{
+                  {KeyFieldname::atan2,
+                   CNode{CNode::ArrayChildren{CNode{UserDouble{1.0}}, CNode{UserDecimal{0.0}}}}}}}},
+             {UserFieldname{"b"}, CNode{KeyValue::falseKey}}}}}}}}};
+    ASSERT_THROWS_CODE(
+        cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 4933100);
+}
+
+TEST(CstTest, TranslatesComputedInclusionMixedProjectionStage) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{
+             {UserFieldname{"a"},
+              CNode{CNode::ObjectChildren{
+                  {KeyFieldname::add,
+                   CNode{CNode::ArrayChildren{CNode{UserLong{0ll}}, CNode{UserInt{1}}}}}}}},
+             {UserFieldname{"b"}, CNode{NonZeroKey{Decimal128{590.095}}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << true << "a"
+                   << BSON("$add" << BSON_ARRAY(BSON("$const" << 0ll) << BSON("$const" << 1)))
+                   << "b" << true) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
+TEST(CstTest, TranslatesMultipleProjectionStages) {
+    // [
+    //     { $project: { a: true },
+    //     { $project: { b: false },
+    //     { $project: { c: { $add: [
+    //         { $const: 2.2 },
+    //         { $atan2: [ { $const: 1 }, { $const: 0 } ] },
+    //         { $const: 3 } ] } } }
+    // ]
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{
             {KeyFieldname::project,
              CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}}}}}}},
         CNode{CNode::ObjectChildren{
             {KeyFieldname::project,
-             CNode{CNode::ObjectChildren{{UserFieldname{"b"}, CNode{KeyValue::trueKey}}}}}}},
-        CNode{CNode::ObjectChildren{
-            {KeyFieldname::project,
-             CNode{CNode::ObjectChildren{{UserFieldname{"c"}, CNode{KeyValue::trueKey}}}}}}},
+             CNode{CNode::ObjectChildren{{UserFieldname{"b"}, CNode{KeyValue::falseKey}}}}}}},
+        CNode{
+            CNode::ObjectChildren{{KeyFieldname::project,
+                                   CNode{CNode::ObjectChildren{
+                                       {UserFieldname{"c"},
+                                        CNode{CNode::ObjectChildren{
+                                            {KeyFieldname::add,
+                                             CNode{CNode::ArrayChildren{
+                                                 CNode{UserDouble{2.2}},
+                                                 CNode{CNode::ObjectChildren{
+                                                     {KeyFieldname::atan2,
+                                                      CNode{CNode::ArrayChildren{
+                                                          CNode{UserInt{1}}, CNode{UserInt{0}}}}}}},
+                                                 CNode{UserLong{3ll}}}}}}}}}}}}},
     }};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(3u, sources.size());
     auto iter = sources.begin();
@@ -155,7 +272,7 @@ TEST(CstTest, TranslatesMultipleInclusionProjectionStages) {
         // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
         // insensitive.
         ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
-            BSON("_id" << true << "b" << true) ==
+            BSON("b" << false) ==
             singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
     }
     {
@@ -163,7 +280,12 @@ TEST(CstTest, TranslatesMultipleInclusionProjectionStages) {
         // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
         // insensitive.
         ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
-            BSON("_id" << true << "c" << true) ==
+            BSON("_id" << true << "c"
+                       << BSON("$add"
+                               << BSON_ARRAY(BSON("$const" << 2.2)
+                                             << BSON("$atan2" << BSON_ARRAY(BSON("$const" << 1)
+                                                                            << BSON("$const" << 0)))
+                                             << BSON("$const" << 3ll)))) ==
             singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
     }
 }

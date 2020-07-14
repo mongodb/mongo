@@ -54,9 +54,9 @@ TEST(BSONLexerTest, TokenizesOpaqueUserObjects) {
     assertTokensMatch(lexer,
                       {PipelineParserGen::token::START_ARRAY,
                        PipelineParserGen::token::START_OBJECT,
-                       PipelineParserGen::token::STRING,
-                       PipelineParserGen::token::NUMBER_INT,
-                       PipelineParserGen::token::STRING,
+                       PipelineParserGen::token::FIELDNAME,
+                       PipelineParserGen::token::INT_NON_ZERO,
+                       PipelineParserGen::token::FIELDNAME,
                        PipelineParserGen::token::STRING,
                        PipelineParserGen::token::END_OBJECT,
                        PipelineParserGen::token::END_ARRAY});
@@ -81,7 +81,7 @@ TEST(BSONLexerTest, TokenizesReservedKeywordsAtAnyDepth) {
     assertTokensMatch(lexer,
                       {PipelineParserGen::token::START_ARRAY,
                        PipelineParserGen::token::START_OBJECT,
-                       PipelineParserGen::token::STRING,
+                       PipelineParserGen::token::FIELDNAME,
                        PipelineParserGen::token::START_OBJECT,
                        PipelineParserGen::token::STAGE_INHIBIT_OPTIMIZATION,
                        PipelineParserGen::token::START_OBJECT,
@@ -92,7 +92,7 @@ TEST(BSONLexerTest, TokenizesReservedKeywordsAtAnyDepth) {
 }
 
 TEST(BSONLexerTest, MidRuleActionToSortNestedObject) {
-    auto input = fromjson("{pipeline: [{pipeline: 1, coll: 'test'}]}");
+    auto input = fromjson("{pipeline: [{pipeline: 1.0, coll: 'test'}]}");
     BSONLexer lexer(input["pipeline"].Array());
     // Iterate until the first object.
     ASSERT_EQ(lexer.getNext().type_get(), PipelineParserGen::token::START_ARRAY);
@@ -104,7 +104,7 @@ TEST(BSONLexerTest, MidRuleActionToSortNestedObject) {
                      PipelineParserGen::token::COLL_ARG,
                      PipelineParserGen::token::STRING,
                      PipelineParserGen::token::PIPELINE_ARG,
-                     PipelineParserGen::token::NUMBER_INT,
+                     PipelineParserGen::token::DOUBLE_NON_ZERO,
                      PipelineParserGen::token::END_OBJECT,
                      PipelineParserGen::token::END_ARRAY};
     assertTokensMatch(lexer, expected);
@@ -113,7 +113,7 @@ TEST(BSONLexerTest, MidRuleActionToSortNestedObject) {
 
 TEST(BSONLexerTest, MidRuleActionToSortDoesNotSortNestedObjects) {
     auto input = fromjson(
-        "{pipeline: [{$unionWith: {pipeline: [{$unionWith: 'inner', a: 1}], coll: 'outer'}}]}");
+        "{pipeline: [{$unionWith: {pipeline: [{$unionWith: 'inner', a: 1.0}], coll: 'outer'}}]}");
     BSONLexer lexer(input["pipeline"].Array());
     // Iterate until we reach the $unionWith object.
     ASSERT_EQ(lexer.getNext().type_get(), PipelineParserGen::token::START_ARRAY);
@@ -130,8 +130,8 @@ TEST(BSONLexerTest, MidRuleActionToSortDoesNotSortNestedObjects) {
         // The nested pipeline does *not* get sorted, meaning '$unionWith' stays before 'a'.
         PipelineParserGen::token::STAGE_UNION_WITH,
         PipelineParserGen::token::STRING,  // $unionWith: 'inner'
-        PipelineParserGen::token::STRING,
-        PipelineParserGen::token::NUMBER_INT,  // a: 1
+        PipelineParserGen::token::FIELDNAME,
+        PipelineParserGen::token::DOUBLE_NON_ZERO,  // a: 1.0
         PipelineParserGen::token::END_OBJECT,
         PipelineParserGen::token::END_ARRAY,
         PipelineParserGen::token::END_OBJECT,
@@ -143,8 +143,8 @@ TEST(BSONLexerTest, MidRuleActionToSortDoesNotSortNestedObjects) {
 
 TEST(BSONLexerTest, MultipleNestedObjectsAreReorderedCorrectly) {
     auto input = fromjson(
-        "{pipeline: [{$unionWith: {pipeline: [{$unionWith: 'inner', a: 1}], coll: [{$unionWith: "
-        "'innerB', a: 2}]}}]}");
+        "{pipeline: [{$unionWith: {pipeline: [{$unionWith: 'inner', a: 1.0}], coll: [{$unionWith: "
+        "'innerB', a: 2.0}]}}]}");
     BSONLexer lexer(input["pipeline"].Array());
     // Iterate until we reach the $unionWith object.
     ASSERT_EQ(lexer.getNext().type_get(), PipelineParserGen::token::START_ARRAY);
@@ -158,9 +158,9 @@ TEST(BSONLexerTest, MultipleNestedObjectsAreReorderedCorrectly) {
         PipelineParserGen::token::START_OBJECT,
         // The nested pipeline does *not* get sorted, meaning '$unionWith' stays before 'a'.
         PipelineParserGen::token::STAGE_UNION_WITH,
-        PipelineParserGen::token::STRING,      // innerb
-        PipelineParserGen::token::STRING,      // a
-        PipelineParserGen::token::NUMBER_INT,  // a: 2
+        PipelineParserGen::token::STRING,           // innerb
+        PipelineParserGen::token::FIELDNAME,        // a
+        PipelineParserGen::token::DOUBLE_NON_ZERO,  // a: 2.0
         PipelineParserGen::token::END_OBJECT,
         PipelineParserGen::token::END_ARRAY,
         // Coll nested object ends here.
@@ -169,9 +169,9 @@ TEST(BSONLexerTest, MultipleNestedObjectsAreReorderedCorrectly) {
         PipelineParserGen::token::START_OBJECT,
         // The nested pipeline does *not* get sorted, meaning '$unionWith' stays before 'a'.
         PipelineParserGen::token::STAGE_UNION_WITH,
-        PipelineParserGen::token::STRING,      // $unionWith: 'inner'
-        PipelineParserGen::token::STRING,      // a
-        PipelineParserGen::token::NUMBER_INT,  // a: 1
+        PipelineParserGen::token::STRING,           // $unionWith: 'inner'
+        PipelineParserGen::token::FIELDNAME,        // a
+        PipelineParserGen::token::DOUBLE_NON_ZERO,  // a: 1.0
         PipelineParserGen::token::END_OBJECT,
         PipelineParserGen::token::END_ARRAY,
         PipelineParserGen::token::END_OBJECT,
@@ -182,8 +182,8 @@ TEST(BSONLexerTest, MultipleNestedObjectsAreReorderedCorrectly) {
 }
 TEST(BSONLexerTest, MultiLevelBSONDoesntSortChildren) {
     auto input = fromjson(
-        "{pipeline: [{$unionWith: {pipeline: [{$unionWith: {'nested': 1, 'apple': 1}, a: 1}], "
-        "coll: 'outer'}}]}");
+        "{pipeline: [{$unionWith: {pipeline: [{$unionWith: {'nested': 1.0, 'apple': 1.0}, a: 1.0}],"
+        " coll: 'outer'}}]}");
     BSONLexer lexer(input["pipeline"].Array());
     // Iterate until we reach the $unionWith object.
     ASSERT_EQ(lexer.getNext().type_get(), PipelineParserGen::token::START_ARRAY);
@@ -201,14 +201,14 @@ TEST(BSONLexerTest, MultiLevelBSONDoesntSortChildren) {
         PipelineParserGen::token::STAGE_UNION_WITH,
         // Second nested object
         PipelineParserGen::token::START_OBJECT,
-        PipelineParserGen::token::STRING,  // nested: 1
-        PipelineParserGen::token::NUMBER_INT,
-        PipelineParserGen::token::STRING,  // apple: 1
-        PipelineParserGen::token::NUMBER_INT,
+        PipelineParserGen::token::FIELDNAME,  // nested: 1.0
+        PipelineParserGen::token::DOUBLE_NON_ZERO,
+        PipelineParserGen::token::FIELDNAME,  // apple: 1.0
+        PipelineParserGen::token::DOUBLE_NON_ZERO,
         PipelineParserGen::token::END_OBJECT,
         // End second nested object
-        PipelineParserGen::token::STRING,
-        PipelineParserGen::token::NUMBER_INT,  // a: 1
+        PipelineParserGen::token::FIELDNAME,
+        PipelineParserGen::token::DOUBLE_NON_ZERO,  // a: 1.0
         PipelineParserGen::token::END_OBJECT,
         // End first nested object
         PipelineParserGen::token::END_ARRAY,
