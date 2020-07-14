@@ -7,6 +7,7 @@ selector:
   - multiversion_incompatible
   - requires_fcv_44
   exclude_files:
+  - jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
 executor:
   config:
     shell_options:
