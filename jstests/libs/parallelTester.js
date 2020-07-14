@@ -201,6 +201,10 @@ if (typeof _threadInject != "undefined") {
             // thread will not release the acquired IX lock until the CRUD ops have finished.
             "background_validation.js",
 
+            // These tests check global command counters.
+            "find_and_modify_metrics.js",
+            "update_metrics.js",
+
             // Views tests
             "views/invalid_system_views.js",      // Puts invalid view definitions in system.views.
             "views/views_all_commands.js",        // Drops test DB.

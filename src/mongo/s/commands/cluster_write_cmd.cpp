@@ -36,6 +36,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/lasterror.h"
@@ -444,11 +445,13 @@ class ClusterWriteCmd::InvocationBase : public CommandInvocation {
 public:
     InvocationBase(const ClusterWriteCmd* command,
                    const OpMsgRequest& request,
-                   BatchedCommandRequest batchedRequest)
+                   BatchedCommandRequest batchedRequest,
+                   UpdateMetrics* updateMetrics = nullptr)
         : CommandInvocation(command),
           _bypass{shouldBypassDocumentValidationForCommand(request.body)},
           _request{&request},
-          _batchedRequest{std::move(batchedRequest)} {}
+          _batchedRequest{std::move(batchedRequest)},
+          _updateMetrics{updateMetrics} {}
 
     const BatchedCommandRequest& getBatchedRequest() const {
         return _batchedRequest;
@@ -536,13 +539,22 @@ private:
                 debug.additiveMetrics.nMatched =
                     response.getN() - (debug.upsert ? response.sizeUpsertDetails() : 0);
                 debug.additiveMetrics.nModified = response.getNModified();
+
+                invariant(_updateMetrics);
                 for (auto&& update : _batchedRequest.getUpdateRequest().getUpdates()) {
-                    // If this was a pipeline style update, record which stages were being used.
+                    // If this was a pipeline style update, record that pipeline-style was used and
+                    // which stages were being used.
                     auto updateMod = update.getU();
                     if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
                         auto pipeline = LiteParsedPipeline(_batchedRequest.getNS(),
                                                            updateMod.getUpdatePipeline());
                         pipeline.tickGlobalStageCounters();
+                        _updateMetrics->incrementExecutedWithAggregationPipeline();
+                    }
+
+                    // If this command had arrayFilters option, record that it was used.
+                    if (update.getArrayFilters()) {
+                        _updateMetrics->incrementExecutedWithArrayFilters();
                     }
                 }
                 break;
@@ -641,6 +653,9 @@ private:
     bool _bypass;
     const OpMsgRequest* _request;
     BatchedCommandRequest _batchedRequest;
+
+    // Update related command execution metrics.
+    UpdateMetrics* const _updateMetrics;
 };
 
 class ClusterInsertCmd final : public ClusterWriteCmd {
@@ -678,7 +693,7 @@ private:
 
 class ClusterUpdateCmd final : public ClusterWriteCmd {
 public:
-    ClusterUpdateCmd() : ClusterWriteCmd("update") {}
+    ClusterUpdateCmd() : ClusterWriteCmd("update"), _updateMetrics{"update"} {}
 
 private:
     class Invocation final : public InvocationBase {
@@ -699,7 +714,8 @@ private:
                 "Cannot specify runtime constants option to a mongos",
                 !parsedRequest.hasRuntimeConstants());
         parsedRequest.setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-        return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
+        return std::make_unique<Invocation>(
+            this, request, std::move(parsedRequest), &_updateMetrics);
     }
 
     std::string help() const override {
@@ -709,6 +725,9 @@ private:
     LogicalOp getLogicalOp() const override {
         return LogicalOp::opUpdate;
     }
+
+    // Update related command execution metrics.
+    UpdateMetrics _updateMetrics;
 } clusterUpdateCmd;
 
 class ClusterDeleteCmd final : public ClusterWriteCmd {
