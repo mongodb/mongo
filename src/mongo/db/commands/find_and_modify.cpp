@@ -41,6 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/find_and_modify_common.h"
+#include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/delete.h"
@@ -204,7 +205,8 @@ void checkIfTransactionOnCappedColl(Collection* coll, bool inTransaction) {
 
 class CmdFindAndModify : public BasicCommand {
 public:
-    CmdFindAndModify() : BasicCommand("findAndModify", "findandmodify") {}
+    CmdFindAndModify()
+        : BasicCommand("findAndModify", "findandmodify"), _updateMetrics{"findAndModify"} {}
 
     std::string help() const override {
         return "{ findAndModify: \"collection\", query: {processed:false}, update: {$set: "
@@ -317,6 +319,9 @@ public:
         uassertStatusOK(userAllowedWriteNS(nsString));
         auto const curOp = CurOp::get(opCtx);
         OpDebug* const opDebug = &curOp->debug();
+
+        // Collect metrics.
+        _updateMetrics.collectMetrics(cmdObj);
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj)) {
@@ -523,6 +528,9 @@ public:
         });
     }
 
+private:
+    // Update related command execution metrics.
+    UpdateMetrics _updateMetrics;
 } cmdFindAndModify;
 
 }  // namespace

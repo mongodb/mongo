@@ -15,6 +15,10 @@ selector:
   - jstests/core/list_all_sessions.js
   - jstests/core/list_local_sessions.js
   - jstests/core/list_sessions.js
+  # These tests verify that an expected number of update operations were tracked in the server
+  # status metrics, but the logical session cache refresh causes additional updates to be recorded.
+  - jstests/core/find_and_modify_metrics.js
+  - jstests/core/update_metrics.js
 
 executor:
   archive:

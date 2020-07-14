@@ -40,6 +40,10 @@ selector:
   # TODO SERVER-31198: Remove once retry attempts are always decremented.
   - jstests/core/write_result.js
 
+  # These tests rely on the assumption that an update command is run only once.
+  - jstests/core/find_and_modify_metrics.js
+  - jstests/core/update_metrics.js
+
   # This test makes the assumption that a command is run a certain number of times, but
   # the retryable writes suite overrides the runCommand to repeat commands.
   - jstests/core/failcommand_failpoint.js
