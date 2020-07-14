@@ -189,9 +189,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         for (const auto& info : indexSpecs) {
             if (info["background"].isBoolean() && !info["background"].Bool()) {
                 LOGV2(20383,
-                      "Ignoring obselete {{ background: false }} index build option because all "
+                      "Ignoring obsolete {{ background: false }} index build option because all "
                       "indexes are built in the background with the hybrid method",
-                      "Ignoring obselete { background: false } index build option because all "
+                      "Ignoring obsolete { background: false } index build option because all "
                       "indexes are built in the background with the hybrid method");
             }
         }
