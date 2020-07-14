@@ -27,8 +27,13 @@
 #
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/client/read_preference.h"
+        - "mongo/db/repl/migrating_tenant_util.h"
 
 imports:
+    - "mongo/client/read_preference_setting.idl"
+    - "mongo/db/repl/replication_types.idl"
     - "mongo/idl/basic_types.idl"
 
 enums:
@@ -50,14 +55,59 @@ structs:
                 type: objectid
                 description: "A unique identifier for the document."
                 cpp_name: id
+            migrationId:
+                type: uuid
+                description: "Unique identifier for the tenant migration."
+            recipientConnectionString:
+                type: string
+                description: "The URI string that the donor will utilize to create a connection with the recipient."
             databasePrefix:
                 type: string
                 description: "The database prefix for the migration."
-            blockTimestamp:
-                type: timestamp
-                description: "The timestamp at which writes and causal reads against the databases
-                              being migrated should start blocking."
-                optional: true
             state:
                 type: TenantMigrationDonorState
                 description: "The state of the tenant migration."
+            blockTimestamp:
+                type: timestamp
+                description:
+                    "The timestamp at which writes and causal reads against the databases
+                    being migrated should start blocking."
+                optional: true
+            garbageCollect:
+                type: bool
+                description: "A boolean that determines whether the state machine should be deleted after a delay via the TTL monitor."
+
+    tenantMigrationRecipientDocument:
+        description: "Represents an in-progress tenant migration on the migration recipient."
+        strict: true
+        fields:
+            _id:
+                type: objectid
+                description: "A unique identifier for the document."
+                cpp_name: id
+            migrationId:
+                type: uuid
+                description: "Unique identifier for the tenant migration."
+            donorConnectionString:
+                type: string
+                description: "The URI string that the donor will utilize to create a connection with the recipient."
+            databasePrefix:
+                type: string
+                description: "The database prefix for the migration."
+                validator:
+                    callback: "validateDbPrefix"
+            readPreference:
+                type: readPreference
+                description: "The read preference setting that the recipient will use to determine which node in the donor replica set to clone from."
+            garbageCollect:
+                type: bool
+                description: "A boolean that determines whether the state machine should be deleted after a delay via the TTL monitor."
+            startApplyingOpTime:
+                description: "Populated during data sync; the donor's operation time when the data cloning starts."
+                type: optime
+            startFetchingOpTime:
+                description: "Populated during data sync; the donor's operation time of the last open transaction when the data cloning started."
+                type: optime
+            cloneFinishedOptime:
+                description: "Populated during data sync; the recipient operation time when the data cloning finishes."
+                type: optime

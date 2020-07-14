@@ -30,48 +30,15 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/client/read_preference.h"
-    - "mongo/db/repl/migrating_tenant_util.h"
 
 imports:
-  - "mongo/client/read_preference_setting.idl"
   - "mongo/idl/basic_types.idl"
-  - "mongo/s/sharding_types.idl"
+  - "mongo/client/read_preference.idl"
 
-commands:
-  donorStartMigration:
-    description: "Parser for the 'donorStartMigration' command."
-    strict: true
-    namespace: ignored
-    fields:
-      migrationId:
-        description: "Unique identifier for the tenant migration."
-        type: uuid
-      recipientConnectionString:
-        description: "The URI string that the donor will utilize to create a connection with the recipient."
-        type: string
-      databasePrefix:
-        description: "The prefix from which the migrating database will be matched. The prefixes 'admin', 'local', 'config', the empty string, are not allowed."
-        type: string
-        validator:
-          callback: "validateDbPrefix"
-      readPreference:
-        description: "The read preference settings that the donor will pass on to the recipient."
-        type: readPreference
-
-  donorWaitForMigrationToCommit:
-    description: "Parser for the 'donorWaitForMigrationToCommit' command."
-    strict: true
-    namespace: ignored
-    fields:
-      migrationId:
-        description: "Unique identifier for the tenant migration."
-        type: uuid
-
-  donorForgetMigration:
-    description: "Parser for the 'donorForgetMigration' command."
-    strict: true
-    namespace: ignored
-    fields:
-      migrationId:
-        description: "Unique identifier for the tenant migration."
-        type: uuid
+types:
+  readPreference:
+    description: "Represents the read preference of a command."
+    bson_serialization_type: object
+    cpp_type: ReadPreferenceSetting
+    serializer: ReadPreferenceSetting::toInnerBSON
+    deserializer: ReadPreferenceSetting::fromInnerBSONForIDL
