@@ -97,7 +97,6 @@ private:
      */
     void _recoverFromStableTimestamp(OperationContext* opCtx,
                                      Timestamp stableTimestamp,
-                                     OpTime appliedThrough,
                                      OpTime topOfOplog);
 
     /**
@@ -109,7 +108,7 @@ private:
                                         OpTime topOfOplog);
 
     /**
-     * Applies all oplog entries from oplogApplicationStartPoint (inclusive) to topOfOplog
+     * Applies all oplog entries from oplogApplicationStartPoint (exclusive) to topOfOplog
      * (inclusive). This fasserts if oplogApplicationStartPoint is not in the oplog.
      */
     void _applyToEndOfOplog(OperationContext* opCtx,
@@ -117,7 +116,7 @@ private:
                             const Timestamp& topOfOplog);
 
     /**
-     * Applies all oplog entries from startPoint (inclusive) to endPoint (inclusive). Returns the
+     * Applies all oplog entries from startPoint (exclusive) to endPoint (inclusive). Returns the
      * Timestamp of the last applied operation.
      */
     Timestamp _applyOplogOperations(OperationContext* opCtx,

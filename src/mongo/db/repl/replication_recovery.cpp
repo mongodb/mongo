@@ -439,12 +439,12 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     fassert(40290, topOfOplogSW);
     const auto topOfOplog = topOfOplogSW.getValue();
 
-    const auto appliedThrough = _consistencyMarkers->getAppliedThrough(opCtx);
     if (stableTimestamp) {
         invariant(supportsRecoveryTimestamp);
-        _recoverFromStableTimestamp(opCtx, *stableTimestamp, appliedThrough, topOfOplog);
+        _recoverFromStableTimestamp(opCtx, *stableTimestamp, topOfOplog);
     } else {
-        _recoverFromUnstableCheckpoint(opCtx, appliedThrough, topOfOplog);
+        _recoverFromUnstableCheckpoint(
+            opCtx, _consistencyMarkers->getAppliedThrough(opCtx), topOfOplog);
     }
 } catch (...) {
     LOGV2_FATAL_CONTINUE(21570,
@@ -456,12 +456,9 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
 
 void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCtx,
                                                           Timestamp stableTimestamp,
-                                                          OpTime appliedThrough,
                                                           OpTime topOfOplog) {
     invariant(!stableTimestamp.isNull());
     invariant(!topOfOplog.isNull());
-
-    const auto truncateAfterPoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
 
     LOGV2(21544,
           "Recovering from stable timestamp: {stableTimestamp} (top of oplog: {topOfOplog}, "
@@ -469,8 +466,7 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
           "Recovering from stable timestamp",
           "stableTimestamp"_attr = stableTimestamp,
           "topOfOplog"_attr = topOfOplog,
-          "appliedThrough"_attr = appliedThrough,
-          "oplogTruncateAfterPoint"_attr = truncateAfterPoint);
+          "appliedThrough"_attr = _consistencyMarkers->getAppliedThrough(opCtx));
 
     LOGV2(21545,
           "Starting recovery oplog application at the stable timestamp: {stableTimestamp}",
@@ -576,9 +572,11 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx,
                                                          const Timestamp& startPoint,
                                                          const Timestamp& endPoint) {
+    // The oplog buffer will fetch all entries >= the startPoint timestamp, but it skips the first
+    // op on startup, which is why the startPoint is described as "exclusive".
     LOGV2(21550,
-          "Replaying stored operations from {startPoint} (inclusive) to {endPoint} (inclusive).",
-          "Replaying stored operations from startPoint (inclusive) to endPoint (inclusive)",
+          "Replaying stored operations from {startPoint} (exclusive) to {endPoint} (inclusive).",
+          "Replaying stored operations from startPoint (exclusive) to endPoint (inclusive)",
           "startPoint"_attr = startPoint,
           "endPoint"_attr = endPoint);
 
