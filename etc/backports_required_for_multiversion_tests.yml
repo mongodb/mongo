@@ -28,6 +28,10 @@ concurrency_replication_multiversion:
 
 concurrency_sharded_replication_multiversion:
 
+replica_sets_multiversion:
+- ticket: SERVER-49471
+  test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
+
 replica_sets_jscore_multiversion_passthrough:
 - ticket: SERVER-40805
   test_file: jstests/core/profile_find.js
