@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/find_and_modify_common.h"
+#include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -166,7 +167,8 @@ void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
 
 class FindAndModifyCmd : public BasicCommand {
 public:
-    FindAndModifyCmd() : BasicCommand("findAndModify", "findandmodify") {}
+    FindAndModifyCmd()
+        : BasicCommand("findAndModify", "findandmodify"), _updateMetrics{"findAndModify"} {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -269,6 +271,9 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+
+        // Collect metrics.
+        _updateMetrics.collectMetrics(cmdObj);
 
         // findAndModify should only be creating database if upsert is true, but this would require
         // that the parsing be pulled into this function.
@@ -413,6 +418,9 @@ private:
         result->appendElementsUnique(
             CommandHelpers::filterCommandReplyForPassthrough(response.data));
     }
+
+    // Update related command execution metrics.
+    UpdateMetrics _updateMetrics;
 } findAndModifyCmd;
 
 }  // namespace

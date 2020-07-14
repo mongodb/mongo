@@ -37,6 +37,10 @@ selector:
   - jstests/core/find_and_modify_server6865.js
   - jstests/core/fts_find_and_modify.js
 
+  # These tests rely on the assumption that an update command is run only once.
+  - jstests/core/find_and_modify_metrics.js
+  - jstests/core/update_metrics.js
+
   # This test makes the assumption that a command is run a certain number of times, but
   # the retryable writes suite overrides the runCommand to repeat commands.
   - jstests/core/failcommand_failpoint.js

@@ -111,6 +111,7 @@ env.Library(
         'refresh_sessions_command.cpp',
         'rename_collection_common.cpp',
         'start_session_command.cpp',
+        'update_metrics.cpp',
         env.Idlc('parameters.idl')[0],
         env.Idlc('sessions_commands.idl')[0],
     ],
