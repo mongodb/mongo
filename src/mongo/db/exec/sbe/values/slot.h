@@ -380,6 +380,21 @@ struct MaterializedRowHasher {
 };
 
 /**
+ * Read the components of the 'keyString' value and populate 'accessors' with those components. Some
+ * components are appended into the 'valueBufferBuilder' object's internal buffer, and the accessors
+ * populated with those values will hold pointers into the buffer. The 'valueBufferBuilder' is
+ * caller owned, and it can be reset and reused once it is safe to invalidate any accessors that
+ * might reference it.
+ */
+void readKeyStringValueIntoAccessors(
+    const KeyString::Value& keyString,
+    const Ordering& ordering,
+    BufBuilder* valueBufferBuilder,
+    std::vector<ViewOfValueAccessor>* accessors,
+    boost::optional<IndexKeysInclusionSet> indexKeysToInclude = boost::none);
+
+
+/**
  * Commonly used containers.
  */
 template <typename T>
