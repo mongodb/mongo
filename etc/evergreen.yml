@@ -7582,6 +7582,7 @@ tasks:
         aws_secret_remote: ${repo_aws_secret}
     - func: "set up notary client credentials"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
