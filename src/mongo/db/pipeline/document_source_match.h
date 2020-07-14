@@ -132,10 +132,14 @@ public:
      */
     void joinMatchWith(boost::intrusive_ptr<DocumentSourceMatch> other);
 
+
+    bool hasQuery() const override;
+
     /**
      * Returns the query in MatchExpression syntax.
      */
-    BSONObj getQuery() const;
+    BSONObj getQuery() const override;
+
 
     /** Returns the portion of the match that can safely be promoted to before a $redact.
      *  If this returns an empty BSONObj, no part of this match may safely be promoted.

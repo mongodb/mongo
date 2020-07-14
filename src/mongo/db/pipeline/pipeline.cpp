@@ -27,28 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/pipeline.h"
 
 #include <algorithm>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/fail_point.h"
@@ -328,21 +320,16 @@ bool Pipeline::usedDisk() {
 }
 
 BSONObj Pipeline::getInitialQuery() const {
-    if (_sources.empty())
-        return BSONObj();
-
-    /* look for an initial $match */
-    DocumentSourceMatch* match = dynamic_cast<DocumentSourceMatch*>(_sources.front().get());
-    if (match) {
-        return match->getQuery();
+    if (_sources.empty()) {
+        return BSONObj{};
     }
 
-    DocumentSourceGeoNear* geoNear = dynamic_cast<DocumentSourceGeoNear*>(_sources.front().get());
-    if (geoNear) {
-        return geoNear->getQuery();
+    const DocumentSource* doc = _sources.front().get();
+    if (doc->hasQuery()) {
+        return doc->getQuery();
     }
 
-    return BSONObj();
+    return BSONObj{};
 }
 
 bool Pipeline::needsPrimaryShardMerger() const {

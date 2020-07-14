@@ -15,10 +15,25 @@ env.SConscript(
 )
 
 env.Library(
-    target='query_planner',
+    target='canonical_query',
     source=[
         "canonical_query.cpp",
         "canonical_query_encoder.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "collation/collator_factory_interface",
+        "collation/collator_interface",
+        "projection_ast",
+        "sort_pattern",
+    ],
+    LIBDEPS_PRIVATE=[
+    ],
+)
+
+env.Library(
+    target='query_planner',
+    source=[
         "index_tag.cpp",
         "plan_cache.cpp",
         "plan_cache_indexability.cpp",
@@ -47,12 +62,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/index/expression_params",
         "$BUILD_DIR/mongo/db/index/key_generator",
         "$BUILD_DIR/mongo/db/index_names",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
         "$BUILD_DIR/mongo/db/mongohasher",
-        "collation/collator_factory_interface",
-        "collation/collator_interface",
+        'canonical_query',
         "command_request_response",
-        "projection_ast",
         "query_knobs",
     ],
     LIBDEPS_PRIVATE=[

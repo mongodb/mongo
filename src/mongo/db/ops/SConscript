@@ -54,11 +54,20 @@ env.Library(
 )
 
 env.Library(
+    target='parsed_update_array_filters',
+    source='parsed_update_array_filters.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+    ],
+)
+
+env.Library(
     target='parsed_update',
     source='parsed_update.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/update/update_driver',
+        'parsed_update_array_filters'
     ],
 )
 

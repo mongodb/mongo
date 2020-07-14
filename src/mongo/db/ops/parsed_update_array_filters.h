@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,24 +29,17 @@
 
 #pragma once
 
-#include "mongo/db/curop.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/update_result.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 
 namespace mongo {
 
-class CanonicalQuery;
-class Database;
-class OperationContext;
-class UpdateDriver;
-
 /**
- * Utility method to execute an update described by "request".
- *
- * Caller must hold the appropriate database locks.
+ * Parses the array filters portion of the update request.
  */
-UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& request);
+StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>
+parsedUpdateArrayFilters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         const std::vector<BSONObj>& rawArrayFiltersIn,
+                         const NamespaceString& nss);
 
 }  // namespace mongo

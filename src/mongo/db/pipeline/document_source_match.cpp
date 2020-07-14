@@ -474,6 +474,10 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
     return DocumentSourceMatch::create(elem.Obj(), pExpCtx);
 }
 
+bool DocumentSourceMatch::hasQuery() const {
+    return true;
+}
+
 BSONObj DocumentSourceMatch::getQuery() const {
     return _predicate;
 }

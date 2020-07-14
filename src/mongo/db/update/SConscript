@@ -21,7 +21,7 @@ env.Library(
 )
 
 env.Library(
-    target='update',
+    target='update_nodes',
     source=[
         'addtoset_node.cpp',
         'arithmetic_node.cpp',
@@ -29,13 +29,8 @@ env.Library(
         'bit_node.cpp',
         'compare_node.cpp',
         'current_date_node.cpp',
-        'document_diff_calculator.cpp',
-        'document_diff_applier.cpp',
-        'document_diff_serialization.cpp',
         'modifier_node.cpp',
         'modifier_table.cpp',
-        'object_replace_executor.cpp',
-        'pipeline_executor.cpp',
         'pop_node.cpp',
         'pull_node.cpp',
         'pullall_node.cpp',
@@ -50,10 +45,24 @@ env.Library(
         'update_object_node.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/update_index_data',
         '$BUILD_DIR/mongo/db/vector_clock_mutable',
         'update_common',
+    ],
+)
+
+env.Library(
+    target='update',
+    source=[
+        'document_diff_applier.cpp',
+        'document_diff_calculator.cpp',
+        'document_diff_serialization.cpp',
+        'object_replace_executor.cpp',
+        'pipeline_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        'update_nodes'
     ],
 )
 
@@ -66,7 +75,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
-        '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/server_options_core',
         'update',
     ],

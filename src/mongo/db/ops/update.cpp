@@ -102,26 +102,4 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     return UpdateStage::makeUpdateResult(updateStats);
 }
 
-BSONObj applyUpdateOperators(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const BSONObj& from,
-                             const BSONObj& operators) {
-    auto expCtx =
-        make_intrusive<ExpressionContext>(opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
-    UpdateDriver driver(std::move(expCtx));
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    driver.parse(operators, arrayFilters);
-
-    mutablebson::Document doc(from, mutablebson::Document::kInPlaceDisabled);
-
-    const bool validateForStorage = false;
-    const FieldRefSet emptyImmutablePaths;
-    const bool isInsert = false;
-
-    uassertStatusOK(
-        driver.update(StringData(), &doc, validateForStorage, emptyImmutablePaths, isInsert));
-
-    return doc.getObject();
-}
-
 }  // namespace mongo

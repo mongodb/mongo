@@ -61,14 +61,6 @@ class ParsedUpdate {
 
 public:
     /**
-     * Parses the array filters portion of the update request.
-     */
-    static StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>
-    parseArrayFilters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                      const std::vector<BSONObj>& rawArrayFiltersIn,
-                      const NamespaceString& nss);
-
-    /**
      * Constructs a parsed update.
      *
      * The objects pointed to by "request" and "extensionsCallback" must stay in scope for the life

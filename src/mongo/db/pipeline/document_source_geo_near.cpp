@@ -96,6 +96,10 @@ intrusive_ptr<DocumentSource> DocumentSourceGeoNear::createFromBson(
     return out;
 }
 
+bool DocumentSourceGeoNear::hasQuery() const {
+    return true;
+}
+
 void DocumentSourceGeoNear::parseOptions(BSONObj options) {
     // First, check for explicitly-disallowed fields.
 

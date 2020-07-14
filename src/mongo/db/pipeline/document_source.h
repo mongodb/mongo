@@ -363,6 +363,16 @@ public:
         Parser parser,
         boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion);
 
+    /**
+     * Returns true if the DocumentSource has a query.
+     */
+    virtual bool hasQuery() const;
+
+    /**
+     * Returns the DocumentSource query if it exists.
+     */
+    virtual BSONObj getQuery() const;
+
 private:
     /**
      * Attempt to push a match stage from directly ahead of the current stage given by itr to before

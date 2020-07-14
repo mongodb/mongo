@@ -34,15 +34,13 @@
 #include "api_common.h"
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/client.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/parsed_update_array_filters.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/update_driver.h"
@@ -242,8 +240,8 @@ struct stitch_support_v1_update {
         for (auto&& filter : this->arrayFilters) {
             arrayFilterVector.push_back(filter.embeddedObject());
         }
-        this->parsedFilters = uassertStatusOK(mongo::ParsedUpdate::parseArrayFilters(
-            expCtx, arrayFilterVector, mongo::kDummyNamespaceStr));
+        this->parsedFilters = uassertStatusOK(
+            mongo::parsedUpdateArrayFilters(expCtx, arrayFilterVector, mongo::kDummyNamespaceStr));
 
         updateDriver.parse(this->updateExpr, parsedFilters);
 
