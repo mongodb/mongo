@@ -30,6 +30,8 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/migrate_tenant_cmds_gen.h"
+#include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
+#include "mongo/db/repl/migrating_tenant_donor_util.h"
 
 namespace mongo {
 namespace {
@@ -75,7 +77,15 @@ public:
     using ParentInvocation = MigrationDonorCmdBase<DonorStartMigration>::Invocation;
     class Invocation final : public ParentInvocation {
     public:
-        void typedRun(OperationContext* opCtx) {}
+        void typedRun(OperationContext* opCtx) {
+            const auto requestBody = request();
+            StringData dbPrefix = requestBody.getDatabasePrefix();
+            auto donorStartState = TenantMigrationDonorStateEnum::kDataSync;
+
+            const TenantMigrationDonorDocument donorDocument(
+                OID::gen(), dbPrefix.toString(), donorStartState);
+            migrating_tenant_donor_util::dataSync(opCtx, donorDocument);
+        }
 
     private:
         void doCheckAuthorization(OperationContext* opCtx) const override {}

@@ -85,11 +85,14 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
 
 }  // namespace
 
+/**
+ *   TODO - Implement recipientSyncData command
+ */
 void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& originalDoc) {
     // Send recipientSyncData.
 
     // Call startBlockingWrites.
-
+    startTenantMigrationBlockOnPrimary(opCtx, originalDoc);
     // Update the on-disk state of the migration to "blocking" state.
     invariant(originalDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
 
@@ -143,6 +146,19 @@ void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& origi
         }));
 }
 
+void startTenantMigrationBlockOnPrimary(OperationContext* opCtx,
+                                        const TenantMigrationDonorDocument& donorDoc) {
+    invariant(donorDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
+    auto serviceContext = opCtx->getServiceContext();
+
+    executor::TaskExecutor* mtabExecutor = getTenantMigrationExecutor(serviceContext).get();
+    auto mtab = std::make_shared<MigratingTenantAccessBlocker>(serviceContext, mtabExecutor);
+
+    mtab->startBlockingWrites();
+
+    auto& mtabByPrefix = MigratingTenantAccessBlockerByPrefix::get(serviceContext);
+    mtabByPrefix.add(donorDoc.getDatabasePrefix(), mtab);
+}
 std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContext* serviceContext) {
     ThreadPool::Options tpOptions;
     tpOptions.threadNamePrefix = kThreadNamePrefix;
