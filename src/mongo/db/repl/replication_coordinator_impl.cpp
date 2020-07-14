@@ -1357,7 +1357,6 @@ void ReplicationCoordinatorImpl::_resetMyLastOpTimes(WithLock lk) {
     _setMyLastAppliedOpTimeAndWallTime(
         lk, OpTimeAndWallTime(), isRollbackAllowed, DataConsistency::Inconsistent);
     _setMyLastDurableOpTimeAndWallTime(lk, OpTimeAndWallTime(), isRollbackAllowed);
-    _stableOpTimeCandidates.clear();
 }
 
 void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<Latch> lock) {
@@ -1429,7 +1428,6 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
     if (consistency == DataConsistency::Consistent) {
         invariant(opTime.getTimestamp().getInc() > 0,
                   str::stream() << "Impossible optime received: " << opTime.toString());
-        _stableOpTimeCandidates.insert(opTimeAndWallTime);
         // If we are lagged behind the commit optime, set a new stable timestamp here. When majority
         // read concern is disabled, the stable timestamp is set to lastApplied.
         if (opTime <= _topCoord->getLastCommittedOpTime() ||
@@ -4130,16 +4128,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _dropAllSnapshots_inlock();
     }
 
-    // Upon transitioning out of ROLLBACK, we must clear any stable optime candidates that may have
-    // been rolled back.
     if (_memberState.rollback()) {
-        // Our 'lastApplied' optime at this point should be the rollback common point. We should
-        // remove any stable optime candidates greater than the common point.
-        auto lastApplied = _getMyLastAppliedOpTimeAndWallTime_inlock();
-        // The upper bound will give us the first optime T such that T > lastApplied.
-        auto deletePoint = _stableOpTimeCandidates.upper_bound(lastApplied);
-        _stableOpTimeCandidates.erase(deletePoint, _stableOpTimeCandidates.end());
-
         // Ensure that no snapshots were created while we were in rollback.
         invariant(!_currentCommittedSnapshot);
     }
@@ -4825,93 +4814,6 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock 
     }
 }
 
-boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_chooseStableOpTimeFromCandidates(
-    WithLock lk,
-    const std::set<OpTimeAndWallTime>& candidates,
-    OpTimeAndWallTime maximumStableOpTime) {
-
-    // No optime candidates.
-    if (candidates.empty()) {
-        return boost::none;
-    }
-
-    auto maximumStableTimestamp = maximumStableOpTime.opTime.getTimestamp();
-    if (_readWriteAbility->canAcceptNonLocalWrites(lk) && _storage->supportsDocLocking(_service)) {
-        // If the storage engine supports document level locking, then it is possible for oplog
-        // writes to commit out of order. In that case, we don't want to set the stable timestamp
-        // ahead of the all_durable timestamp. This is not a problem for oplog application
-        // because we only set lastApplied between batches when the all_durable timestamp cannot
-        // be behind. During oplog application the all_durable timestamp can jump around since
-        // we first write oplog entries to the oplog and then go back and apply them.
-        //
-        // We must construct an upper bound for the stable optime candidates such that the upper
-        // bound is at most 'maximumStableOpTime' and any candidate with a timestamp higher than the
-        // all_durable is greater than the upper bound. If the timestamp of 'maximumStableOpTime'
-        // is <= the all_durable, then we use 'maximumStableOpTime'. Otherwise, we construct an
-        // optime using the all_durable and the term of 'maximumStableOpTime'. We must argue that
-        // there are no stable optime candidates with a timestamp greater than the all_durable and
-        // a term less than that of 'maximumStableOpTime'. Suppose there were. The
-        // 'maximumStableOpTime' is either the commit point or the lastApplied, so the all_durable
-        // can only be behind 'maximumStableOpTime' on a primary. If there is a candidate with a
-        // higher timestamp than the all_durable but a lower term than 'maximumStableOpTime', then
-        // the all_durable corresponds to a write in an earlier term than the current one. But
-        // this is not possible on a primary, since on step-up, the primary storage commits a 'new
-        // primary' oplog entry in the new term before accepting any new writes, so the all
-        // durable must be in the current term.
-        maximumStableTimestamp = std::min(_storage->getAllDurableTimestamp(_service),
-                                          maximumStableOpTime.opTime.getTimestamp());
-    }
-
-    maximumStableOpTime = {OpTime(maximumStableTimestamp, maximumStableOpTime.opTime.getTerm()),
-                           maximumStableOpTime.wallTime};
-
-    // Find the greatest optime candidate that is less than or equal to 'maximumStableOpTime'. To do
-    // this we first find the upper bound of 'maximumStableOpTime', which points to the smallest
-    // element in 'candidates' that is greater than 'maximumStableOpTime'. We then step back one
-    // element, which should give us the largest element in 'candidates' that is less than or equal
-    // to the 'maximumStableOpTime'.
-    auto upperBoundIter = candidates.upper_bound(maximumStableOpTime);
-
-    // All optime candidates are greater than the commit point.
-    if (upperBoundIter == candidates.begin()) {
-        return boost::none;
-    }
-    // There is a valid stable optime.
-    else {
-        auto stableOpTime = *std::prev(upperBoundIter);
-        invariant(stableOpTime.opTime.getTimestamp() <= maximumStableTimestamp);
-        return stableOpTime;
-    }
-}
-
-void ReplicationCoordinatorImpl::_cleanupStableOpTimeCandidates(
-    std::set<OpTimeAndWallTime>* candidates, OpTimeAndWallTime stableOpTime) {
-    // Discard optime candidates earlier than the current stable optime, since we don't need
-    // them anymore. To do this, we find the lower bound of the 'stableOpTime' which is the first
-    // element that is greater than or equal to the 'stableOpTime'. Then we discard everything up
-    // to but not including this lower bound i.e. 'deletePoint'.
-    auto deletePoint = candidates->lower_bound(stableOpTime);
-
-    // Delete the entire range of unneeded optimes.
-    candidates->erase(candidates->begin(), deletePoint);
-}
-
-boost::optional<OpTimeAndWallTime>
-ReplicationCoordinatorImpl::chooseStableOpTimeFromCandidates_forTest(
-    const std::set<OpTimeAndWallTime>& candidates, const OpTimeAndWallTime& maximumStableOpTime) {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _chooseStableOpTimeFromCandidates(lk, candidates, maximumStableOpTime);
-}
-void ReplicationCoordinatorImpl::cleanupStableOpTimeCandidates_forTest(
-    std::set<OpTimeAndWallTime>* candidates, OpTimeAndWallTime stableOpTime) {
-    _cleanupStableOpTimeCandidates(candidates, stableOpTime);
-}
-
-std::set<OpTimeAndWallTime> ReplicationCoordinatorImpl::getStableOpTimeCandidates_forTest() {
-    stdx::unique_lock<Latch> lk(_mutex);
-    return _stableOpTimeCandidates;
-}
-
 void ReplicationCoordinatorImpl::attemptToAdvanceStableTimestamp() {
     stdx::unique_lock<Latch> lk(_mutex);
     _setStableTimestampForStorage(lk);
@@ -5067,7 +4969,6 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
                 }
             }
         }
-        _cleanupStableOpTimeCandidates(&_stableOpTimeCandidates, stableOpTime.get());
     }
 }
 

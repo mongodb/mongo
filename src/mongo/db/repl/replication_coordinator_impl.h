@@ -446,12 +446,6 @@ public:
     /**
      * Simple test wrappers that expose private methods.
      */
-    boost::optional<OpTimeAndWallTime> chooseStableOpTimeFromCandidates_forTest(
-        const std::set<OpTimeAndWallTime>& candidates,
-        const OpTimeAndWallTime& maximumStableOpTime);
-    void cleanupStableOpTimeCandidates_forTest(std::set<OpTimeAndWallTime>* candidates,
-                                               OpTimeAndWallTime stableOpTime);
-    std::set<OpTimeAndWallTime> getStableOpTimeCandidates_forTest();
     void handleHeartbeatResponse_forTest(BSONObj response,
                                          int targetIndex,
                                          Milliseconds ping = Milliseconds(100));
@@ -1352,28 +1346,7 @@ private:
     boost::optional<OpTimeAndWallTime> _recalculateStableOpTime(WithLock lk);
 
     /**
-     * Calculates the 'stable' replication optime given a set of optime candidates and a maximum
-     * stable optime. The stable optime is the greatest optime in 'candidates' that is also less
-     * than or equal to 'maximumStableOpTime' and other criteria.
-     *
-     * Returns boost::none if there is no satisfactory candidate.
-     */
-    boost::optional<OpTimeAndWallTime> _chooseStableOpTimeFromCandidates(
-        WithLock lk,
-        const std::set<OpTimeAndWallTime>& candidates,
-        OpTimeAndWallTime maximumStableOpTime);
-
-    /**
-     * Removes any optimes from the optime set 'candidates' that are less than
-     * 'stableOpTime'.
-     */
-    void _cleanupStableOpTimeCandidates(std::set<OpTimeAndWallTime>* candidates,
-                                        OpTimeAndWallTime stableOpTime);
-
-    /**
-     * Calculates and sets the value of the 'stable' replication optime for the storage engine.  See
-     * ReplicationCoordinatorImpl::_chooseStableOpTimeFromCandidates for a definition of 'stable',
-     * in this context.
+     * Calculates and sets the value of the 'stable' replication optime for the storage engine.
      */
     void _setStableTimestampForStorage(WithLock lk);
 
@@ -1629,12 +1602,6 @@ private:
     // reads, if there is one.
     // When engaged, this must be <= _lastCommittedOpTime.
     boost::optional<OpTimeAndWallTime> _currentCommittedSnapshot;  // (M)
-
-    // A set of optimes that are used for computing the replication system's current 'stable'
-    // optime. Every time a node's applied optime is updated, it will be added to this set.
-    // Optimes that are older than the current stable optime should get removed from this set.
-    // This set should also be cleared if a rollback occurs.
-    std::set<OpTimeAndWallTime> _stableOpTimeCandidates;  // (M)
 
     // A flag that enables/disables advancement of the stable timestamp for storage.
     bool _shouldSetStableTimestamp = true;  // (M)
