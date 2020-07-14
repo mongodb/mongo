@@ -1347,8 +1347,8 @@ __rec_append_orig_value(WT_SESSION_IMPL *session,
 	__wt_cache_page_inmem_incr(session, page, size);
 
 	if (upd->type == WT_UPDATE_BIRTHMARK) {
-		upd->type = WT_UPDATE_STANDARD;
-		upd->txnid = WT_TXN_ABORTED;
+		WT_PUBLISH(upd->txnid, WT_TXN_ABORTED);
+		WT_PUBLISH(upd->type, WT_UPDATE_STANDARD);
 	}
 
 err:	__wt_scr_free(session, &tmp);

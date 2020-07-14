@@ -1205,23 +1205,36 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
 static void
 __drop(WT_CKPT *ckptbase, const char *name, size_t len)
 {
-	WT_CKPT *ckpt;
+    WT_CKPT *ckpt;
+    u_int max_ckpt_drop;
 
-	/*
-	 * If we're dropping internal checkpoints, match to the '.' separating
+    /*
+     * If we're dropping internal checkpoints, match to the '.' separating
 	 * the checkpoint name from the generational number, and take all that
 	 * we can find.  Applications aren't allowed to use any variant of this
 	 * name, so the test is still pretty simple, if the leading bytes match,
-	 * it's one we want to drop.
+     * it's one we want to drop.
+     */
+    if (strncmp(WT_CHECKPOINT, name, len) == 0) {
+	/*
+	 * Currently, hot backup cursors block checkpoint drop, which means
+	 * releasing a hot backup cursor can result in immediately attempting
+	 * to drop lots of checkpoints, which involves a fair amount of work
+	 * while holding locks. Limit the number of standard checkpoints dropped
+	 * per checkpoint.
 	 */
-	if (strncmp(WT_CHECKPOINT, name, len) == 0) {
-		WT_CKPT_FOREACH(ckptbase, ckpt)
-			if (WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT))
-				F_SET(ckpt, WT_CKPT_DELETE);
-	} else
-		WT_CKPT_FOREACH(ckptbase, ckpt)
-			if (WT_STRING_MATCH(ckpt->name, name, len))
-				F_SET(ckpt, WT_CKPT_DELETE);
+	max_ckpt_drop = 0;
+	WT_CKPT_FOREACH (ckptbase, ckpt)
+	    if (WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT)) {
+		F_SET(ckpt, WT_CKPT_DELETE);
+#define	WT_MAX_CHECKPOINT_DROP 4
+		if (++max_ckpt_drop >= WT_MAX_CHECKPOINT_DROP)
+		    break;
+	    }
+    } else
+	WT_CKPT_FOREACH (ckptbase, ckpt)
+	    if (WT_STRING_MATCH(ckpt->name, name, len))
+		F_SET(ckpt, WT_CKPT_DELETE);
 }
 
 /*

@@ -1035,11 +1035,8 @@ __las_sweep_init(WT_SESSION_IMPL *session)
 	 * If no files have been dropped and the lookaside file is empty,
 	 * there's nothing to do.
 	 */
-	if (cache->las_dropped_next == 0) {
-		if (__wt_las_empty(session))
-			ret = WT_NOTFOUND;
-		goto err;
-	}
+	if (cache->las_dropped_next == 0 && __wt_las_empty(session))
+		WT_ERR(WT_NOTFOUND);
 
 	/*
 	 * Record the current page ID: sweep will stop after this point.
@@ -1093,7 +1090,6 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_ITEM las_key, las_timestamp, las_value;
 	WT_ITEM *sweep_key;
-	WT_TXN_ISOLATION saved_isolation;
 #ifdef HAVE_TIMESTAMPS
 	wt_timestamp_t timestamp, *val_ts;
 #else
@@ -1128,7 +1124,6 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 */
 	__wt_las_cursor(session, &cursor, &session_flags);
 	WT_ASSERT(session, cursor->session == &session->iface);
-	__las_set_isolation(session, &saved_isolation);
 	WT_ERR(__wt_txn_begin(session, NULL));
 	local_txn = true;
 
@@ -1323,7 +1318,6 @@ err:		__wt_buf_free(session, sweep_key);
 			    &cache->las_remove_count, remove_cnt);
 	}
 
-	__las_restore_isolation(session, saved_isolation);
 	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 
 	if (locked)
