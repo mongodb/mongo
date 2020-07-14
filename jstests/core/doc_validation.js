@@ -11,6 +11,7 @@
 // Test basic inserts and updates with document validation.
 (function() {
 "use strict";
+load("jstests/libs/doc_validation_utils.js");  // for assertDocumentValidationFailure
 
 const collName = "doc_validation";
 const coll = db[collName];
@@ -18,19 +19,6 @@ const coll = db[collName];
 const array = [];
 for (let i = 0; i < 2048; i++) {
     array.push({arbitrary: i});
-}
-
-function assertFailsValidation(res) {
-    // Assert that validation fails with a 'DocumentValidationFailure' error.
-    assert.commandFailedWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
-    // Verify that the 'errInfo' field is propagated as part of the document validation failure
-    // for WriteErrors.
-    // We don't currently support detailed error info for 'OP_INSERT' and 'OP_UPDATE'.
-    if (coll.getMongo().writeMode() === "commands") {
-        const error = res instanceof WriteResult ? res.getWriteError() : res;
-        assert(error.hasOwnProperty("errInfo"), tojson(error));
-        assert.eq(typeof error["errInfo"], "object", tojson(error));
-    }
 }
 
 /**
@@ -50,10 +38,13 @@ function runInsertUpdateValidationTest(validator) {
         "findAndModify", {query: {_id: "valid3"}, update: {$set: {a: 3}}, upsert: true}));
 
     // Insert and upsert documents that will not pass validation.
-    assertFailsValidation(coll.insert({_id: "invalid3", b: 1}));
-    assertFailsValidation(coll.update({_id: "invalid4"}, {_id: "invalid4", b: 2}, {upsert: true}));
-    assertFailsValidation(coll.runCommand(
-        "findAndModify", {query: {_id: "invalid4"}, update: {$set: {b: 3}}, upsert: true}));
+    assertDocumentValidationFailure(coll.insert({_id: "invalid3", b: 1}), coll);
+    assertDocumentValidationFailure(
+        coll.update({_id: "invalid4"}, {_id: "invalid4", b: 2}, {upsert: true}), coll);
+    assertDocumentValidationFailure(
+        coll.runCommand("findAndModify",
+                        {query: {_id: "invalid4"}, update: {$set: {b: 3}}, upsert: true}),
+        coll);
 
     // Assert that we can remove the document that passed validation.
     assert.commandWorked(coll.remove({_id: "valid1"}));
@@ -85,15 +76,16 @@ function runInsertUpdateValidationTest(validator) {
         coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$set: {a: 1}}}));
 
     // Verify those same updates will fail on non-conforming document.
-    assertFailsValidation(coll.update({_id: "invalid2"}, {$set: {z: 1}}));
-    assertFailsValidation(coll.update({_id: "invalid2"}, {$inc: {z: 1}}));
-    assertFailsValidation(coll.update({_id: "invalid2"}, {$set: {z: array}}));
-    assertFailsValidation(
-        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {y: 2}}}));
-    assertFailsValidation(
-        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$inc: {y: 1}}}));
-    assertFailsValidation(
-        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {y: array}}}));
+    assertDocumentValidationFailure(coll.update({_id: "invalid2"}, {$set: {z: 1}}), coll);
+    assertDocumentValidationFailure(coll.update({_id: "invalid2"}, {$inc: {z: 1}}), coll);
+    assertDocumentValidationFailure(coll.update({_id: "invalid2"}, {$set: {z: array}}), coll);
+    assertDocumentValidationFailure(
+        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {y: 2}}}), coll);
+    assertDocumentValidationFailure(
+        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$inc: {y: 1}}}), coll);
+    assertDocumentValidationFailure(
+        coll.runCommand("findAndModify", {query: {_id: "invalid2"}, update: {$set: {y: array}}}),
+        coll);
 
     // A no-op update of an invalid doc will succeed.
     assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {b: 1}}));
@@ -108,10 +100,10 @@ function runInsertUpdateValidationTest(validator) {
     assert.commandWorked(coll.insert({_id: "invalid3", b: 1}));
     assert.commandWorked(coll.runCommand("collMod", {validator: validator}));
 
-    assertFailsValidation(coll.update({_id: "valid1"}, {$unset: {a: 1}}));
+    assertDocumentValidationFailure(coll.update({_id: "valid1"}, {$unset: {a: 1}}), coll);
     assert.commandWorked(coll.update({_id: "invalid2"}, {$set: {a: 1}}));
-    assertFailsValidation(
-        coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}));
+    assertDocumentValidationFailure(
+        coll.runCommand("findAndModify", {query: {_id: "valid1"}, update: {$unset: {a: 1}}}), coll);
     assert.commandWorked(
         coll.runCommand("findAndModify", {query: {_id: "invalid3"}, update: {$set: {a: 1}}}));
 
@@ -155,8 +147,8 @@ function runCollationValidationTest(validator) {
 
     // A normal validator should respect the collation and the inserts should succeed. A JSON
     // Schema validator ignores the collation and the inserts should fail.
-    const assertCorrectResult =
-        isJSONSchema ? res => assertFailsValidation(res) : res => assert.commandWorked(res);
+    const assertCorrectResult = isJSONSchema ? res => assertDocumentValidationFailure(res, coll)
+                                             : res => assert.commandWorked(res);
     assertCorrectResult(coll.insert({a: "XYZ"}));
     assertCorrectResult(coll.insert({a: "XyZ", b: "foo"}));
     assertCorrectResult(coll.update({_id: 0}, {a: "xyZ", b: "foo"}));
@@ -167,10 +159,10 @@ function runCollationValidationTest(validator) {
         coll.runCommand("findAndModify", {query: {_id: 0}, update: {$set: {a: "Xyz"}}}));
 
     // Test an insert and an update that should always fail.
-    assertFailsValidation(coll.insert({a: "not xyz"}));
-    assertFailsValidation(coll.update({_id: 0}, {$set: {a: "xyzz"}}));
-    assertFailsValidation(
-        coll.runCommand("findAndModify", {query: {_id: 0}, update: {$set: {a: "xyzz"}}}));
+    assertDocumentValidationFailure(coll.insert({a: "not xyz"}), coll);
+    assertDocumentValidationFailure(coll.update({_id: 0}, {$set: {a: "xyzz"}}), coll);
+    assertDocumentValidationFailure(
+        coll.runCommand("findAndModify", {query: {_id: 0}, update: {$set: {a: "xyzz"}}}), coll);
 
     // A normal validator expands leaf arrays, such that if "a" is an array containing "xyz", it
     // matches {a: "xyz"}. A JSON Schema validator does not expand leaf arrays and treats arrays
@@ -187,10 +179,10 @@ runCollationValidationTest({$jsonSchema: {properties: {a: {enum: ["xyz"]}}}});
 coll.drop();
 assert.commandWorked(db.createCollection(collName, {validator: {$expr: {$eq: ["$a", 5]}}}));
 assert.commandWorked(coll.insert({a: 5}));
-assertFailsValidation(coll.insert({a: 4}));
+assertDocumentValidationFailure(coll.insert({a: 4}), coll);
 assert.commandWorked(db.runCommand({"collMod": collName, "validator": {$expr: {$eq: ["$a", 4]}}}));
 assert.commandWorked(coll.insert({a: 4}));
-assertFailsValidation(coll.insert({a: 5}));
+assertDocumentValidationFailure(coll.insert({a: 5}), coll);
 
 // The validator supports $expr with the date extraction expressions (with a timezone
 // specified).
@@ -199,7 +191,7 @@ assert.commandWorked(db.createCollection(
     collName,
     {validator: {$expr: {$eq: [1, {$dayOfMonth: {date: "$a", timezone: "America/New_York"}}]}}}));
 assert.commandWorked(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
-assertFailsValidation(coll.insert({a: ISODate("2017-10-01T00:00:00")}));
+assertDocumentValidationFailure(coll.insert({a: ISODate("2017-10-01T00:00:00")}), coll);
 
 // The validator supports $expr with a $dateToParts expression.
 coll.drop();
@@ -222,7 +214,7 @@ assert.commandWorked(db.createCollection(collName, {
     }
 }));
 assert.commandWorked(coll.insert({a: ISODate("2017-10-01T22:00:00")}));
-assertFailsValidation(coll.insert({a: ISODate("2017-10-01T00:00:00")}));
+assertDocumentValidationFailure(coll.insert({a: ISODate("2017-10-01T00:00:00")}), coll);
 
 // The validator supports $expr with $dateToString expression.
 coll.drop();
@@ -243,8 +235,8 @@ assert.commandWorked(db.createCollection(collName, {
     }
 }));
 assert.commandWorked(coll.insert({date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "UTC"}));
-assertFailsValidation(
-    coll.insert({date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "America/New_York"}));
+assertDocumentValidationFailure(
+    coll.insert({date: new ISODate("2017-07-04T14:56:42.911Z"), tz: "America/New_York"}), coll);
 
 // The validator supports $expr with $dateFromParts expression.
 coll.drop();
@@ -259,8 +251,8 @@ assert.commandWorked(db.createCollection(collName, {
     }
 }));
 assert.commandWorked(coll.insert({_id: 0, year: 2017, month: 6, day: 19, timezone: "Asia/Tokyo"}));
-assertFailsValidation(
-    coll.insert({_id: 1, year: 2022, month: 1, day: 1, timezone: "America/New_York"}));
+assertDocumentValidationFailure(
+    coll.insert({_id: 1, year: 2022, month: 1, day: 1, timezone: "America/New_York"}), coll);
 
 // The validator supports $expr with $dateFromString expression.
 coll.drop();
@@ -275,7 +267,7 @@ assert.commandWorked(db.createCollection(collName, {
     }
 }));
 assert.commandWorked(coll.insert({_id: 0, date: "2017-07-04T11:56:02"}));
-assertFailsValidation(coll.insert({_id: 1, date: "2015-02-02T11:00:00"}));
+assertDocumentValidationFailure(coll.insert({_id: 1, date: "2015-02-02T11:00:00"}), coll);
 
 // The validator can contain an $expr that may throw at runtime.
 coll.drop();
