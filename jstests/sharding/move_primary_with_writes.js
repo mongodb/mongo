@@ -22,19 +22,18 @@ function createCollections() {
     assert.commandWorked(st.getDB(dbName).runCommand({dropDatabase: 1}));
     let db = st.getDB(dbName);
 
-    const unshardedFooIndexes = [{key: {a: 1}, name: 'fooIndex'}];
-    const shardedBarIndexes = [{key: {a: 1}, name: 'barIndex'}];
+    const unshardedFooIndexes = [{key: {a: 1}, name: 'fooIndex_a'}];
+    const shardedBarIndexes = [{key: {a: 1}, name: 'barIndex_a'}];
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
 
     assert.commandWorked(db.createCollection('unshardedFoo'));
-    assert.commandWorked(db.createView('viewOnFoo', 'unshardedFoo', [{$match: {}}]));
     assert.commandWorked(db.createCollection('shardedBar'));
 
     for (let i = 0; i < 3; i++) {
-        assert.commandWorked(db.unshardedFoo.insert({_id: i, a: i}));
-        assert.commandWorked(db.shardedBar.insert({_id: i, a: i}));
+        assert.commandWorked(db.unshardedFoo.insert({_id: i, a: i, b: i}));
+        assert.commandWorked(db.shardedBar.insert({_id: i, a: i, b: i}));
     }
 
     assert.commandWorked(
@@ -43,6 +42,9 @@ function createCollections() {
 
     assert.commandWorked(db.adminCommand({enableSharding: dbName}));
     assert.commandWorked(db.adminCommand({shardCollection: dbName + '.shardedBar', key: {_id: 1}}));
+
+    assert.commandWorked(db.createView('unshardedFooView', 'unshardedFoo', [{$match: {}}]));
+    assert.commandWorked(db.createView('shardedBarView', 'shardedBar', [{$match: {}}]));
 }
 
 function mapFunc() {
@@ -97,13 +99,17 @@ function buildCommands(collName) {
             alwaysFail: true
         },
         {command: {create: "testCollection"}, alwaysFail: true},
+        {
+            command: {createIndexes: collName, indexes: [{key: {b: 1}, name: collName + "Idx_b"}]},
+            alwaysFail: false
+        },
     ];
     return commands;
 }
 
-function buildDDLCommands() {
+function buildDDLCommands(collName) {
     const commands = [{
-        command: {renameCollection: "testdb.unshardedFoo", to: "testdb.testCollection"},
+        command: {renameCollection: dbName + "." + collName, to: dbName + ".testCollection"},
         alwaysFail: true
     }];
     return commands;
@@ -148,7 +154,7 @@ function testMovePrimary(failpoint, fromShard, toShard, db, shouldFail, sharded)
     awaitShell();
 }
 
-function testMovePrimaryDDL(failpoint, fromShard, toShard, db, shouldFail) {
+function testMovePrimaryDDL(failpoint, fromShard, toShard, db, shouldFail, sharded) {
     let codeToRunInParallelShell = '{ db.getSiblingDB("admin").runCommand({movePrimary: "' +
         dbName + '", to: "' + toShard.name + '"}); }';
 
@@ -160,7 +166,14 @@ function testMovePrimaryDDL(failpoint, fromShard, toShard, db, shouldFail) {
     waitForFailpoint("Hit " + failpoint, 1);
     clearRawMongoProgramOutput();
 
-    buildDDLCommands().forEach(commandObj => {
+    let collName;
+    if (sharded) {
+        collName = "shardedBar";
+    } else {
+        collName = "unshardedFoo";
+    }
+
+    buildDDLCommands(collName).forEach(commandObj => {
         if (shouldFail) {
             jsTestLog("running command: " + tojson(commandObj.command) +
                       ",\nshoudFail: " + shouldFail);
@@ -197,7 +210,7 @@ verifyDocuments(fromShard.getDB(dbName), 0);
 createCollections();
 fromShard = st.getPrimaryShard(dbName);
 toShard = st.getOther(fromShard);
-testMovePrimaryDDL('hangInCloneStage', fromShard, toShard, st.s.getDB("admin"), true);
+testMovePrimaryDDL('hangInCloneStage', fromShard, toShard, st.s.getDB("admin"), false, true);
 
 createCollections();
 fromShard = st.getPrimaryShard(dbName);

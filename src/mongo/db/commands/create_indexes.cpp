@@ -55,6 +55,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -355,10 +356,33 @@ bool indexesAlreadyExist(OperationContext* opCtx,
 /**
  * Checks database sharding state. Throws exception on error.
  */
-void checkDatabaseShardingState(OperationContext* opCtx, StringData dbName) {
-    auto dss = DatabaseShardingState::get(opCtx, dbName);
+void checkDatabaseShardingState(OperationContext* opCtx, const NamespaceString& ns) {
+    auto dss = DatabaseShardingState::get(opCtx, ns.db());
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
     dss->checkDbVersion(opCtx, dssLock);
+
+    Lock::CollectionLock collLock(opCtx, ns, MODE_IS);
+    try {
+        const auto collDesc =
+            CollectionShardingState::get(opCtx, ns)->getCollectionDescription(opCtx);
+        if (!collDesc.isSharded()) {
+            auto mpsm = dss->getMovePrimarySourceManager(dssLock);
+
+            if (mpsm) {
+                LOGV2(
+                    4909200, "assertMovePrimaryInProgress", "movePrimaryNss"_attr = ns.toString());
+
+                uasserted(ErrorCodes::MovePrimaryInProgress,
+                          "movePrimary is in progress for namespace " + ns.toString());
+            }
+        }
+    } catch (const DBException& ex) {
+        if (ex.toStatus() != ErrorCodes::MovePrimaryInProgress) {
+            LOGV2(4909201, "Error when getting colleciton description", "what"_attr = ex.what());
+            return;
+        }
+        throw;
+    }
 }
 
 /**
@@ -487,7 +511,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     OptionalCollectionUUID collectionUUID;
     {
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
-        checkDatabaseShardingState(opCtx, ns.db());
+        checkDatabaseShardingState(opCtx, ns);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             uasserted(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while creating indexes in " << ns.ns());
