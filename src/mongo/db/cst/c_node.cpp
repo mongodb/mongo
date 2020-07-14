@@ -107,8 +107,8 @@ auto printValue(const T& payload) {
             },
             [](const UserSymbol& userSymbol) { return "<UserSymbol "s + userSymbol.symbol + ">"; },
             [](const UserJavascriptWithScope& userJavascriptWithScope) {
-                return "<UserJavascriptWithScope "s + userJavascriptWithScope.code + ", ";
-                userJavascriptWithScope.scope.toString() + ">";
+                return "<UserJavascriptWithScope "s + userJavascriptWithScope.code + ", " +
+                    userJavascriptWithScope.scope.toString() + ">";
             },
             [](const UserInt& userInt) { return "<UserInt "s + std::to_string(userInt) + ">"; },
             [](const UserTimestamp& userTimestamp) {
