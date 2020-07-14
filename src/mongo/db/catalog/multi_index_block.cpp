@@ -197,6 +197,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             for (auto& index : _indexes) {
                 index.block->deleteTemporaryTables(opCtx);
             }
+            _indexes.clear();
             _buildIsCleanedUp = true;
         });
 
