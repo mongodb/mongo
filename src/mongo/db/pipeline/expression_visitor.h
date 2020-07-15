@@ -65,6 +65,7 @@ class ExpressionExp;
 class ExpressionFieldPath;
 class ExpressionFilter;
 class ExpressionFloor;
+class ExpressionToHashedIndexKey;
 class ExpressionHour;
 class ExpressionIfNull;
 class ExpressionIn;
@@ -273,6 +274,7 @@ public:
     virtual void visit(ExpressionFromAccumulator<AccumulatorSum>*) = 0;
     virtual void visit(ExpressionFromAccumulator<AccumulatorMergeObjects>*) = 0;
     virtual void visit(ExpressionTests::Testable*) = 0;
+    virtual void visit(ExpressionToHashedIndexKey*) = 0;
 };
 
 }  // namespace mongo

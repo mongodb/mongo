@@ -148,6 +148,7 @@ env.Library(
         'expression_context',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/query_knobs',
     ]
 )

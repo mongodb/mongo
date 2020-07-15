@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -6231,6 +6232,37 @@ Value ExpressionRegexMatch::evaluate(const Document& root, Variables* variables)
     auto executionState = buildInitialState(root, variables);
     // Return output of execute only if regex is not nullish.
     return executionState.nullish() ? Value(false) : Value(execute(&executionState) > 0);
+}
+
+/* ------------------------- ExpressionToHashedIndexKey -------------------------- */
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toHashedIndexKey,
+    ExpressionToHashedIndexKey::parse,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+
+boost::intrusive_ptr<Expression> ExpressionToHashedIndexKey::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+    return new ExpressionToHashedIndexKey(expCtx, parseOperand(expCtx, expr, vps));
+}
+
+Value ExpressionToHashedIndexKey::evaluate(const Document& root, Variables* variables) const {
+    Value inpVal(_children[0]->evaluate(root, variables));
+    if (inpVal.missing()) {
+        inpVal = Value(BSONNULL);
+    }
+
+    return Value(BSONElementHasher::hash64(BSON("" << inpVal).firstElement(),
+                                           BSONElementHasher::DEFAULT_HASH_SEED));
+}
+
+Value ExpressionToHashedIndexKey::serialize(bool explain) const {
+    return Value(DOC("$toHashedIndexKey" << _children[0]->serialize(explain)));
+}
+
+void ExpressionToHashedIndexKey::_doAddDependencies(DepsTracker* deps) const {
+    _children[0]->addDependencies(deps);
 }
 
 }  // namespace mongo

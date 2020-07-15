@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/config.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -6450,4 +6451,93 @@ TEST(ExpressionSubtractTest, OverflowLong) {
     ASSERT_EQ(result.getType(), BSONType::NumberDouble);
     ASSERT_EQ(result.getDouble(), static_cast<double>(minLong) * -1);
 }
+
+namespace ExpressionToHashedIndexKeyTest {
+
+TEST(ExpressionToHashedIndexKeyTest, StringInputSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey"
+                             << "hashThisStringLiteral"_sd);
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(-5776344739422278694));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, IntInputSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey" << 123);
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(-6548868637522515075));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, TimestampInputSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey" << Timestamp(0, 0));
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(-7867208682377458672));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, ObjectIdInputSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey" << OID("47cc67093475061e3d95369d"));
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(1576265281381834298));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, DateInputSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey" << Date_t());
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(-1178696894582842035));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, MissingInputValueSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey"
+                             << "$missingField");
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(2338878944348059895));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, NullInputSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey" << BSONNULL);
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(2338878944348059895));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, ExpressionInputSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey" << BSON("$pow" << BSON_ARRAY(2 << 4)));
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(2598032665634823220));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, UndefinedInputSucceeds) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey" << BSONUndefined);
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+    Value result = expression->evaluate({}, &(expCtx->variables));
+    ASSERT_VALUE_EQ(result, Value::createIntOrLong(40158834000849533LL));
+}
+
+TEST(ExpressionToHashedIndexKeyTest, DoesAddInputDependencies) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    const BSONObj obj = BSON("$toHashedIndexKey"
+                             << "$someValue");
+    auto expression = Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+
+    DepsTracker deps;
+    expression->addDependencies(&deps);
+    ASSERT_EQ(deps.fields.count("someValue"), 1u);
+    ASSERT_EQ(deps.fields.size(), 1u);
+}
+}  // namespace ExpressionToHashedIndexKeyTest
 }  // namespace ExpressionTests
