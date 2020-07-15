@@ -139,6 +139,17 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
                 autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_X));
                 if (autoGetDb->getDb()) {
+                    // We are about to enforce prepare conflicts for the OperationContext. But it is
+                    // illegal to change the behavior of ignoring prepare conflicts while any
+                    // storage transaction is still active. So we need to call abandonSnapshot() to
+                    // close any open transactions. This call is also harmless because any previous
+                    // reads or writes should have already completed, as profile() is called at the
+                    // end of an operation.
+                    opCtx->recoveryUnit()->abandonSnapshot();
+                    // The profiler performs writes even after read commands. Ignoring prepare
+                    // conflicts is not allowed while performing writes, so temporarily enforce
+                    // prepare conflicts.
+                    EnforcePrepareConflictsBlock enforcePrepare(opCtx);
                     createProfileCollection(opCtx, autoGetDb->getDb()).transitional_ignore();
                 }
             } else {
