@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication;
+
 #include "mongo/platform/basic.h"
+#include "mongo/util/str.h"
 
 #include "mongo/db/repl/migrating_tenant_donor_util.h"
 
@@ -36,9 +39,12 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
 #include "mongo/db/repl/migrating_tenant_access_blocker_by_prefix.h"
+#include "mongo/db/s/persistent_task_store.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
 
 namespace mongo {
 
@@ -137,13 +143,16 @@ void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& origi
             // Reserve an opTime for the write and use it as the blockTimestamp for the migration.
             auto oplogSlot = repl::LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
 
+
             TenantMigrationDonorDocument updatedDoc;
             updatedDoc.setId(originalDoc.getId());
             updatedDoc.setDatabasePrefix(originalDoc.getDatabasePrefix());
             updatedDoc.setState(TenantMigrationDonorStateEnum::kBlocking);
             updatedDoc.setBlockTimestamp(oplogSlot.getTimestamp());
 
+
             CollectionUpdateArgs args;
+            // ! Since the updatedDoc isn't properly created, this will throw an error
             args.update = updatedDoc.toBSON();
             args.criteria = BSON("_id" << originalDoc.getId());
             args.oplogSlot = oplogSlot;
@@ -193,6 +202,22 @@ void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONOb
             break;
         default:
             MONGO_UNREACHABLE;
+    }
+}
+
+void persistDonorStateMachine(OperationContext* opCtx,
+                              const TenantMigrationDonorDocument& donorDoc) {
+    PersistentTaskStore<TenantMigrationDonorDocument> store(
+        NamespaceString::kMigrationDonorsNamespace);
+    try {
+        store.add(opCtx, donorDoc);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+        uasserted(
+            4917300,
+            str::stream()
+                << "While attempting to persist the donor state machine for tenant migration"
+                << ", found another document with the same migration id. Attempted migration: "
+                << donorDoc.toBSON());
     }
 }
 

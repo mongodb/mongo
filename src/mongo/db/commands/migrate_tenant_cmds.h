@@ -27,35 +27,34 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
-#include "mongo/executor/task_executor.h"
+#include "mongo/db/commands.h"
 
 namespace mongo {
 
-namespace migrating_tenant_donor_util {
+template <typename DerivedT>
+class MigrationDonorCmdBase : public TypedCommand<DerivedT> {
+public:
+    using TC = TypedCommand<DerivedT>;
 
-/**
- * Sends recipientSyncData to the recipient until success and starts blocking writes and causal
- * reads.
- */
-void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& donorDoc);
+    class Invocation : public TC::InvocationBase {
+        using TC::InvocationBase::InvocationBase;
 
-/**
- * Creates a task executor to be used for tenant migration.
- */
-std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContext* serviceContext);
+    private:
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+        NamespaceString ns() const {
+            return NamespaceString(TC::InvocationBase::request().getDbName(), "");
+        }
+    };
 
-/**
- * Updates the MigratingTenantAccessBlocker for the tenant migration represented by the given
- * config.migrationDonors document.
- */
-void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& doc);
+    bool adminOnly() const override {
+        return true;
+    }
 
-void persistDonorStateMachine(OperationContext* opCtx,
-                              const TenantMigrationDonorDocument& donorDoc);
-}  // namespace migrating_tenant_donor_util
-
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kNever;
+    }
+};
 }  // namespace mongo

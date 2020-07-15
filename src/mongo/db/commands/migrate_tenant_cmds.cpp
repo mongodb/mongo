@@ -26,59 +26,36 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication;
 
 
-#include "mongo/db/commands.h"
+#include "mongo/db/commands/migrate_tenant_cmds.h"
 #include "mongo/db/commands/migrate_tenant_cmds_gen.h"
 #include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
 #include "mongo/db/repl/migrating_tenant_donor_util.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
 
-template <typename RequestT>
-class MigrationDonorCmdBase : public TypedCommand<MigrationDonorCmdBase<RequestT>> {
+
+class DonorStartMigrationCmd : public MigrationDonorCmdBase<DonorStartMigrationCmd> {
 public:
-    using Request = RequestT;
-    using TC = TypedCommand<MigrationDonorCmdBase<RequestT>>;
+    using Request = DonorStartMigration;
+    using ParentInvocation = MigrationDonorCmdBase<DonorStartMigrationCmd>::Invocation;
+    class Invocation : public ParentInvocation {
+        using ParentInvocation::ParentInvocation;
 
-    class Invocation : public TC::InvocationBase {
-    public:
-        using TC::InvocationBase::InvocationBase;
-        using TC::InvocationBase::request;
-
-        void typedRun(OperationContext* opCtx) {}
-
-    private:
-        bool supportsWriteConcern() const override {
-            return false;
-        }
-        NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
-        }
-
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
-    };
-
-    bool adminOnly() const override {
-        return true;
-    }
-
-    std::string help() const override {
-        return "Multi-tenant migration command on the donor.";
-    }
-    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return BasicCommand::AllowedOnSecondary::kNever;
-    }
-};
-
-class DonorStartMigrationCmd : public MigrationDonorCmdBase<DonorStartMigration> {
-public:
-    using ParentInvocation = MigrationDonorCmdBase<DonorStartMigration>::Invocation;
-    class Invocation final : public ParentInvocation {
     public:
         void typedRun(OperationContext* opCtx) {
             const auto requestBody = request();
+            auto donorDocument = getDonorDocumentFromRequest(requestBody);
+
+            migrating_tenant_donor_util::persistDonorStateMachine(opCtx, donorDocument);
+            migrating_tenant_donor_util::dataSync(opCtx, donorDocument);
+        }
+
+        TenantMigrationDonorDocument getDonorDocumentFromRequest(const RequestType& requestBody) {
             mongo::UUID migrationId = requestBody.getMigrationId();
 
             std::string recipientURI = requestBody.getRecipientConnectionString().toString();
@@ -89,14 +66,14 @@ public:
             const TenantMigrationDonorDocument donorDocument(
                 OID::gen(), migrationId, recipientURI, dbPrefix, donorStartState, garbageCollect);
 
-            migrating_tenant_donor_util::dataSync(opCtx, donorDocument);
+            return donorDocument;
         }
 
     private:
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
+        void doCheckAuthorization(OperationContext* opCtx) const {}
     };
 
-    std::string help() const override {
+    std::string help() const {
         return "Start migrating databases whose names match the specified prefix to the specified "
                "replica set.";
     }
@@ -104,12 +81,18 @@ public:
 } donorStartMigrationCmd;
 
 class DonorWaitForMigrationToCommitCmd
-    : public MigrationDonorCmdBase<DonorWaitForMigrationToCommit> {
+    : public MigrationDonorCmdBase<DonorWaitForMigrationToCommitCmd> {
 public:
-    using ParentInvocation = MigrationDonorCmdBase<DonorWaitForMigrationToCommit>::Invocation;
-    class Invocation final : public ParentInvocation {
+    using Request = DonorWaitForMigrationToCommit;
+    using ParentInvocation = MigrationDonorCmdBase<DonorWaitForMigrationToCommitCmd>::Invocation;
+    class Invocation : public ParentInvocation {
+        using ParentInvocation::ParentInvocation;
+
     public:
         void typedRun(OperationContext* opCtx) {}
+
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const {}
     };
 
     std::string help() const override {
@@ -118,12 +101,18 @@ public:
 
 } donorWaitForMigrationToCommit;
 
-class DonorForgetMigrationCmd : public MigrationDonorCmdBase<DonorForgetMigration> {
+class DonorForgetMigrationCmd : public MigrationDonorCmdBase<DonorForgetMigrationCmd> {
 public:
-    using ParentInvocation = MigrationDonorCmdBase<DonorWaitForMigrationToCommit>::Invocation;
-    class Invocation final : public ParentInvocation {
+    using Request = DonorForgetMigration;
+    using ParentInvocation = MigrationDonorCmdBase<DonorForgetMigrationCmd>::Invocation;
+    class Invocation : public ParentInvocation {
+        using ParentInvocation::ParentInvocation;
+
     public:
         void typedRun(OperationContext* opCtx) {}
+
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const {}
     };
 
     std::string help() const override {
