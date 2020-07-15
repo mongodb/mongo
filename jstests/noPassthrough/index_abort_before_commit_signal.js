@@ -34,8 +34,10 @@ assert.commandWorked(coll.insert({_id: 1, a: 1}));
 // Enable fail point which makes index build hang before it reads the index build
 const failPoint = configureFailPoint(primary, 'hangBeforeGettingIndexBuildEntry');
 
-const createIndex = IndexBuildTest.startIndexBuild(
-    primary, coll.getFullName(), {a: 1}, {}, ErrorCodes.NoMatchingDocument);
+const createIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {}, [
+    ErrorCodes.IndexBuildAborted,
+    ErrorCodes.NoMatchingDocument
+]);
 
 failPoint.wait();
 
