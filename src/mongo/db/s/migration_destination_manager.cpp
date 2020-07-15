@@ -860,7 +860,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                 outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
 
             if (!status.isOK()) {
-                _setStateFail(redact(status.reason()));
+                _setStateFail(redact(status.toString()));
                 return;
             }
 
