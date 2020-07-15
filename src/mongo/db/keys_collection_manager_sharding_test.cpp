@@ -371,5 +371,32 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     ASSERT_EQ(true, keyManager()->hasSeenKeys());
 }
 
+LogicalTime addSeconds(const LogicalTime& logicalTime, const Seconds& seconds) {
+    auto asTimestamp = logicalTime.asTimestamp();
+    return LogicalTime(Timestamp(asTimestamp.getSecs() + seconds.count(), asTimestamp.getInc()));
+}
+
+TEST(KeysCollectionManagerUtilTest, HowMuchSleepNeededForCalculationDoesNotOverflow) {
+    auto secondsSinceEpoch = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+    auto defaultKeysIntervalSeconds = Seconds(KeysRotationIntervalSec);
+
+    // Mock inputs that would have caused an overflow without the changes from SERVER-48709.
+    // "currentTime" is the current logical time in the LogicalClock, which will typically be close
+    // to a timestamp constructed from the number of seconds since the unix epoch. "latestExpiredAt"
+    // is the highest expiration logical time of any key, which will at most be currentTime +
+    // (default key rotation interval * 2) because two valid keys are kept at a time. "interval" is
+    // the duration a key is valid for, which defaults to 90 days = 7,776,000 seconds.
+    auto currentTime = LogicalTime(Timestamp(secondsSinceEpoch, 0));
+    auto latestExpiredAt = addSeconds(currentTime, defaultKeysIntervalSeconds * 2);
+    auto interval = Milliseconds(defaultKeysIntervalSeconds);
+
+    // Despite the default rotation interval seconds * 1000 not fitting in a 32 bit unsigned
+    // integer (7,776,000,000 vs. 4,294,967,295), the calculation should not overflow, and the next
+    // wakeup should correctly be the default interval.
+    auto nextWakeupMillis =
+        keys_collection_manager_util::howMuchSleepNeedFor(currentTime, latestExpiredAt, interval);
+    ASSERT_EQ(nextWakeupMillis, interval);
+}
+
 }  // namespace
 }  // namespace mongo
