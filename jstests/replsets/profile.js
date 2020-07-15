@@ -24,7 +24,8 @@ assert.eq(0, primaryDB.system.profile.count());
 assert.eq([{_id: 1}], primaryDB.foo.aggregate([]).toArray());
 let newAssertCounts = primaryDB.serverStatus().asserts;
 assert.eq(oldAssertCounts, newAssertCounts);
-assert.eq(1, primaryDB.system.profile.count());
+// Should have 2 entries, one for the count command and one for the aggregate command.
+assert.eq(2, primaryDB.system.profile.count());
 
 rst.stopSet();
 })();
