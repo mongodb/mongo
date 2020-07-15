@@ -151,6 +151,9 @@ struct ServerGlobalParams {
     // queryableBackupMode.
     BSONObj overrideShardIdentity;
 
+    // True if the current binary version is an LTS Version.
+    static constexpr bool kIsLTSBinaryVersion = false;
+
     struct FeatureCompatibility {
         /**
          * The combination of the fields (version, targetVersion) in the featureCompatiiblityVersion

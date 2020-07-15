@@ -4402,6 +4402,21 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
 
     _topCoord->updateConfig(newConfig, myIndex, _replExecutor->now());
 
+    // It is only necessary to check if an arbiter is running on a quarterly binary version when a
+    // fresh node is added to the replica set as an arbiter and when an old secondary node is
+    // removed and then re-added to the replica set as an arbiter. That's why we only need to warn
+    // once per process as converting from secondary to arbiter normally requires a server shutdown.
+    static std::once_flag checkArbiterOnQuarterlyBinaryVersion;
+    std::call_once(checkArbiterOnQuarterlyBinaryVersion, [this] {
+        // Warn if an arbiter is running on a quarterly binary version.
+        if (_topCoord->getMemberState().arbiter() && !ServerGlobalParams::kIsLTSBinaryVersion) {
+            LOGV2_WARNING_OPTIONS(
+                4906901,
+                {logv2::LogTag::kStartupWarnings},
+                "** WARNING: Arbiters are not supported in quarterly binary versions");
+        }
+    });
+
     // updateConfig() can change terms, so update our term shadow to match.
     _termShadow.store(_topCoord->getTerm());
 
