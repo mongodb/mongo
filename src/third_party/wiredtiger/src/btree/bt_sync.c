@@ -388,7 +388,16 @@ __sync_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *ski
     if (ref->state != WT_REF_DISK)
         return (0);
 
-    /* Check whether this ref has any possible updates to be aborted. */
+    /* Don't read pages into cache during startup or shutdown phase. */
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP)) {
+        *skipp = true;
+        return (0);
+    }
+
+    /*
+     * Ignore the pages with no on-disk address. It is possible that a page with deleted state may
+     * not have an on-disk address.
+     */
     if (!__wt_ref_addr_copy(session, ref, &addr))
         return (0);
 
@@ -553,8 +562,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             if (walk == NULL)
                 break;
 
-            /* Traverse through the internal page for obsolete child pages. */
-            if (F_ISSET(walk, WT_REF_FLAG_INTERNAL)) {
+            /*
+             * Perform checkpoint cleanup when not in startup or shutdown phase by traversing
+             * through internal pages looking for obsolete child pages.
+             */
+            if (!F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP) &&
+              F_ISSET(walk, WT_REF_FLAG_INTERNAL)) {
                 WT_WITH_PAGE_INDEX(
                   session, ret = __sync_ref_int_obsolete_cleanup(session, walk, &ref_list));
                 WT_ERR(ret);
