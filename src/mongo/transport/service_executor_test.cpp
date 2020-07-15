@@ -233,8 +233,8 @@ TEST_F(ServiceExecutorFixedFixture, RecursiveTask) {
     auto executor = startAndGetServiceExecutor();
     auto barrier = std::make_shared<unittest::Barrier>(2);
 
-    ServiceExecutor::Task recursiveTask;
-    recursiveTask = [this, executor, barrier, &recursiveTask] {
+    std::function<void()> recursiveTask;
+    recursiveTask = [&, barrier] {
         auto recursionGuard = makeRecursionGuard();
         if (getRecursionDepth() < fixedServiceExecutorRecursionLimit.load()) {
             ASSERT_OK(executor->schedule(recursiveTask, ServiceExecutor::kMayRecurse));
@@ -257,8 +257,8 @@ TEST_F(ServiceExecutorFixedFixture, FlattenRecursiveScheduledTasks) {
     // A recursive task that expects to be executed non-recursively. The task recursively schedules
     // "tasksToSchedule" tasks to the service executor, and each scheduled task verifies that the
     // recursion depth remains zero during its execution.
-    ServiceExecutor::Task recursiveTask;
-    recursiveTask = [this, executor, barrier, &recursiveTask, &tasksToSchedule] {
+    std::function<void()> recursiveTask;
+    recursiveTask = [&, barrier] {
         auto recursionGuard = makeRecursionGuard();
         ASSERT_EQ(getRecursionDepth(), 1);
         if (tasksToSchedule.fetchAndSubtract(1) > 0) {

@@ -128,7 +128,7 @@ Status ServiceExecutorFixed::schedule(Task task, ScheduleFlags flags) {
         if (_executorContext->getRecursionDepth() <
             fixedServiceExecutorRecursionLimit.loadRelaxed()) {
             // Recursively executing the task on the executor thread.
-            _executorContext->run(task);
+            _executorContext->run(std::move(task));
             return Status::OK();
         }
     }
@@ -137,10 +137,10 @@ Status ServiceExecutorFixed::schedule(Task task, ScheduleFlags flags) {
 
     // May throw if an attempt is made to schedule after the thread pool is shutdown.
     try {
-        _threadPool->schedule([task = std::move(task)](Status status) {
+        _threadPool->schedule([task = std::move(task)](Status status) mutable {
             internalAssert(status);
             invariant(_executorContext);
-            _executorContext->run(task);
+            _executorContext->run(std::move(task));
         });
     } catch (DBException& e) {
         return e.toStatus();

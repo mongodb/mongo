@@ -114,7 +114,7 @@ Status ServiceExecutorSynchronous::schedule(Task task, ScheduleFlags flags) {
     LOGV2_DEBUG(22983, 3, "Starting new executor thread in passthrough mode");
 
     Status status = launchServiceWorkerThread(
-        [this, condVarAnchor = _shutdownCondition, task = std::move(task)] {
+        [this, condVarAnchor = _shutdownCondition, task = std::move(task)]() mutable {
             _numRunningWorkerThreads.addAndFetch(1);
 
             _localWorkQueue.emplace_back(std::move(task));

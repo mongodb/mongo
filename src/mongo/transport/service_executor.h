@@ -36,6 +36,7 @@
 #include "mongo/platform/bitwise_enum_operators.h"
 #include "mongo/transport/transport_mode.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
 // This needs to be forward declared here because the service_context.h is a circular dependency.
@@ -49,7 +50,7 @@ namespace transport {
 class ServiceExecutor {
 public:
     virtual ~ServiceExecutor() = default;
-    using Task = std::function<void()>;
+    using Task = unique_function<void()>;
     enum ScheduleFlags {
         // No flags (kEmptyFlags) specifies that this is a normal task and that the executor should
         // launch new threads as needed to run the task.

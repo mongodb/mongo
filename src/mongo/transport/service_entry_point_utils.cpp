@@ -57,18 +57,19 @@ namespace mongo {
 
 namespace {
 void* runFunc(void* ctx) {
-    std::unique_ptr<std::function<void()>> taskPtr(static_cast<std::function<void()>*>(ctx));
+    auto taskPtr =
+        std::unique_ptr<unique_function<void()>>(static_cast<unique_function<void()>*>(ctx));
     (*taskPtr)();
 
     return nullptr;
 }
 }  // namespace
 
-Status launchServiceWorkerThread(std::function<void()> task) noexcept {
+Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
 
     try {
 #if defined(_WIN32)
-        stdx::thread(std::move(task)).detach();
+        stdx::thread([task = std::move(task)]() mutable { task(); }).detach();
 #else
         pthread_attr_t attrs;
         pthread_attr_init(&attrs);
@@ -102,13 +103,13 @@ Status launchServiceWorkerThread(std::function<void()> task) noexcept {
 
         // Wrap the user-specified `task` so it runs with an installed `sigaltstack`.
         task = [sigAltStackController = std::make_shared<stdx::support::SigAltStackController>(),
-                f = std::move(task)] {
+                f = std::move(task)]() mutable {
             auto sigAltStackGuard = sigAltStackController->makeInstallGuard();
             f();
         };
 
         pthread_t thread;
-        auto ctx = std::make_unique<std::function<void()>>(std::move(task));
+        auto ctx = std::make_unique<unique_function<void()>>(std::move(task));
         ThreadSafetyContext::getThreadSafetyContext()->onThreadCreate();
         int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());
 
