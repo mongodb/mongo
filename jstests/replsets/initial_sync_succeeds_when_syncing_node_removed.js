@@ -2,6 +2,8 @@
  * Tests that initial sync will continue if the syncing node is removed during syncing.
  * This behavior is desired because transient DNS failures can cause the node to falsely believe
  * that it is removed.
+ *
+ * @tags: [requires_fcv_46]
  */
 (function() {
 "use strict";
