@@ -183,8 +183,8 @@ struct ExpressionVisitorContext {
 
 /**
  * Generate an EExpression that converts a value (contained in a variable bound to 'branchRef') that
- * can be of any type to a Boolean value based on MQL's definition of truth for the branch of a
- * "$and" or "$or" expression.
+ * can be of any type to a Boolean value based on MQL's definition of truth for the branch of any
+ * logical expression.
  */
 std::unique_ptr<sbe::EExpression> generateExpressionForLogicBranch(sbe::EVariable branchRef) {
     // Make an expression that compares the value in 'branchRef' to the result of evaluating the
@@ -199,7 +199,7 @@ std::unique_ptr<sbe::EExpression> generateExpressionForLogicBranch(sbe::EVariabl
     };
 
     // If any of these are false, the branch is considered false for the purposes of the
-    // $and/$or.
+    // any logical expression.
     auto checkExists = sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(branchRef.clone()));
     auto checkNotNull = sbe::makeE<sbe::EPrimUnary>(
         sbe::EPrimUnary::logicNot,
@@ -952,7 +952,14 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionNot* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+
+        auto notExpr = sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
+                                                   generateExpressionForLogicBranch({frameId, 0}));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(notExpr)));
     }
     void visit(ExpressionObject* expr) final {
         unsupportedExpression("$object");
