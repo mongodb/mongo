@@ -34,6 +34,12 @@ const rst = new ReplSetTest({
                 priority: 0,
             },
         },
+        {
+            // Disallow elections on secondary.
+            rsConfig: {
+                priority: 0,
+            },
+        },
     ]
 });
 
@@ -111,10 +117,6 @@ function checkForIndexes(indexes) {
     }
 }
 checkForIndexes(["b_1", "c_1", "d_1", "e_1", "f_1", "g_1"]);
-
-// Checks that the index specs have the proper grouping by ensuring that we only start 3 index
-// builder threads.
-checkLog.containsWithCount(secondary, "Index build: initialized", 3);
 
 assert.commandWorked(
     secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
