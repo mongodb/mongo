@@ -41,8 +41,8 @@
     ENUMIFY(unionWith)           \
     ENUMIFY(collArg)             \
     ENUMIFY(pipelineArg)         \
-    ENUMIFY(limit)               \
-    ENUMIFY(skip)
+    ENUMIFY(skip)                \
+    ENUMIFY(limit)
 
 MAKE_PRINTABLE_ENUM(KeyFieldname, KEYFIELDNAMES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_fieldname, KeyFieldname, KEYFIELDNAMES);

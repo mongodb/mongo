@@ -198,5 +198,64 @@ TEST(CstGrammarTest, InvalidParseSkipString) {
     ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
 }
 
+TEST(CstGrammarTest, ParsesLimitInt) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$limit: 5}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::limit == stages[0].firstKeyFieldname());
+    ASSERT_BSONOBJ_EQ(fromjson("{limit : \"<UserInt 5>\"}"), stages[0].toBson());
+}
+
+TEST(CstGrammarTest, ParsesLimitDouble) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$limit: 5.0}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::limit == stages[0].firstKeyFieldname());
+    ASSERT_BSONOBJ_EQ(fromjson("{limit : \"<UserDouble 5.000000>\"}"), stages[0].toBson());
+}
+
+TEST(CstGrammarTest, ParsesLimitLong) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$limit: 123123123123}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::limit == stages[0].firstKeyFieldname());
+    ASSERT_BSONOBJ_EQ(fromjson("{limit : \"<UserLong 123123123123>\"}"), stages[0].toBson());
+}
+
+TEST(CstGrammarTest, InvalidParseLimitString) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$limit: \"5\"}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+TEST(CstGrammarTest, InvalidParseLimitObject) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$limit: {}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+
+TEST(CstGrammarTest, InvalidParseLimitArray) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$limit: [2]}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+
 }  // namespace
 }  // namespace mongo

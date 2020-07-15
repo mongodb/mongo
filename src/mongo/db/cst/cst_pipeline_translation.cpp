@@ -38,6 +38,7 @@
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo::cst_pipeline_translation {
 namespace {
@@ -107,6 +109,14 @@ auto translateSkip(const CNode& cst, const boost::intrusive_ptr<ExpressionContex
 }
 
 /**
+ * Unwrap a limit stage CNode and produce a DocumentSourceLimit.
+ */
+auto translateLimit(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    UserLong limit = translateNumToLong(cst);
+    return DocumentSourceLimit::create(expCtx, limit);
+}
+
+/**
  * Walk an aggregation pipeline stage object CNode and produce a DocumentSource.
  */
 boost::intrusive_ptr<DocumentSource> translateSource(
@@ -116,6 +126,8 @@ boost::intrusive_ptr<DocumentSource> translateSource(
             return translateProject(cst.objectChildren()[0].second, expCtx);
         case KeyFieldname::skip:
             return translateSkip(cst.objectChildren()[0].second, expCtx);
+        case KeyFieldname::limit:
+            return translateLimit(cst.objectChildren()[0].second, expCtx);
         default:
             MONGO_UNREACHABLE;
     }

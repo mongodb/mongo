@@ -41,6 +41,7 @@
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -204,6 +205,45 @@ TEST(CstTest, TranslatesSkipWithLong) {
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceSkip) == typeid(**iter));
     ASSERT_EQ((dynamic_cast<DocumentSourceSkip&>(**iter).getSkip()), 8223372036854775807);
+}
+
+TEST(CstTest, TranslatesLimitWithInt) {
+    auto nss = NamespaceString{"db", "coll"};
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserInt{10}}}}}}};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    ASSERT(typeid(DocumentSourceLimit) == typeid(**iter));
+    ASSERT_EQ(10ll, dynamic_cast<DocumentSourceLimit&>(**iter).getLimit());
+}
+
+TEST(CstTest, TranslatesLimitWithDouble) {
+    auto nss = NamespaceString{"db", "coll"};
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserDouble{10.5}}}}}}};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    ASSERT(typeid(DocumentSourceLimit) == typeid(**iter));
+    ASSERT_EQ(10ll, dynamic_cast<DocumentSourceLimit&>(**iter).getLimit());
+}
+
+TEST(CstTest, TranslatesLimitWithLong) {
+    auto nss = NamespaceString{"db", "coll"};
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserLong{123123123123}}}}}}};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    ASSERT(typeid(DocumentSourceLimit) == typeid(**iter));
+    ASSERT_EQ(123123123123, dynamic_cast<DocumentSourceLimit&>(**iter).getLimit());
 }
 
 }  // namespace

@@ -109,6 +109,7 @@
     STAGE_INHIBIT_OPTIMIZATION
     STAGE_UNION_WITH
     STAGE_SKIP
+    STAGE_LIMIT
 
     // $unionWith arguments.
     COLL_ARG
@@ -126,7 +127,7 @@
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
-%nterm <CNode> stageList stage inhibitOptimization unionWith num skip
+%nterm <CNode> stageList stage inhibitOptimization unionWith num skip limit
 
 //
 // Grammar rules
@@ -151,7 +152,7 @@ stageList[result]:
 START_ORDERED_OBJECT: { lexer.sortObjTokens(); } START_OBJECT;
 
 stage:
-    inhibitOptimization | unionWith | skip
+    inhibitOptimization | unionWith | skip | limit
 ;
 
 inhibitOptimization:
@@ -186,6 +187,11 @@ num:
 skip:
     STAGE_SKIP num {
         $skip = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::skip, $num}}};
+};
+
+limit:
+    STAGE_LIMIT num {
+        $limit = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::limit, $num}}};
 };
 
 %%
