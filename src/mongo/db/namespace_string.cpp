@@ -87,6 +87,9 @@ const NamespaceString NamespaceString::kRangeDeletionNamespace(NamespaceString::
                                                                "rangeDeletions");
 const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString::kConfigDb,
                                                                 "settings");
+const NamespaceString NamespaceString::kVectorClockNamespace(NamespaceString::kConfigDb,
+                                                             "vectorClock");
+
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
@@ -217,7 +220,7 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
 
     // Certain config collections can never be sharded
     if (ns() == kSessionTransactionsTableNamespace.ns() || ns() == kRangeDeletionNamespace.ns() ||
-        ns() == kTransactionCoordinatorsNamespace.ns() ||
+        ns() == kTransactionCoordinatorsNamespace.ns() || ns() == kVectorClockNamespace.ns() ||
         ns() == kMigrationCoordinatorsNamespace.ns() || ns() == kIndexBuildEntryNamespace.ns())
         return true;
 

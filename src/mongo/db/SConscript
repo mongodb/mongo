@@ -1613,6 +1613,8 @@ env.Library(
         'vector_clock_mutable',
     ],
     LIBDEPS_PRIVATE=[
+        'dbdirectclient',
+        'rw_concern_d',
         'repl/replica_set_aware_service',
         'server_options_core',
     ],

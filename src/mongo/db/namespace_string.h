@@ -121,6 +121,9 @@ public:
     // Namespace for balancer settings and default read and write concerns.
     static const NamespaceString kConfigSettingsNamespace;
 
+    // Namespace for vector clock state.
+    static const NamespaceString kVectorClockNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

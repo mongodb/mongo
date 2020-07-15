@@ -32,6 +32,7 @@
 #include "mongo/db/vector_clock.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/query.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/logical_clock_gen.h"
 #include "mongo/db/logical_time_validator.h"

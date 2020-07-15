@@ -32,7 +32,9 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
@@ -47,6 +49,8 @@ namespace {
  */
 class VectorClockMongoDTest : public ShardingMongodTestFixture {
 protected:
+    using Component = VectorClock::Component;
+
     void setUp() override {
         ShardingMongodTestFixture::setUp();
 
@@ -56,7 +60,7 @@ protected:
         auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>();
 
         VectorClockMutable::get(getServiceContext())
-            ->tickTo(VectorClock::Component::ClusterTime, LogicalTime(Timestamp(1, 0)));
+            ->tickTo(Component::ClusterTime, LogicalTime(Timestamp(1, 0)));
 
         _keyManager = std::make_shared<KeysCollectionManager>(
             "dummy", std::move(keysCollectionClient), Seconds(1000));
@@ -87,17 +91,17 @@ TEST_F(VectorClockMongoDTest, TickClusterTime) {
     auto vc = VectorClockMutable::get(sc);
 
     const auto t0 = vc->getTime();
-    ASSERT_EQ(LogicalTime(Timestamp(1, 0)), t0[VectorClock::Component::ClusterTime]);
+    ASSERT_EQ(LogicalTime(Timestamp(1, 0)), t0[Component::ClusterTime]);
 
-    const auto r1 = vc->tick(VectorClock::Component::ClusterTime, 1);
+    const auto r1 = vc->tick(Component::ClusterTime, 1);
     const auto t1 = vc->getTime();
-    ASSERT_EQ(r1, t1[VectorClock::Component::ClusterTime]);
-    ASSERT_GT(r1, t0[VectorClock::Component::ClusterTime]);
+    ASSERT_EQ(r1, t1[Component::ClusterTime]);
+    ASSERT_GT(r1, t0[Component::ClusterTime]);
 
-    const auto r2 = vc->tick(VectorClock::Component::ClusterTime, 2);
+    const auto r2 = vc->tick(Component::ClusterTime, 2);
     const auto t2 = vc->getTime();
     ASSERT_GT(r2, r1);
-    ASSERT_GT(t2[VectorClock::Component::ClusterTime], r1);
+    ASSERT_GT(t2[Component::ClusterTime], r1);
 }
 
 TEST_F(VectorClockMongoDTest, TickToClusterTime) {
@@ -105,43 +109,43 @@ TEST_F(VectorClockMongoDTest, TickToClusterTime) {
     auto vc = VectorClockMutable::get(sc);
 
     const auto t0 = vc->getTime();
-    ASSERT_EQ(LogicalTime(Timestamp(1, 0)), t0[VectorClock::Component::ClusterTime]);
+    ASSERT_EQ(LogicalTime(Timestamp(1, 0)), t0[Component::ClusterTime]);
 
-    vc->tickTo(VectorClock::Component::ClusterTime, LogicalTime(Timestamp(1, 1)));
+    vc->tickTo(Component::ClusterTime, LogicalTime(Timestamp(1, 1)));
     const auto t1 = vc->getTime();
-    ASSERT_EQ(LogicalTime(Timestamp(1, 1)), t1[VectorClock::Component::ClusterTime]);
+    ASSERT_EQ(LogicalTime(Timestamp(1, 1)), t1[Component::ClusterTime]);
 
-    vc->tickTo(VectorClock::Component::ClusterTime, LogicalTime(Timestamp(3, 3)));
+    vc->tickTo(Component::ClusterTime, LogicalTime(Timestamp(3, 3)));
     const auto t2 = vc->getTime();
-    ASSERT_EQ(LogicalTime(Timestamp(3, 3)), t2[VectorClock::Component::ClusterTime]);
+    ASSERT_EQ(LogicalTime(Timestamp(3, 3)), t2[Component::ClusterTime]);
 
-    vc->tickTo(VectorClock::Component::ClusterTime, LogicalTime(Timestamp(2, 2)));
+    vc->tickTo(Component::ClusterTime, LogicalTime(Timestamp(2, 2)));
     const auto t3 = vc->getTime();
-    ASSERT_EQ(LogicalTime(Timestamp(3, 3)), t3[VectorClock::Component::ClusterTime]);
+    ASSERT_EQ(LogicalTime(Timestamp(3, 3)), t3[Component::ClusterTime]);
 }
 
 DEATH_TEST_F(VectorClockMongoDTest, CannotTickConfigTime, "Hit a MONGO_UNREACHABLE") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
-    vc->tick(VectorClock::Component::ConfigTime, 1);
+    vc->tick(Component::ConfigTime, 1);
 }
 
 DEATH_TEST_F(VectorClockMongoDTest, CannotTickToConfigTime, "Hit a MONGO_UNREACHABLE") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
-    vc->tickTo(VectorClock::Component::ConfigTime, LogicalTime());
+    vc->tickTo(Component::ConfigTime, LogicalTime());
 }
 
 DEATH_TEST_F(VectorClockMongoDTest, CannotTickTopologyTime, "Hit a MONGO_UNREACHABLE") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
-    vc->tick(VectorClock::Component::TopologyTime, 1);
+    vc->tick(Component::TopologyTime, 1);
 }
 
 DEATH_TEST_F(VectorClockMongoDTest, CannotTickToTopologyTime, "Hit a MONGO_UNREACHABLE") {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
-    vc->tickTo(VectorClock::Component::TopologyTime, LogicalTime());
+    vc->tickTo(Component::TopologyTime, LogicalTime());
 }
 
 TEST_F(VectorClockMongoDTest, GossipOutInternal) {
@@ -151,7 +155,7 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
     LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
     refreshKeyManager();
 
-    const auto clusterTime = vc->tick(VectorClock::Component::ClusterTime, 1);
+    const auto clusterTime = vc->tick(Component::ClusterTime, 1);
 
     BSONObjBuilder bob;
     vc->gossipOut(nullptr, &bob, transport::Session::kInternalClient);
@@ -172,7 +176,7 @@ TEST_F(VectorClockMongoDTest, GossipOutExternal) {
     LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
     refreshKeyManager();
 
-    const auto clusterTime = vc->tick(VectorClock::Component::ClusterTime, 1);
+    const auto clusterTime = vc->tick(Component::ClusterTime, 1);
 
     BSONObjBuilder bob;
     vc->gossipOut(nullptr, &bob);
@@ -190,7 +194,7 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
-    vc->tick(VectorClock::Component::ClusterTime, 1);
+    vc->tick(Component::ClusterTime, 1);
 
     auto dummySignature =
         BSON("hash" << BSONBinData("\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1", 20, BinDataGeneral)
@@ -205,9 +209,9 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
     // On plain replset servers, gossip in from internal clients should update $clusterTime, but not
     // $configTime or $topologyTime.
     auto afterTime = vc->getTime();
-    ASSERT_EQ(afterTime[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime[Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
+    ASSERT_EQ(afterTime[Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime[Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -217,9 +221,9 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
                  transport::Session::kInternalClient);
 
     auto afterTime2 = vc->getTime();
-    ASSERT_EQ(afterTime2[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime2[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime2[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2[Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
+    ASSERT_EQ(afterTime2[Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2[Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -229,16 +233,16 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
                  transport::Session::kInternalClient);
 
     auto afterTime3 = vc->getTime();
-    ASSERT_EQ(afterTime3[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(3, 3));
-    ASSERT_EQ(afterTime3[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime3[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime3[Component::ClusterTime].asTimestamp(), Timestamp(3, 3));
+    ASSERT_EQ(afterTime3[Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime3[Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 }
 
 TEST_F(VectorClockMongoDTest, GossipInExternal) {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
-    vc->tick(VectorClock::Component::ClusterTime, 1);
+    vc->tick(Component::ClusterTime, 1);
 
     auto dummySignature =
         BSON("hash" << BSONBinData("\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1", 20, BinDataGeneral)
@@ -252,9 +256,9 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     // On plain replset servers, gossip in from external clients should update $clusterTime, but not
     // $configTime or $topologyTime.
     auto afterTime = vc->getTime();
-    ASSERT_EQ(afterTime[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime[Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
+    ASSERT_EQ(afterTime[Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime[Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -263,9 +267,9 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
                  false);
 
     auto afterTime2 = vc->getTime();
-    ASSERT_EQ(afterTime2[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime2[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime2[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2[Component::ClusterTime].asTimestamp(), Timestamp(2, 2));
+    ASSERT_EQ(afterTime2[Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime2[Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -274,9 +278,120 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
                  false);
 
     auto afterTime3 = vc->getTime();
-    ASSERT_EQ(afterTime3[VectorClock::Component::ClusterTime].asTimestamp(), Timestamp(3, 3));
-    ASSERT_EQ(afterTime2[VectorClock::Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
-    ASSERT_EQ(afterTime3[VectorClock::Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime3[Component::ClusterTime].asTimestamp(), Timestamp(3, 3));
+    ASSERT_EQ(afterTime2[Component::ConfigTime].asTimestamp(), Timestamp(0, 0));
+    ASSERT_EQ(afterTime3[Component::TopologyTime].asTimestamp(), Timestamp(0, 0));
+}
+
+TEST_F(VectorClockMongoDTest, PersistVectorClockDocument) {
+    auto sc = getServiceContext();
+    auto opCtx = operationContext();
+
+    auto vc = VectorClockMutable::get(sc);
+    vc->advanceTime_forTest(Component::ConfigTime, LogicalTime());
+    vc->advanceTime_forTest(Component::TopologyTime, LogicalTime());
+
+    NamespaceString nss(NamespaceString::kVectorClockNamespace);
+    PersistentTaskStore<VectorClockDocument> store(nss);
+
+    // Check that no vectorClockState document is present
+    ASSERT_EQUALS(store.count(opCtx, VectorClock::kStateQuery()), 0);
+
+    // Persist and check that the vectorClockState document has been persisted
+    auto future = vc->persist(opCtx);
+    future.get();
+    ASSERT_EQUALS(store.count(opCtx, VectorClock::kStateQuery()), 1);
+
+    // Check that the vectorClockState document is still one after more persist calls
+    future = vc->persist(opCtx);
+    vc->waitForInMemoryVectorClockToBePersisted(opCtx);
+    ASSERT_EQUALS(store.count(opCtx, VectorClock::kStateQuery()), 1);
+}
+
+TEST_F(VectorClockMongoDTest, RecoverVectorClockDocument) {
+    auto sc = getServiceContext();
+    auto opCtx = operationContext();
+    const auto configTime = LogicalTime(Timestamp(3, 3));
+    const auto topologyTime = LogicalTime(Timestamp(4, 4));
+
+    auto vc = VectorClockMutable::get(sc);
+    vc->advanceTime_forTest(Component::ConfigTime, configTime);
+    vc->advanceTime_forTest(Component::TopologyTime, topologyTime);
+
+    // Persist the vector clock, then reset its components
+    auto future = vc->persist(opCtx);
+    future.get(opCtx);
+    vc->resetVectorClock_forTest();
+
+    NamespaceString nss(NamespaceString::kVectorClockNamespace);
+    PersistentTaskStore<VectorClockDocument> store(nss);
+
+    future = vc->recover(opCtx);
+    vc->waitForVectorClockToBeRecovered(opCtx);
+
+    auto time = vc->getTime();
+    auto actualConfTime = time[Component::ConfigTime];
+    auto actualTopologyTime = time[Component::TopologyTime];
+
+    ASSERT_EQUALS(actualConfTime, configTime);
+    ASSERT_EQUALS(actualTopologyTime, topologyTime);
+}
+
+TEST_F(VectorClockMongoDTest, RecoverNotExistingVectorClockDocument) {
+    auto sc = getServiceContext();
+    auto opCtx = operationContext();
+    auto vc = VectorClockMutable::get(sc);
+
+    const auto configTime = LogicalTime(Timestamp(3, 3));
+    const auto topologyTime = LogicalTime(Timestamp(4, 4));
+    vc->advanceTime_forTest(Component::ConfigTime, configTime);
+    vc->advanceTime_forTest(Component::TopologyTime, topologyTime);
+
+    NamespaceString nss(NamespaceString::kVectorClockNamespace);
+    PersistentTaskStore<VectorClockDocument> store(nss);
+
+    // Check that no recovery document is stored and call recovery
+    int nDocuments = store.count(opCtx, VectorClock::kStateQuery());
+    ASSERT_EQUALS(nDocuments, 0);
+
+    auto future = vc->recover(opCtx);
+    vc->waitForVectorClockToBeRecovered(opCtx);
+
+    // Verify that times didn't change after an unsuccessful recovery
+    auto time = vc->getTime();
+    auto actualConfTime = time[Component::ConfigTime];
+    auto actualTopologyTime = time[Component::TopologyTime];
+
+    ASSERT_EQUALS(actualConfTime, configTime);
+    ASSERT_EQUALS(actualTopologyTime, topologyTime);
+}
+
+TEST_F(VectorClockMongoDTest, SubsequentPersistRecoverVectorClockDocument) {
+    auto sc = getServiceContext();
+    auto opCtx = operationContext();
+    auto vc = VectorClockMutable::get(sc);
+
+    for (int i = 1; i < 10; i++) {
+        auto newTime = LogicalTime(Timestamp(i, i));
+        vc->advanceTime_forTest(Component::ClusterTime, newTime);
+        vc->advanceTime_forTest(Component::ConfigTime, newTime);
+        vc->advanceTime_forTest(Component::TopologyTime, newTime);
+
+        // Persist the vector clock, then reset its components
+        auto future = vc->persist(opCtx);
+        future.get(opCtx);
+        vc->resetVectorClock_forTest();
+
+        future = vc->recover(opCtx);
+        vc->waitForVectorClockToBeRecovered(opCtx);
+
+        auto time = vc->getTime();
+        auto actualConfTime = time[Component::ConfigTime];
+        auto actualTopologyTime = time[Component::TopologyTime];
+
+        ASSERT_EQUALS(actualConfTime, newTime);
+        ASSERT_EQUALS(actualTopologyTime, newTime);
+    }
 }
 
 }  // namespace
