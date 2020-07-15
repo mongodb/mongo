@@ -1,4 +1,5 @@
-/* Test that snapshot reads on capped collections are not allowed.
+/* Test that both transaction and non-transaction snapshot reads on capped collections are not
+ * allowed.
  *
  * @tags: [
  *   requires_majority_read_concern,
@@ -31,6 +32,14 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     primaryDB.runCommand({distinct: collName, key: "_id", readConcern: {level: "snapshot"}}),
     ErrorCodes.SnapshotUnavailable);
+
+// After starting a transaction with read concern snapshot, the following find command should fail.
+// This is because transaction snapshot reads are banned on capped collections.
+const session = primary.startSession({causalConsistency: false});
+const sessionDB = session.getDatabase('test');
+session.startTransaction({readConcern: {level: 'snapshot'}});
+assert.commandFailedWithCode(sessionDB.runCommand({find: collName}),
+                             ErrorCodes.SnapshotUnavailable);
 
 replSet.stopSet();
 })();

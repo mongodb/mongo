@@ -329,6 +329,8 @@ selector:
   - requires_fastcount
   # Transactions are not allowed to operate on capped collections.
   - requires_profiling
+  # Snapshot reads in transactions are banned on capped collections.
+  - requires_capped
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
   # $out is not supported in transactions

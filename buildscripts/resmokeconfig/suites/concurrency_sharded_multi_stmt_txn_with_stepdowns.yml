@@ -181,6 +181,8 @@ selector:
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_replication
+  # Snapshot reads in transactions are banned on capped collections.
+  - requires_capped
   - assumes_balancer_on
   # Sharing cursors between state functions will fail in this suite because it will attempt to use
   # the same cursor in multiple transactions.

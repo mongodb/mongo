@@ -320,6 +320,8 @@ selector:
   # Cannot retry a getMore command if a transient transaction or network error occurs during
   # it, since we won't know whether the cursor was advanced or not.
   - requires_getmore
+  # Snapshot reads in transactions are banned on capped collections.
+  - requires_capped
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
   # Retrying a query can change whether a plan cache entry is active.
