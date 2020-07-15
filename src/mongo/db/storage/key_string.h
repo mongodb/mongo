@@ -48,10 +48,6 @@
 
 namespace mongo {
 
-namespace sbe::value {
-class ValueBuilder;
-}
-
 namespace KeyString {
 
 enum class Version : uint8_t { V0 = 0, V1 = 1, kLatestVersion = V1 };
@@ -954,18 +950,6 @@ size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize);
 RecordId decodeRecordId(BufReader* reader);
 
 int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize);
-
-/**
- * Read one KeyString component from the given 'reader' and 'typeBits' inputs and stream it to the
- * 'valueBuilder' object, which converts it to a "Slot-Based Execution" (SBE) representation. When
- * no components remain in the KeyString, this function returns false and leaves 'valueBuilder'
- * unmodified.
- */
-bool readSBEValue(BufReader* reader,
-                  TypeBits::Reader* typeBits,
-                  bool inverted,
-                  Version version,
-                  sbe::value::ValueBuilder* valueBuilder);
 
 template <class BufferT>
 template <class T>

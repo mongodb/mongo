@@ -34,7 +34,6 @@
 #include <pcrecpp.h>
 
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/storage/key_string.h"
 
 namespace mongo {
@@ -612,48 +611,6 @@ std::string_view ObjectEnumerator::getFieldName() const {
             return ""sv;
         }
     }
-}
-
-void readKeyStringValueIntoAccessors(const KeyString::Value& keyString,
-                                     const Ordering& ordering,
-                                     BufBuilder* valueBufferBuilder,
-                                     std::vector<ViewOfValueAccessor>* accessors,
-                                     boost::optional<IndexKeysInclusionSet> indexKeysToInclude) {
-    ValueBuilder valBuilder(valueBufferBuilder);
-    invariant(!indexKeysToInclude || indexKeysToInclude->count() == accessors->size());
-
-    BufReader reader(keyString.getBuffer(), keyString.getSize());
-    KeyString::TypeBits typeBits(keyString.getTypeBits());
-    KeyString::TypeBits::Reader typeBitsReader(typeBits);
-
-    bool keepReading = true;
-    size_t componentIndex = 0;
-    do {
-        // In the edge case that 'componentIndex' indicates that we have already read
-        // 'kMaxCompoundIndexKeys' components, we expect that the next 'readSBEValue()' will return
-        // false (to indicate EOF), so the value of 'inverted' does not matter.
-        bool inverted = (componentIndex < Ordering::kMaxCompoundIndexKeys)
-            ? (ordering.get(componentIndex) == -1)
-            : false;
-
-        keepReading = KeyString::readSBEValue(
-            &reader, &typeBitsReader, inverted, typeBits.version, &valBuilder);
-
-        invariant(componentIndex < Ordering::kMaxCompoundIndexKeys || !keepReading);
-
-        // If 'indexKeysToInclude' indicates that this index key component is not part of the
-        // projection, remove it from the list of values that will be fed to the 'accessors' list.
-        // Note that, even when we are excluding a key component, we can't skip the call to
-        // 'KeyString::readSBEValue()' because it is needed to advance the 'reader' and
-        // 'typeBitsReader' stream.
-        if (indexKeysToInclude && (componentIndex < Ordering::kMaxCompoundIndexKeys) &&
-            !(*indexKeysToInclude)[componentIndex]) {
-            valBuilder.popValue();
-        }
-        ++componentIndex;
-    } while (keepReading && valBuilder.numValues() < accessors->size());
-
-    valBuilder.readValues(accessors);
 }
 
 }  // namespace value

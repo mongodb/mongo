@@ -32,7 +32,6 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <array>
-#include <bitset>
 #include <cstdint>
 #include <ostream>
 #include <string>
@@ -41,7 +40,6 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/bson/ordering.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 
@@ -59,8 +57,6 @@ class Value;
 namespace sbe {
 using FrameId = int64_t;
 using SpoolId = int64_t;
-
-using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
 
@@ -466,22 +462,15 @@ inline std::string_view getStringView(TypeTags tag, Value& val) noexcept {
     MONGO_UNREACHABLE;
 }
 
-inline std::pair<TypeTags, Value> makeSmallString(std::string_view input) {
-    size_t len = input.size();
-    invariant(len < kSmallStringThreshold - 1);
-
-    Value smallString;
-    // This is OK - we are aliasing to char*.
-    auto stringAlias = getSmallStringView(smallString);
-    memcpy(stringAlias, input.data(), len);
-    stringAlias[len] = 0;
-    return {TypeTags::StringSmall, smallString};
-}
-
 inline std::pair<TypeTags, Value> makeNewString(std::string_view input) {
     size_t len = input.size();
     if (len < kSmallStringThreshold - 1) {
-        return makeSmallString(input);
+        Value smallString;
+        // This is OK - we are aliasing to char*.
+        auto stringAlias = getSmallStringView(smallString);
+        memcpy(stringAlias, input.data(), len);
+        stringAlias[len] = 0;
+        return {TypeTags::StringSmall, smallString};
     } else {
         auto str = new char[len + 1];
         memcpy(str, input.data(), len);

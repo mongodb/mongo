@@ -39,12 +39,11 @@ namespace mongo {
  *   Over time we should push this up higher and higher.
  */
 class Ordering {
-    uint32_t bits;
-    Ordering(uint32_t b) : bits(b) {}
+    unsigned bits;
+    Ordering(unsigned b) : bits(b) {}
 
 public:
     static constexpr size_t kMaxCompoundIndexKeys = size_t{32};
-    static_assert(kMaxCompoundIndexKeys == 8 * sizeof(bits));
 
     static Ordering allAscending() {
         return {0};
@@ -63,24 +62,24 @@ public:
         uassert(ErrorCodes::Overflow,
                 str::stream() << "Ordering offset is out of bounds: " << i,
                 i >= 0 && static_cast<size_t>(i) < kMaxCompoundIndexKeys);
-        return ((1u << i) & bits) ? -1 : 1;
+        return ((1 << i) & bits) ? -1 : 1;
     }
 
-    uint32_t descending(uint32_t mask) const {
+    unsigned descending(unsigned mask) const {
         return bits & mask;
     }
 
     static Ordering make(const BSONObj& obj) {
-        uint32_t b = 0;
+        unsigned b = 0;
         BSONObjIterator k(obj);
-        uint32_t n = 0;
+        unsigned n = 0;
         while (1) {
             BSONElement e = k.next();
             if (e.eoo())
                 break;
             uassert(13103, "too many compound keys", n < kMaxCompoundIndexKeys);
             if (e.number() < 0)
-                b |= (1u << n);
+                b |= (1 << n);
             n++;
         }
         return Ordering(b);
