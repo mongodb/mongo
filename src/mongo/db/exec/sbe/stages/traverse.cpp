@@ -175,10 +175,7 @@ bool TraverseStage::traverse(value::SlotAccessor* inFieldAccessor,
         for (; !inArrayAccessor.atEnd(); inArrayAccessor.advance()) {
             auto [tag, val] = inArrayAccessor.getViewOfValue();
 
-            if (value::isArray(tag)) {
-                if (_nestedArraysDepth && level + 1 >= *_nestedArraysDepth) {
-                    continue;
-                }
+            if (value::isArray(tag) && (!_nestedArraysDepth || level + 1 < *_nestedArraysDepth)) {
 
                 // If the current array element is an array itself, traverse it recursively.
                 value::OwnedValueAccessor outArrayAccessor;

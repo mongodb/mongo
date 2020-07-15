@@ -120,6 +120,23 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpre
 }
 
 /**
+ * Helper to check if the current comparison expression is a branch of a logical $and expression.
+ * If it is but is not the last one, inject a filter stage to bail out early from the $and predicate
+ * without the need to evaluate all branches. If this is the last branch of the $and expression, or
+ * if it's not within a logical expression at all, just keep the predicate var on the top on the
+ * stack and let the parent expression process it.
+ */
+void checkForShortCircuitFromLogicalAnd(MatchExpressionVisitorContext* context) {
+    if (!context->nestedLogicalExprs.empty() && context->nestedLogicalExprs.top().second > 1 &&
+        context->nestedLogicalExprs.top().first->matchType() == MatchExpression::AND) {
+        context->inputStage = sbe::makeS<sbe::FilterStage<false>>(
+            std::move(context->inputStage),
+            sbe::makeE<sbe::EVariable>(context->predicateVars.top()));
+        context->predicateVars.pop();
+    }
+}
+
+/**
  * A helper function to generate a path traversal plan stage at the given nested 'level' of the
  * traversal path. For example, for a dotted path expression {'a.b': 2}, the traversal sub-tree will
  * look like this:
@@ -223,6 +240,122 @@ std::unique_ptr<sbe::PlanStage> generateTraverseHelper(MatchExpressionVisitorCon
         1);
 }
 
+/*
+ * A helper function for 'generateTraverseForArraySize' similar to the 'generateTraverseHelper'. The
+ * function extends the traverse sub-tree generation by retuning a special leaf-level traverse stage
+ * that uses a fold expression to add counts of elements in the array, as well as performs an extra
+ * check that the leaf-level traversal is being done on a valid array.
+ */
+std::unique_ptr<sbe::PlanStage> generateTraverseForArraySizeHelper(
+    MatchExpressionVisitorContext* context,
+    std::unique_ptr<sbe::PlanStage> inputStage,
+    sbe::value::SlotId inputVar,
+    const SizeMatchExpression* expr,
+    size_t level) {
+    using namespace std::literals;
+
+    FieldPath path{expr->path()};
+    invariant(level < path.getPathLength());
+
+    // The global traversal result.
+    const auto& traversePredicateVar = context->predicateVars.top();
+    // The field we will be traversing at the current nested level.
+    auto fieldVar{context->slotIdGenerator->generate()};
+    // The result coming from the 'in' branch of the traverse plan stage.
+    auto elemPredicateVar{context->slotIdGenerator->generate()};
+
+    // Generate the projection stage to read a sub-field at the current nested level and bind it
+    // to 'fieldVar'.
+    inputStage = sbe::makeProjectStage(
+        std::move(inputStage),
+        fieldVar,
+        sbe::makeE<sbe::EFunction>(
+            "getField"sv,
+            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputVar), sbe::makeE<sbe::EConstant>([&]() {
+                            auto fieldName = path.getFieldName(level);
+                            return std::string_view{fieldName.rawData(), fieldName.size()};
+                        }()))));
+
+    std::unique_ptr<sbe::PlanStage> innerBranch;
+    if (level == path.getPathLength() - 1u) {
+        // Before generating a final leaf traverse stage, check that the thing we are about to
+        // traverse is indeed an array.
+        inputStage = sbe::makeS<sbe::FilterStage<false>>(
+            std::move(inputStage),
+            sbe::makeE<sbe::EFunction>("isArray",
+                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldVar))));
+
+        // Project '1' for each element in the array, then sum up using a fold expression.
+        innerBranch = sbe::makeProjectStage(
+            sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), 1, boost::none),
+            elemPredicateVar,
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 1));
+
+        // The final traverse stage for the leaf level with a fold expression that sums up
+        // values in slot fieldVar, resulting in the count of elements in the array.
+        auto leafLevelTraverseStage = sbe::makeS<sbe::TraverseStage>(
+            std::move(inputStage),
+            std::move(innerBranch),
+            fieldVar,
+            traversePredicateVar,
+            elemPredicateVar,
+            sbe::makeSV(),
+            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::add,
+                                         sbe::makeE<sbe::EVariable>(traversePredicateVar),
+                                         sbe::makeE<sbe::EVariable>(elemPredicateVar)),
+            nullptr,
+            1);
+
+        auto finalArrayTraverseVar{context->slotIdGenerator->generate()};
+        // Final project stage to filter based on the user provided value. If the traversal result
+        // was not evaluated to Nothing, then compare to the user provided value. If the traversal
+        // final result did evaluate to Nothing, the only way the fold expression result would be
+        // Nothing is if the array was empty, so replace Nothing with 0 and compare to the user
+        // provided value.
+        auto finalProjectStage = sbe::makeProjectStage(
+            std::move(leafLevelTraverseStage),
+            finalArrayTraverseVar,
+            sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::eq,
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, expr->getData()),
+                sbe::makeE<sbe::EIf>(
+                    sbe::makeE<sbe::EFunction>(
+                        "exists", sbe::makeEs(sbe::makeE<sbe::EVariable>(traversePredicateVar))),
+                    sbe::makeE<sbe::EVariable>(traversePredicateVar),
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0))));
+
+        context->predicateVars.pop();
+        context->predicateVars.push(finalArrayTraverseVar);
+
+        return finalProjectStage;
+    } else {
+        // Generate nested traversal.
+        innerBranch = sbe::makeProjectStage(
+            generateTraverseForArraySizeHelper(
+                context,
+                sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), 1, boost::none),
+                fieldVar,
+                expr,
+                level + 1),
+            elemPredicateVar,
+            sbe::makeE<sbe::EVariable>(traversePredicateVar));
+    }
+
+    // The final traverse stage for the current nested level.
+    return sbe::makeS<sbe::TraverseStage>(
+        std::move(inputStage),
+        std::move(innerBranch),
+        fieldVar,
+        traversePredicateVar,
+        elemPredicateVar,
+        sbe::makeSV(),
+        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+                                     sbe::makeE<sbe::EVariable>(traversePredicateVar),
+                                     sbe::makeE<sbe::EVariable>(elemPredicateVar)),
+        sbe::makeE<sbe::EVariable>(traversePredicateVar),
+        1);
+}
+
 /**
  * For the given PathMatchExpression 'expr', generates a path traversal SBE plan stage sub-tree
  * implementing the expression. Generates a sequence of nested traverse operators in order to
@@ -240,18 +373,22 @@ void generateTraverse(MatchExpressionVisitorContext* context,
                                                  std::move(makeEExprCallback),
                                                  0);
 
-    // If this comparison expression is a branch of a logical $and expression, but not the last
-    // one, inject a filter stage to bail out early from the $and predicate without the need to
-    // evaluate all branches. If this is the last branch of the $and expression, or if it's not
-    // within a logical expression at all, just keep the predicate var on the top on the stack
-    // and let the parent expression process it.
-    if (!context->nestedLogicalExprs.empty() && context->nestedLogicalExprs.top().second > 1 &&
-        context->nestedLogicalExprs.top().first->matchType() == MatchExpression::AND) {
-        context->inputStage = sbe::makeS<sbe::FilterStage<false>>(
-            std::move(context->inputStage),
-            sbe::makeE<sbe::EVariable>(context->predicateVars.top()));
-        context->predicateVars.pop();
-    }
+    // Check if can bail out early from the $and predicate if this expression is part of branch.
+    checkForShortCircuitFromLogicalAnd(context);
+}
+
+/**
+ * Generates a path traversal SBE plan stage sub-tree for matching arrays with '$size'. Applies
+ * an extra project on top of the sub-tree to filter based on user provided value.
+ */
+void generateTraverseForArraySize(MatchExpressionVisitorContext* context,
+                                  const SizeMatchExpression* expr) {
+    context->predicateVars.push(context->slotIdGenerator->generate());
+    context->inputStage = generateTraverseForArraySizeHelper(
+        context, std::move(context->inputStage), context->inputVar, expr, 0);
+
+    // Check if can bail out early from the $and predicate if this expression is part of branch.
+    checkForShortCircuitFromLogicalAnd(context);
 }
 
 /**
@@ -469,9 +606,7 @@ public:
         _context->nestedLogicalExprs.push({expr, expr->numChildren()});
     }
     void visit(const RegexMatchExpression* expr) final {}
-    void visit(const SizeMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const SizeMatchExpression* expr) final {}
     void visit(const TextMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -597,7 +732,10 @@ public:
         generateTraverse(_context, expr, std::move(makeEExprFn));
     }
 
-    void visit(const SizeMatchExpression* expr) final {}
+    void visit(const SizeMatchExpression* expr) final {
+        generateTraverseForArraySize(_context, expr);
+    }
+
     void visit(const TextMatchExpression* expr) final {}
     void visit(const TextNoOpMatchExpression* expr) final {}
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
