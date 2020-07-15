@@ -66,6 +66,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/dbref.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -214,15 +215,15 @@ bool isDBRefDocument(const BSONObj& obj, bool allowIncompleteDBRef) {
         auto element = i.next();
         auto fieldName = element.fieldNameStringData();
         // $ref
-        if (!hasRef && "$ref"_sd == fieldName) {
+        if (!hasRef && dbref::kRefFieldName == fieldName) {
             hasRef = true;
         }
         // $id
-        else if (!hasID && "$id"_sd == fieldName) {
+        else if (!hasID && dbref::kIdFieldName == fieldName) {
             hasID = true;
         }
         // $db
-        else if (!hasDB && "$db"_sd == fieldName) {
+        else if (!hasDB && dbref::kDbFieldName == fieldName) {
             hasDB = true;
         }
     }

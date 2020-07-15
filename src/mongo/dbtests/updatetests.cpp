@@ -112,12 +112,6 @@ class ModNonmodMix : public Fail {
     }
 };
 
-class InvalidMod : public Fail {
-    void doIt() {
-        update(ns(), BSONObj(), fromjson("{$awk:{a:4}}"));
-    }
-};
-
 class ModNotFirst : public Fail {
     void doIt() {
         update(ns(), BSONObj(), fromjson("{z:3,$set:{a:4}}"));
@@ -133,20 +127,6 @@ class ModDuplicateFieldSpec : public Fail {
 class IncNonNumber : public Fail {
     void doIt() {
         update(ns(), BSONObj(), fromjson("{$inc:{a:'d'}}"));
-    }
-};
-
-class PushAllNonArray : public Fail {
-    void doIt() {
-        insert(ns(), fromjson("{a:[1]}"));
-        update(ns(), BSONObj(), fromjson("{$pushAll:{a:'d'}}"));
-    }
-};
-
-class PullAllNonArray : public Fail {
-    void doIt() {
-        insert(ns(), fromjson("{a:[1]}"));
-        update(ns(), BSONObj(), fromjson("{$pullAll:{a:'d'}}"));
     }
 };
 
@@ -2004,12 +1984,9 @@ public:
     void setupTests() {
         add<ModId>();
         add<ModNonmodMix>();
-        add<InvalidMod>();
         add<ModNotFirst>();
         add<ModDuplicateFieldSpec>();
         add<IncNonNumber>();
-        add<PushAllNonArray>();
-        add<PullAllNonArray>();
         add<IncTargetNonNumber>();
         add<SetNum>();
         add<SetString>();

@@ -7,7 +7,7 @@
  *
  * contained in a top-level element, embedded element, and within _id.
  *
- * @tags: [assumes_unsharded_collection]
+ * @tags: [assumes_unsharded_collection, requires_fcv_46]
  */
 (function() {
 "use strict";
@@ -31,15 +31,14 @@ assert.writeError(coll.insert({_id: /a/}));
 // Test that _id cannot be an array.
 assert.writeError(coll.insert({_id: [9]}));
 
-// Test that $-prefixed field names are allowed in embedded objects.
+// Test that $-prefixed field names are allowed.
 assert.commandWorked(coll.insert({a: {$b: 1}}));
 assert.eq(1, coll.find({"a.$b": 1}).itcount());
+assert.commandWorked(coll.insert({$a: 1}));
+assert.commandWorked(coll.insert({valid: 1, $a: 1}));
+assert.commandWorked(coll.insert({$a: {$b: 1}}));
 
-// Test that $-prefixed field names are not allowed at the top level.
-assert.writeErrorWithCode(coll.insert({$a: 1}), ErrorCodes.BadValue);
-assert.writeErrorWithCode(coll.insert({valid: 1, $a: 1}), ErrorCodes.BadValue);
-
-// Test that reserved $-prefixed field names are also not allowed.
+// Test that reserved $-prefixed field names are not allowed.
 assert.writeErrorWithCode(coll.insert({$ref: 1}), ErrorCodes.BadValue);
 assert.writeErrorWithCode(coll.insert({$id: 1}), ErrorCodes.BadValue);
 assert.writeErrorWithCode(coll.insert({$db: 1}), ErrorCodes.BadValue);
@@ -52,6 +51,15 @@ assert.writeErrorWithCode(coll.insert({_id: {a: 1, $b: 1}}), ErrorCodes.DollarPr
 assert.commandWorked(coll.insert({a: {_id: [9]}}));
 assert.commandWorked(coll.insert({a: {_id: /a/}}));
 assert.commandWorked(coll.insert({a: {_id: {$b: 1}}}));
+
+// Test that inserting an object with a $-prefixed field name is properly validated.
+assert.commandWorked(coll.insert({_id: 0, $valid: 1, "a": 1}));
+assert.eq([{_id: 0, $valid: 1, "a": 1}], coll.find({_id: 0}).toArray());
+
+assert.writeErrorWithCode(coll.insert({_id: 0, $valid: 1, $id: 1}), ErrorCodes.BadValue);
+assert.writeErrorWithCode(coll.insert({_id: 0, $valid: 1, $db: 1}), ErrorCodes.BadValue);
+assert.writeErrorWithCode(coll.insert({_id: 0, $valid: 1, $ref: 1}), ErrorCodes.BadValue);
+assert.commandWorked(coll.insert({_id: 1, $valid: 1, $alsoValid: 1}));
 
 //
 // Update command field name validation.
@@ -75,18 +83,37 @@ assert.eq(1, coll.find({a: {b: 2}}).itcount());
 assert.commandWorked(coll.update({"a.b": 2}, {"a.b": 3}));
 assert.eq(0, coll.find({"a.b": 3}).itcount());
 
-// $-prefixed field names are not allowed.
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {$c: 1}, {upsert: true}),
-                          ErrorCodes.FailedToParse);
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {$c: 1}}, {upsert: true}),
-                          ErrorCodes.DollarPrefixedFieldName);
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {c: {$d: 1}}}, {upsert: true}),
-                          ErrorCodes.DollarPrefixedFieldName);
+// $-prefixed field names are allowed.
+assert.commandWorked(coll.update({"a.b": 1}, {$c: 1}, {upsert: true}));
+assert.commandWorked(coll.update({"a.b": 1}, {$set: {$c: 1}}, {upsert: true}));
+assert.commandWorked(coll.update({"a.b": 1}, {$set: {c: {$d: 1}}}, {upsert: true}));
 
-// Reserved $-prefixed field names are also not allowed.
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {$ref: 1}), ErrorCodes.FailedToParse);
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {$id: 1}), ErrorCodes.FailedToParse);
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {$db: 1}), ErrorCodes.FailedToParse);
+// Reserved $-prefixed field names are not allowed.
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$ref: 1}), ErrorCodes.InvalidDBRef);
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$id: 1}), ErrorCodes.InvalidDBRef);
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$db: 1}), ErrorCodes.InvalidDBRef);
+
+// Test that update docs with recognized operators are treated as modifier-style docs while update
+// docs with non-operator field names are treated as replacement-style docs.
+
+// Test that update documents with non-operators as field names are treated as replacement-style
+// updates.
+coll.update({_id: 1}, {$nonOp: 1}, {upsert: true});
+assert.eq([{_id: 1, $nonOp: 1}], coll.find({_id: 1}).toArray());
+
+// Test that update documents with recognized operators as field names are treated as modifier-style
+// updates.
+coll.update({_id: 2}, {$inc: {x: 1}}, {upsert: true});
+assert.eq([{_id: 2, x: 1}], coll.find({_id: 2}).toArray());
+
+// Test that update documents with a non-operator after an operator will not parse (expects all
+// operators).
+assert.writeErrorWithCode(coll.update({_id: 3}, {$set: {x: 12}, $hello: 1}, {upsert: true}),
+                          ErrorCodes.FailedToParse);
+
+// Test that update documents with a non-operator before an operator will expect only non-operators.
+assert.writeErrorWithCode(coll.update({_id: 4}, {$hello: 1, $set: {x: 12}}, {upsert: true}),
+                          ErrorCodes.BadValue);
 
 //
 // FindAndModify field name validation.
@@ -108,13 +135,15 @@ assert.eq([{_id: 0, "a.b": 1}], coll.find({_id: 0}).toArray());
 coll.findAndModify({query: {_id: 1, "a.b": 1}, update: {$set: {_id: 1, "a.b": 2}}});
 assert.eq([{_id: 1, a: {b: 2}}], coll.find({_id: 1}).toArray());
 
-// $-prefixed field names are not allowed.
-assert.throws(function() {
-    coll.findAndModify({query: {_id: 1}, update: {_id: 1, $invalid: 1}});
-});
-assert.throws(function() {
-    coll.findAndModify({query: {_id: 1}, update: {$set: {_id: 1, $invalid: 1}}});
-});
+// Test that $-prefixed fields are allowed.
+coll.findAndModify({query: {_id: 1}, update: {_id: 1, $valid: 1}});
+assert.eq([{_id: 1, $valid: 1}], coll.find({_id: 1}).toArray());
+
+coll.findAndModify({query: {_id: 1}, update: {_id: 1, $embed: {$a: 1, "b": 2}}});
+assert([{_id: 1, $embed: {$a: 1, "b": 2}}], coll.find({_id: 1}).toArray());
+
+coll.findAndModify({query: {_id: 2}, update: {_id: 2, out: {$in: 1, "x": 2}, upsert: true}});
+assert([{_id: 2, out: {$in: 1, "x": 2}}], coll.find({_id: 2}).toArray());
 
 // Reserved $-prefixed field names are also not allowed.
 assert.throws(function() {

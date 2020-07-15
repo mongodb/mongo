@@ -59,7 +59,6 @@ selector:
   - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
   - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
   - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
-  - jstests/core/insert2.js # Creates new mongo connection.
   - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
   - jstests/core/startup_log.js # Checks pid, which is different on each server.
   - jstests/core/validate_cmd_ns.js # Calls _exec() directly, not retryable.

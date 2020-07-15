@@ -32,6 +32,8 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/query/dbref.h"
+#include "mongo/db/update/modifier_table.h"
 
 namespace mongo {
 
@@ -58,14 +60,15 @@ void storageValidChildren(mutablebson::ConstElement elem,
 /**
  * Validates an element that has a field name which starts with a dollar sign ($).
  * In the case of a DBRef field ($id, $ref, [$db]) these fields may be valid in
- * the correct order/context only.
+ * the correct order/context only. In other cases, $-prefixed field names are
+ * now allowed (SERVER-49117).
  */
 void validateDollarPrefixElement(mutablebson::ConstElement elem) {
     auto curr = elem;
     auto currName = elem.getFieldName();
 
     // Found a $db field.
-    if (currName == "$db") {
+    if (currName == dbref::kDbFieldName) {
         uassert(ErrorCodes::InvalidDBRef,
                 str::stream() << "The DBRef $db field must be a String, not a "
                               << typeName(curr.getType()),
@@ -80,7 +83,7 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
     }
 
     // Found a $id field.
-    if (currName == "$id") {
+    if (currName == dbref::kIdFieldName) {
         curr = curr.leftSibling();
         uassert(ErrorCodes::InvalidDBRef,
                 "Found $id field without a $ref before it, which is invalid.",
@@ -90,7 +93,7 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
     }
 
     // Found a $ref field.
-    if (currName == "$ref") {
+    if (currName == dbref::kRefFieldName) {
         uassert(ErrorCodes::InvalidDBRef,
                 str::stream() << "The DBRef $ref field must be a String, not a "
                               << typeName(curr.getType()),
@@ -99,14 +102,13 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
         uassert(ErrorCodes::InvalidDBRef,
                 "The DBRef $ref field must be followed by a $id field",
                 curr.rightSibling().ok() && curr.rightSibling().getFieldName() == "$id");
-    } else {
-
-        // Not an okay, $ prefixed field name.
-        uasserted(ErrorCodes::DollarPrefixedFieldName,
-                  str::stream() << "The dollar ($) prefixed field '" << elem.getFieldName()
-                                << "' in '" << mutablebson::getFullName(elem)
-                                << "' is not valid for storage.");
     }
+
+    // Found a non-reserved $-prefixed field.
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Field " << currName << " is invalid. "
+                          << "Please use a field name that is not an update modifier",
+            modifiertable::getType(currName) == modifiertable::MOD_UNKNOWN);
 }
 }  // namespace
 

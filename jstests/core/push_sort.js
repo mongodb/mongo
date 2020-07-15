@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [requires_non_retryable_writes, requires_fcv_46]
 
 //
 //  $push acquired the possibility of sorting the resulting array as part of SERVER-8008. This
@@ -54,12 +54,13 @@ assert.eq([{a: {b: 2}}, {a: {b: 3}}], t.findOne({_id: 7}).x);
 // Invalid Cases
 //
 
-// $push with $sort should not push a "$sort" field
+// Test that when given a document with a $sort field that matches the form of a plain document
+// (instead of a $sort modifier document), $push will add that field to the specified array.
 var doc8 = {_id: 8, x: [{a: 1}, {a: 2}]};
 t.save(doc8);
 var res = t.update({_id: 8}, {$push: {x: {$sort: {a: -1}}}});
-assert.writeErrorWithCode(res, ErrorCodes.DollarPrefixedFieldName);
-assert.docEq(t.findOne({_id: 8}), doc8);  // ensure doc was not changed
+assert.commandWorked(res);
+assert.docEq(t.findOne({_id: 8}), {_id: 8, x: [{a: 1}, {a: 2}, {$sort: {a: -1}}]});
 
 t.save({_id: 100, x: [{a: 1}]});
 

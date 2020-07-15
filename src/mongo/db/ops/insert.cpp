@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/query/dbref.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/util/str.h"
@@ -74,6 +75,11 @@ Status validateDepth(const BSONObj& obj) {
 }
 }  // namespace
 
+bool isReservedDollarPrefixedWord(StringData fieldName) {
+    return (std::find(dbref::kDbRefFieldNames.begin(), dbref::kDbRefFieldNames.end(), fieldName) !=
+            std::end(dbref::kDbRefFieldNames));
+}
+
 StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj& doc) {
     if (doc.objsize() > BSONObjMaxUserSize)
         return StatusWith<BSONObj>(ErrorCodes::BadValue,
@@ -102,10 +108,13 @@ StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj&
 
             auto fieldName = e.fieldNameStringData();
 
-            if (fieldName[0] == '$') {
-                return StatusWith<BSONObj>(
-                    ErrorCodes::BadValue,
-                    str::stream() << "Document can't have $ prefixed field names: " << fieldName);
+            // Ensure that fieldName is not a reserved $-prefixed field name.
+            if (isReservedDollarPrefixedWord(fieldName)) {
+
+                return StatusWith<BSONObj>(ErrorCodes::BadValue,
+                                           str::stream() << fieldName << " is a reserved fieldName"
+                                                         << " and cannot be used. Please"
+                                                         << " try another field name.");
             }
 
             // check no regexp for _id (SERVER-9502)

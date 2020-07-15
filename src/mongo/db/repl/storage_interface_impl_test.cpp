@@ -2220,31 +2220,6 @@ TEST_F(StorageInterfaceImplTest,
               ErrorCodes::IndexNotFound);
 }
 
-TEST_F(StorageInterfaceImplTest,
-       UpsertSingleDocumentReturnsFailedToParseWhenUpdateDocumentContainsUnknownOperator) {
-    auto opCtx = getOperationContext();
-    auto nss = makeNamespace(_agent);
-    auto options = generateOptionsWithUuid();
-
-    StorageInterfaceImpl storage;
-    ASSERT_OK(storage.createCollection(opCtx, nss, options));
-
-    auto unknownUpdateOp = BSON("$unknownUpdateOp" << BSON("x" << 1000));
-    ASSERT_THROWS_CODE_AND_WHAT(
-        storage.upsertById(opCtx, nss, BSON("" << 1).firstElement(), unknownUpdateOp),
-        AssertionException,
-        ErrorCodes::FailedToParse,
-        "Unknown modifier: $unknownUpdateOp. Expected a valid update modifier or pipeline-style "
-        "update specified as an array");
-
-    ASSERT_THROWS_CODE(storage.upsertById(opCtx,
-                                          {nss.db().toString(), *options.uuid},
-                                          BSON("" << 1).firstElement(),
-                                          unknownUpdateOp),
-                       DBException,
-                       ErrorCodes::FailedToParse);
-}
-
 TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

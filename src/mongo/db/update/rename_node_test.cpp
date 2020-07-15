@@ -550,21 +550,6 @@ TEST_F(RenameNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
     ASSERT_EQUALS(getModifiedPaths(), "{a.b.c, d}");
 }
 
-TEST_F(RenameNodeTest, ApplyCannotCreateDollarPrefixedField) {
-    auto update = fromjson("{$rename: {a: '$bad'}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    RenameNode node;
-    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
-
-    mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathToCreate("$bad");
-    ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams()),
-        AssertionException,
-        ErrorCodes::DollarPrefixedFieldName,
-        "The dollar ($) prefixed field '$bad' in '$bad' is not valid for storage.");
-}
-
 TEST_F(RenameNodeTest, ApplyCannotOverwriteImmutablePath) {
     auto update = fromjson("{$rename: {a: 'b'}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

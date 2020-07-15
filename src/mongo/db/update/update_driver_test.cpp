@@ -128,15 +128,12 @@ TEST(Parse, EmptyMod) {
         "'$set' is empty. You must specify a field like so: {$set: {<field>: ...}}");
 }
 
-TEST(Parse, WrongMod) {
+TEST(Parse, UnknownMod) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters),
-                                AssertionException,
-                                ErrorCodes::FailedToParse,
-                                "Unknown modifier: $xyz. Expected a valid update modifier or "
-                                "pipeline-style update specified as an array");
+    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters));
+    ASSERT_TRUE(driver.type() == UpdateDriver::UpdateType::kReplacement);
 }
 
 TEST(Parse, WrongType) {
