@@ -128,6 +128,10 @@ class FindCmd final : public Command {
 public:
     FindCmd() : Command("find") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
         // TODO: Parse into a QueryRequest here.

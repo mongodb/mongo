@@ -46,6 +46,10 @@ class DropCmd : public BasicCommand {
 public:
     DropCmd() : BasicCommand("drop") {}
 
+    virtual const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }

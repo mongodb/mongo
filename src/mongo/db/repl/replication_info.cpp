@@ -225,6 +225,10 @@ class CmdIsMaster final : public BasicCommandWithReplyBuilderInterface {
 public:
     CmdIsMaster() : BasicCommandWithReplyBuilderInterface("isMaster", "ismaster") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     bool requiresAuth() const final {
         return false;
     }

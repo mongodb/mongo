@@ -46,6 +46,10 @@ class ClusterCommitTransactionCmd : public BasicCommand {
 public:
     ClusterCommitTransactionCmd() : BasicCommand("commitTransaction") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }

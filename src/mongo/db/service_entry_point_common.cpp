@@ -945,7 +945,7 @@ void execCommandDatabase(OperationContext* opCtx,
 
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-        auto const apiParamsFromClient = initializeAPIParameters(request.body);
+        auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
         APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
 
         sessionOptions = initializeOperationSessionInfo(

@@ -48,6 +48,10 @@ class KillCursorsCmd final : public KillCursorsCmdBase {
 public:
     KillCursorsCmd() = default;
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,

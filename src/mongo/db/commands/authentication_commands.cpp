@@ -144,6 +144,10 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
 
 class CmdAuthenticate : public BasicCommand {
 public:
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }

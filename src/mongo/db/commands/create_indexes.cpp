@@ -711,6 +711,10 @@ class CmdCreateIndex : public ErrmsgCommandDeprecated {
 public:
     CmdCreateIndex() : ErrmsgCommandDeprecated(kCommandName) {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }

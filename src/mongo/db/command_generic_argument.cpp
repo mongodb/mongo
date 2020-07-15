@@ -52,10 +52,13 @@ struct SpecialArgRecord {
 // If that changes, it should be added. When you add to this list, consider whether you
 // should also change the filterCommandRequestForPassthrough() function.
 // clang-format off
-static constexpr std::array<SpecialArgRecord, 31> specials{{
+static constexpr std::array<SpecialArgRecord, 34> specials{{
     //                                       /-isGeneric
     //                                       |  /-stripFromRequest
     //                                       |  |  /-stripFromReply
+    {"apiVersion"_sd,                        1, 0, 0},
+    {"apiStrict"_sd,                         1, 0, 0},
+    {"apiDeprecationErrors"_sd,              1, 0, 0},
     {"$audit"_sd,                            1, 1, 0},
     {"$client"_sd,                           1, 1, 0},
     {"$configServerState"_sd,                1, 1, 1},

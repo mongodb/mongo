@@ -170,6 +170,10 @@ public:
     FindAndModifyCmd()
         : BasicCommand("findAndModify", "findandmodify"), _updateMetrics{"findAndModify"} {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }

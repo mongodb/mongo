@@ -53,6 +53,10 @@ class CmdExplain final : public Command {
 public:
     CmdExplain() : Command("explain") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) override;
 

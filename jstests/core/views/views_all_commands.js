@@ -546,6 +546,7 @@ let viewsCommandTests = {
     startRecordingTraffic: {skip: isUnrelated},
     startSession: {skip: isAnInternalCommand},
     stopRecordingTraffic: {skip: isUnrelated},
+    testDeprecation: {skip: isAnInternalCommand},
     top: {skip: "tested in views/views_stats.js"},
     touch: {skip: wasRemovedInBinaryVersion44},
     unsetSharding: {skip: isAnInternalCommand},

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/sessions_commands_gen.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/logical_session_cache.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/initialize_api_parameters.h"
 
 namespace mongo {
-namespace {
 
-class RefreshSessionsCommand final : public BasicCommand {
+/**
+ * Command for testing API Version deprecation logic. The command replies with the values of the
+ * OperationContext's API parameters.
+ */
+class TestDeprecationCmd : public BasicCommand {
 public:
-    RefreshSessionsCommand() : BasicCommand("refreshSessions") {}
+    TestDeprecationCmd() : BasicCommand("testDeprecation") {}
 
     const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
+    const std::set<std::string>& deprecatedApiVersions() const {
         return kApiVersions1;
     }
 
@@ -53,51 +52,34 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    bool adminOnly() const override {
-        return false;
-    }
-
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    std::string help() const override {
-        return "renew a set of logical sessions";
+    bool requiresAuth() const override {
+        return false;
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
-        // It is always ok to run this command, as long as you are authenticated
-        // as some user, if auth is enabled.
-        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-        try {
-            auto user = authSession->getSingleUser();
-            invariant(user);
-            return Status::OK();
-        } catch (...) {
-            return exceptionToStatus();
-        }
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {}
+
+    std::string help() const override {
+        return "replies with the values of the OperationContext's API parameters";
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto refreshSessionsRequest = RefreshSessionsCmdFromClient::parse(
-            IDLParserErrorContext("RefreshSessionsCmdFromClient"), cmdObj);
-
-        const auto lsCache = LogicalSessionCache::get(opCtx);
-
-        for (const auto& lsid :
-             makeLogicalSessionIds(refreshSessionsRequest.getSessions(), opCtx)) {
-            uassertStatusOK(lsCache->vivify(opCtx, lsid));
-        }
-
+        result.append("apiVersion", APIParameters::get(opCtx).getAPIVersion());
+        result.append("apiStrict", APIParameters::get(opCtx).getAPIStrict());
+        result.append("apiDeprecationErrors", APIParameters::get(opCtx).getAPIDeprecationErrors());
         return true;
     }
+};
 
-} refreshSessionsCommand;
+MONGO_REGISTER_TEST_COMMAND(TestDeprecationCmd);
 
-}  // namespace
+
 }  // namespace mongo

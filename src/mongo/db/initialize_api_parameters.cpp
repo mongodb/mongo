@@ -31,7 +31,8 @@
 
 namespace mongo {
 
-const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody) {
+const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody,
+                                                      Command* command) {
 
     auto apiParamsFromClient =
         APIParametersFromClient::parse("APIParametersFromClient"_sd, requestBody);
@@ -46,6 +47,24 @@ const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody
         uassert(ErrorCodes::APIVersionError,
                 "API version must be \"1\"",
                 "1" == apiParamsFromClient.getApiVersion().value());
+    }
+
+    if (apiParamsFromClient.getApiStrict().get_value_or(false)) {
+        auto cmdApiVersions = command->apiVersions();
+        bool strictAssert = (cmdApiVersions.find("1") != cmdApiVersions.end());
+        uassert(ErrorCodes::APIStrictError,
+                str::stream() << "Provided apiStrict:true, but the command " << command->getName()
+                              << " is not in API Version \"1\"",
+                strictAssert);
+    }
+
+    if (apiParamsFromClient.getApiDeprecationErrors().get_value_or(false)) {
+        auto cmdDepApiVersions = command->deprecatedApiVersions();
+        bool deprecationAssert = (cmdDepApiVersions.find("1") == cmdDepApiVersions.end());
+        uassert(ErrorCodes::APIDeprecationError,
+                str::stream() << "Provided apiDeprecationErrors:true, but the command "
+                              << command->getName() << " is deprecated in API Version \"1\"",
+                deprecationAssert);
     }
 
     return apiParamsFromClient;

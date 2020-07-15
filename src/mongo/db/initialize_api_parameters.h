@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/commands.h"
 #include "mongo/db/initialize_api_parameters_gen.h"
 #include "mongo/db/operation_context.h"
 
@@ -38,7 +39,7 @@ namespace mongo {
  * Parses a command's API Version parameters from a request and stores the apiVersion, apiStrict,
  * and apiDeprecationErrors fields.
  */
-const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody);
+const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command);
 
 /**
  * Decorates operation context with methods to retrieve apiVersion, apiStrict, and

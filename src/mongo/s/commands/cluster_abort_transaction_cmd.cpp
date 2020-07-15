@@ -51,6 +51,10 @@ class ClusterAbortTransactionCmd : public BasicCommand {
 public:
     ClusterAbortTransactionCmd() : BasicCommand("abortTransaction") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }

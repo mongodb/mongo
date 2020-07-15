@@ -42,6 +42,10 @@ class ClusterKillCursorsCmd final : public KillCursorsCmdBase {
 public:
     ClusterKillCursorsCmd() = default;
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level) const final {
         // killCursors must support read concerns in order to be run in transactions.

@@ -54,6 +54,10 @@ class ClusterExplainCmd final : public Command {
 public:
     ClusterExplainCmd() : Command("explain") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) override;
 

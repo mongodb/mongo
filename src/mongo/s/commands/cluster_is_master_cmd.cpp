@@ -59,6 +59,10 @@ class CmdIsMaster : public BasicCommandWithReplyBuilderInterface {
 public:
     CmdIsMaster() : BasicCommandWithReplyBuilderInterface("isMaster", "ismaster") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }

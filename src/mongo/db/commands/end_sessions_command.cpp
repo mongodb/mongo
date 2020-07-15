@@ -48,6 +48,10 @@ class EndSessionsCommand final : public BasicCommand {
 public:
     EndSessionsCommand() : BasicCommand("endSessions") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }

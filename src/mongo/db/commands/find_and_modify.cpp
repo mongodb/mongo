@@ -216,6 +216,10 @@ public:
     CmdFindAndModify()
         : BasicCommand("findAndModify", "findandmodify"), _updateMetrics{"findAndModify"} {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     std::string help() const override {
         return "{ findAndModify: \"collection\", query: {processed:false}, update: {$set: "
                "{processed:true}}, new: true}\n"

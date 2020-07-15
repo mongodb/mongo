@@ -290,6 +290,7 @@ const allCommands = {
     startRecordingTraffic: {skip: isNotAUserDataRead},
     startSession: {skip: isNotAUserDataRead},
     stopRecordingTraffic: {skip: isNotAUserDataRead},
+    testDeprecation: {skip: isNotAUserDataRead},
     top: {skip: isNotAUserDataRead},
     unsetSharding: {skip: isNotAUserDataRead},
     update: {skip: isPrimaryOnly},

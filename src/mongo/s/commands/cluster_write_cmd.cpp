@@ -633,6 +633,10 @@ class ClusterInsertCmd final : public ClusterWriteCmd {
 public:
     ClusterInsertCmd() : ClusterWriteCmd("insert") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
 private:
     class Invocation final : public InvocationBase {
     public:
@@ -665,6 +669,10 @@ private:
 class ClusterUpdateCmd final : public ClusterWriteCmd {
 public:
     ClusterUpdateCmd() : ClusterWriteCmd("update"), _updateMetrics{"update"} {}
+
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
 
 private:
     class Invocation final : public InvocationBase {
@@ -704,6 +712,10 @@ private:
 class ClusterDeleteCmd final : public ClusterWriteCmd {
 public:
     ClusterDeleteCmd() : ClusterWriteCmd("delete") {}
+
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
 
 private:
     class Invocation final : public InvocationBase {

@@ -286,6 +286,10 @@ class CmdInsert final : public WriteCommand {
 public:
     CmdInsert() : WriteCommand("insert") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
 private:
     class Invocation final : public InvocationBase {
     public:
@@ -331,6 +335,10 @@ private:
 class CmdUpdate final : public WriteCommand {
 public:
     CmdUpdate() : WriteCommand("update"), _updateMetrics{"update"} {}
+
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
 
 private:
     class Invocation final : public InvocationBase {
@@ -486,11 +494,16 @@ class CmdDelete final : public WriteCommand {
 public:
     CmdDelete() : WriteCommand("delete") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
 private:
     class Invocation final : public InvocationBase {
     public:
         Invocation(const WriteCommand* cmd, const OpMsgRequest& request)
             : InvocationBase(cmd, request), _batch(DeleteOp::parse(request)) {}
+
 
     private:
         NamespaceString ns() const override {

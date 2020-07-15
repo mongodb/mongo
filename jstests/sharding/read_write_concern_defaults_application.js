@@ -615,6 +615,7 @@ let testCases = {
     startRecordingTraffic: {skip: "does not accept read or write concern"},
     startSession: {skip: "does not accept read or write concern"},
     stopRecordingTraffic: {skip: "does not accept read or write concern"},
+    testDeprecation: {skip: "does not accept read or write concern"},
     top: {skip: "does not accept read or write concern"},
     unsetSharding: {skip: "internal command"},
     update: {

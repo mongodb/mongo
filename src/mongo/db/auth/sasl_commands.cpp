@@ -70,6 +70,10 @@ public:
     CmdSaslStart();
     virtual ~CmdSaslStart();
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     virtual void addRequiredPrivileges(const std::string&,
                                        const BSONObj&,
                                        std::vector<Privilege>*) const {}
@@ -100,6 +104,9 @@ public:
     CmdSaslContinue();
     virtual ~CmdSaslContinue();
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
     virtual void addRequiredPrivileges(const std::string&,
                                        const BSONObj&,
                                        std::vector<Privilege>*) const {}

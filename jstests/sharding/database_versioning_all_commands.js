@@ -626,6 +626,7 @@ let testCases = {
     startRecordingTraffic: {skip: "executes locally on mongos (not sent to any remote node)"},
     startSession: {skip: "executes locally on mongos (not sent to any remote node)"},
     stopRecordingTraffic: {skip: "executes locally on mongos (not sent to any remote node)"},
+    testDeprecation: {skip: "executes locally on mongos (not sent to any remote node)"},
     update: {
         run: {
             sendsDbVersion: true,

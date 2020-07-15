@@ -348,7 +348,7 @@ void runCommand(OperationContext* opCtx,
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
 
-    auto const apiParamsFromClient = initializeAPIParameters(request.body);
+    auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
     APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
 
     auto osi = initializeOperationSessionInfo(opCtx,

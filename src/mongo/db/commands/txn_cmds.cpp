@@ -61,6 +61,10 @@ class CmdCommitTxn : public BasicCommand {
 public:
     CmdCommitTxn() : BasicCommand("commitTransaction") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -160,6 +164,10 @@ static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
 class CmdAbortTxn : public BasicCommand {
 public:
     CmdAbortTxn() : BasicCommand("abortTransaction") {}
+
+    virtual const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;

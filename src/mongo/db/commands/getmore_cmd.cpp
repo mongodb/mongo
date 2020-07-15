@@ -241,6 +241,12 @@ class GetMoreCmd final : public Command {
 public:
     GetMoreCmd() : Command("getMore") {}
 
+    // Do not currently use apiVersions because clients are prohibited from calling
+    // getMore with apiVersion.
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
         return std::make_unique<Invocation>(this, opMsgRequest);

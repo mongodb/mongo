@@ -45,6 +45,10 @@ class CreateCmd : public BasicCommand {
 public:
     CreateCmd() : BasicCommand("create") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }

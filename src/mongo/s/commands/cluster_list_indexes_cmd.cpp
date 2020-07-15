@@ -72,6 +72,10 @@ class CmdListIndexes : public BasicCommand {
 public:
     CmdListIndexes() : BasicCommand("listIndexes") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
     }

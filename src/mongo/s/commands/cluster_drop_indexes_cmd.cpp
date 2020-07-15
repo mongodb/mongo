@@ -71,6 +71,10 @@ void updateStateForStaleConfigRetry(OperationContext* opCtx,
 
 class DropIndexesCmd : public ErrmsgCommandDeprecated {
 public:
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     DropIndexesCmd() : ErrmsgCommandDeprecated("dropIndexes", "deleteIndexes") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {

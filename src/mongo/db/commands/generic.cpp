@@ -52,6 +52,10 @@ class PingCommand : public BasicCommand {
 public:
     PingCommand() : BasicCommand("ping") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }

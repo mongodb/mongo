@@ -43,6 +43,10 @@ class PipelineCommand final : public Command {
 public:
     PipelineCommand() : Command("aggregate") {}
 
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
+
     /**
      * It's not known until after parsing whether or not an aggregation command is an explain
      * request, because it might include the `explain: true` field (ie. aggregation explains do not

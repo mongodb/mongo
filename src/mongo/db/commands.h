@@ -358,12 +358,12 @@ public:
     // List of API versions that include this command.
     virtual const std::set<std::string>& apiVersions() const {
         return kNoApiVersions;
-    };
+    }
 
     // API versions in which this command is deprecated.
     virtual const std::set<std::string>& deprecatedApiVersions() const {
         return kNoApiVersions;
-    };
+    }
 
     /**
      * Like adminOnly, but even stricter: we must either be authenticated for admin db,
