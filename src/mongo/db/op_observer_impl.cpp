@@ -778,6 +778,22 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onSystemViewsCollectionDrop(opCtx, collectionName);
     } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
+        // Disallow this drop if there are currently prepared transactions.
+        const auto sessionCatalog = SessionCatalog::get(opCtx);
+        SessionKiller::Matcher matcherAllSessions(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+        bool noPreparedTxns = true;
+        sessionCatalog->scanSessions(matcherAllSessions, [&](const ObservableSession& session) {
+            auto txnParticipant = TransactionParticipant::get(session);
+            if (txnParticipant.transactionIsPrepared()) {
+                noPreparedTxns = false;
+            }
+        });
+        uassert(4852500,
+                "Unable to drop transactions table (config.transactions) while prepared "
+                "transactions are present.",
+                noPreparedTxns);
+
         MongoDSessionCatalog::invalidateAllSessions(opCtx);
     } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).invalidate();

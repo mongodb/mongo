@@ -46,6 +46,8 @@ replica_sets_jscore_multiversion_passthrough:
   test_file: jstests/core/wildcard_index_partial_index.js
 - ticket: SERVER-48993
   test_file: jstests/core/explode_for_sort_collation.js
+- ticket: SERVER-48525
+  test_file: jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
 
 sharding_jscore_multiversion_passthrough:
 - ticket: SERVER-47773
