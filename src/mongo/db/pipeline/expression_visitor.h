@@ -68,6 +68,7 @@ class ExpressionExp;
 class ExpressionFieldPath;
 class ExpressionFilter;
 class ExpressionFloor;
+class ExpressionToHashedIndexKey;
 class ExpressionHour;
 class ExpressionIfNull;
 class ExpressionIn;
@@ -299,6 +300,7 @@ public:
     virtual void visit(ExpressionInternalFindSlice*) = 0;
     virtual void visit(ExpressionInternalFindPositional*) = 0;
     virtual void visit(ExpressionInternalFindElemMatch*) = 0;
+    virtual void visit(ExpressionToHashedIndexKey*) = 0;
 };
 
 }  // namespace mongo

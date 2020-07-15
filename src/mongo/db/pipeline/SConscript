@@ -83,6 +83,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/vector_clock',
+        '$BUILD_DIR/mongo/db/mongohasher',
     ],
 )
 
@@ -392,6 +393,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/cst/cst',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
+        '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',

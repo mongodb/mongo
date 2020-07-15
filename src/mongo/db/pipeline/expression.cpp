@@ -42,6 +42,7 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -6481,4 +6482,32 @@ void ExpressionRandom::_doAddDependencies(DepsTracker* deps) const {
 Value ExpressionRandom::serialize(const bool explain) const {
     return Value(DOC(getOpName() << Document()));
 }
+
+/* ------------------------- ExpressionToHashedIndexKey -------------------------- */
+REGISTER_EXPRESSION(toHashedIndexKey, ExpressionToHashedIndexKey::parse);
+
+boost::intrusive_ptr<Expression> ExpressionToHashedIndexKey::parse(ExpressionContext* const expCtx,
+                                                                   BSONElement expr,
+                                                                   const VariablesParseState& vps) {
+    return make_intrusive<ExpressionToHashedIndexKey>(expCtx, parseOperand(expCtx, expr, vps));
+}
+
+Value ExpressionToHashedIndexKey::evaluate(const Document& root, Variables* variables) const {
+    Value inpVal(_children[0]->evaluate(root, variables));
+    if (inpVal.missing()) {
+        inpVal = Value(BSONNULL);
+    }
+
+    return Value(BSONElementHasher::hash64(BSON("" << inpVal).firstElement(),
+                                           BSONElementHasher::DEFAULT_HASH_SEED));
+}
+
+Value ExpressionToHashedIndexKey::serialize(bool explain) const {
+    return Value(DOC("$toHashedIndexKey" << _children[0]->serialize(explain)));
+}
+
+void ExpressionToHashedIndexKey::_doAddDependencies(DepsTracker* deps) const {
+    // Nothing to do
+}
+
 }  // namespace mongo

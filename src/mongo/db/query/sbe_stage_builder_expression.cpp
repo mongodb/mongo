@@ -467,6 +467,7 @@ public:
     void visit(ExpressionInternalFindElemMatch* expr) final {}
     void visit(ExpressionFunction* expr) final {}
     void visit(ExpressionRandom* expr) final {}
+    void visit(ExpressionToHashedIndexKey* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -652,6 +653,7 @@ public:
     void visit(ExpressionInternalFindElemMatch* expr) final {}
     void visit(ExpressionFunction* expr) final {}
     void visit(ExpressionRandom* expr) final {}
+    void visit(ExpressionToHashedIndexKey* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -1507,6 +1509,10 @@ public:
 
     void visit(ExpressionRandom* expr) final {
         unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(ExpressionToHashedIndexKey* expr) final {
+        unsupportedExpression("$toHashedIndexKey");
     }
 
 private:
