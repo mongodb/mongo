@@ -482,6 +482,21 @@ structs:
         strict: true
         fields:
             stringField: string
+            field1o:
+                type: string
+                optional: true
+            field2o:
+                type: int
+                optional: true
+            field3o:
+                type: object
+                optional: true
+            field4o:
+                type: bindata_generic
+                optional: true
+            field5o:
+                type: bindata_uuid
+                optional: true
 
     chained_struct_inline:
         description: Chained struct with chained structs and fields
