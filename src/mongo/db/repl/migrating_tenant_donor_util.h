@@ -53,9 +53,6 @@ std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContex
  * config.migrationDonors document.
  */
 void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& doc);
-
-void startTenantMigrationBlockOnPrimary(OperationContext* opCtx, const TenantMigrationDonorDocument& donorDoc);
-
 }  // namespace migrating_tenant_donor_util
 
 }  // namespace mongo

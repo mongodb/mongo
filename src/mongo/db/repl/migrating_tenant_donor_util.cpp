@@ -83,6 +83,23 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
     mtab->startBlockingReadsAfter(donorDoc.getBlockTimestamp().get());
 }
 
+/**
+ * Creates a MigratingTenantAccess blocker and then adds it to the MtabByPrefix container through
+ * the donor document's databasePrefix.
+ */
+void startTenantMigrationBlockOnPrimary(OperationContext* opCtx,
+                                        const TenantMigrationDonorDocument& donorDoc) {
+    invariant(donorDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
+    auto serviceContext = opCtx->getServiceContext();
+
+    executor::TaskExecutor* mtabExecutor = getTenantMigrationExecutor(serviceContext).get();
+    auto mtab = std::make_shared<MigratingTenantAccessBlocker>(serviceContext, mtabExecutor);
+
+    mtab->startBlockingWrites();
+
+    auto& mtabByPrefix = MigratingTenantAccessBlockerByPrefix::get(serviceContext);
+    mtabByPrefix.add(donorDoc.getDatabasePrefix(), mtab);
+}
 }  // namespace
 
 /**
@@ -146,19 +163,7 @@ void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& origi
         }));
 }
 
-void startTenantMigrationBlockOnPrimary(OperationContext* opCtx,
-                                        const TenantMigrationDonorDocument& donorDoc) {
-    invariant(donorDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
-    auto serviceContext = opCtx->getServiceContext();
 
-    executor::TaskExecutor* mtabExecutor = getTenantMigrationExecutor(serviceContext).get();
-    auto mtab = std::make_shared<MigratingTenantAccessBlocker>(serviceContext, mtabExecutor);
-
-    mtab->startBlockingWrites();
-
-    auto& mtabByPrefix = MigratingTenantAccessBlockerByPrefix::get(serviceContext);
-    mtabByPrefix.add(donorDoc.getDatabasePrefix(), mtab);
-}
 std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContext* serviceContext) {
     ThreadPool::Options tpOptions;
     tpOptions.threadNamePrefix = kThreadNamePrefix;
