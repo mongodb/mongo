@@ -733,9 +733,9 @@ Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
  * and returns a set of Certificate IDs that are there in the response and a date object
  * which represents the time when the Response needs to be refreshed.
  */
-StatusWith<std::pair<OCSPCertIDSet, Date_t>> iterateResponse(OCSP_BASICRESP* basicResp,
-                                                             STACK_OF(X509) * intermediateCerts) {
-    Date_t earliestNextUpdate = Date_t::max();
+StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> iterateResponse(
+    OCSP_BASICRESP* basicResp, STACK_OF(X509) * intermediateCerts) {
+    boost::optional<Date_t> earliestNextUpdate = boost::none;
 
     OCSPCertIDSet certIdsInResponse;
 
@@ -766,8 +766,12 @@ StatusWith<std::pair<OCSPCertIDSet, Date_t>> iterateResponse(OCSP_BASICRESP* bas
                                  << "Unexpected OCSP Certificate Status. Reason: " << status);
         }
 
-        Date_t nextUpdateDate(convertASN1ToMillis(static_cast<ASN1_TIME*>(nextupd)));
-        earliestNextUpdate = std::min(earliestNextUpdate, nextUpdateDate);
+        if (nextupd) {
+            Date_t nextUpdateDate(convertASN1ToMillis(static_cast<ASN1_TIME*>(nextupd)));
+            earliestNextUpdate = earliestNextUpdate
+                ? boost::optional<Date_t>(std::min(earliestNextUpdate.get(), nextUpdateDate))
+                : boost::optional<Date_t>(nextUpdateDate);
+        }
     }
 
     if (earliestNextUpdate < Date_t::now()) {
@@ -782,7 +786,7 @@ StatusWith<std::pair<OCSPCertIDSet, Date_t>> iterateResponse(OCSP_BASICRESP* bas
  * the IDs of the certificates that the OCSP Response contains. The Date_t object is the
  * earliest expiration date on the OCSPResponse.
  */
-StatusWith<std::pair<OCSPCertIDSet, Date_t>> parseAndValidateOCSPResponse(
+StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> parseAndValidateOCSPResponse(
     SSL_CTX* context, OCSP_RESPONSE* response, STACK_OF(X509) * intermediateCerts) {
     // Read the overall status of the OCSP response
     int responseStatus = OCSP_response_status(response);
@@ -880,7 +884,7 @@ Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
                     // If not, we pass down a bogus response, and let the caller deal with it down
                     // there.
                     boost::optional<Date_t> nextUpdate = swCertIDSetAndDuration.isOK()
-                        ? boost::optional<Date_t>(swCertIDSetAndDuration.getValue().second)
+                        ? swCertIDSetAndDuration.getValue().second
                         : boost::none;
 
                     if (state->finishLine.arriveStrongly()) {
