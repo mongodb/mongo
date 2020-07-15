@@ -79,11 +79,16 @@ public:
     public:
         void typedRun(OperationContext* opCtx) {
             const auto requestBody = request();
-            StringData dbPrefix = requestBody.getDatabasePrefix();
-            auto donorStartState = TenantMigrationDonorStateEnum::kDataSync;
+            mongo::UUID migrationId = requestBody.getMigrationId();
 
+            std::string recipientURI = requestBody.getRecipientConnectionString().toString();
+            std::string dbPrefix = requestBody.getDatabasePrefix().toString();
+
+            auto donorStartState = TenantMigrationDonorStateEnum::kDataSync;
+            bool garbageCollect = true;
             const TenantMigrationDonorDocument donorDocument(
-                OID::gen(), dbPrefix.toString(), donorStartState);
+                OID::gen(), migrationId, recipientURI, dbPrefix, donorStartState, garbageCollect);
+
             migrating_tenant_donor_util::dataSync(opCtx, donorDocument);
         }
 
