@@ -50,6 +50,17 @@ class LogicalTime;
 class ServiceContext;
 class KeysCollectionClient;
 
+namespace keys_collection_manager_util {
+
+/**
+ * Returns the amount of time to wait until the monitoring thread should attempt to refresh again.
+ */
+Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
+                                 const LogicalTime& latestExpiredAt,
+                                 const Milliseconds& interval);
+
+}  // namespace keys_collection_manager_util
+
 /**
  * This implementation of the KeysCollectionManager queries the config servers for keys.
  * It maintains in internal background thread that is used to periodically refresh
