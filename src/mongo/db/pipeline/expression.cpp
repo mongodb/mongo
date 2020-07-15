@@ -639,7 +639,13 @@ Value ExpressionArrayToObject::evaluate(const Document& root, Variables* variabl
                                   << typeName(valArray[0].getType()),
                     (valArray[0].getType() == BSONType::String));
 
-            output[valArray[0].getString()] = valArray[1];
+            auto keyName = valArray[0].getStringData();
+
+            uassert(4940400,
+                    "Key field cannot contain an embedded null byte",
+                    keyName.find('\0') == std::string::npos);
+
+            output[keyName] = valArray[1];
 
         } else {
             uassert(
@@ -671,7 +677,13 @@ Value ExpressionArrayToObject::evaluate(const Document& root, Variables* variabl
                               << typeName(key.getType()),
                 (key.getType() == BSONType::String));
 
-            output[key.getString()] = value;
+            auto keyName = key.getStringData();
+
+            uassert(4940401,
+                    "Key field cannot contain an embedded null byte",
+                    keyName.find('\0') == std::string::npos);
+
+            output[keyName] = value;
         }
     }
 

@@ -74,4 +74,28 @@
     assertPipelineErrors([{k: undefined, v: "undefinedKey"}], 40394);
     assertPipelineErrors([{y: "ignored", k: "item", v: "pear"}], 40392);
     assertPipelineErrors(NaN, 40386);
+
+    // Check that $arrayToObject produces an error when the key contains a null byte.
+    assertErrorCode(
+        coll,
+        [{$replaceRoot: {newRoot: {$arrayToObject: {$literal: [["a\0b", "abra cadabra"]]}}}}],
+        4940400);
+    assertErrorCode(
+        coll,
+        [{$replaceRoot: {newRoot: {$arrayToObject: {$literal: [{k: "a\0b", v: "blah"}]}}}}],
+        4940401);
+    assertErrorCode(
+        coll,
+        [
+          {$replaceRoot: {newRoot: {$arrayToObject: {$literal: [["a\0b", "abra cadabra"]]}}}},
+          {$out: "output"}
+        ],
+        4940400);
+    assertErrorCode(
+        coll,
+        [
+          {$replaceRoot: {newRoot: {$arrayToObject: {$literal: [{k: "a\0b", v: "blah"}]}}}},
+          {$out: "output"}
+        ],
+        4940401);
 }());
