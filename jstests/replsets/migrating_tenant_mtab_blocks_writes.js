@@ -16,6 +16,8 @@
             });
         };
 
+    // the value of the access enum in MigratingTenantAccessBlocker for the 'kBlockWritesAndReads' access state.
+    const kBlockReadsAndWrites = 2;
     const rst = new ReplSetTest({ nodes: 1 });
     rst.startSet();
     rst.initiate();
@@ -34,8 +36,10 @@
     assert.commandWorked(runDonorStartMigrationCommand(donorPrimary, kMigrationId, kRecipientConnectionString, kDBPrefixes, kReadPreference));
 
     jsTest.log('Running the serverStatus command.')
-    const res = donorPrimary.adminCommand({ serverStatus: 1 });
-    jsTest.log(tojson(res));
+    const migratingTenantServerStatus = donorPrimary.adminCommand({ serverStatus: 1 }).migratingTenantAccessBlocker;
+
+    assert.eq(migratingTenantServerStatus.access, kBlockReadsAndWrites);
+    assert(migratingTenantServerStatus.blockTimestamp);
 
     rst.stopSet();
 })();

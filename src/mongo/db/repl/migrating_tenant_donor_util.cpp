@@ -90,8 +90,8 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
 }
 
 /**
- * Creates a MigratingTenantAccess blocker and then adds it to the MtabByPrefix container through
- * the donor document's databasePrefix.
+ * Creates a MigratingTenantAccess blocker, and makes it start blocking writes. Then adds it to
+ * the MigratingTenantAccessBlockerByPrefix container using the donor document's databasePrefix as the key.
  */
 void startTenantMigrationBlockOnPrimary(OperationContext* opCtx,
                                         const TenantMigrationDonorDocument& donorDoc) {
@@ -144,15 +144,11 @@ void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& origi
             auto oplogSlot = repl::LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
 
 
-            TenantMigrationDonorDocument updatedDoc;
-            updatedDoc.setId(originalDoc.getId());
-            updatedDoc.setDatabasePrefix(originalDoc.getDatabasePrefix());
+            TenantMigrationDonorDocument updatedDoc = originalDoc;
             updatedDoc.setState(TenantMigrationDonorStateEnum::kBlocking);
             updatedDoc.setBlockTimestamp(oplogSlot.getTimestamp());
 
-
             CollectionUpdateArgs args;
-            // ! Since the updatedDoc isn't properly created, this will throw an error
             args.update = updatedDoc.toBSON();
             args.criteria = BSON("_id" << originalDoc.getId());
             args.oplogSlot = oplogSlot;
@@ -205,6 +201,9 @@ void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONOb
     }
 }
 
+/**
+ * TODO - ADD DESCRIPTION EXPLAINING PURPOSE
+ */
 void persistDonorStateMachine(OperationContext* opCtx,
                               const TenantMigrationDonorDocument& donorDoc) {
     PersistentTaskStore<TenantMigrationDonorDocument> store(
