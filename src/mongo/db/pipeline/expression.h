@@ -2920,4 +2920,26 @@ private:
 
     double getRandomValue() const;
 };
+
+class ExpressionToHashedIndexKey : public Expression {
+public:
+    ExpressionToHashedIndexKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               boost::intrusive_ptr<Expression> inputExpression)
+        : Expression(expCtx, {inputExpression}){};
+
+    static boost::intrusive_ptr<Expression> parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const;
+    Value serialize(bool explain) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
+};
+
 }  // namespace mongo
