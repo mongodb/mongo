@@ -1,4 +1,6 @@
-# Internal Ingress Networking
+# Transport Internals
+## Ingress Networking
+
 Ingress networking refers to when a MongoDB process receives incoming requests from a client.
 
 When a client wants to interact with a server, they must first establish a connection. The server listens on a single port for incoming client connections. Once a client connection is received over an ephermeral port, a client session is created out of this connection and commands begin to be processed on a new dedicated thread.
@@ -35,9 +37,7 @@ The various builders supplied in the ReplyBuilderInterface can be appended toget
 This interface acts as a cursor to build a response message to be sent out back to the client.
 
 ## See Also
-Below are links to relevant server-related internal documentation.
-- [Egress Networking][egress_networking]
-- Transport Layer (in progress)
+For details on egress networking, see [this document][egress_networking].
 
 [ServiceExecutor]: service_executor.h
 [ServiceStateMachine]: service_state_machine.h

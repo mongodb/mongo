@@ -1,6 +1,6 @@
-# Internal Egress Networking
+# Egress Networking
 
-Egress networking entails outbound communication (i.e. requests) from a client process to other servers (e.g. *mongod*), as well as inbound communication (i.e. responses) from such a server process back to some client.
+Egress networking entails outbound communication (i.e. requests) from a client process to a server process (e.g. *mongod*), as well as inbound communication (i.e. responses) from such a server process back to a client process.
 
 ## Remote Commands
 
@@ -20,12 +20,11 @@ Client-side outbound communication in egress networking is primarily handled by 
 
 The scheduling of requests is managed by the [task executor][task_executor_h], which maintains the notion of **events** and **callbacks**. Callbacks represent work (e.g. remote requests) that is to be executed by the executor, and are scheduled by client threads as well as other callbacks. There are several variations of work scheduling methods, which include: immediate scheduling, scheduling no earlier than a specified time, and scheduling iff a specified event has been signalled. These methods return a handle that can be used while the executor is still in scope for either waiting on or cancelling the scheduled callback in question. If a scheduled callback is cancelled, it remains on the work queue and is technically still run, but is labeled as having been 'cancelled' beforehand. Once a given callback/request is scheduled, the task executor is then able to execute such requests via a [network interface][network_interface_h]. The network interface, connected to a particular host/server, begins the asynchronous execution of commands specified via a request bundled in the aforementioned callback handle. The interface is capable of blocking threads until its associated task executor has work that needs to be performed, and is likewise able to return from an idle state when it receives a signal that the executor has new work to process. 
 
-Client-side legacy networking draws upon the `DBClientBase` class, of which there are multiple subclasses residing in the `src/mongo/client` folder. The [replica set DBClient][dbclient_rs_h] discerns which one of multiple servers in a replica set is the primary/master at construction time, and establishes a connection (using the `DBClientConnection` wrapper class, also extended from `DBClientBase`) with the replica set via the primary/master. In cases where the primary/master server is unresponsive within a specified time range, the RS DBClient will automatically attempt to establish a secondary/slave server as the new primary/master (see [automatic failover][automatic_failover]).
+Client-side legacy networking draws upon the `DBClientBase` class, of which there are multiple subclasses residing in the `src/mongo/client` folder. The [replica set DBClient][dbclient_rs_h] discerns which one of multiple servers in a replica set is the primary at construction time, and establishes a connection (using the `DBClientConnection` wrapper class, also extended from `DBClientBase`) with the replica set via the primary. In cases where the primary server is unresponsive within a specified time range, the RS DBClient will automatically attempt to establish a secondary server as the new primary (see [automatic failover][automatic_failover]).
 
 ## See Also
-Below are links to relevant server-related internal documentation.
-- [Ingress Networking][ingress_networking]
-- Transport Layer (in progress)
+For details on transport internals, including ingress networking, see [this
+document][transport_internals].
 
 [remote_command_request_h]: ../src/mongo/executor/remote_command_request.h
 [remote_command_response_h]: ../src/mongo/executor/remote_command_response.h
@@ -39,4 +38,4 @@ Below are links to relevant server-related internal documentation.
 [network_interface_h]: ../src/mongo/executor/network_interface.h
 [dbclient_rs_h]: ../src/mongo/client/dbclient_rs.h
 [automatic_failover]: https://docs.mongodb.com/manual/replication/#automatic-failover
-[ingress_networking]: ../src/mongo/transport/README.md
+[transport_internals]: ../src/mongo/transport/README.md
