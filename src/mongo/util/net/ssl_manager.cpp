@@ -40,11 +40,14 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/net/ssl_options.h"
@@ -344,7 +347,30 @@ std::shared_ptr<SSLManagerInterface> SSLManagerCoordinator::getSSLManager() {
     return *_manager;
 }
 
-void SSLManagerCoordinator::rotate() {}
+void SSLManagerCoordinator::rotate() {
+// Note: This isn't Windows-specific code, but other platforms may need more work
+#if defined(_WIN32) || defined(__APPLE__)
+    stdx::lock_guard lockGuard(_lock);
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(sslGlobalParams, isSSLServer);
+
+    int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
+    if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 ||
+        clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
+        auth::setInternalUserAuthParams(
+            BSON(saslCommandMechanismFieldName
+                 << "MONGODB-X509" << saslCommandUserDBFieldName << "$external"
+                 << saslCommandUserFieldName
+                 << manager->getSSLConfiguration().clientSubjectName.toString()));
+    }
+
+    auto tl = getGlobalServiceContext()->getTransportLayer();
+    invariant(tl != nullptr);
+    uassertStatusOK(tl->rotateCertificates(manager));
+    _manager = manager;
+    LOGV2(4913400, "Successfully rotated X509 certificates.");
+#endif
+}
 
 SSLManagerCoordinator::SSLManagerCoordinator()
     : _manager(SSLManagerInterface::create(sslGlobalParams, isSSLServer)) {}

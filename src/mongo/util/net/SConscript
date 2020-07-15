@@ -128,6 +128,7 @@ if not get_option('ssl') == 'off':
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/auth/auth',
+            '$BUILD_DIR/mongo/client/internal_auth',
             '$BUILD_DIR/mongo/util/caching',
             '$BUILD_DIR/mongo/util/concurrency/thread_pool',
             '$BUILD_DIR/third_party/shim_asio',

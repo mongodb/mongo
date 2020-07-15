@@ -119,6 +119,11 @@ public:
         return opCtx->getServiceContext()->makeBaton(opCtx);
     }
 
+#ifdef MONGO_CONFIG_SSL
+    /** Rotate the in-use certificates for new connections. */
+    virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager) = 0;
+#endif
+
 protected:
     TransportLayer() = default;
 };

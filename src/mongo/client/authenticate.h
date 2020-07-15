@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/db/auth/user_name.h"
@@ -130,29 +131,6 @@ Future<void> authenticateInternalClient(const std::string& clientSubjectName,
                                         RunCommandHook runCommand);
 
 /**
- * Sets the keys used by authenticateInternalClient - these should be a vector of raw passwords,
- * they will be digested and prepped appropriately by authenticateInternalClient depending
- * on what mechanism is used.
- */
-void setInternalAuthKeys(const std::vector<std::string>& keys);
-
-/**
- * Sets the parameters for non-password based internal authentication.
- */
-void setInternalUserAuthParams(BSONObj obj);
-
-/**
- * Returns whether there are multiple keys that will be tried while authenticating an internal
- * client (used for logging a startup warning).
- */
-bool hasMultipleInternalAuthKeys();
-
-/**
- * Returns whether there are any internal auth data set.
- */
-bool isInternalAuthSet();
-
-/**
  * Build a BSONObject representing parameters to be passed to authenticateClient(). Takes
  * the following fields:
  *
@@ -207,11 +185,6 @@ SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
  */
 SpeculativeAuthType speculateInternalAuth(BSONObjBuilder* isMasterRequest,
                                           std::shared_ptr<SaslClientSession>* saslClientSession);
-
-/**
- * Returns the AuthDB used by internal authentication.
- */
-std::string getInternalAuthDB();
 
 }  // namespace auth
 }  // namespace mongo

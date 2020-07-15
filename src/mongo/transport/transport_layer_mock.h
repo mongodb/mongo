@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/config.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -73,6 +74,12 @@ public:
 
     // Set to a factory function to use your own session type.
     std::function<SessionHandle(TransportLayer*)> createSessionHook;
+
+#ifdef MONGO_CONFIG_SSL
+    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager) override {
+        return Status::OK();
+    }
+#endif
 
 private:
     friend class MockSession;

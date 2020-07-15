@@ -144,8 +144,10 @@ public:
 #endif
 
 #ifdef MONGO_CONFIG_SSL
+    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager) override;
+
     std::shared_ptr<SSLManagerInterface> getSSLManager() {
-        return _sslManager;
+        return _sslContext.get()->manager;
     }
 #endif
 
@@ -200,9 +202,12 @@ private:
     std::shared_ptr<ASIOReactor> _acceptorReactor;
 
 #ifdef MONGO_CONFIG_SSL
-    std::unique_ptr<asio::ssl::context> _ingressSSLContext;
-    std::unique_ptr<asio::ssl::context> _egressSSLContext;
-    std::shared_ptr<SSLManagerInterface> _sslManager;
+    struct SSLConnectionContext {
+        std::unique_ptr<asio::ssl::context> ingress;
+        std::unique_ptr<asio::ssl::context> egress;
+        std::shared_ptr<SSLManagerInterface> manager;
+    };
+    synchronized_value<std::shared_ptr<SSLConnectionContext>> _sslContext;
 #endif
 
     std::vector<std::pair<SockAddr, GenericAcceptor>> _acceptors;

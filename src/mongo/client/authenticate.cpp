@@ -187,67 +187,6 @@ Future<void> authenticateClient(const BSONObj& params,
 
 AuthMongoCRHandler authMongoCR = authMongoCRImpl;
 
-static auto internalAuthKeysMutex = MONGO_MAKE_LATCH();
-static bool internalAuthSet = false;
-static std::vector<std::string> internalAuthKeys;
-static BSONObj internalAuthParams;
-
-void setInternalAuthKeys(const std::vector<std::string>& keys) {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
-
-    internalAuthKeys = keys;
-    fassert(50996, internalAuthKeys.size() > 0);
-    internalAuthSet = true;
-}
-
-void setInternalUserAuthParams(BSONObj obj) {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
-    internalAuthParams = obj.getOwned();
-    internalAuthKeys.clear();
-    internalAuthSet = true;
-}
-
-bool hasMultipleInternalAuthKeys() {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
-    return internalAuthSet && internalAuthKeys.size() > 1;
-}
-
-bool isInternalAuthSet() {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
-    return internalAuthSet;
-}
-
-BSONObj getInternalAuthParams(size_t idx, const std::string& mechanism) {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
-    if (!internalAuthSet) {
-        return BSONObj();
-    }
-
-    // If we've set a specific BSONObj as the internal auth pararms, return it if the index
-    // is zero (there are no alternate credentials if we've set a BSONObj explicitly).
-    if (!internalAuthParams.isEmpty()) {
-        return idx == 0 ? internalAuthParams : BSONObj();
-    }
-
-    // If the index is larger than the number of keys we know about then return an empty
-    // BSONObj.
-    if (idx + 1 > internalAuthKeys.size()) {
-        return BSONObj();
-    }
-
-    auto password = internalAuthKeys.at(idx);
-    if (mechanism == kMechanismScramSha1) {
-        password = mongo::createPasswordDigest(
-            internalSecurity.user->getName().getUser().toString(), password);
-    }
-
-    return BSON(saslCommandMechanismFieldName
-                << mechanism << saslCommandUserDBFieldName
-                << internalSecurity.user->getName().getDB() << saslCommandUserFieldName
-                << internalSecurity.user->getName().getUser() << saslCommandPasswordFieldName
-                << password << saslCommandDigestPasswordFieldName << false);
-}
-
 Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                                            const UserName& username,
                                            boost::optional<std::string> mechanismHint,
@@ -450,17 +389,6 @@ SpeculativeAuthType speculateInternalAuth(
 } catch (...) {
     // Swallow any exception and fallback on explicit auth.
     return SpeculativeAuthType::kNone;
-}
-
-std::string getInternalAuthDB() {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
-
-    if (!internalAuthParams.isEmpty()) {
-        return getBSONString(internalAuthParams, saslCommandUserDBFieldName);
-    }
-
-    auto isu = internalSecurity.user;
-    return isu ? isu->getName().getDB().toString() : "admin";
 }
 
 }  // namespace auth
