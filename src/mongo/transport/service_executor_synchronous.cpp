@@ -52,7 +52,8 @@ thread_local std::deque<ServiceExecutor::Task> ServiceExecutorSynchronous::_loca
 thread_local int ServiceExecutorSynchronous::_localRecursionDepth = 0;
 thread_local int64_t ServiceExecutorSynchronous::_localThreadIdleCounter = 0;
 
-ServiceExecutorSynchronous::ServiceExecutorSynchronous(ServiceContext* ctx) {}
+ServiceExecutorSynchronous::ServiceExecutorSynchronous(ServiceContext* ctx)
+    : _shutdownCondition(std::make_shared<stdx::condition_variable>()) {}
 
 Status ServiceExecutorSynchronous::start() {
     _numHardwareCores = static_cast<size_t>(ProcessInfo::getNumAvailableCores());
@@ -68,7 +69,7 @@ Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
     _stillRunning.store(false);
 
     stdx::unique_lock<Latch> lock(_shutdownMutex);
-    bool result = _shutdownCondition.wait_for(lock, timeout.toSystemDuration(), [this]() {
+    bool result = _shutdownCondition->wait_for(lock, timeout.toSystemDuration(), [this]() {
         return _numRunningWorkerThreads.load() == 0;
     });
 
@@ -115,20 +116,25 @@ Status ServiceExecutorSynchronous::schedule(Task task,
     // into the thread local job queue.
     LOGV2_DEBUG(22983, 3, "Starting new executor thread in passthrough mode");
 
-    Status status = launchServiceWorkerThread([this, task = std::move(task)] {
-        _numRunningWorkerThreads.addAndFetch(1);
+    Status status = launchServiceWorkerThread(
+        [this, condVarAnchor = _shutdownCondition, task = std::move(task)] {
+            _numRunningWorkerThreads.addAndFetch(1);
 
-        _localWorkQueue.emplace_back(std::move(task));
-        while (!_localWorkQueue.empty() && _stillRunning.loadRelaxed()) {
-            _localRecursionDepth = 1;
-            _localWorkQueue.front()();
-            _localWorkQueue.pop_front();
-        }
+            _localWorkQueue.emplace_back(std::move(task));
+            while (!_localWorkQueue.empty() && _stillRunning.loadRelaxed()) {
+                _localRecursionDepth = 1;
+                _localWorkQueue.front()();
+                _localWorkQueue.pop_front();
+            }
 
-        if (_numRunningWorkerThreads.subtractAndFetch(1) == 0) {
-            _shutdownCondition.notify_all();
-        }
-    });
+            // We maintain an anchor to "_shutdownCondition" to ensure it remains alive even if the
+            // service executor is freed. Any access to the service executor (through "this") is
+            // prohibited (and unsafe) after the following line. For more context, see SERVER-49432.
+            auto numWorkerThreadsStillRunning = _numRunningWorkerThreads.subtractAndFetch(1);
+            if (numWorkerThreadsStillRunning == 0) {
+                condVarAnchor->notify_all();
+            }
+        });
 
     return status;
 }

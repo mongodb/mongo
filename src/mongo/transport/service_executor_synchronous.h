@@ -69,7 +69,7 @@ private:
 
     mutable Mutex _shutdownMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0),
                                                     "ServiceExecutorSynchronous::_shutdownMutex");
-    stdx::condition_variable _shutdownCondition;
+    std::shared_ptr<stdx::condition_variable> _shutdownCondition;
 
     AtomicWord<size_t> _numRunningWorkerThreads{0};
     size_t _numHardwareCores{0};
