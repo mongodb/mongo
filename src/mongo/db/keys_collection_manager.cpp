@@ -67,14 +67,15 @@ Milliseconds kMaxRefreshWaitTime(10 * 60 * 1000);
 // a successful refresh.
 MONGO_FAIL_POINT_DEFINE(maxKeyRefreshWaitTimeOverrideMS);
 
-/**
- * Returns the amount of time to wait until the monitoring thread should attempt to refresh again.
- */
+}  // unnamed namespace
+
+namespace keys_collection_manager_util {
+
 Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
                                  const LogicalTime& latestExpiredAt,
                                  const Milliseconds& interval) {
-    auto currentSecs = currentTime.asTimestamp().getSecs();
-    auto expiredSecs = latestExpiredAt.asTimestamp().getSecs();
+    auto currentSecs = Seconds(currentTime.asTimestamp().getSecs());
+    auto expiredSecs = Seconds(latestExpiredAt.asTimestamp().getSecs());
 
     if (currentSecs >= expiredSecs) {
         // This means that the last round didn't generate a usable key for the current time.
@@ -82,16 +83,16 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
         return kRefreshIntervalIfErrored;
     }
 
-    auto millisBeforeExpire = 1000 * (expiredSecs - currentSecs);
+    Milliseconds millisBeforeExpire = Milliseconds(expiredSecs) - Milliseconds(currentSecs);
 
-    if (interval.count() <= millisBeforeExpire) {
+    if (interval <= millisBeforeExpire) {
         return interval;
     }
 
-    return Milliseconds(millisBeforeExpire);
+    return millisBeforeExpire;
 }
 
-}  // unnamed namespace
+}  // namespace keys_collection_manager_util
 
 KeysCollectionManager::KeysCollectionManager(std::string purpose,
                                              std::unique_ptr<KeysCollectionClient> client,
@@ -260,8 +261,8 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                     _hasSeenKeys = true;
                 }
 
-                nextWakeup =
-                    howMuchSleepNeedFor(currentTime, latestKey.getExpiresAt(), refreshInterval);
+                nextWakeup = keys_collection_manager_util::howMuchSleepNeedFor(
+                    currentTime, latestKey.getExpiresAt(), refreshInterval);
             } else {
                 errorCount += 1;
                 nextWakeup = Milliseconds(kRefreshIntervalIfErrored.count() * errorCount);

@@ -51,6 +51,17 @@ class KeysCollectionClient;
 
 extern int KeysRotationIntervalSec;
 
+namespace keys_collection_manager_util {
+
+/**
+ * Returns the amount of time to wait until the monitoring thread should attempt to refresh again.
+ */
+Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
+                                 const LogicalTime& latestExpiredAt,
+                                 const Milliseconds& interval);
+
+}  // namespace keys_collection_manager_util
+
 /**
  * The KeysCollectionManager queries the config servers for keys that can be used for
  * HMAC computation. It maintains an internal background thread that is used to periodically
