@@ -160,6 +160,7 @@ namespace {
 
 // Attempting to read the featureCompatibilityVersion parameter before it is explicitly initialized
 // with a meaningful value will trigger failures as of SERVER-32630.
+// (Generic FCV reference): This FCV reference should exist across LTS binary versions.
 void setUpFCV() {
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);

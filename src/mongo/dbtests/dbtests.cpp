@@ -179,6 +179,7 @@ int dbtestsMain(int argc, char** argv) {
     mongo::dbtests::initWireSpec();
 
     mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);
     repl::ReplSettings replSettings;

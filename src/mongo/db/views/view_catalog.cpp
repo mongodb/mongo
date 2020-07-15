@@ -334,6 +334,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
     // If the feature compatibility version is not kLatest, and we are validating features as
     // master, ban the use of new agg features introduced in kLatest to prevent them from being
     // persisted in the catalog.
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     if (serverGlobalParams.validateFeaturesAsMaster.load() &&
         currentFCV != ServerGlobalParams::FeatureCompatibility::kLatest) {
         expCtx->maxFeatureCompatibilityVersion = currentFCV;

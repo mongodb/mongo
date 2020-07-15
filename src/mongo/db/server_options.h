@@ -198,6 +198,8 @@ struct ServerGlobalParams {
             kVersion451 = 4,
         };
 
+        // These constants should only be used for generic FCV references. Generic references are
+        // FCV references that are expected to exist across LTS binary versions.
         static constexpr Version kLatest = Version::kVersion451;
         static constexpr Version kLastContinuous = Version::kFullyDowngradedTo44;
         static constexpr Version kLastLTS = Version::kFullyDowngradedTo44;

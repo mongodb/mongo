@@ -338,6 +338,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                                 << "field when attempting to add "
                                                 << connectionString.toString() << " as a shard");
     }
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     if (serverGlobalParams.featureCompatibility.getVersion() >
         ServerGlobalParams::FeatureCompatibility::kLastLTS) {
         // If the cluster's FCV is kLatest, or upgrading to / downgrading from, the node being added
@@ -346,6 +347,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     } else {
         // If the cluster's FCV is kLastLTS, the node being added must be a version kLastLTS or
         // version kLatest binary.
+        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
         invariant(serverGlobalParams.featureCompatibility.getVersion() ==
                   ServerGlobalParams::FeatureCompatibility::kLastLTS);
         invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION - 1);

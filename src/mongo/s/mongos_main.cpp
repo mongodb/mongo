@@ -902,6 +902,7 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 // featureCompatibilityVersion is lower.
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
                                      ("EndStartupOptionStorage"))
+// (Generic FCV reference): This FCV reference should exist across LTS binary versions.
 (InitializerContext* context) {
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);

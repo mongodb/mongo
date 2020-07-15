@@ -208,6 +208,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             // being persisted in the catalog.
             boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
                 maxFeatureCompatibilityVersion;
+            // (Generic FCV reference): This FCV check should exist across LTS binary versions.
             if (serverGlobalParams.validateFeaturesAsMaster.load() &&
                 currentFCV != ServerGlobalParams::FeatureCompatibility::kLatest) {
                 maxFeatureCompatibilityVersion = currentFCV;

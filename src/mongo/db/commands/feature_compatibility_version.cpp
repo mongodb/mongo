@@ -196,6 +196,7 @@ void FeatureCompatibilityVersion::_setVersion(
     serverGlobalParams.featureCompatibility.setVersion(newVersion);
     updateMinWireVersion();
 
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     if (newVersion != ServerGlobalParams::FeatureCompatibility::kLastLTS) {
         // Close all incoming connections from internal clients with binary versions lower than
         // ours.
@@ -207,6 +208,7 @@ void FeatureCompatibilityVersion::_setVersion(
             .dropConnections(transport::Session::kKeepOpen);
     }
 
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     if (newVersion != ServerGlobalParams::FeatureCompatibility::kLatest) {
         if (MONGO_unlikely(hangBeforeAbortingRunningTransactionsOnFCVDowngrade.shouldFail())) {
             LOGV2(20460,
@@ -227,6 +229,7 @@ void FeatureCompatibilityVersion::_setVersion(
     // This can only happen in two scenarios:
     // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.
     // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     const auto shouldIncrementTopologyVersion =
         newVersion == ServerGlobalParams::FeatureCompatibility::kLastLTS ||
         newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To451;
