@@ -775,6 +775,8 @@ void Parser::walkSort(AstQuery& ast) {
                                  std::move(dirs),
                                  lookupSlots(ast.nodes[1]->identifiers),
                                  std::numeric_limits<std::size_t>::max(),
+                                 std::numeric_limits<std::size_t>::max(),
+                                 true /* allowDiskUse */,
                                  nullptr);
 }
 

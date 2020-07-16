@@ -430,6 +430,10 @@ public:
         return *this;
     }
 
+    Version getVersion() const {
+        return _version;
+    }
+
 private:
     Version _version;
     // _ksSize is the total length that the KeyString takes up in the buffer.

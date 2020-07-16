@@ -325,6 +325,9 @@ public:
         appendNumImpl(j);
     }
 
+    void appendNum(unsigned long int j) {
+        appendNumImpl(j);
+    }
     void appendBuf(const void* src, size_t len) {
         if (len)
             memcpy(grow((int)len), src, len);

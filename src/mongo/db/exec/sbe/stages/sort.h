@@ -32,6 +32,11 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/trial_run_progress_tracker.h"
 
+namespace mongo {
+template <typename Key, typename Value>
+class SortIteratorInterface;
+}  // namespace mongo
+
 namespace mongo::sbe {
 class SortStage final : public PlanStage {
 public:
@@ -40,7 +45,11 @@ public:
               std::vector<value::SortDirection> dirs,
               value::SlotVector vals,
               size_t limit,
+              size_t memoryLimit,
+              bool allowDiskUse,
               TrialRunProgressTracker* tracker);
+
+    ~SortStage();
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -61,18 +70,29 @@ private:
     using SortKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
     using SortValueAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
 
+    using SorterIterator = SortIteratorInterface<value::MaterializedRow, value::MaterializedRow>;
+    using SorterData = std::pair<value::MaterializedRow, value::MaterializedRow>;
+
     const value::SlotVector _obs;
     const std::vector<value::SortDirection> _dirs;
     const value::SlotVector _vals;
     const size_t _limit;
+    const size_t _memoryLimit;
+    const bool _allowDiskUse;
 
     std::vector<value::SlotAccessor*> _inKeyAccessors;
     std::vector<value::SlotAccessor*> _inValueAccessors;
 
-    value::SlotMap<std::unique_ptr<value::SlotAccessor>> _outAccessors;
+    value::SlotMap<value::SwitchAccessor> _outAccessors;
 
     TableType _st;
     TableType::iterator _stIt;
+
+    // Data that has already been spilled.
+    std::vector<std::shared_ptr<SorterIterator>> _iters;
+    std::unique_ptr<SorterIterator> _mergeIt;
+    SorterData _mergeData;
+    SorterData* _mergeDataIt{&_mergeData};
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.

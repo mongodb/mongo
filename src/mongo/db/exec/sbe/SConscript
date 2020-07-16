@@ -12,7 +12,9 @@ env.Library(
         ]
     )
 
-env.Library(
+sbeEnv = env.Clone()
+sbeEnv.InjectThirdParty(libraries=['snappy'])
+sbeEnv.Library(
     target='query_sbe',
     source=[
         'expressions/expression.cpp',
@@ -36,6 +38,7 @@ env.Library(
         'stages/unwind.cpp',
         'util/debug_print.cpp',
         'values/bson.cpp',
+        'values/slot.cpp',
         'values/value.cpp',
         'vm/arith.cpp',
         'vm/vm.cpp',
@@ -46,9 +49,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/plan_yield_policy',
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/third_party/shim_snappy',
         'query_sbe_plan_stats'
          ]
     )

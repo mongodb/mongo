@@ -31,6 +31,11 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 
+namespace mongo {
+class BufReader;
+class BufBuilder;
+}  // namespace mongo
+
 namespace mongo::sbe::value {
 /**
  * Uniquely identifies a slot in an SBE plan. The slot ids are allocated as part of creating the
@@ -225,6 +230,34 @@ private:
 };
 
 /**
+ * This is a switched accessor - it holds a vector of accessors and operates on an accessor selected
+ * (switched) by the index field.
+ */
+class SwitchAccessor final : public SlotAccessor {
+public:
+    SwitchAccessor(std::vector<std::unique_ptr<SlotAccessor>> accessors)
+        : _accessors(std::move(accessors)) {
+        invariant(!_accessors.empty());
+    }
+
+    std::pair<TypeTags, Value> getViewOfValue() const override {
+        return _accessors[_index]->getViewOfValue();
+    }
+    std::pair<TypeTags, Value> copyOrMoveValue() override {
+        return _accessors[_index]->copyOrMoveValue();
+    }
+
+    void setIndex(size_t index) {
+        invariant(index < _accessors.size());
+        _index = index;
+    }
+
+private:
+    std::vector<std::unique_ptr<SlotAccessor>> _accessors;
+    size_t _index{0};
+};
+
+/**
  * Some SBE stages must materialize rows inside (key, value) data structures, e.g. for the sort or
  * hash aggregation operators. In such cases, both key and value are each materialized rows which
  * may consist of multiple 'sbe::Value' instances. This accessor provides a view of a particular
@@ -334,6 +367,12 @@ struct MaterializedRow {
 
         return true;
     }
+
+    // The following methods are used by the sorter only.
+    struct SorterDeserializeSettings {};
+    static MaterializedRow deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
+    void serializeForSorter(BufBuilder& buf) const;
+    int memUsageForSorter() const;
 
     std::vector<OwnedValueAccessor> _fields;
 };
