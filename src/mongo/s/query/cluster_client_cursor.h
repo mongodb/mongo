@@ -33,6 +33,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
@@ -174,6 +175,11 @@ public:
      * Returns the transaction number for this cursor.
      */
     virtual boost::optional<TxnNumber> getTxnNumber() const = 0;
+
+    /**
+     * Returns the APIParameters for this cursor.
+     */
+    virtual APIParameters getAPIParameters() const = 0;
 
     /**
      * Returns the readPreference for this cursor.

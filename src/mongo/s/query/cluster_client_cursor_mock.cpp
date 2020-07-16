@@ -149,6 +149,14 @@ boost::optional<TxnNumber> ClusterClientCursorMock::getTxnNumber() const {
     return _txnNumber;
 }
 
+void ClusterClientCursorMock::setAPIParameters(APIParameters& apiParameters) {
+    _apiParameters = apiParameters;
+}
+
+APIParameters ClusterClientCursorMock::getAPIParameters() const {
+    return _apiParameters;
+}
+
 boost::optional<ReadPreferenceSetting> ClusterClientCursorMock::getReadPreference() const {
     return boost::none;
 }

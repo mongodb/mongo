@@ -248,7 +248,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
-    ClusterClientCursorParams params(query.nss(), readPref, ReadConcernArgs::get(opCtx));
+    ClusterClientCursorParams params(
+        query.nss(), APIParameters::get(opCtx), readPref, ReadConcernArgs::get(opCtx));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.batchSize = query.getQueryRequest().getEffectiveBatchSize();
     params.tailableMode = query.getQueryRequest().getTailableMode();
@@ -439,6 +440,8 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
         // Used to return "atClusterTime" in cursor replies to clients for snapshot reads.
         ReadConcernArgs::get(opCtx) = *readConcern;
     }
+
+    APIParameters::get(opCtx) = cursor->getAPIParameters();
 
     // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
     // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.

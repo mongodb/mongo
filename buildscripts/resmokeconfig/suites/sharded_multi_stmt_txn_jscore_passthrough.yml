@@ -70,6 +70,7 @@ selector:
   - jstests/core/geo_allowedcomparisons.js
   - jstests/core/geo_big_polygon2.js
   - jstests/core/geonear_key.js
+  - jstests/core/get_more_cmd_refuses_api_params.js
   - jstests/core/in.js
   - jstests/core/index8.js # No explicit check for failed command.
   - jstests/core/index_decimal.js

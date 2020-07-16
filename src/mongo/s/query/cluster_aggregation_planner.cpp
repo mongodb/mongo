@@ -250,8 +250,10 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
                                      const PrivilegeVector& privileges) {
 
-    ClusterClientCursorParams params(
-        requestedNss, ReadPreferenceSetting::get(opCtx), ReadConcernArgs::get(opCtx));
+    ClusterClientCursorParams params(requestedNss,
+                                     APIParameters::get(opCtx),
+                                     ReadPreferenceSetting::get(opCtx),
+                                     ReadConcernArgs::get(opCtx));
 
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = pipelineForMerging->getContext()->tailableMode;

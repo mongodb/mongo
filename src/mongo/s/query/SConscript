@@ -47,6 +47,7 @@ env.Library(
         "cluster_client_cursor_impl.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/shared_request_handling',
         "router_exec_stage",
     ],
 )
@@ -93,6 +94,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/shared_request_handling',
     ],
 )
 
@@ -123,6 +125,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/kill_sessions',
         '$BUILD_DIR/mongo/db/logical_session_cache',
         '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/shared_request_handling',
     ],
 )
 

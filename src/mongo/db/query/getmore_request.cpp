@@ -51,6 +51,9 @@ const char kBatchSizeField[] = "batchSize";
 const char kAwaitDataTimeoutField[] = "maxTimeMS";
 const char kTermField[] = "term";
 const char kLastKnownCommittedOpTimeField[] = "lastKnownCommittedOpTime";
+const char kApiVersion[] = "apiVersion";
+const char kApiStrict[] = "apiStrict";
+const char kApiDeprecationErrors[] = "apiDeprecationErrors";
 
 }  // namespace
 
@@ -105,6 +108,13 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 
     for (BSONElement el : cmdObj) {
         const auto fieldName = el.fieldNameStringData();
+
+        auto containsAPIParamField = fieldName == kApiVersion || fieldName == kApiStrict ||
+            fieldName == kApiDeprecationErrors;
+        uassert(4937600,
+                str::stream() << "Cannot pass in API parameter field " << fieldName,
+                !containsAPIParamField);
+
         if (fieldName == kGetMoreCommandName) {
             if (el.type() != BSONType::NumberLong) {
                 return {ErrorCodes::TypeMismatch,

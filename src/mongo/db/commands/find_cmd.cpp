@@ -490,6 +490,7 @@ public:
                     {std::move(exec),
                      nss,
                      AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                     APIParameters::get(opCtx),
                      opCtx->getWriteConcern(),
                      repl::ReadConcernArgs::get(opCtx),
                      _request.body,

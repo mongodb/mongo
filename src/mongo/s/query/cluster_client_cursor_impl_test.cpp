@@ -56,10 +56,11 @@ TEST_F(ClusterClientCursorImplTest, NumReturnedSoFar) {
         mockStage->queueResult(BSON("a" << i));
     }
 
-    ClusterClientCursorImpl cursor(_opCtx.get(),
-                                   std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused"), {}),
-                                   boost::none);
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString("unused"), APIParameters(), {}),
+        boost::none);
 
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 0);
 
@@ -249,6 +250,24 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreLSIDIfSetOnOpCtx) {
         ASSERT_EQ(*cursor->getLsid(), lsid);
         ASSERT_EQ(*cursor->getTxnNumber(), txnNumber);
     }
+}
+
+TEST_F(ClusterClientCursorImplTest, ShouldStoreAPIParameters) {
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+
+    APIParameters apiParams = APIParameters();
+    apiParams.setAPIVersion("2");
+    apiParams.setAPIStrict(true);
+    apiParams.setAPIDeprecationErrors(true);
+
+    ClusterClientCursorParams params(NamespaceString("test"), apiParams, {});
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(), std::move(mockStage), std::move(params), boost::none);
+    auto storedAPIParams = cursor.getAPIParameters();
+
+    ASSERT_EQ(apiParams.getAPIVersion(), storedAPIParams.getAPIVersion());
+    ASSERT_EQ(apiParams.getAPIStrict(), storedAPIParams.getAPIStrict());
+    ASSERT_EQ(apiParams.getAPIDeprecationErrors(), storedAPIParams.getAPIDeprecationErrors());
 }
 
 }  // namespace

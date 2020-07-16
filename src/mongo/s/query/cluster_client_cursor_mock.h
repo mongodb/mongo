@@ -90,6 +90,10 @@ public:
 
     boost::optional<TxnNumber> getTxnNumber() const final;
 
+    void setAPIParameters(APIParameters& apiParameters);
+
+    APIParameters getAPIParameters() const final;
+
     boost::optional<ReadPreferenceSetting> getReadPreference() const final;
 
     boost::optional<ReadConcernArgs> getReadConcern() const final;
@@ -141,6 +145,8 @@ private:
     Date_t _lastUseDate;
 
     std::uint64_t _nBatchesReturned = 0;
+
+    APIParameters _apiParameters = APIParameters();
 };
 
 }  // namespace mongo

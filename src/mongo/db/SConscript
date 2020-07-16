@@ -1192,6 +1192,7 @@ env.Library(
         'query/query_planner',
         'repl/repl_coordinator_interface',
         's/sharding_api_d',
+        'shared_request_handling',
         'stats/serveronly_stats',
         'storage/oplog_hack',
         'storage/snapshot_helper',

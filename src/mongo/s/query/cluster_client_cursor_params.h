@@ -39,6 +39,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/cursor_response.h"
@@ -68,9 +69,10 @@ using repl::ReadConcernArgs;
  */
 struct ClusterClientCursorParams {
     ClusterClientCursorParams(NamespaceString nss,
+                              APIParameters apiParameters,
                               boost::optional<ReadPreferenceSetting> readPref = boost::none,
                               boost::optional<ReadConcernArgs> readConcernArgs = boost::none)
-        : nsString(std::move(nss)) {
+        : nsString(std::move(nss)), apiParameters(std::move(apiParameters)) {
         if (readPref) {
             readPreference = std::move(readPref.get());
         }
@@ -146,6 +148,9 @@ struct ClusterClientCursorParams {
     // Whether this cursor is tailing a capped collection, and whether it has the awaitData option
     // set.
     TailableModeEnum tailableMode = TailableModeEnum::kNormal;
+
+    // The API parameters associated with the cursor.
+    APIParameters apiParameters;
 
     // Set if a readPreference must be respected throughout the lifetime of the cursor.
     boost::optional<ReadPreferenceSetting> readPreference;

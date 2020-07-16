@@ -220,6 +220,7 @@ void setUpOperationContextStateForGetMore(OperationContext* opCtx,
                                           bool disableAwaitDataFailpointActive) {
     applyCursorReadConcern(opCtx, cursor.getReadConcernArgs());
     opCtx->setWriteConcern(cursor.getWriteConcernOptions());
+    APIParameters::get(opCtx) = cursor.getAPIParameters();
     setUpOperationDeadline(opCtx, cursor, request, disableAwaitDataFailpointActive);
 
     // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note

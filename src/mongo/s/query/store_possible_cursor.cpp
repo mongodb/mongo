@@ -99,8 +99,10 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         return cmdResult;
     }
 
-    ClusterClientCursorParams params(
-        incomingCursorResponse.getValue().getNSS(), boost::none, ReadConcernArgs::get(opCtx));
+    ClusterClientCursorParams params(incomingCursorResponse.getValue().getNSS(),
+                                     APIParameters::get(opCtx),
+                                     boost::none,
+                                     ReadConcernArgs::get(opCtx));
     params.remotes.emplace_back();
     auto& remoteCursor = params.remotes.back();
     remoteCursor.setShardId(shardId.toString());

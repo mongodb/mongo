@@ -35,6 +35,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/query/plan_executor.h"
@@ -58,12 +59,14 @@ struct ClientCursorParams {
     ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
                        NamespaceString nss,
                        UserNameIterator authenticatedUsersIter,
+                       APIParameters apiParameters,
                        WriteConcernOptions writeConcernOptions,
                        repl::ReadConcernArgs readConcernArgs,
                        BSONObj originatingCommandObj,
                        PrivilegeVector originatingPrivileges)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
+          apiParameters(std::move(apiParameters)),
           writeConcernOptions(std::move(writeConcernOptions)),
           readConcernArgs(std::move(readConcernArgs)),
           queryOptions(exec->getCanonicalQuery()
@@ -93,6 +96,7 @@ struct ClientCursorParams {
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     const NamespaceString nss;
     std::vector<UserName> authenticatedUsers;
+    const APIParameters apiParameters;
     const WriteConcernOptions writeConcernOptions;
     const repl::ReadConcernArgs readConcernArgs;
     int queryOptions = 0;
@@ -141,12 +145,16 @@ public:
         return _txnNumber;
     }
 
-    repl::ReadConcernArgs getReadConcernArgs() const {
-        return _readConcernArgs;
+    APIParameters getAPIParameters() const {
+        return _apiParameters;
     }
 
     WriteConcernOptions getWriteConcernOptions() const {
         return _writeConcernOptions;
+    }
+
+    repl::ReadConcernArgs getReadConcernArgs() const {
+        return _readConcernArgs;
     }
 
     /**
@@ -358,6 +366,7 @@ private:
     // A transaction number for this cursor, if it was provided in the originating command.
     const boost::optional<TxnNumber> _txnNumber;
 
+    const APIParameters _apiParameters;
     const WriteConcernOptions _writeConcernOptions;
     const repl::ReadConcernArgs _readConcernArgs;
 

@@ -102,6 +102,8 @@ public:
 
     boost::optional<TxnNumber> getTxnNumber() const final;
 
+    APIParameters getAPIParameters() const final;
+
     boost::optional<ReadPreferenceSetting> getReadPreference() const final;
 
     boost::optional<ReadConcernArgs> getReadConcern() const final;

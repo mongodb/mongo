@@ -405,6 +405,7 @@ public:
             {std::move(exec),
              cursorNss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             APIParameters::get(opCtx),
              opCtx->getWriteConcern(),
              repl::ReadConcernArgs::get(opCtx),
              jsobj,
