@@ -67,7 +67,7 @@ TEST_F(SetNodeTest, ApplyNoOp) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -85,7 +85,7 @@ TEST_F(SetNodeTest, ApplyEmptyPathToCreate) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -104,7 +104,7 @@ TEST_F(SetNodeTest, ApplyCreatePath) {
 
     mutablebson::Document doc(fromjson("{a: {d: 5}}"));
     setPathToCreate("b.c");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -140,7 +140,7 @@ TEST_F(SetNodeTest, ApplyPositional) {
     ASSERT_OK(node.init(update["$set"]["a.$"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
-    setPathTaken("a.1");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.1"));
     setMatchedField("1");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"][1]), getUpdateNodeApplyParams());
@@ -160,7 +160,7 @@ TEST_F(SetNodeTest, ApplyNonViablePathToCreate) {
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
@@ -177,7 +177,7 @@ TEST_F(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathToCreate("b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
@@ -196,7 +196,7 @@ TEST_F(SetNodeTest, ApplyNoIndexDataNoLogBuilder) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -213,7 +213,7 @@ TEST_F(SetNodeTest, ApplyDoesNotAffectIndexes) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -230,7 +230,7 @@ TEST_F(SetNodeTest, TypeChangeIsNotANoop) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: NumberInt(2)}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -251,7 +251,7 @@ TEST_F(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
     // Apply a mutation to the document that will make it non-serialized.
     doc.root()["a"]["b"].setValueInt(2).transitional_ignore();
 
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -285,7 +285,7 @@ TEST_F(SetNodeTest, ApplyInPlace) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -302,7 +302,7 @@ TEST_F(SetNodeTest, ApplyOverridePath) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -319,7 +319,7 @@ TEST_F(SetNodeTest, ApplyChangeType) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 'str'}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -353,7 +353,7 @@ TEST_F(SetNodeTest, ApplyLog) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_EQUALS(fromjson("{a: 2}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
@@ -369,7 +369,7 @@ TEST_F(SetNodeTest, ApplyNoOpDottedPath) {
     ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -386,7 +386,7 @@ TEST_F(SetNodeTest, TypeChangeOnDottedPathIsNotANoOp) {
     ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: NumberLong(2)}}"));
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -404,7 +404,7 @@ TEST_F(SetNodeTest, ApplyPathNotViable) {
 
     mutablebson::Document doc(fromjson("{a:1}"));
     setPathToCreate("b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
@@ -420,7 +420,7 @@ TEST_F(SetNodeTest, ApplyPathNotViableArrray) {
 
     mutablebson::Document doc(fromjson("{a:[{b:1}]}"));
     setPathToCreate("b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
@@ -435,7 +435,7 @@ TEST_F(SetNodeTest, ApplyInPlaceDottedPath) {
     ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 1}}"));
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -452,7 +452,7 @@ TEST_F(SetNodeTest, ApplyChangeTypeDottedPath) {
     ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 'str'}}"));
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -469,7 +469,7 @@ TEST_F(SetNodeTest, ApplyChangePath) {
     ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 1}}}"));
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -487,7 +487,7 @@ TEST_F(SetNodeTest, ApplyExtendPath) {
 
     mutablebson::Document doc(fromjson("{a: {c: 1}}"));
     setPathToCreate("b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -555,7 +555,7 @@ TEST_F(SetNodeTest, ApplyNoOpArrayIndex) {
     ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
-    setPathTaken("a.2.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.2.b"));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -572,7 +572,7 @@ TEST_F(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
     ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2.0}]}"));
-    setPathTaken("a.2.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.2.b"));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -590,7 +590,7 @@ TEST_F(SetNodeTest, ApplyNonViablePath) {
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
@@ -605,7 +605,7 @@ TEST_F(SetNodeTest, ApplyInPlaceArrayIndex) {
     ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
-    setPathTaken("a.2.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.2.b"));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -623,7 +623,7 @@ TEST_F(SetNodeTest, ApplyNormalArray) {
 
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -641,7 +641,7 @@ TEST_F(SetNodeTest, ApplyPaddingArray) {
 
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -659,7 +659,7 @@ TEST_F(SetNodeTest, ApplyNumericObject) {
 
     mutablebson::Document doc(fromjson("{a: {b: 0}}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -676,7 +676,10 @@ TEST_F(SetNodeTest, ApplyNumericField) {
     ASSERT_OK(node.init(update["$set"]["a.2.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {'2': {b: 1}}}"));
-    setPathTaken("a.2.b");
+    setPathTaken(RuntimeUpdatePath(FieldRef("a.2.b"),
+                                   {RuntimeUpdatePath::ComponentType::kFieldName,
+                                    RuntimeUpdatePath::ComponentType::kFieldName,
+                                    RuntimeUpdatePath::ComponentType::kFieldName}));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -694,7 +697,9 @@ TEST_F(SetNodeTest, ApplyExtendNumericField) {
 
     mutablebson::Document doc(fromjson("{a: {'2': {c: 1}}}"));
     setPathToCreate("b");
-    setPathTaken("a.2");
+    setPathTaken(RuntimeUpdatePath(FieldRef("a.2"),
+                                   {RuntimeUpdatePath::ComponentType::kFieldName,
+                                    RuntimeUpdatePath::ComponentType::kFieldName}));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]["2"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -712,7 +717,7 @@ TEST_F(SetNodeTest, ApplyEmptyObject) {
 
     mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -730,7 +735,7 @@ TEST_F(SetNodeTest, ApplyEmptyArray) {
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.2.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -748,7 +753,7 @@ TEST_F(SetNodeTest, ApplyLogDottedPath) {
 
     mutablebson::Document doc(fromjson("{a: [{b:0}, {b:1}]}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_EQUALS(fromjson("{a: [{b:0}, {b:1}, {b:2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
@@ -765,7 +770,7 @@ TEST_F(SetNodeTest, LogEmptyArray) {
 
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_EQUALS(fromjson("{a: [null, null, {b:2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
@@ -782,7 +787,7 @@ TEST_F(SetNodeTest, LogEmptyObject) {
 
     mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("2.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
@@ -798,7 +803,7 @@ TEST_F(SetNodeTest, ApplyNoOpComplex) {
     ASSERT_OK(node.init(update["$set"]["a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"));
-    setPathTaken("a.1.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.1.b"));
     addIndexedPath("a.1.b");
     auto result = node.apply(getApplyParams(doc.root()["a"][1]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -815,7 +820,7 @@ TEST_F(SetNodeTest, ApplySameStructure) {
     ASSERT_OK(node.init(update["$set"]["a.1.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, xxx: 1}}]}}"));
-    setPathTaken("a.1.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.1.b"));
     addIndexedPath("a.1.b");
     auto result = node.apply(getApplyParams(doc.root()["a"][1]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -833,7 +838,7 @@ TEST_F(SetNodeTest, NonViablePathWithoutRepl) {
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathToCreate("1.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
@@ -849,7 +854,7 @@ TEST_F(SetNodeTest, SingleFieldFromReplication) {
 
     mutablebson::Document doc(fromjson("{_id:1, a: 1}"));
     setPathToCreate("1.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.1.b");
     setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
@@ -868,7 +873,7 @@ TEST_F(SetNodeTest, SingleFieldNoIdFromReplication) {
 
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathToCreate("1.b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.1.b");
     setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
@@ -887,7 +892,7 @@ TEST_F(SetNodeTest, NestedFieldFromReplication) {
 
     mutablebson::Document doc(fromjson("{_id:1, a: {a: 1}}"));
     setPathToCreate("1.b");
-    setPathTaken("a.a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.a"));
     addIndexedPath("a.a.1.b");
     setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]["a"]), getUpdateNodeApplyParams());
@@ -906,7 +911,7 @@ TEST_F(SetNodeTest, DoubleNestedFieldFromReplication) {
 
     mutablebson::Document doc(fromjson("{_id:1, a: {b: {c: 1}}}"));
     setPathToCreate("d");
-    setPathTaken("a.b.c");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b.c"));
     addIndexedPath("a.b.c.d");
     setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams());
@@ -925,7 +930,7 @@ TEST_F(SetNodeTest, NestedFieldNoIdFromReplication) {
 
     mutablebson::Document doc(fromjson("{a: {a: 1}}"));
     setPathToCreate("1.b");
-    setPathTaken("a.a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.a"));
     addIndexedPath("a.a.1.b");
     setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"]["a"]), getUpdateNodeApplyParams());
@@ -944,7 +949,7 @@ TEST_F(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
 
     mutablebson::Document doc(fromjson("{_id: 0, a: [1, {b: [1]}]}"));
     setPathToCreate("b");
-    setPathTaken("a.0");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.0"));
     addIndexedPath("a.1.b");
     setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["a"][0]), getUpdateNodeApplyParams());
@@ -962,7 +967,7 @@ TEST_F(SetNodeTest, Set6) {
     ASSERT_OK(node.init(update["$set"]["r.a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
-    setPathTaken("r.a");
+    setPathTaken(makeRuntimeUpdatePathForTest("r.a"));
     addIndexedPath("r.a");
     auto result = node.apply(getApplyParams(doc.root()["r"]["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -981,7 +986,7 @@ TEST_F(SetNodeTest, Set6FromRepl) {
     ASSERT_OK(node.init(update["$set"]["r.a"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
-    setPathTaken("r.a");
+    setPathTaken(makeRuntimeUpdatePathForTest("r.a"));
     addIndexedPath("r.a");
     setFromOplogApplication(true);
     auto result = node.apply(getApplyParams(doc.root()["r"]["a"]), getUpdateNodeApplyParams());
@@ -1009,7 +1014,7 @@ TEST_F(SetNodeTest, ApplySetModToEphemeralDocument) {
     Element a = doc.makeElementInt("a", 100);
     x.pushBack(a).transitional_ignore();
 
-    setPathTaken("x");
+    setPathTaken(makeRuntimeUpdatePathForTest("x"));
     addIndexedPath("x");
     auto result = node.apply(getApplyParams(doc.root()["x"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -1025,7 +1030,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
@@ -1105,7 +1110,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteImmutablePath) {
     ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams()),
@@ -1121,7 +1126,7 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnImmutablePath) {
     ASSERT_OK(node.init(update["$set"]["a.b"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addImmutablePath("a.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
@@ -1141,7 +1146,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToRemoveImmutablePath) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
@@ -1157,7 +1162,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwritePrefixToModifyImmutablePath) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
@@ -1174,7 +1179,7 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnPrefixOfImmutablePath) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addImmutablePath("a.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
@@ -1194,7 +1199,7 @@ TEST_F(SetNodeTest, ApplyCanOverwritePrefixToCreateImmutablePath) {
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addImmutablePath("a.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
@@ -1214,7 +1219,7 @@ TEST_F(SetNodeTest, ApplyCanOverwritePrefixOfImmutablePathIfNoopOnImmutablePath)
     ASSERT_OK(node.init(update["$set"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addImmutablePath("a.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
@@ -1234,7 +1239,7 @@ TEST_F(SetNodeTest, ApplyCannotOverwriteSuffixOfImmutablePath) {
     ASSERT_OK(node.init(update["$set"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 2}}}"));
-    setPathTaken("a.b.c");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b.c"));
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams()),
@@ -1250,7 +1255,7 @@ TEST_F(SetNodeTest, ApplyCanPerformNoopOnSuffixOfImmutablePath) {
     ASSERT_OK(node.init(update["$set"]["a.b.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 2}}}"));
-    setPathTaken("a.b.c");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b.c"));
     addImmutablePath("a.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams());
@@ -1271,7 +1276,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateFieldAtEndOfImmutablePath) {
 
     mutablebson::Document doc(fromjson("{a: {b: {}}}"));
     setPathToCreate("c");
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams()),
@@ -1288,7 +1293,7 @@ TEST_F(SetNodeTest, ApplyCannotCreateFieldBeyondEndOfImmutablePath) {
 
     mutablebson::Document doc(fromjson("{a: {b: {}}}"));
     setPathToCreate("c");
-    setPathTaken("a.b");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addImmutablePath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams()),
@@ -1305,7 +1310,7 @@ TEST_F(SetNodeTest, ApplyCanCreateImmutablePath) {
 
     mutablebson::Document doc(fromjson("{a: {}}"));
     setPathToCreate("b");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addImmutablePath("a.b");
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
@@ -1346,7 +1351,7 @@ TEST_F(SetNodeTest, ApplySetFieldInNonExistentArrayElementAffectsIndexOnSiblingF
 
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     setPathToCreate("1.c");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -1366,7 +1371,7 @@ TEST_F(SetNodeTest, ApplySetFieldInExistingArrayElementDoesNotAffectIndexOnSibli
 
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     setPathToCreate("c");
-    setPathTaken("a.0");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.0"));
     addIndexedPath("a.b");
     auto result = node.apply(getApplyParams(doc.root()["a"][0]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -1386,7 +1391,7 @@ TEST_F(SetNodeTest, ApplySetFieldInNonExistentNumericFieldDoesNotAffectIndexOnSi
 
     mutablebson::Document doc(fromjson("{a: {'0': {b: 0}}}"));
     setPathToCreate("1.c");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a.b");
     addIndexedPath("a.1.b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
@@ -1443,7 +1448,7 @@ TEST_F(SetNodeTest, ApplySetOnInsertExistingPath) {
     ASSERT_OK(node.init(update["$setOnInsert"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     setInsert(true);
     addIndexedPath("a");
     setLogBuilderToNull();  // The log builder is null for inserts.

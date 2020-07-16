@@ -31,48 +31,69 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/update/update_oplog_entry_version.h"
+#include "mongo/db/update/log_builder_interface.h"
 
 namespace mongo {
+class RuntimeUpdatePath;
 
 /**
  * LogBuilder abstracts away some of the details of producing a properly constructed oplog $v:1
  * modifier-style update entry. It manages separate regions into which it accumulates $set and
  * $unset operations.
  */
-class LogBuilder {
+class V1LogBuilder : public LogBuilderInterface {
 public:
-    /** Construct a new LogBuilder. Log entries will be recorded as new children under the
-     *  'logRoot' Element, which must be of type mongo::Object and have no children.
+    /**
+     * Construct a new LogBuilder. Log entries will be recorded as new children under the
+     * 'logRoot' Element, which must be of type mongo::Object and have no children.
+     *
+     * The 'includeVersionField' indicates whether the generated log entry should include a $v
+     * (version) field.
      */
-    inline LogBuilder(mutablebson::Element logRoot)
-        : _logRoot(logRoot),
-          _setAccumulator(_logRoot.getDocument().end()),
-          _unsetAccumulator(_setAccumulator),
-          _version(_setAccumulator) {
-        dassert(logRoot.isType(mongo::Object));
-        dassert(!logRoot.hasChildren());
-    }
+    V1LogBuilder(mutablebson::Element logRoot, bool includeVersionField = false);
 
-    /** Return the Document to which the logging root belongs. */
+    /**
+     * Overloads from LogBuilderInterface. Each of these methods logs a modification to the document
+     * in _logRoot. The field name given in the mutablebson element or BSONElement is ignored
+     * and the 'path' argument is used instead.
+     */
+    Status logUpdatedField(const RuntimeUpdatePath& path, mutablebson::Element elt) override;
+
+    /**
+     * Logs the creation of a new field. The 'idxOfFirstNewComponent' parameter is unused in this
+     * implementation.
+     */
+    Status logCreatedField(const RuntimeUpdatePath& path,
+                           int idxOfFirstNewComponent,
+                           mutablebson::Element elt) override;
+    Status logCreatedField(const RuntimeUpdatePath& path,
+                           int idxOfFirstNewComponent,
+                           BSONElement elt) override;
+
+    Status logDeletedField(const RuntimeUpdatePath& path) override;
+
+    /**
+     * Return the Document to which the logging root belongs.
+     */
     inline mutablebson::Document& getDocument() {
         return _logRoot.getDocument();
     }
 
-    /** Add the given Element as a new entry in the '$set' section of the log. If a $set
-     *  section does not yet exist, it will be created. If this LogBuilder is currently
-     *  configured to contain an object replacement, the request to add to the $set section
-     *  will return an Error.
+    /**
+     * Produces a BSON object representing this update using the modifier syntax which can be
+     * stored in the oplog.
+     */
+    BSONObj serialize() const override {
+        return _logRoot.getDocument().getObject();
+    }
+
+private:
+    /**
+     * Add the given Element as a new entry in the '$set' section of the log. If a $set section
+     * does not yet exist, it will be created. If this LogBuilder is currently configured to
+     * contain an object replacement, the request to add to the $set section will return an Error.
      */
     Status addToSets(mutablebson::Element elt);
-
-    /**
-     * Convenience method which calls addToSets after
-     * creating a new Element to wrap the SafeNum value.
-     *
-     * If any problem occurs then the operation will stop and return that error Status.
-     */
-    Status addToSets(StringData name, const SafeNum& val);
 
     /**
      * Convenience method which calls addToSets after
@@ -90,27 +111,20 @@ public:
      */
     Status addToSetsWithNewFieldName(StringData name, const BSONElement& val);
 
-    /** Add the given path as a new entry in the '$unset' section of the log. If an
-     *  '$unset' section does not yet exist, it will be created. If this LogBuilder is
-     *  currently configured to contain an object replacement, the request to add to the
-     *  $unset section will return an Error.
+    /**
+     * Add the given path as a new entry in the '$unset' section of the log. If an '$unset' section
+     * does not yet exist, it will be created. If this LogBuilder is currently configured to
+     * contain an object replacement, the request to add to the $unset section will return an
+     * Error.
      */
     Status addToUnsets(StringData path);
 
-    /**
-     * Add a "$v" field to the log. Fails if there is already a "$v" field.
-     */
-    Status setVersion(UpdateOplogEntryVersion);
-
-private:
-    inline Status addToSection(mutablebson::Element newElt,
-                               mutablebson::Element* section,
-                               const char* sectionName);
+    Status addToSection(mutablebson::Element newElt,
+                        mutablebson::Element* section,
+                        const char* sectionName);
 
     mutablebson::Element _logRoot;
     mutablebson::Element _setAccumulator;
     mutablebson::Element _unsetAccumulator;
-    mutablebson::Element _version;
 };
-
 }  // namespace mongo

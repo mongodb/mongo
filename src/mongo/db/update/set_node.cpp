@@ -43,8 +43,8 @@ Status SetNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionC
     return Status::OK();
 }
 
-ModifierNode::ModifyResult SetNode::updateExistingElement(
-    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+ModifierNode::ModifyResult SetNode::updateExistingElement(mutablebson::Element* element,
+                                                          const FieldRef& elementPath) const {
     // If 'element' is deserialized, then element.getValue() will be EOO, which will never equal
     // val.
     if (element->getValue().binaryEqualValues(val)) {

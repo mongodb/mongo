@@ -33,6 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/update/update_node.h"
+#include "mongo/db/update/v1_log_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -42,6 +43,22 @@ public:
     ~UpdateNodeTest() override = default;
 
 protected:
+    // Creates a RuntimeUpdatePath from a string, assuming that all numeric path components are
+    // array indexes. Tests which use numeric field names in objects must manually create a
+    // RuntimeUpdatePath.
+    static RuntimeUpdatePath makeRuntimeUpdatePathForTest(StringData path) {
+        FieldRef fr(path);
+        std::vector<RuntimeUpdatePath::ComponentType> types;
+
+        for (int i = 0; i < fr.numParts(); ++i) {
+            types.push_back(fr.isNumericPathComponentStrict(i)
+                                ? RuntimeUpdatePath::ComponentType::kArrayIndex
+                                : RuntimeUpdatePath::ComponentType::kFieldName);
+        }
+
+        return RuntimeUpdatePath(fr, std::move(types));
+    }
+
     void setUp() override {
         resetApplyParams();
 
@@ -55,14 +72,14 @@ protected:
         _immutablePathsVector.clear();
         _immutablePaths.clear();
         _pathToCreate = std::make_shared<FieldRef>();
-        _pathTaken = std::make_shared<FieldRef>();
+        _pathTaken = std::make_shared<RuntimeUpdatePath>();
         _matchedField = StringData();
         _insert = false;
         _fromOplogApplication = false;
         _validateForStorage = true;
         _indexData.reset();
         _logDoc.reset();
-        _logBuilder = std::make_unique<LogBuilder>(_logDoc.root());
+        _logBuilder = std::make_unique<V1LogBuilder>(_logDoc.root());
         _modifiedPaths.clear();
     }
 
@@ -97,9 +114,8 @@ protected:
         _pathToCreate->parse(path);
     }
 
-    void setPathTaken(StringData path) {
-        _pathTaken->clear();
-        _pathTaken->parse(path);
+    void setPathTaken(const RuntimeUpdatePath& pathTaken) {
+        *_pathTaken = pathTaken;
     }
 
     void setMatchedField(StringData matchedField) {
@@ -141,14 +157,14 @@ private:
     std::vector<std::unique_ptr<FieldRef>> _immutablePathsVector;
     FieldRefSet _immutablePaths;
     std::shared_ptr<FieldRef> _pathToCreate;
-    std::shared_ptr<FieldRef> _pathTaken;
+    std::shared_ptr<RuntimeUpdatePath> _pathTaken;
     StringData _matchedField;
     bool _insert;
     bool _fromOplogApplication;
     bool _validateForStorage;
     std::unique_ptr<UpdateIndexData> _indexData;
     mutablebson::Document _logDoc;
-    std::unique_ptr<LogBuilder> _logBuilder;
+    std::unique_ptr<LogBuilderInterface> _logBuilder;
     FieldRefSetWithStorage _modifiedPaths;
 };
 

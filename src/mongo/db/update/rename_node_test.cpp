@@ -134,7 +134,7 @@ TEST_F(RenameNodeTest, ToExistsAtSameLevel) {
     ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2, b: 1}"));
-    setPathTaken("b");
+    setPathTaken(makeRuntimeUpdatePathForTest("b"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -151,7 +151,7 @@ TEST_F(RenameNodeTest, ToAndFromHaveSameValue) {
     ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2, b: 2}"));
-    setPathTaken("b");
+    setPathTaken(makeRuntimeUpdatePathForTest("b"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -168,7 +168,7 @@ TEST_F(RenameNodeTest, RenameToFieldWithSameValueButDifferentType) {
     ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1, b: NumberLong(1)}"));
-    setPathTaken("b");
+    setPathTaken(makeRuntimeUpdatePathForTest("b"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -185,7 +185,7 @@ TEST_F(RenameNodeTest, FromDottedElement) {
     ASSERT_OK(node.init(update["$rename"]["a.c"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {c: {d: 6}}, b: 1}"));
-    setPathTaken("b");
+    setPathTaken(makeRuntimeUpdatePathForTest("b"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -202,7 +202,7 @@ TEST_F(RenameNodeTest, RenameToExistingNestedFieldDoesNotReorderFields) {
     ASSERT_OK(node.init(update["$rename"]["c.d"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: {c: 1, d: 2}}, b: 3, c: {d: 4}}"));
-    setPathTaken("a.b.c");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.b.c"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -220,7 +220,7 @@ TEST_F(RenameNodeTest, MissingCompleteTo) {
 
     mutablebson::Document doc(fromjson("{a: 2, b: 1, c: {}}"));
     setPathToCreate("r.d");
-    setPathTaken("c");
+    setPathTaken(makeRuntimeUpdatePathForTest("c"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["c"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -272,7 +272,7 @@ TEST_F(RenameNodeTest, MoveIntoArray) {
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: [1, 2], b: 2}"));
     setPathToCreate("2");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
@@ -290,7 +290,7 @@ TEST_F(RenameNodeTest, MoveIntoArrayNoId) {
 
     mutablebson::Document doc(fromjson("{a: [1, 2], b: 2}"));
     setPathToCreate("2");
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
@@ -307,7 +307,7 @@ TEST_F(RenameNodeTest, MoveToArrayElement) {
     ASSERT_OK(node.init(update["$rename"]["b"], expCtx));
 
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: [1, 2], b: 2}"));
-    setPathTaken("a.1");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.1"));
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"][1]), getUpdateNodeApplyParams()),
@@ -372,7 +372,7 @@ TEST_F(RenameNodeTest, ReplaceArrayField) {
     ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2, b: []}"));
-    setPathTaken("b");
+    setPathTaken(makeRuntimeUpdatePathForTest("b"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -389,7 +389,7 @@ TEST_F(RenameNodeTest, ReplaceWithArrayField) {
     ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [], b: 2}"));
-    setPathTaken("b");
+    setPathTaken(makeRuntimeUpdatePathForTest("b"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -437,7 +437,7 @@ TEST_F(RenameNodeTest, RenameFromNonExistentPathIsNoOp) {
     ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{b: 2}"));
-    setPathTaken("b");
+    setPathTaken(makeRuntimeUpdatePathForTest("b"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -572,7 +572,7 @@ TEST_F(RenameNodeTest, ApplyCannotOverwriteImmutablePath) {
     ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0, b: 1}"));
-    setPathTaken("b");
+    setPathTaken(makeRuntimeUpdatePathForTest("b"));
     addImmutablePath("b");
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["b"]), getUpdateNodeApplyParams()),

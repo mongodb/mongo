@@ -86,8 +86,8 @@ Status BitNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionC
     return Status::OK();
 }
 
-ModifierNode::ModifyResult BitNode::updateExistingElement(
-    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+ModifierNode::ModifyResult BitNode::updateExistingElement(mutablebson::Element* element,
+                                                          const FieldRef& elementPath) const {
     if (!element->isIntegral()) {
         mutablebson::Element idElem =
             mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");

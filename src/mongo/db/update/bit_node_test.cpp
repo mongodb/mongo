@@ -203,7 +203,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b0101));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0100), doc);
@@ -218,7 +218,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b0101));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0111), doc);
@@ -233,7 +233,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b0101));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0011), doc);
@@ -248,7 +248,7 @@ TEST_F(BitNodeTest, ApplyShouldReportNoOp) {
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 1));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_EQUALS(BSON("a" << static_cast<int>(1)), doc);
@@ -268,7 +268,7 @@ TEST_F(BitNodeTest, ApplyMultipleBitOps) {
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b1111111100000000));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0101011001100110), doc);
@@ -283,7 +283,7 @@ TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
     ASSERT_OK(node.init(update["$bit"]["a"], expCtx));
 
     mutablebson::Document doc(BSON("a" << 0b11110000));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b10010110), doc);

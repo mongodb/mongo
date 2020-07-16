@@ -50,7 +50,7 @@ public:
     void setCollator(const CollatorInterface* collator) final {}
 
     ModifyResult updateExistingElement(mutablebson::Element* element,
-                                       std::shared_ptr<FieldRef> elementPath) const final;
+                                       const FieldRef& elementPath) const final;
 
     void validateUpdate(mutablebson::ConstElement updatedElement,
                         mutablebson::ConstElement leftSibling,
@@ -58,10 +58,11 @@ public:
                         std::uint32_t recursionLevel,
                         ModifyResult modifyResult) const final;
 
-    void logUpdate(LogBuilder* logBuilder,
-                   StringData pathTaken,
+    void logUpdate(LogBuilderInterface* logBuilder,
+                   const RuntimeUpdatePath& pathTaken,
                    mutablebson::Element element,
-                   ModifyResult modifyResult) const final;
+                   ModifyResult modifyResult,
+                   boost::optional<int> createdFieldIdx) const final;
 
     bool allowNonViablePath() const final {
         return true;

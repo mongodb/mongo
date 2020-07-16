@@ -50,12 +50,12 @@ std::unique_ptr<UpdateNode> UpdateArrayNode::createUpdateNodeByMerging(
 UpdateExecutor::ApplyResult UpdateArrayNode::apply(
     ApplyParams applyParams, UpdateNodeApplyParams updateNodeApplyParams) const {
     if (!updateNodeApplyParams.pathToCreate->empty()) {
+        FieldRef pathTakenCopy(updateNodeApplyParams.pathTaken->fieldRef());
         for (size_t i = 0; i < updateNodeApplyParams.pathToCreate->numParts(); ++i) {
-            updateNodeApplyParams.pathTaken->appendPart(
-                updateNodeApplyParams.pathToCreate->getPart(i));
+            pathTakenCopy.appendPart(updateNodeApplyParams.pathToCreate->getPart(i));
         }
         uasserted(ErrorCodes::BadValue,
-                  str::stream() << "The path '" << updateNodeApplyParams.pathTaken->dottedField()
+                  str::stream() << "The path '" << pathTakenCopy.dottedField()
                                 << "' must exist in the document in order to apply array updates.");
     }
 
@@ -118,8 +118,10 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
             // Merge all of the updates for this array element.
             invariant(updates->second.size() > 0);
             auto mergedChild = updates->second[0];
-            FieldRef::FieldRefTempAppend tempAppend(*(updateNodeApplyParams.pathTaken),
-                                                    childElement.getFieldName());
+            RuntimeUpdatePathTempAppend tempAppend(*updateNodeApplyParams.pathTaken,
+                                                   childElement.getFieldName(),
+                                                   RuntimeUpdatePath::ComponentType::kArrayIndex);
+
             for (size_t j = 1; j < updates->second.size(); ++j) {
 
                 // Use the cached merge result, if it is available.
@@ -129,11 +131,15 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
                     continue;
                 }
 
+                // UpdateNode::createUpdateNodeByMerging() requires a mutable field path
+                FieldRef pathTakenFieldRefCopy(updateNodeApplyParams.pathTaken->fieldRef());
+
+
                 // The cached merge result is not available, so perform the merge and cache the
                 // result.
                 _mergedChildrenCache[mergedChild][updates->second[j]] =
                     UpdateNode::createUpdateNodeByMerging(
-                        *mergedChild, *updates->second[j], updateNodeApplyParams.pathTaken.get());
+                        *mergedChild, *updates->second[j], &pathTakenFieldRefCopy);
                 mergedChild = _mergedChildrenCache[mergedChild][updates->second[j]].get();
             }
 
@@ -162,29 +168,29 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
 
     // If no elements match the array filter, report the path to the array itself as modified.
     if (applyParams.modifiedPaths && matchingElements.size() == 0) {
-        applyParams.modifiedPaths->keepShortest(*updateNodeApplyParams.pathTaken);
+        applyParams.modifiedPaths->keepShortest(updateNodeApplyParams.pathTaken->fieldRef());
     }
 
     // If the child updates have not been logged, log the updated array elements.
     auto* const logBuilder = updateNodeApplyParams.logBuilder;
     if (!childrenShouldLogThemselves && logBuilder) {
+        // Earlier we should have checked that the path already exists.
+        invariant(updateNodeApplyParams.pathToCreate->empty());
+
         if (nModified > 1) {
-
             // Log the entire array.
-            auto logElement = logBuilder->getDocument().makeElementWithNewFieldName(
-                updateNodeApplyParams.pathTaken->dottedField(), applyParams.element);
-            invariant(logElement.ok());
-            uassertStatusOK(logBuilder->addToSets(logElement));
+            uassertStatusOK(
+                logBuilder->logUpdatedField(*updateNodeApplyParams.pathTaken, applyParams.element));
         } else if (nModified == 1) {
-
             // Log the modified array element.
             invariant(modifiedElement);
-            FieldRef::FieldRefTempAppend tempAppend(*(updateNodeApplyParams.pathTaken),
-                                                    modifiedElement->getFieldName());
-            auto logElement = logBuilder->getDocument().makeElementWithNewFieldName(
-                updateNodeApplyParams.pathTaken->dottedField(), *modifiedElement);
-            invariant(logElement.ok());
-            uassertStatusOK(logBuilder->addToSets(logElement));
+
+            // Temporarily append the array index.
+            RuntimeUpdatePathTempAppend tempAppend(*updateNodeApplyParams.pathTaken,
+                                                   modifiedElement->getFieldName(),
+                                                   RuntimeUpdatePath::ComponentType::kArrayIndex);
+            uassertStatusOK(
+                logBuilder->logUpdatedField(*updateNodeApplyParams.pathTaken, *modifiedElement));
         }
     }
 

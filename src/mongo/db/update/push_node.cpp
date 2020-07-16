@@ -285,7 +285,7 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
 }
 
 ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
-                                                 FieldRef* elementPath) const {
+                                                 const FieldRef* elementPath) const {
     if (element->getType() != BSONType::Array) {
         invariant(elementPath);  // We can only hit this error if we are updating an existing path.
         auto idElem = mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
@@ -321,32 +321,41 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
     return result;
 }
 
-ModifierNode::ModifyResult PushNode::updateExistingElement(
-    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
-    return performPush(element, elementPath.get());
+ModifierNode::ModifyResult PushNode::updateExistingElement(mutablebson::Element* element,
+                                                           const FieldRef& elementPath) const {
+    return performPush(element, &elementPath);
 }
 
-void PushNode::logUpdate(LogBuilder* logBuilder,
-                         StringData pathTaken,
+void PushNode::logUpdate(LogBuilderInterface* logBuilder,
+                         const RuntimeUpdatePath& pathTaken,
                          mutablebson::Element element,
-                         ModifyResult modifyResult) const {
+                         ModifyResult modifyResult,
+                         boost::optional<int> createdFieldIdx) const {
     invariant(logBuilder);
 
-    if (modifyResult == ModifyResult::kNormalUpdate || modifyResult == ModifyResult::kCreated) {
-        // Simple case: log the entires contents of the updated array.
-        uassertStatusOK(logBuilder->addToSetsWithNewFieldName(pathTaken, element));
+    if (modifyResult == ModifyResult::kNormalUpdate) {
+        uassertStatusOK(logBuilder->logUpdatedField(pathTaken, element));
+    } else if (modifyResult == ModifyResult::kCreated) {
+        invariant(createdFieldIdx);
+        uassertStatusOK(logBuilder->logCreatedField(pathTaken, *createdFieldIdx, element));
     } else if (modifyResult == ModifyResult::kArrayAppendUpdate) {
         // This update only modified the array by appending entries to the end. Rather than writing
         // out the entire contents of the array, we create oplog entries for the newly appended
         // elements.
-        auto numAppended = _valuesToPush.size();
-        auto arraySize = countChildren(element);
+        const auto numAppended = _valuesToPush.size();
+        const auto arraySize = countChildren(element);
 
+        // We have to copy the field ref provided in order to use RuntimeUpdatePathTempAppend.
+        RuntimeUpdatePath pathTakenCopy = pathTaken;
         invariant(arraySize > numAppended);
         auto position = arraySize - numAppended;
         for (const auto& valueToLog : _valuesToPush) {
-            std::string pathToArrayElement(str::stream() << pathTaken << "." << position);
-            uassertStatusOK(logBuilder->addToSetsWithNewFieldName(pathToArrayElement, valueToLog));
+            const std::string positionAsString = std::to_string(position);
+
+            RuntimeUpdatePathTempAppend tempAppend(
+                pathTakenCopy, positionAsString, RuntimeUpdatePath::ComponentType::kArrayIndex);
+            uassertStatusOK(
+                logBuilder->logCreatedField(pathTakenCopy, pathTakenCopy.size() - 1, valueToLog));
 
             ++position;
         }

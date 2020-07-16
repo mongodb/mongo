@@ -8,9 +8,9 @@ env.Library(
     target='update_common',
     source=[
         'field_checker.cpp',
-        'log_builder.cpp',
         'path_support.cpp',
         'storage_validation.cpp',
+        'v1_log_builder.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -119,7 +119,6 @@ env.CppUnitTest(
         'document_diff_applier_test.cpp',
         'document_diff_test.cpp',
         'field_checker_test.cpp',
-        'log_builder_test.cpp',
         'modifier_table_test.cpp',
         'object_replace_executor_test.cpp',
         'path_support_test.cpp',
@@ -136,6 +135,7 @@ env.CppUnitTest(
         'update_driver_test.cpp',
         'update_object_node_test.cpp',
         'update_serialization_test.cpp',
+        'v1_log_builder_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',

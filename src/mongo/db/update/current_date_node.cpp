@@ -97,7 +97,7 @@ Status CurrentDateNode::init(BSONElement modExpr,
 }
 
 ModifierNode::ModifyResult CurrentDateNode::updateExistingElement(
-    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+    mutablebson::Element* element, const FieldRef& elementPath) const {
     setValue(_service, element, _typeIsDate);
     return ModifyResult::kNormalUpdate;
 }

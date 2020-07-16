@@ -132,7 +132,7 @@ TEST_F(CurrentDateNodeTest, ApplyTrue) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -156,7 +156,7 @@ TEST_F(CurrentDateNodeTest, ApplyFalse) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -180,7 +180,7 @@ TEST_F(CurrentDateNodeTest, ApplyDate) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -204,7 +204,7 @@ TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -252,7 +252,7 @@ TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -276,7 +276,7 @@ TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
     ASSERT_OK(node.init(update["$currentDate"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);

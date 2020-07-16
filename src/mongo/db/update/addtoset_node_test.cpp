@@ -113,7 +113,7 @@ TEST_F(AddToSetNodeTest, ApplyFailsOnNonArray) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 2}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     ASSERT_THROWS_CODE_AND_WHAT(
         node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
@@ -128,7 +128,7 @@ TEST_F(AddToSetNodeTest, ApplyNonEach) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -146,7 +146,7 @@ TEST_F(AddToSetNodeTest, ApplyNonEachArray) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -164,7 +164,7 @@ TEST_F(AddToSetNodeTest, ApplyEach) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -182,7 +182,7 @@ TEST_F(AddToSetNodeTest, ApplyToEmptyArray) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -200,7 +200,7 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicateElementsToAdd) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -218,7 +218,7 @@ TEST_F(AddToSetNodeTest, ApplyDoNotAddExistingElements) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -236,7 +236,7 @@ TEST_F(AddToSetNodeTest, ApplyDoNotDeduplicateExistingElements) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0, 0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -254,7 +254,7 @@ TEST_F(AddToSetNodeTest, ApplyNoElementsToAdd) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -272,7 +272,7 @@ TEST_F(AddToSetNodeTest, ApplyNoNonDuplicateElementsToAdd) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -329,7 +329,7 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicationOfElementsToAddRespectsCollation) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: []}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -350,7 +350,7 @@ TEST_F(AddToSetNodeTest, ApplyComparisonToExistingElementsRespectsCollation) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: ['ABC']}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -372,7 +372,7 @@ TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
     node.setCollator(&caseInsensitiveCollator);
 
     mutablebson::Document doc(fromjson("{a: []}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -415,7 +415,7 @@ TEST_F(AddToSetNodeTest, ApplyNestedArray) {
     ASSERT_OK(node.init(update["$addToSet"]["a.1"], expCtx));
 
     mutablebson::Document doc(fromjson("{ _id : 1, a : [ 1, [ ] ] }"));
-    setPathTaken("a.1");
+    setPathTaken(makeRuntimeUpdatePathForTest("a.1"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"][1]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -433,7 +433,7 @@ TEST_F(AddToSetNodeTest, ApplyIndexesNotAffected) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -450,7 +450,7 @@ TEST_F(AddToSetNodeTest, ApplyNoIndexDataOrLogBuilder) {
     ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);

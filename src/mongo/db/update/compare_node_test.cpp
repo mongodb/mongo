@@ -63,7 +63,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameNumber) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -80,7 +80,7 @@ TEST_F(CompareNodeTest, ApplyMinSameNumber) {
     ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -97,7 +97,7 @@ TEST_F(CompareNodeTest, ApplyMaxNumberIsLess) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -114,7 +114,7 @@ TEST_F(CompareNodeTest, ApplyMinNumberIsMore) {
     ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -131,7 +131,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameValInt) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1.0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -148,7 +148,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameValIntZero) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0.0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -165,7 +165,7 @@ TEST_F(CompareNodeTest, ApplyMinSameValIntZero) {
     ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0.0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -199,7 +199,7 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMinNumber) {
     ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -233,7 +233,7 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMaxNumber) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 1}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -250,7 +250,7 @@ TEST_F(CompareNodeTest, ApplyExistingDateMaxDate) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {$date: 0}}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -267,7 +267,7 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -284,7 +284,7 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
@@ -304,7 +304,7 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollation) {
     ASSERT_OK(node.init(update["$min"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 'cbc'}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -325,7 +325,7 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
     node.setCollator(&reverseStringCollator);
 
     mutablebson::Document doc(fromjson("{a: 'cbc'}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -346,7 +346,7 @@ TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
     node.setCollator(&reverseStringCollator);
 
     mutablebson::Document doc(fromjson("{a: 'cbc'}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -389,7 +389,7 @@ TEST_F(CompareNodeTest, ApplyIndexesNotAffected) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("b");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
@@ -406,7 +406,7 @@ TEST_F(CompareNodeTest, ApplyNoIndexDataOrLogBuilder) {
     ASSERT_OK(node.init(update["$max"]["a"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 0}"));
-    setPathTaken("a");
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
     setLogBuilderToNull();
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);

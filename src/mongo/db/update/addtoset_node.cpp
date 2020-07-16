@@ -104,8 +104,8 @@ void AddToSetNode::setCollator(const CollatorInterface* collator) {
     deduplicate(_elements, _collator);
 }
 
-ModifierNode::ModifyResult AddToSetNode::updateExistingElement(
-    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+ModifierNode::ModifyResult AddToSetNode::updateExistingElement(mutablebson::Element* element,
+                                                               const FieldRef& elementPath) const {
     uassert(ErrorCodes::BadValue,
             str::stream() << "Cannot apply $addToSet to non-array field. Field named '"
                           << element->getFieldName() << "' has non-array type "

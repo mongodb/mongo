@@ -63,7 +63,7 @@ Status ArithmeticNode::init(BSONElement modExpr,
 }
 
 ModifierNode::ModifyResult ArithmeticNode::updateExistingElement(
-    mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
+    mutablebson::Element* element, const FieldRef& elementPath) const {
     if (!element->isNumeric()) {
         auto idElem = mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
         uasserted(ErrorCodes::TypeMismatch,

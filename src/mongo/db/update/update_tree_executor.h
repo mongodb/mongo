@@ -33,6 +33,7 @@
 
 #include "mongo/db/update/update_node.h"
 #include "mongo/db/update/update_object_node.h"
+#include "mongo/db/update/v1_log_builder.h"
 
 namespace mongo {
 
@@ -43,19 +44,11 @@ public:
 
     ApplyResult applyUpdate(ApplyParams applyParams) const final {
         mutablebson::Document logDocument;
-        boost::optional<LogBuilder> optLogBuilder;
-        const bool generateOplogEntry =
-            applyParams.logMode != ApplyParams::LogMode::kDoNotGenerateOplogEntry;
-        if (generateOplogEntry) {
-            optLogBuilder.emplace(logDocument.root());
-        }
+        boost::optional<V1LogBuilder> optLogBuilder;
 
         UpdateNode::UpdateNodeApplyParams updateNodeApplyParams;
-        updateNodeApplyParams.logBuilder = optLogBuilder.get_ptr();
 
-        auto ret = _updateTree->apply(applyParams, updateNodeApplyParams);
-
-        if (generateOplogEntry) {
+        if (applyParams.logMode != ApplyParams::LogMode::kDoNotGenerateOplogEntry) {
             // In versions since 3.6, the absence of a $v field indicates either a
             // replacement-style update or a "classic" modifier-style update.
             //
@@ -66,10 +59,17 @@ public:
             // it because:
             // (a) It avoids an unnecessary oplog format change.
             // (b) It is easy to distinguish from $v: 2 delta-style oplog entries.
-            invariant(optLogBuilder->setVersion(UpdateOplogEntryVersion::kUpdateNodeV1));
+            const bool includeVersionField = true;
 
-            invariant(ret.oplogEntry.isEmpty());
-            ret.oplogEntry = logDocument.getObject();
+            optLogBuilder.emplace(logDocument.root(), includeVersionField);
+            updateNodeApplyParams.logBuilder = optLogBuilder.get_ptr();
+        }
+
+        auto ret = _updateTree->apply(applyParams, updateNodeApplyParams);
+
+        invariant(ret.oplogEntry.isEmpty());
+        if (auto logBuilder = updateNodeApplyParams.logBuilder) {
+            ret.oplogEntry = logBuilder->serialize();
         }
 
         return ret;

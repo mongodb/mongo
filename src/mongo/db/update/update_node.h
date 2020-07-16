@@ -38,7 +38,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/log_builder_interface.h"
+#include "mongo/db/update/runtime_update_path.h"
 #include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
@@ -81,11 +82,11 @@ public:
         // The path through the root document to 'element', ending with the field name of 'element'.
         // For example, if the update is {$set: {'a.b.c': 5}}, and the document is {a: {}}, then at
         // the leaf node, 'pathTaken'="a".
-        std::shared_ptr<FieldRef> pathTaken = std::make_shared<FieldRef>();
+        std::shared_ptr<RuntimeUpdatePath> pathTaken = std::make_shared<RuntimeUpdatePath>();
 
         // Builder object used for constructing an oplog entry. A value of nullptr indicates that
         // no oplog entry needs to be constructed.
-        LogBuilder* logBuilder = nullptr;
+        LogBuilderInterface* logBuilder = nullptr;
     };
 
     explicit UpdateNode(Type type, Context context = Context::kAll)

@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/v1_log_builder.h"
+
+#include "mongo/db/update/runtime_update_path.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -39,7 +42,22 @@ const char kSet[] = "$set";
 const char kUnset[] = "$unset";
 }  // namespace
 
-inline Status LogBuilder::addToSection(Element newElt, Element* section, const char* sectionName) {
+V1LogBuilder::V1LogBuilder(mutablebson::Element logRoot, bool includeVersionField)
+    : _logRoot(logRoot),
+      _setAccumulator(_logRoot.getDocument().end()),
+      _unsetAccumulator(_setAccumulator) {
+    invariant(logRoot.isType(mongo::Object));
+    invariant(!logRoot.hasChildren());
+
+    if (includeVersionField) {
+        auto version = logRoot.getDocument().makeElementInt(
+            kUpdateOplogEntryVersionFieldName,
+            static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1));
+        invariant(_logRoot.pushFront(version).isOK());
+    }
+}
+
+Status V1LogBuilder::addToSection(Element newElt, Element* section, const char* sectionName) {
     // If we don't already have this section, try to create it now.
     if (!section->ok()) {
         mutablebson::Document& doc = _logRoot.getDocument();
@@ -51,7 +69,7 @@ inline Status LogBuilder::addToSection(Element newElt, Element* section, const c
         const Element newElement = doc.makeElementObject(sectionName);
         if (!newElement.ok())
             return Status(ErrorCodes::InternalError,
-                          "LogBuilder: failed to construct Object Element for $set/$unset");
+                          "V1LogBuilder: failed to construct Object Element for $set/$unset");
 
         // Enqueue the new section under the root, and record it as our out parameter.
         Status result = _logRoot.pushBack(newElement);
@@ -68,11 +86,11 @@ inline Status LogBuilder::addToSection(Element newElt, Element* section, const c
     return section->pushBack(newElt);
 }
 
-Status LogBuilder::addToSets(Element elt) {
+Status V1LogBuilder::addToSets(Element elt) {
     return addToSection(elt, &_setAccumulator, kSet);
 }
 
-Status LogBuilder::addToSetsWithNewFieldName(StringData name, const mutablebson::Element val) {
+Status V1LogBuilder::addToSetsWithNewFieldName(StringData name, const mutablebson::Element val) {
     mutablebson::Element elemToSet = _logRoot.getDocument().makeElementWithNewFieldName(name, val);
     if (!elemToSet.ok())
         return Status(ErrorCodes::InternalError,
@@ -83,7 +101,7 @@ Status LogBuilder::addToSetsWithNewFieldName(StringData name, const mutablebson:
     return addToSets(elemToSet);
 }
 
-Status LogBuilder::addToSetsWithNewFieldName(StringData name, const BSONElement& val) {
+Status V1LogBuilder::addToSetsWithNewFieldName(StringData name, const BSONElement& val) {
     mutablebson::Element elemToSet = _logRoot.getDocument().makeElementWithNewFieldName(name, val);
     if (!elemToSet.ok())
         return Status(ErrorCodes::InternalError,
@@ -94,17 +112,7 @@ Status LogBuilder::addToSetsWithNewFieldName(StringData name, const BSONElement&
     return addToSets(elemToSet);
 }
 
-Status LogBuilder::addToSets(StringData name, const SafeNum& val) {
-    mutablebson::Element elemToSet = _logRoot.getDocument().makeElementSafeNum(name, val);
-    if (!elemToSet.ok())
-        return Status(ErrorCodes::InternalError,
-                      str::stream() << "Could not create new '" << name << "' SafeNum from "
-                                    << val.debugString());
-
-    return addToSets(elemToSet);
-}
-
-Status LogBuilder::addToUnsets(StringData path) {
+Status V1LogBuilder::addToUnsets(StringData path) {
     mutablebson::Element logElement = _logRoot.getDocument().makeElementBool(path, true);
     if (!logElement.ok())
         return Status(ErrorCodes::InternalError,
@@ -113,17 +121,23 @@ Status LogBuilder::addToUnsets(StringData path) {
     return addToSection(logElement, &_unsetAccumulator, kUnset);
 }
 
-Status LogBuilder::setVersion(UpdateOplogEntryVersion oplogVersion) {
-    if (_version.ok()) {
-        return Status(ErrorCodes::IllegalOperation, "LogBuilder: Invalid attempt to set $v twice.");
-    }
+Status V1LogBuilder::logUpdatedField(const RuntimeUpdatePath& path, mutablebson::Element elt) {
+    return addToSetsWithNewFieldName(path.fieldRef().dottedField(), elt);
+}
 
-    mutablebson::Document& doc = _logRoot.getDocument();
-    _version =
-        doc.makeElementInt(kUpdateOplogEntryVersionFieldName, static_cast<int>(oplogVersion));
+Status V1LogBuilder::logCreatedField(const RuntimeUpdatePath& path,
+                                     int idxOfFirstNewComponent,
+                                     mutablebson::Element elt) {
+    return addToSetsWithNewFieldName(path.fieldRef().dottedField(), elt);
+}
 
-    dassert(_logRoot[kUpdateOplogEntryVersionFieldName] == doc.end());
+Status V1LogBuilder::logCreatedField(const RuntimeUpdatePath& path,
+                                     int idxOfFirstNewComponent,
+                                     BSONElement elt) {
+    return addToSetsWithNewFieldName(path.fieldRef().dottedField(), elt);
+}
 
-    return _logRoot.pushFront(_version);
+Status V1LogBuilder::logDeletedField(const RuntimeUpdatePath& path) {
+    return addToUnsets(path.fieldRef().dottedField());
 }
 }  // namespace mongo

@@ -45,6 +45,7 @@
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/str.h"
