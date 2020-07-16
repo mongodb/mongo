@@ -135,14 +135,3 @@ env.Library(
         '$BUILD_DIR/mongo/util/version_impl',
     ]
 )
-
-env.Library(
-    target='embedded_integration_helpers',
-    source=[
-        'embedded_options_helpers.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
-    ],
-)
