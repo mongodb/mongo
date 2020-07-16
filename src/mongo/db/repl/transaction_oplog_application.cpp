@@ -56,14 +56,11 @@ MONGO_FAIL_POINT_DEFINE(applyOpsHangBeforePreparingTransaction);
 // Failpoint that will cause reconstructPreparedTransactions to return early.
 MONGO_FAIL_POINT_DEFINE(skipReconstructPreparedTransactions);
 
-// Failpoint that causes apply prepare transaction oplog entry's ops to fail with write
-// conflict error.
-MONGO_FAIL_POINT_DEFINE(applyPrepareTxnOpsFailsWithWriteConflict);
 
 // Apply the oplog entries for a prepare or a prepared commit during recovery/initial sync.
 Status _applyOperationsForTransaction(OperationContext* opCtx,
                                       const repl::MultiApplier::Operations& ops,
-                                      repl::OplogApplication::Mode oplogApplicationMode) noexcept {
+                                      repl::OplogApplication::Mode oplogApplicationMode) {
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : ops) {
         try {
@@ -73,21 +70,10 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             if (!status.isOK()) {
                 return status;
             }
-        } catch (const DBException& ex) {
-            // Ignore NamespaceNotFound errors if we are in initial sync or recovering mode.
-            const bool ignoreException = ex.code() == ErrorCodes::NamespaceNotFound &&
-                (oplogApplicationMode == repl::OplogApplication::Mode::kInitialSync ||
-                 oplogApplicationMode == repl::OplogApplication::Mode::kRecovering);
-
-            if (!ignoreException) {
-                LOG(1) << "Error applying operation in transaction. " << redact(ex)
-                       << "- oplog entry: " << redact(op.toBSON());
-                return exceptionToStatus();
-            }
-            LOG(1) << "Encountered but ignoring error: " << redact(ex)
-                   << " while applying operations for transaction because we are either in initial "
-                      "sync or recovering mode - oplog entry: "
-                   << redact(op.toBSON());
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            if (oplogApplicationMode != repl::OplogApplication::Mode::kInitialSync &&
+                oplogApplicationMode != repl::OplogApplication::Mode::kRecovering)
+                throw;
         }
     }
     return Status::OK();
@@ -356,58 +342,33 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     opCtx->setTxnNumber(*entry.getTxnNumber());
     opCtx->setInMultiDocumentTransaction();
 
-    return writeConflictRetry(opCtx, "applying prepare transaction", entry.getNss().ns(), [&] {
-        // The write on transaction table may be applied concurrently, so refreshing state
-        // from disk may read that write, causing starting a new transaction on an existing
-        // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-        MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+    // The write on transaction table may be applied concurrently, so refreshing state
+    // from disk may read that write, causing starting a new transaction on an existing
+    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
-        auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto transaction = TransactionParticipant::get(opCtx);
+    transaction.unstashTransactionResources(opCtx, "prepareTransaction");
 
-        // Release the WUOW, transaction lock resources and abort storage transaction so that the
-        // writeConflictRetry loop will be able to retry applying transactional ops on WCE error.
-        auto abortOnError = makeGuard([&txnParticipant, opCtx] {
-            // Abort the transaction and invalidate the session it is associated with.
-            txnParticipant.abortTransaction(opCtx);
-            txnParticipant.invalidate(opCtx);
-        });
+    // Set this in case the application of any ops need to use the prepare timestamp of this
+    // transaction. It should be cleared automatically when the transaction finishes.
+    if (mode == repl::OplogApplication::Mode::kRecovering) {
+        transaction.setPrepareOpTimeForRecovery(opCtx, entry.getOpTime());
+    }
 
-        // Starts the WUOW.
-        txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
+    auto status = _applyOperationsForTransaction(opCtx, ops, mode);
+    fassert(31137, status);
 
-        // Set this in case the application of any ops need to use the prepare timestamp of this
-        // transaction. It should be cleared automatically when the transaction finishes.
-        if (mode == repl::OplogApplication::Mode::kRecovering) {
-            txnParticipant.setPrepareOpTimeForRecovery(opCtx, entry.getOpTime());
-        }
+    if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
+        LOG(0) << "Hit applyOpsHangBeforePreparingTransaction failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                        applyOpsHangBeforePreparingTransaction);
+    }
 
-        auto status = _applyOperationsForTransaction(opCtx, ops, mode);
+    transaction.prepareTransaction(opCtx, entry.getOpTime());
+    transaction.stashTransactionResources(opCtx);
 
-        if (MONGO_FAIL_POINT(applyPrepareTxnOpsFailsWithWriteConflict)) {
-            LOG(0) << "Hit applyPrepareTxnOpsFailsWithWriteConflict failpoint";
-            status = Status(ErrorCodes::WriteConflict,
-                            "Prepare transaction apply ops failed due to write conflict");
-        }
-
-
-        if (status == ErrorCodes::WriteConflict) {
-            throw WriteConflictException();
-        }
-        fassert(31137, status);
-
-        if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
-            LOG(0) << "Hit applyOpsHangBeforePreparingTransaction failpoint";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                            applyOpsHangBeforePreparingTransaction);
-        }
-
-        txnParticipant.prepareTransaction(opCtx, entry.getOpTime());
-        // Prepare transaction success.
-        abortOnError.dismiss();
-
-        txnParticipant.stashTransactionResources(opCtx);
-        return Status::OK();
-    });
+    return Status::OK();
 }
 
 /**
