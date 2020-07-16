@@ -8190,15 +8190,18 @@ task_groups:
   name: compile_without_package_TG
   tasks:
   - compile
+
 - <<: *compile_task_group_template
   name: compile_TG
   tasks:
   - compile
   - package
+
 - <<: *compile_task_group_template
   name: compile_core_tools_TG
   tasks:
   - compile_core_tools
+
 - <<: *compile_task_group_template
   name: compile_ninja_TG
   tasks:
@@ -8215,25 +8218,49 @@ task_groups:
         permissions: public-read
         content_type: text/plain
         display_name: build.ninja
+
 - <<: *compile_task_group_template
   name: server_discovery_and_monitoring_json_test_TG
   tasks:
   - server_discovery_and_monitoring_json_test
+
 - <<: *compile_task_group_template
   name: server_selection_json_test_TG
   tasks:
   - server_selection_json_test
+
 - <<: *compile_task_group_template
   name: dbtest_TG
   tasks:
   - dbtest
+
 - <<: *compile_task_group_template
   name: libfuzzertests_TG
   tasks:
   - compile_libfuzzertests
   - libfuzzertests
+
 - <<: *compile_task_group_template
   name: compile_all_run_unittests_TG
+  tasks:
+  - compile
+  - unittests
+  - dbtest
+  - compile_all
+  - package
+
+# This task group is only appropriate for builders that use
+# --link-model=dynamic, and have scons_cache_scope: shared and
+# scons_cache_mode: all. Such builders are able to share all build
+# artifacts, and therefore will not repeatedly re-link the same
+# code. In that mode, it makes sense to run all of these tasks
+# concurrently, since they will share state across machines and can
+# complete faster than running them serially. We keep them in a task
+# group so that if they do run on the same machine, they can avoid the
+# cost of re-running the setup tasks.
+- <<: *compile_task_group_template
+  name: compile_all_run_unittests_parallel_TG
+  max_hosts: 5
   tasks:
   - compile
   - unittests
@@ -8384,7 +8411,7 @@ buildvariants:
     max_sub_suites: 100
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_all_run_unittests_parallel_TG
   - name: .aggregation !.encrypt
   - name: .auth !.audit !.gle !.multiversion
   - name: bulk_gle_passthrough
@@ -9936,7 +9963,7 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_all_run_unittests_parallel_TG
     distros:
     - rhel62-large
   - name: lint_pylinters
