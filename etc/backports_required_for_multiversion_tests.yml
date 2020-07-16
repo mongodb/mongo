@@ -61,6 +61,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
 - ticket: SERVER-47190
   test_file: jstests/replsets/force_shutdown_primary.js
+- ticket: SERVER-49471
+  test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
 
 sharding_multiversion:
 - ticket: SERVER-38691
