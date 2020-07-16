@@ -163,12 +163,12 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         fassert(40690, rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
     }
 
-    // Once all unfinished index builds have been dropped and the catalog has been reloaded, restart
-    // any unfinished index builds. This will not restart any index builds to completion, but rather
-    // start the background thread, build the index, and wait for a replicated commit or abort oplog
-    // entry.
+    // Once all unfinished index builds have been dropped and the catalog has been reloaded, resume
+    // or restart any unfinished index builds. This will not resume/restart any index builds to
+    // completion, but rather start the background thread, build the index, and wait for a
+    // replicated commit or abort oplog entry.
     IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
-        opCtx, reconcileResult.indexBuildsToRestart);
+        opCtx, reconcileResult.indexBuildsToRestart, reconcileResult.indexBuildsToResume);
 
     // Open all databases and repopulate the CollectionCatalog.
     LOGV2(20276, "openCatalog: reopening all databases");

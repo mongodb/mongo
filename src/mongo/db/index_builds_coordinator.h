@@ -46,6 +46,7 @@
 #include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl_index_build_state.h"
+#include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -146,11 +147,13 @@ public:
         IndexBuildOptions indexBuildOptions) = 0;
 
     /**
-     * Given a set of two-phase index builds, start, but do not complete each one in a background
-     * thread. Each index build will wait for a replicated commit or abort, as in steady-state
-     * replication.
+     * Resumes and restarts index builds for recovery. Anything that fails to resume will be
+     * started in a background thread. Each index build will wait for a replicated commit or abort,
+     * as in steady-state.
      */
-    void restartIndexBuildsForRecovery(OperationContext* opCtx, const IndexBuilds& buildsToRestart);
+    void restartIndexBuildsForRecovery(OperationContext* opCtx,
+                                       const IndexBuilds& buildsToRestart,
+                                       const std::vector<ResumeIndexInfo>& buildsToResume);
 
     /**
      * Runs the full index rebuild for recovery. This will only rebuild single-phase index builds.

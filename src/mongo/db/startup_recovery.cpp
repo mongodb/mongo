@@ -390,7 +390,7 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(OperationContext* opCtx,
     // not build any indexes to completion, but rather start the background thread to build the
     // index, and wait for a replicated commit or abort oplog entry.
     IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
-        opCtx, reconcileResult.indexBuildsToRestart);
+        opCtx, reconcileResult.indexBuildsToRestart, reconcileResult.indexBuildsToResume);
 }
 
 /**

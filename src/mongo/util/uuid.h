@@ -85,6 +85,7 @@ class UUID {
     friend class repl::OplogEntryBase;
     friend class repl::DurableReplOperation;
     friend class repl::InitialSyncIdDocument;
+    friend class ResumeIndexInfo;
     friend class ResumeTokenInternal;
     friend class ShardCollectionTypeBase;
     friend class TenantMigrationDonorDocument;

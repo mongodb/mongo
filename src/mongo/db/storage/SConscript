@@ -524,6 +524,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
+        '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
         '$BUILD_DIR/mongo/db/vector_clock',
         'two_phase_index_build_knobs_idl',
     ],

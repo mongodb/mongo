@@ -383,6 +383,15 @@ private:
      */
     void _onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp);
 
+    /**
+     * Returns whether the given ident is an internal ident and if it should be dropped or used to
+     * resume an index build.
+     */
+    bool _handleInternalIdents(OperationContext* opCtx,
+                               const std::string& ident,
+                               ReconcileResult* reconcileResult,
+                               std::set<std::string>* internalIdentsToDrop);
+
     class RemoveDBChange;
 
     // This must be the first member so it is destroyed last.

@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/index_builds.h"
+#include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/str.h"
@@ -538,6 +539,10 @@ public:
         // not to completion; they will wait for replicated commit or abort operations. This is a
         // mapping from index build UUID to index build.
         IndexBuilds indexBuildsToRestart;
+
+        // List of index builds to be resumed. Each ResumeIndexInfo may contain multiple indexes to
+        // resume as part of the same build.
+        std::vector<ResumeIndexInfo> indexBuildsToResume;
     };
 
     /**

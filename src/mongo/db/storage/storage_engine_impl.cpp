@@ -320,6 +320,63 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
+bool StorageEngineImpl::_handleInternalIdents(OperationContext* opCtx,
+                                              const std::string& ident,
+                                              ReconcileResult* reconcileResult,
+                                              std::set<std::string>* internalIdentsToDrop) {
+    if (!_catalog->isInternalIdent(ident)) {
+        return false;
+    }
+    // When starting up after an unclean shutdown, we do not attempt to recover any state from the
+    // internal idents. Thus, we drop them in this case.
+    if (startingAfterUncleanShutdown(opCtx->getServiceContext()) ||
+        !supportsResumableIndexBuilds()) {
+        internalIdentsToDrop->insert(ident);
+        return true;
+    }
+
+    // When starting up after a clean shutdown and resumable index builds are supported, find the
+    // internal idents that contain the relevant information to resume each index build and recover
+    // the state.
+    auto rs = _engine->getRecordStore(opCtx, "", ident, CollectionOptions());
+
+    // Look at the contents to determine whether this ident will contain information for
+    // resuming an index build.
+    // TODO SERVER-49125: differentiate the internal idents without looking at the contents.
+    auto cursor = rs->getCursor(opCtx);
+    auto record = cursor->next();
+    if (record) {
+        auto doc = record.get().data.toBson();
+
+        // Parse the documents here so that we can restart the build if the document doesn't
+        // contain all the necessary information to be able to resume building the index.
+        if (doc.hasField("phase")) {
+            ResumeIndexInfo resumeInfo;
+            try {
+                resumeInfo = ResumeIndexInfo::parse(IDLParserErrorContext("ResumeIndexInfo"), doc);
+            } catch (const DBException& e) {
+                LOGV2(4916300, "Failed to parse resumable index info", "error"_attr = e.toStatus());
+
+                // Ignore the error so that we can restart the index build instead of resume it. We
+                // should drop the internal ident if we failed to parse.
+                internalIdentsToDrop->insert(ident);
+                return true;
+            }
+
+            reconcileResult->indexBuildsToResume.push_back(resumeInfo);
+
+            LOGV2(4916301,
+                  "Found unfinished index build to resume",
+                  "buildUUID"_attr = resumeInfo.getBuildUUID(),
+                  "collectionUUID"_attr = resumeInfo.getCollectionUUID(),
+                  "phase"_attr = IndexBuildPhase_serializer(resumeInfo.getPhase()));
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * This method reconciles differences between idents the KVEngine is aware of and the
  * DurableCatalog. There are three differences to consider:
@@ -366,16 +423,13 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 
     // Drop all idents in the storage engine that are not known to the catalog. This can happen in
     // the case of a collection or index creation being rolled back.
+    StorageEngine::ReconcileResult reconcileResult;
     for (const auto& it : engineIdents) {
         if (catalogIdents.find(it) != catalogIdents.end()) {
             continue;
         }
 
-        // When starting up after an unclean shutdown, we do not attempt to recover any state from
-        // the internal idents. Thus, we drop them in this case.
-        if (startingAfterUncleanShutdown(opCtx->getServiceContext()) &&
-            _catalog->isInternalIdent(it)) {
-            internalIdentsToDrop.insert(it);
+        if (_handleInternalIdents(opCtx, it, &reconcileResult, &internalIdentsToDrop)) {
             continue;
         }
 
@@ -425,7 +479,6 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     //
     // Also, remove unfinished builds except those that were background index builds started on a
     // secondary.
-    StorageEngine::ReconcileResult ret;
     for (DurableCatalog::Entry entry : catalogEntries) {
         BSONCollectionCatalogEntry::MetaData metaData =
             _catalog->getMetaData(opCtx, entry.catalogId);
@@ -472,13 +525,14 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                       "Expected index data is missing, rebuilding",
                       "index"_attr = indexName,
                       "namespace"_attr = coll);
-                ret.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
+                reconcileResult.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
                 continue;
             }
 
             // Any index build with a UUID is an unfinished two-phase build and must be restarted.
             // There are no special cases to handle on primaries or secondaries. An index build may
-            // be associated with multiple indexes.
+            // be associated with multiple indexes. We should only restart an index build if we
+            // aren't going to resume it.
             if (indexMetaData.buildUUID) {
                 invariant(!indexMetaData.ready);
 
@@ -496,10 +550,11 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                       "buildUUID"_attr = buildUUID);
 
                 // Insert in the map if a build has not already been registered.
-                auto existingIt = ret.indexBuildsToRestart.find(buildUUID);
-                if (existingIt == ret.indexBuildsToRestart.end()) {
-                    ret.indexBuildsToRestart.insert({buildUUID, IndexBuildDetails(*collUUID)});
-                    existingIt = ret.indexBuildsToRestart.find(buildUUID);
+                auto existingIt = reconcileResult.indexBuildsToRestart.find(buildUUID);
+                if (existingIt == reconcileResult.indexBuildsToRestart.end()) {
+                    reconcileResult.indexBuildsToRestart.insert(
+                        {buildUUID, IndexBuildDetails(*collUUID)});
+                    existingIt = reconcileResult.indexBuildsToRestart.find(buildUUID);
                 }
 
                 existingIt->second.indexSpecs.emplace_back(indexMetaData.spec);
@@ -516,7 +571,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                       "- see SERVER-43097",
                       "namespace"_attr = coll,
                       "index"_attr = indexName);
-                ret.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
+                reconcileResult.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
                 continue;
             }
 
@@ -557,7 +612,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         wuow.commit();
     }
 
-    return ret;
+    return reconcileResult;
 }
 
 std::string StorageEngineImpl::getFilesystemPathForDb(const std::string& dbName) const {

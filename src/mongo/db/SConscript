@@ -845,6 +845,17 @@ env.Library(
 )
 
 env.Library(
+    target='resumable_index_builds_idl',
+    source=[
+        env.Idlc('resumable_index_builds.idl')[0],
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ]
+)
+
+env.Library(
     target="index_builds_coordinator_mongod",
     source=[
         "index_builds_coordinator_mongod.cpp",
@@ -857,6 +868,7 @@ env.Library(
         'curop',
         'db_raii',
         'index_build_entry_helpers',
+        'resumable_index_builds_idl',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
         "$BUILD_DIR/mongo/executor/task_executor_interface",

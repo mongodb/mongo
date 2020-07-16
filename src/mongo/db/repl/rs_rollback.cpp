@@ -1669,7 +1669,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     LOGV2(21707, "Restarting rolled-back committed or aborted index builds");
     IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
-        opCtx, fixUpInfo.indexBuildsToRestart);
+        opCtx, fixUpInfo.indexBuildsToRestart, {});
 
     LOGV2(21708,
           "Deleting and updating documents to roll back insert, update and remove "

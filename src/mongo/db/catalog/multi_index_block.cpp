@@ -397,8 +397,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     opCtx->recoveryUnit()->setReadOnce(readOnce);
 
     try {
-        invariant(_phase == Phase::kInitialized, _phaseToString(_phase));
-        _phase = Phase::kCollectionScan;
+        invariant(_phase == IndexBuildPhaseEnum::kInitialized,
+                  IndexBuildPhase_serializer(_phase).toString());
+        _phase = IndexBuildPhaseEnum::kCollectionScan;
 
         BSONObj objToIndex;
         RecordId loc;
@@ -433,7 +434,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
             n++;
         }
     } catch (...) {
-        _phase = Phase::kInitialized;
+        _phase = IndexBuildPhaseEnum::kInitialized;
         return exceptionToStatus();
     }
 
@@ -522,9 +523,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
     // insertDocumentsInCollection() to scan and insert the contents of the collection.
     // Therefore, it is possible for the phase of this MultiIndexBlock to be kInitialized
     // rather than kCollection when this function is called.
-    invariant(_phase == Phase::kCollectionScan || _phase == Phase::kInitialized,
-              _phaseToString(_phase));
-    _phase = Phase::kBulkLoad;
+    invariant(_phase == IndexBuildPhaseEnum::kCollectionScan ||
+                  _phase == IndexBuildPhaseEnum::kInitialized,
+              IndexBuildPhase_serializer(_phase).toString());
+    _phase = IndexBuildPhaseEnum::kBulkLoad;
 
     for (size_t i = 0; i < _indexes.size(); i++) {
         // When dupRecords is passed, 'dupsAllowed' should be passed to reflect whether or not the
@@ -577,8 +579,10 @@ Status MultiIndexBlock::drainBackgroundWrites(
     // Background writes are drained three times (once without blocking writes and twice blocking
     // writes), so we may either be coming from the bulk load phase or be already in the drain
     // writes phase.
-    invariant(_phase == Phase::kBulkLoad || _phase == Phase::kDrainWrites, _phaseToString(_phase));
-    _phase = Phase::kDrainWrites;
+    invariant(_phase == IndexBuildPhaseEnum::kBulkLoad ||
+                  _phase == IndexBuildPhaseEnum::kDrainWrites,
+              IndexBuildPhase_serializer(_phase).toString());
+    _phase = IndexBuildPhaseEnum::kDrainWrites;
 
     const Collection* coll =
         CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, _collectionUUID.get());
@@ -779,18 +783,23 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
 BSONObj MultiIndexBlock::_constructStateObject() const {
     BSONObjBuilder builder;
     _buildUUID->appendToBuilder(&builder, "_id");
-    builder.append("phase", _phaseToString(_phase));
+    builder.append("phase", IndexBuildPhase_serializer(_phase));
+
+    if (_collectionUUID) {
+        _collectionUUID->appendToBuilder(&builder, "collectionUUID");
+    }
 
     // We can be interrupted by shutdown before inserting the first document from the collection
     // scan, in which case there is no _lastRecordIdInserted.
-    if (_phase == Phase::kCollectionScan && _lastRecordIdInserted)
+    if (_phase == IndexBuildPhaseEnum::kCollectionScan && _lastRecordIdInserted)
         builder.append("collectionScanPosition", _lastRecordIdInserted->repr());
 
     BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));
     for (const auto& index : _indexes) {
         BSONObjBuilder indexInfo(indexesArray.subobjStart());
 
-        if (_phase == Phase::kCollectionScan || _phase == Phase::kBulkLoad) {
+        if (_phase == IndexBuildPhaseEnum::kCollectionScan ||
+            _phase == IndexBuildPhaseEnum::kBulkLoad) {
             auto state = index.bulk->getSorterState();
 
             indexInfo.append("tempDir", state.tempDir);
@@ -814,11 +823,15 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
 
         if (auto duplicateKeyTrackerTableIdent =
                 indexBuildInterceptor->getDuplicateKeyTrackerTableIdent())
-            indexInfo.append("dupKeyTempTable", *duplicateKeyTrackerTableIdent);
+            indexInfo.append("duplicateKeyTrackerTable", *duplicateKeyTrackerTableIdent);
 
         if (auto skippedRecordTrackerTableIdent =
                 indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent())
             indexInfo.append("skippedRecordTrackerTable", *skippedRecordTrackerTableIdent);
+
+        // TODO SERVER-49450: Consider only writing out the index name or key and getting the rest
+        // of the spec from the durable catalog on startup.
+        indexInfo.append("spec", index.block->getSpec());
 
         indexInfo.done();
 
@@ -829,19 +842,4 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
 
     return builder.obj();
 }
-
-std::string MultiIndexBlock::_phaseToString(Phase phase) const {
-    switch (phase) {
-        case Phase::kInitialized:
-            return "initialized";
-        case Phase::kCollectionScan:
-            return "collection scan";
-        case Phase::kBulkLoad:
-            return "bulk load";
-        case Phase::kDrainWrites:
-            return "drain writes";
-    }
-    MONGO_UNREACHABLE;
-}
-
 }  // namespace mongo

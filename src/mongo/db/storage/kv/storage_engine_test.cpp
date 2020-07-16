@@ -93,6 +93,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
     ASSERT_EQUALS(1UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
+    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 
     StorageEngine::IndexIdentifier& toRebuild = reconcileResult.indexesToRebuild[0];
     ASSERT_EQUALS("db.coll1", toRebuild.nss.ns());
@@ -148,6 +149,7 @@ TEST_F(StorageEngineTest, ReconcileDropsTemporary) {
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
+    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 
     // The storage engine is responsible for dropping its temporary idents.
     ASSERT(!identExists(opCtx.get(), ident));
@@ -170,9 +172,14 @@ TEST_F(StorageEngineTest, ReconcileKeepsTemporary) {
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
 
-    // The storage engine does not drop its temporary idents outside of starting up after an
-    // unclean shutdown.
-    ASSERT(identExists(opCtx.get(), ident));
+    // TODO SERVER-49847: Clean up when the feature is turned on by default.
+    if (_storageEngine->supportsResumableIndexBuilds()) {
+        // The storage engine does not drop its temporary idents outside of starting up after an
+        // unclean shutdown.
+        ASSERT(identExists(opCtx.get(), ident));
+    } else {
+        ASSERT_FALSE(identExists(opCtx.get(), ident));
+    }
 
     rs->finalizeTemporaryTable(opCtx.get(), TemporaryRecordStore::FinalizationAction::kDelete);
 }
@@ -231,8 +238,9 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     // not require it to be rebuilt.
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
 
-    // There are no two-phase builds to restart.
+    // There are no two-phase builds to resume or restart.
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
+    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 }
 
 TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
@@ -272,8 +280,9 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
     ASSERT_EQUALS(ns.ns(), toRebuild.nss.ns());
     ASSERT_EQUALS(indexName, toRebuild.indexName);
 
-    // There are no two-phase builds to restart.
+    // There are no two-phase builds to restart or resume.
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
+    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 }
 
 TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
@@ -332,6 +341,9 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     ASSERT_EQ(2UL, specs.size());
     ASSERT_EQ(indexA, specs[0]["name"].str());
     ASSERT_EQ(indexB, specs[1]["name"].str());
+
+    // There should be no index builds to resume.
+    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 }
 
 TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
@@ -373,6 +385,7 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
+    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 
     ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));

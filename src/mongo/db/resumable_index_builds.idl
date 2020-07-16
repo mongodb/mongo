@@ -1,0 +1,123 @@
+# Copyright (C) 2020-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+# This IDL file describes the BSON format for ElectionMetrics,
+# ElectionCandidateMetrics and ElectionParticipantMetrics, and
+# handles the serialization to and deserialization from their BSON
+# representations for those classes.
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/uuid.h"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+enums:
+    IndexBuildPhase:
+        description: "Phase of a hybrid index build"
+        type: string
+        values:
+            kInitialized: "initialized"
+            kCollectionScan: "collection scan"
+            kBulkLoad: "bulk load"
+            kDrainWrites: "drain writes"
+
+structs:
+    SorterRange:
+        description: "The range of data that was sorted and spilled to disk"
+        strict: true
+        fields:
+            startOffset:
+                description: "Tracks where in the file we started writing this data range"
+                type: long
+            endOffset:
+                description: "Tracks where in the file we finished writing this data range"
+                type: long
+            checksum:
+                description: "Keeps track of the hash of all data objects spilled to disk"
+                type: long
+                validator: { gte: 0 }
+
+    IndexSorterInfo:
+        description: "The information to resume the sorter for an index build"
+        strict: true
+        fields:
+            sideWritesTable:
+                description: "The name of the ident associated with the side writes table for this
+                              index build"
+                type: string
+            duplicateKeyTrackerTable:
+                description: "The name of the ident associated with the duplicate key tracker table
+                              for this index build"
+                type: string
+                optional: true
+            skippedRecordTrackerTable:
+                description: "The name of the ident associated with the skipped record tracker table
+                              for this index build"
+                type: string
+                optional: true
+            tempDir:
+                description: "The directory into which we place a file when spilling data to disk"
+                type: string
+                optional: true
+            fileName:
+                description: "The name of the file that sorted data is written to"
+                type: string
+                optional: true
+            ranges:
+                description: "All ranges of data that were already sorted and spilled to disk"
+                type: array<SorterRange>
+                optional: true
+            spec:
+                description: "The index specification"
+                type: object
+
+    ResumeIndexInfo:
+        description: "Information needed to resume index builds"
+        strict: true
+        fields:
+            _id:
+                description: "A UUID that uniquely identifies the index build across replica set
+                              members."
+                cpp_name: buildUUID
+                type: uuid
+            phase:
+                description: "The phase the index build was in when the node shut down"
+                type: IndexBuildPhase
+            collectionUUID:
+                description: "A UUID that uniquely identifies which collection the index is being
+                             built on"
+                type: uuid
+            collectionScanPosition:
+                description: "The last record id inserted into the sorter before shutdown"
+                type: long
+                optional: true
+            indexes:
+                description: "The information needed to resume each specific index in this build"
+                type: array<IndexSorterInfo>

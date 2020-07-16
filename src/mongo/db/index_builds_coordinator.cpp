@@ -1321,8 +1321,10 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
     return buildsStopped;
 }
 
-void IndexBuildsCoordinator::restartIndexBuildsForRecovery(OperationContext* opCtx,
-                                                           const IndexBuilds& buildsToRestart) {
+void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
+    OperationContext* opCtx,
+    const IndexBuilds& buildsToRestart,
+    const std::vector<ResumeIndexInfo>& buildsToResume) {
     for (auto& [buildUUID, build] : buildsToRestart) {
         boost::optional<NamespaceString> nss =
             CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, build.collUUID);
