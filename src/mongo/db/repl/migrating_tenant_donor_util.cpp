@@ -61,8 +61,10 @@ const char kNetName[] = "TenantMigrationWorkerNetwork";
  * state.
  */
 void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocument& donorDoc) {
+    LOGV2(4917300, "Reached the beginning of the onTransitionToBlocking");
     invariant(donorDoc.getState() == TenantMigrationDonorStateEnum::kBlocking);
     invariant(donorDoc.getBlockTimestamp());
+    LOGV2(4917300, "Passed invariants of the onTransitionToBlocking");
 
     auto& mtabByPrefix = MigratingTenantAccessBlockerByPrefix::get(opCtx->getServiceContext());
     auto mtab = mtabByPrefix.getMigratingTenantBlocker(donorDoc.getDatabasePrefix());
@@ -91,7 +93,8 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
 
 /**
  * Creates a MigratingTenantAccess blocker, and makes it start blocking writes. Then adds it to
- * the MigratingTenantAccessBlockerByPrefix container using the donor document's databasePrefix as the key.
+ * the MigratingTenantAccessBlockerByPrefix container using the donor document's databasePrefix as
+ * the key.
  */
 void startTenantMigrationBlockOnPrimary(OperationContext* opCtx,
                                         const TenantMigrationDonorDocument& donorDoc) {
@@ -106,6 +109,72 @@ void startTenantMigrationBlockOnPrimary(OperationContext* opCtx,
     auto& mtabByPrefix = MigratingTenantAccessBlockerByPrefix::get(serviceContext);
     mtabByPrefix.add(donorDoc.getDatabasePrefix(), mtab);
 }
+
+/**
+ *  Returns an updated donor state document that will be the same as the original except with the
+ *  state set to blocking and the blockTimestamp set to the reserved Optime.
+ */
+TenantMigrationDonorDocument createUpdatedDonorStateDocument(
+    const TenantMigrationDonorDocument& originalDoc, const OplogSlot& oplogSlot) {
+    TenantMigrationDonorDocument updatedDoc = originalDoc;
+    updatedDoc.setState(TenantMigrationDonorStateEnum::kBlocking);
+    updatedDoc.setBlockTimestamp(oplogSlot.getTimestamp());
+    return updatedDoc;
+}
+
+/**
+ * Returns the arguments object for the update command with the _id as the criteria and the reserved
+ * opTime as the oplogSlot.
+ */
+CollectionUpdateArgs createUpdateArgumentsForDonorStateDocument(
+    const TenantMigrationDonorDocument& originalDoc,
+    const OplogSlot& oplogSlot,
+    const BSONObj& parsedUpdatedDoc) {
+    CollectionUpdateArgs args;
+    args.criteria = BSON("_id" << originalDoc.getId());
+    args.oplogSlot = oplogSlot;
+    args.update = parsedUpdatedDoc;
+
+    return args;
+}
+
+/**
+ * Returns the collection that stores the state machine documents for the donor.
+ */
+Collection* getTenantMigrationDonorsCollection(OperationContext* opCtx) {
+    AutoGetCollection autoCollection(opCtx, NamespaceString::kMigrationDonorsNamespace, MODE_IX);
+    return autoCollection.getCollection();
+}
+
+/**
+ * After reserving the opTime for the write and creating the new updated document with the necessary
+ * update arguments. It will send the update command to the tenant migration donors collection.
+ */
+void updateDonorStateDocument(OperationContext* opCtx,
+                              Collection* collection,
+                              const TenantMigrationDonorDocument& originalDoc) {
+
+    // Reserve an opTime for the write and use it as the blockTimestamp for the migration.
+    const auto originalRecordId =
+        Helpers::findOne(opCtx, collection, originalDoc.toBSON(), false /* requireIndex */);
+    invariant(!originalRecordId.isNull());
+
+    auto oplogSlot = repl::LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
+
+    BSONObj parsedUpdatedDoc = createUpdatedDonorStateDocument(originalDoc, oplogSlot).toBSON();
+
+    CollectionUpdateArgs args =
+        createUpdateArgumentsForDonorStateDocument(originalDoc, oplogSlot, parsedUpdatedDoc);
+
+    collection->updateDocument(
+        opCtx,
+        originalRecordId,
+        Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(), originalDoc.toBSON()),
+        parsedUpdatedDoc,
+        false,
+        nullptr /* OpDebug* */,
+        &args);
+}
 }  // namespace
 
 /**
@@ -114,8 +183,8 @@ void startTenantMigrationBlockOnPrimary(OperationContext* opCtx,
 void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& originalDoc) {
     // Send recipientSyncData.
 
-    // Call startBlockingWrites.
     startTenantMigrationBlockOnPrimary(opCtx, originalDoc);
+
     // Update the on-disk state of the migration to "blocking" state.
     invariant(originalDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
 
@@ -135,33 +204,7 @@ void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& origi
             }
 
             WriteUnitOfWork wuow(opCtx);
-
-            const auto originalRecordId =
-                Helpers::findOne(opCtx, collection, originalDoc.toBSON(), false /* requireIndex */);
-            invariant(!originalRecordId.isNull());
-
-            // Reserve an opTime for the write and use it as the blockTimestamp for the migration.
-            auto oplogSlot = repl::LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
-
-
-            TenantMigrationDonorDocument updatedDoc = originalDoc;
-            updatedDoc.setState(TenantMigrationDonorStateEnum::kBlocking);
-            updatedDoc.setBlockTimestamp(oplogSlot.getTimestamp());
-
-            CollectionUpdateArgs args;
-            args.update = updatedDoc.toBSON();
-            args.criteria = BSON("_id" << originalDoc.getId());
-            args.oplogSlot = oplogSlot;
-
-            collection->updateDocument(
-                opCtx,
-                originalRecordId,
-                Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(), originalDoc.toBSON()),
-                updatedDoc.toBSON(),
-                false,
-                nullptr /* OpDebug* */,
-                &args);
-
+            updateDonorStateDocument(opCtx, collection, originalDoc);
             wuow.commit();
 
             return Status::OK();
@@ -202,21 +245,23 @@ void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONOb
 }
 
 /**
- * TODO - ADD DESCRIPTION EXPLAINING PURPOSE
+ * The function will persist(insert) the provided donorStateDocument into the config data on the
+ * collection for the tenantMigration donors In order to maintain a stable state for the tenant
+ * migration in case of node failure or restart.
  */
-void persistDonorStateMachine(OperationContext* opCtx,
-                              const TenantMigrationDonorDocument& donorDoc) {
+void persistDonorStateDocument(OperationContext* opCtx,
+                               const TenantMigrationDonorDocument& donorStateDocument) {
     PersistentTaskStore<TenantMigrationDonorDocument> store(
         NamespaceString::kMigrationDonorsNamespace);
     try {
-        store.add(opCtx, donorDoc);
+        store.add(opCtx, donorStateDocument);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         uasserted(
             4917300,
             str::stream()
                 << "While attempting to persist the donor state machine for tenant migration"
                 << ", found another document with the same migration id. Attempted migration: "
-                << donorDoc.toBSON());
+                << donorStateDocument.toBSON());
     }
 }
 

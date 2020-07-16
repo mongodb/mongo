@@ -51,7 +51,7 @@ public:
             const auto requestBody = request();
             auto donorDocument = getDonorDocumentFromRequest(requestBody);
 
-            migrating_tenant_donor_util::persistDonorStateMachine(opCtx, donorDocument);
+            migrating_tenant_donor_util::persistDonorStateDocument(opCtx, donorDocument);
             migrating_tenant_donor_util::dataSync(opCtx, donorDocument);
         }
 
@@ -62,7 +62,7 @@ public:
             std::string dbPrefix = requestBody.getDatabasePrefix().toString();
 
             auto donorStartState = TenantMigrationDonorStateEnum::kDataSync;
-            bool garbageCollect = true;
+            bool garbageCollect = false;
             const TenantMigrationDonorDocument donorDocument(
                 OID::gen(), migrationId, recipientURI, dbPrefix, donorStartState, garbageCollect);
 
