@@ -35,10 +35,9 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/static_immortal.h"
+
 
 namespace mongo {
 
@@ -137,8 +136,8 @@ public:
 
     /*
      * Methods to save/recover the the vector clock to/from persistent storage. Subclasses are
-     * eventually expected to override those method to provide persistence mechanisms. Default
-     * implementations result in a NOP.
+     * eventually expected to override these methods to provide persistence mechanisms. Default
+     * implementations do nothing.
      */
     virtual SharedSemiFuture<void> persist(OperationContext* opCtx) {
         return SharedSemiFuture<void>();
@@ -147,16 +146,13 @@ public:
         return SharedSemiFuture<void>();
     }
     virtual void waitForInMemoryVectorClockToBePersisted(OperationContext* opCtx) {}
-    virtual void waitForVectorClockToBeRecovered(OperationContext* opCtx){};
+    virtual void waitForVectorClockToBeRecovered(OperationContext* opCtx) {}
 
     void resetVectorClock_forTest();
     void advanceTime_forTest(Component component, LogicalTime newTime);
 
     // Query to use when reading/writing the vector clock state document.
-    static const Query& kStateQuery() {
-        static StaticImmortal<Query> q{QUERY(VectorClockDocument::k_idFieldName << kDocIdKey)};
-        return *q;
-    }
+    static const Query& stateQuery();
 
     // The _id value of the vector clock singleton document.
     static constexpr StringData kDocIdKey = "vectorClockState"_sd;

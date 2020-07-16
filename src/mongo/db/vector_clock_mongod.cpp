@@ -239,7 +239,7 @@ private:
             vcd.setVectorClock(obj);
 
             store.update(opCtx,
-                         VectorClock::kStateQuery(),
+                         VectorClock::stateQuery(),
                          vcd.toBSON(),
                          WriteConcerns::kMajorityWriteConcern,
                          true);
@@ -259,14 +259,14 @@ private:
             NamespaceString nss(NamespaceString::kVectorClockNamespace);
             PersistentTaskStore<VectorClockDocument> store(nss);
 
-            int nDocuments = store.count(opCtx, VectorClock::kStateQuery());
+            int nDocuments = store.count(opCtx, VectorClock::stateQuery());
             if (nDocuments == 0) {
                 LOGV2_DEBUG(4924403, 2, "No VectorClockDocument to recover");
                 return;
             }
             fassert(4924404, nDocuments == 1);
 
-            store.forEach(opCtx, VectorClock::kStateQuery(), [&](const VectorClockDocument& vcd) {
+            store.forEach(opCtx, VectorClock::stateQuery(), [&](const VectorClockDocument& vcd) {
                 BSONObj obj = vcd.getVectorClock();
 
                 LogicalTimeArray newTime;

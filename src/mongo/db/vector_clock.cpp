@@ -36,6 +36,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/logical_clock_gen.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/vector_clock_document_gen.h"
+#include "mongo/util/static_immortal.h"
 
 namespace mongo {
 
@@ -402,6 +404,11 @@ void VectorClock::advanceTime_forTest(Component component, LogicalTime newTime) 
     LogicalTimeArray newTimeArray;
     newTimeArray[component] = newTime;
     _advanceTime(std::move(newTimeArray));
+}
+
+const Query& VectorClock::stateQuery() {
+    static StaticImmortal q{QUERY(VectorClockDocument::k_idFieldName << kDocIdKey)};
+    return *q;
 }
 
 }  // namespace mongo

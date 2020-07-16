@@ -295,17 +295,17 @@ TEST_F(VectorClockMongoDTest, PersistVectorClockDocument) {
     PersistentTaskStore<VectorClockDocument> store(nss);
 
     // Check that no vectorClockState document is present
-    ASSERT_EQUALS(store.count(opCtx, VectorClock::kStateQuery()), 0);
+    ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 0);
 
     // Persist and check that the vectorClockState document has been persisted
     auto future = vc->persist(opCtx);
     future.get();
-    ASSERT_EQUALS(store.count(opCtx, VectorClock::kStateQuery()), 1);
+    ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 1);
 
     // Check that the vectorClockState document is still one after more persist calls
     future = vc->persist(opCtx);
     vc->waitForInMemoryVectorClockToBePersisted(opCtx);
-    ASSERT_EQUALS(store.count(opCtx, VectorClock::kStateQuery()), 1);
+    ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 1);
 }
 
 TEST_F(VectorClockMongoDTest, RecoverVectorClockDocument) {
@@ -351,7 +351,7 @@ TEST_F(VectorClockMongoDTest, RecoverNotExistingVectorClockDocument) {
     PersistentTaskStore<VectorClockDocument> store(nss);
 
     // Check that no recovery document is stored and call recovery
-    int nDocuments = store.count(opCtx, VectorClock::kStateQuery());
+    int nDocuments = store.count(opCtx, VectorClock::stateQuery());
     ASSERT_EQUALS(nDocuments, 0);
 
     auto future = vc->recover(opCtx);
