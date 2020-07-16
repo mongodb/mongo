@@ -61,6 +61,7 @@
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/ttl.h"
+#include "mongo/embedded/embedded_options_parser_init.h"
 #include "mongo/embedded/index_builds_coordinator_embedded.h"
 #include "mongo/embedded/periodic_runner_embedded.h"
 #include "mongo/embedded/read_write_concern_defaults_cache_lookup_embedded.h"
@@ -190,10 +191,10 @@ void shutdown(ServiceContext* srvContext) {
 ServiceContext* initialize(const char* yaml_config) {
     srand(static_cast<unsigned>(curTimeMicros64()));
 
-    std::vector<std::string> argv;
     if (yaml_config)
-        argv.push_back(yaml_config);
-    Status status = mongo::runGlobalInitializers(argv);
+        embedded::EmbeddedOptionsConfig::instance().set(yaml_config);
+
+    Status status = mongo::runGlobalInitializers(std::vector<std::string>{});
     uassertStatusOKWithContext(status, "Global initilization failed");
     auto giGuard = makeGuard([] { mongo::runGlobalDeinitializers().ignore(); });
     setGlobalServiceContext(ServiceContext::make());

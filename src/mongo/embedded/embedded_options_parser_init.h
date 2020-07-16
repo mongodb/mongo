@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,38 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/util/options_parser/startup_options.h"
+#pragma once
 
-#include <iostream>
+#include "mongo/embedded/embedded_options.h"
 
-#include "mongo/embedded/embedded_options_parser_init.h"
-#include "mongo/util/exit_code.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/quick_exit.h"
+#include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/static_immortal.h"
 
-namespace mongo {
-namespace optionenvironment {
+#include <string>
+#include <utility>
 
-GlobalInitializerRegisterer startupOptionsInitializer(
-    "StartupOptions",
-    [](InitializerContext* context) {
-        std::string config = embedded::EmbeddedOptionsConfig::instance().get();
+namespace mongo::embedded {
 
-        OptionsParser parser;
-        Status ret = parser.runConfigFile(startupOptions, config, &startupOptionsParsed);
-        uassertStatusOKWithContext(ret, "Options parsing failed.");
+class EmbeddedOptionsConfig {
+public:
+    void set(std::string config) {
+        _config = std::move(config);
+    }
+    const std::string& get() const {
+        return _config;
+    }
+    static EmbeddedOptionsConfig& instance() {
+        static StaticImmortal<EmbeddedOptionsConfig> embeddedOptionsConfig{};
+        return embeddedOptionsConfig.value();
+    }
 
-        return Status::OK();
-    },
-    [](DeinitializerContext* context) {
-        startupOptionsParsed = Environment();
-        return Status::OK();
-    },
-    {"BeginStartupOptionParsing"},
-    {"EndStartupOptionParsing"});
+private:
+    std::string _config;
+};
 
-}  // namespace optionenvironment
-}  // namespace mongo
+}  // namespace mongo::embedded

@@ -697,7 +697,7 @@ int main(const int argc, const char* const* const argv) {
     // The reason this works is that the unittest system relies on other systems being initialized
     // through global init and deinitialize just deinitializes systems that explicitly supports
     // deinit leaving the systems unittest needs initialized.
-    ret = mongo::runGlobalInitializers(std::vector<std::string>{});
+    ret = mongo::runGlobalInitializers(std::vector<std::string>{argv, argv + argc});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
         return EXIT_FAILURE;
